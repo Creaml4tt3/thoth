@@ -1,0 +1,33 @@
+{
+  "$id": "https://thoth.invalid/schemas/provenance.v1.json",
+  "title": "provenance.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "system": {
+      "type": "string",
+      "enum": [
+        "notion",
+        "obsidian",
+        "workspace",
+        "thoth"
+      ]
+    },
+    "sourcePath": {
+      "type": "string"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "importJobId": {
+      "type": "string"
+    },
+    "transferOperationId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "system"
+  ],
+  "additionalProperties": false
+}

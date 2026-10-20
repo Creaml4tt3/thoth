@@ -1,0 +1,33 @@
+{
+  "name": "thoth",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "pnpm typecheck && pnpm schemas:check && pnpm test",
+    "turbo": "turbo",
+    "schemas": "node scripts/generate-schemas.ts",
+    "schemas:check": "node scripts/generate-schemas.ts --check"
+  },
+  "devDependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/importer-core": "workspace:*",
+    "@thoth/importer-notion": "workspace:*",
+    "@thoth/importer-obsidian": "workspace:*",
+    "@thoth/local-store": "workspace:*",
+    "@types/node": "^24.19.2",
+    "@types/yazl": "^3.3.1",
+    "turbo": "^2.11.9",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "yazl": "^3.3.1",
+    "zod": "^4.6.7"
+  }
+}

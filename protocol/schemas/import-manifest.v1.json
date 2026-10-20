@@ -1,0 +1,285 @@
+{
+  "$id": "https://thoth.invalid/schemas/import-manifest.v1.json",
+  "title": "import-manifest.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "manifestVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "jobId": {
+      "type": "string"
+    },
+    "system": {
+      "type": "string",
+      "enum": [
+        "notion",
+        "obsidian"
+      ]
+    },
+    "sourceKind": {
+      "type": "string",
+      "enum": [
+        "notion-zip",
+        "notion-folder",
+        "obsidian-vault",
+        "obsidian-zip"
+      ]
+    },
+    "sourceLabel": {
+      "type": "string"
+    },
+    "sourceLocation": {
+      "type": "string"
+    },
+    "sourceFingerprint": {
+      "type": "string"
+    },
+    "sourceRootPrefix": {
+      "type": "string"
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "destinationRoot": {
+          "type": "string"
+        },
+        "conflictPolicy": {
+          "type": "string",
+          "enum": [
+            "rename",
+            "skip"
+          ]
+        },
+        "addIdentityFrontmatter": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "destinationRoot",
+        "conflictPolicy",
+        "addIdentityFrontmatter"
+      ],
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "scanned",
+        "planned",
+        "staging",
+        "staged",
+        "committing",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "sourcePath": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "attachment",
+              "database",
+              "skipped"
+            ]
+          },
+          "destPath": {
+            "type": "string"
+          },
+          "sourceHash": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pageId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "staged",
+              "committed",
+              "skipped",
+              "failed"
+            ]
+          },
+          "stagedHash": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "info",
+                    "warning",
+                    "error"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                },
+                "sourcePath": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "code",
+                "severity",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "sourcePath",
+          "kind",
+          "sourceHash",
+          "size",
+          "state",
+          "warnings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "sourcePath": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "links": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "resolved": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "rewritten": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "unresolved": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "ambiguous": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "external": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "total",
+        "resolved",
+        "rewritten",
+        "unresolved",
+        "ambiguous",
+        "external"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "manifestVersion",
+    "jobId",
+    "system",
+    "sourceKind",
+    "sourceLabel",
+    "sourceLocation",
+    "sourceFingerprint",
+    "sourceRootPrefix",
+    "options",
+    "state",
+    "createdAt",
+    "updatedAt",
+    "items",
+    "warnings"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@thoth/importer-obsidian",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/importers.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/importer-core": "workspace:*",
+    "@thoth/local-store": "workspace:*"
+  }
+}

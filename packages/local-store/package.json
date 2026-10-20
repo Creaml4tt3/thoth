@@ -1,0 +1,15 @@
+{
+  "name": "@thoth/local-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

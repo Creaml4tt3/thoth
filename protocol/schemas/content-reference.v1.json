@@ -1,0 +1,54 @@
+{
+  "$id": "https://thoth.invalid/schemas/content-reference.v1.json",
+  "title": "content-reference.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sourcePageId": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "markdown-link",
+        "image",
+        "wikilink",
+        "embed"
+      ]
+    },
+    "target": {
+      "type": "string"
+    },
+    "fragment": {
+      "type": "string"
+    },
+    "resolution": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "unresolved",
+        "ambiguous",
+        "external"
+      ]
+    },
+    "targetPath": {
+      "type": "string"
+    },
+    "targetPageId": {
+      "type": "string"
+    },
+    "line": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sourcePageId",
+    "kind",
+    "target",
+    "resolution",
+    "line"
+  ],
+  "additionalProperties": false
+}

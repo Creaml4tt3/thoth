@@ -1,0 +1,134 @@
+/*
+ * Thoth design tokens — "Ink & Moon" (design/DESIGN.md).
+ *
+ * Blend: Notion's calm, warm paper canvas and opacity-based ink ramp for
+ * reading and writing; Grok Bot's near-black cinematic surfaces, pill
+ * controls, and medium-weight tight display type for chrome and the Agent Hub.
+ * One accent — Moon (warm lunar orange) — used sparingly.
+ */
+:root {
+  /* Type */
+  --thoth-font-sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  --thoth-font-serif: "Newsreader", "Iowan Old Style", Georgia, "Noto Serif Thai", serif;
+  --thoth-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  --thoth-text-display: 600 clamp(40px, 6vw, 72px) / 1.02 var(--thoth-font-sans);
+  --thoth-text-h1: 600 40px / 1.15 var(--thoth-font-sans);
+  --thoth-text-h2: 600 28px / 1.25 var(--thoth-font-sans);
+  --thoth-text-h3: 600 20px / 1.35 var(--thoth-font-sans);
+  --thoth-text-body: 400 16px / 1.65 var(--thoth-font-sans);
+  --thoth-text-ui: 450 14px / 20px var(--thoth-font-sans);
+  --thoth-text-small: 450 12px / 16px var(--thoth-font-sans);
+  --thoth-tracking-display: -0.035em;
+  --thoth-tracking-heading: -0.015em;
+
+  /* Ink ramp base (Notion-style opacity, warm black). The ramp itself is
+     declared below on every theme scope so it re-resolves per theme. */
+  --thoth-ink: 20 18 16;
+
+  /* Surfaces — light (Paper) */
+  --thoth-bg: #FFFFFF;
+  --thoth-bg-sidebar: #F9F9F8;
+  --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
+  --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);
+  --thoth-border: rgb(var(--thoth-ink) / 0.09);
+  --thoth-border-strong: rgb(var(--thoth-ink) / 0.16);
+  --thoth-stone-400: #A39E98;
+  --thoth-stone-600: #615D59;
+
+  /* Accent: Moon — warm lunar orange, used for focus, selection, the active agent */
+  --thoth-moon: #E8590C;
+  --thoth-moon-soft: #FFE8D6;
+  --thoth-moon-ink: #8A3200;
+  --thoth-link: #0B6BCB;
+
+  /* Semantic */
+  --thoth-success: #2F8F5B;
+  --thoth-warning: #B7791F;
+  --thoth-danger: #D1453B;
+  --thoth-private: #615D59;   /* Private Space badge: local, stone */
+  --thoth-workspace: #0B6BCB; /* Workspace badge: connected, blue */
+  --thoth-agent: #E8590C;     /* Agent Hub badge: moon */
+
+  /* Shape — Notion radii in content, Grok pills for actions */
+  --thoth-radius-xs: 4px;
+  --thoth-radius-sm: 6px;
+  --thoth-radius-md: 8px;
+  --thoth-radius-lg: 12px;
+  --thoth-radius-xl: 20px;
+  --thoth-radius-pill: 9999px;
+
+  /* Elevation — hairlines first, shadows only for floating layers */
+  --thoth-shadow-pop: 0 0 0 1px rgb(var(--thoth-ink) / 0.06), 0 8px 24px -6px rgb(var(--thoth-ink) / 0.16);
+  --thoth-shadow-modal: 0 0 0 1px rgb(var(--thoth-ink) / 0.06), 0 24px 64px -12px rgb(var(--thoth-ink) / 0.28);
+
+  /* Spacing (4px grid) */
+  --thoth-space-1: 4px;
+  --thoth-space-2: 8px;
+  --thoth-space-3: 12px;
+  --thoth-space-4: 16px;
+  --thoth-space-6: 24px;
+  --thoth-space-8: 32px;
+  --thoth-space-12: 48px;
+  --thoth-space-16: 64px;
+  --thoth-content-width: 720px;
+  --thoth-sidebar-width: 260px;
+
+  /* Motion */
+  --thoth-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --thoth-dur-fast: 120ms;
+  --thoth-dur: 200ms;
+
+  color-scheme: light;
+}
+
+/* Night — Grok Bot's near-black, warm-shifted so it pairs with paper. */
+[data-theme="night"][data-theme] {
+  --thoth-ink: 245 243 240;
+  --thoth-bg: #0A0A0A;
+  --thoth-bg-sidebar: #111112;
+  --thoth-bg-hover: rgb(255 255 255 / 0.05);
+  --thoth-bg-active: rgb(255 255 255 / 0.09);
+  --thoth-border: rgb(255 255 255 / 0.08);
+  --thoth-border-strong: rgb(255 255 255 / 0.14);
+  --thoth-moon: #FF7A2F;
+  --thoth-moon-soft: rgb(255 122 47 / 0.14);
+  --thoth-moon-ink: #FFB386;
+  --thoth-link: #5AA9FF;
+  --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
+  --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"][data-theme] {
+    --thoth-ink: 245 243 240;
+    --thoth-bg: #0A0A0A;
+    --thoth-bg-sidebar: #111112;
+    --thoth-bg-hover: rgb(255 255 255 / 0.05);
+    --thoth-bg-active: rgb(255 255 255 / 0.09);
+    --thoth-border: rgb(255 255 255 / 0.08);
+    --thoth-border-strong: rgb(255 255 255 / 0.14);
+    --thoth-moon: #FF7A2F;
+    --thoth-moon-soft: rgb(255 122 47 / 0.14);
+    --thoth-moon-ink: #FFB386;
+    --thoth-link: #5AA9FF;
+    color-scheme: dark;
+  }
+}
+
+/* Custom properties resolve where declared, so the ramp must be re-declared
+   wherever --thoth-ink changes, not only on :root. */
+:root, [data-theme] {
+  --thoth-ink-primary: rgb(var(--thoth-ink) / 0.94);
+  --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.66);
+  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.46);
+  --thoth-ink-faint: rgb(var(--thoth-ink) / 0.28);
+  --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
+  --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);
+  color: var(--thoth-ink-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --thoth-dur-fast: 0ms; --thoth-dur: 0ms; }
+}

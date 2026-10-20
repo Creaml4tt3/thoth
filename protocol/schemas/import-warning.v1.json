@@ -1,0 +1,36 @@
+{
+  "$id": "https://thoth.invalid/schemas/import-warning.v1.json",
+  "title": "import-warning.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "sourcePath": {
+      "type": "string"
+    },
+    "line": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "code",
+    "severity",
+    "message"
+  ],
+  "additionalProperties": false
+}

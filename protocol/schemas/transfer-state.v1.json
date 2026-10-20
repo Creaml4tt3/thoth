@@ -1,0 +1,19 @@
+{
+  "$id": "https://thoth.invalid/schemas/transfer-state.v1.json",
+  "title": "transfer-state.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "plan",
+    "validate",
+    "stage",
+    "transfer",
+    "verify",
+    "commit_destination",
+    "finalize_source",
+    "done",
+    "destination_committed_source_cleanup_pending",
+    "failed",
+    "aborted"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@thoth/importer-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/local-store": "workspace:*",
+    "yauzl": "^3.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/yauzl": "^3.4.0"
+  }
+}

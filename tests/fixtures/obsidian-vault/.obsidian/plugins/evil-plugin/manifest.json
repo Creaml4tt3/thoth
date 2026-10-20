@@ -1,0 +1,6 @@
+{
+  "id": "evil-plugin",
+  "name": "Evil Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.0.0"
+}

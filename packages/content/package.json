@@ -1,0 +1,22 @@
+{
+  "name": "@thoth/content",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/domain": "workspace:*",
+    "mdast-util-from-markdown": "^2.1.0",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-markdown": "^2.2.0",
+    "mdast-util-to-string": "^4.0.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4"
+  }
+}
