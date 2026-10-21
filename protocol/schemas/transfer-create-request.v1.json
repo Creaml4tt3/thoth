@@ -1,0 +1,126 @@
+{
+  "$id": "https://thoth.invalid/schemas/transfer-create-request.v1.json",
+  "title": "transfer-create-request.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "description": "Client-generated UUIDv7. Must equal the Idempotency-Key header."
+        },
+        "direction": {
+          "type": "string",
+          "const": "to_workspace"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "copy",
+            "move"
+          ]
+        },
+        "pages": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pageId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "markdown": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sourceId",
+              "pageId",
+              "parentId",
+              "title",
+              "markdown"
+            ]
+          }
+        },
+        "attachmentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      },
+      "required": [
+        "operationId",
+        "direction",
+        "mode",
+        "pages"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "direction": {
+          "type": "string",
+          "const": "from_workspace"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "copy",
+            "move"
+          ]
+        },
+        "pages": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pageId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              }
+            },
+            "required": [
+              "pageId"
+            ]
+          }
+        }
+      },
+      "required": [
+        "operationId",
+        "direction",
+        "mode",
+        "pages"
+      ]
+    }
+  ]
+}

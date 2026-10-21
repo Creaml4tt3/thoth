@@ -1,0 +1,84 @@
+{
+  "$id": "https://thoth.invalid/schemas/problem-details.v1.json",
+  "title": "problem-details.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 599
+    },
+    "code": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "validation_failed",
+            "cursor_invalid",
+            "unauthenticated",
+            "forbidden",
+            "export_restricted",
+            "not_found",
+            "method_not_allowed",
+            "invalid_transfer_state",
+            "cursor_expired",
+            "revision_conflict",
+            "payload_too_large",
+            "unsupported_media_type",
+            "idempotency_key_reused",
+            "precondition_required",
+            "rate_limited",
+            "internal_error",
+            "capability_not_supported",
+            "service_unavailable"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        }
+      ]
+    },
+    "detail": {
+      "type": "string"
+    },
+    "instance": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pointer": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ]
+      }
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "status",
+    "code"
+  ],
+  "additionalProperties": {}
+}

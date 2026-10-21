@@ -1,0 +1,66 @@
+/** One valid sample per named protocol schema, keyed by component name. */
+const REV = {
+  id: "rev_1_abc",
+  pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019",
+  parentId: null,
+  createdAt: "2026-10-21T10:00:00Z",
+  authorId: "user_1",
+  title: "Hello",
+  size: 5,
+  contentHash: "a".repeat(64),
+};
+const META = {
+  workspaceId: "ws_1",
+  parentId: null,
+  title: "Hello",
+  createdAt: "2026-10-21T10:00:00Z",
+  createdBy: "user_1",
+  updatedAt: "2026-10-21T10:00:00+07:00",
+  updatedBy: "user_1",
+};
+const WORKSPACE = { id: "ws_1", kind: "workspace", name: "Main", role: "editor", exportRestricted: false, memberCount: 1, members: [{ userId: "user_1", displayName: "Ann", role: "editor" }], createdAt: "2026-01-01T00:00:00Z" };
+const TRANSFER = {
+  operationId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019",
+  workspaceId: "ws_1",
+  direction: "to_workspace",
+  mode: "copy",
+  state: "stage",
+  items: [{ pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b01a", sourceId: "local:abc", revisionId: null, state: "staged" }],
+  createdAt: "2026-10-21T10:00:00Z",
+  updatedAt: "2026-10-21T10:00:00Z",
+  error: null,
+};
+
+export const SAMPLES: Record<string, unknown> = {
+  Capabilities: { protocolVersion: "1.0", capabilities: ["search", "x-acme.graph"], limits: { idempotencyWindowSeconds: 86400, maxPageSize: 200 }, server: { name: "acme" } },
+  Limits: { maxMarkdownBytes: 1000, idempotencyWindowSeconds: 90000 },
+  ProblemDetails: { type: "https://thoth.invalid/problems/not_found", title: "Not found", status: 404, code: "not_found", detail: "nope", extension: 1 },
+  RevisionConflictProblem: { type: "https://thoth.invalid/problems/revision_conflict", title: "Revision conflict", status: 412, code: "revision_conflict", currentRevision: REV },
+  Me: { id: "user_1", displayName: "Ann", email: "ann@example.com" },
+  Member: { userId: "user_1", displayName: "Ann", role: "owner" },
+  Workspace: WORKSPACE,
+  WorkspaceList: { items: [WORKSPACE], nextCursor: null },
+  TreeNode: { id: REV.pageId, parentId: null, title: "Hello", revisionId: "rev_1_abc", updatedAt: "2026-10-21T10:00:00Z" },
+  TreePage: { workspaceId: "ws_1", items: [{ id: REV.pageId, parentId: null, title: "Hello", revisionId: "rev_1_abc", updatedAt: "2026-10-21T10:00:00Z" }], nextCursor: "t_abc", changeCursor: "c_abc" },
+  RevisionSummary: REV,
+  RevisionList: { items: [REV], nextCursor: null },
+  PageMetadata: META,
+  PageResource: { id: REV.pageId, markdown: "# Hello\n", revision: REV, metadata: META },
+  PageWrite: { title: "Hello", markdown: "# Hello\n", parentId: null },
+  SearchRequest: { query: "hello", limit: 10, cursor: "s_abc" },
+  SearchHit: { pageId: REV.pageId, title: "Hello", revisionId: "rev_1_abc", snippet: "...", score: 0.5 },
+  SearchResponse: { items: [{ pageId: REV.pageId, title: "Hello", revisionId: "rev_1_abc" }], nextCursor: null },
+  AttachmentResource: { id: REV.pageId, workspaceId: "ws_1", hash: "b".repeat(64), size: 3, mimeType: "image/png", fileName: "a.png", createdAt: "2026-10-21T10:00:00Z", createdBy: null },
+  ChangeEntry: { id: "chg_1", kind: "page.updated", occurredAt: "2026-10-21T10:00:00Z", actorId: "user_1", pageId: REV.pageId, revisionId: "rev_1_abc", parentId: null, title: "Hello" },
+  ChangesResponse: { entries: [{ id: "chg_1", kind: "page.deleted", occurredAt: "2026-10-21T10:00:00Z", actorId: null, pageId: REV.pageId }], cursor: "c_abc", hasMore: false },
+  ChangeHintEvent: { type: "changes.available", workspaceId: "ws_1", cursor: "c_abc" },
+  TransferCreateRequest: {
+    operationId: TRANSFER.operationId,
+    direction: "to_workspace",
+    mode: "move",
+    pages: [{ sourceId: "local:abc", pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b01a", parentId: null, title: "T", markdown: "# T" }],
+  },
+  TransferCommitRequest: { verified: [{ pageId: REV.pageId, revisionId: "rev_1_abc", contentHash: "c".repeat(64) }] },
+  TransferItem: TRANSFER.items[0],
+  TransferResource: TRANSFER,
+};

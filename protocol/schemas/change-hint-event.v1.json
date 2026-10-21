@@ -1,0 +1,29 @@
+{
+  "$id": "https://thoth.invalid/schemas/change-hint-event.v1.json",
+  "title": "change-hint-event.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "changes.available"
+    },
+    "workspaceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.~-]+$"
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^[A-Za-z0-9_.~-]+$",
+      "description": "Opaque cursor. Clients must not parse or construct it."
+    }
+  },
+  "required": [
+    "type",
+    "workspaceId"
+  ]
+}

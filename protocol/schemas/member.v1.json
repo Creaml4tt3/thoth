@@ -1,0 +1,30 @@
+{
+  "$id": "https://thoth.invalid/schemas/member.v1.json",
+  "title": "member.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.~-]+$"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "editor",
+        "viewer"
+      ]
+    }
+  },
+  "required": [
+    "userId",
+    "displayName",
+    "role"
+  ]
+}

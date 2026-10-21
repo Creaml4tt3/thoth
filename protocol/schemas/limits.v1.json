@@ -1,0 +1,28 @@
+{
+  "$id": "https://thoth.invalid/schemas/limits.v1.json",
+  "title": "limits.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "maxMarkdownBytes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "maxAttachmentBytes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "maxPageSize": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "idempotencyWindowSeconds": {
+      "type": "integer",
+      "minimum": 86400,
+      "maximum": 9007199254740991
+    }
+  }
+}

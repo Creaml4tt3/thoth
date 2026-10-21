@@ -22,11 +22,11 @@ Toolchain verified on the dev machine:
 | Canonical content schema (§6, §15.1) | **Done (v1)** | `packages/content`, `packages/domain`, `protocol/schemas/*.json`, `docs/architecture/content-schema.md` |
 | Private Space persistence + index (P0) | **Done: domain/storage layer** | `packages/local-store`: CAS atomic writes, journal recovery, reconcile, rebuild, FTS5 search, links/backlinks/graph |
 | Filesystem watcher (P0) | Not started | Reconcile exists and is safe to trigger any time. The watcher is a trigger only (ADR-0001). |
-| Markdown editor (P0) | Not started | `packages/editor` (Tiptap). ADR-0002 editor part is still Proposed. |
-| Desktop runtime (P0) | **Blocked on decision** | ADR-0008 open question: Rust ports vs Node sidecar. The Tauri CLI is also not installed. |
+| Markdown editor (P0) | **Done: model/serializer layer (2026-10-21)** | `packages/editor`: Tiptap schema matching the v1 blocks, byte-identical round-trip for untouched blocks, canonical serializer with golden and property tests. No UI yet (Phase 1c). |
+| Desktop runtime (P0) | **Unblocked (2026-10-21)** | ADR-0008 decided: Rust Tauri commands implement `VaultFs`/`SqlDriver`; no Node sidecar. The Tauri CLI is not installed yet. |
 | Import pipeline (P1) | **Done: domain layer** | `importer-core`, `importer-obsidian`, `importer-notion`, with all four adapters from §7.4 |
 | Import wizard UI (P1, §7.1) | Not started | The pipeline already exposes everything the wizard needs: `planImport` → preview, `runImport` with progress, cancel and resume, and a report. |
-| Workspace protocol / server / web (P2) | Not started | ADR-0004, ADR-0005 and ADR-0009 are Proposed. |
+| Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; server and web not started | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | Not started | ADR-0006 is Proposed. The state enum and `operation_journal` table are reserved. |
 | Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
 | Licensing | **Owner decision required** | ADR-0011. There is no LICENSE file, so the repo must not be published. |
@@ -75,15 +75,23 @@ Acceptance tests (`tests/import/*.test.ts`) map to spec §7.5:
 | Unknown frontmatter fields | `cssclasses`, nested `custom` map preserved |
 | No network | fetch stubbed to throw |
 
-### Phase 1c — Desktop shell + editor + import wizard (next)
+### Track 1 (2026-10-21) ✅ — work not blocked on ADR-0008
 
-1. **Decision needed: ADR-0008 hosting model.** Then scaffold `apps/desktop`
-   (Tauri 2) and `apps/web` (Vite + React), sharing `packages/ui`.
-2. `packages/editor`: Tiptap schema mapped 1:1 to the v1 block types. The
-   Markdown serializer is golden-tested. Unsupported blocks become read-only raw
-   nodes that round-trip byte-for-byte.
-3. A filesystem watcher (Rust `notify` or chokidar, depending on the ADR-0008
-   choice) that debounces into `vault.reconcile()`. Saving from the editor uses
+| Item | Result | Tests |
+|---|---|---|
+| `packages/editor` | Tiptap schema and Markdown round-trip (ADR-0002 §7) | 237 tests: every fixture `.md` round-trips byte-identically; canonical goldens; minimal diff; raw survival; more than 2,500 seeded escaping and idempotence cases |
+| Import memory (review item 11) | See §5 | `streaming.test.ts`, `memory-smoke.test.ts` |
+| Workspace protocol contract | Zod route registry, OpenAPI 3.1, normative docs, conformance suite | 194 tests in `tests/protocol/` |
+
+### Phase 1c — Desktop shell + editor UI + import wizard (next)
+
+1. ADR-0008 is decided (Rust-hosted ports). Scaffold `apps/desktop` (Tauri 2)
+   and `apps/web` (Vite + React), sharing `packages/ui`. Implement `VaultFs` and
+   `SqlDriver` as Rust commands (`rusqlite` bundled, FTS5) behind a shared port
+   contract test suite.
+2. Editor UI on top of `packages/editor` (the schema and serializer are done):
+   node views for callouts, wikilinks and read-only raw blocks.
+3. A filesystem watcher (Rust `notify`, per ADR-0008) that debounces into `vault.reconcile()`. Saving from the editor uses
    `writePage(…, { expectedHash })`. On `ConflictError` the UI shows a diff with
    keep-mine, keep-theirs and keep-both. It never silently overwrites.
 4. Import wizard covering spec §7.1 steps 1–10. It goes in Settings → Import &
@@ -94,7 +102,8 @@ AC:
 - Playwright or WebDriver e2e: create a note offline → edit → edit externally
   → conflict prompt.
 - Import wizard happy path plus cancel and resume.
-- Golden round-trip tests for the editor serializer.
+- Editor UI: an edit in the app saves through CAS with only the edited
+  block changed on disk.
 
 ### Phase 2 — Workspace protocol + reference server
 
@@ -194,16 +203,21 @@ regression tests (`pnpm check`: 92 tests):
 | 12 | Duplicate-ID owner flipped after rebuild; stale warnings | Owner chosen from paths only (`claimOwner`); warnings recomputed | `keeps duplicate thoth_id ownership stable…` |
 | 14 | Schema-version drop skipped `search_content` | Drop all tables | (covered by rebuild path) |
 | low | Duplicate frontmatter keys; mixed line endings; NUL in search | Treated as malformed; fence-local EOL; control chars stripped | content/vault tests |
+| 11 (fixed 2026-10-21) | Nested ZIPs and all page text held in memory during planning | STORED parts read in place through a range-bounded reader; compressed parts stream to a private 0700 temp dir that is removed on success, failure, cancel and close; planning streams hashes and keeps only references and metadata; every item is re-read and hash-verified at convert time; new `maxNestedArchiveBytes` limit (1 GiB) | `tests/import/streaming.test.ts`, `memory-smoke.test.ts` (312 MiB export: peak 110 MiB, versus 628 MiB before) |
 
 **Still open (tracked, not fixed):**
 
-- **11 (medium) Memory:** nested ZIPs (≤1 GiB) and all page text are held in
-  memory during planning. Fix with streaming hashing and a lower nested-part
-  cap before importing very large exports.
 - **13 (medium) Narrow overwrite window:** an external edit made between the
   final hash re-check and `rename()` can be replaced. Closing it fully needs
   OS-level compare-and-swap. Mitigation in Phase 1c: the watcher re-verifies
   after each write and surfaces any lost-update as a conflict copy.
+- **Residual from item 11:**
+  - One file at a time still passes through memory, because `VaultFs.writeFile`
+    takes bytes.
+  - Database CSV checks parse each CSV whole.
+  - `reconcile()` keeps every parsed page in memory.
+  - A SIGKILL during extraction can leave a `thoth-import-*` temp directory
+    behind; a startup sweep is still to do.
 - **Low:** APFS folds `ς`/`Σ` but `collisionKey` does not, which gives a
   reported failure, not data loss. Folder imports do not detect hardlinked
   source files (`nlink > 1`). There is a small TOCTOU window between the
@@ -211,8 +225,7 @@ regression tests (`pnpm check`: 92 tests):
 
 ## 6. Open blockers needing an owner decision
 
-1. **ADR-0008: desktop hosting model** (Rust ports vs Node sidecar). This blocks
-   Phase 1c. Recommendation: Rust ports.
+1. ~~ADR-0008: desktop hosting model.~~ Decided 2026-10-21: Rust-hosted ports.
 2. **ADR-0011: license.** This blocks any public release, not implementation.
 3. **A real Notion export sample**, needed to confirm the INFERRED format
    details before release.

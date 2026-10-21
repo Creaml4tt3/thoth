@@ -1,4 +1,4 @@
-import { decodeText, encodeText, FrontmatterError, LinkResolver, parsePage, rewriteTargets, updateFrontmatter, type PageDocument, type TargetEdit } from "@thoth/content";
+import { decodeText, encodeText, FrontmatterError, LinkResolver, parsePage, rewriteTargets, updateFrontmatter, type ParsedReference, type TargetEdit } from "@thoth/content";
 import {
   basename,
   collisionKey,
@@ -16,6 +16,7 @@ import {
   type ImportWarning,
 } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
+import { hashStream } from "./hash.ts";
 import {
   IMPORT_STAGING_DIR,
   listManifests,
@@ -82,10 +83,23 @@ export class ImportCancelledError extends Error {
   }
 }
 
-interface PageInfo {
+/** What link resolution needs from a page. Page text is never retained across files. */
+interface PageLinkInfo {
   rel: string;
-  doc?: PageDocument;
-  text?: string;
+  aliases: readonly string[];
+}
+
+/** Planning keeps these facts per page instead of its text (spec §7.1 step 4). */
+interface PageFacts extends PageLinkInfo {
+  /** Absent for pages that are not valid UTF-8 (imported byte-for-byte). */
+  doc?: {
+    references: ParsedReference[];
+    frontmatterError?: string;
+    thothId?: string;
+    title?: string;
+  };
+  /** Provider analysis warnings, applied only if the page is not skipped. */
+  analysis: ImportWarning[];
 }
 
 /** Strips the shared wrapper prefix from a source path. */
@@ -118,6 +132,34 @@ function withSuffix(path: string, n: number): string {
 function decodePage(bytes: Uint8Array): string | undefined {
   const decoded = decodeText(bytes);
   return decoded.editable ? decoded.text : undefined;
+}
+
+function pageFacts(provider: ImportProvider, rel: string, sourcePath: string, bytes: Uint8Array): PageFacts {
+  const text = decodePage(bytes);
+  if (text === undefined) return { rel, aliases: [], analysis: [] };
+  const doc = parsePage(rel, text);
+  const title = doc.frontmatter["title"];
+  return {
+    rel,
+    aliases: doc.aliases,
+    doc: {
+      references: doc.references,
+      ...(doc.frontmatterError ? { frontmatterError: doc.frontmatterError } : {}),
+      ...(doc.thothId !== undefined ? { thothId: doc.thothId } : {}),
+      ...(typeof title === "string" ? { title } : {}),
+    },
+    analysis: provider.analyzePage(doc, sourcePath),
+  };
+}
+
+/**
+ * Re-reads one entry and checks it against the hash recorded at plan time, so
+ * content that changed after planning is never converted or staged.
+ */
+async function readVerified(source: ImportSource, item: ImportItem): Promise<Uint8Array> {
+  const raw = await source.read(item.sourcePath);
+  if (sha256Hex(raw) !== item.sourceHash) throw new Error("Source file changed since the import was planned; not imported");
+  return raw;
 }
 
 // ------------------------------------------------------------------- planning
@@ -161,17 +203,32 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
   const classified = provider.classify(usable.map((e) => ({ ...e, path: e.path.slice(prefix.length) })));
 
   // Hash every entry so resume and duplicate-import detection are content-based.
+  // Memory stays O(largest file): pages and database CSVs are read one at a time
+  // and only their parsed facts are kept; every other file is hashed by streaming.
   const items: ImportItem[] = [];
+  const facts = new Map<string, PageFacts>();
+  const fileWarnings = new Map<string, ImportWarning[]>();
   for (const c of classified) {
     const sourcePath = prefix + c.sourcePath;
-    const bytes = await source.read(sourcePath);
+    let digest: { hash: string; size: number };
+    if (c.kind === "page") {
+      const bytes = await source.read(sourcePath);
+      digest = { hash: sha256Hex(bytes), size: bytes.length };
+      facts.set(sourcePath, pageFacts(provider, c.sourcePath, sourcePath, bytes));
+    } else if (c.kind === "database" && provider.analyzeFile) {
+      const bytes = await source.read(sourcePath);
+      digest = { hash: sha256Hex(bytes), size: bytes.length };
+      fileWarnings.set(sourcePath, provider.analyzeFile(sourcePath, bytes));
+    } else {
+      digest = await hashStream(source.openReadStream(sourcePath));
+    }
     items.push({
       key: `${provider.system}:${sourcePath}`,
       sourcePath,
       kind: c.kind,
       ...(c.relDest !== undefined ? { destPath: c.relDest } : {}),
-      sourceHash: sha256Hex(bytes),
-      size: bytes.length,
+      sourceHash: digest.hash,
+      size: digest.size,
       ...(c.sourceId !== undefined ? { sourceId: c.sourceId } : {}),
       state: c.kind === "skipped" ? "skipped" : "pending",
       warnings: c.warnings ?? [],
@@ -256,19 +313,20 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
     warnings,
   };
 
-  // Parse pages once to assign IDs, collect analysis warnings, and preview links.
-  const pages = await loadPages(manifest, source);
+  // Assign IDs, collect analysis warnings, and preview links from the facts gathered above.
+  const pages = new Map<string, PageLinkInfo>();
   const existingIds = new Set((await vault.listPages()).map((p) => p.id));
   const seenIds = new Set<string>();
   for (const item of items) {
     if (item.kind !== "page" || item.state === "skipped") continue;
-    const info = pages.get(item.sourcePath)!;
+    const info = facts.get(item.sourcePath)!;
+    pages.set(item.sourcePath, info);
     if (!info.doc) {
       item.warnings.push({ code: "invalid_utf8", severity: "warning", message: "Not valid UTF-8; imported byte-for-byte without link rewriting", sourcePath: item.sourcePath });
     } else {
       if (info.doc.frontmatterError)
         item.warnings.push({ code: "malformed_frontmatter", severity: "warning", message: `Frontmatter could not be parsed and is imported verbatim: ${info.doc.frontmatterError}`, sourcePath: item.sourcePath });
-      item.warnings.push(...provider.analyzePage(info.doc, item.sourcePath));
+      item.warnings.push(...info.analysis);
     }
     if (info.doc?.frontmatterError || !info.doc) {
       // Identity cannot be written without rewriting unparseable content (ADR-001); the index assigns a provisional ID.
@@ -282,20 +340,26 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
     seenIds.add(item.pageId);
   }
   for (const item of items) {
-    if (item.kind === "database" && item.state !== "skipped" && provider.analyzeFile)
-      item.warnings.push(...provider.analyzeFile(item.sourcePath, await source.read(item.sourcePath)));
+    if (item.kind === "database" && item.state !== "skipped") item.warnings.push(...(fileWarnings.get(item.sourcePath) ?? []));
   }
-  const linkResult = await convertAll(manifest, pages, vault, { dryRun: true });
-  manifest.links = linkResult.stats;
-  for (const [sourcePath, ws] of linkResult.warnings) manifest.items.find((i) => i.sourcePath === sourcePath)!.warnings.push(...ws);
+  const links = await linkContext(manifest, pages, vault);
+  const linkStats = emptyLinkStats();
+  for (const item of links.active) {
+    const doc = item.kind === "page" ? facts.get(item.sourcePath)?.doc : undefined;
+    if (!doc) continue;
+    const result = planLinks(links, item, relPath(manifest, item.sourcePath), doc.references);
+    for (const key of Object.keys(linkStats) as (keyof LinkStats)[]) linkStats[key] += result.stats[key];
+    item.warnings.push(...result.warnings);
+  }
+  manifest.links = linkStats;
 
   const titles = new Map<string, string[]>();
   const titleNames = new Map<string, string>();
   for (const item of items) {
     if (item.kind !== "page" || item.state === "skipped") continue;
     // Destination name, not source name: provider-specific ID suffixes are already stripped.
-    const fmTitle = pages.get(item.sourcePath)?.doc?.frontmatter["title"];
-    const title = typeof fmTitle === "string" && fmTitle.trim() ? fmTitle.trim() : stripExtension(basename(item.destPath ?? item.sourcePath));
+    const fmTitle = facts.get(item.sourcePath)?.doc?.title;
+    const title = fmTitle?.trim() ? fmTitle.trim() : stripExtension(basename(item.destPath ?? item.sourcePath));
     titles.set(collisionKey(title), [...(titles.get(collisionKey(title)) ?? []), item.sourcePath]);
     if (!titleNames.has(collisionKey(title))) titleNames.set(collisionKey(title), title);
   }
@@ -311,7 +375,7 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
     folders: new Set(active.map((i) => dirname(relPath(manifest, i.sourcePath))).filter(Boolean)).size,
     skipped: items.length - active.length,
     rejected: [...source.rejected],
-    links: linkResult.stats,
+    links: linkStats,
     duplicateTitles: [...titleNames.entries()].filter(([key]) => titles.get(key)!.length > 1).map(([key, title]) => ({ title, sourcePaths: titles.get(key)! })),
     collisions,
     warningCounts: countWarnings(allWarnings(manifest)),
@@ -320,38 +384,30 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
   return { manifest, preview };
 }
 
-async function loadPages(manifest: ImportManifest, source: ImportSource): Promise<Map<string, PageInfo>> {
-  const pages = new Map<string, PageInfo>();
-  for (const item of manifest.items) {
-    if (item.kind !== "page" || item.state === "skipped") continue;
-    const rel = relPath(manifest, item.sourcePath);
-    const text = decodePage(await source.read(item.sourcePath));
-    pages.set(item.sourcePath, text === undefined ? { rel } : { rel, text, doc: parsePage(rel, text) });
-  }
-  return pages;
-}
-
 // ----------------------------------------------------------------- conversion
 
-interface ConvertResult {
-  stats: LinkStats;
-  warnings: Map<string, ImportWarning[]>;
-  output: Map<string, Uint8Array>;
+interface LinkContext {
+  /** Items that will have a destination (resolution targets). */
+  active: ImportItem[];
+  destBySource: Map<string, string>;
+  sourceResolver: LinkResolver;
+  destResolver: LinkResolver;
+}
+
+function emptyLinkStats(): LinkStats {
+  return { total: 0, resolved: 0, rewritten: 0, unresolved: 0, ambiguous: 0, external: 0 };
 }
 
 /**
- * Converts every page: resolves links against the complete source file set
- * (never per-file), maps them to destination paths, and rewrites only links
- * whose meaning would otherwise change (spec §7.3, §9.3).
+ * Resolvers over the complete source file set (never per-file) and the
+ * destination vault. Built from paths and aliases only, so no page text is held.
  */
-async function convertAll(manifest: ImportManifest, pages: Map<string, PageInfo>, vault: Vault, mode: { dryRun: boolean }): Promise<ConvertResult> {
+async function linkContext(manifest: ImportManifest, pages: Map<string, PageLinkInfo>, vault: Vault): Promise<LinkContext> {
   const active = manifest.items.filter((i) => i.state !== "skipped" && i.destPath !== undefined);
   const destBySource = new Map(active.map((i) => [relPath(manifest, i.sourcePath), i.destPath!]));
-  const pageAliases = (info: PageInfo) => info.doc?.aliases ?? [];
-
   const sourceResolver = new LinkResolver(
     manifest.items.map((i) => relPath(manifest, i.sourcePath)),
-    [...pages.values()].map((p) => ({ path: p.rel, aliases: pageAliases(p) })),
+    [...pages.values()].map((p) => ({ path: p.rel, aliases: p.aliases })),
   );
   const vaultFiles = (await vault.scanFiles()).files;
   const vaultPages = await vault.listPages();
@@ -359,75 +415,82 @@ async function convertAll(manifest: ImportManifest, pages: Map<string, PageInfo>
     [...vaultFiles, ...destBySource.values()],
     [
       ...vaultPages.map((p) => ({ path: p.path, aliases: p.aliases })),
-      ...[...pages.values()].flatMap((p) => (destBySource.has(p.rel) ? [{ path: destBySource.get(p.rel)!, aliases: pageAliases(p) }] : [])),
+      ...[...pages.values()].flatMap((p) => (destBySource.has(p.rel) ? [{ path: destBySource.get(p.rel)!, aliases: p.aliases }] : [])),
     ],
   );
+  return { active, destBySource, sourceResolver, destResolver };
+}
 
-  const stats: LinkStats = { total: 0, resolved: 0, rewritten: 0, unresolved: 0, ambiguous: 0, external: 0 };
-  const warnings = new Map<string, ImportWarning[]>();
-  const output = new Map<string, Uint8Array>();
-
-  for (const item of active) {
-    if (item.kind !== "page") continue;
-    const info = pages.get(item.sourcePath);
-    if (!info?.doc || info.text === undefined) continue;
-    const destPath = item.destPath!;
-    const itemWarnings: ImportWarning[] = [];
-    const edits: TargetEdit[] = [];
-    for (const ref of info.doc.references) {
-      stats.total++;
-      const result = sourceResolver.resolve(info.rel, ref);
-      if (result.state === "external") {
-        stats.external++;
-        continue;
-      }
-      if (result.state === "ambiguous") {
-        stats.ambiguous++;
-        itemWarnings.push({ code: "ambiguous_link", severity: "warning", message: `Link "${ref.rawTarget}" matches ${result.candidates.length} files (${result.candidates.join(", ")}); left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
-        continue;
-      }
-      const targetDest = result.state === "resolved" ? destBySource.get(result.path) : undefined;
-      if (result.state === "unresolved" || targetDest === undefined) {
+/**
+ * Maps one page's links to destination paths and decides which to rewrite:
+ * only links whose meaning would otherwise change (spec §7.3, §9.3).
+ */
+function planLinks(ctx: LinkContext, item: ImportItem, rel: string, references: readonly ParsedReference[]): { edits: TargetEdit[]; warnings: ImportWarning[]; stats: LinkStats } {
+  const destPath = item.destPath!;
+  const stats = emptyLinkStats();
+  const warnings: ImportWarning[] = [];
+  const edits: TargetEdit[] = [];
+  for (const ref of references) {
+    stats.total++;
+    const result = ctx.sourceResolver.resolve(rel, ref);
+    if (result.state === "external") {
+      stats.external++;
+      continue;
+    }
+    if (result.state === "ambiguous") {
+      stats.ambiguous++;
+      warnings.push({ code: "ambiguous_link", severity: "warning", message: `Link "${ref.rawTarget}" matches ${result.candidates.length} files (${result.candidates.join(", ")}); left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
+      continue;
+    }
+    const targetDest = result.state === "resolved" ? ctx.destBySource.get(result.path) : undefined;
+    if (result.state === "unresolved" || targetDest === undefined) {
+      stats.unresolved++;
+      warnings.push({ code: "unresolved_link", severity: "warning", message: `Link target "${ref.rawTarget}" was not found in the import; left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
+      continue;
+    }
+    stats.resolved++;
+    if (ref.target === "") continue; // same-page fragment
+    if (ref.syntax === "wikilink" || ref.syntax === "embed") {
+      const still = ctx.destResolver.resolve(destPath, ref);
+      if (still.state === "resolved" && still.path === targetDest) continue;
+      const newTarget = isMarkdownPath(targetDest) ? stripExtension(targetDest) : targetDest;
+      if (/[[\]|#\n]/.test(newTarget)) {
         stats.unresolved++;
-        itemWarnings.push({ code: "unresolved_link", severity: "warning", message: `Link target "${ref.rawTarget}" was not found in the import; left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
+        warnings.push({ code: "link_not_rewritable", severity: "warning", message: `Link "${ref.rawTarget}" could not be rewritten to ${targetDest}`, sourcePath: item.sourcePath, line: ref.range.startLine });
         continue;
       }
-      stats.resolved++;
-      if (ref.target === "") continue; // same-page fragment
-      if (ref.syntax === "wikilink" || ref.syntax === "embed") {
-        const still = destResolver.resolve(destPath, ref);
-        if (still.state === "resolved" && still.path === targetDest) continue;
-        const newTarget = isMarkdownPath(targetDest) ? stripExtension(targetDest) : targetDest;
-        if (/[[\]|#\n]/.test(newTarget)) {
-          stats.unresolved++;
-          itemWarnings.push({ code: "link_not_rewritable", severity: "warning", message: `Link "${ref.rawTarget}" could not be rewritten to ${targetDest}`, sourcePath: item.sourcePath, line: ref.range.startLine });
-          continue;
-        }
-        edits.push({ reference: ref, newTarget });
-      } else {
-        const newTarget = relativeLink(destPath, targetDest);
-        if (newTarget === ref.target) continue;
-        edits.push({ reference: ref, newTarget });
-      }
-      stats.rewritten++;
+      edits.push({ reference: ref, newTarget });
+    } else {
+      const newTarget = relativeLink(destPath, targetDest);
+      if (newTarget === ref.target) continue;
+      edits.push({ reference: ref, newTarget });
     }
-    warnings.set(item.sourcePath, itemWarnings);
-    if (mode.dryRun) continue;
-
-    let text = edits.length > 0 ? rewriteTargets(info.text, edits) : info.text;
-    if (manifest.options.addIdentityFrontmatter && item.pageId) {
-      // Malformed frontmatter never reaches here: such items have no pageId.
-      try {
-        const provenance = { system: manifest.system, sourcePath: relPath(manifest, item.sourcePath), ...(item.sourceId ? { sourceId: item.sourceId } : {}), importJobId: manifest.jobId };
-        text = updateFrontmatter(text, { thoth_id: item.pageId, thoth_source: provenance });
-      } catch (error) {
-        if (!(error instanceof FrontmatterError)) throw error;
-      }
-    }
-    // Untouched pages are staged from the original bytes, not re-encoded.
-    if (text !== info.text) output.set(item.sourcePath, encodeText(text));
+    stats.rewritten++;
   }
-  return { stats, warnings, output };
+  return { edits, warnings, stats };
+}
+
+/**
+ * Converts one page from its verified source bytes: rewrites links and adds
+ * identity frontmatter. Untouched pages are staged from the original bytes,
+ * not re-encoded; non-UTF-8 pages are copied byte-for-byte.
+ */
+function convertPage(manifest: ImportManifest, ctx: LinkContext, item: ImportItem, raw: Uint8Array): Uint8Array {
+  const original = decodePage(raw);
+  if (original === undefined) return raw;
+  const rel = relPath(manifest, item.sourcePath);
+  const { edits } = planLinks(ctx, item, rel, parsePage(rel, original).references);
+  let text = edits.length > 0 ? rewriteTargets(original, edits) : original;
+  if (manifest.options.addIdentityFrontmatter && item.pageId) {
+    // Malformed frontmatter never reaches here: such items have no pageId.
+    try {
+      const provenance = { system: manifest.system, sourcePath: rel, ...(item.sourceId ? { sourceId: item.sourceId } : {}), importJobId: manifest.jobId };
+      text = updateFrontmatter(text, { thoth_id: item.pageId, thoth_source: provenance });
+    } catch (error) {
+      if (!(error instanceof FrontmatterError)) throw error;
+    }
+  }
+  return text === original ? raw : encodeText(text);
 }
 
 // ------------------------------------------------------------------ execution
@@ -459,9 +522,26 @@ export async function runImport(vault: Vault, source: ImportSource, manifest: Im
     await vault.fs.mkdirp(`${IMPORT_STAGING_DIR}/${manifest.jobId}`);
     await touch("staging");
 
-    // Stage: convert and write every pending item into .thoth staging.
-    const pages = await loadPages(manifest, source);
-    const converted = await convertAll(manifest, pages, vault, { dryRun: false });
+    // Link context: aliases of every page so links resolve exactly as planned.
+    // Pages are read and verified one at a time; no text is kept.
+    const pages = new Map<string, PageLinkInfo>();
+    const changed = new Map<string, string>();
+    for (const item of manifest.items) {
+      if (item.kind !== "page" || item.state === "skipped") continue;
+      checkCancelled(signal);
+      const rel = relPath(manifest, item.sourcePath);
+      let aliases: readonly string[] = [];
+      try {
+        const text = decodePage(await readVerified(source, item));
+        if (text !== undefined) aliases = parsePage(rel, text).aliases;
+      } catch (error) {
+        changed.set(item.sourcePath, (error as Error).message);
+      }
+      pages.set(item.sourcePath, { rel, aliases });
+    }
+    const links = await linkContext(manifest, pages, vault);
+
+    // Stage: convert and write every pending item into .thoth staging, one file in memory at a time.
     const work = manifest.items.map((item, index) => ({ item, index })).filter(({ item }) => item.state !== "skipped" && item.state !== "committed");
     let done = 0;
     for (const { item, index } of work) {
@@ -474,9 +554,11 @@ export async function runImport(vault: Vault, source: ImportSource, manifest: Im
         }
       }
       try {
-        const raw = await source.read(item.sourcePath);
-        if (sha256Hex(raw) !== item.sourceHash) throw new Error("Source file changed since the import was planned");
-        const bytes = converted.output.get(item.sourcePath) ?? raw;
+        const earlier = changed.get(item.sourcePath);
+        if (earlier !== undefined) throw new Error(earlier);
+        // Convert only from bytes that match the planned hash; the staged file derives from exactly these bytes.
+        const raw = await readVerified(source, item);
+        const bytes = item.kind === "page" ? convertPage(manifest, links, item, raw) : raw;
         await vault.fs.writeFile(stagingPath(manifest.jobId, index), bytes);
         item.stagedHash = sha256Hex(bytes);
         item.state = "staged";

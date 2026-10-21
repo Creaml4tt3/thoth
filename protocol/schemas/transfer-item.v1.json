@@ -1,0 +1,74 @@
+{
+  "$id": "https://thoth.invalid/schemas/transfer-item.v1.json",
+  "title": "transfer-item.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "revisionId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.~-]+$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "staged",
+        "committed",
+        "skipped",
+        "failed"
+      ]
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "validation_failed",
+            "cursor_invalid",
+            "unauthenticated",
+            "forbidden",
+            "export_restricted",
+            "not_found",
+            "method_not_allowed",
+            "invalid_transfer_state",
+            "cursor_expired",
+            "revision_conflict",
+            "payload_too_large",
+            "unsupported_media_type",
+            "idempotency_key_reused",
+            "precondition_required",
+            "rate_limited",
+            "internal_error",
+            "capability_not_supported",
+            "service_unavailable"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        }
+      ]
+    }
+  },
+  "required": [
+    "pageId",
+    "revisionId",
+    "state"
+  ]
+}

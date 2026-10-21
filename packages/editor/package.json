@@ -1,0 +1,17 @@
+{
+  "name": "@thoth/editor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@tiptap/core": "^3.32.0",
+    "@tiptap/pm": "^3.32.0"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$id": "https://thoth.invalid/schemas/capabilities.v1.json",
+  "title": "capabilities.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "protocolVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "attachments",
+              "search",
+              "events.sse",
+              "transfers",
+              "databases",
+              "realtime-collab"
+            ]
+          },
+          {
+            "type": "string",
+            "pattern": "^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+          }
+        ]
+      },
+      "uniqueItems": true
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxMarkdownBytes": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxAttachmentBytes": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxPageSize": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "idempotencyWindowSeconds": {
+          "type": "integer",
+          "minimum": 86400,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "capabilities"
+  ]
+}

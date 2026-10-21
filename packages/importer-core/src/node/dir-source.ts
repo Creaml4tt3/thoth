@@ -5,6 +5,8 @@ import type { ImportWarning } from "@thoth/domain";
 import { ArchiveRejectedError, DEFAULT_LIMITS, type ScanLimits } from "../limits.ts";
 import { isNoiseEntry, type ImportSource, type SourceEntry } from "../source.ts";
 
+const STREAM_CHUNK = 64 * 1024;
+
 /**
  * Read-only directory source. Never follows symlinks, never leaves the chosen
  * root, and opens files with O_NOFOLLOW (spec §7.3, ADR-010).
@@ -57,7 +59,13 @@ class DirectorySource implements ImportSource {
   /** Source paths are NFC; on-disk names may be NFD (e.g. older macOS volumes). */
   private readonly diskNames = new Map<string, string>();
 
-  async read(path: string): Promise<Uint8Array> {
+  /**
+   * Opens a scanned file for reading: re-checks every ancestor for symlinks,
+   * opens with O_NOFOLLOW (and O_NONBLOCK so a FIFO swapped in cannot block),
+   * and requires a regular file within `maxEntryBytes`. Shared by `read` and
+   * `openReadStream` so both paths keep the same guarantees.
+   */
+  private async openChecked(path: string): Promise<{ handle: fs.FileHandle; size: number }> {
     const disk = this.diskNames.get(path);
     if (disk === undefined) throw new Error(`No source file ${path}`);
     const full = nodePath.join(this.location, ...disk.split("/"));
@@ -68,9 +76,47 @@ class DirectorySource implements ImportSource {
       current = nodePath.join(current, segment);
       if ((await fs.lstat(current)).isSymbolicLink()) throw new Error(`Symlinked directory in source path: ${path}`);
     }
-    const handle = await fs.open(full, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const handle = await fs.open(full, constants.O_RDONLY | constants.O_NOFOLLOW | (constants.O_NONBLOCK ?? 0));
     try {
-      return new Uint8Array(await handle.readFile());
+      const stat = await handle.stat();
+      if (!stat.isFile()) throw new Error(`Not a regular file: ${path}`);
+      if (stat.size > this.limits.maxEntryBytes) throw new ArchiveRejectedError("entry_too_large", `File "${path}" grew beyond ${this.limits.maxEntryBytes} bytes`);
+      return { handle, size: stat.size };
+    } catch (error) {
+      await handle.close();
+      throw error;
+    }
+  }
+
+  async read(path: string): Promise<Uint8Array> {
+    const { handle, size } = await this.openChecked(path);
+    try {
+      // Reads at most the size seen at open time; a file that changes is caught by hash verification.
+      const out = new Uint8Array(size);
+      let filled = 0;
+      while (filled < size) {
+        const { bytesRead } = await handle.read(out, filled, size - filled, filled);
+        if (bytesRead === 0) break;
+        filled += bytesRead;
+      }
+      return filled === size ? out : out.subarray(0, filled);
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async *openReadStream(path: string): AsyncIterable<Uint8Array> {
+    const { handle } = await this.openChecked(path);
+    try {
+      let total = 0;
+      for (;;) {
+        const chunk = new Uint8Array(STREAM_CHUNK);
+        const { bytesRead } = await handle.read(chunk, 0, STREAM_CHUNK, total);
+        if (bytesRead === 0) return;
+        total += bytesRead;
+        if (total > this.limits.maxEntryBytes) throw new ArchiveRejectedError("entry_too_large", `File "${path}" grew beyond ${this.limits.maxEntryBytes} bytes`);
+        yield bytesRead === STREAM_CHUNK ? chunk : chunk.subarray(0, bytesRead);
+      }
     } finally {
       await handle.close();
     }

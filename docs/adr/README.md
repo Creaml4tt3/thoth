@@ -11,13 +11,13 @@ trade-off.
 | No. | Title | Status |
 | --- | ----- | ------ |
 | [0001](0001-markdown-private-space-source.md) | Markdown as portable Private Space source | Accepted |
-| [0002](0002-canonical-content-model-and-editor-serialization.md) | Canonical content model and editor serialization | Accepted (editor part Proposed until `packages/editor` exists) |
+| [0002](0002-canonical-content-model-and-editor-serialization.md) | Canonical content model and editor serialization | Accepted (editor part accepted 2026-10-21) |
 | [0003](0003-stable-logical-identity-vs-physical-location.md) | Stable logical identity vs physical location | Accepted |
 | [0004](0004-workspace-protocol-and-capability-negotiation.md) | Workspace protocol and capability negotiation | Proposed (finalize in phase P2) |
 | [0005](0005-revision-based-synchronization-and-conflict-resolution.md) | Revision-based synchronization and conflict resolution | Proposed |
 | [0006](0006-transfer-lifecycle-idempotency-and-recovery.md) | Transfer lifecycle, idempotency, and recovery | Proposed (implementation phase P3) |
 | [0007](0007-agent-adapter-contract-and-execution-security.md) | Agent adapter contract and execution security | Proposed (phase P4) |
-| [0008](0008-desktop-runtime-web-client-and-local-bridge.md) | Desktop runtime, web client, and local bridge | Accepted for Tauri 2 + Rust and shared React/TS/Vite UI; Proposed for the rest |
+| [0008](0008-desktop-runtime-web-client-and-local-bridge.md) | Desktop runtime, web client, and local bridge | Accepted for Tauri 2 + Rust, shared React/TS/Vite UI, and Rust-hosted ports (2026-10-21); Proposed for the local bridge |
 | [0009](0009-workspace-authorization-and-sharing-semantics.md) | Workspace authorization and sharing semantics | Proposed (phase P2) |
 | [0010](0010-notion-obsidian-import-format-and-compatibility-policy.md) | Notion/Obsidian import format and compatibility policy | Accepted |
 | [0011](0011-license-and-contribution-policy.md) | Open-source license and contribution policy | Proposed (decision required from project owner before first public release) |

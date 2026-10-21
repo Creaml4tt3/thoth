@@ -18,7 +18,15 @@ export interface ImportSource {
   readonly entries: readonly SourceEntry[];
   /** Entries rejected by the scan, with reasons. */
   readonly rejected: readonly ImportWarning[];
+  /** Reads one whole entry. Only for a single file at a time (convert/stage); bounded by `maxEntryBytes`. */
   read(path: string): Promise<Uint8Array>;
+  /**
+   * Streams one entry in bounded chunks (≤ 64 KiB) without buffering it whole,
+   * with the same safety checks as `read`. Breaking out of the loop releases
+   * the underlying handle. Chunks are not reused, so callers may keep them.
+   */
+  openReadStream(path: string): AsyncIterable<Uint8Array>;
+  /** Releases handles and deletes any temp files. Idempotent. */
   close(): Promise<void>;
 }
 
@@ -57,8 +65,17 @@ export class CompositeSource implements ImportSource {
     return owner.read(path);
   }
 
+  async *openReadStream(path: string): AsyncIterable<Uint8Array> {
+    const owner = this.owners.get(path);
+    if (!owner) throw new Error(`No source entry ${path}`);
+    yield* owner.openReadStream(path);
+  }
+
   async close(): Promise<void> {
-    for (const part of this.parts) await part.close();
+    // Close every part even if one fails, so no handle or temp file is leaked.
+    let failure: unknown;
+    for (const part of this.parts) await part.close().catch((error: unknown) => (failure ??= error));
+    if (failure !== undefined) throw failure;
   }
 }
 

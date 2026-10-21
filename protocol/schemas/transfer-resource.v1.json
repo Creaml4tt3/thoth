@@ -1,0 +1,192 @@
+{
+  "$id": "https://thoth.invalid/schemas/transfer-resource.v1.json",
+  "title": "transfer-resource.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "operationId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "workspaceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.~-]+$"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "to_workspace",
+        "from_workspace"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "copy",
+        "move"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "validate",
+        "stage",
+        "transfer",
+        "verify",
+        "commit_destination",
+        "finalize_source",
+        "done",
+        "destination_committed_source_cleanup_pending",
+        "failed",
+        "aborted"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "revisionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.~-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "staged",
+              "committed",
+              "skipped",
+              "failed"
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "validation_failed",
+                  "cursor_invalid",
+                  "unauthenticated",
+                  "forbidden",
+                  "export_restricted",
+                  "not_found",
+                  "method_not_allowed",
+                  "invalid_transfer_state",
+                  "cursor_expired",
+                  "revision_conflict",
+                  "payload_too_large",
+                  "unsupported_media_type",
+                  "idempotency_key_reused",
+                  "precondition_required",
+                  "rate_limited",
+                  "internal_error",
+                  "capability_not_supported",
+                  "service_unavailable"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+              }
+            ]
+          }
+        },
+        "required": [
+          "pageId",
+          "revisionId",
+          "state"
+        ]
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "validation_failed",
+                    "cursor_invalid",
+                    "unauthenticated",
+                    "forbidden",
+                    "export_restricted",
+                    "not_found",
+                    "method_not_allowed",
+                    "invalid_transfer_state",
+                    "cursor_expired",
+                    "revision_conflict",
+                    "payload_too_large",
+                    "unsupported_media_type",
+                    "idempotency_key_reused",
+                    "precondition_required",
+                    "rate_limited",
+                    "internal_error",
+                    "capability_not_supported",
+                    "service_unavailable"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "pattern": "^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                }
+              ]
+            },
+            "detail": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "operationId",
+    "workspaceId",
+    "direction",
+    "mode",
+    "state",
+    "items",
+    "createdAt",
+    "updatedAt",
+    "error"
+  ]
+}

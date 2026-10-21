@@ -12,6 +12,14 @@ export interface ScanLimits {
   archiveRatioThresholdBytes: number;
   /** Nested archive depth (Notion multi-part exports only). */
   maxNestingDepth: number;
+  /**
+   * Largest nested archive part (uncompressed bytes) that is opened. Parts are
+   * never buffered in memory: STORED parts are read in place and compressed
+   * parts are stream-extracted to a private temp file, so this bounds temp
+   * disk use and extraction time per part. The effective cap is
+   * min(maxEntryBytes, maxNestedArchiveBytes); a part over it rejects the archive.
+   */
+  maxNestedArchiveBytes: number;
 }
 
 export const DEFAULT_LIMITS: ScanLimits = {
@@ -23,6 +31,7 @@ export const DEFAULT_LIMITS: ScanLimits = {
   maxArchiveRatio: 100,
   archiveRatioThresholdBytes: 64 * 1024 ** 2,
   maxNestingDepth: 1,
+  maxNestedArchiveBytes: 1024 ** 3,
 };
 
 export class ArchiveRejectedError extends Error {

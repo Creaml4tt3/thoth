@@ -1,0 +1,2086 @@
+# GENERATED FILE. DRAFT: Proposed per ADR-0004.
+# Source: packages/workspace-protocol (route registry + Zod schemas).
+# Regenerate: pnpm openapi   Check: pnpm openapi:check
+openapi: 3.1.0
+info:
+  title: Thoth Workspace Protocol
+  version: "1.0"
+  summary: Open, versioned REST protocol between Thoth clients and any compatible workspace server.
+  description: |-
+    DRAFT, Proposed per ADR-0004. Generated from `packages/workspace-protocol` (route registry and Zod schemas); do not edit by hand.
+
+    Authentication is PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme will change before the protocol is finalized; do not build long-lived integrations on it. No OAuth flow is defined here.
+
+    Normative semantics (versioning, capabilities, conditional writes, idempotency, change feed, transfers) are in docs/protocol/README.md.
+servers:
+  - url: https://workspace.example.invalid
+    description: Placeholder. Servers are self-hosted; use the base URL of the workspace server you connect to.
+security:
+  - bearerAuth: []
+tags:
+  - name: Discovery
+  - name: Identity
+  - name: Pages
+  - name: Revisions
+  - name: Search
+  - name: Attachments
+  - name: Changes
+  - name: Transfers
+paths:
+  /api/v1/capabilities:
+    get:
+      operationId: getCapabilities
+      tags:
+        - Discovery
+      summary: Protocol version and optional capabilities
+      description: Reachable without credentials so clients can discover the server before signing in. Clients MUST NOT assume a capability that is not listed.
+      responses:
+        "200":
+          description: Capabilities of this server.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      security: []
+      x-thoth-error-codes:
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/me:
+    get:
+      operationId: getMe
+      tags:
+        - Identity
+      summary: The authenticated principal
+      description: Returns the principal the bearer credential resolves to.
+      responses:
+        "200":
+          description: The principal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - unauthenticated
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces:
+    get:
+      operationId: listWorkspaces
+      tags:
+        - Identity
+      summary: Workspaces the principal belongs to
+      description: Lists only workspaces the principal is a member of, each with the principal's role.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of workspaces.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceList"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/tree:
+    get:
+      operationId: getWorkspaceTree
+      tags:
+        - Pages
+      summary: Page hierarchy of a workspace
+      description: Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of tree nodes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreePage"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/pages/{pageId}:
+    get:
+      operationId: getPage
+      tags:
+        - Pages
+      summary: Read a page
+      description: Returns the Markdown source of the current revision, or of the revision named by the `revision` query parameter. The ETag header is the revision's entity tag.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: revision
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: ^[A-Za-z0-9_.~-]+$
+      responses:
+        "200":
+          description: The page.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - service_unavailable
+    put:
+      operationId: putPage
+      tags:
+        - Pages
+      summary: Create or update a page
+      description: "Conditional write. Create with `If-None-Match: *` (201). Update with `If-Match: <etag>` (200). A write with neither header is 428 `precondition_required`; both headers is 400. A stale `If-Match`, or `If-None-Match: *` on an existing page, is 412 `revision_conflict` carrying `currentRevision`; the server never overwrites silently. Every successful write creates a new immutable revision."
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: If-Match
+          in: header
+          required: false
+          description: 'Strong entity tag of the revision being replaced or deleted, for example `"01J..."`. `*` is not accepted. Conditionally required: see the operation description.'
+          schema:
+            type: string
+            pattern: ^"[A-Za-z0-9_.~-]{1,128}"$
+          x-thoth-requirement: conditional
+        - name: If-None-Match
+          in: header
+          required: false
+          description: "Only the value `*`: create the page only if it does not exist. Conditionally required: see the operation description."
+          schema:
+            type: string
+            const: "*"
+          x-thoth-requirement: conditional
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: New title, Markdown source, and optional parent.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageWrite"
+      responses:
+        "200":
+          description: The page was updated; a new revision was created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResource"
+        "201":
+          description: The page was created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "412":
+          $ref: "#/components/responses/Problem412"
+          description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
+        "413":
+          $ref: "#/components/responses/Problem413"
+          description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "428":
+          $ref: "#/components/responses/Problem428"
+          description: "`precondition_required`: The write must carry If-Match or If-None-Match."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - revision_conflict
+        - payload_too_large
+        - idempotency_key_reused
+        - precondition_required
+        - rate_limited
+        - internal_error
+        - service_unavailable
+    delete:
+      operationId: deletePage
+      tags:
+        - Pages
+      summary: Delete a page
+      description: Requires `If-Match`. The server records the deletion in the change feed. Retention of earlier revisions is unspecified (see open questions).
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: If-Match
+          in: header
+          required: true
+          description: Strong entity tag of the revision being replaced or deleted, for example `"01J..."`. `*` is not accepted.
+          schema:
+            type: string
+            pattern: ^"[A-Za-z0-9_.~-]{1,128}"$
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "204":
+          description: The page was deleted.
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "412":
+          $ref: "#/components/responses/Problem412"
+          description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "428":
+          $ref: "#/components/responses/Problem428"
+          description: "`precondition_required`: The write must carry If-Match or If-None-Match."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - revision_conflict
+        - idempotency_key_reused
+        - precondition_required
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/pages/{pageId}/revisions:
+    get:
+      operationId: listPageRevisions
+      tags:
+        - Revisions
+      summary: List the revisions of a page
+      description: "Newest first. Revision entries are immutable: once listed, an entry never changes."
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of revisions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionList"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/search:
+    post:
+      operationId: searchWorkspace
+      tags:
+        - Search
+      summary: Full-text search
+      description: |-
+        Read-only despite the POST verb. Results are limited to pages the principal can read. The index may lag writes by a short time.
+
+        Requires capability `search`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        required: true
+        description: Query and paging.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+      responses:
+        "200":
+          description: A page of hits.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: search
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/attachments:
+    post:
+      operationId: uploadAttachment
+      tags:
+        - Attachments
+      summary: Upload an attachment
+      description: |-
+        Single-request upload. The body is the raw bytes and `Content-Type` is the MIME type.
+
+        Requires capability `attachments`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: fileName
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: Raw attachment bytes. The declared Content-Type is stored as the attachment MIME type.
+        content:
+          "*/*":
+            schema:
+              type: string
+              contentMediaType: application/octet-stream
+      responses:
+        "201":
+          description: The attachment was stored.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "413":
+          $ref: "#/components/responses/Problem413"
+          description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
+        "415":
+          $ref: "#/components/responses/Problem415"
+          description: "`unsupported_media_type`: The request content type is not accepted."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: attachments
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - payload_too_large
+        - unsupported_media_type
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/attachments/{attachmentId}:
+    get:
+      operationId: getAttachment
+      tags:
+        - Attachments
+      summary: Download an attachment
+      description: |-
+        Returns the stored bytes with the original Content-Type. An addition to the spec section 8 endpoint list, needed so uploaded bytes can be read back.
+
+        Requires capability `attachments`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/AttachmentId"
+      responses:
+        "200":
+          description: The attachment bytes, with the stored Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: attachments
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/changes:
+    get:
+      operationId: listWorkspaceChanges
+      tags:
+        - Changes
+      summary: Change feed
+      description: Source of truth for changes. Returns entries after `cursor` in a stable order, a continuation cursor, and `hasMore`. SSE events are only hints to call this route.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of change entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangesResponse"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "410":
+          $ref: "#/components/responses/Problem410"
+          description: "`cursor_expired`: The cursor points before the retained change history; the client must resynchronize from the tree."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - cursor_expired
+        - rate_limited
+        - internal_error
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/events:
+    get:
+      operationId: streamWorkspaceEvents
+      tags:
+        - Changes
+      summary: Server-sent change hints
+      description: |-
+        `text/event-stream`. Emits `event: changes` with a ChangeHintEvent payload when the change feed advances. A hint is not data; clients fetch the change feed from their own cursor and MUST be able to recover missed events that way.
+
+        Requires capability `events.sse`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          description: An event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+          x-thoth-sse:
+            event: changes
+            data:
+              $ref: "#/components/schemas/ChangeHintEvent"
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: events.sse
+      x-thoth-error-codes:
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/transfers:
+    post:
+      operationId: createTransfer
+      tags:
+        - Transfers
+      summary: Create a transfer operation
+      description: |-
+        Registers and stages a transfer. `Idempotency-Key` is required and MUST equal the body `operationId`. For `from_workspace` the server rejects restricted workspaces with 403 `export_restricted`.
+
+        Requires capability `transfers`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused. MUST equal the body `operationId`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The transfer plan.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferCreateRequest"
+      responses:
+        "201":
+          description: The transfer was created and staged.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`export_restricted`: The workspace forbids exporting content out of it (ADR-0009). `forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "413":
+          $ref: "#/components/responses/Problem413"
+          description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: transfers
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - export_restricted
+        - forbidden
+        - not_found
+        - payload_too_large
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/transfers/{operationId}:
+    get:
+      operationId: getTransfer
+      tags:
+        - Transfers
+      summary: Read a transfer operation
+      description: |-
+        Returns the recorded state of a transfer. Visible only to principals with access to its workspace.
+
+        Requires capability `transfers`.
+      parameters:
+        - $ref: "#/components/parameters/OperationId"
+      responses:
+        "200":
+          description: The transfer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: transfers
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/transfers/{operationId}/commit:
+    post:
+      operationId: commitTransfer
+      tags:
+        - Transfers
+      summary: Commit a transfer
+      description: |-
+        `to_workspace`: atomically publishes the staged pages (COMMIT_DESTINATION). `from_workspace`: confirms the client committed and verified the destination; for `move` the body `verified` is required and the server deletes a source page only when its current revision equals the verified revision. Committing a completed transfer returns it unchanged.
+
+        Requires capability `transfers`.
+      parameters:
+        - $ref: "#/components/parameters/OperationId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: false
+        description: Verification results for from_workspace transfers.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferCommitRequest"
+      responses:
+        "200":
+          description: The transfer after commit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResource"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`invalid_transfer_state`: The transfer is in a state that does not allow the requested action."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: transfers
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - invalid_transfer_state
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/transfers/{operationId}/abort:
+    post:
+      operationId: abortTransfer
+      tags:
+        - Transfers
+      summary: Abort a transfer
+      description: |-
+        Discards uncommitted staged items. Aborting an already aborted transfer returns it unchanged; a committed transfer is 409 `invalid_transfer_state`.
+
+        Requires capability `transfers`.
+      parameters:
+        - $ref: "#/components/parameters/OperationId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: The transfer after abort.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResource"
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`invalid_transfer_state`: The transfer is in a state that does not allow the requested action."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: transfers
+      x-thoth-error-codes:
+        - unauthenticated
+        - forbidden
+        - not_found
+        - invalid_transfer_state
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+components:
+  schemas:
+    AttachmentResource:
+      type: object
+      properties:
+        hash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        size:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        mimeType:
+          type: string
+        id:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        fileName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        createdBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+      required:
+        - hash
+        - size
+        - mimeType
+        - id
+        - workspaceId
+        - createdAt
+        - createdBy
+    Capabilities:
+      type: object
+      properties:
+        protocolVersion:
+          type: string
+          pattern: ^\d+\.\d+$
+        capabilities:
+          type: array
+          items:
+            anyOf:
+              - type: string
+                enum:
+                  - attachments
+                  - search
+                  - events.sse
+                  - transfers
+                  - databases
+                  - realtime-collab
+              - type: string
+                pattern: ^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$
+          uniqueItems: true
+        limits:
+          $ref: "#/components/schemas/Limits"
+        server:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+          required:
+            - name
+      required:
+        - protocolVersion
+        - capabilities
+    ChangeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        kind:
+          anyOf:
+            - type: string
+              enum:
+                - page.created
+                - page.updated
+                - page.deleted
+                - attachment.created
+            - type: string
+              pattern: ^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$
+        occurredAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        actorId:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        revisionId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        title:
+          type: string
+        attachmentId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+      required:
+        - id
+        - kind
+        - occurredAt
+        - actorId
+    ChangeHintEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          const: changes.available
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        cursor:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_.~-]+$
+          description: Opaque cursor. Clients must not parse or construct it.
+      required:
+        - type
+        - workspaceId
+    ChangesResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeEntry"
+          description: Changes after the request cursor, oldest first.
+        cursor:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_.~-]+$
+          description: Opaque position after the last returned entry. Pass it back as `cursor` to continue.
+        hasMore:
+          type: boolean
+          description: True when more entries are available now; read until false.
+      required:
+        - entries
+        - cursor
+        - hasMore
+    Limits:
+      type: object
+      properties:
+        maxMarkdownBytes:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        maxAttachmentBytes:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        maxPageSize:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        idempotencyWindowSeconds:
+          type: integer
+          minimum: 86400
+          maximum: 9007199254740991
+    Me:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        displayName:
+          type: string
+        email:
+          type: string
+      required:
+        - id
+        - displayName
+    Member:
+      type: object
+      properties:
+        userId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - editor
+            - viewer
+      required:
+        - userId
+        - displayName
+        - role
+    PageMetadata:
+      type: object
+      properties:
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        createdBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        updatedBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+      required:
+        - workspaceId
+        - parentId
+        - title
+        - createdAt
+        - createdBy
+        - updatedAt
+        - updatedBy
+    PageResource:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        markdown:
+          type: string
+          description: Full Markdown source of this revision, including any frontmatter, byte-for-byte.
+        revision:
+          $ref: "#/components/schemas/RevisionSummary"
+        metadata:
+          $ref: "#/components/schemas/PageMetadata"
+      required:
+        - id
+        - markdown
+        - revision
+        - metadata
+    PageWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        markdown:
+          type: string
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+      required:
+        - title
+        - markdown
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          anyOf:
+            - type: string
+              enum:
+                - validation_failed
+                - cursor_invalid
+                - unauthenticated
+                - forbidden
+                - export_restricted
+                - not_found
+                - method_not_allowed
+                - invalid_transfer_state
+                - cursor_expired
+                - revision_conflict
+                - payload_too_large
+                - unsupported_media_type
+                - idempotency_key_reused
+                - precondition_required
+                - rate_limited
+                - internal_error
+                - capability_not_supported
+                - service_unavailable
+            - type: string
+              pattern: ^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$
+        detail:
+          type: string
+        instance:
+          type: string
+        requestId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              pointer:
+                type: string
+              detail:
+                type: string
+            required:
+              - detail
+      required:
+        - type
+        - title
+        - status
+        - code
+      additionalProperties: {}
+    RevisionConflictProblem:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        status:
+          type: number
+          const: 412
+        code:
+          type: string
+          const: revision_conflict
+        detail:
+          type: string
+        instance:
+          type: string
+        requestId:
+          type: string
+        currentRevision:
+          description: The revision that was current when the conditional write was evaluated.
+          $ref: "#/components/schemas/RevisionSummary"
+      required:
+        - type
+        - title
+        - status
+        - code
+        - currentRevision
+      additionalProperties: {}
+    RevisionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevisionSummary"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+      required:
+        - items
+        - nextCursor
+    RevisionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        parentId:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+          description: The previous revision of the same page; null for the first revision.
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        authorId:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        title:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        contentHash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Lower-case hex SHA-256 of the UTF-8 bytes of the Markdown source.
+      required:
+        - id
+        - pageId
+        - parentId
+        - createdAt
+        - authorId
+        - title
+        - size
+        - contentHash
+    SearchHit:
+      type: object
+      properties:
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        title:
+          type: string
+        revisionId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        snippet:
+          type: string
+        score:
+          type: number
+      required:
+        - pageId
+        - title
+        - revisionId
+    SearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        cursor:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_.~-]+$
+          description: Opaque cursor. Clients must not parse or construct it.
+        withinPageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+      required:
+        - query
+    SearchResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchHit"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+      required:
+        - items
+        - nextCursor
+    TransferCommitRequest:
+      type: object
+      properties:
+        verified:
+          type: array
+          items:
+            type: object
+            properties:
+              pageId:
+                type: string
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+              revisionId:
+                type: string
+                minLength: 1
+                maxLength: 128
+                pattern: ^[A-Za-z0-9_.~-]+$
+              contentHash:
+                type: string
+                pattern: ^[0-9a-f]{64}$
+            required:
+              - pageId
+              - revisionId
+              - contentHash
+    TransferCreateRequest:
+      oneOf:
+        - type: object
+          properties:
+            operationId:
+              type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+              description: Client-generated UUIDv7. Must equal the Idempotency-Key header.
+            direction:
+              type: string
+              const: to_workspace
+            mode:
+              type: string
+              enum:
+                - copy
+                - move
+            pages:
+              minItems: 1
+              type: array
+              items:
+                type: object
+                properties:
+                  sourceId:
+                    type: string
+                    minLength: 1
+                  pageId:
+                    type: string
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                  parentId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 500
+                  markdown:
+                    type: string
+                required:
+                  - sourceId
+                  - pageId
+                  - parentId
+                  - title
+                  - markdown
+            attachmentIds:
+              type: array
+              items:
+                type: string
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+          required:
+            - operationId
+            - direction
+            - mode
+            - pages
+        - type: object
+          properties:
+            operationId:
+              type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            direction:
+              type: string
+              const: from_workspace
+            mode:
+              type: string
+              enum:
+                - copy
+                - move
+            pages:
+              minItems: 1
+              type: array
+              items:
+                type: object
+                properties:
+                  pageId:
+                    type: string
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                required:
+                  - pageId
+          required:
+            - operationId
+            - direction
+            - mode
+            - pages
+    TransferItem:
+      type: object
+      properties:
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        sourceId:
+          type: string
+        revisionId:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        state:
+          type: string
+          enum:
+            - pending
+            - staged
+            - committed
+            - skipped
+            - failed
+        error:
+          anyOf:
+            - type: string
+              enum:
+                - validation_failed
+                - cursor_invalid
+                - unauthenticated
+                - forbidden
+                - export_restricted
+                - not_found
+                - method_not_allowed
+                - invalid_transfer_state
+                - cursor_expired
+                - revision_conflict
+                - payload_too_large
+                - unsupported_media_type
+                - idempotency_key_reused
+                - precondition_required
+                - rate_limited
+                - internal_error
+                - capability_not_supported
+                - service_unavailable
+            - type: string
+              pattern: ^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$
+      required:
+        - pageId
+        - revisionId
+        - state
+    TransferResource:
+      type: object
+      properties:
+        operationId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        direction:
+          type: string
+          enum:
+            - to_workspace
+            - from_workspace
+        mode:
+          type: string
+          enum:
+            - copy
+            - move
+        state:
+          type: string
+          enum:
+            - plan
+            - validate
+            - stage
+            - transfer
+            - verify
+            - commit_destination
+            - finalize_source
+            - done
+            - destination_committed_source_cleanup_pending
+            - failed
+            - aborted
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransferItem"
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        error:
+          anyOf:
+            - type: object
+              properties:
+                code:
+                  anyOf:
+                    - type: string
+                      enum:
+                        - validation_failed
+                        - cursor_invalid
+                        - unauthenticated
+                        - forbidden
+                        - export_restricted
+                        - not_found
+                        - method_not_allowed
+                        - invalid_transfer_state
+                        - cursor_expired
+                        - revision_conflict
+                        - payload_too_large
+                        - unsupported_media_type
+                        - idempotency_key_reused
+                        - precondition_required
+                        - rate_limited
+                        - internal_error
+                        - capability_not_supported
+                        - service_unavailable
+                    - type: string
+                      pattern: ^x-[a-z0-9]+(?:[._-][a-z0-9]+)*$
+                detail:
+                  type: string
+              required:
+                - code
+            - type: "null"
+      required:
+        - operationId
+        - workspaceId
+        - direction
+        - mode
+        - state
+        - items
+        - createdAt
+        - updatedAt
+        - error
+    TreeNode:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        title:
+          type: string
+        revisionId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+      required:
+        - id
+        - parentId
+        - title
+        - revisionId
+        - updatedAt
+    TreePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TreeNode"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        changeCursor:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_.~-]+$
+          description: Change-feed cursor taken no later than the start of the traversal; follow GET /changes from it after reading all pages.
+      required:
+        - items
+        - nextCursor
+        - workspaceId
+        - changeCursor
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        kind:
+          type: string
+          const: workspace
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - editor
+            - viewer
+        exportRestricted:
+          type: boolean
+          description: When true the server refuses Workspace to Private transfers and copies with 403 export_restricted.
+        memberCount:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+      required:
+        - id
+        - kind
+        - name
+        - role
+        - exportRestricted
+        - memberCount
+        - createdAt
+    WorkspaceList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Workspace"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+      required:
+        - items
+        - nextCursor
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 2048
+        pattern: ^[A-Za-z0-9_.~-]+$
+        description: Opaque cursor. Clients must not parse or construct it.
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9_.~-]+$
+    PageId:
+      name: pageId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+  responses:
+    Problem400:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem401:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+      headers:
+        WWW-Authenticate:
+          description: Challenge, for example `Bearer`. Provisional, see the bearerAuth scheme.
+          schema:
+            type: string
+    Problem403:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem404:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem405:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+      headers:
+        Allow:
+          description: Methods supported by the route.
+          schema:
+            type: string
+    Problem409:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem410:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem412:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/RevisionConflictProblem"
+    Problem413:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem415:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem422:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem428:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem429:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+            minimum: 0
+    Problem500:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem501:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Problem503:
+      description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+  headers:
+    ETag:
+      description: "Strong entity tag: the revision ID in double quotes."
+      schema:
+        type: string
+    Location:
+      description: Absolute path of the created resource.
+      schema:
+        type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme will change before the protocol is finalized; do not build long-lived integrations on it. No OAuth flow is defined here.
+x-thoth-protocol-status: draft
+x-thoth-capabilities:
+  - attachments
+  - search
+  - events.sse
+  - transfers
+  - databases
+  - realtime-collab

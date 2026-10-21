@@ -12,6 +12,8 @@ export interface RawZipEntry {
   /** Unix mode stored in external attributes (e.g. 0o120777 for a symlink). */
   mode?: number;
   deflate?: boolean;
+  /** Extra general-purpose flag bits (e.g. 0x1 marks the entry encrypted). */
+  flags?: number;
 }
 
 export function buildZip(entries: RawZipEntry[]): Buffer {
@@ -25,7 +27,7 @@ export function buildZip(entries: RawZipEntry[]): Buffer {
     const body = deflate ? deflateRawSync(raw) : raw;
     const crc = crc32(raw);
     const method = deflate ? 8 : 0;
-    const flags = 0x0800; // UTF-8 names
+    const flags = 0x0800 | (entry.flags ?? 0); // UTF-8 names
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);

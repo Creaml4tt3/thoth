@@ -1,6 +1,6 @@
 # ADR-0002: Canonical content model and editor serialization
 
-- **Status:** Accepted (the editor part is Proposed until `packages/editor` exists)
+- **Status:** Accepted (editor part accepted 2026-10-21 when `packages/editor` landed with golden tests)
 - **Date:** 2026-10-20
 
 ## Context
@@ -43,10 +43,24 @@ Obsidian-style callouts are common in the vaults Thoth imports (spec section
    transfer and rename uses parser source positions to replace only the affected
    ranges, so untouched text keeps its exact original formatting. Whole-document
    reserialization happens only when the user edits in the editor.
-7. **Editor (Proposed).** The Tiptap/ProseMirror schema maps 1:1 to the block
-   types above. The Markdown serializer must round-trip the supported subset,
+7. **Editor.** The Tiptap/ProseMirror schema maps 1:1 to the block types
+   above. The Markdown serializer must round-trip the supported subset,
    verified with golden-file tests. Unsupported blocks render as read-only raw
-   nodes that round-trip byte-for-byte.
+   nodes that round-trip byte-for-byte. Implementation (`packages/editor`, contract
+   in `docs/architecture/editor-serialization.md`):
+   - Parsing reuses `@thoth/content` (mdast + GFM). The editor uses a custom
+     Tiptap extension set, not starter-kit.
+   - **Preservation is per top-level block.** Each block carries its exact source
+     (`mdSrc`), its preceding separator (`mdSep`) and a fingerprint of its
+     canonical form at parse time (`mdFp`). An untouched block is written back
+     byte-for-byte. An edited block is written in canonical form. The output is
+     reparsed to verify block boundaries, and a blank-line separator is used when
+     a move would glue blocks together.
+   - Editing one list item or table cell rewrites the whole list or table.
+     Range-splicing smaller units remains the job of programmatic edits (rule 6).
+   - **Raw fallback.** A top-level container that holds an unsupported child (a
+     link reference or footnote definition, HTML, math) becomes a single `raw`
+     block. `math` is a read-only atom with no behavior in v1.
 
 ## Consequences
 
@@ -81,8 +95,8 @@ Section 2 (editor, private storage), 6.1, 6.2 (frontmatter, unknown keys), 7.3
 
 - Persisted block IDs (for `[[Target#^block]]` anchors and the `blocks` table):
   whether Thoth ever writes `^block` markers itself. Not decided.
-- Which Markdown parser and Tiptap extension set to use. Blocks implementation
-  of `packages/content` and `packages/editor`, not this ADR.
+- ~~Which Markdown parser and Tiptap extension set to use.~~ Decided: mdast with
+  GFM from `@thoth/content`, and a custom Tiptap extension set.
 - Math block semantics (reserved in v1, no behavior defined).
-- Editor round-trip scope is Proposed; the exact golden-file corpus is not yet
-  written.
+- Finer-grained preservation (per list item or table row) if whole-container
+  rewrites prove too noisy in practice.
