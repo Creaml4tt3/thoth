@@ -104,6 +104,8 @@ export class Vault {
   readonly fs: VaultFs;
   readonly sql: SqlDriver;
   private readonly now: () => number;
+  /** Serializes index mutations: the SQL port is one connection, and BEGIN/COMMIT must not interleave. */
+  private queue: Promise<unknown> = Promise.resolve();
 
   private constructor(options: VaultOptions) {
     this.fs = options.fs;
@@ -198,6 +200,17 @@ export class Vault {
    * filesystem watcher only needs to trigger it.
    */
   async reconcile(options: { full?: boolean } = {}): Promise<ReconcileReport> {
+    return this.exclusive(() => this.reconcileNow(options));
+  }
+
+  /** Runs `task` after every earlier mutation has settled, so the watcher, saves and imports never overlap. */
+  private exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async reconcileNow(options: { full?: boolean } = {}): Promise<ReconcileReport> {
     const report: ReconcileReport = { added: [], updated: [], removed: [], unchanged: 0, warnings: [], recoveredJournalEntries: 0 };
     const { files, skipped } = await this.scanFiles();
     for (const s of skipped) report.warnings.push({ path: s.path, code: "skipped_entry", message: s.reason });
@@ -300,11 +313,13 @@ export class Vault {
 
   /** Drops the whole index and rebuilds it from files (index loss is never content loss). */
   async rebuildIndex(): Promise<ReconcileReport> {
-    await this.sql.exec("BEGIN");
-    for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
-      await this.sql.exec(`DELETE FROM ${table}`);
-    await this.sql.exec("COMMIT");
-    return this.reconcile({ full: true });
+    return this.exclusive(async () => {
+      await this.sql.exec("BEGIN");
+      for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
+        await this.sql.exec(`DELETE FROM ${table}`);
+      await this.sql.exec("COMMIT");
+      return this.reconcileNow({ full: true });
+    });
   }
 
   private pageIdFor(doc: PageDocument): string {
@@ -538,6 +553,10 @@ export class Vault {
    * (ADR-001 §5–7). Never overwrites a file changed since the caller read it.
    */
   async writeFileAtomic(path: string, data: Uint8Array, options: WriteOptions): Promise<string> {
+    return this.exclusive(() => this.writeFileAtomicNow(path, data, options));
+  }
+
+  private async writeFileAtomicNow(path: string, data: Uint8Array, options: WriteOptions): Promise<string> {
     const normalized = normalizeVaultPath(path);
     if (isReservedPath(normalized)) throw new Error("Refusing to write vault content into .thoth/");
     const currentHash = await this.currentHash(normalized);
@@ -564,7 +583,7 @@ export class Vault {
       throw error;
     }
     await clearJournalEntry(this.fs, id);
-    await this.reconcile();
+    await this.reconcileNow();
     return newHash;
   }
 

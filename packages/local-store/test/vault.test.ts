@@ -287,3 +287,20 @@ describe("search input hardening", () => {
     await expect(vault.search('a"\u0007b')).resolves.toBeInstanceOf(Array);
   });
 });
+
+describe("Vault concurrency", () => {
+  it("serializes concurrent saves, reconciles and rebuilds without overlapping transactions", async () => {
+    // The watcher, editor saves and imports all run on one SQL connection; overlapping BEGINs would throw.
+    const created = await Promise.all(Array.from({ length: 8 }, (_, i) => vault.createPage(`Burst/Note ${i}.md`, `# Note ${i}\n`)));
+    const work: Promise<unknown>[] = [];
+    for (let i = 0; i < 8; i++) {
+      work.push(vault.writePage(`Burst/Note ${i}.md`, `${(await vault.readPage(`Burst/Note ${i}.md`)).source}zebramark${i}\n`, { expectedHash: created[i]!.hash }));
+      work.push(vault.reconcile());
+      if (i % 3 === 0) work.push(vault.rebuildIndex());
+    }
+    await Promise.all(work);
+    const pages = (await vault.listPages()).filter((p) => p.path.startsWith("Burst/"));
+    expect(pages).toHaveLength(8);
+    for (let i = 0; i < 8; i++) expect((await vault.search(`zebramark${i}`)).some((h) => h.path === `Burst/Note ${i}.md`)).toBe(true);
+  });
+});

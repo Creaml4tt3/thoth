@@ -5,3 +5,4 @@ export * from "./manifest.ts";
 export * from "./pipeline.ts";
 export * from "./provider.ts";
 export * from "./source.ts";
+export * from "./ports.ts";

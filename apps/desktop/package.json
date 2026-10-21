@@ -1,0 +1,40 @@
+{
+  "name": "@thoth/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/editor": "workspace:*",
+    "@thoth/importer-core": "workspace:*",
+    "@thoth/importer-notion": "workspace:*",
+    "@thoth/importer-obsidian": "workspace:*",
+    "@thoth/local-store": "workspace:*",
+    "@thoth/platform": "workspace:*",
+    "@thoth/ui": "workspace:*",
+    "@tiptap/core": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "diff": "^9.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^30.1.3",
+    "vite": "8.3.4"
+  }
+}
