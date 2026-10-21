@@ -1,13 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { mkdir, mkdtemp, open, readdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSha256, sha256Hex } from "@thoth/domain";
-import { hashStream, ImportCancelledError, planImport, runImport, type ImportSource } from "@thoth/importer-core";
+import { hashStream, ImportCancelledError, planImport, runImport, ZipReader, type ByteRange, type ImportSource } from "@thoth/importer-core";
 import { openDirectorySource, openZipSource } from "@thoth/importer-core/node";
 import { obsidianProvider } from "@thoth/importer-obsidian";
 import { ObsidianVaultImporter, ObsidianZipImporter } from "@thoth/importer-obsidian/node";
@@ -15,12 +14,6 @@ import type { Vault } from "@thoth/local-store";
 import { openNodeVault } from "@thoth/local-store/node";
 import { InstrumentedSource } from "../helpers/instrumented-source.ts";
 import { buildZip, dirEntries, writeZip, type RawZipEntry } from "../helpers/zip.ts";
-
-// yauzl is a dependency of importer-core only; load the very instance it uses.
-const yauzl = createRequire(resolve(import.meta.dirname, "../../packages/importer-core/package.json"))("yauzl") as Record<
-  "fromBuffer" | "fromBufferPromise" | "fromRandomAccessReaderPromise",
-  (...args: unknown[]) => unknown
->;
 
 let work: string;
 let tempRoot: string;
@@ -131,17 +124,20 @@ describe("nested archives are never buffered", () => {
       { name: "Export-Part-1.zip", data: part1, deflate: false },
       { name: "Export-Part-2.zip", data: part2, deflate: false },
     ]);
-    const fromBuffer = vi.spyOn(yauzl, "fromBufferPromise");
-    const fromBufferCb = vi.spyOn(yauzl, "fromBuffer");
-    const fromReader = vi.spyOn(yauzl, "fromRandomAccessReaderPromise");
+    const opened = vi.spyOn(ZipReader, "open");
 
     const { result: source, requested } = await bytesReadDuring(() => openZipSource(outer, {}, { tempRoot }));
     // EOCD search windows (≤ 64 KiB each) + central directories + one local header; the 4 MiB part is never read.
     expect(requested).toBeLessThan(256 * 1024);
     expect(part1.length).toBeGreaterThan(16 * requested);
-    expect(fromBuffer).not.toHaveBeenCalled();
-    expect(fromBufferCb).not.toHaveBeenCalled();
-    expect(fromReader).toHaveBeenCalledTimes(3); // control: the spies do see zip_source's yauzl calls (outer + 2 parts)
+    // Outer archive + 2 parts, all opened over the *same* outer file: each part is a sub-range of it, never a copy.
+    const ranges = opened.mock.calls.map(([range]) => range as ByteRange);
+    expect(ranges).toHaveLength(3);
+    const outerSize = (await stat(outer)).size;
+    expect(ranges[0]).toMatchObject({ base: 0, length: outerSize });
+    expect(ranges.every((r) => r.file === ranges[0]!.file)).toBe(true);
+    expect(ranges.slice(1).map((r) => r.length)).toEqual([part1.length, part2.length]);
+    expect(ranges.slice(1).every((r) => r.base > 0 && r.base + r.length <= outerSize)).toBe(true);
     expect(await readdir(tempRoot)).toEqual([]);
     expect(source.entries.map((e) => e.path)).toEqual(["a.md", "b.md", "big.bin"]);
 

@@ -106,6 +106,7 @@ export class Vault {
   private readonly now: () => number;
   /** Serializes index mutations: the SQL port is one connection, and BEGIN/COMMIT must not interleave. */
   private queue: Promise<unknown> = Promise.resolve();
+  private closed = false;
 
   private constructor(options: VaultOptions) {
     this.fs = options.fs;
@@ -125,7 +126,11 @@ export class Vault {
     return { vault, report };
   }
 
+  /** Waits for in-flight writes and reconciles, then closes the index. Later mutations reject. */
   async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    await this.queue;
     await this.sql.close();
   }
 
@@ -205,6 +210,7 @@ export class Vault {
 
   /** Runs `task` after every earlier mutation has settled, so the watcher, saves and imports never overlap. */
   private exclusive<T>(task: () => Promise<T>): Promise<T> {
+    if (this.closed) return Promise.reject(new Error("Vault is closed"));
     const run = this.queue.then(task, task);
     this.queue = run.catch(() => undefined);
     return run;

@@ -11,10 +11,10 @@
     "@thoth/content": "workspace:*",
     "@thoth/domain": "workspace:*",
     "@thoth/local-store": "workspace:*",
-    "yauzl": "^3.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/yauzl": "^3.4.0"
+    "@types/yauzl": "^3.4.0",
+    "yauzl": "^3.4.0"
   }
 }

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = ["crates/thoth-host", "apps/desktop/src-tauri"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+thoth-host = { path = "crates/thoth-host" }
+base64 = "0.22"
+getrandom = "0.3"
+notify = "8"
+notify-debouncer-full = "0.5"
+rusqlite = { version = "0.37", features = ["bundled", "hooks", "limits"] }
+rustix = { version = "1", features = ["fs", "process"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tempfile = "3"
+thiserror = "2"
+unicode-normalization = "0.1"
+tauri = { version = "2", features = [] }
+tauri-build = { version = "2", features = [] }
+tauri-plugin-dialog = "2"

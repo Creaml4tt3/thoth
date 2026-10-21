@@ -212,14 +212,14 @@ importers:
       '@thoth/local-store':
         specifier: workspace:*
         version: link:../local-store
-      yauzl:
-        specifier: ^3.4.0
-        version: 3.4.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
       '@types/yauzl':
+        specifier: ^3.4.0
+        version: 3.4.0
+      yauzl:
         specifier: ^3.4.0
         version: 3.4.0
 

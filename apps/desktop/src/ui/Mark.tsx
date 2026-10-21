@@ -1,0 +1,22 @@
+import { useId } from "react";
+
+/** The Moon Ibis mark (design/brand/mark.svg), inline so it inherits `color`. */
+export function Mark({ size = 20, title }: { size?: number; title?: string }) {
+  const id = useId();
+  const mask = `thoth-mark-${id.replace(/:/g, "")}`;
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true} className="mark">
+      <defs>
+        <mask id={mask}>
+          <circle cx="256" cy="256" r="224" fill="#fff" />
+          <path
+            d="M150 520 C146 410 150 326 164 270 C142 248 133 220 137 194 C143 147 182 120 222 121 C252 123 274 138 287 160 C348 180 394 244 409 334 C414 364 414 388 410 406 C398 354 372 298 336 259 C314 235 291 221 270 223 C262 241 250 257 236 267 C231 332 240 424 252 520 Z"
+            fill="#000"
+          />
+          <circle cx="222" cy="180" r="15" fill="#fff" />
+        </mask>
+      </defs>
+      <circle cx="256" cy="256" r="224" fill="currentColor" mask={`url(#${mask})`} />
+    </svg>
+  );
+}

@@ -1,6 +1,7 @@
 import type { PageDocument } from "@thoth/content";
 import type { ImportSourceKind, ImportWarning } from "@thoth/domain";
 import type { ImportItemKind } from "./manifest.ts";
+import type { SourceHost } from "./ports.ts";
 import type { ImportSource, SourceEntry } from "./source.ts";
 
 export interface ClassifiedEntry {
@@ -29,9 +30,30 @@ export interface ImportProvider {
   rootPrefix?(paths: readonly string[]): string;
 }
 
-/** A named adapter (spec §7.4) pairing a source opener with a provider. */
-export interface Importer<Limits = unknown> {
+export interface OpenedImport {
+  source: ImportSource;
+  provider: ImportProvider;
+}
+
+/**
+ * A named adapter (spec §7.4) pairing a source opener with a provider. The
+ * main package entries export host-based importers that run anywhere (Tauri
+ * webview included); the `./node` entries add `open(location)` on top.
+ */
+export interface HostImporter<Limits = unknown> {
   readonly id: "NotionZipImporter" | "NotionMarkdownCsvImporter" | "ObsidianVaultImporter" | "ObsidianZipImporter";
   readonly sourceKind: ImportSourceKind;
-  open(location: string, limits?: Limits): Promise<{ source: ImportSource; provider: ImportProvider }>;
+  /** Whether `openHost` needs a host bound to a chosen file (an archive) or a folder. */
+  readonly hostKind: SourceHost["rootKind"];
+  /**
+   * Opens a source through a platform `SourceHost` and takes ownership of it:
+   * the host is closed with the source, or at once if opening fails
+   * (including when the host is the wrong kind).
+   */
+  openHost(host: SourceHost, limits?: Limits): Promise<OpenedImport>;
+}
+
+/** A host importer plus the Node convenience of opening a path directly. */
+export interface Importer<Limits = unknown> extends HostImporter<Limits> {
+  open(location: string, limits?: Limits): Promise<OpenedImport>;
 }

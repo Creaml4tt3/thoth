@@ -21,11 +21,11 @@ Toolchain verified on the dev machine:
 | ADRs 001–011 (§16) | **Written** | `docs/adr/`. 001, 003 and 010 are Accepted. 002 is Accepted except its editor part. 008 is Accepted for runtimes. The rest are Proposed. ADR-011 needs an owner decision. |
 | Canonical content schema (§6, §15.1) | **Done (v1)** | `packages/content`, `packages/domain`, `protocol/schemas/*.json`, `docs/architecture/content-schema.md` |
 | Private Space persistence + index (P0) | **Done: domain/storage layer** | `packages/local-store`: CAS atomic writes, journal recovery, reconcile, rebuild, FTS5 search, links/backlinks/graph |
-| Filesystem watcher (P0) | Not started | Reconcile exists and is safe to trigger any time. The watcher is a trigger only (ADR-0001). |
-| Markdown editor (P0) | **Done: model/serializer layer (2026-10-21)** | `packages/editor`: Tiptap schema matching the v1 blocks, byte-identical round-trip for untouched blocks, canonical serializer with golden and property tests. No UI yet (Phase 1c). |
-| Desktop runtime (P0) | **Unblocked (2026-10-21)** | ADR-0008 decided: Rust Tauri commands implement `VaultFs`/`SqlDriver`; no Node sidecar. The Tauri CLI is not installed yet. |
+| Filesystem watcher (P0) | **Done (2026-10-21)** | Rust `notify` debouncer (200 ms) emits vault-relative paths; the UI debounces into `vault.reconcile()`, with a full rescan on overflow. |
+| Markdown editor (P0) | **Done (2026-10-21)** | `packages/editor` (schema and serializer) plus the editor UI in `apps/desktop`: callout, wikilink and read-only raw node views, CAS saves, and a conflict dialog (keep mine, keep theirs, keep both). |
+| Desktop runtime (P0) | **Done (2026-10-21)** | `crates/thoth-host` (Rust ports, openat traversal, SQL sandbox, picker allow-list) and `apps/desktop/src-tauri` (least-privilege capability, strict CSP). `tauri build --debug` succeeds. No signed release bundle yet. |
 | Import pipeline (P1) | **Done: domain layer** | `importer-core`, `importer-obsidian`, `importer-notion`, with all four adapters from §7.4 |
-| Import wizard UI (P1, §7.1) | Not started | The pipeline already exposes everything the wizard needs: `planImport` → preview, `runImport` with progress, cancel and resume, and a report. |
+| Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; server and web not started | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | Not started | ADR-0006 is Proposed. The state enum and `operation_journal` table are reserved. |
 | Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
@@ -83,7 +83,7 @@ Acceptance tests (`tests/import/*.test.ts`) map to spec §7.5:
 | Import memory (review item 11) | See §5 | `streaming.test.ts`, `memory-smoke.test.ts` |
 | Workspace protocol contract | Zod route registry, OpenAPI 3.1, normative docs, conformance suite | 194 tests in `tests/protocol/` |
 
-### Phase 1c — Desktop shell + editor UI + import wizard (next)
+### Phase 1c — Desktop shell + editor UI + import wizard ✅ (2026-10-21)
 
 1. ADR-0008 is decided (Rust-hosted ports). Scaffold `apps/desktop` (Tauri 2)
    and `apps/web` (Vite + React), sharing `packages/ui`. Implement `VaultFs` and
@@ -104,6 +104,24 @@ AC:
 - Import wizard happy path plus cancel and resume.
 - Editor UI: an edit in the app saves through CAS with only the edited
   block changed on disk.
+
+Result:
+
+| AC | Evidence |
+|---|---|
+| E2E: create a note offline → edit → edit externally → conflict prompt | `tests/e2e/private-space.e2e.ts`. The real UI runs in Chromium on the real Rust host through a test-only bridge, with the network blocked. Keep both writes a conflict copy and never overwrites. |
+| Import wizard happy path plus cancel and resume | Same file: an Obsidian ZIP through all wizard steps; a second import cancelled mid-run, then resumed with an identical file set and the source byte-identical. |
+| Golden round-trip tests for the editor serializer | `packages/editor/test` |
+| One port contract for Node and Rust | `tests/ports`: 22 contract tests on each runtime, 15 Rust security tests, 8 tests running the real `Vault` on Rust ports. |
+| Desktop UI behaviour | `apps/desktop/test`: 39 jsdom tests (no-op save, minimal diff, every conflict path, watcher, read-only pages, wizard, search). |
+
+Run with `pnpm check` (unit and contract tests) and `pnpm e2e` (Playwright, which needs the Rust toolchain and Chromium).
+
+Not done in 1c:
+- No real-webview e2e. The IPC path is covered by a fake-API test and a successful `tauri build`, not by driving the WebKit webview.
+- No signed or notarized bundle.
+- No editor toolbar, slash menu or wikilink autocomplete.
+- Import performance is about 13 ms per file on Rust ports. Most of it is fsync (two per file) and IPC round trips. Batch staging and commits before importing exports with tens of thousands of files.
 
 ### Phase 2 — Workspace protocol + reference server
 
@@ -218,6 +236,15 @@ regression tests (`pnpm check`: 92 tests):
   - `reconcile()` keeps every parsed page in memory.
   - A SIGKILL during extraction can leave a `thoth-import-*` temp directory
     behind; a startup sweep is still to do.
+- **Phase 1c review fixes:**
+  - `Vault` serializes reconcile, rebuild and writes on its single SQL connection; overlapping transactions used to throw.
+  - `Vault.close()` drains in-flight work before closing.
+  - Both are covered by regression tests.
+- **Desktop (ADR-0008), still open:**
+  - Linux opens the vault root without `O_NOFOLLOW_ANY`.
+  - SQLite opens its file by path, not anchored to a directory fd.
+  - The webview can exhaust resources with SQL against its own index; this is bounded by a 120 s deadline and a 256 MiB result cap.
+  - The CSP allows inline styles.
 - **Low:** APFS folds `ς`/`Σ` but `collisionKey` does not, which gives a
   reported failure, not data loss. Folder imports do not detect hardlinked
   source files (`nlink > 1`). There is a small TOCTOU window between the

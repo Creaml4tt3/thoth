@@ -304,3 +304,16 @@ describe("Vault concurrency", () => {
     for (let i = 0; i < 8; i++) expect((await vault.search(`zebramark${i}`)).some((h) => h.path === `Burst/Note ${i}.md`)).toBe(true);
   });
 });
+
+describe("Vault close", () => {
+  it("lets in-flight writes finish, then rejects new mutations", async () => {
+    const pending = vault.createPage("Closing/Note.md", "# Note\n");
+    const closing = vault.close();
+    await expect(pending).resolves.toMatchObject({ hash: expect.any(String) });
+    await closing;
+    await expect(vault.reconcile()).rejects.toThrow("Vault is closed");
+    expect(await readFile(join(root, "Closing/Note.md"), "utf8")).toContain("# Note");
+    ({ vault } = await openNodeVault(root));
+    expect(await vault.pageByPath("Closing/Note.md")).toBeDefined();
+  });
+});

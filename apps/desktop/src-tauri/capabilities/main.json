@@ -1,0 +1,38 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Least privilege for the main window: Thoth's host commands and event listening only. No fs, shell, http or window plugins; native dialogs are opened by the host, not the webview.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-vault-pick",
+    "allow-vault-recent",
+    "allow-vault-open",
+    "allow-vault-close",
+    "allow-fs-stat",
+    "allow-fs-read",
+    "allow-fs-list",
+    "allow-fs-mkdirp",
+    "allow-fs-write",
+    "allow-fs-rename",
+    "allow-fs-remove",
+    "allow-sql-exec",
+    "allow-sql-run",
+    "allow-sql-all",
+    "allow-sql-get",
+    "allow-watch-start",
+    "allow-watch-stop",
+    "allow-source-pick",
+    "allow-source-open",
+    "allow-source-list",
+    "allow-source-file-open",
+    "allow-source-file-read",
+    "allow-source-file-close",
+    "allow-source-temp-create",
+    "allow-source-temp-write",
+    "allow-source-close"
+  ]
+}

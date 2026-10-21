@@ -1,0 +1,32 @@
+[package]
+name = "thoth-host"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Native host for Thoth's platform ports: scoped vault fs, SQLite, watcher, import sources (ADR-0008)."
+
+[lib]
+path = "src/lib.rs"
+
+# JSON-lines harness for the port contract tests and the e2e dev bridge.
+# Test infrastructure only: the desktop app links the library, never this binary.
+[[bin]]
+name = "thoth-host-stdio"
+path = "src/bin/thoth-host-stdio.rs"
+
+[dependencies]
+base64.workspace = true
+getrandom.workspace = true
+notify.workspace = true
+notify-debouncer-full.workspace = true
+rusqlite.workspace = true
+rustix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

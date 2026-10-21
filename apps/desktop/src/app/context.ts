@@ -5,17 +5,45 @@
 import { createContext, useContext } from "react";
 import type { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
+import type { ImportService } from "../features/import/service.ts";
+import type { OpenImportSource } from "../features/import/open-source.ts";
+
+/** Tunables that tests (and later settings) override. */
+export interface AppOptions {
+  /** Idle time before an edited page is saved. 0 disables autosave. */
+  autosaveMs: number;
+  /** Quiet period that coalesces watcher events into one reconcile. */
+  reconcileDebounceMs: number;
+  /** Connects the import wizard to a source. Defaults to the marked function in `features/import/open-source.ts`. */
+  openImportSource: OpenImportSource;
+  now: () => Date;
+}
 
 export interface Session {
   platform: Platform;
   connection: VaultConnection;
   vault: Vault;
+  options: AppOptions;
+  importService: ImportService;
   /** Bumped after any change to the index (save, reconcile, import) so views re-query. */
   revision: number;
   /** Call after mutating the vault outside the shell (e.g. an import) to refresh views. */
   refresh(): Promise<void>;
   /** Opens a page in the editor. */
   openPage(path: string): void;
+  /** Opens Settings (a full view, not a page). */
+  openSettings(): void;
+  /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
+  openFolder(path: string): void;
+  reveal: { path: string; nonce: number } | null;
+  /** The open page registers how to write its pending edits; returns the unregister function. */
+  registerFlush(flush: () => Promise<boolean>): () => void;
+  /** Writes every pending edit. False when something (a conflict, an error) still needs the user. */
+  flushAll(): Promise<boolean>;
+  /** Closes this Private Space and returns to onboarding. */
+  switchVault(): void;
+  /** Set when the filesystem watcher could not start; saving still works. */
+  watchError: string | null;
 }
 
 export const SessionContext = createContext<Session | null>(null);

@@ -1,21 +1,18 @@
-import { openDirectorySource, openZipSource } from "@thoth/importer-core/node";
 import type { Importer, ScanLimits } from "@thoth/importer-core";
-import { notionProvider } from "./index.ts";
+import { openNodeSourceHost } from "@thoth/importer-core/node";
+import * as hostImporters from "./host-importers.ts";
 
-/** Notion Markdown & CSV export ZIP, including multi-part exports of nested ZIPs. */
+/** Node entry: the host importers plus `open(location)`, which opens a Node `SourceHost` for the path. */
 export const NotionZipImporter: Importer<Partial<ScanLimits>> = {
-  id: "NotionZipImporter",
-  sourceKind: "notion-zip",
+  ...hostImporters.NotionZipImporter,
   async open(location, limits) {
-    return { source: await openZipSource(location, limits), provider: notionProvider() };
+    return hostImporters.NotionZipImporter.openHost(await openNodeSourceHost(location), limits);
   },
 };
 
-/** A Notion export the user already extracted to a folder. */
 export const NotionMarkdownCsvImporter: Importer<Partial<ScanLimits>> = {
-  id: "NotionMarkdownCsvImporter",
-  sourceKind: "notion-folder",
+  ...hostImporters.NotionMarkdownCsvImporter,
   async open(location, limits) {
-    return { source: await openDirectorySource(location, limits), provider: { ...notionProvider(), sourceKind: "notion-folder" } };
+    return hostImporters.NotionMarkdownCsvImporter.openHost(await openNodeSourceHost(location), limits);
   },
 };

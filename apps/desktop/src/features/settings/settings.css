@@ -1,0 +1,4 @@
+.settings { display: grid; gap: var(--thoth-space-8); }
+.set-section { display: grid; gap: var(--thoth-space-2); padding-bottom: var(--thoth-space-6); border-bottom: 1px solid var(--thoth-border); }
+.set-section h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); }
+.set-actions { display: flex; gap: var(--thoth-space-3); align-items: center; flex-wrap: wrap; margin-top: var(--thoth-space-1); }
