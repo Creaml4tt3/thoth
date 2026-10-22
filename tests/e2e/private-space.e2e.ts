@@ -4,6 +4,9 @@
  *
  * 1. Create a note offline → edit → edit externally → conflict prompt → keep both.
  * 2. Import wizard: Obsidian ZIP happy path, then cancel and resume.
+ * 3. Plain mode: real keystrokes, mode switching, exact bytes.
+ * 4. `[[` autocomplete in both modes.
+ * 5. Blocks mode: `/` menu, toggle and to-do, drag with the handle, fold, exact bytes on disk.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, utimes, writeFile } from "node:fs/promises";
@@ -213,4 +216,76 @@ test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => 
   await page.keyboard.press("ControlOrMeta+s");
 
   await expect.poll(() => readFile(join(vault, "Linking.md"), "utf8")).toBe("# Linking\n\nBlocks: [[Roadmap]]\n\nPlain: [[Roadmap]]\n");
+});
+
+test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact bytes on disk", async ({ page }) => {
+  // Odd formatting that Blocks must not touch: double spaces, a `*` bullet, trailing spaces.
+  const source = "# Blocks\n\nalpha  para\n\n* star   bullet\n\nomega para   \n";
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await writeFile(join(vault, "Blocks.md"), source); // the Rust watcher picks it up
+  await page.getByRole("treeitem", { name: "Blocks" }).click({ timeout: 15_000 });
+  const box = await editor(page);
+  await expect(box).toContainText("omega para");
+  const menu = page.getByRole("listbox", { name: "Insert block" });
+  // ProseMirror reads a click's selection a tick later: wait until the caret is in the block, as a person would see it.
+  const clickBlock = async (text: string) => {
+    await box.getByText(text).click();
+    await expect.poll(() => box.evaluate((el) => (el as unknown as { editor: { state: { selection: { $from: { parent: { textContent: string } } } } } }).editor.state.selection.$from.parent.textContent)).toBe(text);
+  };
+
+  // 1. A to-do after the last paragraph and a toggle after the first, both from the `/` menu.
+  await clickBlock("omega para");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/todo");
+  await expect(menu.getByRole("option", { name: /To-do list/ })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  await page.keyboard.type("buy milk");
+
+  await clickBlock("alpha  para");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/tog");
+  await expect(menu.getByRole("option")).toHaveCount(1);
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("Fold me");
+  await page.keyboard.press("Enter"); // title to body
+  await page.keyboard.type("hidden line");
+  const toggle = box.locator('.callout[data-callout="toggle"]');
+  await expect(toggle).toHaveAttribute("data-collapsed", "false");
+  await expect(toggle.locator(".callout-title")).toHaveText("Fold me");
+
+  // 2. Drag "omega para" above the toggle by its gutter handle (real mouse, real drag events).
+  const omega = box.locator("p", { hasText: "omega para" });
+  await omega.hover();
+  const handle = page.locator(".block-handle");
+  await expect(handle).toBeVisible();
+  const from = (await handle.boundingBox())!;
+  const target = (await toggle.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, from.y - 10, { steps: 4 });
+  await page.mouse.move(target.x + 60, target.y + 2, { steps: 10 });
+  await expect(page.locator(".block-drop-indicator")).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator(".block-drop-indicator")).toBeHidden();
+  await expect(box.locator("p, .callout").filter({ hasText: /omega para|Fold me/ }).first()).toContainText("omega para");
+
+  // 3. Collapse the toggle: view only, nothing becomes unsaved by it. (The page is already dirty from typing; save first.)
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).not.toBe(source);
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  const saved = await readFile(join(vault, "Blocks.md"), "utf8");
+  await toggle.getByRole("button", { name: /collapse toggle/i }).click();
+  await expect(toggle).toHaveAttribute("data-collapsed", "true");
+  await expect(toggle.getByText("hidden line")).toBeHidden();
+  await page.waitForTimeout(500);
+  expect(await readFile(join(vault, "Blocks.md"), "utf8")).toBe(saved);
+  await expect(page.getByRole("status").filter({ hasText: /Unsaved/ })).toHaveCount(0);
+
+  // 4. Save and check the file: new blocks canonical, every untouched line byte-identical.
+  await page.keyboard.press("ControlOrMeta+s");
+  const expected = "# Blocks\n\nalpha  para\n\nomega para   \n\n> [!toggle]+ Fold me\n> hidden line\n\n* star   bullet\n\n- [ ] buy milk\n";
+  await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).toBe(expected);
 });

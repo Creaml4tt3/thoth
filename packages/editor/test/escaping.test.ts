@@ -83,7 +83,7 @@ describe("canonical escaping preserves text", () => {
         ["list", { type: "list", attrs: { ordered: false }, content: [item(text)] }],
         ["ordered list", { type: "list", attrs: { ordered: true, start: 1 }, content: [item(text)] }],
         ["blockquote", { type: "blockquote", content: [paragraph(text)] }],
-        ["callout", { type: "callout", attrs: { kind: "note", fold: "", title: "T" }, content: [paragraph(text)] }],
+        ["callout", { type: "callout", attrs: { kind: "note", fold: "" }, content: [{ type: "calloutTitle", content: [{ type: "text", text: "T" }] }, paragraph(text)] }],
         ["table", { type: "table", attrs: { align: [null] }, content: [{ type: "tableRow", content: [cell("tableHeader")] }, { type: "tableRow", content: [cell("tableCell")] }] }],
       ];
       for (const [name, node] of wrappers) {

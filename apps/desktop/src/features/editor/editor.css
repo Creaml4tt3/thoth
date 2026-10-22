@@ -34,12 +34,31 @@
 .wikilink[data-state="ambiguous"] { color: var(--thoth-warning); cursor: default; }
 .embed { margin: 0.6em 0; }
 
-/* Callouts, styled by kind. Neutral by default; semantic colours only for state kinds. */
-.callout { --callout: var(--thoth-ink-secondary); display: grid; gap: 4px; margin: 0.9em 0; padding: 12px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border-left: 3px solid var(--callout); }
-.callout-head { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 14px; user-select: none; }
-.callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; }
-.callout-body { font-size: 15px; }
-.callout-body > :last-child { margin-bottom: 0; }
+/* Callouts, styled by kind. Neutral by default; semantic colours only for state kinds.
+   Layout: a lead (fold triangle, icon) beside the content (editable title, then the body). */
+.callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 12px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border-left: 3px solid var(--callout); }
+.callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
+.callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
+.callout-fold { all: unset; box-sizing: border-box; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
+.callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.callout-fold:focus-visible { outline: 2px solid var(--thoth-moon); }
+.callout-fold[hidden] { display: none; }
+.callout-content { min-width: 0; font-size: 15px; }
+.callout-content > :last-child { margin-bottom: 0; }
+.callout-title { font-weight: 600; font-size: 14px; line-height: 20px; margin: 0 0 4px; min-height: 20px; }
+.callout-title:empty::before { content: var(--callout-label, "Note"); color: var(--thoth-ink-tertiary); font-weight: 600; }
+.callout[data-collapsed="true"] .callout-content > :not(.callout-title) { display: none; }
+.callout[data-collapsed="true"] .callout-title { margin-bottom: 0; }
+
+/* Toggle (Notion-style): no box, a triangle, an editable title and an indented body. */
+.callout[data-callout="toggle"] { display: block; position: relative; margin: 0.4em 0; padding: 0; background: none; border-left: 0; border-radius: 0; }
+.callout[data-callout="toggle"] > .callout-lead { position: absolute; left: 0; top: 0; }
+.callout[data-callout="toggle"] .callout-icon { display: none; }
+.callout[data-callout="toggle"] > .callout-content { padding-left: 24px; }
+.callout[data-callout="toggle"] .callout-title { font: var(--thoth-text-body); font-weight: 450; margin: 0 0 2px; min-height: 26px; line-height: 26px; }
+.callout[data-callout="toggle"] .callout-title:empty::before { content: "Toggle"; font-weight: 450; }
+.callout[data-callout="toggle"] .callout-fold { width: 24px; height: 26px; font-size: 15px; }
+.callout[data-callout="toggle"] .callout-content > :not(.callout-title) { margin-left: 2px; }
 .callout[data-callout="tip"], .callout[data-callout="hint"], .callout[data-callout="success"], .callout[data-callout="check"], .callout[data-callout="done"] { --callout: var(--thoth-success); }
 .callout[data-callout="warning"], .callout[data-callout="caution"], .callout[data-callout="attention"], .callout[data-callout="important"] { --callout: var(--thoth-warning); }
 .callout[data-callout="danger"], .callout[data-callout="error"], .callout[data-callout="failure"], .callout[data-callout="fail"], .callout[data-callout="missing"], .callout[data-callout="bug"] { --callout: var(--thoth-danger); }
@@ -101,3 +120,33 @@
 .link-option-title { color: var(--thoth-ink-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-option-meta { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-menu-empty { padding: 8px 10px; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
+
+/* `/` block menu: same look as the link menu, with a glyph and a description per row. */
+.slash-menu { position: fixed; z-index: 40; width: 300px; max-height: 320px; overflow: auto; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
+.slash-option { display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 5px 10px 5px 6px; border-radius: var(--thoth-radius-sm); cursor: pointer; }
+.slash-option[aria-selected="true"] { background: var(--thoth-bg-active); }
+.slash-option-icon { grid-row: 1 / 3; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-secondary); font: 600 12px var(--thoth-font-sans); }
+.slash-option-title { color: var(--thoth-ink-primary); }
+.slash-option-meta { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-menu-empty { padding: 8px 10px; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
+
+/* Block handle (gutter), drop indicator and block menu */
+.editor-surface { position: relative; }
+.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; }
+.block-handle:hover, .block-handle:active { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
+.block-handle[hidden] { display: none; }
+.block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-moon); pointer-events: none; }
+.block-drop-indicator[hidden] { display: none; }
+.is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
+.block-menu { position: fixed; z-index: 50; min-width: 220px; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
+.block-menu[hidden] { display: none; }
+.block-submenu { z-index: 51; max-height: calc(100vh - 16px); overflow: auto; }
+.block-menu-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-primary); outline: none; }
+.block-menu-item:focus, .block-menu-item:hover { background: var(--thoth-bg-active); }
+.block-menu-item:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
+.block-menu-item[aria-disabled="true"] { color: var(--thoth-ink-faint); cursor: default; }
+.block-menu-item[aria-disabled="true"]:hover { background: none; }
+.block-menu-item[aria-checked="true"] .block-menu-label::after { content: " ✓"; color: var(--thoth-ink-tertiary); }
+.block-menu-icon { width: 20px; text-align: center; color: var(--thoth-ink-secondary); font-size: 12px; }
+.block-menu-label { flex: 1; }
+.block-menu-hint { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }

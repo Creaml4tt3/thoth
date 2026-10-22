@@ -215,6 +215,22 @@ function afterFirstLine(children: PhrasingContent[]): PhrasingContent[] {
   return [];
 }
 
+/** The first line of a callout's first paragraph, without the `[!kind]+` marker. */
+function firstLine(children: PhrasingContent[]): PhrasingContent[] {
+  const out: PhrasingContent[] = [];
+  for (const c of children) {
+    if (c.type === "break") break;
+    if (c.type === "text" && /\r?\n/.test(c.value)) {
+      out.push({ ...c, value: c.value.slice(0, c.value.search(/\r?\n/)) });
+      break;
+    }
+    out.push(c);
+  }
+  const head = out[0];
+  if (head?.type === "text") out[0] = { ...head, value: head.value.replace(/^\[![A-Za-z0-9_-]+\][+-]?[ \t]*/, "") };
+  return out;
+}
+
 function blockquote(node: Extract<RootContent, { type: "blockquote" }>, ctx: Ctx): JSONContent {
   const first = node.children[0];
   const head = first?.type === "paragraph" ? first.children[0] : undefined;
@@ -222,15 +238,12 @@ function blockquote(node: Extract<RootContent, { type: "blockquote" }>, ctx: Ctx
     const line = sliceOf(first, ctx).split(/\r?\n/, 1)[0] ?? "";
     const m = CALLOUT_LINE.exec(line);
     if (m) {
-      const kids: JSONContent[] = [];
+      const kids: JSONContent[] = [withContent("calloutTitle", undefined, inline(firstLine(first.children), ctx, true))];
       const restInline = inline(afterFirstLine(first.children), ctx);
       if (restInline.length) kids.push(withContent("paragraph", undefined, restInline));
       kids.push(...node.children.slice(1).map((c) => block(c, ctx)));
-      return {
-        type: "callout",
-        attrs: { kind: m[1]!, fold: m[2]!, title: m[3]! },
-        content: kids.length ? kids : [emptyParagraph()],
-      };
+      if (kids.length === 1) kids.push(emptyParagraph());
+      return { type: "callout", attrs: { kind: m[1]!, fold: m[2]! }, content: kids };
     }
   }
   const kids = node.children.map((c) => block(c, ctx));

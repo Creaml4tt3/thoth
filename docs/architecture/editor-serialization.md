@@ -94,7 +94,7 @@ the whole body becomes one `raw` block.
 | Image | `![alt](src "title")` |
 | Code block | backtick fence, at least 3 and longer than any backtick run inside; `~~~` when the info string has a backtick. Info string is `lang meta`. Indented code becomes fenced |
 | Blockquote | `> ` prefix on every line; empty lines are `>` |
-| Callout | `> [!kind]` + fold marker (`+`/`-`) + ` title`, then the body quoted. When the first child is not a paragraph a `>` line separates it from the head, so it is not absorbed into the title |
+| Callout | `> [!kind]` + fold marker (`+`/`-`) + ` title`, then the body quoted. The title is the callout's first child (`calloutTitle`, inline content on one line; section 3a). When the first body child is not a paragraph a `>` line separates it from the head, so it is not absorbed into the title |
 | Table | `\| a \| b \|`, delimiter row `---` / `:--` / `--:` / `:-:`, one space padding, no column alignment padding. Rows are padded or truncated to the header width. A cell is inline content on one line; `\|` for pipes |
 | Thematic break | `***` |
 | Wikilink | `[[Target#Fragment\|label]]`. Pipes become `\|` inside table cells |
@@ -104,6 +104,57 @@ the whole body becomes one `raw` block.
 
 Callout `kind` is stored as written (case preserved) and the content model
 lowercases it, as `@thoth/content` does.
+
+### 3a. Callout titles and toggles
+
+A callout node is `calloutTitle block+`: the first child is the title line, the
+rest is the body. (Before the toggle work the title was an attribute holding
+Markdown source and was not editable. It is now inline content, so it is edited
+in place and can hold marks, wikilinks and escapes like any text.)
+
+- **Parsing.** The title is the first line of the quote's first paragraph after
+  `[!kind]` and the fold marker, parsed as inline Markdown with breaks flattened.
+  The rest of that paragraph (after the first line) is the first body block.
+  An empty body gets one empty paragraph, which has no Markdown form.
+- **Serializing.** `> [!kind]` + fold + ` ` + the title rendered inline on a
+  single line: breaks become spaces, edge blanks are dropped (they would not
+  survive a reparse), block-start syntax in the text (`# `, `- `, `1. `) is not
+  escaped because the title never starts a line of its own. An empty title
+  writes no text and keeps the marker.
+- **Untouched callouts stay byte-identical**, including odd title spacing
+  (`> [!toggle]-   Odd   title  `): the block is emitted from `mdSrc` until a
+  title or body edit changes its canonical form. An edit rewrites that one
+  callout only (`[!toggle]-   Odd   title  ` becomes `[!toggle]- Odd title`).
+- **Toggle.** A callout of kind `toggle` is the Notion-style toggle:
+  `> [!toggle]- Title` then the body as quoted lines. Obsidian and other
+  callout-aware editors show it as a collapsible block (`-` collapsed, `+` open);
+  a plain Markdown viewer shows a quote. A new toggle is written `+` (open).
+  Any callout with a `+`/`-` marker gets the same fold triangle in Blocks mode.
+- **Folding is view-only.** The triangle (and Mod+Enter in a callout) flips a
+  data attribute on the node view. It dispatches no document change, so it
+  never marks the page dirty and never writes. The marker in the file is the
+  initial state only; it changes only when the user converts the block.
+
+### 3b. Moving, duplicating and converting blocks
+
+Block moves in Blocks mode keep the same node objects, so a moved block that was
+not edited keeps `mdSrc`, `mdSep` and `mdFp` and is written back byte-for-byte
+(section 2); its neighbours are not touched. A duplicate carries the same source
+attributes (the original and the copy both emit the original bytes until one of
+them is edited). Converted and new blocks (`/` menu, Turn into, input rules) are
+new nodes without source, so they are written canonically. Moving a list item
+rewrites its list (section 7).
+
+| Blocks mode feature | File effect |
+|---|---|
+| `/` menu, Turn into | the block becomes the canonical form of the new type; text is kept |
+| `>> ` (Markdown shortcut) | an open toggle, `> [!toggle]+` |
+| `> ` | a quote (unchanged) |
+| `[] ` or `[ ] ` | a to-do item, `- [ ] ` |
+| `---` | a divider, written `***` |
+| Alt+Shift+Up/Down | moves the block at the cursor |
+| Ctrl/Cmd+Alt+M | opens the block menu (Turn into, Duplicate, Delete, Move up, Move down) for the block at the cursor |
+| Mod+Enter in a callout | folds or unfolds it (view only) |
 
 ## 4. Escaping
 
@@ -166,6 +217,8 @@ block inside a list item; the byte-exact source is the safe model.
 - **Reformatting by design:** setext to ATX, `__` to `**`, indented code to
   fenced, `*`/`+` bullets to `-`, trailing spaces, odd indentation and table
   column padding all normalize when a block is rewritten.
+- A callout title is one line. Hard breaks and blank edges in a title cannot
+  be written and are flattened or dropped on the next edit of that callout.
 - Block IDs (`^id`) stay in text: they are plain paragraph text.
 - Frontmatter is carried, not modelled; the UI edits it through
   `updateFrontmatter` in `@thoth/content`.

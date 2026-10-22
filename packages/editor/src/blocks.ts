@@ -124,12 +124,35 @@ function canonTable(node: JSONContent): string {
   return [row(head), delimiter, ...rows.slice(1).map(row)].join("\n");
 }
 
+/**
+ * A callout title is one line without edge whitespace: `> [!kind] title`
+ * would lose it on reparse. Breaks become spaces; edge blanks are dropped.
+ */
+export function trimTitle(content: JSONContent[] | undefined): JSONContent[] {
+  const out = (content ?? []).map((n): JSONContent => (n.type === "hardBreak" ? { type: "text", text: " ", ...(n.marks ? { marks: n.marks } : {}) } : { ...n }));
+  const trim = (at: "first" | "last", re: RegExp) => {
+    for (;;) {
+      const n = at === "first" ? out[0] : out.at(-1);
+      if (n?.type !== "text") return;
+      n.text = (n.text ?? "").replace(re, "");
+      if (n.text !== "") return;
+      if (at === "first") out.shift();
+      else out.pop();
+    }
+  };
+  trim("first", /^[ \t\r\n]+/);
+  trim("last", /[ \t\r\n]+$/);
+  return out;
+}
+
 function canonCallout(node: JSONContent): string {
   const a = readAttrs(CalloutAttrsSchema, node);
   const kind = a.kind.replace(/[^A-Za-z0-9_-]/g, "") || "note";
-  const title = a.title.replace(/\r?\n|\r/g, " ").trim();
+  const all = node.content ?? [];
+  const titleNode = all[0]?.type === "calloutTitle" ? all[0] : undefined;
+  const title = renderInline(trimTitle(titleNode?.content), { start: false, blockEscapes: false, flatten: true, cell: false });
   const head = `> [!${kind}]${a.fold}${title === "" ? "" : ` ${title}`}`;
-  const kids = (node.content ?? []).filter((k) => !isVoid(k));
+  const kids = all.slice(titleNode ? 1 : 0).filter((k) => !isVoid(k));
   const body = canonBlocks(kids);
   if (body === "") return head;
   // Anything but a paragraph is separated by a `>` line so it cannot be absorbed into the title paragraph.

@@ -39,11 +39,10 @@ export const ListAttrsSchema = z.object({
   tight: z.boolean().catch(true),
 });
 export const TaskItemAttrsSchema = z.object({ checked: z.boolean().catch(false) });
+/** The title is the callout's first child (`calloutTitle`), not an attribute. */
 export const CalloutAttrsSchema = z.object({
   kind: z.string().catch("note"),
   fold: z.enum(["", "+", "-"]).catch(""),
-  /** Markdown source of the title line. */
-  title: str,
 });
 export const CodeAttrsSchema = z.object({ lang: optStr, meta: optStr });
 export const TableAttrsSchema = z.object({

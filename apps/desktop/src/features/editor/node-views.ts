@@ -3,6 +3,7 @@
  * portals) so they stay cheap and the editor has no React re-render per node.
  */
 import type { NodeViewRenderer } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
 import type { EditorContext } from "./context.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
@@ -20,36 +21,75 @@ const CALLOUT_ICONS: Record<string, string> = {
 
 const kindClass = (kind: string): string => kind.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
-/** Obsidian-style callout: a header (icon and title) over editable content. */
-export const calloutView: NodeViewRenderer = ({ node }) => {
+const capitalized = (kind: string): string => kind.charAt(0).toUpperCase() + kind.slice(1).toLowerCase();
+
+/**
+ * Obsidian-style callout. The title is the first child (`calloutTitle`), so it
+ * is edited in place; the icon and the fold triangle sit beside it in a
+ * non-editable lead. `toggle` callouts look like Notion toggles (no box).
+ *
+ * Folding is view-only: it flips attributes on this element and never
+ * dispatches a document change, so it cannot mark the page dirty or save.
+ * The initial state comes from the marker (`-` collapsed, `+` open).
+ */
+export const calloutView: NodeViewRenderer = ({ node: initial, view, getPos }) => {
+  let node = initial;
   const dom = el("div", "callout");
-  const header = el("div", "callout-head");
-  header.setAttribute("contenteditable", "false");
+  const lead = el("div", "callout-lead");
+  lead.setAttribute("contenteditable", "false");
+  const fold = el("button", "callout-fold");
+  fold.type = "button";
   const icon = el("span", "callout-icon");
   icon.setAttribute("aria-hidden", "true");
-  const title = el("span", "callout-title");
-  header.append(icon, title);
-  const contentDOM = el("div", "callout-body");
-  dom.append(header, contentDOM);
-  let shown = "";
-  const paint = (kind: string, text: string, fold: string): void => {
+  lead.append(fold, icon);
+  const contentDOM = el("div", "callout-content");
+  dom.append(lead, contentDOM);
+  let collapsed = node.attrs["fold"] === "-";
+
+  const foldable = (): boolean => node.attrs["fold"] !== "" || node.attrs["kind"] === "toggle";
+  const paint = (): void => {
+    const kind = node.attrs["kind"] as string;
     const key = kindClass(kind);
     dom.dataset["callout"] = key;
-    dom.dataset["fold"] = fold;
+    dom.dataset["fold"] = node.attrs["fold"] as string;
+    dom.dataset["foldable"] = String(foldable());
+    dom.dataset["collapsed"] = String(foldable() && collapsed);
+    dom.style.setProperty("--callout-label", JSON.stringify(capitalized(kind)));
     icon.textContent = CALLOUT_ICONS[key] ?? "i";
-    title.textContent = text.trim() || kind.charAt(0).toUpperCase() + kind.slice(1).toLowerCase();
-    shown = node.type.name;
+    fold.hidden = !foldable();
+    fold.setAttribute("aria-expanded", String(!collapsed));
+    fold.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${key === "toggle" ? "toggle" : "callout"}`);
+    fold.textContent = collapsed ? "▸" : "▾";
   };
-  paint(node.attrs["kind"] as string, node.attrs["title"] as string, node.attrs["fold"] as string);
+  const setCollapsed = (next: boolean): void => {
+    collapsed = next;
+    paint();
+    const pos = getPos();
+    const { selection } = view.state;
+    if (!next || pos === undefined || selection.from <= pos || selection.to >= pos + node.nodeSize) return;
+    // The caret was in the body that just disappeared: move it to the end of the title (a selection change, not an edit).
+    const end = pos + 1 + node.firstChild!.nodeSize - 1;
+    if (selection.from > end) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, end)));
+  };
+  fold.addEventListener("mousedown", (event) => event.preventDefault());
+  fold.addEventListener("click", (event) => {
+    event.preventDefault();
+    setCollapsed(!collapsed);
+  });
+  paint();
   return {
     dom,
     contentDOM,
     update(next) {
-      if (next.type.name !== shown) return false;
-      paint(next.attrs["kind"] as string, next.attrs["title"] as string, next.attrs["fold"] as string);
+      if (next.type.name !== node.type.name) return false;
+      // A new marker (another kind of callout, a converted block) restarts from the marker.
+      if (next.attrs["fold"] !== node.attrs["fold"]) collapsed = next.attrs["fold"] === "-";
+      node = next;
+      paint();
       return true;
     },
-    ignoreMutation: (mutation) => header.contains(mutation.target),
+    stopEvent: (event) => lead.contains(event.target as Node | null),
+    ignoreMutation: (mutation) => mutation.type !== "selection" && !contentDOM.contains(mutation.target),
   };
 };
 

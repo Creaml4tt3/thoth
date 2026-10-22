@@ -15,7 +15,7 @@ export const V1_BLOCK_NODES = {
   list: ["list", "listItem"],
   taskList: ["taskList", "taskItem"],
   blockquote: ["blockquote"],
-  callout: ["callout"],
+  callout: ["callout", "calloutTitle"],
   code: ["code"],
   table: ["table", "tableRow", "tableCell", "tableHeader"],
   thematicBreak: ["thematicBreak"],
@@ -115,15 +115,27 @@ const Blockquote = Node.create({
   renderHTML: () => ["blockquote", 0],
 });
 
-/** Obsidian `> [!kind]+ title`; `title` is the Markdown source of the title line. */
+/**
+ * Obsidian `> [!kind]+ title`. The first child is the editable title line
+ * (inline content, no breaks); the rest is the body. `kind` `toggle` is the
+ * Notion-style toggle block (`> [!toggle]- Title`).
+ */
 const Callout = Node.create({
   name: "callout",
   group: "block",
-  content: "block+",
+  content: "calloutTitle block+",
   defining: true,
-  addAttributes: () => ({ kind: attr("note"), fold: attr(""), title: attr("") }),
+  addAttributes: () => ({ kind: attr("note"), fold: attr("") }),
   parseHTML: () => [{ tag: "div[data-callout]" }],
   renderHTML: ({ node }) => ["div", { "data-callout": node.attrs["kind"] as string }, 0],
+});
+
+const CalloutTitle = Node.create({
+  name: "calloutTitle",
+  content: "cellInline*",
+  selectable: false,
+  parseHTML: () => [{ tag: "div[data-callout-title]" }],
+  renderHTML: () => ["div", { "data-callout-title": "", class: "callout-title" }, 0],
 });
 
 const Code = Node.create({
@@ -265,7 +277,7 @@ const Link = Mark.create({
 
 export function thothExtensions(): AnyExtension[] {
   return [
-    Doc, Text, Paragraph, Heading, List, ListItem, TaskList, TaskItem, Blockquote, Callout, Code,
+    Doc, Text, Paragraph, Heading, List, ListItem, TaskList, TaskItem, Blockquote, Callout, CalloutTitle, Code,
     Table, TableRow, TableCell, TableHeader, ThematicBreak, Image, Embed,
     rawBlock("html"), rawBlock("math"), rawBlock("raw"),
     HardBreak, Wikilink, InlineImage, InlineRaw,

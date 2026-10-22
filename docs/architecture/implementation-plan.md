@@ -153,6 +153,49 @@ both modes).
 
 Not done: per-page mode is remembered for the session only.
 
+### Track 3 (2026-10-22) — Notion-style blocks in Blocks mode (ADR-0012)
+
+The owner clarified that "Blocks" meant Notion's block interactions, not only a
+rich-text editor. Built before sign-in (Phase 2b part 2), per the owner. Scope,
+all saved as plain Markdown:
+
+- a `/` menu to insert any block;
+- a ⋮⋮ handle on each block to drag it, and a block menu: turn into, duplicate,
+  delete, move up and down, with keyboard equivalents;
+- toggle blocks, stored as Obsidian foldable callouts `> [!toggle]- Title`.
+  Folding only changes the view and never writes the file;
+- callouts, to-dos, code, quotes and dividers can be inserted, converted and
+  deleted.
+
+Columns and databases are out of scope: neither has a plain Markdown form.
+
+AC:
+
+- Moving, duplicating or editing one block leaves every untouched block
+  byte-identical.
+- Toggles round-trip (parse, serialize, reparse, idempotent) for every fold
+  marker.
+- Folding a toggle never saves.
+- Every block action is one undo step and can be done from the keyboard.
+- Read-only pages show no handle or menus.
+- e2e: insert a toggle and a to-do with `/`, drag a block, fold the toggle,
+  save, and check the file on disk.
+
+Result (2026-10-23) ✅:
+- `pnpm check` 924/924; `pnpm e2e` 5/5 (scenario 5 drives the real mouse and
+  keyboard on the Rust host).
+- The callout title is now editable inline content: `calloutTitle block+`
+  (`editor-serialization.md` §3a–3b). Untouched callouts stay byte-identical.
+- Drag uses ProseMirror's own dragging, with no new dependency.
+- Shortcuts: Alt+Shift+↑/↓ moves the block at the cursor, Ctrl/Cmd+Alt+M opens
+  its block menu, Mod+Enter folds. `>> ` starts a toggle.
+- Mutation checks:
+  - fold writing to the file (2 failures);
+  - move dropping neighbours' source bytes (1 failure);
+  - the handle staying on a read-only page (1 failure, my own run).
+- Not done: inserting an image from `/`. A local path needs the host to read
+  the file, so it waits for an attachments design.
+
 ### Phase 2 — Workspace protocol + reference server + web (ADR-0013)
 
 The protocol contract and conformance suite exist (Track 1). Phase 2 is split:
