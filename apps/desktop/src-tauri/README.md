@@ -4,8 +4,13 @@ Hosts the platform ports for the webview (ADR-0008, option (a)). The React UI in
 `apps/desktop` runs the TypeScript domain code; this crate exposes
 `thoth_host::Host::call` (`crates/thoth-host`) as Tauri commands.
 
-- **Bundle identifier `app.thoth.desktop` is provisional.** The owner has not
-  decided it; changing it later moves the app data directory (recent vaults).
+- **Bundle identifier `io.github.creaml4tt3.thoth`** (owner decision
+  2026-10-22; replaces the provisional `app.thoth.desktop`). It names the app
+  data directory (`~/Library/Application Support/<identifier>/`, which holds the
+  recent vaults list). Changing it again later is possible, but the app then
+  starts with an empty recent list unless a migration copies the old file, and
+  macOS treats it as a new app (permission prompts, signing). Do not end it in
+  `.app` (Tauri warns: it clashes with the macOS bundle extension).
 - Commands: each contract command `a.b` in `packages/platform/src/ipc.ts` is the
   Tauri command `a_b`. Events are emitted as `vault:changed`.
 - Capabilities (`capabilities/main.json`): only Thoth's commands plus

@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn root_policy_refuses_dangerous_roots() {
         let home = Path::new("/Users/alice");
-        let data = Path::new("/Users/alice/Library/Application Support/app.thoth.desktop");
+        let data = Path::new("/Users/alice/Library/Application Support/io.github.creaml4tt3.thoth");
         for bad in ["/", "/Users", "/Users/alice", "/System/Library", "/usr/local", "/private/var", "/Users/alice/Library/Mail"] {
             assert!(check_root_policy(Path::new(bad), Some(home), Some(data)).is_err(), "{bad}");
         }

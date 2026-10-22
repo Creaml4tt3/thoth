@@ -1,6 +1,6 @@
 # ADR-0002: Canonical content model and editor serialization
 
-- **Status:** Accepted (editor part accepted 2026-10-21 when `packages/editor` landed with golden tests)
+- **Status:** Accepted (editor part accepted 2026-10-21 when `packages/editor` landed with golden tests); a second, Plain text mode is added by ADR-0012 without changing this decision
 - **Date:** 2026-10-20
 
 ## Context

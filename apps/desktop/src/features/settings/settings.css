@@ -2,3 +2,9 @@
 .set-section { display: grid; gap: var(--thoth-space-2); padding-bottom: var(--thoth-space-6); border-bottom: 1px solid var(--thoth-border); }
 .set-section h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); }
 .set-actions { display: flex; gap: var(--thoth-space-3); align-items: center; flex-wrap: wrap; margin-top: var(--thoth-space-1); }
+.mode-choices { border: 0; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
+.mode-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); cursor: pointer; }
+.mode-choice:has(input:checked) { border-color: var(--thoth-moon); background: var(--thoth-moon-soft); }
+.mode-choice input { accent-color: var(--thoth-moon); margin: 0; }
+.mode-choice b { font-weight: 550; }
+.mode-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }

@@ -21,6 +21,7 @@ trade-off.
 | [0009](0009-workspace-authorization-and-sharing-semantics.md) | Workspace authorization and sharing semantics | Proposed (phase P2) |
 | [0010](0010-notion-obsidian-import-format-and-compatibility-policy.md) | Notion/Obsidian import format and compatibility policy | Accepted |
 | [0011](0011-license-and-contribution-policy.md) | Open-source license and contribution policy | Accepted 2026-10-22: Apache-2.0, DCO |
+| [0012](0012-plain-markdown-editor-mode.md) | Plain Markdown editor mode beside the block editor | Accepted 2026-10-22 |
 
 Template: [0000-template.md](0000-template.md).
 

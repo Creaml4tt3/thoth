@@ -2,14 +2,16 @@ import { useState } from "react";
 import { Button } from "../../ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { ImportWizard } from "../import/ImportWizard.tsx";
+import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "../editor/mode.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
-/** Settings: vault location, Rebuild index, and Import & Export. */
+/** Settings: vault location, editor mode, Rebuild index, and Import & Export. */
 export function SettingsView() {
   const { connection, vault, refresh, switchVault, openPage, openFolder } = useSession();
   const [rebuild, setRebuild] = useState<Rebuild>({ state: "idle" });
   const [importing, setImporting] = useState(false);
+  const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
 
   const rebuildIndex = async () => {
     setRebuild({ state: "running" });
@@ -41,6 +43,32 @@ export function SettingsView() {
               Switch Private Space
             </Button>
           </div>
+        </section>
+
+        <section aria-labelledby="set-editor" className="set-section">
+          <h2 id="set-editor">Editor</h2>
+          <p className="muted">Both modes edit the same Markdown file. Switch any page with Ctrl/Cmd+Shift+E or the toggle above it.</p>
+          <fieldset className="mode-choices">
+            <legend className="sr-only">Default editor mode</legend>
+            {EDITOR_MODES.map((m) => (
+              <label key={m.id} className="mode-choice">
+                <input
+                  type="radio"
+                  name="editor-mode"
+                  value={m.id}
+                  aria-label={m.label}
+                  aria-describedby={`editor-mode-${m.id}`}
+                  checked={mode === m.id}
+                  onChange={() => {
+                    setDefaultEditorMode(m.id);
+                    setMode(m.id);
+                  }}
+                />
+                <b aria-hidden="true">{m.label}</b>
+                <span id={`editor-mode-${m.id}`}>{m.hint}</span>
+              </label>
+            ))}
+          </fieldset>
         </section>
 
         <section aria-labelledby="set-index" className="set-section">

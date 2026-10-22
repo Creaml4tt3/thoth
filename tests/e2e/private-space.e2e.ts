@@ -148,3 +148,38 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
   expect(await list(join(vault, "Imports/Second"))).toEqual(await list(join(vault, "Imports/First")));
   expect(Buffer.compare(await readFile(join(scratch, "source")), sourceBefore)).toBe(0);
 });
+
+test("Plain mode: type real keystrokes, switch modes, save exact bytes", async ({ page }) => {
+  // CRLF, a BOM and odd spacing: Plain mode must change only what is typed.
+  const source = "﻿# Plain\r\n\r\n* star   bullet\r\n\r\nSee [[Plain]] here.\r\n";
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await writeFile(join(vault, "Plain.md"), source); // the Rust watcher picks it up
+  await page.getByRole("treeitem", { name: "Plain" }).click({ timeout: 15_000 });
+
+  const modes = page.getByRole("group", { name: "Editor mode" });
+  await modes.getByRole("button", { name: "Plain" }).click();
+  const box = await editor(page);
+  await expect(box).toHaveClass(/cm-content/);
+  // The line with the cursor shows its exact source; other lines show the live preview.
+  await expect(box.getByText("# Plain")).toBeVisible();
+  await box.getByText("star   bullet").click();
+  await expect(box.getByText("# Plain")).toHaveCount(0);
+  await expect(box.locator(".md-line-h1")).toHaveText("Plain");
+  await expect(box.locator(".wikilink", { hasText: "Plain" })).toBeVisible();
+
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("new item");
+  // Switch back to Blocks with the edit unsaved: nothing is written, the edit is kept.
+  await page.keyboard.press("ControlOrMeta+Shift+E");
+  await expect(modes.getByRole("button", { name: "Blocks" })).toHaveAttribute("aria-pressed", "true");
+  expect(await readFile(join(vault, "Plain.md"), "utf8")).toBe(source);
+  await page.keyboard.press("ControlOrMeta+Shift+E");
+  await expect(modes.getByRole("button", { name: "Plain" })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ControlOrMeta+s");
+
+  // Enter continued the list with the file's own CRLF; nothing else changed.
+  const expected = source.replace("* star   bullet\r\n", "* star   bullet typed\r\n* new item\r\n");
+  await expect.poll(() => readFile(join(vault, "Plain.md"), "utf8")).toBe(expected);
+});

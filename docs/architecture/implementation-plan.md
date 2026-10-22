@@ -123,6 +123,29 @@ Not done in 1c:
 - No editor toolbar, slash menu or wikilink autocomplete.
 - Import performance is about 13 ms per file on Rust ports. Most of it is fsync (two per file) and IPC round trips. Batch staging and commits before importing exports with tens of thousands of files.
 
+### Track 2 (2026-10-22) ✅ — Plain editor mode (ADR-0012)
+
+Owner request: block editing like Notion and plain writing like Obsidian.
+
+AC:
+
+- Plain mode saves exactly the typed characters, with CRLF, a BOM and odd
+  spacing kept: `apps/desktop/test/plain-text.test.ts` (whole fixture and
+  golden corpus round-trips through CodeMirror unchanged, plus edge cases) and
+  `plain-mode.test.tsx`.
+- Switching modes never writes and never drops an unsaved edit; disabled while
+  a conflict is open: `plain-mode.test.tsx`.
+- The same `PageSession` rules hold in Plain mode (no-op save, CAS, conflict
+  dialog with keep both, silent reload, read-only non-UTF-8):
+  `plain-mode.test.tsx`.
+- Real keystrokes in Chromium on the Rust host: the third scenario in
+  `tests/e2e/private-space.e2e.ts` (list continuation uses the file's CRLF).
+- The tests were checked by breaking the code on purpose (dropping the BOM, not
+  carrying text across a switch, forcing LF): each break fails them.
+
+Not done: wikilink autocomplete; per-page mode is remembered for the session
+only.
+
 ### Phase 2 — Workspace protocol + reference server
 
 - `protocol/openapi.yaml` (OpenAPI 3.1) generated from shared Zod schemas, with
@@ -258,7 +281,7 @@ regression tests (`pnpm check`: 92 tests):
 3. **Larger real Notion exports.** One small real export was checked on
    2026-10-22 (import-formats.md §1.0). Multi-part exports, images, toggles and
    title truncation are still unconfirmed.
-4. **Bundle identifier.** `app.thoth.desktop` is provisional. It must be fixed
-   before the first build anyone else installs, because changing it later moves
-   the app data directory (recent vaults list).
+4. ~~Bundle identifier.~~ Decided 2026-10-22: `io.github.creaml4tt3.thoth`
+   (no owned domain yet; the product name may still change, see
+   `apps/desktop/src-tauri/README.md` for what a later change costs).
 5. ~~Logo and accent.~~ Decided 2026-10-22: Moon Ibis mark, lunar orange accent.

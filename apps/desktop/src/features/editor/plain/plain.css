@@ -1,0 +1,47 @@
+/* Plain mode (ADR-0012): Markdown text in CodeMirror, live preview. Same column and type as Blocks. */
+.plain-editor .cm-editor { background: transparent; font: var(--thoth-text-body); }
+.plain-editor .cm-editor.cm-focused { outline: none; }
+.plain-editor .cm-scroller { font-family: inherit; line-height: inherit; overflow: visible; }
+.plain-editor .cm-content { min-height: 40vh; padding: 0 0 var(--thoth-space-16); caret-color: var(--thoth-moon); }
+.plain-editor .cm-line { padding: 0; }
+.plain-editor .cm-cursor { border-left: 2px solid var(--thoth-moon); }
+.plain-editor .cm-selectionBackground, .plain-editor .cm-focused .cm-selectionBackground { background: var(--thoth-moon-soft) !important; }
+.plain-editor .cm-content[contenteditable="false"] { cursor: default; }
+
+/* Line styles */
+.plain-editor .md-line-h1 { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); padding-top: 0.5em !important; }
+.plain-editor .md-line-h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); padding-top: 0.4em !important; }
+.plain-editor .md-line-h3 { font: 600 17px / 1.4 var(--thoth-font-sans); padding-top: 0.3em !important; }
+.plain-editor .md-line-code { font: 13px / 1.6 var(--thoth-font-mono); background: var(--thoth-bg-hover); padding: 0 14px !important; }
+.plain-editor .md-line-quote { border-left: 3px solid var(--thoth-border-strong); padding-left: 1em !important; color: var(--thoth-ink-secondary); }
+.plain-editor .md-line-meta { font: 13px / 1.6 var(--thoth-font-mono); color: var(--thoth-ink-tertiary); }
+.plain-editor .md-line-done { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
+
+/* Tokens (visible on the active line, and wherever live preview keeps the source) */
+.plain-editor .md-heading { font-weight: 600; }
+.plain-editor .md-strong { font-weight: 650; }
+.plain-editor .md-em { font-style: italic; }
+.plain-editor .md-strike { text-decoration: line-through; }
+.plain-editor .md-code { font: 0.9em var(--thoth-font-mono); background: var(--thoth-bg-hover); border-radius: var(--thoth-radius-xs); }
+.plain-editor .md-line-code .md-code { background: none; }
+.plain-editor .md-link { color: var(--thoth-link); }
+.plain-editor .md-url, .plain-editor .md-label { color: var(--thoth-ink-tertiary); }
+.plain-editor .md-mark { color: var(--thoth-ink-faint); }
+.plain-editor .md-quote { color: var(--thoth-ink-secondary); }
+.plain-editor .md-meta { color: var(--thoth-ink-tertiary); }
+.plain-editor .md-key { color: var(--thoth-ink-secondary); }
+
+/* Widgets */
+.plain-editor .md-bullet { display: inline-block; width: 1.1em; color: var(--thoth-ink-tertiary); }
+.plain-editor .md-hr { display: inline-block; width: 100%; vertical-align: middle; border-top: 1px solid var(--thoth-border-strong); }
+.plain-editor .task-box { vertical-align: -2px; margin-right: 8px; }
+
+/* Mode switch in the page header */
+.crumb-tools { display: inline-flex; gap: var(--thoth-space-3); align-items: center; }
+.mode-switch { display: inline-flex; padding: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); }
+.mode-option { all: unset; font: 500 12px/1 var(--thoth-font-sans); padding: 5px 10px; border-radius: var(--thoth-radius-pill); color: var(--thoth-ink-tertiary); cursor: pointer; }
+.mode-option[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
+.mode-option:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--thoth-ink-primary); }
+.mode-option:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 1px; }
+.mode-option:disabled { opacity: 0.45; cursor: default; }
+.plain-editor .wikilink[data-state="resolved"] { color: var(--thoth-link); }

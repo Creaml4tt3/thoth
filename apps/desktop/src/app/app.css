@@ -2,5 +2,6 @@
 @import "../features/onboarding/onboarding.css";
 @import "../features/shell/shell.css";
 @import "../features/editor/editor.css";
+@import "../features/editor/plain/plain.css";
 @import "../features/settings/settings.css";
 @import "../features/import/import.css";
