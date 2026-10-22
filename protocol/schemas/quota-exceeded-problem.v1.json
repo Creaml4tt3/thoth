@@ -1,0 +1,55 @@
+{
+  "$id": "https://thoth.invalid/schemas/quota-exceeded-problem.v1.json",
+  "title": "quota-exceeded-problem.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "number",
+      "const": 409
+    },
+    "code": {
+      "type": "string",
+      "const": "quota_exceeded"
+    },
+    "detail": {
+      "type": "string"
+    },
+    "instance": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "quota": {
+      "description": "Which quota was hit, for example `pagesPerWorkspace`. Open set.",
+      "type": "string"
+    },
+    "limit": {
+      "description": "The quota, in the unit of the quota (pages, bytes, members, workspaces).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "current": {
+      "description": "Usage before the rejected request.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "status",
+    "code"
+  ],
+  "additionalProperties": {}
+}

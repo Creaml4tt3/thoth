@@ -213,7 +213,7 @@ export const ROUTES: readonly RouteDefinition[] = [
       json(200, "The page was updated; a new revision was created.", PageResourceSchema, [ETAG_HEADER]),
       json(201, "The page was created.", PageResourceSchema, [ETAG_HEADER]),
     ],
-    errors: ["validation_failed", "forbidden", "not_found", "revision_conflict", "payload_too_large", "idempotency_key_reused", "precondition_required"],
+    errors: ["validation_failed", "forbidden", "not_found", "revision_conflict", "quota_exceeded", "payload_too_large", "idempotency_key_reused", "precondition_required"],
   }),
   route({
     operationId: "deletePage",
@@ -265,7 +265,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     requestBody: { contentType: "*/*", schema: null, required: true, description: "Raw attachment bytes. The declared Content-Type is stored as the attachment MIME type." },
     responses: [json(201, "The attachment was stored.", AttachmentResourceSchema, [LOCATION_HEADER])],
-    errors: ["validation_failed", "forbidden", "not_found", "payload_too_large", "unsupported_media_type", "idempotency_key_reused"],
+    errors: ["validation_failed", "forbidden", "not_found", "quota_exceeded", "payload_too_large", "unsupported_media_type", "idempotency_key_reused"],
   }),
   route({
     operationId: "getAttachment",
@@ -315,7 +315,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("required", " MUST equal the body `operationId`.")],
     requestBody: { contentType: JSON_CT, schema: TransferCreateRequestSchema, required: true, description: "The transfer plan." },
     responses: [json(201, "The transfer was created and staged.", TransferResourceSchema, [LOCATION_HEADER])],
-    errors: ["validation_failed", "forbidden", "export_restricted", "not_found", "payload_too_large", "idempotency_key_reused"],
+    errors: ["validation_failed", "forbidden", "export_restricted", "not_found", "quota_exceeded", "payload_too_large", "idempotency_key_reused"],
   }),
   route({
     operationId: "getTransfer",
@@ -342,7 +342,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     requestBody: { contentType: JSON_CT, schema: TransferCommitRequestSchema, required: false, description: "Verification results for from_workspace transfers." },
     responses: [json(200, "The transfer after commit.", TransferResourceSchema)],
-    errors: ["validation_failed", "forbidden", "not_found", "invalid_transfer_state", "idempotency_key_reused"],
+    errors: ["validation_failed", "forbidden", "not_found", "invalid_transfer_state", "quota_exceeded", "idempotency_key_reused"],
   }),
   route({
     operationId: "abortTransfer",

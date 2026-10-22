@@ -294,6 +294,9 @@ paths:
         "404":
           $ref: "#/components/responses/Problem404"
           description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
         "412":
           $ref: "#/components/responses/Problem412"
           description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
@@ -320,6 +323,7 @@ paths:
         - unauthenticated
         - forbidden
         - not_found
+        - quota_exceeded
         - revision_conflict
         - payload_too_large
         - idempotency_key_reused
@@ -556,6 +560,9 @@ paths:
         "404":
           $ref: "#/components/responses/Problem404"
           description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
         "413":
           $ref: "#/components/responses/Problem413"
           description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
@@ -583,6 +590,7 @@ paths:
         - unauthenticated
         - forbidden
         - not_found
+        - quota_exceeded
         - payload_too_large
         - unsupported_media_type
         - idempotency_key_reused
@@ -788,6 +796,9 @@ paths:
         "404":
           $ref: "#/components/responses/Problem404"
           description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
         "413":
           $ref: "#/components/responses/Problem413"
           description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
@@ -813,6 +824,7 @@ paths:
         - export_restricted
         - forbidden
         - not_found
+        - quota_exceeded
         - payload_too_large
         - idempotency_key_reused
         - rate_limited
@@ -917,7 +929,7 @@ paths:
           description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
         "409":
           $ref: "#/components/responses/Problem409"
-          description: "`invalid_transfer_state`: The transfer is in a state that does not allow the requested action."
+          description: "`invalid_transfer_state`: The transfer is in a state that does not allow the requested action. `quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
         "422":
           $ref: "#/components/responses/Problem422"
           description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
@@ -940,6 +952,7 @@ paths:
         - forbidden
         - not_found
         - invalid_transfer_state
+        - quota_exceeded
         - idempotency_key_reused
         - rate_limited
         - internal_error
@@ -1201,6 +1214,26 @@ components:
           type: integer
           minimum: 86400
           maximum: 9007199254740991
+        maxPagesPerWorkspace:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        maxWorkspaceAttachmentBytes:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        maxMembersPerWorkspace:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        maxWorkspacesPerAccount:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        revisionRetentionDays:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
     Me:
       type: object
       properties:
@@ -1340,6 +1373,7 @@ components:
                 - not_found
                 - method_not_allowed
                 - invalid_transfer_state
+                - quota_exceeded
                 - cursor_expired
                 - revision_conflict
                 - payload_too_large
@@ -1369,6 +1403,45 @@ components:
                 type: string
             required:
               - detail
+      required:
+        - type
+        - title
+        - status
+        - code
+      additionalProperties: {}
+    QuotaExceededProblem:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        status:
+          type: number
+          const: 409
+        code:
+          type: string
+          const: quota_exceeded
+        detail:
+          type: string
+        instance:
+          type: string
+        requestId:
+          type: string
+        quota:
+          description: Which quota was hit, for example `pagesPerWorkspace`. Open set.
+          type: string
+        limit:
+          description: The quota, in the unit of the quota (pages, bytes, members, workspaces).
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        current:
+          description: Usage before the rejected request.
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
       required:
         - type
         - title
@@ -1675,6 +1748,7 @@ components:
                 - not_found
                 - method_not_allowed
                 - invalid_transfer_state
+                - quota_exceeded
                 - cursor_expired
                 - revision_conflict
                 - payload_too_large
@@ -1754,6 +1828,7 @@ components:
                         - not_found
                         - method_not_allowed
                         - invalid_transfer_state
+                        - quota_exceeded
                         - cursor_expired
                         - revision_conflict
                         - payload_too_large

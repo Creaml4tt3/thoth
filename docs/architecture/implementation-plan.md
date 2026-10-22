@@ -180,15 +180,50 @@ breaking the code on purpose (stale-write check removed; non-members let in).
 Deviations are listed in `apps/server/README.md` (substring + trigram search,
 no rate limiting yet, unbounded change-feed retention).
 
-**2b — OIDC sign-in and trial mode.** OIDC token verification (issuer
-discovery, JWKS, audience, expiry), server sessions where needed, PKCE login in
-the desktop app (loopback) and web, SSE stream tickets, CORS allow-list, trial
-quotas from configuration.
+**2b — Sign-in and trial mode (ADR-0014).** Built in three parts:
+
+- **Part 1, trial mode.** Every limit is configuration
+  (`THOTH_PROFILE=trial`), advertised in `/capabilities`, and enforced with
+  `quota_exceeded`. Also: a CORS allow-list, rate limits counted in PostgreSQL,
+  a daily maintenance job (revision retention, expiry), a PostgreSQL blob store,
+  and `EVENTS=off` for serverless hosts.
+- **Part 2, sign-in broker.** The server signs in to Google (OIDC) and GitHub
+  (OAuth adapter) on the user's behalf. Clients do Authorization Code + PKCE
+  against the Thoth server. The server issues short-lived opaque access tokens
+  and rotating refresh tokens.
+- **Part 3, desktop sign-in.** A loopback redirect, with tokens in the OS
+  keychain.
+
+Because SSE is off on the trial, the stream tickets of ADR-0013 are needed
+only by self-hosted servers that keep SSE for browsers.
+
+Part 1 result (2026-10-22) ✅:
+- `pnpm check` 817/817; `pnpm test:server` 149/149; `pnpm server:conformance`
+  36 passed, 0 failed, 0 skipped.
+- Every limit is tested at its boundary, including concurrent page creation and
+  transfers that would exceed the page limit (nothing is published).
+- Also tested: CORS, rate limits across instances, revision pruning (current
+  revisions and revisions held by a transfer survive), the maintenance endpoint
+  secret, `EVENTS=off`, and the PostgreSQL blob store against the same tests as
+  the filesystem store.
+- Mutation checks, where each break was caught by the tests:
+  - the page-limit check, the CORS origin check and the workspace lock (caught
+    in the helper's run);
+  - letting pruning delete current revisions (5 failures, my own run).
+- `quota_exceeded` is 409. Protocol stays 1.0 (additive changes).
+- Revisions are only ever deleted by maintenance, through a transaction-local
+  flag the immutability trigger checks.
+- A retained revision's `parentId` may name a pruned revision, which answers 404.
 
 AC:
 
+- Every trial limit is tested at the boundary (limit − 1 succeeds; the limit
+  gives `quota_exceeded`, with nothing written), including concurrent creates.
 - Tests against a local OIDC test issuer: valid, expired, wrong-audience,
-  wrong-issuer and unsigned tokens; key rotation.
+  wrong-issuer, wrong-nonce and unsigned ID tokens; key rotation.
+- Sign-in broker: a replayed code, a PKCE mismatch, a redirect URI mismatch and
+  refresh-token reuse are all rejected; a reused refresh token revokes the
+  whole token family.
 - Desktop and web complete a PKCE login against the test issuer (e2e).
 - Every trial limit returns a clear protocol error at the limit and never
   loses data; limits appear in `GET /capabilities`.
@@ -328,3 +363,14 @@ regression tests (`pnpm check`: 92 tests):
    (no owned domain yet; the product name may still change, see
    `apps/desktop/src-tauri/README.md` for what a later change costs).
 5. ~~Logo and accent.~~ Decided 2026-10-22: Moon Ibis mark, lunar orange accent.
+6. ~~Trial hosting, limits, sign-in providers.~~ Decided 2026-10-22 (ADR-0014):
+   - hosting on Vercel + Neon at `thoth.creaml4tt3.me` / `api.thoth.creaml4tt3.me`;
+   - limits of 1 workspace, 10 members, 200 pages and 20 MB per workspace;
+   - Google first, then GitHub.
+
+   Still open:
+   - the owner's contact address for `docs/legal/` (blocks the public launch);
+   - the account cap (300) and the region (Proposed).
+7. **Product name.** Thoth stays as the base, with a word added to make it
+   unique; the owner has not chosen one yet. This blocks buying a domain, not
+   the build.

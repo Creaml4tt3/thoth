@@ -1,8 +1,10 @@
+import type { OutgoingHttpHeaders } from "node:http";
 import type { FastifyInstance } from "fastify";
 import { API_BASE_PATH } from "@thoth/workspace-protocol";
 import { workspaceAccess } from "../access.ts";
 import { changeCursorOf, sseFrame } from "../changes.ts";
 import type { Deps } from "../deps.ts";
+import { ApiError } from "../errors.ts";
 import { principalOf } from "../http.ts";
 
 const KEEPALIVE_MS = 15_000;
@@ -25,11 +27,14 @@ export function registerEventRoutes(app: FastifyInstance, deps: Deps): void {
    */
   app.get<{ Params: { workspaceId: string } }>(`${API_BASE_PATH}/workspaces/:workspaceId/events`, async (request, reply) => {
     const me = principalOf(request);
+    if (!hub) throw new ApiError("capability_not_supported", "capability events.sse is not supported");
     const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "read");
 
     reply.hijack();
     const raw = reply.raw;
+    // A hijacked reply bypasses Fastify's header handling: carry over what the onRequest hook set (CORS, nosniff).
     raw.writeHead(200, {
+      ...(reply.getHeaders() as OutgoingHttpHeaders),
       "content-type": "text/event-stream",
       "cache-control": "no-cache, no-transform",
       connection: "keep-alive",

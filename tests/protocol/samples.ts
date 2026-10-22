@@ -35,6 +35,7 @@ export const SAMPLES: Record<string, unknown> = {
   Capabilities: { protocolVersion: "1.0", capabilities: ["search", "x-acme.graph"], limits: { idempotencyWindowSeconds: 86400, maxPageSize: 200 }, server: { name: "acme" } },
   Limits: { maxMarkdownBytes: 1000, idempotencyWindowSeconds: 90000 },
   ProblemDetails: { type: "https://thoth.invalid/problems/not_found", title: "Not found", status: 404, code: "not_found", detail: "nope", extension: 1 },
+  QuotaExceededProblem: { type: "https://thoth.invalid/problems/quota_exceeded", title: "Quota exceeded", status: 409, code: "quota_exceeded", quota: "pagesPerWorkspace", limit: 200, current: 200 },
   RevisionConflictProblem: { type: "https://thoth.invalid/problems/revision_conflict", title: "Revision conflict", status: 412, code: "revision_conflict", currentRevision: REV },
   Me: { id: "user_1", displayName: "Ann", email: "ann@example.com" },
   Member: { userId: "user_1", displayName: "Ann", role: "owner" },

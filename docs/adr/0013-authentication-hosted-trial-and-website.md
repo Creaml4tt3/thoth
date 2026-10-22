@@ -2,8 +2,8 @@
 
 - **Status:** Accepted for rules 1–3 and 6 (owner decisions 2026-10-22: OIDC; a
   public trial server; a landing site that also runs Thoth in the browser).
-  Proposed for rules 4–5 (quota values and hosting), to be confirmed before the
-  trial server is deployed.
+  Rules 4–5 (quota values and hosting) are decided in ADR-0014, which also
+  changes the token exchange in rule 1 to a server-side sign-in broker.
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 
@@ -106,11 +106,10 @@ abuse), 13 (P2 web client; hosted SaaS out of scope).
 
 ## Open questions
 
-- Which OIDC providers the trial server offers first (GitHub needs an OIDC
-  bridge because its OAuth tokens are not OIDC ID tokens). Blocks Phase 2b
-  deployment, not its code.
-- Trial limit values and hosting (rules 4–5). Blocks the trial launch.
-- Privacy policy, terms and an abuse contact for the trial. Blocks the trial
-  launch.
+- ~~Which OIDC providers first.~~ Decided in ADR-0014: Google, then GitHub
+  (through a server-side adapter, not an OIDC bridge).
+- ~~Trial limit values and hosting (rules 4–5).~~ Decided in ADR-0014.
+- Privacy policy, terms and an abuse contact: drafted in `docs/legal/`; the
+  owner's contact address is still needed before the trial launches.
 - The product name may still change (name clash with an existing app). Blocks
   buying a domain and the final website copy, not the build.

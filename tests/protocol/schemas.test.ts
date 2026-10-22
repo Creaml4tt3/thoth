@@ -135,7 +135,7 @@ describe("error-code registry", () => {
   it("accepts x- vendor codes and rejects unregistered bare codes", () => {
     const base = { type: "about:blank", title: "t", status: 400 };
     expect(ProblemDetailsSchema.safeParse({ ...base, code: "x-acme.quota" }).success).toBe(true);
-    expect(ProblemDetailsSchema.safeParse({ ...base, code: "quota_exceeded" }).success).toBe(false);
+    expect(ProblemDetailsSchema.safeParse({ ...base, code: "quota_exceeded_soon" }).success).toBe(false);
     expect(ProblemDetailsSchema.safeParse({ ...base }).success).toBe(false);
   });
 

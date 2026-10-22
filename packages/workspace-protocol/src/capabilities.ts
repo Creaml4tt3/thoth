@@ -27,6 +27,16 @@ export const LimitsSchema = z.object({
   maxPageSize: z.number().int().positive().optional(),
   /** How long idempotency records are retained. Servers MUST retain them for at least 86400 seconds. */
   idempotencyWindowSeconds: z.number().int().min(86_400).optional(),
+  /** Pages a workspace may hold (deleted pages do not count). Creating one more is 409 `quota_exceeded`. */
+  maxPagesPerWorkspace: z.number().int().positive().optional(),
+  /** Sum of the sizes of a workspace's attachments, in bytes. An upload that would exceed it is 409 `quota_exceeded`. */
+  maxWorkspaceAttachmentBytes: z.number().int().positive().optional(),
+  /** Members a workspace may have. */
+  maxMembersPerWorkspace: z.number().int().positive().optional(),
+  /** Workspaces one account may own. */
+  maxWorkspacesPerAccount: z.number().int().positive().optional(),
+  /** Non-current revisions older than this many days are removed; `GET ?revision=` of a removed revision is 404. */
+  revisionRetentionDays: z.number().int().positive().optional(),
 });
 export type Limits = z.infer<typeof LimitsSchema>;
 

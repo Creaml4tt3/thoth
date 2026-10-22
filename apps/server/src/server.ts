@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { PatAuthenticator, type Authenticator } from "./auth.ts";
 import { buildApp, type BuildOptions } from "./app.ts";
-import { FsBlobStore, type BlobStore } from "./blob.ts";
+import { FsBlobStore, PgBlobStore, type BlobStore } from "./blob.ts";
 import { ChangeHub } from "./changes.ts";
 import type { ServerConfig } from "./config.ts";
 import { createDatabase, type Database } from "./db.ts";
@@ -27,14 +27,16 @@ export interface StartOptions extends BuildOptions {
 /** Connects to PostgreSQL, applies migrations, starts the LISTEN connection and the HTTP listener. */
 export async function startServer(config: ServerConfig, options: StartOptions = {}): Promise<RunningServer> {
   let log: Deps["log"] | undefined;
-  const db: Database = createDatabase(config.databaseUrl, { onError: (error) => log?.error({ err: error.message }, "idle database client error") });
+  const db: Database = createDatabase(config.databaseUrl, { max: config.databasePoolMax, onError: (error) => log?.error({ err: error.message }, "idle database client error") });
   const hubLog: Deps["log"] = { info: (...a) => log?.info(...a), warn: (...a) => log?.warn(...a), error: (...a) => log?.error(...a) };
-  const hub = new ChangeHub(config.databaseUrl, hubLog);
+  // EVENTS=off: no dedicated LISTEN connection at all (serverless hosts, poolers in transaction mode, scale-to-zero databases).
+  const hub = config.capabilities.includes("events.sse") ? new ChangeHub(config.databaseUrl, hubLog) : null;
   try {
-    if (options.migrate !== false) await migrate(db.pool);
-    await hub.start();
+    // MIGRATE_ON_START=false never touches the migration lock (a session-level advisory lock cannot work through a transaction-mode pooler).
+    if (config.migrateOnStart && options.migrate !== false) await migrate(db.pool);
+    await hub?.start();
   } catch (error) {
-    await hub.close();
+    await hub?.close();
     await db.close();
     throw error;
   }
@@ -42,7 +44,7 @@ export async function startServer(config: ServerConfig, options: StartOptions = 
     config,
     db,
     authenticator: options.authenticator ?? new PatAuthenticator(db),
-    blobs: options.blobs ?? new FsBlobStore(config.blobDir),
+    blobs: options.blobs ?? (config.blobStore === "postgres" ? new PgBlobStore(db) : new FsBlobStore(config.blobDir)),
     hub,
     log: hubLog,
   };
@@ -52,7 +54,7 @@ export async function startServer(config: ServerConfig, options: StartOptions = 
     await app.listen({ host: config.host, port: config.port });
   } catch (error) {
     await app.close().catch(() => undefined);
-    await hub.close();
+    await hub?.close();
     await db.close();
     throw error;
   }
@@ -68,7 +70,7 @@ export async function startServer(config: ServerConfig, options: StartOptions = 
       if (closed) return;
       closed = true;
       await app.close();
-      await hub.close();
+      await hub?.close();
       await db.close();
     },
   };

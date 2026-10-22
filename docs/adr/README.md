@@ -22,7 +22,8 @@ trade-off.
 | [0010](0010-notion-obsidian-import-format-and-compatibility-policy.md) | Notion/Obsidian import format and compatibility policy | Accepted |
 | [0011](0011-license-and-contribution-policy.md) | Open-source license and contribution policy | Accepted 2026-10-22: Apache-2.0, DCO |
 | [0012](0012-plain-markdown-editor-mode.md) | Plain Markdown editor mode beside the block editor | Accepted 2026-10-22 |
-| [0013](0013-authentication-hosted-trial-and-website.md) | Authentication (OIDC), a hosted trial server, and the project website | Accepted 2026-10-22 (OIDC, trial, website); Proposed (trial limits, hosting) |
+| [0013](0013-authentication-hosted-trial-and-website.md) | Authentication (OIDC), a hosted trial server, and the project website | Accepted 2026-10-22 (limits and hosting in ADR-0014) |
+| [0014](0014-hosted-trial-deployment-and-sign-in-broker.md) | Hosted trial deployment (Vercel + Neon) and the sign-in broker | Accepted 2026-10-22; Proposed (account cap, region) |
 
 Template: [0000-template.md](0000-template.md).
 

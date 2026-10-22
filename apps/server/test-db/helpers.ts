@@ -62,10 +62,10 @@ export interface ApiResult {
   bytes: Buffer;
 }
 
-export async function startTestEnv(options: { startOptions?: StartOptions; configure?: (c: ServerConfig) => void } = {}): Promise<TestEnv> {
+export async function startTestEnv(options: { startOptions?: StartOptions; configure?: (c: ServerConfig) => void; env?: Record<string, string> } = {}): Promise<TestEnv> {
   const database = await createTestDatabase();
   const blobDir = await mkdtemp(join(tmpdir(), "thoth-blobs-"));
-  const config = loadConfig({ DATABASE_URL: database.url, BLOB_DIR: blobDir, HOST: "127.0.0.1", PORT: "0", LOG_LEVEL: "silent" });
+  const config = loadConfig({ DATABASE_URL: database.url, BLOB_DIR: blobDir, HOST: "127.0.0.1", PORT: "0", LOG_LEVEL: "silent", ...options.env });
   options.configure?.(config);
   const env = {} as TestEnv;
   let startOptions = options.startOptions ?? {};

@@ -53,6 +53,9 @@ when either is stale.
   routes, new capabilities, new `kind` values in the change feed, new error codes. A client
   MUST therefore ignore unknown members, unknown capability IDs and unknown change kinds.
 - A client SHOULD refuse to talk to a server whose major version it does not implement.
+- The quota limits and the `quota_exceeded` code were added within `1.0`: they are an optional
+  `limits` member and a new error code, both additive, so `protocolVersion` stays `1.0`. A client that
+  does not know `quota_exceeded` treats an unknown 4xx code like any other failure of that request.
 - The policy for deprecation windows and for what counts as breaking is not settled (open
   questions).
 
@@ -65,7 +68,7 @@ discover a server before signing in.
 {
   "protocolVersion": "1.0",
   "capabilities": ["attachments", "search", "events.sse", "transfers"],
-  "limits": { "maxMarkdownBytes": 1048576, "maxPageSize": 200, "idempotencyWindowSeconds": 86400 },
+  "limits": { "maxMarkdownBytes": 1048576, "maxPageSize": 200, "idempotencyWindowSeconds": 86400, "maxPagesPerWorkspace": 200 },
   "server": { "name": "example", "version": "1.2.3" }
 }
 ```
@@ -91,6 +94,20 @@ discover a server before signing in.
 `limits` members are optional. When present they are authoritative: a request above
 `maxMarkdownBytes` or `maxAttachmentBytes` is 413 `payload_too_large`. `idempotencyWindowSeconds`,
 when present, MUST be at least 86400.
+
+Quota limits (protocol 1.0, additive; absent means the server sets no such limit). Exceeding one
+is 409 `quota_exceeded` (section 5), never 413 (that is the size of one request) and never 403:
+
+| Member | Meaning |
+| --- | --- |
+| `maxPagesPerWorkspace` | Live pages per workspace. Deleted pages do not count; updates never count. |
+| `maxWorkspaceAttachmentBytes` | Sum of the sizes of a workspace's attachments. Every upload counts, including an upload of bytes the server already stores for another attachment (the quota measures what the workspace holds, not how the server deduplicates). |
+| `maxMembersPerWorkspace` | Members of one workspace. |
+| `maxWorkspacesPerAccount` | Workspaces one account owns. |
+| `revisionRetentionDays` | Revisions that are not current are removed after this many days; see section 7. |
+
+A server may have further quotas that it does not advertise (for example a server-wide storage
+limit); they surface only as `quota_exceeded`.
 
 ## 4. Authentication and authorization
 
@@ -170,7 +187,20 @@ violation.
   `header:<Name>`, `query:<name>`, `path:<name>`.
 - `requestId` (optional) is for support correlation.
 - Extension members are allowed; clients ignore unknown ones. `revision_conflict` always
-  carries `currentRevision`.
+  carries `currentRevision`. `quota_exceeded` MAY carry `quota` (which quota, for example
+  `pagesPerWorkspace`; an open set), `limit` and `current` (integers, in the unit of the quota).
+  A server-wide quota carries none of the three numbers.
+- `quota_exceeded` is **409**, deliberately. It is not 403: `forbidden` means the role may not do
+  this and no change of data helps, whereas a quota is a state of the workspace, account or server, and
+  deleting a page or waiting makes the identical request succeed. It is not 413 (the size of this one
+  request against `maxMarkdownBytes` or `maxAttachmentBytes`), and not 429 (request rate, honour
+  `Retry-After`). 409 is the status RFC 9110 gives to a request that conflicts with the current state of
+  the target resource. A client branches on `code`, so the three never blur. A rejected request writes
+  nothing; a server SHOULD NOT remember a `quota_exceeded` reply under an `Idempotency-Key` (section 8),
+  so retrying after freeing room runs the request. `putPage`, `uploadAttachment`, `createTransfer` and
+  `commitTransfer` list it. A `to_workspace` transfer that would exceed `maxPagesPerWorkspace` is
+  refused as a whole, at creation or at commit; no page of it is ever published, and a transfer refused
+  at commit stays staged so the client can retry.
 - `429 rate_limited` SHOULD carry `Retry-After`. `405 method_not_allowed` MUST carry `Allow`.
 
 ### Error-code registry
@@ -186,6 +216,7 @@ violation.
 | `method_not_allowed` | 405 | Route exists, method does not |
 | `invalid_transfer_state` | 409 | The transfer state does not allow the action |
 | `cursor_expired` | 410 | Cursor points before retained change history; resynchronize from the tree |
+| `quota_exceeded` | 409 | Valid, permitted request that would exceed a quota; may carry `quota`, `limit`, `current` |
 | `revision_conflict` | 412 | Conditional write did not match; body has `currentRevision` |
 | `payload_too_large` | 413 | Body exceeds an advertised limit |
 | `unsupported_media_type` | 415 | Content type not accepted |
@@ -278,7 +309,11 @@ Revisions are append-only. Once a revision has been returned by any route, its s
 Markdown (via `GET ?revision=`) and its hash never change. The change feed and the revision
 list both refer to revisions by ID. Whether and when old revisions are compacted is an open
 question; until decided a server MUST NOT alter a revision, and MAY refuse `?revision=` with
-404 only for a revision it has removed under a documented retention policy.
+404 only for a revision it has removed under a documented retention policy. A server that does so
+advertises `limits.revisionRetentionDays`. It never removes the current revision of a page, nor a
+revision a pending transfer still pins. A revision whose parent was removed keeps its summary
+unchanged, so its `parentId` names a revision that now answers 404, and the revision list simply
+omits removed revisions.
 
 `GET .../pages/{pageId}/revisions` lists revisions newest first (paginated envelope).
 

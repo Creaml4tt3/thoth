@@ -14,6 +14,7 @@ export const ERROR_CODES = {
   not_found: { status: 404, title: "Not found", description: "The route or resource does not exist, or the principal may not know that it exists." },
   method_not_allowed: { status: 405, title: "Method not allowed", description: "The route exists but not for this method." },
   invalid_transfer_state: { status: 409, title: "Invalid transfer state", description: "The transfer is in a state that does not allow the requested action." },
+  quota_exceeded: { status: 409, title: "Quota exceeded", description: "The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`." },
   cursor_expired: { status: 410, title: "Cursor expired", description: "The cursor points before the retained change history; the client must resynchronize from the tree." },
   revision_conflict: { status: 412, title: "Revision conflict", description: "A conditional write did not match the current revision. The body carries `currentRevision`." },
   payload_too_large: { status: 413, title: "Payload too large", description: "The request body exceeds a server limit advertised in `limits`." },
@@ -67,6 +68,27 @@ export const ProblemDetailsSchema = z.looseObject({
   errors: z.array(ProblemFieldErrorSchema).optional(),
 });
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>;
+
+/** Names the quota a `quota_exceeded` problem refers to. Open set: clients ignore values they do not know. */
+export const QUOTA_NAMES = ["pagesPerWorkspace", "attachmentBytesPerWorkspace", "membersPerWorkspace", "workspacesPerAccount", "serverAttachmentBytes", "accounts"] as const;
+
+/**
+ * Problem body for HTTP 409 `quota_exceeded`. `limit` and `current` are omitted for server-wide quotas
+ * (they would disclose how full the whole server is to every user).
+ */
+export const QuotaExceededProblemSchema = z.looseObject({
+  type: z.string().min(1),
+  title: z.string(),
+  status: z.literal(409),
+  code: z.literal("quota_exceeded"),
+  detail: z.string().optional(),
+  instance: z.string().optional(),
+  requestId: z.string().optional(),
+  quota: z.string().optional().describe("Which quota was hit, for example `pagesPerWorkspace`. Open set."),
+  limit: z.number().int().nonnegative().optional().describe("The quota, in the unit of the quota (pages, bytes, members, workspaces)."),
+  current: z.number().int().nonnegative().optional().describe("Usage before the rejected request."),
+});
+export type QuotaExceededProblem = z.infer<typeof QuotaExceededProblemSchema>;
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json" as const;
 

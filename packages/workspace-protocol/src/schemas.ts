@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { CapabilitiesSchema, LimitsSchema } from "./capabilities.ts";
-import { ProblemDetailsSchema } from "./errors.ts";
+import { ProblemDetailsSchema, QuotaExceededProblemSchema } from "./errors.ts";
 import { MemberSchema, MeSchema, WorkspaceListSchema, WorkspaceSchema } from "./identity.ts";
 import { PageMetadataSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema, RevisionSummarySchema } from "./pages.ts";
 import { TreeNodeSchema, TreePageSchema } from "./tree.ts";
@@ -26,6 +26,7 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "Limits", file: "limits.v1", schema: LimitsSchema },
   { name: "ProblemDetails", file: "problem-details.v1", schema: ProblemDetailsSchema },
   { name: "RevisionConflictProblem", file: "revision-conflict-problem.v1", schema: RevisionConflictProblemSchema },
+  { name: "QuotaExceededProblem", file: "quota-exceeded-problem.v1", schema: QuotaExceededProblemSchema },
   { name: "Me", file: "me.v1", schema: MeSchema },
   { name: "Member", file: "member.v1", schema: MemberSchema },
   { name: "Workspace", file: "workspace.v1", schema: WorkspaceSchema },

@@ -24,17 +24,17 @@ describe("migration runner", () => {
   it("applies the shipped migrations once, in order, and records them", async () => {
     const pool = await fresh();
     const first = await migrate(pool);
-    expect(first.applied).toEqual(["001_core.sql", "002_idempotency.sql", "003_attachments_transfers_audit.sql", "004_search.sql", "005_change_notify.sql"]);
+    expect(first.applied).toEqual(["001_core.sql", "002_idempotency.sql", "003_attachments_transfers_audit.sql", "004_search.sql", "005_change_notify.sql", "006_trial_mode.sql"]);
     const again = await migrate(pool);
-    expect(again).toEqual({ applied: [], alreadyApplied: 5 });
+    expect(again).toEqual({ applied: [], alreadyApplied: 6 });
     const rows = (await pool.query("SELECT name FROM schema_migrations ORDER BY name")).rows;
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
   });
 
   it("several instances starting together apply each migration exactly once", async () => {
     const pool = await fresh();
     const results = await Promise.all(Array.from({ length: 4 }, () => migrate(pool)));
-    expect(results.flatMap((r) => r.applied)).toHaveLength(5);
+    expect(results.flatMap((r) => r.applied)).toHaveLength(6);
   });
 
   it("rolls a failing migration back completely and reports it; a modified applied migration is an error", async () => {

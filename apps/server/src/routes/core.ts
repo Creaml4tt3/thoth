@@ -14,6 +14,7 @@ import { changeCursorOf, changeEntryOf, type ChangeRow } from "../changes.ts";
 import { decodeCursor, decodeIntCursor, encodeCursor } from "../cursor.ts";
 import type { Deps } from "../deps.ts";
 import { IDEMPOTENCY_WINDOW_SECONDS } from "../idempotency.ts";
+import { assertCanCreatePages } from "../quota.ts";
 import { ApiError, fieldError, jsonReply, zodFailure } from "../errors.ts";
 import { mutate, parseJsonBody, principalOf, send } from "../http.ts";
 import {
@@ -56,6 +57,12 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
           maxAttachmentBytes: config.maxAttachmentBytes,
           maxPageSize: PAGE_SIZE_MAX,
           idempotencyWindowSeconds: IDEMPOTENCY_WINDOW_SECONDS,
+          // Configured quotas only: an unset limit is simply absent.
+          ...(config.maxPagesPerWorkspace === undefined ? {} : { maxPagesPerWorkspace: config.maxPagesPerWorkspace }),
+          ...(config.maxWorkspaceAttachmentBytes === undefined ? {} : { maxWorkspaceAttachmentBytes: config.maxWorkspaceAttachmentBytes }),
+          ...(config.maxMembersPerWorkspace === undefined ? {} : { maxMembersPerWorkspace: config.maxMembersPerWorkspace }),
+          ...(config.maxWorkspacesPerAccount === undefined ? {} : { maxWorkspacesPerAccount: config.maxWorkspacesPerAccount }),
+          ...(config.revisionRetentionDays === undefined ? {} : { revisionRetentionDays: config.revisionRetentionDays }),
         },
         server: { name: "thoth-server", version: pkg.version },
       }),
@@ -169,6 +176,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
           if (expected !== existing.current_revision_id) throw await conflict("If-Match does not match the current revision");
         }
         await checkParent(tx, ws.id, pageId, parsed.data.parentId);
+        // Under the workspace lock taken above, so concurrent creates cannot both pass at limit - 1. Updates never count.
+        if (!existing) await assertCanCreatePages(tx, config, ws.id, 1);
         const { page, revision, created } = await writeRevision(tx, { workspaceId: ws.id, pageId, input: parsed.data, userId: me.id, existing, now });
         return jsonReply(created ? 201 : 200, pageResource(page, revision), { etag: formatEtag(revision.id) });
       }),

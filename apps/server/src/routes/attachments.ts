@@ -6,7 +6,8 @@ import { appendChange } from "../changes.ts";
 import type { Deps } from "../deps.ts";
 import { ApiError, fieldError, jsonReply, zodFailure } from "../errors.ts";
 import { bodyOf, headerOf, mutate, principalOf } from "../http.ts";
-import { checkStorableText } from "../pages.ts";
+import { checkStorableText, sha256Hex } from "../pages.ts";
+import { assertAttachmentFits } from "../quota.ts";
 
 const MIME = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/;
 
@@ -51,8 +52,11 @@ export function registerAttachmentRoutes(app: FastifyInstance, deps: Deps): void
         if (bytes.length === 0) throw new ApiError("validation_failed", "an attachment cannot be empty", fieldError("body", "empty upload"));
         if (bytes.length > config.maxAttachmentBytes) throw new ApiError("payload_too_large", `attachment exceeds ${config.maxAttachmentBytes} bytes`);
         if (query.data.fileName !== undefined) checkStorableText(query.data.fileName, "query:fileName");
-        // Content-addressed and idempotent. If the transaction later rolls back the blob stays, unreferenced and harmless.
-        const stored = await blobs.put(bytes);
+        // Quotas are checked before any byte is stored, under the workspace lock, so a rejected upload writes nothing.
+        await assertAttachmentFits(tx, config, ws.id, sha256Hex(bytes), bytes.length);
+        // Content-addressed and idempotent. The Postgres store joins `tx` (rollback removes the blob too); if the
+        // transaction rolls back the filesystem store leaves an unreferenced, harmless blob (README, deviation 8).
+        const stored = await blobs.put(bytes, tx);
         const id = newStableId();
         const { rows } = await tx.query<AttachmentRow>(
           `INSERT INTO attachments (workspace_id, id, hash, size, mime_type, file_name, created_at, created_by)

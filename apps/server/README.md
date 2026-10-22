@@ -6,7 +6,8 @@ contract is the route registry in `packages/workspace-protocol` and the conforma
 `protocol/conformance`; the server passes the suite with nothing skipped.
 
 Phase 2a scope: pages and immutable revisions, change feed, attachments, search, SSE hints, transfers,
-personal-access-token authentication, an admin CLI, a container image. OIDC is phase 2b.
+personal-access-token authentication, an admin CLI, a container image. Phase 2b adds the hosted trial mode
+(quotas, a trial profile, Postgres blob storage, CORS, rate limiting, maintenance); sign-in is separate.
 
 ## Run it
 
@@ -23,12 +24,33 @@ node apps/server/src/main.ts
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `DATABASE_URL` | required | `postgres://...`. Never logged. |
-| `BLOB_DIR` | `./data/blobs` | Attachment bytes, content-addressed. |
+| `DATABASE_POOL_MAX` | 10 | Connections this process may open (1 to 100). Keep it small on serverless hosts. |
+| `MIGRATE_ON_START` | `true` | `false` skips migrations (and the migration lock) at startup. |
+| `BLOB_STORE` | `fs` (`postgres` in the trial profile) | Where attachment bytes live: `fs` or `postgres`. |
+| `BLOB_DIR` | `./data/blobs` | Attachment directory for `BLOB_STORE=fs`, content-addressed. |
 | `HOST`, `PORT` | `127.0.0.1`, `8080` | Listen address. |
 | `LOG_LEVEL` | `info` | pino level. |
-| `MAX_MARKDOWN_BYTES` | 1 MiB | Advertised as `limits.maxMarkdownBytes`; larger is 413. |
-| `MAX_ATTACHMENT_BYTES` | 25 MiB | Advertised as `limits.maxAttachmentBytes`; larger is 413. |
-| `MAX_TRANSFER_BYTES` | 32 MiB | Body limit of `createTransfer`. |
+| `EVENTS` | `on` (trial `off`) | `off`: no `ChangeHub`, no LISTEN connection, `events.sse` not advertised; the events route answers 501 `capability_not_supported`. |
+| `THOTH_PROFILE` | `default` | `trial` fills the hosted-trial values below. Any explicit variable wins. |
+| `MAX_MARKDOWN_BYTES` | 1 MiB (trial 256 KiB) | Advertised as `limits.maxMarkdownBytes`; larger is 413. |
+| `MAX_ATTACHMENT_BYTES` | 25 MiB (trial 4 MiB) | Advertised as `limits.maxAttachmentBytes`; larger is 413. |
+| `MAX_TRANSFER_BYTES` | 32 MiB (trial 4 MiB, never below the Markdown limit) | Body limit of `createTransfer`. |
+| `MAX_WORKSPACES_PER_ACCOUNT` | none (trial 1) | Workspaces one account owns. Advertised. |
+| `MAX_MEMBERS_PER_WORKSPACE` | none (trial 10) | Advertised. |
+| `MAX_PAGES_PER_WORKSPACE` | none (trial 200) | Live pages; deleted pages do not count. Advertised. |
+| `MAX_WORKSPACE_ATTACHMENT_BYTES` | none (trial 20 MiB) | Sum of a workspace's attachment sizes. Advertised. |
+| `REVISION_RETENTION_DAYS` | none (trial 30) | Non-current revisions older than this are pruned by maintenance. Advertised. |
+| `MAX_TOTAL_ATTACHMENT_BYTES` | none (trial 600 MiB) | Server-wide stored attachment bytes. Not advertised. |
+| `MAX_ACCOUNTS` | none (trial 300) | Server-wide number of accounts. Not advertised. |
+| `CORS_ORIGINS` | none | Comma-separated exact origins allowed from a browser (see CORS). |
+| `RATE_LIMIT_PER_ACCOUNT`, `RATE_LIMIT_PER_IP` | off (trial 300 / 600 per 60 s) | Requests per window (see Rate limiting). |
+| `RATE_LIMIT_WINDOW_SECONDS` | 60 | Fixed window length. |
+| `TRUST_PROXY` | `false` | Trust `x-real-ip` / `x-forwarded-for` for the client IP. |
+| `CRON_SECRET` | none | Enables `GET /internal/maintenance` (at least 16 characters). Never logged. |
+
+Every limit is its own optional variable: unset means no limit. Each accepts a positive integer, or the word
+`unlimited` to remove a value the trial profile would set. Invalid values stop the server at startup with a
+message that names the variable and never echoes the value.
 
 The server speaks plain HTTP. Put a TLS-terminating reverse proxy in front of it; the protocol requires
 HTTPS outside local development. Server-sent events need the proxy not to buffer responses.
@@ -46,6 +68,115 @@ node apps/server/src/cli.ts revoke-token --token-id <id>
 `create-token` writes the token to `--out` with mode 0600, refuses to overwrite an existing file, and prints
 only the token ID. A token is never printed, logged, or accepted as an argument; the database stores only its
 SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
+
+## Hosted trial profile
+
+`THOTH_PROFILE=trial` is a bundle of defaults for the hosted trial (Vercel Functions + Neon PostgreSQL free plan):
+
+| Setting | Trial default | Why |
+| --- | --- | --- |
+| `MAX_WORKSPACES_PER_ACCOUNT` / `MAX_MEMBERS_PER_WORKSPACE` / `MAX_PAGES_PER_WORKSPACE` | 1 / 10 / 200 | owner decision |
+| `MAX_WORKSPACE_ATTACHMENT_BYTES` | 20 MiB | owner decision |
+| `MAX_ATTACHMENT_BYTES` | **4 MiB** | Vercel Functions reject request bodies above 4.5 MB at the platform, before our code runs. Staying below it means a user sees our clear 413 `payload_too_large` instead of a platform error page. |
+| `MAX_MARKDOWN_BYTES`, `MAX_TRANSFER_BYTES` | 256 KiB, 4 MiB | the same 4.5 MB ceiling applies to `createTransfer` |
+| `REVISION_RETENTION_DAYS` | 30 | owner decision |
+| `MAX_TOTAL_ATTACHMENT_BYTES` | 600 MiB | Neon's free plan has 1 GB of storage per project, shared by pages, revisions and (with `BLOB_STORE=postgres`) attachments |
+| `BLOB_STORE` | `postgres` | a function's filesystem is ephemeral |
+| `EVENTS` | `off` | no long-lived SSE on a 300 s function or a database that must be allowed to sleep (ADR-0014) |
+| `MAX_ACCOUNTS` | 300 | keeps the database inside Neon's 1 GB; adjust after real usage |
+| `RATE_LIMIT_PER_ACCOUNT` / `RATE_LIMIT_PER_IP` | 300 / 600 per 60 s | ample for a person whose client polls the change feed, small for a script |
+
+Recommended companions (not part of the profile because they depend on the deployment):
+`MIGRATE_ON_START=false`, `DATABASE_POOL_MAX=1` to `3`, `TRUST_PROXY=true`, `CORS_ORIGINS`, `CRON_SECRET`.
+See `docs/deploy/trial.md` for the full setup.
+
+### Quotas
+
+A request that would exceed a quota is **409 `quota_exceeded`** (see `docs/protocol/README.md`, section 5, for why
+not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
+
+- **Pages.** Creating a page (`PUT` with `If-None-Match: *`) counts live pages; deleted pages and updates do not.
+  A `to_workspace` transfer is checked against the room left at creation and again at commit, before any page is
+  published: an over-limit transfer publishes nothing, and one refused at commit stays staged, so it can be retried
+  after making room.
+- **Attachment bytes per workspace.** The sum of `attachments.size` of the workspace, checked before any byte is stored.
+  Every upload is one attachment row, so uploading the same bytes twice counts twice: the quota is "what this workspace
+  holds", independent of how the server deduplicates storage.
+- **Attachment bytes per server (`MAX_TOTAL_ATTACHMENT_BYTES`).** Counts each distinct content hash once, since
+  identical bytes are stored once, so re-uploading known bytes never fills the server. When it would be exceeded the
+  reply says the trial server is full and that nothing is wrong with the account or request; it carries no `limit` or
+  `current` (they would tell every user how full the server is).
+- **Workspaces per account, members per workspace, accounts.** Enforced in `admin.ts` (`createWorkspace --owner`,
+  `addMember`, `createUser`), which call the shared checks in `quota.ts`, so the later sign-in and HTTP membership
+  routes reuse them. Workspaces count the account's `owner` memberships. A role change is not a new member. The CLI
+  reads the same environment as the server, so `THOTH_PROFILE=trial node src/cli.ts add-member ...` enforces the trial
+  limits.
+- All checks run under the per-workspace row lock (or, for server-wide and per-account counts, a transaction-scoped
+  advisory lock), so concurrent requests cannot overshoot: at limit - 1 exactly one of N concurrent creates wins.
+- A `quota_exceeded` reply is not stored under its `Idempotency-Key`: retrying after freeing room runs the request.
+
+### Serverless notes (Vercel + Neon)
+
+- **Migrations** run with a direct (non-pooled) URL via the CLI (`node src/cli.ts migrate`), not at function start:
+  the migration runner uses a session-level `pg_advisory_lock`, which does not work through a PgBouncer
+  transaction-mode pooler. `MIGRATE_ON_START=false` skips the runner and its lock entirely. The function itself
+  uses the pooled URL.
+- **No LISTEN/NOTIFY.** The pooled endpoint cannot carry it, and an always-open connection keeps a scale-to-zero
+  database awake and burns compute hours. The trial profile sets `EVENTS=off`: no listener is started and `events.sse` is not
+  advertised (clients poll the change feed).
+- **Blobs** live in the `blobs` table (`BLOB_STORE=postgres`): content-addressed, `INSERT ... ON CONFLICT DO NOTHING`.
+  The insert joins the request's transaction, so a failed request leaves no orphan. Bytes are read whole, so this
+  store is for small attachments, not large files.
+- **Pool size.** Each function instance has its own pool: keep `DATABASE_POOL_MAX` small.
+- **Client IP.** Vercel sets `x-forwarded-for` (and `x-real-ip`) itself, overwriting what the client sent. Set
+  `TRUST_PROXY=true` there. Without a trusted proxy in front, leave it unset: the headers are then ignored, so a client
+  cannot pick its own rate-limit key.
+- **Maintenance** runs from Vercel Cron: set `CRON_SECRET` and add a cron entry for `/internal/maintenance` (Vercel
+  sends `GET` with `Authorization: Bearer $CRON_SECRET`).
+- Statements time out after 30 s and requests are short; nothing relies on process memory between requests.
+
+## CORS
+
+`CORS_ORIGINS` lists exact origins (`https://app.example.org`, `http://localhost:5173`; no path, trailing slash or
+wildcard; a bad entry stops startup). Only a listed origin gets `Access-Control-Allow-Origin` (echoed) with
+`Access-Control-Allow-Credentials: true`, `Vary: Origin`, and `Access-Control-Expose-Headers: ETag, Location,
+Retry-After, WWW-Authenticate`, on every reply including 401/404/405 and the event stream. A preflight (`OPTIONS` with
+`Origin` and `Access-Control-Request-Method`) under `/api/v1` is answered 204 without authentication, with methods
+`GET, POST, PUT, DELETE` and headers `Authorization, Content-Type, If-Match, If-None-Match, Idempotency-Key`. A request
+from an unlisted origin is processed normally (authentication applies) but carries no CORS header, so the browser blocks
+it. With `CORS_ORIGINS` unset nothing is added and a stray `OPTIONS` is an ordinary 405.
+
+## Rate limiting
+
+Off unless `RATE_LIMIT_PER_ACCOUNT` and/or `RATE_LIMIT_PER_IP` is set (the trial profile sets both). Counters are fixed windows
+(`RATE_LIMIT_WINDOW_SECONDS`, default 60) in the `rate_limits` table, so the limit holds across instances. A check is
+one statement (`INSERT ... ON CONFLICT DO UPDATE ... RETURNING count`) on the database clock. The per-IP counter runs
+first, for every `/api/v1` request including `/capabilities`; the per-account counter runs after authentication, so a
+request with a bad token never spends an account's allowance. The 429 is `rate_limited` with `Retry-After` (seconds to
+the end of the window). Preflights are not counted. Expired counters are removed by maintenance. The cost is one
+extra database round trip per request, per enabled limit.
+
+The client IP is the socket address unless `TRUST_PROXY` is set, then `x-real-ip`, else the last `x-forwarded-for` entry
+(the one the trusted proxy appended).
+
+## Maintenance
+
+```sh
+node apps/server/src/cli.ts maintenance      # prints {"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..}
+curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
+```
+
+- Prunes revisions older than `REVISION_RETENTION_DAYS` (only if set) that are **not** the current revision of any page
+  (deleted pages keep their last revision) and are not pinned by a `from_workspace` transfer that is not terminal
+  (`done`, `failed`, `aborted`). A surviving revision is never modified: if its parent was pruned its `parentId` keeps
+  naming it and that revision now answers 404; `listPageRevisions` simply omits what is gone.
+- Deletes idempotency records past the 24 h window and expired rate-limit rows.
+- Revisions stay immutable. Migration 006 replaces the trigger so that `UPDATE` is always rejected and `DELETE` is
+  allowed only inside a transaction that set `thoth.pruning = on` (transaction-local, so it cannot leak through a
+  pooled connection). Only `pruneRevisions` sets it. The `parent_revision_id` foreign key is dropped for the same reason.
+- `GET /internal/maintenance` is outside `/api/v1`, registered only when `CRON_SECRET` is set (otherwise 404 like any
+  unknown route), requires `Authorization: Bearer <CRON_SECRET>` compared in constant time (401 otherwise), and is safe to
+  run on any instance concurrently. The secret is redacted from logs. It is not rate limited.
 
 ## Containers (Podman)
 
@@ -88,7 +219,8 @@ live on named volumes.
   order (a reader holding cursor N never later sees an entry below N) and makes a stale `If-Match` impossible to
   race past (the page row is also locked `FOR UPDATE`). Reads take no locks. Writers in different workspaces do not
   block each other.
-- **Revisions are immutable** in the schema: a trigger rejects `UPDATE` and `DELETE` on `page_revisions`.
+- **Revisions are immutable** in the schema: a trigger rejects every `UPDATE` on `page_revisions`, and every `DELETE`
+  except the retention pruning of the maintenance job (see Maintenance).
 - **Idempotency** records live in `idempotency_records`, scoped per principal, committed in the same transaction
   as the write, with a per-key advisory lock so a duplicate arriving mid-flight waits and replays rather than runs
   twice. Window: 24 h (also advertised).
@@ -120,7 +252,9 @@ live on named volumes.
    nothing published) and answers 409 `invalid_transfer_state`. The protocol leaves destination collisions open.
 6. **Transfer attachments** (`attachmentIds`) are validated to exist in the workspace; they are not otherwise
    linked to the transfer.
-7. **No rate limiting** (`429` is never produced) and no per-principal SSE connection cap.
-8. **Blob garbage collection** is not implemented: an upload whose transaction rolls back leaves an unreferenced,
-   content-addressed blob. Harmless, but it needs a sweeper before S3.
+7. **Rate limiting is opt-in** (see above) and there is no per-principal SSE connection cap.
+8. **Blob garbage collection** is not implemented for the filesystem store: an upload whose transaction rolls back
+   leaves an unreferenced, content-addressed blob. Harmless, but it needs a sweeper before S3. The Postgres store has
+   no such orphans (its insert joins the request transaction). Neither store deletes the bytes of attachments that
+   are no longer referenced, because attachments cannot be deleted through the API yet.
 9. `GET /workspaces` lists up to 50 members per workspace in `members`; `memberCount` is exact.

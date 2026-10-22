@@ -10,6 +10,7 @@ export interface Deps {
   db: Database;
   authenticator: Authenticator;
   blobs: BlobStore;
-  hub: ChangeHub;
+  /** `null` when `EVENTS=off`: no LISTEN connection exists. */
+  hub: ChangeHub | null;
   log: Logger;
 }

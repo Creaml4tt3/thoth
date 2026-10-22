@@ -3,7 +3,10 @@ import { API_BASE_PATH } from "@thoth/workspace-protocol";
 import type { Deps } from "./deps.ts";
 import { isUnavailable } from "./db.ts";
 import { ApiError, problemReply } from "./errors.ts";
+import { corsHeaders, isPreflight } from "./cors.ts";
 import { send } from "./http.ts";
+import { clientIp, hit } from "./ratelimit.ts";
+import { registerMaintenanceRoutes } from "./routes/maintenance.ts";
 import { registerAttachmentRoutes } from "./routes/attachments.ts";
 import { registerCoreRoutes } from "./routes/core.ts";
 import { registerEventRoutes } from "./routes/events.ts";
@@ -25,6 +28,8 @@ export const LOG_REDACT_PATHS = [
   "databaseUrl",
   "*.databaseUrl",
   "connectionString",
+  "cronSecret",
+  "*.cronSecret",
 ];
 
 export interface BuildOptions {
@@ -69,12 +74,23 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   app.removeAllContentTypeParsers();
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 
+  const { rateLimit } = config;
+  const limitedByIp = rateLimit.perIp !== undefined;
+  const limitedByAccount = rateLimit.perAccount !== undefined;
+
   app.addHook("onRequest", async (request, reply) => {
     reply.header("cache-control", "no-store");
     reply.header("x-content-type-options", "nosniff");
     const path = request.url.split("?")[0] ?? "";
+    const origin = typeof request.headers.origin === "string" ? request.headers.origin : undefined;
+    // CORS headers go on every reply (also errors and 404/405) for an allowed origin; others get none and the browser blocks them.
+    const preflight = isPreflight(request.method, request.headers);
+    for (const [name, value] of Object.entries(corsHeaders(config.corsOrigins, origin, preflight))) reply.header(name, value);
+    // A preflight carries no credentials by design: answered here, before authentication and rate limiting.
+    if (preflight && config.corsOrigins.length > 0 && (path === API_BASE_PATH || path.startsWith(`${API_BASE_PATH}/`))) return reply.code(204).send();
     if (!path.startsWith(`${API_BASE_PATH}/`)) return;
     const route = path.slice(API_BASE_PATH.length);
+    if (limitedByIp) await enforce(`ip:${clientIp(request.headers, request.socket.remoteAddress, config.trustProxy)}`, rateLimit.perIp!);
     if (route === "/capabilities") return;
     const gate = CAPABILITY_ROUTES.find((c) => c.test(request.method, route));
     request.principal = null;
@@ -82,8 +98,15 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
     const principal = await deps.authenticator.authenticate({ headers: request.headers });
     if (!principal) throw new ApiError("unauthenticated", "a valid bearer credential is required");
     request.principal = principal;
+    if (limitedByAccount) await enforce(`acct:${principal.id}`, rateLimit.perAccount!);
     if (gate && !capabilities.has(gate.capability)) throw new ApiError("capability_not_supported", `capability ${gate.capability} is not supported`);
   });
+
+  /** One upsert per check. A denied request is 429 with the seconds until the window ends. */
+  async function enforce(key: string, limit: number): Promise<void> {
+    const decision = await hit(deps.db, key, limit, rateLimit.windowSeconds);
+    if (!decision.allowed) throw new ApiError("rate_limited", "too many requests; retry after the time in the Retry-After header", {}, { "retry-after": String(decision.retryAfterSeconds) });
+  }
 
   app.setErrorHandler((error: FastifyError | Error, request, reply) => {
     let apiError: ApiError;
@@ -117,6 +140,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerAttachmentRoutes(app, deps);
   registerEventRoutes(app, deps);
   registerTransferRoutes(app, deps);
+  registerMaintenanceRoutes(app, deps);
   return app;
 }
 

@@ -29,6 +29,7 @@
             "not_found",
             "method_not_allowed",
             "invalid_transfer_state",
+            "quota_exceeded",
             "cursor_expired",
             "revision_conflict",
             "payload_too_large",

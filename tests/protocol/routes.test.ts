@@ -86,7 +86,7 @@ describe("route registry", () => {
   });
 
   it("derives allowed statuses from success responses and error codes", () => {
-    expect(allowedStatuses(getRoute("putPage"))).toEqual([200, 201, 400, 401, 403, 404, 412, 413, 422, 428, 429, 500, 503]);
+    expect(allowedStatuses(getRoute("putPage"))).toEqual([200, 201, 400, 401, 403, 404, 409, 412, 413, 422, 428, 429, 500, 503]);
   });
 });
 

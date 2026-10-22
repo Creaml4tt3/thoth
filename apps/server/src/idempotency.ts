@@ -68,6 +68,9 @@ export async function runMutation(db: Database, req: MutationRequest, run: (tx: 
     }
     await tx.query("SAVEPOINT idempotent_run");
     let reply: Reply;
+    // A quota rejection says nothing about the request itself and can stop being true after the user frees room,
+    // so, like 5xx and 429, it is not remembered: retrying with the same key runs the request again.
+    let remember = true;
     try {
       reply = await run(tx, info);
       await tx.query("RELEASE SAVEPOINT idempotent_run");
@@ -75,8 +78,9 @@ export async function runMutation(db: Database, req: MutationRequest, run: (tx: 
       if (!(error instanceof ApiError)) throw error;
       await tx.query("ROLLBACK TO SAVEPOINT idempotent_run");
       reply = problemReply(error, req.requestId);
+      remember = error.code !== "quota_exceeded";
     }
-    if (isStorable(reply.status)) {
+    if (remember && isStorable(reply.status)) {
       const body = reply.body === undefined ? null : Buffer.from(reply.body);
       await tx.query("INSERT INTO idempotency_records (principal_id, key, fingerprint, status, headers, body) VALUES ($1, $2, $3, $4, $5, $6)", [req.principalId, key, fingerprint, reply.status, JSON.stringify(reply.headers), body]);
     }

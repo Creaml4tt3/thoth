@@ -6,6 +6,7 @@ import type { Queryable, Tx } from "../db.ts";
 import { ApiError, fieldError, jsonReply, problemReply, zodFailure, type Reply } from "../errors.ts";
 import { audit, mutate, parseJsonBody, principalOf, send } from "../http.ts";
 import { checkStorableText, deletePage, loadPage, writeRevision } from "../pages.ts";
+import { assertCanCreatePages } from "../quota.ts";
 
 interface TransferRow {
   operation_id: string;
@@ -129,6 +130,8 @@ export function registerTransferRoutes(app: FastifyInstance, deps: Deps): void {
           const known = await tx.query<{ n: number }>("SELECT count(*)::int AS n FROM attachments WHERE workspace_id = $1 AND id = ANY($2::uuid[])", [ws.id, [...new Set(plan.attachmentIds)]]);
           if (known.rows[0]!.n !== new Set(plan.attachmentIds).size) throw new ApiError("validation_failed", "attachmentIds must name attachments uploaded to this workspace", fieldError("/attachmentIds", "unknown attachment"));
         }
+        // Early answer, under the workspace lock; the commit checks again because the workspace may grow in between.
+        await assertCanCreatePages(tx, config, ws.id, plan.pages.length);
         items = plan.pages.map((p) => ({ pageId: p.pageId, sourceId: p.sourceId, revisionId: null, parentId: p.parentId, title: p.title, markdown: p.markdown }));
       } else {
         if (plan.pages.length > MAX_TRANSFER_PAGES) throw new ApiError("payload_too_large", `a transfer carries at most ${MAX_TRANSFER_PAGES} pages`);
@@ -198,6 +201,8 @@ export function registerTransferRoutes(app: FastifyInstance, deps: Deps): void {
           // The failure is recorded (this reply commits the transaction) and reported as a conflict.
           return problemReply(new ApiError("invalid_transfer_state", "a pageId was taken in the workspace after the transfer was staged; the transfer failed and nothing was published"), request.id);
         }
+        // Nothing has been written yet: exceeding the limit leaves the transfer staged (retryable after freeing room) and publishes no page.
+        await assertCanCreatePages(tx, config, access.id, items.length);
         for (const item of items) {
           const { revision } = await writeRevision(tx, { workspaceId: access.id, pageId: item.page_id, input: { title: item.title!, markdown: item.markdown!, parentId: item.parent_id }, userId: transfer.user_id, existing: undefined, now });
           await setItem(item.position, "committed", revision.id, null);

@@ -7,14 +7,17 @@
  *   node src/cli.ts add-member --workspace <id> --user <id> --role owner|editor|viewer
  *   node src/cli.ts create-token --user <id> --out <file> [--label <text>] [--expires-days <n>]
  *   node src/cli.ts revoke-token --token-id <id>
+ *   node src/cli.ts maintenance
  *
  * IDs are printed to stdout. A token is written only to the --out file (mode 0600); it is never
  * printed, logged, or accepted on the command line.
  */
 import { parseArgs } from "node:util";
 import { AdminError, addMember, createToken, createUser, createWorkspace, revokeToken } from "./admin.ts";
-import { ConfigError } from "./config.ts";
+import { ConfigError, loadConfig } from "./config.ts";
 import { createDatabase } from "./db.ts";
+import { ApiError } from "./errors.ts";
+import { runMaintenance } from "./maintenance.ts";
 import { migrate } from "./migrate.ts";
 
 const USAGE = `Usage: node src/cli.ts <command> [options]   (DATABASE_URL must be set)
@@ -22,11 +25,17 @@ const USAGE = `Usage: node src/cli.ts <command> [options]   (DATABASE_URL must b
 Commands:
   migrate                                                   apply pending SQL migrations
   create-user --name <name> [--email <email>]               prints the user ID
-  create-workspace --name <name> [--export-restricted]      prints the workspace ID
+  create-workspace --name <name> [--export-restricted] [--owner <user id>]   prints the workspace ID
   add-member --workspace <id> --user <id> --role <role>     role: owner | editor | viewer
   create-token --user <id> --out <file> [--label <text>] [--expires-days <n>]
                                                             writes the token to <file> (mode 0600); prints the token ID
-  revoke-token --token-id <id>`;
+  revoke-token --token-id <id>
+  maintenance                                               prune old revisions (REVISION_RETENTION_DAYS), expired idempotency
+                                                            records and rate-limit rows; prints what was removed
+
+create-user, create-workspace and add-member enforce the quotas of the environment (THOTH_PROFILE, MAX_*).
+create-workspace takes --owner <user id> to make that user the owner (and count it against MAX_WORKSPACES_PER_ACCOUNT).
+Run migrate with a direct (non-pooled) DATABASE_URL.`;
 
 const fail = (message: string): never => {
   throw new AdminError(message);
@@ -45,6 +54,7 @@ async function main(argv: string[]): Promise<number> {
       email: { type: "string" },
       workspace: { type: "string" },
       user: { type: "string" },
+      owner: { type: "string" },
       role: { type: "string" },
       out: { type: "string" },
       label: { type: "string" },
@@ -57,6 +67,8 @@ async function main(argv: string[]): Promise<number> {
   });
   const url = process.env.DATABASE_URL;
   if (!url) throw new ConfigError("DATABASE_URL is required");
+  // Quotas and retention come from the same environment as the server (the profile applies here too).
+  const config = loadConfig(process.env);
   const db = createDatabase(url, { max: 2 });
   try {
     switch (command) {
@@ -66,18 +78,23 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "create-user": {
-        const { id } = await createUser(db, { name: values.name ?? fail("--name is required"), ...(values.email ? { email: values.email } : {}) });
+        const { id } = await createUser(db, { name: values.name ?? fail("--name is required"), ...(values.email ? { email: values.email } : {}) }, config);
         console.log(id);
         return 0;
       }
       case "create-workspace": {
-        const { id } = await createWorkspace(db, { name: values.name ?? fail("--name is required"), exportRestricted: values["export-restricted"] === true });
+        const { id } = await createWorkspace(db, { name: values.name ?? fail("--name is required"), exportRestricted: values["export-restricted"] === true, ...(values.owner ? { ownerId: values.owner } : {}) }, config);
         console.log(id);
         return 0;
       }
       case "add-member": {
-        await addMember(db, { workspaceId: values.workspace ?? fail("--workspace is required"), userId: values.user ?? fail("--user is required"), role: values.role ?? fail("--role is required") });
+        await addMember(db, { workspaceId: values.workspace ?? fail("--workspace is required"), userId: values.user ?? fail("--user is required"), role: values.role ?? fail("--role is required") }, config);
         console.log("ok");
+        return 0;
+      }
+      case "maintenance": {
+        const result = await runMaintenance(db, { revisionRetentionDays: config.revisionRetentionDays });
+        console.log(JSON.stringify(result));
         return 0;
       }
       case "create-token": {
@@ -112,5 +129,5 @@ try {
   const message = error instanceof Error ? error.message : "unknown error";
   // Messages may quote driver errors; never let a connection string through.
   console.error(`error: ${message.replace(/postgres(ql)?:\/\/\S+/g, "postgres://[redacted]")}`);
-  process.exitCode = error instanceof AdminError || error instanceof ConfigError || (error as { code?: string }).code === "ERR_PARSE_ARGS_UNKNOWN_OPTION" ? 2 : 1;
+  process.exitCode = error instanceof AdminError || error instanceof ConfigError || (error instanceof ApiError && error.code === "quota_exceeded") || (error as { code?: string }).code === "ERR_PARSE_ARGS_UNKNOWN_OPTION" ? 2 : 1;
 }
