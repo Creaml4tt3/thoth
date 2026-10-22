@@ -1,9 +1,10 @@
 # ADR-0014: Hosted trial deployment (Vercel + Neon) and the sign-in broker
 
-- **Status:** Accepted for rules 1–4 and 6 (owner decisions 2026-10-22: Vercel or
-  Cloudflare hosting, `thoth.creaml4tt3.me` until a domain is bought, Neon or
-  another free PostgreSQL, the trial limits below, Google then GitHub sign-in).
-  Proposed for rule 5 (the account cap and region), to be confirmed before the trial is public.
+- **Status:** Accepted (owner decisions 2026-10-22: Vercel or Cloudflare
+  hosting, `thoth.creaml4tt3.me` until a domain is bought, Neon or another free
+  PostgreSQL, the trial limits below, Google then GitHub sign-in; region
+  Singapore and contact `creaml4tt3@gmail.com` confirmed the same day). The
+  account cap in rule 5 stays adjustable after real usage.
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 - **Refines:** ADR-0013 rules 1, 4 and 5.
@@ -146,12 +147,11 @@ documentation. Re-check them before launch, because free plans change.
    - **Creating accounts.** Sign-up only happens through a configured provider
      and is limited per IP and by the server-wide account cap (rule 5).
      Personal access tokens stay for scripts and self-hosting.
-5. **Account cap and region (Proposed).**
+5. **Account cap and region.**
    - `MAX_ACCOUNTS` starts at **300**, so the database cannot fill Neon's 1 GB.
      Raise it after watching real usage.
    - The API function and Neon run in the **same region**: Singapore
-     (`sin1` / `aws-ap-southeast-1`) if most users are in Southeast Asia,
-     otherwise the US East defaults.
+     (Vercel `sin1`, Neon `aws-ap-southeast-1`), chosen by the owner.
 6. **The privacy notice, terms and abuse contact are drafted** in `docs/legal/`.
    They must show the owner's contact address and be published on the website
    before the trial accepts sign-ups.
@@ -210,10 +210,12 @@ rate limits), 12 (browser sessions, secrets, abuse), 13 (P2 web client).
 
 ## Open questions
 
-- The owner's public contact address for the privacy notice and abuse reports.
-  Blocks the public trial.
+- ~~The owner's contact address.~~ `creaml4tt3@gmail.com`, filled into
+  `docs/legal/`. The remaining `[[OWNER: …]]` items there (publication date,
+  log retention, applicable law, minimum age) are filled in at publication.
 - Emailing a notice before an inactive account is deleted needs an email
   sending service. Until one is chosen, the warning is shown in the app at
   sign-in instead. Blocks deleting inactive accounts, not the launch.
-- The final product name and domain (ADR-0013). Moving domains is a
-  configuration change (rule 1).
+- ~~The product name.~~ The owner keeps **Thoth** (2026-10-22). The clash
+  with the unrelated voice app at thoth-app.com remains a known risk; buying a
+  domain is still open, and moving to it is a configuration change (rule 1).

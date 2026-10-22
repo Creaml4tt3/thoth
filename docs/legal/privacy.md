@@ -11,9 +11,9 @@ Last updated: [[OWNER: date of publication]]
 ## Who runs this service
 
 The Thoth trial server at `api.thoth.creaml4tt3.me` and the website at
-`thoth.creaml4tt3.me` are run by [[OWNER: your name or handle]] as a free,
+`thoth.creaml4tt3.me` are run by Creaml4tt3 as a free,
 non-commercial trial of the open-source Thoth project. Contact:
-[[OWNER: contact email]].
+creaml4tt3@gmail.com.
 
 This notice covers only the hosted trial. The Thoth desktop app keeps your
 Private Space on your own computer. Nothing in it is sent to this server unless
@@ -47,7 +47,7 @@ We do not sell your data, show ads, or use your content to train AI models.
 The trial runs on:
 
 - **Vercel** (website and API hosting);
-- **Neon** (PostgreSQL database), in region [[OWNER: region, e.g. Singapore]];
+- **Neon** (PostgreSQL database), in region AWS Asia Pacific (Singapore);
 - **Google** and **GitHub** (sign-in).
 
 Each one processes data under its own terms and privacy policy. Your data may be
@@ -71,7 +71,7 @@ Private Space at any time.
 ## Your choices and rights
 
 You can export your content at any time. To delete your account, or to ask for
-a copy or correction of your account data, write to [[OWNER: contact email]].
+a copy or correction of your account data, write to creaml4tt3@gmail.com.
 [[OWNER: add the rights that apply under your law, and how to complain to a
 regulator.]]
 

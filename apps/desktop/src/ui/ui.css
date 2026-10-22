@@ -40,7 +40,10 @@ h1, h2, h3, p { margin: 0; }
 .modal-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--thoth-space-6); background: rgb(0 0 0 / 0.45); color: var(--thoth-ink-primary); }
 .modal { background: var(--thoth-bg); color: var(--thoth-ink-primary); border-radius: var(--thoth-radius-xl); box-shadow: var(--thoth-shadow-modal); width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: var(--thoth-space-6); display: grid; gap: var(--thoth-space-4); align-content: start; }
 .modal-wide { width: min(880px, 100%); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); }
 .modal-title { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); }
+.modal-close { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px -4px 0; border: 0; border-radius: var(--thoth-radius-md); background: transparent; color: var(--thoth-ink-tertiary); cursor: pointer; }
+.modal-close:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .modal-actions { display: flex; gap: var(--thoth-space-2); justify-content: flex-end; flex-wrap: wrap; }
 
 .alert { padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); color: var(--thoth-ink-secondary); font: var(--thoth-text-ui); }

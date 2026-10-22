@@ -363,14 +363,15 @@ regression tests (`pnpm check`: 92 tests):
    (no owned domain yet; the product name may still change, see
    `apps/desktop/src-tauri/README.md` for what a later change costs).
 5. ~~Logo and accent.~~ Decided 2026-10-22: Moon Ibis mark, lunar orange accent.
+   The first SVG was a hand-drawn approximation that did not match concept A;
+   on 2026-10-22 it was replaced by a trace of concept A itself
+   (`design/concepts/logo-directions-sheet.png`), and the app icons were
+   regenerated.
 6. ~~Trial hosting, limits, sign-in providers.~~ Decided 2026-10-22 (ADR-0014):
    - hosting on Vercel + Neon at `thoth.creaml4tt3.me` / `api.thoth.creaml4tt3.me`;
    - limits of 1 workspace, 10 members, 200 pages and 20 MB per workspace;
    - Google first, then GitHub.
 
-   Still open:
-   - the owner's contact address for `docs/legal/` (blocks the public launch);
-   - the account cap (300) and the region (Proposed).
-7. **Product name.** Thoth stays as the base, with a word added to make it
-   unique; the owner has not chosen one yet. This blocks buying a domain, not
-   the build.
+   Region Singapore and contact `creaml4tt3@gmail.com` confirmed the same day.
+7. ~~Product name.~~ Decided 2026-10-22: **Thoth**. Buying a domain is still
+   open; moving to it is a configuration change (ADR-0014).

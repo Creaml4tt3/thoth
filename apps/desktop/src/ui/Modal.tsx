@@ -11,7 +11,10 @@ interface ModalProps {
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Accessible modal: labelled, focus moves in and is restored, Tab is trapped, Escape closes when allowed. */
+/**
+ * Accessible modal: labelled, focus moves in and is restored, Tab is trapped. When it may be dismissed it
+ * has a visible Close button, and Escape or a click on the backdrop closes it too.
+ */
 export function Modal({ title, onClose, theme = "paper", wide, children }: ModalProps) {
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
@@ -46,11 +49,27 @@ export function Modal({ title, onClose, theme = "paper", wide, children }: Modal
   };
 
   return (
-    <div className="modal-scrim" data-theme={theme === "night" ? "night" : undefined}>
+    <div
+      className="modal-scrim"
+      data-theme={theme === "night" ? "night" : undefined}
+      // Only a press that starts on the backdrop itself closes: a text selection dragged out of the dialog does not.
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close.current?.();
+      }}
+    >
       <div ref={box} className={`modal${wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
-        <h2 id={titleId} className="modal-title">
-          {title}
-        </h2>
+        <div className="modal-head">
+          <h2 id={titleId} className="modal-title">
+            {title}
+          </h2>
+          {onClose && (
+            <button type="button" className="modal-close" aria-label="Close" title="Close (Esc)" onClick={() => close.current?.()}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
         {children}
       </div>
     </div>

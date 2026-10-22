@@ -7,7 +7,7 @@
 Last updated: [[OWNER: date of publication]]
 
 1. **What this is.** A free, non-commercial trial of the open-source Thoth
-   workspace server, run by [[OWNER: your name or handle]]. It is for trying
+   workspace server, run by Creaml4tt3. It is for trying
    Thoth, not for important or sensitive data.
 2. **No guarantees.** The service is provided "as is", without warranty of any
    kind. It may be slow, unavailable, reset or shut down at any time, with or
@@ -31,11 +31,11 @@ Last updated: [[OWNER: date of publication]]
 6. **Suspension.** The operator may suspend or delete accounts or content that
    break these terms, or when needed to protect the service or its users.
 7. **Reporting abuse.** Report abuse or illegal content to
-   [[OWNER: abuse contact email]]. Include the workspace or page link if you
+   creaml4tt3@gmail.com (subject: "Abuse report"). Include the workspace or page link if you
    can.
 8. **Liability.** To the extent the law allows, the operator is not liable for
    any loss of data, profits or anything else arising from use of the trial.
    [[OWNER: check what your law allows.]]
 9. **Changes.** These terms may change. Continued use after a change means you
    accept it.
-10. **Contact.** [[OWNER: contact email]].
+10. **Contact.** creaml4tt3@gmail.com.
