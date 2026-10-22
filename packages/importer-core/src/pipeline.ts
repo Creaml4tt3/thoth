@@ -16,6 +16,7 @@ import {
   type ImportWarning,
 } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
+import { defaultImportRoot, folderExists, importFolderName } from "./folder-name.ts";
 import { hashStream } from "./hash.ts";
 import {
   IMPORT_STAGING_DIR,
@@ -182,7 +183,7 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
   const now = input.now ?? Date.now;
   const jobId = input.jobId ?? newStableId(now());
   const options: ImportOptions = {
-    destinationRoot: input.options?.destinationRoot ?? `Imports/${stripExtension(source.label)}`,
+    destinationRoot: input.options?.destinationRoot ?? (await defaultImportRoot(folderExists((dir) => vault.fs.list(dir)), importFolderName(source.label, provider.system, now()))),
     conflictPolicy: input.options?.conflictPolicy ?? "rename",
     addIdentityFrontmatter: input.options?.addIdentityFrontmatter ?? true,
   };

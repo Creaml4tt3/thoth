@@ -29,7 +29,7 @@ Toolchain verified on the dev machine:
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; server and web not started | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | Not started | ADR-0006 is Proposed. The state enum and `operation_journal` table are reserved. |
 | Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
-| Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. DCO vs CLA still open. |
+| Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
 
 ## 3. Phased plan with acceptance criteria
 
@@ -253,10 +253,11 @@ regression tests (`pnpm check`: 92 tests):
 ## 6. Open blockers needing an owner decision
 
 1. ~~ADR-0008: desktop hosting model.~~ Decided 2026-10-21: Rust-hosted ports.
-2. ~~ADR-0011: license.~~ Decided 2026-10-22: Apache-2.0. Still open: DCO vs
-   CLA, which blocks accepting outside contributions.
-3. **A real Notion export sample**, needed to confirm the INFERRED format
-   details before release.
+2. ~~ADR-0011: license and contributions.~~ Decided 2026-10-22: Apache-2.0,
+   DCO sign-off.
+3. **Larger real Notion exports.** One small real export was checked on
+   2026-10-22 (import-formats.md §1.0). Multi-part exports, images, toggles and
+   title truncation are still unconfirmed.
 4. **Bundle identifier.** `app.thoth.desktop` is provisional. It must be fixed
    before the first build anyone else installs, because changing it later moves
    the app data directory (recent vaults list).

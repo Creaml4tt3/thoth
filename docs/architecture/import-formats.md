@@ -10,12 +10,37 @@ Legend:
   official docs or Obsidian's own code. Treat as strong evidence, not proof.
 - **INFERRED**: assumption or recollection. Confirm against a real export.
 
-Important caveat: no real Notion export was available. The Obsidian Importer
+Important caveat: until 2026-10-22 no real Notion export was available; section 1.0 records the one small real export seen since. The Obsidian Importer
 reads Notion's **HTML** export, not Markdown, so its code confirms ID, ZIP and
 attachment conventions but not Markdown link or property syntax. Markdown
 details rest on third-party tools (VERIFIED-2) or inference.
 
 ## 1. Notion "Markdown & CSV" export
+
+### 1.0 Observed in a real export (2026-10-22)
+
+The owner supplied one small, real workspace export (20 entries, 26 KiB). Only
+its structure is recorded here. Its content is private and is not committed.
+These observations override the matching INFERRED rows below.
+
+| Observation | Status |
+|---|---|
+| The download is named `<uuid>_Export-<uuid>.zip`. Inside, everything sits under one `Export-<uuid>/` folder. No `ExportBlock-` prefix, no nested `Part-N` ZIPs at this size. | OBSERVED |
+| Top-level folders below the wrapper are sidebar sections: `Private & Shared/` and a teamspace folder `<Owner>'s Notion HQ/<32hex>/` whose second level is an ID-only folder. | OBSERVED |
+| Uploaded files are not next to the page. They sit in a root-level `attachments/<uuid>/<file name>` folder and are linked as `../attachments/<uuid>/<url-encoded name>`. | OBSERVED (contradicts the per-page folder layout in 1.6 for this export) |
+| Entry names are UTF-8. Thai names set the ZIP UTF-8 flag (0x800); ASCII-only names do not. | OBSERVED |
+| A database page is a short `.md` (H1, a link to its CSV, then plain-text `filters:` / `sort:` lines). Only the `_all.csv` variant was present; no view-only `.csv`. | OBSERVED |
+| CSV files are UTF-8 **with a BOM**, RFC 4180 style, header row first. | OBSERVED |
+| Row pages: H1, blank line, then `Key: Value` property lines, no YAML frontmatter. | OBSERVED |
+| Links to child databases are URL-encoded relative paths with literal `(` `)` left unencoded (`Sheet%20(TR)/Name%20<id>_all.csv`). Parentheses in attachment names are encoded (`%28` `%29`). | OBSERVED |
+| Callouts are `<aside>` HTML blocks; in this export without an icon `<img>`. Code blocks are fenced; tables are pipe tables. | OBSERVED |
+
+Import result with the current importer: completed, 15 pages, 1 attachment,
+4 databases, 0 failed, 5 of 5 internal links resolved, 8 external links left
+unchanged. Fix made from it: the default destination folder no longer copies
+the `<uuid>_Export-<uuid>` name (`importFolderName`). Not covered by this
+sample: large multi-part exports, images, toggles, comments, `notion.so` links
+to pages outside the export, and title truncation.
 
 Sources:
 - N1 https://www.notion.com/help/export-your-content (official)

@@ -1,7 +1,6 @@
 # ADR-0011: Open-source license and contribution policy
 
-- **Status:** Accepted (license) 2026-10-22. Contribution policy (DCO vs CLA)
-  still open.
+- **Status:** Accepted 2026-10-22 (Apache-2.0, DCO).
 - **Date:** 2026-10-20 (proposed), 2026-10-22 (license accepted)
 
 ## Context
@@ -32,6 +31,10 @@ The project owner chose **Option 1: Apache-2.0 for everything** (2026-10-22).
    unmodified). No GPL/AGPL-only dependency. A CI license check is still to do.
 4. Hosted closed forks are permitted. The owner accepted this trade-off for
    simplicity and adoption.
+5. Contributions use the **DCO 1.1** (owner decision 2026-10-22): every commit
+   carries `Signed-off-by:`. There is no CLA, so contributors keep copyright and
+   relicensing later would need their consent. Text in `DCO`; process in
+   `CONTRIBUTING.md`. A CI check for sign-offs is still to do.
 
 ## Options
 
@@ -105,7 +108,7 @@ Section 2 (licensing), 1 (open-source mission), 11 (reference server), 13
 ## Open questions
 
 - ~~Which option~~ Decided 2026-10-22: Apache-2.0.
-- DCO vs CLA (owner decision; blocks accepting external contributions).
+- ~~DCO vs CLA~~ Decided 2026-10-22: DCO.
 - Trademark and naming policy for the Thoth name.
 - License of documentation and test fixtures (including any fixtures derived from
   third-party exports).

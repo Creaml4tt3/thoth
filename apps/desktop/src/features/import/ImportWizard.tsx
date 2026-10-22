@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImportManifest } from "@thoth/importer-core";
 import { Button } from "../../ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
-import { checkDestination, defaultDestination, sourceKindFor, type Format, type System } from "./model.ts";
+import { checkDestination, sourceKindFor, type Format, type System } from "./model.ts";
 import type { ScanResult } from "./service.ts";
 import { ChooseSource } from "./steps/ChooseSource.tsx";
 import { Destination } from "./steps/Destination.tsx";
@@ -77,7 +77,7 @@ export function ImportWizard({ onClose, onOpenFolder }: Props) {
     try {
       const result = await service.scan(sourceKindFor(system, format), location);
       setScan(result);
-      setDestination(defaultDestination(result.preview.sourceLabel));
+      setDestination(result.manifest.options.destinationRoot);
       setStep("preview");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

@@ -1,6 +1,7 @@
 export { openArchiveSource, type ArchiveSourceOptions } from "./archive-source.ts";
 export * from "./csv.ts";
 export { openFolderSource } from "./folder-source.ts";
+export * from "./folder-name.ts";
 export * from "./hash.ts";
 export * from "./limits.ts";
 export * from "./manifest.ts";

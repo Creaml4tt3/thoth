@@ -126,6 +126,23 @@ describe("NotionZipImporter", () => {
     expect(report.imported).toEqual({ pages: 9, attachments: 3, databases: 2 });
   });
 
+  it("defaults to a short Imports/ folder for a Notion-named export, numbering repeats", async () => {
+    const name = "38fbabd2-79c6-464e-9ea7-ad3f550c73a3_Export-53d6ae23-ad3e-47c2-b31a-a90029419a2d.zip";
+    const zip = await writeZip(join(work, name), await dirEntries(FIXTURE, "Export-53d6ae23-ad3e-47c2-b31a-a90029419a2d/"));
+    const now = () => Date.UTC(2026, 9, 22, 12);
+    const roots: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const { source, provider } = await NotionZipImporter.open(zip);
+      const { manifest } = await planImport({ vault, source, provider, now });
+      expect((await runImport(vault, source, manifest)).state).toBe("completed");
+      await source.close();
+      roots.push(manifest.options.destinationRoot);
+    }
+    expect(roots).toEqual(["Imports/Notion import 2026-10-22", "Imports/Notion import 2026-10-22 2"]);
+    expect(await vault.pageByPath(`Imports/Notion import 2026-10-22 2/Private & Shared/Thoth Handbook.md`)).toBeUndefined();
+    expect(await vault.pageByPath(`Imports/Notion import 2026-10-22 2/Thoth Handbook.md`)).toBeDefined();
+  });
+
   it("strips an Export-<uuid>/ wrapper folder", async () => {
     const zip = await writeZip(join(work, "wrapped.zip"), await dirEntries(FIXTURE, "Export-0f0e0d0c-0b0a-4908-8706-050403020100/"));
     const { manifest } = await importZip(zip);

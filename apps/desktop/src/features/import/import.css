@@ -1,5 +1,6 @@
 /* Import wizard (Night). Inside Settings (Paper) it keeps its own dark surface. */
 .wizard { background: var(--thoth-bg); color: var(--thoth-ink-primary); border-radius: var(--thoth-radius-xl); padding: var(--thoth-space-6); display: grid; gap: var(--thoth-space-4); width: min(760px, 100%); text-align: left; }
+.wizard > * { min-width: 0; } /* a long name must not widen the grid past the panel */
 .onboarding-wizard .wizard { box-shadow: var(--thoth-shadow-modal); }
 .wz-head { display: flex; justify-content: space-between; align-items: start; gap: var(--thoth-space-4); }
 .wz-title { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); outline: none; }
@@ -19,6 +20,8 @@
 .wz-choice input { margin-top: 3px; accent-color: var(--thoth-ink-primary); }
 .wz-actions { display: flex; gap: var(--thoth-space-2); justify-content: flex-end; flex-wrap: wrap; }
 .wz-actions-start { justify-content: flex-start; }
+.wz-actions > * { min-width: 0; max-width: 100%; }
+.wz-open-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 36ch; }
 .wz-list { margin: 0; padding-left: 1.3em; display: grid; gap: var(--thoth-space-2); color: var(--thoth-ink-secondary); }
 .wz-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--thoth-space-2); }
 .wz-stat { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-hover); }

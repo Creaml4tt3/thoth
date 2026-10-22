@@ -1,5 +1,5 @@
 import type { ImportSourceKind } from "@thoth/domain";
-import { normalizeVaultPath, isReservedPath, stripExtension } from "@thoth/domain";
+import { normalizeVaultPath, isReservedPath } from "@thoth/domain";
 
 export type System = "notion" | "obsidian";
 export type Format = "zip" | "folder";
@@ -7,12 +7,6 @@ export type Format = "zip" | "folder";
 export function sourceKindFor(system: System, format: Format): ImportSourceKind {
   if (system === "notion") return format === "zip" ? "notion-zip" : "notion-folder";
   return format === "zip" ? "obsidian-zip" : "obsidian-vault";
-}
-
-/** `Imports/<name>`: the default destination folder (spec section 7.1 step 6). */
-export function defaultDestination(sourceLabel: string): string {
-  const name = stripExtension(sourceLabel).replace(/[\\/]+/g, "-").trim() || "Import";
-  return `Imports/${name}`;
 }
 
 /** Validates the destination folder the user typed. "" means the vault root. */

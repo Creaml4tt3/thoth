@@ -74,8 +74,8 @@ export function Report({ report, destinationRoot, onOpenFolder, onResume, onDone
           Close
         </Button>
         {total > 0 && (
-          <Button variant="primary" onClick={onOpenFolder}>
-            Open imported folder{destinationRoot ? ` (${destinationRoot})` : ""}
+          <Button variant="primary" onClick={onOpenFolder} title={destinationRoot || undefined} aria-label={`Open imported folder ${destinationRoot || "(top level)"}`}>
+            <span className="wz-open-label">Open {destinationRoot ? `“${destinationRoot.slice(destinationRoot.lastIndexOf("/") + 1)}”` : "imported pages"}</span>
           </Button>
         )}
       </div>
