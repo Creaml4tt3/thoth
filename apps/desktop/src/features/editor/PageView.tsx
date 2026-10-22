@@ -6,6 +6,7 @@ import { ConflictDialog } from "./ConflictDialog.tsx";
 import { PageEditor, type PageEditorHandle } from "./PageEditor.tsx";
 import { createEditorContext } from "./context.ts";
 import { EMPTY_LOOKUP, loadLinkLookup, type LinkLookup } from "./links.ts";
+import { EMPTY_SUGGESTER, type LinkSuggester } from "./link-suggest.ts";
 import { usePageSession } from "./usePageSession.ts";
 import type { SaveStatus } from "./page-session.ts";
 import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode } from "./mode.ts";
@@ -58,10 +59,11 @@ export function PageView({ path }: { path: string }) {
   /** The text carried from the editor being replaced into the one being mounted, unsaved edits included. */
   const carried = useRef<string | null>(null);
   const lookup = useRef<LinkLookup>(EMPTY_LOOKUP);
+  const suggester = useRef<LinkSuggester>(EMPTY_SUGGESTER);
   // One context per page: `openPage` changes with every index revision, and node views and the Plain editor hold the context.
   const open = useRef(openPage);
   open.current = openPage;
-  const ctx = useMemo(() => createEditorContext({ lookup: () => lookup.current, openPage: (p) => open.current(p) }), []);
+  const ctx = useMemo(() => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p) }), []);
   const { session, state } = usePageSession(path, handle);
 
   // Wikilink chips resolve through the index; refresh them when it changes.
@@ -70,7 +72,8 @@ export function PageView({ path }: { path: string }) {
     loadLinkLookup(vault, path)
       .then((next) => {
         if (!live) return;
-        lookup.current = next;
+        lookup.current = next.lookup;
+        suggester.current = next.suggester;
         for (const view of ctx.views) view.refresh();
       })
       .catch(() => undefined); // the vault may have closed while this was in flight

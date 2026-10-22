@@ -5,6 +5,7 @@ import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import type { EditorContext } from "../context.ts";
 import type { PageEditorHandle } from "../PageEditor.tsx";
 import { livePreview, refreshLinks } from "./live-preview.ts";
+import { plainLinkSuggest } from "./link-suggest-plain.ts";
 import { markdownHighlighting, markdownSupport } from "./syntax.ts";
 import { normalizeLineBreaks, toEditorText } from "./text.ts";
 
@@ -52,6 +53,7 @@ export function PlainEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
         markdownSupport(),
         markdownHighlighting,
         livePreview(ctx),
+        plainLinkSuggest(ctx),
         EditorView.clipboardInputFilter.of(normalizeLineBreaks),
         EditorView.domEventHandlers({
           // Cmd+S and Ctrl+S on every platform, as in the block editor.

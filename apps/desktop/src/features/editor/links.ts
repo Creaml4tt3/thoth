@@ -6,6 +6,7 @@
 import { LinkResolver } from "@thoth/content";
 import type { PageSummary } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
+import { createLinkSuggester, type LinkSuggester } from "./link-suggest.ts";
 
 export type LinkTarget = { state: "resolved"; path: string } | { state: "unresolved" } | { state: "ambiguous"; candidates: string[] };
 
@@ -44,7 +45,7 @@ export function buildLinkLookup(fromPath: string, outgoing: readonly OutgoingLin
   };
 }
 
-export async function loadLinkLookup(vault: Vault, path: string): Promise<LinkLookup> {
+export async function loadLinkLookup(vault: Vault, path: string): Promise<{ lookup: LinkLookup; suggester: LinkSuggester }> {
   const [outgoing, pages] = await Promise.all([vault.outgoingLinks(path).catch(() => []), vault.listPages()]);
-  return buildLinkLookup(path, outgoing, pages);
+  return { lookup: buildLinkLookup(path, outgoing, pages), suggester: createLinkSuggester(path, pages) };
 }

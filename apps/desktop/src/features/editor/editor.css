@@ -93,3 +93,11 @@
 .conflict-choice:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .conflict-choice b { font-weight: 550; }
 .conflict-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
+
+/* `[[` link suggestions (both modes). Floats over the page, so it uses the popover radius and shadow. */
+.link-menu { position: fixed; z-index: 40; width: 320px; max-height: 280px; overflow: auto; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
+.link-option { display: grid; gap: 1px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; }
+.link-option[aria-selected="true"] { background: var(--thoth-bg-active); }
+.link-option-title { color: var(--thoth-ink-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-option-meta { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-menu-empty { padding: 8px 10px; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }

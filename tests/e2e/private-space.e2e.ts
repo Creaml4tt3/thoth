@@ -183,3 +183,34 @@ test("Plain mode: type real keystrokes, switch modes, save exact bytes", async (
   const expected = source.replace("* star   bullet\r\n", "* star   bullet typed\r\n* new item\r\n");
   await expect.poll(() => readFile(join(vault, "Plain.md"), "utf8")).toBe(expected);
 });
+
+test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => {
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await mkdir(join(vault, "Projects"));
+  await writeFile(join(vault, "Projects/Roadmap.md"), "# Roadmap\n");
+  await writeFile(join(vault, "Linking.md"), "# Linking\n\nBlocks:\n\nPlain:\n");
+  await page.getByRole("treeitem", { name: "Linking" }).click({ timeout: 15_000 });
+  const box = await editor(page);
+  const menu = page.getByRole("listbox", { name: "Link to page" });
+
+  // Blocks: type, pick with Enter.
+  await box.getByText("Blocks:").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" [[road");
+  await expect(menu.getByRole("option", { name: /Roadmap/ })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  await expect(box.locator('.wikilink[data-target="Projects/Roadmap.md"]')).toBeVisible();
+
+  // Plain: same page, same menu, plain text result.
+  await page.getByRole("group", { name: "Editor mode" }).getByRole("button", { name: "Plain" }).click();
+  await box.getByText("Plain:").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" [[road");
+  await expect(menu.getByRole("option", { name: /Roadmap/ })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(menu).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+s");
+
+  await expect.poll(() => readFile(join(vault, "Linking.md"), "utf8")).toBe("# Linking\n\nBlocks: [[Roadmap]]\n\nPlain: [[Roadmap]]\n");
+});

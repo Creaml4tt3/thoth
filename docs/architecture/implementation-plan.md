@@ -120,7 +120,7 @@ Run with `pnpm check` (unit and contract tests) and `pnpm e2e` (Playwright, whic
 Not done in 1c:
 - No real-webview e2e. The IPC path is covered by a fake-API test and a successful `tauri build`, not by driving the WebKit webview.
 - No signed or notarized bundle.
-- No editor toolbar, slash menu or wikilink autocomplete.
+- No editor toolbar or slash menu. (Wikilink autocomplete: done in Track 2.)
 - Import performance is about 13 ms per file on Rust ports. Most of it is fsync (two per file) and IPC round trips. Batch staging and commits before importing exports with tens of thousands of files.
 
 ### Track 2 (2026-10-22) ✅ — Plain editor mode (ADR-0012)
@@ -143,8 +143,15 @@ AC:
 - The tests were checked by breaking the code on purpose (dropping the BOM, not
   carrying text across a switch, forcing LF): each break fails them.
 
-Not done: wikilink autocomplete; per-page mode is remembered for the session
-only.
+Wikilink autocomplete (2026-10-22), both modes: typing `[[` lists vault pages
+(title, file name, alias, then folder; prefix before word start before
+substring). Enter/Tab/click inserts the shortest target that resolves to the
+chosen page, so a picked link is never ambiguous. Escape dismisses. In Blocks a
+hand-typed `[[Target]]` becomes a real link. Tests: `link-suggest.test.ts`,
+`link-autocomplete.test.tsx`, and the fourth e2e scenario (real keystrokes in
+both modes).
+
+Not done: per-page mode is remembered for the session only.
 
 ### Phase 2 — Workspace protocol + reference server
 

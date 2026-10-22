@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
@@ -34,6 +34,7 @@ beforeEach(async () => {
   await seed(root, { "Rich.md": RICH, "Folder/Target Page.md": "# Target Page\n\nI am the target.\n" });
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   cleanup();
   await dirs.cleanup();
 });

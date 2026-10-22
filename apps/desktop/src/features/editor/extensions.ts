@@ -9,6 +9,7 @@ import { history, redo, undo } from "@tiptap/pm/history";
 import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
 import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
+import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 
 const Editing = Extension.create({
   name: "thothEditing",
@@ -53,5 +54,5 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     const view = views[ext.name];
     return view ? ext.extend({ addNodeView: () => view }) : ext;
   });
-  return [...base, Editing];
+  return [...base, Editing, linkSuggestExtension(ctx)];
 }
