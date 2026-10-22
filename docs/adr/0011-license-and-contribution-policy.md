@@ -1,8 +1,8 @@
 # ADR-0011: Open-source license and contribution policy
 
-- **Status:** Proposed. DECISION REQUIRED FROM PROJECT OWNER before first public
-  release.
-- **Date:** 2026-10-20
+- **Status:** Accepted (license) 2026-10-22. Contribution policy (DCO vs CLA)
+  still open.
+- **Date:** 2026-10-20 (proposed), 2026-10-22 (license accepted)
 
 ## Context
 
@@ -14,18 +14,24 @@ should implement freely, client packages, and a self-hostable reference server.
 A license chosen later is hard to change once outside contributions are accepted
 without every contributor's consent (or a CLA).
 
-This ADR sets out options neutrally. It does not choose one. It is not legal
-advice.
+This ADR is not legal advice.
 
 ## Decision
 
-Interim policy only:
+The project owner chose **Option 1: Apache-2.0 for everything** (2026-10-22).
 
-1. No `LICENSE` file is added until the project owner decides.
-2. Until then the repository is "all rights reserved by default" and must not be
-   published as open source.
-3. Third-party dependency licenses must be checked to be compatible with every
-   candidate option below.
+1. The root `LICENSE` is the unmodified Apache License 2.0 text from
+   apache.org. Every `package.json` has `"license": "Apache-2.0"` and the Cargo
+   workspace has `license = "Apache-2.0"`.
+2. Packages stay `"private": true` and crates `publish = false` until a release
+   process exists; the license does not by itself publish anything.
+3. Dependency audit (2026-10-22): production npm dependencies are MIT, ISC,
+   BSD-3-Clause or MIT/Apache-2.0. Rust dependencies are MIT, Apache-2.0,
+   BSD, ISC, Zlib, Unicode-3.0, CC0 or dual-licensed with one of these, plus
+   five MPL-2.0 crates (file-level copyleft, compatible with Apache-2.0 when
+   unmodified). No GPL/AGPL-only dependency. A CI license check is still to do.
+4. Hosted closed forks are permitted. The owner accepted this trade-off for
+   simplicity and adoption.
 
 ## Options
 
@@ -98,7 +104,7 @@ Section 2 (licensing), 1 (open-source mission), 11 (reference server), 13
 
 ## Open questions
 
-- Which option (owner decision; blocks first public release).
+- ~~Which option~~ Decided 2026-10-22: Apache-2.0.
 - DCO vs CLA (owner decision; blocks accepting external contributions).
 - Trademark and naming policy for the Thoth name.
 - License of documentation and test fixtures (including any fixtures derived from

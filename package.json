@@ -1,6 +1,7 @@
 {
   "name": "thoth",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {

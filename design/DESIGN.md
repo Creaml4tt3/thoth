@@ -1,6 +1,6 @@
 # Thoth design system — "Ink & Moon"
 
-Status: **Proposed** (v0.1, 2026-10-20). Tokens: `packages/ui/src/tokens.css`.
+Status: **Accepted** (v0.1, 2026-10-20; mark and accent confirmed by the owner 2026-10-22). Tokens: `packages/ui/src/tokens.css`.
 Brand files: `design/brand/`. Reference mockup: `design/mockups/ink-and-moon.html`.
 Research: `design/research/notes.md`. AI concept art: `design/concepts/` (exploration only, not production assets).
 
@@ -109,9 +109,9 @@ The editor's content column is 720px.
 
 ## 7. Open design questions
 
-- Does the owner prefer the Moon Ibis or one of the alternative directions in
-  `design/concepts/logo-directions-sheet.png`?
-- Does the moon accent stay orange, or move to a cooler silver-blue that reads
-  as "moon"? Orange was chosen for warmth next to Notion's paper.
+- ~~Moon Ibis or an alternative direction?~~ Decided 2026-10-22: Moon Ibis
+  (direction A).
+- ~~Orange or silver-blue accent?~~ Decided 2026-10-22: lunar orange. Silver-blue
+  was too close to the Workspace badge blue.
 - Do we license a custom display face later? For now, Inter is a deliberate,
   free choice for an OSS project.

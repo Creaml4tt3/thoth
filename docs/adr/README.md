@@ -20,7 +20,7 @@ trade-off.
 | [0008](0008-desktop-runtime-web-client-and-local-bridge.md) | Desktop runtime, web client, and local bridge | Accepted for Tauri 2 + Rust, shared React/TS/Vite UI, and Rust-hosted ports (2026-10-21); Proposed for the local bridge |
 | [0009](0009-workspace-authorization-and-sharing-semantics.md) | Workspace authorization and sharing semantics | Proposed (phase P2) |
 | [0010](0010-notion-obsidian-import-format-and-compatibility-policy.md) | Notion/Obsidian import format and compatibility policy | Accepted |
-| [0011](0011-license-and-contribution-policy.md) | Open-source license and contribution policy | Proposed (decision required from project owner before first public release) |
+| [0011](0011-license-and-contribution-policy.md) | Open-source license and contribution policy | Accepted 2026-10-22: Apache-2.0 (DCO vs CLA still open) |
 
 Template: [0000-template.md](0000-template.md).
 

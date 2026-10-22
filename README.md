@@ -4,12 +4,11 @@ Thoth is a local-first, open-source knowledge workspace. Notes are Markdown
 files you own. Workspaces are optional, connected through an open protocol, and
 AI agents run on CLI tools you already have.
 
-> **Status:** pre-alpha. The Private Space core and the Notion/Obsidian import
-> pipeline exist as tested TypeScript packages. There is no UI or desktop app
-> yet. See [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md).
+> **Status:** pre-alpha. The Private Space desktop app (Tauri) with its editor
+> and the Notion/Obsidian import wizard runs locally; the workspace server and
+> Agent Hub are not built yet. See [`docs/architecture/implementation-plan.md`](docs/architecture/implementation-plan.md).
 >
-> **License:** not yet decided (see [ADR-0011](docs/adr/0011-license-and-contribution-policy.md)).
-> Do not redistribute.
+> **License:** [Apache-2.0](LICENSE) (see [ADR-0011](docs/adr/0011-license-and-contribution-policy.md)).
 
 ## Layout
 
