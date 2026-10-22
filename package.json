@@ -17,7 +17,9 @@
     "schemas:check": "node scripts/generate-schemas.ts --check",
     "openapi": "node scripts/generate-openapi.ts",
     "openapi:check": "node scripts/generate-openapi.ts --check",
-    "e2e": "playwright test -c tests/e2e/playwright.config.ts"
+    "e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "test:server": "vitest run -c apps/server/test-db/vitest.config.ts",
+    "server:conformance": "node apps/server/scripts/server-conformance.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

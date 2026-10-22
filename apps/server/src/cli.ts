@@ -1,0 +1,116 @@
+/**
+ * Admin CLI. Reads DATABASE_URL from the environment.
+ *
+ *   node src/cli.ts migrate
+ *   node src/cli.ts create-user --name "Ada" [--email ada@example.org]
+ *   node src/cli.ts create-workspace --name "Team" [--export-restricted]
+ *   node src/cli.ts add-member --workspace <id> --user <id> --role owner|editor|viewer
+ *   node src/cli.ts create-token --user <id> --out <file> [--label <text>] [--expires-days <n>]
+ *   node src/cli.ts revoke-token --token-id <id>
+ *
+ * IDs are printed to stdout. A token is written only to the --out file (mode 0600); it is never
+ * printed, logged, or accepted on the command line.
+ */
+import { parseArgs } from "node:util";
+import { AdminError, addMember, createToken, createUser, createWorkspace, revokeToken } from "./admin.ts";
+import { ConfigError } from "./config.ts";
+import { createDatabase } from "./db.ts";
+import { migrate } from "./migrate.ts";
+
+const USAGE = `Usage: node src/cli.ts <command> [options]   (DATABASE_URL must be set)
+
+Commands:
+  migrate                                                   apply pending SQL migrations
+  create-user --name <name> [--email <email>]               prints the user ID
+  create-workspace --name <name> [--export-restricted]      prints the workspace ID
+  add-member --workspace <id> --user <id> --role <role>     role: owner | editor | viewer
+  create-token --user <id> --out <file> [--label <text>] [--expires-days <n>]
+                                                            writes the token to <file> (mode 0600); prints the token ID
+  revoke-token --token-id <id>`;
+
+const fail = (message: string): never => {
+  throw new AdminError(message);
+};
+
+async function main(argv: string[]): Promise<number> {
+  const [command, ...rest] = argv;
+  if (!command || command === "--help" || command === "-h") {
+    console.log(USAGE);
+    return command ? 0 : 2;
+  }
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      name: { type: "string" },
+      email: { type: "string" },
+      workspace: { type: "string" },
+      user: { type: "string" },
+      role: { type: "string" },
+      out: { type: "string" },
+      label: { type: "string" },
+      "token-id": { type: "string" },
+      "expires-days": { type: "string" },
+      "export-restricted": { type: "boolean" },
+    },
+    strict: true,
+    allowPositionals: false,
+  });
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new ConfigError("DATABASE_URL is required");
+  const db = createDatabase(url, { max: 2 });
+  try {
+    switch (command) {
+      case "migrate": {
+        const result = await migrate(db.pool);
+        console.log(result.applied.length ? `applied: ${result.applied.join(", ")}` : `up to date (${result.alreadyApplied} migration(s) applied)`);
+        return 0;
+      }
+      case "create-user": {
+        const { id } = await createUser(db, { name: values.name ?? fail("--name is required"), ...(values.email ? { email: values.email } : {}) });
+        console.log(id);
+        return 0;
+      }
+      case "create-workspace": {
+        const { id } = await createWorkspace(db, { name: values.name ?? fail("--name is required"), exportRestricted: values["export-restricted"] === true });
+        console.log(id);
+        return 0;
+      }
+      case "add-member": {
+        await addMember(db, { workspaceId: values.workspace ?? fail("--workspace is required"), userId: values.user ?? fail("--user is required"), role: values.role ?? fail("--role is required") });
+        console.log("ok");
+        return 0;
+      }
+      case "create-token": {
+        const days = values["expires-days"];
+        if (days !== undefined && !/^[1-9]\d{0,4}$/.test(days)) fail("--expires-days must be a positive integer");
+        const { tokenId } = await createToken(db, {
+          userId: values.user ?? fail("--user is required"),
+          outFile: values.out ?? fail("--out is required: the token is written only to that file"),
+          ...(values.label ? { label: values.label } : {}),
+          ...(days === undefined ? {} : { expiresInDays: Number(days) }),
+        });
+        console.log(tokenId);
+        return 0;
+      }
+      case "revoke-token": {
+        const revoked = await revokeToken(db, values["token-id"] ?? fail("--token-id is required"));
+        console.log(revoked ? "revoked" : "no active token with that ID");
+        return revoked ? 0 : 1;
+      }
+      default:
+        console.error(`unknown command: ${command}\n\n${USAGE}`);
+        return 2;
+    }
+  } finally {
+    await db.close();
+  }
+}
+
+try {
+  process.exitCode = await main(process.argv.slice(2));
+} catch (error) {
+  const message = error instanceof Error ? error.message : "unknown error";
+  // Messages may quote driver errors; never let a connection string through.
+  console.error(`error: ${message.replace(/postgres(ql)?:\/\/\S+/g, "postgres://[redacted]")}`);
+  process.exitCode = error instanceof AdminError || error instanceof ConfigError || (error as { code?: string }).code === "ERR_PARSE_ARGS_UNKNOWN_OPTION" ? 2 : 1;
+}

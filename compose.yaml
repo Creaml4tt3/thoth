@@ -1,0 +1,55 @@
+# Thoth reference server with PostgreSQL.
+#
+#   export THOTH_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=')"   # any strong password; not stored in this repo
+#   podman compose up --build -d
+#
+# The server listens on http://127.0.0.1:${THOTH_PORT:-8080}. Create a user, workspace and token with the
+# admin CLI (see apps/server/README.md). Nothing secret is committed: the password comes from the environment.
+name: thoth
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thoth
+      POSTGRES_DB: thoth
+      POSTGRES_PASSWORD: ${THOTH_DB_PASSWORD:?set THOTH_DB_PASSWORD to a strong password}
+    volumes:
+      # PostgreSQL 18 images keep PGDATA below /var/lib/postgresql/18/docker.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thoth -d thoth"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    # Not published: only the server reaches the database.
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Containerfile
+    image: localhost/thoth-server:dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://thoth:${THOTH_DB_PASSWORD:?set THOTH_DB_PASSWORD to a strong password}@postgres:5432/thoth
+      BLOB_DIR: /data/blobs
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${THOTH_PORT:-8080}:8080"
+    volumes:
+      - blobs:/data/blobs
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/capabilities').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  pgdata:
+  blobs:

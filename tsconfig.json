@@ -5,6 +5,9 @@
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts",
     "apps/*/src/**/*.ts",
+    "apps/server/test/**/*.ts",
+    "apps/server/scripts/**/*.ts",
+    "apps/server/test-db/**/*.ts",
     "tests/**/*.ts",
     "protocol/conformance/**/*.ts",
     "vitest.config.ts"

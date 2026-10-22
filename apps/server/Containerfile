@@ -1,0 +1,42 @@
+# Thoth reference workspace server. Build from the repository root:
+#   podman build -f apps/server/Containerfile -t thoth-server .
+#
+# Node 24 runs the TypeScript sources directly. It refuses to strip types for files below
+# node_modules, so the workspace packages (which export .ts) must stay at their real paths:
+# the image keeps the pnpm workspace layout instead of using `pnpm deploy`.
+
+# ---- stage 1: production dependencies only ---------------------------------------------------
+FROM docker.io/library/node:24-alpine AS deps
+WORKDIR /app
+RUN corepack enable
+COPY . .
+# --prod: no devDependencies (typescript, vitest, playwright, ...). --filter: only what the server needs.
+RUN pnpm install --frozen-lockfile --prod --filter "@thoth/server..." \
+ && pnpm store prune
+
+# ---- stage 2: runtime ------------------------------------------------------------------------
+FROM docker.io/library/node:24-alpine AS runtime
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=8080 \
+    BLOB_DIR=/data/blobs
+WORKDIR /app
+# Only what runs: the server, the two workspace packages it imports (plus content, which
+# workspace-protocol declares), the resolved production node_modules, and the SQL migrations.
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/apps/server/package.json ./apps/server/package.json
+COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=deps /app/apps/server/src ./apps/server/src
+COPY --from=deps /app/apps/server/migrations ./apps/server/migrations
+COPY --from=deps /app/packages/domain ./packages/domain
+COPY --from=deps /app/packages/content ./packages/content
+COPY --from=deps /app/packages/workspace-protocol ./packages/workspace-protocol
+# The blob directory is the only writable place; the process runs as the unprivileged `node` user.
+RUN mkdir -p /data/blobs && chown -R node:node /data
+USER node
+VOLUME ["/data"]
+EXPOSE 8080
+# Liveness is probed by the orchestrator (compose.yaml): OCI images carry no HEALTHCHECK.
+WORKDIR /app/apps/server
+CMD ["node", "src/main.ts"]

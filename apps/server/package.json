@@ -1,0 +1,21 @@
+{
+  "name": "@thoth/server",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Thoth reference workspace server: Fastify + PostgreSQL implementation of the workspace protocol.",
+  "scripts": {
+    "start": "node src/main.ts",
+    "cli": "node src/cli.ts"
+  },
+  "dependencies": {
+    "@thoth/domain": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
+    "fastify": "5.12.7",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

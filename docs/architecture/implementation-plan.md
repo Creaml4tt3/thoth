@@ -26,7 +26,7 @@ Toolchain verified on the dev machine:
 | Desktop runtime (P0) | **Done (2026-10-21)** | `crates/thoth-host` (Rust ports, openat traversal, SQL sandbox, picker allow-list) and `apps/desktop/src-tauri` (least-privilege capability, strict CSP). `tauri build --debug` succeeds. No signed release bundle yet. |
 | Import pipeline (P1) | **Done: domain layer** | `importer-core`, `importer-obsidian`, `importer-notion`, with all four adapters from §7.4 |
 | Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
-| Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; server and web not started | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
+| Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; auth decided (OIDC, ADR-0013); server 2a done (Podman + PostgreSQL) | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | Not started | ADR-0006 is Proposed. The state enum and `operation_journal` table are reserved. |
 | Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
 | Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
@@ -153,21 +153,57 @@ both modes).
 
 Not done: per-page mode is remembered for the session only.
 
-### Phase 2 — Workspace protocol + reference server
+### Phase 2 — Workspace protocol + reference server + web (ADR-0013)
 
-- `protocol/openapi.yaml` (OpenAPI 3.1) generated from shared Zod schemas, with
-  RFC 9457 errors, cursors, ETag/If-Match and Idempotency-Key.
-- `apps/server` (Fastify + PostgreSQL, filesystem blob store with an S3
-  adapter) and Docker Compose.
-- `protocol/conformance/` suite that can run against any server URL.
+The protocol contract and conformance suite exist (Track 1). Phase 2 is split:
+
+**2a — Reference server core.** `apps/server` (Fastify + PostgreSQL,
+filesystem blob store), personal access tokens behind an `Authenticator`
+interface, admin CLI, `compose.yaml` for `podman compose`.
 
 AC:
 
-- The conformance suite is green against the reference server.
+- The conformance suite is green against the reference server on real
+  PostgreSQL (Podman), nothing skipped.
 - Server-side authorization tests cover every resource type, including search,
   revisions, attachments and change feeds.
-- A stale write returns 412 `revision_conflict`.
+- A stale write returns 412 `revision_conflict`, including two racing writes.
 - Missed SSE events are recoverable from the cursor.
+- Tokens never appear in logs or responses.
+
+Result (2026-10-22) ✅: `pnpm test:server` 85/85 on PostgreSQL 18 in Podman
+(authorization matrix, 12 racing writers ×5 rounds with exactly one winner,
+SSE recovery and fan-out across two instances, idempotency across restart,
+log/secret capture); `pnpm server:conformance` 36 passed / 0 failed / 0
+skipped against the built container. Both kinds of check were confirmed by
+breaking the code on purpose (stale-write check removed; non-members let in).
+Deviations are listed in `apps/server/README.md` (substring + trigram search,
+no rate limiting yet, unbounded change-feed retention).
+
+**2b — OIDC sign-in and trial mode.** OIDC token verification (issuer
+discovery, JWKS, audience, expiry), server sessions where needed, PKCE login in
+the desktop app (loopback) and web, SSE stream tickets, CORS allow-list, trial
+quotas from configuration.
+
+AC:
+
+- Tests against a local OIDC test issuer: valid, expired, wrong-audience,
+  wrong-issuer and unsigned tokens; key rotation.
+- Desktop and web complete a PKCE login against the test issuer (e2e).
+- Every trial limit returns a clear protocol error at the limit and never
+  loses data; limits appear in `GET /capabilities`.
+
+**2c — Website and web client.** `apps/web`: static landing page plus the web
+client at `/app` (connect to a server, browse the tree, read and edit pages
+with both editor modes, conflicts, search). Deployable without a domain.
+
+AC:
+
+- Lighthouse accessibility ≥ 95 on the landing page; no network calls except
+  to the chosen server.
+- Playwright: sign in against the test issuer, edit a page, see a stale-write
+  conflict, keep both.
+- The web build cannot reach the local filesystem or spawn processes (§14.11).
 
 ### Phase 3 — Transfer engine
 

@@ -65,8 +65,9 @@ registry), 15 step 4.
 
 ## Open questions
 
-- Authentication scheme for third-party servers: OAuth 2.1 / OIDC vs. session
-  tokens. Blocks the `/me` contract and client login flow.
+- ~~Authentication scheme for third-party servers.~~ Decided 2026-10-22 in
+  ADR-0013: OIDC (Authorization Code + PKCE), plus personal access tokens for
+  tools.
 - Versioning policy for breaking changes under `/api/v1`.
 - Exact set and naming of capability identifiers beyond the examples above.
 - Attachment upload mechanism details (single request vs. resumable).

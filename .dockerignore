@@ -1,0 +1,17 @@
+# Keeps the container build context small and free of local state (the Rust target/ dir alone is ~1 GB).
+# Root-level on purpose: the docker-compose provider behind `podman compose` ignores Containerfile.dockerignore.
+**/node_modules
+.git
+**/dist
+**/target
+**/.turbo
+**/coverage
+test-results
+tests/.tmp
+crates
+design
+apps/desktop
+tests/e2e
+**/.env
+**/.env.*
+**/*.log
