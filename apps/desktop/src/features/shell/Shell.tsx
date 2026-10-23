@@ -6,9 +6,9 @@ import { SettingsView } from "../settings/SettingsView.tsx";
 import { NewPageDialog } from "./NewPageDialog.tsx";
 import { SearchPalette } from "./SearchPalette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
-import { Mark } from "../../ui/Mark.tsx";
+import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
-import type { WorkspacePageRef } from "../servers/directory.ts";
+import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 
 type Dialog = "search" | "new" | null;
 

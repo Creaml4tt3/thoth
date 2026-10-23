@@ -1,4 +1,4 @@
-import "./jsdom-shims.ts";
+import "../../../../tests/helpers/jsdom-shims.ts";
 import { cleanup, configure, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { mkdir, readFile, stat, utimes, writeFile } from "node:fs/promises";

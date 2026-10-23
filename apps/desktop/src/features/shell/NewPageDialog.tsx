@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ConflictError } from "@thoth/local-store";
 import { isReservedPath, normalizeVaultPath } from "@thoth/domain";
-import { Button } from "../../ui/Button.tsx";
-import { Modal } from "../../ui/Modal.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { useSession } from "../../app/context.ts";
 
 /** `Notes/Ideas` or `Ideas.md` becomes a vault path ending in .md; throws on unsafe paths. */

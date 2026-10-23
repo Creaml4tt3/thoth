@@ -8,9 +8,9 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { describe, expect, it } from "vitest";
 import { LinkResolver } from "@thoth/content";
 import type { PageSummary } from "@thoth/domain";
-import { createLinkSuggester } from "../src/features/editor/link-suggest.ts";
-import { completion, findTrigger } from "../src/features/editor/plain/link-suggest-plain.ts";
-import { markdownSupport } from "../src/features/editor/plain/syntax.ts";
+import { createLinkSuggester } from "@thoth/app-ui/editor/link-suggest.ts";
+import { completion, findTrigger } from "@thoth/app-ui/editor/plain/link-suggest-plain.ts";
+import { markdownSupport } from "@thoth/app-ui/editor/plain/syntax.ts";
 
 let mtime = 0;
 const page = (path: string, title: string, aliases: string[] = []): PageSummary => ({

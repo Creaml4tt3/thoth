@@ -10,7 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.json && tsc -p apps/site/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.json && tsc -p packages/app-ui/tsconfig.json && tsc -p apps/web/tsconfig.json && tsc -p apps/site/tsconfig.json",
     "check": "pnpm typecheck && pnpm schemas:check && pnpm openapi:check && pnpm test",
     "turbo": "turbo",
     "schemas": "node scripts/generate-schemas.ts",

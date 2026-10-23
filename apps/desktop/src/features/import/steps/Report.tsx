@@ -1,5 +1,5 @@
 import type { ImportReport } from "@thoth/importer-core";
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { SEVERITY_ORDER } from "../warnings.ts";
 import { Stat, WarningList, type WarningGroup } from "./Preview.tsx";
 

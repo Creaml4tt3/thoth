@@ -8,8 +8,8 @@ import { join } from "node:path";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { decodeText } from "@thoth/content";
-import { normalizeLineBreaks, toEditorText } from "../src/features/editor/plain/text.ts";
-import { markdownSupport } from "../src/features/editor/plain/syntax.ts";
+import { normalizeLineBreaks, toEditorText } from "@thoth/app-ui/editor/plain/text.ts";
+import { markdownSupport } from "@thoth/app-ui/editor/plain/syntax.ts";
 import { syntaxTree, ensureSyntaxTree } from "@codemirror/language";
 
 const FIXTURES = new URL("../../../tests/fixtures/", import.meta.url).pathname;

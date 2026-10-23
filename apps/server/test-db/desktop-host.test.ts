@@ -159,7 +159,9 @@ describe("desktop host against the reference server", () => {
     const ws = await env.workspace("Team", { members: { [userId]: "owner" } });
     const list = await host.api({ server: id, method: "GET", path: "/api/v1/workspaces", query: { limit: "10" } });
     expect(list.status).toBe(200);
-    expect(JSON.parse(list.body).items.map((w: { id: string }) => w.id)).toEqual([ws]);
+    // The account's own first-run workspace, plus the one it was added to.
+    expect(JSON.parse(list.body).items.map((w: { id: string }) => w.id)).toContain(ws);
+    expect(JSON.parse(list.body).items).toHaveLength(2);
 
     const pageId = uuid();
     const path = `/api/v1/workspaces/${ws}/pages/${pageId}`;

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { SearchHit } from "@thoth/local-store";
-import { Modal } from "../../ui/Modal.tsx";
+import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { useSession } from "../../app/context.ts";
 
 /** Cmd/Ctrl+K quick search over the index (`vault.search`). */

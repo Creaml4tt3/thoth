@@ -16,6 +16,8 @@
     "**/node_modules/**",
     "tests/fixtures/**",
     "apps/desktop/**",
-    "apps/site/**"
+    "apps/site/**",
+    "apps/web/**",
+    "packages/app-ui/**"
   ]
 }

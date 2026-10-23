@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { Platform, VaultChangedEvent, VaultConnection } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
-import { FakeServers } from "./fake-servers.ts";
+import { FakeServers } from "../../../../tests/helpers/fake-servers.ts";
 
 type Listener = (event: Omit<VaultChangedEvent, "vault">) => void;
 

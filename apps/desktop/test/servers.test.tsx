@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AppOptions } from "../src/app/context.ts";
 import { describeLimits } from "../src/features/servers/ServersSettings.tsx";
-import { titleFromMarkdown } from "../src/features/servers/workspace-store.ts";
-import { nestWorkspaceTree } from "../src/features/servers/tree.ts";
+import { titleFromMarkdown } from "@thoth/app-ui/workspace/workspace-store.ts";
+import { nestWorkspaceTree } from "@thoth/app-ui/workspace/tree.ts";
 import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
-import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "./support/fake-servers.ts";
+import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
 
 const dirs = tempDirs();
@@ -455,6 +455,56 @@ describe("change-feed polling", () => {
     await screen.findByRole("tree", { name: "Workspaces on Team server" });
     await new Promise((r) => setTimeout(r, 100));
     expect(servers.calls.filter((c) => c.path.endsWith("/changes"))).toHaveLength(0);
+  });
+});
+
+describe("New page in a workspace", () => {
+  it("creates the page with If-None-Match: *, shows it in the tree and opens it; the first heading becomes its title", async () => {
+    const { app, servers, ws } = await withWorkspace({ autosaveMs: 60 });
+    const list = await screen.findByRole("tree", { name: "Workspaces on Team server" });
+    await app.user.click(within(list).getByRole("button", { name: "New page in Design" }));
+
+    const put = await waitFor(() => {
+      const call = servers.calls.find((c) => c.method === "PUT");
+      expect(call).toBeDefined();
+      return call!;
+    });
+    expect(put.headers).toMatchObject({ "if-none-match": "*" });
+    expect(put.headers?.["if-match"]).toBeUndefined();
+    const created = servers.page(ws, "Untitled");
+    expect(created.markdown).toBe("");
+
+    const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+    expect(within(pages).getByRole("treeitem", { name: "Untitled" }).getAttribute("aria-current")).toBe("page");
+    const box = await editorBox();
+    await waitFor(() => expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toContain("Workspace · Design"));
+
+    box.focus();
+    await app.user.keyboard("# Notes");
+    await waitFor(() => expect(created.markdown.trim()).toBe("# Notes"), { timeout: 3000 });
+    expect(created.title).toBe("Notes");
+  });
+
+  it("is offered to editors and owners, not to viewers", async () => {
+    await start((s) => {
+      const id = s.connect(LOCAL);
+      s.addWorkspace(id, { name: "Mine", role: "owner" });
+      s.addWorkspace(id, { name: "Shared", role: "editor" });
+      s.addWorkspace(id, { name: "Read only", role: "viewer" });
+    });
+    const list = await screen.findByRole("tree", { name: "Workspaces on Team server" });
+    expect(within(list).getByRole("button", { name: "New page in Mine" })).toBeTruthy();
+    expect(within(list).getByRole("button", { name: "New page in Shared" })).toBeTruthy();
+    expect(within(list).queryByRole("button", { name: "New page in Read only" })).toBeNull();
+  });
+
+  it("a full workspace says so and creates nothing", async () => {
+    const { app, servers, ws } = await withWorkspace({}, "editor", { ...LOCAL, limits: { maxPagesPerWorkspace: 1 } });
+    const list = await screen.findByRole("tree", { name: "Workspaces on Team server" });
+    await app.user.click(within(list).getByRole("button", { name: "New page in Design" }));
+    expect((await within(list).findByRole("alert")).textContent).toMatch(/limited to 1 pages/);
+    expect([...ws.pages.values()].map((p) => p.title)).toEqual(["Plan"]);
+    expect(servers.calls.filter((c) => c.method === "PUT")).toHaveLength(1);
   });
 });
 

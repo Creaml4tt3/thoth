@@ -18,8 +18,8 @@ import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/
 import { tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 import { guardWrites } from "./support/write-guard.ts";
-import { setDefaultEditorMode } from "../src/features/editor/mode.ts";
-import { filterBlockKinds } from "../src/features/editor/block-kinds.ts";
+import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
+import { filterBlockKinds } from "@thoth/app-ui/editor/block-kinds.ts";
 
 const dirs = tempDirs();
 let root: string;

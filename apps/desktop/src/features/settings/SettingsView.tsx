@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Button } from "../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
-import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "../editor/mode.ts";
+import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 

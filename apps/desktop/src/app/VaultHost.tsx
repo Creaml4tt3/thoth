@@ -6,7 +6,8 @@ import { createImportService } from "../features/import/service.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
-import { ServerDirectory, type WorkspacePageRef } from "../features/servers/directory.ts";
+import { ServerDirectory, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
+import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 
 interface Props {
   platform: Platform;
@@ -60,7 +61,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   }, [connection, vault, options.reconcileDebounceMs, bump]);
 
   // Workspace servers: one directory per open window, polling only expanded workspaces.
-  const servers = useMemo(() => new ServerDirectory(platform, { pollMs: options.pollMs }), [platform, options.pollMs]);
+  const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
+  const pageHost = useMemo<PageHost>(() => ({ autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
   useEffect(() => {
     void servers.start();
     return () => servers.dispose();
@@ -121,7 +123,9 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   return (
     <SessionContext.Provider value={session}>
-      {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell path={remote ? null : path} remote={remote} settings={settings} />}
+      <PageHostContext.Provider value={pageHost}>
+        {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell path={remote ? null : path} remote={remote} settings={settings} />}
+      </PageHostContext.Provider>
     </SessionContext.Provider>
   );
 }

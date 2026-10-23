@@ -1,4 +1,4 @@
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 
 export interface WizardOptions {
   conflictPolicy: "rename" | "skip";

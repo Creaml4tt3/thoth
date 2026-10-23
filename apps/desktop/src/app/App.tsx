@@ -3,7 +3,7 @@ import { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
 import { Onboarding } from "../features/onboarding/Onboarding.tsx";
 import { openImportSource } from "../features/import/open-source.ts";
-import { STARTER_SERVER } from "../features/servers/starter.ts";
+import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
 import { VaultHost } from "./VaultHost.tsx";
 import type { AppOptions } from "./context.ts";
 import "./app.css";

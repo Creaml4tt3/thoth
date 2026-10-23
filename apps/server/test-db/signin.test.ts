@@ -223,7 +223,8 @@ describe("happy path", () => {
     expect(me.json).toMatchObject({ displayName: "Ada Lovelace", email: "ada@example.org" });
     const workspaces = await env.api(bearer(t.json.access_token), "GET", "/workspaces");
     expect(workspaces.status).toBe(200);
-    expect(workspaces.json.items).toEqual([]);
+    // First sign-in: the new account owns one workspace, named after it.
+    expect(workspaces.json.items).toMatchObject([{ name: "Ada Lovelace's workspace", role: "owner" }]);
     expect(await usersWithSubject("google", issuer.profile.sub)).toBe(1);
 
     const r2 = await refresh(t.json.refresh_token);
@@ -346,6 +347,90 @@ describe("email and identity", () => {
     const b = await desktopTokens();
     expect(b.userId).toBe(a.userId);
     expect(await usersWithSubject("google", sub)).toBe(1);
+  });
+});
+
+describe("first run: a new account's own workspace", () => {
+  const ownedBy = (userId: string) => env.db.query<{ id: string; name: string }>("SELECT w.id, w.name FROM workspaces w JOIN memberships m ON m.workspace_id = w.id WHERE m.user_id = $1 AND m.role = 'owner' ORDER BY w.name", [userId]);
+
+  it("signs in, finds its own workspace, then creates, edits and reopens a page in it", async () => {
+    issuer.reset({ sub: `sub-${random(6)}`, name: "Grace Hopper" });
+    const t = await desktopTokens();
+    const me = bearer(t.access);
+    const list = await env.api(me, "GET", "/workspaces");
+    expect(list.json.items).toHaveLength(1);
+    expect(list.json.items[0]).toMatchObject({ name: "Grace Hopper's workspace", role: "owner", memberCount: 1 });
+    const ws = list.json.items[0].id as string;
+    expect((await env.db.query("SELECT 1 FROM audit_events WHERE workspace_id = $1 AND action = 'workspace.created'", [ws])).rowCount).toBe(1);
+
+    const pageId = "01930000-0000-7000-8000-00000000f001";
+    const created = await env.api(me, "PUT", `/workspaces/${ws}/pages/${pageId}`, { headers: { "if-none-match": "*" }, json: { title: "Untitled", markdown: "" } });
+    expect(created.status, created.text).toBe(201);
+    const edited = await env.api(me, "PUT", `/workspaces/${ws}/pages/${pageId}`, { headers: { "if-match": `"${created.json.revision.id}"` }, json: { title: "Notes", markdown: "# Notes\n\nHello.\n" } });
+    expect(edited.status, edited.text).toBe(200);
+    const reopened = await env.api(me, "GET", `/workspaces/${ws}/pages/${pageId}`);
+    expect(reopened.json).toMatchObject({ markdown: "# Notes\n\nHello.\n", metadata: { title: "Notes" } });
+  });
+
+  it("an existing account signing in again gets no second workspace", async () => {
+    const sub = `sub-${random(6)}`;
+    issuer.reset({ sub });
+    const a = await desktopTokens();
+    issuer.reset({ sub });
+    const b = await desktopTokens();
+    expect(b.userId).toBe(a.userId);
+    expect((await ownedBy(a.userId)).rows).toHaveLength(1);
+  });
+
+  it("an account that existed before (created by an operator) is left as it is", async () => {
+    const before = await env.user("Operator-made");
+    const sub = `sub-${random(6)}`;
+    await env.db.query("INSERT INTO identities (provider, subject, user_id) VALUES ('google', $1, $2)", [sub, before.userId]);
+    issuer.reset({ sub });
+    expect((await desktopTokens()).userId).toBe(before.userId);
+    expect((await ownedBy(before.userId)).rows).toHaveLength(0);
+  });
+
+  it("falls back to \"My workspace\" when the provider gives no name, or only an email address", async () => {
+    gh.reset({ name: null, login: "" });
+    const a = await desktopTokens("github");
+    expect((await ownedBy(a.userId)).rows.map((r) => r.name)).toEqual(["My workspace"]);
+    gh.reset({ name: "octo@example.org" });
+    const b = await desktopTokens("github");
+    expect((await ownedBy(b.userId)).rows.map((r) => r.name)).toEqual(["My workspace"]);
+  });
+
+  it("a long name is cut to fit the 200-character limit", async () => {
+    issuer.reset({ sub: `sub-${random(6)}`, name: "ก".repeat(200) });
+    const t = await desktopTokens();
+    const [row] = (await ownedBy(t.userId)).rows;
+    expect([...row!.name]).toHaveLength(200);
+    expect(row!.name.endsWith("'s workspace")).toBe(true);
+  });
+
+  it("counts toward the per-account workspace limit (trial: 1): the account owns 1 of 1", async () => {
+    env.config.maxWorkspacesPerAccount = 1;
+    try {
+      issuer.reset({ sub: `sub-${random(6)}` });
+      const t = await desktopTokens();
+      expect((await ownedBy(t.userId)).rows).toHaveLength(1);
+      const { createWorkspace } = await import("../src/admin.ts");
+      await expect(createWorkspace(env.db, { name: "Second", exportRestricted: false, ownerId: t.userId }, env.config)).rejects.toMatchObject({ code: "quota_exceeded" });
+    } finally {
+      env.config.maxWorkspacesPerAccount = undefined;
+    }
+  });
+
+  it("the workspace is created in the same transaction: a refused sign-up leaves no workspace behind", async () => {
+    const workspaces = await count("SELECT count(*) AS n FROM workspaces");
+    env.config.maxAccounts = await count("SELECT count(*) AS n FROM users");
+    try {
+      issuer.reset();
+      expect((await signIn()).back!.get("error")).toBe("access_denied");
+    } finally {
+      env.config.maxAccounts = undefined;
+    }
+    expect(await count("SELECT count(*) AS n FROM workspaces")).toBe(workspaces);
   });
 });
 

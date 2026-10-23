@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { Modal } from "../src/ui/Modal.tsx";
+import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";

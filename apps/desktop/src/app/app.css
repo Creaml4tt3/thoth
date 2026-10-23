@@ -1,7 +1,7 @@
-@import "../ui/ui.css";
+@import "@thoth/app-ui/ui.css";
 @import "../features/onboarding/onboarding.css";
-@import "../features/shell/shell.css";
-@import "../features/editor/editor.css";
-@import "../features/editor/plain/plain.css";
+@import "@thoth/app-ui/shell.css";
+@import "@thoth/app-ui/editor.css";
+@import "@thoth/app-ui/plain.css";
 @import "../features/settings/settings.css";
 @import "../features/import/import.css";

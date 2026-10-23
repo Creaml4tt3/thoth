@@ -1,4 +1,4 @@
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import type { System } from "../model.ts";
 
 const HOW: Record<System, { title: string; steps: string[]; note: string }> = {

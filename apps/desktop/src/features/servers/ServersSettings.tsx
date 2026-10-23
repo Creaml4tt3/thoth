@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ServerInfo } from "@thoth/platform";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
+import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
+import { isStarter } from "@thoth/app-ui/workspace/starter.ts";
 import { useSession } from "../../app/context.ts";
-import { Button } from "../../ui/Button.tsx";
-import { Modal } from "../../ui/Modal.tsx";
-import type { ServerDirectory } from "./directory.ts";
-import { isStarter } from "./starter.ts";
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -17,54 +18,7 @@ function addError(error: unknown): string {
   return detail;
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
-
-function bytes(n: number): string {
-  const units = ["bytes", "KB", "MB", "GB", "TB"];
-  let value = n;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  return unit === 0 ? plural(n, "byte") : `${Number.isInteger(value) ? value : value.toFixed(1)} ${units[unit]}`;
-}
-
-/** Advertised limits in plain words. Unknown limits are listed by name so nothing is hidden. */
-export function describeLimits(limits: Record<string, number>): string[] {
-  const out: string[] = [];
-  for (const [name, n] of Object.entries(limits)) {
-    switch (name) {
-      case "maxPagesPerWorkspace":
-        out.push(`${plural(n, "page")} per workspace`);
-        break;
-      case "maxMembersPerWorkspace":
-        out.push(`${plural(n, "member")} per workspace`);
-        break;
-      case "maxWorkspacesPerAccount":
-        out.push(`${plural(n, "workspace")} per account`);
-        break;
-      case "maxWorkspaceAttachmentBytes":
-        out.push(`${bytes(n)} of attachments per workspace`);
-        break;
-      case "maxAttachmentBytes":
-        out.push(`${bytes(n)} per attachment`);
-        break;
-      case "maxMarkdownBytes":
-        out.push(`${bytes(n)} per page`);
-        break;
-      case "revisionRetentionDays":
-        out.push(`Old versions of a page are kept for ${plural(n, "day")}`);
-        break;
-      case "maxPageSize":
-      case "idempotencyWindowSeconds":
-        break; // protocol tuning, not something a person plans around
-      default:
-        out.push(`${name}: ${n.toLocaleString()}`);
-    }
-  }
-  return out;
-}
+export { describeLimits };
 
 type Busy = null | { kind: "browser"; provider: string } | { kind: "token" | "signout" | "remove" };
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button } from "../../ui/Button.tsx";
-import { Mark } from "../../ui/Mark.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { useSession } from "../../app/context.ts";
 

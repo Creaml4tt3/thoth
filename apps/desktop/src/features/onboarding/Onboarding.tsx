@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Platform } from "@thoth/platform";
-import { Button } from "../../ui/Button.tsx";
-import { Mark } from "../../ui/Mark.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 
 interface Props {
   platform: Platform;

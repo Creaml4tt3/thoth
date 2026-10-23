@@ -1,4 +1,4 @@
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { checkDestination } from "../model.ts";
 
 /** Step 6: where the import lands. Workspace destinations come later. */
