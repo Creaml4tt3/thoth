@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { FakeWebServer, SERVER } from "./support/fake-web-server.ts";
+import { sameOrigin } from "../src/App.tsx";
 import { cleanup, editorBox, fakeBrowser, open, screen, signInThroughUi, waitFor, within } from "./support/render.tsx";
 
 afterEach(() => cleanup());
@@ -98,6 +99,16 @@ describe("sign-in", () => {
     browser.location.search = back.search;
     open(browser);
     expect((await screen.findByRole("alert")).textContent).toMatch(/did not start here/);
+  });
+});
+
+describe("sign-in endpoints", () => {
+  const ok = { authorizationEndpoint: `${SERVER}/auth/authorize`, tokenEndpoint: `${SERVER}/auth/token`, revocationEndpoint: `${SERVER}/auth/revoke`, providers: [{ id: "google", name: "Google" }] };
+  it("are used only when every one is on the server's origin", () => {
+    expect(sameOrigin(ok, SERVER)).toBe(true);
+    expect(sameOrigin({ ...ok, tokenEndpoint: "https://evil.example.org/auth/token" }, SERVER)).toBe(false);
+    expect(sameOrigin({ ...ok, authorizationEndpoint: "not a url" }, SERVER)).toBe(false);
+    expect(sameOrigin({ ...ok, revocationEndpoint: `${SERVER}:444/auth/revoke` }, SERVER)).toBe(false);
   });
 });
 

@@ -35,6 +35,17 @@ async function loadCapabilities(env: WebEnv): Promise<Capabilities> {
   return client.getCapabilities();
 }
 
+/** True when every sign-in endpoint is on `server` (an origin). */
+export function sameOrigin(signIn: NonNullable<Capabilities["signIn"]>, server: string): boolean {
+  return [signIn.authorizationEndpoint, signIn.tokenEndpoint, signIn.revocationEndpoint].every((endpoint) => {
+    try {
+      return new URL(endpoint).origin === server;
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function App({ env }: { env: WebEnv }) {
   const [lang, setLangState] = useState<Lang>(() => initialLang(env));
   const strings = STRINGS[lang];
@@ -68,7 +79,8 @@ export function App({ env }: { env: WebEnv }) {
         if (live) setBoot({ phase: "unreachable" });
         return;
       }
-      const signIn = capabilities.signIn;
+      // Sign-in endpoints off the server's origin are ignored, as on the desktop: a code or cookie never goes elsewhere.
+      const signIn = capabilities.signIn && sameOrigin(capabilities.signIn, env.server) ? capabilities.signIn : undefined;
       if (!signIn) {
         if (live) setBoot({ phase: "ready", capabilities, auth: null, failure: null });
         return;
@@ -172,7 +184,7 @@ function Ready({ env, capabilities, auth, failure, restart }: { env: WebEnv; cap
     return <WorkspaceApp env={env} directory={directory} capabilities={capabilities} account={account} signOut={signOut} signInAgain={restart} />;
   }
   const error = failure === null ? null : failure === "unreachable" ? t.web.unreachable : t.web.signInFailed[failure];
-  return <SignInView env={env} signIn={capabilities.signIn} limits={capabilities.limits as Record<string, number> | undefined} error={error} begin={(provider) => auth?.begin(provider) ?? Promise.resolve()} />;
+  return <SignInView env={env} signIn={auth ? capabilities.signIn : undefined} limits={capabilities.limits as Record<string, number> | undefined} error={error} begin={(provider) => auth?.begin(provider) ?? Promise.resolve()} />;
 }
 
 const noSubscribe = () => () => undefined;
