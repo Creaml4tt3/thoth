@@ -10,6 +10,7 @@
     "apps/server/test-db/**/*.ts",
     "tests/**/*.ts",
     "protocol/conformance/**/*.ts",
+    "design/video/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": [

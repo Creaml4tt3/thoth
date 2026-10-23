@@ -7,3 +7,5 @@ coverage/
 .DS_Store
 # Test scratch output
 tests/.tmp/
+# Showcase video intermediates (design/video/README.md)
+.tmp/

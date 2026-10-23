@@ -20,7 +20,9 @@
     "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "build:website": "node scripts/build-website.ts",
     "test:server": "vitest run -c apps/server/test-db/vitest.config.ts",
-    "server:conformance": "node apps/server/scripts/server-conformance.ts"
+    "server:conformance": "node apps/server/scripts/server-conformance.ts",
+    "video": "node design/video/build.ts",
+    "video:record": "node design/video/record.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
