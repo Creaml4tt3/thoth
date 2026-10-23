@@ -8,7 +8,7 @@ Domains used below (change them when you buy your own domain):
 
 | What | Address |
 | --- | --- |
-| Website (`apps/web`) | `https://thoth.creaml4tt3.me` |
+| Website (`apps/site`, with `apps/web` at `/app/`) | `https://thoth.creaml4tt3.me` |
 | API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
 
 > Status: steps 1–5 can be done once the sign-in broker (Phase 2b part 2) is
@@ -103,12 +103,59 @@ names do not work for sign-in cookies.
 
 ## 6. Website project
 
-Static files from `apps/web`, either on Vercel (a second project) or on
-Cloudflare Pages, with the domain `thoth.creaml4tt3.me`. The web client
-connects only to this trial server (owner, 2026-10-24): its server address is
-fixed at build time (planned variable: `VITE_DEFAULT_SERVER`,
-`https://api.thoth.creaml4tt3.me`), and it has no "connect to another server"
-field. Self-hosters use the desktop app, or host the web client themselves.
+The website at `thoth.creaml4tt3.me` is **one static deployment** made of two
+builds (ADR-0015):
+
+| Path | Built from | Output |
+| --- | --- | --- |
+| `/`, `/th/`, `/privacy/`, `/terms/`, `/th/privacy/`, `/th/terms/`, `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`, `/analytics.js` | `apps/site` | `apps/site/dist` |
+| `/app/` | `apps/web` (Vite `base: "/app/"`) | `apps/web/dist`, copied to `apps/site/dist/app` |
+| `/media/` (showcase video, poster, captions) | rendered into `apps/site/public/media/` | copied by the site build |
+
+`pnpm build:website` (`scripts/build-website.ts`) builds the site, builds
+`apps/web` when it exists, and copies `apps/web/dist` into
+`apps/site/dist/app`. Without `apps/web` it builds the site alone.
+
+1. Create a second Vercel project from this repository with **root directory
+   `apps/site`**. `apps/site/vercel.json` sets the install and build commands
+   (both run from the repository root), the output directory `dist`, and:
+   - security headers on every path (HSTS, `nosniff`, referrer and permissions
+     policy);
+   - the site's Content Security Policy as a header, including
+     `frame-ancestors 'none'`, which browsers ignore in a meta tag. `/app/` is
+     left out so the web client can send its own CSP (its `connect-src` needs
+     the trial API);
+   - `X-Robots-Tag: noindex` on `/app/` (`robots.txt` also disallows it);
+   - a one-year immutable cache for hashed files in `/assets/` and
+     `/app/assets/`, 30 days for `/media/`, 5 minutes for `/analytics.js`
+     (its name is fixed, so the web client can include it);
+   - a rewrite of `/app/*` to `/app/index.html` for the web client's routes.
+2. Add the domain `thoth.creaml4tt3.me`.
+3. Environment variables (Production), in the Vercel dashboard only:
+
+   | Variable | Value |
+   | --- | --- |
+   | `SITE_URL` | `https://thoth.creaml4tt3.me` (the default; canonical URLs, `hreflang`, the sitemap and JSON-LD use it) |
+   | `VITE_GA4_ID` | the GA4 measurement ID (`G-…`). Leave unset for no analytics code at all |
+   | `VITE_DEFAULT_SERVER` | `https://api.thoth.creaml4tt3.me` (read by the web client's build) |
+
+4. In Google Analytics (property settings):
+   - **Data retention**: 2 months, to match the privacy notice;
+   - **Google signals**: off; ads personalisation: off;
+   - no user ID, no User-Provided Data collection.
+5. Check after the first deploy:
+   - `/`, `/th/`, `/privacy/` and `/app/` load;
+   - before you choose in the cookie banner, the browser's network panel shows
+     no request to Google;
+   - `https://thoth.creaml4tt3.me/sitemap.xml` and `/robots.txt` load. Submit
+     the sitemap in Google Search Console.
+
+The web client connects only to this trial server (owner, 2026-10-24): its
+server address is fixed at build time (`VITE_DEFAULT_SERVER`), and it has no
+"connect to another server" field. Self-hosters use the desktop app, or host
+the web client themselves. The web client sends analytics through the site's
+`/analytics.js` (`window.thothAnalytics.track`), so the one consent choice
+covers both.
 
 The desktop app suggests this server as its starter server (Settings →
 Servers), with a short caution. The address is in
@@ -116,8 +163,11 @@ Servers), with a short caution. The address is in
 
 ## Before the trial goes public
 
-- [ ] Every `[[OWNER: …]]` in `docs/legal/privacy.md` and `terms.md` is filled
-      in, and both are published on the website.
+- [ ] The privacy notice and terms (`docs/legal/`, English and Thai) have been
+      reviewed by someone who knows Thai PDPA, and the `OWNER:` comments in
+      them are resolved (log retention matches your Vercel plan; GA4 data
+      retention is 2 months). The site publishes them at `/privacy/`,
+      `/terms/`, `/th/privacy/` and `/th/terms/`.
 - [ ] An abuse contact address works.
 - [ ] The Google app is published; the branding links work.
 - [ ] `GET https://api.thoth.creaml4tt3.me/api/v1/capabilities` shows the trial limits.
