@@ -17,6 +17,23 @@
 .server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); font: var(--thoth-text-small); }
 .server-limits summary { cursor: pointer; font: var(--thoth-text-small); }
 
+/* Privacy and cookie settings */
+.web-legal { display: flex; gap: var(--thoth-space-3); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.web-legal a { color: inherit; }
+.web-legal .link-button { all: unset; cursor: pointer; text-decoration: underline; }
+.web-legal .link-button:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 2px; }
+
+/* The site's consent banner (built by /analytics.js); Accept and Decline carry equal weight (PDPA). */
+.consent { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 50; max-width: 520px; margin: 0 auto; padding: 18px; border-radius: var(--thoth-radius-xl); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
+.consent[hidden] { display: none; }
+.consent-title { font: 600 15px/1.4 var(--thoth-font-sans); margin: 0 0 6px; }
+.consent-body { color: var(--thoth-ink-secondary); margin: 0; }
+.consent-body a { color: var(--thoth-link); }
+.consent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.consent-button { min-height: 40px; padding: 8px 16px; border-radius: var(--thoth-radius-pill); border: 1px solid var(--thoth-border-strong); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); font: 500 14px/1.2 var(--thoth-font-sans); cursor: pointer; }
+.consent-button:hover { background: var(--thoth-bg-active); }
+.consent-button:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 2px; }
+
 /* Language switch */
 .lang-select { width: auto; padding: 4px 8px; font: var(--thoth-text-small); }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SignIn } from "@thoth/workspace-protocol";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { LegalLinks } from "./LegalLinks.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
@@ -70,6 +71,7 @@ export function SignInView({ env, signIn, limits, error, begin }: Props) {
             </ul>
           </div>
         )}
+        <LegalLinks />
       </div>
     </main>
   );

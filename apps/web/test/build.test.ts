@@ -14,7 +14,7 @@ function files(dir: string): string[] {
 describe("web client production build", () => {
   it("builds under /app/ for the configured server, with no filesystem, Tauri or process code (spec 14.11)", () => {
     const vite = join(app, "node_modules/.bin/vite");
-    const result = spawnSync(vite, ["build", "--logLevel", "warn"], { cwd: app, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0", VITE_DEFAULT_SERVER: SERVER } });
+    const result = spawnSync(vite, ["build", "--logLevel", "warn"], { cwd: app, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0", VITE_DEFAULT_SERVER: SERVER, VITE_GA4_ID: "" } });
     expect(result.status, result.stdout + result.stderr).toBe(0);
 
     const built = files(dist);
@@ -43,5 +43,17 @@ describe("web client production build", () => {
     // The server address is the one fixed at build time; the trial's default does not leak into this build.
     expect(code.some((c) => c.text.includes(SERVER))).toBe(true);
     expect(code.some((c) => c.text.includes("api.thoth.creaml4tt3.me"))).toBe(false);
+    // Without a GA4 ID no analytics script is referenced.
+    expect(html).not.toContain("analytics.js");
+  }, 120_000);
+
+  it("with a GA4 ID, includes the site's /analytics.js (one consent banner for site and client)", () => {
+    const vite = join(app, "node_modules/.bin/vite");
+    const result = spawnSync(vite, ["build", "--logLevel", "warn"], { cwd: app, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0", VITE_DEFAULT_SERVER: SERVER, VITE_GA4_ID: "G-TEST000000" } });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const html = readFileSync(join(dist, "index.html"), "utf8");
+    expect(html).toContain('<script type="module" src="/analytics.js"></script>');
+    // The ID itself lives in /analytics.js (the site build), not in the client.
+    expect(files(dist).some((f) => readFileSync(f).includes("G-TEST000000"))).toBe(false);
   }, 120_000);
 });

@@ -14,6 +14,17 @@ export function serverOrigin(raw: string): string {
   return url.origin;
 }
 
+/**
+ * With a GA4 ID, includes the site's `/analytics.js` (consent banner + GA4, apps/site/src/client/analytics.ts), so
+ * one consent choice covers the site and the web client. Without one, no analytics script is referenced.
+ */
+function analytics(ga4Id: string | undefined): Plugin {
+  return {
+    name: "thoth-analytics",
+    transformIndexHtml: (html) => html.replace("<!-- thoth:analytics -->", ga4Id ? '<script type="module" src="/analytics.js"></script>' : ""),
+  };
+}
+
 /** Puts the server's origin into the Content-Security-Policy in index.html. */
 function csp(origin: string): Plugin {
   return {
@@ -27,7 +38,7 @@ export default defineConfig(({ mode }) => {
   const origin = serverOrigin(env["VITE_DEFAULT_SERVER"] || DEFAULT_SERVER);
   return {
     base: "/app/",
-    plugins: [react(), csp(origin)],
+    plugins: [react(), csp(origin), analytics(env["VITE_GA4_ID"] || process.env["VITE_GA4_ID"])],
     clearScreen: false,
     define: { "import.meta.env.VITE_DEFAULT_SERVER": JSON.stringify(origin) },
     build: { outDir: "dist", emptyOutDir: true, target: "es2022", assetsInlineLimit: 0 },

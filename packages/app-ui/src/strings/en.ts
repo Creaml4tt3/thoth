@@ -146,6 +146,8 @@ export const en = {
     unreachable: "Could not reach the Thoth server. Check your connection and try again.",
     tryAgain: "Try again",
     signOut: "Sign out",
+    privacy: "Privacy",
+    cookieSettings: "Cookie settings",
     signingOut: "Signing out…",
     signedInAs: (name: string) => `Signed in as ${name}`,
     caution: "A free demo for trying Thoth, with limits. Accounts unused for 90 days are deleted, and the demo may be reset, so keep a copy of anything important.",

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { hasCapability, type Capabilities } from "@thoth/workspace-protocol";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { LegalLinks } from "./LegalLinks.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
@@ -146,6 +147,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 {signingOut ? t.web.signingOut : t.web.signOut}
               </Button>
             </div>
+            <LegalLinks />
           </div>
         </aside>
         <main className="main">

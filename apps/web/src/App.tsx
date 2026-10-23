@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { LegalLinks } from "./LegalLinks.tsx";
 import { WorkspaceClient } from "@thoth/workspace-client";
 import type { Capabilities, Me } from "@thoth/workspace-protocol";
 import { STRINGS, StringsContext, pickLang, useStrings, type Lang } from "@thoth/app-ui/strings/index.ts";
@@ -129,6 +130,7 @@ export function App({ env }: { env: WebEnv }) {
         <Button variant="primary" small onClick={() => setAttempt((n) => n + 1)}>
           {strings.web.tryAgain}
         </Button>
+        <LegalLinks />
       </div>
     );
   } else {
