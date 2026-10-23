@@ -7,7 +7,8 @@ contract is the route registry in `packages/workspace-protocol` and the conforma
 
 Phase 2a scope: pages and immutable revisions, change feed, attachments, search, SSE hints, transfers,
 personal-access-token authentication, an admin CLI, a container image. Phase 2b adds the hosted trial mode
-(quotas, a trial profile, Postgres blob storage, CORS, rate limiting, maintenance); sign-in is separate.
+(quotas, a trial profile, Postgres blob storage, CORS, rate limiting, maintenance) and the sign-in broker
+(Google / any OIDC issuer / GitHub, see Sign-in).
 
 ## Run it
 
@@ -47,6 +48,16 @@ node apps/server/src/main.ts
 | `RATE_LIMIT_WINDOW_SECONDS` | 60 | Fixed window length. |
 | `TRUST_PROXY` | `false` | Trust `x-real-ip` / `x-forwarded-for` for the client IP. |
 | `CRON_SECRET` | none | Enables `GET /internal/maintenance` (at least 16 characters). Never logged. |
+| `PUBLIC_URL` | none | The server's public origin (`https://api.example.org`). Required when a sign-in provider is set; plain `http` only on a loopback host. |
+| `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET` | none | Google sign-in (issuer `https://accounts.google.com`). Secret never logged. |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_NAME` | none | Any other OIDC issuer (Keycloak, Authentik...), provider ID `oidc`. The issuer must be `https` unless it is a loopback host. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | none | GitHub OAuth App sign-in. |
+| `GITHUB_URL`, `GITHUB_API_URL` | `https://github.com`, `https://api.github.com` | GitHub Enterprise or a test double. |
+| `WEB_REDIRECT_URIS` | none | Comma-separated exact redirect URIs of the `thoth-web` client; without it that client does not exist. |
+| `SIGNUP_LIMIT_PER_IP` | none (trial 10) | New accounts per client IP per 24 h. |
+| `ACCESS_TOKEN_TTL_SECONDS` | 900 | Sign-in access token lifetime (60 to 3600). |
+| `REFRESH_TOKEN_TTL_DAYS` | 30 | Refresh token lifetime, sliding (1 to 365). |
+| `SESSION_MAX_DAYS` | 90 | Maximum age of a sign-in session; then the user signs in again (1 to 365). |
 
 Every limit is its own optional variable: unset means no limit. Each accepts a positive integer, or the word
 `unlimited` to remove a value the trial profile would set. Invalid values stop the server at startup with a
@@ -85,6 +96,7 @@ SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
 | `EVENTS` | `off` | no long-lived SSE on a 300 s function or a database that must be allowed to sleep (ADR-0014) |
 | `MAX_ACCOUNTS` | 300 | keeps the database inside Neon's 1 GB; adjust after real usage |
 | `RATE_LIMIT_PER_ACCOUNT` / `RATE_LIMIT_PER_IP` | 300 / 600 per 60 s | ample for a person whose client polls the change feed, small for a script |
+| `SIGNUP_LIMIT_PER_IP` | 10 per 24 h | ADR-0014 rule 4: sign-up is limited per IP |
 
 Recommended companions (not part of the profile because they depend on the deployment):
 `MIGRATE_ON_START=false`, `DATABASE_POOL_MAX=1` to `3`, `TRUST_PROXY=true`, `CORS_ORIGINS`, `CRON_SECRET`.
@@ -134,6 +146,45 @@ not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
 - **Maintenance** runs from Vercel Cron: set `CRON_SECRET` and add a cron entry for `/internal/maintenance` (Vercel
   sends `GET` with `Authorization: Bearer $CRON_SECRET`).
 - Statements time out after 30 s and requests are short; nothing relies on process memory between requests.
+
+## Sign-in
+
+The contract is [`docs/protocol/sign-in.md`](../../docs/protocol/sign-in.md); the code is `src/signin/`. With at least one
+provider configured the server is an OAuth authorization server for its two public clients (`thoth-desktop`, loopback
+redirect; `thoth-web`, `WEB_REDIRECT_URIS`) and a confidential OAuth client of each upstream provider. Without a provider
+nothing changes: `/auth/*` is 404 and `/capabilities` has no `signIn` member.
+
+```sh
+export PUBLIC_URL=https://api.example.org
+export OIDC_GOOGLE_CLIENT_ID=... OIDC_GOOGLE_CLIENT_SECRET=...   # from your secret store, never a committed file
+# Register https://api.example.org/auth/callback/google (and /auth/callback/github) at the provider.
+```
+
+- **Routes.** `GET /auth/authorize` (chooser page when several providers and no `provider=`), `GET /auth/callback/:provider`,
+  `POST /auth/token` (`authorization_code`, `refresh_token`), `POST /auth/revoke`. They need no bearer credential, count
+  against `RATE_LIMIT_PER_IP`, and answer OAuth JSON (`Cache-Control: no-store`) or a small HTML page, never problem
+  documents. CORS applies to token and revoke only.
+- **Upstream.** OIDC uses discovery (its `issuer` must equal the configured one) and the JWKS, both cached for an hour; a
+  token with an unknown `kid` causes one JWKS refetch (key rotation). ID tokens are verified with `node:crypto` (no JWT
+  library): RS/PS/ES 256-512 only, never `none` or `HS*`; `iss`, `aud`/`azp`, `exp`/`iat` (60 s), `nonce`, `sub`. The
+  email is kept only when `email_verified` is `true`. GitHub: `GET /user` (numeric `id` is the subject), `GET /user/emails`
+  (primary and verified only). Upstream calls use `fetch` with a 10 s timeout, no redirects and a 1 MiB cap.
+- **Accounts** are keyed by `(provider, subject)` in `identities`, never by email. A new account passes the per-IP sign-up
+  limit (`sign_ups`, the IP stored only as a SHA-256) and `assertCanCreateAccount` in the same transaction; a refusal is
+  `access_denied` to the client, and an existing account can always sign in.
+- **Tokens.** Every state, binding value, code and token is 256 random bits, stored as its SHA-256. The upstream PKCE
+  verifier and nonce are stored for the 10 minutes of the auth request and nulled when it is consumed. Session access
+  tokens (`thoth_at_`) live in `access_tokens` with a `session_id`, so `PatAuthenticator` serves both kinds; it refuses a
+  token whose session is revoked or past `SESSION_MAX_DAYS`. Refresh tokens (`thoth_rt_`) rotate; a reused one revokes
+  the whole session (`auth.refresh_reuse` audit event), and a replayed code revokes the session it created.
+- **Web client.** The refresh token is only in `__Secure-thoth_refresh` (`thoth_refresh` on plain http): `HttpOnly; Secure;
+  SameSite=Strict; Path=/auth`. Refresh and cookie-based revoke also need an `Origin` from `CORS_ORIGINS`.
+- **Logs** carry the provider, the client and a fixed reason, never a code, state, token, verifier, nonce or secret; the
+  redaction list in `app.ts` also covers those names in case a handler ever logs them. Query strings are never logged.
+- **Maintenance** also deletes expired auth requests and codes, refresh and session access tokens expired for a day,
+  revoked or expired sessions, and sign-up counters older than a day (`signInRowsDeleted`).
+- **Tests** (`test-db/signin.test.ts`) run the whole flow against an in-process OIDC issuer and a fake GitHub on
+  127.0.0.1 (`test-db/fakes.ts`), following redirects by hand.
 
 ## CORS
 
@@ -231,8 +282,9 @@ live on named volumes.
 - **Authorization** is `workspaceAccess()`: not a member is 404, a member whose role lacks the permission is 403.
   Every route goes through it; transfers resolve the workspace first and return the same 404 text for a real
   transfer of another workspace and for an unknown ID.
-- **Authentication** is the `Authenticator` interface (`src/auth.ts`); `PatAuthenticator` is the 2a implementation.
-  OIDC (2b) adds another implementation and does not touch the routes.
+- **Authentication** is the `Authenticator` interface (`src/auth.ts`); `PatAuthenticator` checks personal access tokens
+  and sign-in access tokens alike (both are SHA-256 rows of `access_tokens`), so the sign-in broker did not touch the
+  `/api/v1` routes.
 
 ## Deviations and open points
 
@@ -258,3 +310,12 @@ live on named volumes.
    no such orphans (its insert joins the request transaction). Neither store deletes the bytes of attachments that
    are no longer referenced, because attachments cannot be deleted through the API yet.
 9. `GET /workspaces` lists up to 50 members per workspace in `members`; `memberCount` is exact.
+10. **Sign-in, beyond sign-in.md.** A `sign_ups` table (IP hash, time) implements `SIGNUP_LIMIT_PER_IP`, and `sessions`
+    records its `provider`. The binding cookie is named `__Host-thoth_signin` (`thoth_signin` on plain http). An unknown
+    `client_id` at the token and revoke endpoints is 400 `invalid_client`. `thoth-web` sending a `refresh_token` in the
+    body is refused (`invalid_request`) rather than ignored. Google ID tokens may carry `iss` `accounts.google.com`
+    (without scheme), as Google documents; that alias is accepted for the Google issuer only.
+11. **Sign-in open points.** Nothing deletes accounts inactive for 90 days yet (`users.last_seen_at` is maintained for
+    it; ADR-0014 open question on email). An auth request row is written before the provider is visited, so without
+    `RATE_LIMIT_PER_IP` a client can create many short-lived rows (maintenance removes them). Accounts cannot be linked
+    across providers. There is no consent screen and no per-client scope: a token grants everything the account can do.

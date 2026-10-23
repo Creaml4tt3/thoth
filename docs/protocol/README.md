@@ -1,7 +1,7 @@
 # Thoth workspace protocol
 
 **Status: Draft, Proposed per ADR-0004.** Unstable until finalized in phase P2.
-Endpoint shapes may still change. Authentication is provisional (see section 4).
+Endpoint shapes may still change. Client login is the sign-in broker ([`sign-in.md`](sign-in.md), section 4).
 
 The protocol is an open, versioned REST API between Thoth clients and any compatible
 workspace server. The Thoth reference server is one implementation, not the only one.
@@ -111,15 +111,23 @@ limit); they surface only as `quota_exceeded`.
 
 ## 4. Authentication and authorization
 
-### Authentication (PROVISIONAL)
+### Authentication
 
-> **Provisional.** The authentication scheme for third-party servers is an open question in
-> ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This draft uses a generic HTTP bearer
-> credential as a placeholder: `Authorization: Bearer <credential>`. No OAuth flow, token
-> endpoint or discovery document is defined here, and the OpenAPI `bearerAuth` scheme is
-> marked provisional. Expect this section, `GET /me` and the client login flow to change.
+Every route except `GET /capabilities` takes an HTTP bearer credential:
+`Authorization: Bearer <credential>`. How a client obtains it is the server's business; the
+protocol does not require one login flow of every server.
 
-Until it is settled:
+- **Client login is defined by the sign-in broker,** [`sign-in.md`](sign-in.md): OAuth 2.0
+  Authorization Code with PKCE (S256) against the server's own `/auth/*` endpoints, with
+  the server signing the user in at Google, any OIDC issuer or GitHub. The reference server
+  implements it. A server that offers it advertises the optional `signIn` member of
+  `GET /capabilities` (additive in 1.0); Thoth's desktop and web clients use it when present.
+- Without `signIn`, credentials are issued out of band (for example the reference server's
+  personal access tokens for scripts and self-hosting).
+- Whether third-party servers should also accept tokens from an external OAuth 2.1 / OIDC
+  authorization server remains open (ADR-0004).
+
+Rules for every credential:
 
 - A missing, malformed, expired or revoked credential is 401 `unauthenticated`. A 401
   response MUST carry a `WWW-Authenticate` header (RFC 9110 section 11.6.1), for example

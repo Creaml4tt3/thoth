@@ -2,11 +2,14 @@ import { timingSafeEqual, createHash } from "node:crypto";
 import type { Database } from "./db.ts";
 import { purgeIdempotencyRecords } from "./idempotency.ts";
 import { purgeRateLimits } from "./ratelimit.ts";
+import { purgeSignIn } from "./signin/sessions.ts";
 
 export interface MaintenanceResult {
   revisionsPruned: number;
   idempotencyRecordsDeleted: number;
   rateLimitRowsDeleted: number;
+  /** Expired auth requests, codes, refresh and session access tokens, finished sessions, old sign-up counters. */
+  signInRowsDeleted: number;
 }
 
 /**
@@ -43,6 +46,7 @@ export async function runMaintenance(db: Database, options: { revisionRetentionD
     revisionsPruned: options.revisionRetentionDays === undefined ? 0 : await pruneRevisions(db, options.revisionRetentionDays),
     idempotencyRecordsDeleted: await purgeIdempotencyRecords(db),
     rateLimitRowsDeleted: await purgeRateLimits(db),
+    signInRowsDeleted: await purgeSignIn(db),
   };
 }
 

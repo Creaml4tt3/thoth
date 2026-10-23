@@ -11,10 +11,9 @@ Domains used below (change them when you buy your own domain):
 | Website (`apps/web`) | `https://thoth.creaml4tt3.me` |
 | API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
 
-> Status: steps 1–3 can be done now. Steps 4–6 need Phase 2b part 2 (the
-> sign-in broker) and Phase 2c (the website). The variable names they list are
-> the planned names and will be confirmed in `apps/server/README.md` when that
-> code lands.
+> Status: steps 1–5 can be done once the sign-in broker (Phase 2b part 2) is
+> merged; its contract is `docs/protocol/sign-in.md`. Step 6 needs Phase 2c
+> (the website).
 
 ## 1. Database: Neon (free plan)
 
@@ -70,6 +69,8 @@ names do not work for sign-in cookies.
    | `TRUST_PROXY` | `true` (Vercel sets the client IP header) |
    | `CORS_ORIGINS` | `https://thoth.creaml4tt3.me` |
    | `CRON_SECRET` | a long random value, e.g. from `openssl rand -base64 32`; Vercel Cron sends it automatically |
+   | `PUBLIC_URL` | `https://api.thoth.creaml4tt3.me` (the sign-in redirect addresses are built from it) |
+   | `WEB_REDIRECT_URIS` | `https://thoth.creaml4tt3.me/app/callback` |
 
 5. Add a daily cron job that calls `/internal/maintenance`. The Hobby plan allows
    once a day.
@@ -88,7 +89,7 @@ names do not work for sign-in cookies.
    - Authorized redirect URI: `https://api.thoth.creaml4tt3.me/auth/callback/google`
    - No JavaScript origins needed: the browser never talks to Google directly.
 4. Put the client ID and client secret into the API project's environment
-   variables (planned names: `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET`).
+   variables: `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET`.
 5. Publish the app (Testing mode only allows listed test users).
 
 ## 5. GitHub sign-in (second provider)
@@ -97,8 +98,7 @@ names do not work for sign-in cookies.
    - Homepage URL: `https://thoth.creaml4tt3.me`
    - Authorization callback URL: `https://api.thoth.creaml4tt3.me/auth/callback/github`
 2. Generate a client secret and put both values into the API project's
-   environment variables (planned names: `GITHUB_CLIENT_ID`,
-   `GITHUB_CLIENT_SECRET`).
+   environment variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
 3. The server asks only for `read:user` and `user:email`.
 
 ## 6. Website project
@@ -121,8 +121,8 @@ URL to `https://api.thoth.creaml4tt3.me` (planned variable: `VITE_DEFAULT_SERVER
 ## Moving to a bought domain later
 
 1. Add the new domains in Vercel (or Pages) and DNS.
-2. Update `CORS_ORIGINS`, the Google redirect URI, the GitHub callback URL, and
-   the website's default server.
+2. Update `PUBLIC_URL`, `CORS_ORIGINS`, `WEB_REDIRECT_URIS`, the Google
+   redirect URI, the GitHub callback URL, and the website's default server.
 3. Keep the old domains redirecting for a while.
 
 Signed-in users sign in once more: cookies belong to the old domain.

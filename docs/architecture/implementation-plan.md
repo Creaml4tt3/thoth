@@ -258,6 +258,44 @@ Part 1 result (2026-10-22) ✅:
   flag the immutability trigger checks.
 - A retained revision's `parentId` may name a pruned revision, which answers 404.
 
+Part 2 result (2026-10-23) ✅: the sign-in broker, to the contract in
+`docs/protocol/sign-in.md`.
+- `pnpm check` 942/942; `pnpm test:server` 198/198 (49 sign-in tests against a
+  local OIDC test issuer and a fake GitHub, both in-process).
+- ID tokens are verified with `node:crypto` (no new dependency).
+  - Asymmetric algorithms only; `none` and `HS*` are refused.
+  - Tested and rejected: expired, wrong audience, wrong issuer, wrong nonce,
+    unsigned, HS256 with the client secret, unknown key.
+  - A rotated key is picked up by refetching the JWKS once.
+- Rejected with tests:
+  - a replayed code (also revokes the first session);
+  - a PKCE mismatch (burns the code);
+  - redirect URI and client mismatches;
+  - an expired code;
+  - refresh-token reuse (revokes the whole family, so old access tokens give
+    401);
+  - bad redirect URIs (400 page, never a redirect);
+  - a replayed or unbound callback.
+- Identity is (provider, subject): the same email at Google and GitHub gives
+  two accounts.
+- The account cap and the per-IP sign-up limit refuse new accounts but not
+  existing ones.
+- Web refresh tokens are only in an `HttpOnly; Secure; SameSite=Strict`
+  cookie, used only from an allowed `Origin`.
+- No secret, code, token, state, verifier or nonce appears in any log line or
+  page (captured at trace level).
+- Mutation checks:
+  - helper's run: the PKCE comparison, reuse family revocation, the audience
+    check, the binding cookie;
+  - my run: the session check on access tokens, `localhost` redirects, expired
+    codes.
+
+  Each was caught.
+- Deviations: listed in `apps/server/README.md` (open points 10–11).
+- Not yet built:
+  - deleting inactive accounts (`users.last_seen_at` is kept for it);
+  - the clients' side: Part 3 for desktop, Phase 2c for web.
+
 AC:
 
 - Every trial limit is tested at the boundary (limit − 1 succeeds; the limit

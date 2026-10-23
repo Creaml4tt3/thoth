@@ -31,7 +31,7 @@ Commands:
                                                             writes the token to <file> (mode 0600); prints the token ID
   revoke-token --token-id <id>
   maintenance                                               prune old revisions (REVISION_RETENTION_DAYS), expired idempotency
-                                                            records and rate-limit rows; prints what was removed
+                                                            records, rate-limit rows and sign-in rows; prints what was removed
 
 create-user, create-workspace and add-member enforce the quotas of the environment (THOTH_PROFILE, MAX_*).
 create-workspace takes --owner <user id> to make that user the owner (and count it against MAX_WORKSPACES_PER_ACCOUNT).

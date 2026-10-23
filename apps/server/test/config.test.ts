@@ -124,3 +124,69 @@ describe("configuration", () => {
     expect(loadConfig(env({ THOTH_PROFILE: "trial", MAX_MARKDOWN_BYTES: "8388608" })).maxTransferBytes).toBeGreaterThanOrEqual(8_388_608);
   });
 });
+
+describe("sign-in configuration", () => {
+  const SECRET = "gcs-not-a-real-secret-0123456789";
+  const google = { PUBLIC_URL: "https://api.example.org", OIDC_GOOGLE_CLIENT_ID: "gid.apps.example", OIDC_GOOGLE_CLIENT_SECRET: SECRET };
+
+  it("no provider: sign-in is off, and lifetimes still validate", () => {
+    expect(loadConfig(env()).signIn).toBeUndefined();
+    expect(failure({ ACCESS_TOKEN_TTL_SECONDS: "30" })).toContain("ACCESS_TOKEN_TTL_SECONDS");
+  });
+
+  it("a provider with PUBLIC_URL: defaults per sign-in.md section 5", () => {
+    const s = loadConfig(env(google)).signIn!;
+    expect(s).toMatchObject({ publicUrl: "https://api.example.org", webRedirectUris: [], signupLimitPerIp: undefined, accessTokenTtlSeconds: 900, refreshTokenTtlDays: 30, sessionMaxDays: 90 });
+    expect(s.providers).toEqual([{ kind: "oidc", id: "google", name: "Google", issuer: "https://accounts.google.com", clientId: "gid.apps.example", clientSecret: SECRET }]);
+  });
+
+  it("the trial profile limits sign-ups to 10 per IP; `unlimited` removes it", () => {
+    expect(loadConfig(env({ ...google, THOTH_PROFILE: "trial" })).signIn!.signupLimitPerIp).toBe(10);
+    expect(loadConfig(env({ ...google, THOTH_PROFILE: "trial", SIGNUP_LIMIT_PER_IP: "unlimited" })).signIn!.signupLimitPerIp).toBeUndefined();
+  });
+
+  it("GitHub and a generic issuer, with Enterprise URLs and a loopback test issuer", () => {
+    const s = loadConfig(env({ PUBLIC_URL: "http://127.0.0.1:8080", GITHUB_CLIENT_ID: "Iv1.x", GITHUB_CLIENT_SECRET: SECRET, GITHUB_URL: "https://ghe.example.org", GITHUB_API_URL: "https://ghe.example.org/api/v3", OIDC_ISSUER: "http://127.0.0.1:9000/realms/t", OIDC_CLIENT_ID: "kc", OIDC_CLIENT_SECRET: SECRET, OIDC_NAME: "Keycloak", WEB_REDIRECT_URIS: "https://app.example.org/app/callback, http://localhost:5173/callback" })).signIn!;
+    expect(s.providers.map((p) => p.id)).toEqual(["github", "oidc"]);
+    expect(s.providers[0]).toMatchObject({ webUrl: "https://ghe.example.org", apiUrl: "https://ghe.example.org/api/v3" });
+    expect(s.providers[1]).toMatchObject({ name: "Keycloak", issuer: "http://127.0.0.1:9000/realms/t" });
+    expect(s.webRedirectUris).toEqual(["https://app.example.org/app/callback", "http://localhost:5173/callback"]);
+  });
+
+  it("only one of a provider's ID and secret is a ConfigError naming the variable, never the value", () => {
+    const cases: [Record<string, string>, string][] = [
+      [{ PUBLIC_URL: "https://a.example", OIDC_GOOGLE_CLIENT_ID: "only-the-id-value" }, "OIDC_GOOGLE_CLIENT_SECRET"],
+      [{ PUBLIC_URL: "https://a.example", OIDC_GOOGLE_CLIENT_SECRET: SECRET }, "OIDC_GOOGLE_CLIENT_ID"],
+      [{ PUBLIC_URL: "https://a.example", GITHUB_CLIENT_SECRET: SECRET }, "GITHUB_CLIENT_ID"],
+      [{ PUBLIC_URL: "https://a.example", GITHUB_CLIENT_ID: "only-the-id-value" }, "GITHUB_CLIENT_SECRET"],
+      [{ PUBLIC_URL: "https://a.example", OIDC_ISSUER: "https://id.example", OIDC_CLIENT_SECRET: SECRET }, "OIDC_CLIENT_ID"],
+      [{ PUBLIC_URL: "https://a.example", OIDC_CLIENT_ID: "kc", OIDC_CLIENT_SECRET: SECRET }, "OIDC_ISSUER"],
+    ];
+    for (const [extra, variable] of cases) {
+      const message = failure(extra);
+      expect(message, variable).toContain(variable);
+      expect(message).not.toContain(SECRET);
+      expect(message).not.toContain("only-the-id-value");
+    }
+  });
+
+  it("a non-https issuer that is not loopback is an error; so are other insecure URLs", () => {
+    for (const issuer of ["http://id.example.org", "http://10.0.0.5/realms/x", "ftp://id.example.org", "https://u:p@id.example.org", "https://id.example.org/?x=1", "not a url"]) {
+      const message = failure({ PUBLIC_URL: "https://a.example", OIDC_ISSUER: issuer, OIDC_CLIENT_ID: "kc", OIDC_CLIENT_SECRET: SECRET });
+      expect(message, issuer).toContain("OIDC_ISSUER");
+      expect(message).not.toContain(issuer);
+    }
+    expect(failure({ PUBLIC_URL: "https://a.example", GITHUB_CLIENT_ID: "x", GITHUB_CLIENT_SECRET: SECRET, GITHUB_URL: "http://github.example" })).toContain("GITHUB_URL");
+    for (const url of ["http://[::1]:9000", "http://127.0.0.1:9000/r", "http://localhost:9000"]) expect(loadConfig(env({ PUBLIC_URL: "https://a.example", OIDC_ISSUER: url, OIDC_CLIENT_ID: "kc", OIDC_CLIENT_SECRET: SECRET })).signIn!.providers[0]!.kind).toBe("oidc");
+  });
+
+  it("PUBLIC_URL is required with a provider and must be an https origin (http only on loopback)", () => {
+    expect(failure({ OIDC_GOOGLE_CLIENT_ID: "x", OIDC_GOOGLE_CLIENT_SECRET: SECRET })).toContain("PUBLIC_URL");
+    for (const bad of ["https://api.example.org/base", "http://api.example.org", "https://api.example.org/?x", "api.example.org"]) expect(failure({ ...google, PUBLIC_URL: bad }), bad).toContain("PUBLIC_URL");
+    expect(loadConfig(env({ ...google, PUBLIC_URL: "https://api.example.org/" })).signIn!.publicUrl).toBe("https://api.example.org");
+  });
+
+  it("WEB_REDIRECT_URIS: exact URIs only", () => {
+    for (const bad of ["https://app.example.org/cb#x", "https://*.example.org/cb", "http://app.example.org/cb", "/cb", "https://app.example.org"]) expect(failure({ ...google, WEB_REDIRECT_URIS: bad }), bad).toContain("WEB_REDIRECT_URIS");
+  });
+});

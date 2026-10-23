@@ -94,6 +94,50 @@
       "required": [
         "name"
       ]
+    },
+    "signIn": {
+      "type": "object",
+      "properties": {
+        "authorizationEndpoint": {
+          "type": "string",
+          "format": "uri"
+        },
+        "tokenEndpoint": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revocationEndpoint": {
+          "type": "string",
+          "format": "uri"
+        },
+        "providers": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        }
+      },
+      "required": [
+        "authorizationEndpoint",
+        "tokenEndpoint",
+        "revocationEndpoint",
+        "providers"
+      ]
     }
   },
   "required": [

@@ -12,6 +12,7 @@ import { registerCoreRoutes } from "./routes/core.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
+import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
 import type { CapabilityId } from "@thoth/workspace-protocol";
 
 /** Everything that could carry a credential or content is removed from log lines. */
@@ -30,6 +31,32 @@ export const LOG_REDACT_PATHS = [
   "connectionString",
   "cronSecret",
   "*.cronSecret",
+  // Sign-in: OAuth parameters and provider credentials, wherever a handler might put them.
+  // `code` and `state` are common words (an error's `code`), so only where OAuth parameters would sit.
+  "code",
+  "state",
+  "query.code",
+  "query.state",
+  "params.code",
+  "params.state",
+  "form.code",
+  "form.state",
+  "refresh_token",
+  "*.refresh_token",
+  "access_token",
+  "*.access_token",
+  "id_token",
+  "*.id_token",
+  "code_verifier",
+  "*.code_verifier",
+  "nonce",
+  "*.nonce",
+  "client_secret",
+  "*.client_secret",
+  "clientSecret",
+  "*.clientSecret",
+  "signIn.providers[*].clientSecret",
+  "*.signIn.providers[*].clientSecret",
 ];
 
 export interface BuildOptions {
@@ -85,9 +112,17 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
     const origin = typeof request.headers.origin === "string" ? request.headers.origin : undefined;
     // CORS headers go on every reply (also errors and 404/405) for an allowed origin; others get none and the browser blocks them.
     const preflight = isPreflight(request.method, request.headers);
-    for (const [name, value] of Object.entries(corsHeaders(config.corsOrigins, origin, preflight))) reply.header(name, value);
+    // Sign-in: only the fetch()ed endpoints (token, revoke) are CORS resources; authorize and callbacks are navigations.
+    const auth = isAuthPath(path);
+    const corsPath = !auth || isAuthCorsPath(path);
+    if (corsPath) for (const [name, value] of Object.entries(corsHeaders(config.corsOrigins, origin, preflight))) reply.header(name, value);
     // A preflight carries no credentials by design: answered here, before authentication and rate limiting.
-    if (preflight && config.corsOrigins.length > 0 && (path === API_BASE_PATH || path.startsWith(`${API_BASE_PATH}/`))) return reply.code(204).send();
+    if (preflight && config.corsOrigins.length > 0 && (path === API_BASE_PATH || path.startsWith(`${API_BASE_PATH}/`) || (auth && corsPath && config.signIn !== undefined))) return reply.code(204).send();
+    // /auth/* is rate limited per IP like /api/v1, and needs no bearer credential (it is how one is obtained).
+    if (auth) {
+      if (limitedByIp && config.signIn !== undefined) await enforce(`ip:${clientIp(request.headers, request.socket.remoteAddress, config.trustProxy)}`, rateLimit.perIp!);
+      return;
+    }
     if (!path.startsWith(`${API_BASE_PATH}/`)) return;
     const route = path.slice(API_BASE_PATH.length);
     if (limitedByIp) await enforce(`ip:${clientIp(request.headers, request.socket.remoteAddress, config.trustProxy)}`, rateLimit.perIp!);
@@ -109,6 +144,19 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   }
 
   app.setErrorHandler((error: FastifyError | Error, request, reply) => {
+    const path = request.url.split("?")[0] ?? "";
+    if (config.signIn !== undefined && isAuthPath(path)) {
+      // OAuth endpoints answer OAuth JSON or an HTML page, never a problem document; nothing about the request is logged.
+      if (error instanceof ApiError) return authErrorReply(path, error, reply);
+      const code = (error as FastifyError).code;
+      if (typeof code === "string" && code.startsWith("FST_ERR_CTP_")) return authErrorReply(path, new ApiError("validation_failed", "the request body is malformed"), reply);
+      if (isUnavailable(error)) {
+        request.log.error({ err: { code: (error as { code?: string }).code } }, "database unavailable");
+        return authErrorReply(path, new ApiError("service_unavailable", "unavailable", {}, { "retry-after": "2" }), reply);
+      }
+      request.log.error({ err: { name: error.name } }, "sign-in: unhandled error");
+      return authErrorReply(path, new ApiError("internal_error", "unexpected server failure"), reply);
+    }
     let apiError: ApiError;
     if (error instanceof ApiError) apiError = error;
     else {
@@ -141,6 +189,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerEventRoutes(app, deps);
   registerTransferRoutes(app, deps);
   registerMaintenanceRoutes(app, deps);
+  registerSignInRoutes(app, deps);
   return app;
 }
 

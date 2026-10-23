@@ -60,7 +60,7 @@ const schemaNameOf = (schema: z.ZodType): string | undefined => componentRegistr
 
 const PROVISIONAL_AUTH =
   "HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). " +
-  "This scheme will change before the protocol is finalized; do not build long-lived integrations on it. No OAuth flow is defined here.";
+  "This scheme may change before the protocol is finalized. Thoth clients obtain the credential through the sign-in broker (docs/protocol/sign-in.md, advertised as `signIn` in /capabilities); its /auth endpoints are not part of this document.";
 
 export function buildOpenApiDocument(): Json {
   const components: Record<string, Json> = {};

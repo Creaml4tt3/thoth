@@ -40,11 +40,29 @@ export const LimitsSchema = z.object({
 });
 export type Limits = z.infer<typeof LimitsSchema>;
 
+/**
+ * The reference server's sign-in broker (docs/protocol/sign-in.md), present only when the server has at least one
+ * sign-in provider. Additive in 1.0: clients that do not know it ignore it, and a server without it accepts
+ * whatever bearer credentials it issues by other means (personal access tokens).
+ */
+export const SignInSchema = z.object({
+  /** OAuth 2.0 authorization endpoint (Authorization Code + PKCE S256). Absolute URL. */
+  authorizationEndpoint: z.url(),
+  /** OAuth 2.0 token endpoint, form-encoded (`authorization_code`, `refresh_token`). Absolute URL. */
+  tokenEndpoint: z.url(),
+  /** RFC 7009 revocation endpoint. Absolute URL. */
+  revocationEndpoint: z.url(),
+  /** Upstream providers a user can choose from, in display order. */
+  providers: z.array(z.object({ id: z.string().min(1), name: z.string().min(1) })).min(1),
+});
+export type SignIn = z.infer<typeof SignInSchema>;
+
 export const CapabilitiesSchema = z.object({
   protocolVersion: z.string().regex(/^\d+\.\d+$/, "Expected MAJOR.MINOR"),
   capabilities: z.array(CapabilityIdSchema).meta({ uniqueItems: true }).refine((ids) => new Set(ids).size === ids.length, "Capability IDs must be unique"),
   limits: LimitsSchema.optional(),
   server: z.object({ name: z.string(), version: z.string().optional() }).optional(),
+  signIn: SignInSchema.optional(),
 });
 export type Capabilities = z.infer<typeof CapabilitiesSchema>;
 

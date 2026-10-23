@@ -40,6 +40,46 @@ export interface ServerConfig {
   /** Enables `GET /internal/maintenance` when set. Never logged or echoed. */
   cronSecret: string | undefined;
   capabilities: CapabilityId[];
+  /** The sign-in broker (docs/protocol/sign-in.md); `undefined` when no provider is configured. */
+  signIn: SignInConfig | undefined;
+}
+
+export interface OidcProviderConfig {
+  kind: "oidc";
+  /** `google` (fixed issuer) or `oidc` (any issuer). */
+  id: "google" | "oidc";
+  name: string;
+  issuer: string;
+  clientId: string;
+  /** Never logged or echoed. */
+  clientSecret: string;
+}
+
+export interface GithubProviderConfig {
+  kind: "github";
+  id: "github";
+  name: string;
+  clientId: string;
+  /** Never logged or echoed. */
+  clientSecret: string;
+  /** `https://github.com` or a GitHub Enterprise / test double origin. */
+  webUrl: string;
+  apiUrl: string;
+}
+
+export type ProviderConfig = OidcProviderConfig | GithubProviderConfig;
+
+export interface SignInConfig {
+  /** The server's public origin, no trailing slash. Endpoint URLs, the upstream redirect URI and `iss` derive from it. */
+  publicUrl: string;
+  providers: ProviderConfig[];
+  /** Exact redirect URIs of `thoth-web`; empty = the web client does not exist. */
+  webRedirectUris: string[];
+  /** New accounts per client IP per 24 h; `undefined` = not limited. */
+  signupLimitPerIp: number | undefined;
+  accessTokenTtlSeconds: number;
+  refreshTokenTtlDays: number;
+  sessionMaxDays: number;
 }
 
 export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers"];
@@ -67,6 +107,8 @@ export const TRIAL_PROFILE = {
   rateLimitPerIp: 600,
   // ADR-0014 rule 2: no long-lived SSE on a 300 s serverless function or a database that must be allowed to sleep.
   events: "off",
+  // ADR-0014 rule 4: sign-up is limited per IP.
+  signupLimitPerIp: 10,
 } as const;
 
 export class ConfigError extends Error {
@@ -133,6 +175,98 @@ export function parseCorsOrigins(raw: string | undefined): string[] {
   return origins;
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "[::1]"]);
+
+/** True for `localhost`, `127.0.0.0/8` and `[::1]`, the hosts allowed over plain http (local test issuers, dev web clients). */
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname) || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+}
+
+/** An absolute `https` URL, or `http` on a loopback host; no credentials, query or fragment. Values are never echoed. */
+function secureUrlFrom(name: string, raw: string, options: { keepTrailingSlash?: boolean } = {}): string {
+  let url: URL | null = null;
+  try {
+    url = new URL(raw);
+  } catch {
+    /* rejected below */
+  }
+  const ok = url !== null && (url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname))) && url.username === "" && url.password === "" && url.search === "" && url.hash === "" && !raw.includes("#");
+  if (!ok) throw new ConfigError(`${name} must be an https URL (plain http is allowed only for loopback hosts), without credentials, query or fragment`);
+  // An issuer is compared byte for byte with the `iss` claim, so it is kept exactly as configured.
+  return options.keepTrailingSlash ? raw : raw.replace(/\/+$/, "");
+}
+
+/** Both or neither: a provider with only its ID or only its secret is a configuration error naming the missing variable. */
+function pairFrom(env: NodeJS.ProcessEnv, idName: string, secretName: string): { clientId: string; clientSecret: string } | undefined {
+  const clientId = present(env, idName);
+  const clientSecret = present(env, secretName);
+  if (clientId === undefined && clientSecret === undefined) return undefined;
+  if (clientId === undefined) throw new ConfigError(`${idName} is required when ${secretName} is set`);
+  if (clientSecret === undefined) throw new ConfigError(`${secretName} is required when ${idName} is set`);
+  return { clientId, clientSecret };
+}
+
+/** Comma-separated exact redirect URIs of the web client (https, or http on a loopback host; no fragment or wildcard). */
+export function parseWebRedirectUris(raw: string | undefined): string[] {
+  if (raw === undefined || raw.trim() === "") return [];
+  const uris: string[] = [];
+  for (const part of raw.split(",")) {
+    const uri = part.trim();
+    let ok = false;
+    try {
+      const url = new URL(uri);
+      ok = (url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname))) && url.href === uri && url.hash === "" && !uri.includes("#") && !uri.includes("*") && url.username === "" && url.password === "";
+    } catch {
+      /* rejected below */
+    }
+    if (!ok) throw new ConfigError("WEB_REDIRECT_URIS must be a comma-separated list of exact absolute URIs (https, or http on a loopback host; normalized, no fragment or wildcard)");
+    if (!uris.includes(uri)) uris.push(uri);
+  }
+  return uris;
+}
+
+export const GOOGLE_ISSUER = "https://accounts.google.com";
+
+/** Sign-in settings (docs/protocol/sign-in.md section 9). `undefined` when no provider is configured. */
+function signInFrom(env: NodeJS.ProcessEnv, trial: typeof TRIAL_PROFILE | undefined): SignInConfig | undefined {
+  const providers: ProviderConfig[] = [];
+  const google = pairFrom(env, "OIDC_GOOGLE_CLIENT_ID", "OIDC_GOOGLE_CLIENT_SECRET");
+  if (google) providers.push({ kind: "oidc", id: "google", name: "Google", issuer: GOOGLE_ISSUER, ...google });
+  const github = pairFrom(env, "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET");
+  if (github) {
+    const webUrl = secureUrlFrom("GITHUB_URL", present(env, "GITHUB_URL") ?? "https://github.com");
+    const apiUrl = secureUrlFrom("GITHUB_API_URL", present(env, "GITHUB_API_URL") ?? "https://api.github.com");
+    providers.push({ kind: "github", id: "github", name: "GitHub", webUrl, apiUrl, ...github });
+  }
+  const oidc = pairFrom(env, "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET");
+  const issuerRaw = present(env, "OIDC_ISSUER");
+  if (oidc && issuerRaw === undefined) throw new ConfigError("OIDC_ISSUER is required when OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are set");
+  if (!oidc && issuerRaw !== undefined) throw new ConfigError("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required when OIDC_ISSUER is set");
+  if (oidc && issuerRaw !== undefined) {
+    const name = (present(env, "OIDC_NAME") ?? "OpenID Connect").trim();
+    if (name.length < 1 || name.length > 60) throw new ConfigError("OIDC_NAME must be 1 to 60 characters");
+    providers.push({ kind: "oidc", id: "oidc", name, issuer: secureUrlFrom("OIDC_ISSUER", issuerRaw, { keepTrailingSlash: true }), ...oidc });
+  }
+
+  const webRedirectUris = parseWebRedirectUris(env.WEB_REDIRECT_URIS);
+  const signupLimitPerIp = limitFrom(env, "SIGNUP_LIMIT_PER_IP", trial?.signupLimitPerIp, 1_000_000);
+  const accessTokenTtlSeconds = intFrom(env, "ACCESS_TOKEN_TTL_SECONDS", 900, 60, 3600);
+  const refreshTokenTtlDays = intFrom(env, "REFRESH_TOKEN_TTL_DAYS", 30, 1, 365);
+  const sessionMaxDays = intFrom(env, "SESSION_MAX_DAYS", 90, 1, 365);
+  const publicUrlRaw = present(env, "PUBLIC_URL");
+  if (providers.length === 0) return undefined;
+  if (publicUrlRaw === undefined) throw new ConfigError("PUBLIC_URL is required when a sign-in provider is configured");
+  let publicUrl: string | null = null;
+  try {
+    const url = new URL(publicUrlRaw);
+    if ((url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname))) && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "") publicUrl = url.origin;
+  } catch {
+    /* rejected below */
+  }
+  if (publicUrl === null) throw new ConfigError("PUBLIC_URL must be an https origin (scheme://host[:port], plain http only on a loopback host) without a path, query or fragment");
+  return { publicUrl, providers, webRedirectUris, signupLimitPerIp, accessTokenTtlSeconds, refreshTokenTtlDays, sessionMaxDays };
+}
+
 /**
  * Reads the configuration from environment variables. Secrets (the database URL carries a
  * password, CRON_SECRET is a bearer secret) are read here and never echoed in error messages.
@@ -154,6 +288,12 @@ export function parseCorsOrigins(raw: string | undefined): string[] {
  *   RATE_LIMIT_PER_ACCOUNT, RATE_LIMIT_PER_IP, RATE_LIMIT_WINDOW_SECONDS   fixed-window rate limits (unset = off)
  *   TRUST_PROXY   trust x-forwarded-for / x-real-ip for the client IP (default false)
  *   CRON_SECRET   enables GET /internal/maintenance (bearer secret, at least 16 characters)
+ *   PUBLIC_URL    the server's public origin; required when a sign-in provider is set
+ *   OIDC_GOOGLE_CLIENT_ID/_SECRET, OIDC_ISSUER + OIDC_CLIENT_ID/_SECRET (+ OIDC_NAME), GITHUB_CLIENT_ID/_SECRET
+ *                 sign-in providers (secrets, never echoed); GITHUB_URL, GITHUB_API_URL for Enterprise or a test double
+ *   WEB_REDIRECT_URIS   exact redirect URIs of the thoth-web client
+ *   SIGNUP_LIMIT_PER_IP new accounts per IP per 24 h (trial 10)
+ *   ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_DAYS, SESSION_MAX_DAYS   sign-in lifetimes
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -197,5 +337,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
     capabilities: DEFAULT_CAPABILITIES.filter((c) => eventsEnabled || c !== "events.sse"),
+    signIn: signInFrom(env, trial),
   };
 }

@@ -9,7 +9,7 @@ info:
   description: |-
     DRAFT, Proposed per ADR-0004. Generated from `packages/workspace-protocol` (route registry and Zod schemas); do not edit by hand.
 
-    Authentication is PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme will change before the protocol is finalized; do not build long-lived integrations on it. No OAuth flow is defined here.
+    Authentication is PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme may change before the protocol is finalized. Thoth clients obtain the credential through the sign-in broker (docs/protocol/sign-in.md, advertised as `signIn` in /capabilities); its /auth endpoints are not part of this document.
 
     Normative semantics (versioning, capabilities, conditional writes, idempotency, change feed, transfers) are in docs/protocol/README.md.
 servers:
@@ -1099,6 +1099,38 @@ components:
               type: string
           required:
             - name
+        signIn:
+          type: object
+          properties:
+            authorizationEndpoint:
+              type: string
+              format: uri
+            tokenEndpoint:
+              type: string
+              format: uri
+            revocationEndpoint:
+              type: string
+              format: uri
+            providers:
+              minItems: 1
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                  name:
+                    type: string
+                    minLength: 1
+                required:
+                  - id
+                  - name
+          required:
+            - authorizationEndpoint
+            - tokenEndpoint
+            - revocationEndpoint
+            - providers
       required:
         - protocolVersion
         - capabilities
@@ -2150,7 +2182,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme will change before the protocol is finalized; do not build long-lived integrations on it. No OAuth flow is defined here.
+      description: PROVISIONAL. HTTP bearer credentials are used as a placeholder because the authentication scheme for third-party servers is an open question in ADR-0004 (OAuth 2.1 / OIDC versus session tokens). This scheme may change before the protocol is finalized. Thoth clients obtain the credential through the sign-in broker (docs/protocol/sign-in.md, advertised as `signIn` in /capabilities); its /auth endpoints are not part of this document.
 x-thoth-protocol-status: draft
 x-thoth-capabilities:
   - attachments

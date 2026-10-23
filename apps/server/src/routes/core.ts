@@ -32,6 +32,7 @@ import {
   writeRevision,
   type RevisionRow,
 } from "../pages.ts";
+import { signInCapability } from "../signin/routes.ts";
 import pkg from "../../package.json" with { type: "json" };
 
 interface WsParams {
@@ -65,6 +66,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
           ...(config.revisionRetentionDays === undefined ? {} : { revisionRetentionDays: config.revisionRetentionDays }),
         },
         server: { name: "thoth-server", version: pkg.version },
+        // Only when a provider is configured (docs/protocol/sign-in.md section 1).
+        ...(config.signIn === undefined ? {} : { signIn: signInCapability(config.signIn) }),
       }),
     ),
   );

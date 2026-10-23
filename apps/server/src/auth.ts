@@ -57,7 +57,10 @@ interface PrincipalRow {
 
 const toPrincipal = (row: PrincipalRow): Principal => ({ id: row.id, displayName: row.display_name, ...(row.email ? { email: row.email } : {}), credentialId: row.token_id });
 
-/** Personal access tokens looked up by hash. Revocation and expiry take effect on the next request. */
+/** A sign-in access token (`session_id` set) is valid only while its session is neither revoked nor past its maximum age. */
+const LIVE_SESSION = "(t.session_id IS NULL OR EXISTS (SELECT 1 FROM sessions s WHERE s.id = t.session_id AND s.revoked_at IS NULL AND s.expires_at > now()))";
+
+/** Personal access tokens and sign-in access tokens, looked up by hash. Revocation and expiry take effect on the next request. */
 export class PatAuthenticator implements Authenticator {
   readonly #db: Queryable;
   constructor(db: Queryable) {
@@ -70,7 +73,7 @@ export class PatAuthenticator implements Authenticator {
     const { rows } = await this.#db.query<PrincipalRow>(
       `SELECT t.id AS token_id, u.id, u.display_name, u.email
          FROM access_tokens t JOIN users u ON u.id = t.user_id
-        WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())`,
+        WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND ${LIVE_SESSION}`,
       [hashToken(token)],
     );
     const row = rows[0];
@@ -82,7 +85,7 @@ export class PatAuthenticator implements Authenticator {
 
   async revalidate(principal: Principal): Promise<boolean> {
     if (!principal.credentialId) return false;
-    const { rowCount } = await this.#db.query("SELECT 1 FROM access_tokens WHERE id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())", [principal.credentialId]);
+    const { rowCount } = await this.#db.query(`SELECT 1 FROM access_tokens t WHERE t.id = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND ${LIVE_SESSION}`, [principal.credentialId]);
     return (rowCount ?? 0) > 0;
   }
 }

@@ -73,7 +73,9 @@ async function main(): Promise<number> {
   let code = 1;
   try {
     console.log(`[server:conformance] starting ${project} (build + postgres + server) on ${url}`);
-    await compose("up", "--build", "-d");
+    // Built by Podman itself, not through `compose --build`: the external docker-compose provider can hang in its build step.
+    await podman(["build", "-f", "apps/server/Containerfile", "-t", "localhost/thoth-server:dev", "."]);
+    await compose("up", "--no-build", "-d");
     await waitForServer(url);
 
     const userId = await adminCli("create-user", "--name", "Conformance Owner");
