@@ -53,7 +53,8 @@ client is for connected workspaces only.
    - a landing page (what Thoth is, download links, the open protocol, self-host
      instructions);
    - the web client at `/app`, which connects to any Thoth server the user
-     names and defaults to the trial server;
+     names and defaults to the trial server (refined by ADR-0015: the hosted
+     web client connects only to the trial server);
    - static files only, so it can be hosted for free without a domain (for
      example GitHub Pages at `<owner>.github.io/thoth`, or Cloudflare Pages)
      and moved to a custom domain later by changing configuration.

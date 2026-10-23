@@ -420,23 +420,89 @@ AC:
     anything important in your Private Space"), not a big warning. Other
     servers show none.
 
-**2c — Website and web client.** `apps/web`: static landing page plus the web
-client at `/app` (sign in, browse the tree, read and edit pages with both
-editor modes, conflicts, search). Deployable without a domain.
+**2c — Website and web client (2026-10-24 plan, ADR-0015).** Owner
+decisions:
+- The web client connects only to the trial server.
+- The site is in English and Thai.
+- A showcase video with motion and sound, made by us.
+- GA4 runs after consent, anonymously in the web client.
+- The site is built for SEO, AEO and GEO.
+- Legal pages follow Thai law (PDPA).
 
-The web client connects **only to the owner's trial server** (owner,
-2026-10-24). Its address is fixed at build time and there is no field to
-connect elsewhere. Self-hosters use the desktop app, or build and host the
-web client themselves with their own address. It shows the same short
-caution as the desktop app.
+Work streams, each in its own worktree:
+
+1. **Web client + first-run fix** (`apps/web`, `/app`).
+   - **First-run gap found 2026-10-24:** a new account has no workspace (the
+     protocol cannot create one, and sign-up does not). Fix:
+     - On an account's first sign-in through the broker, the server creates
+       one workspace owned by it, named "<display name>'s workspace" (or
+       "My workspace"). This applies to both profiles, and it counts toward
+       the trial limit.
+     - Workspaces in the desktop app and the web client get **New page**,
+       which creates the page with `If-None-Match: *`.
+   - The editor, page session, conflict dialog and workspace store are shared
+     with the desktop app through a package, not copied. There is no
+     behaviour change on the desktop: its tests stay green.
+   - Sign-in uses `thoth-web`: a top-level redirect to `/auth/authorize`,
+     `/app/callback`, the refresh-token cookie, and the access token in memory.
+     Silent refresh on load, sign-out with revoke.
+   - Browse the tree, open, edit and autosave in both editor modes, 412
+     conflicts with Keep both, search, change-feed polling while visible, and
+     the trial caution and limits.
+   - English and Thai UI.
+2. **Landing site** (`apps/site`): static HTML per page in English (`/`) and
+   Thai (`/th/`).
+   - Pages: home (hero, video, features, how it works, Private vs Workspace,
+     self-host, FAQ), privacy, terms.
+   - Download and self-host say "coming soon" until the repository is public.
+   - SEO, AEO and GEO: JSON-LD, `hreflang`, a sitemap, `robots.txt` and
+     `llms.txt`.
+   - GA4 consent: a banner with Consent Mode v2, defaulting to denied.
+   - Legal pages under PDPA. The deploy merges the site with the web
+     client's build under `/app`.
+3. **Showcase video** (`design/video/` sources, renders in
+   `apps/site/public/media/`).
+   - About 60 to 75 s. Footage is recorded by Playwright from the real UI
+     with demo data. Motion titles in English and Thai.
+   - An original soundtrack and interface sounds are generated in the repo.
+     There is no voice.
+   - Outputs: MP4, WebM, a poster and WebVTT captions per language. The
+     whole video rebuilds from one script.
 
 AC:
-
-- Lighthouse accessibility ≥ 95 on the landing page; no network calls except
-  to the chosen server.
-- Playwright: sign in against the test issuer, edit a page, see a stale-write
-  conflict, keep both.
-- The web build cannot reach the local filesystem or spawn processes (§14.11).
+- **First run:** a new account signs in and finds its own workspace, then
+  creates, edits and reopens a page (server test, plus Playwright in the web
+  client).
+- **Web client** (Playwright, against the real server and the test issuer):
+  - sign in;
+  - open a page;
+  - edit it in Blocks and in Plain;
+  - a stale write shows the conflict dialog, and Keep both works;
+  - reload, and the user is still signed in (cookie refresh);
+  - sign out, and the server revokes the session.
+- **No token in storage:** after sign-in, `localStorage`, `sessionStorage`,
+  `document.cookie` and the DOM hold no `thoth_at_` / `thoth_rt_`.
+- **Network:**
+  - before consent, the site and the client make no request outside their
+    own origin, except to the trial API;
+  - after Decline, still none;
+  - after Accept, only `googletagmanager.com` and
+    `*.google-analytics.com`;
+  - analytics payloads contain no page title, ID, search text or email
+    (checked by intercepting the requests in Playwright).
+- **Accessibility:** Lighthouse accessibility ≥ 95 on the English and Thai
+  home pages. The Lighthouse SEO score is 100.
+- **SEO checks:**
+  - every page has a title, a description, a canonical URL and
+    `hreflang` pairs;
+  - the JSON-LD is valid;
+  - `/app` is `noindex`.
+- **Video:** it plays muted on load, plays with sound on demand, and has
+  captions. `prefers-reduced-motion` shows the poster. The video rebuilds from
+  its script.
+- **Security:** the web build cannot reach the local filesystem or spawn
+  processes (§14.11). CSP: `connect-src` lists only self, the trial API and
+  the GA4 hosts.
 
 ### Phase 3 — Transfer engine
 

@@ -24,6 +24,7 @@ trade-off.
 | [0012](0012-plain-markdown-editor-mode.md) | Plain Markdown editor mode beside the block editor | Accepted 2026-10-22 |
 | [0013](0013-authentication-hosted-trial-and-website.md) | Authentication (OIDC), a hosted trial server, and the project website | Accepted 2026-10-22 (limits and hosting in ADR-0014) |
 | [0014](0014-hosted-trial-deployment-and-sign-in-broker.md) | Hosted trial deployment (Vercel + Neon) and the sign-in broker | Accepted 2026-10-22 |
+| [0015](0015-website-web-client-and-analytics.md) | Website, trial-only web client, and analytics (GA4) | Accepted 2026-10-24 |
 
 Template: [0000-template.md](0000-template.md).
 
