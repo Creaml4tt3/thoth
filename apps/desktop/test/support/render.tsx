@@ -21,7 +21,8 @@ export interface Harness {
 // Opening a vault indexes it first; under a full parallel `pnpm test` that can exceed the 1 s default.
 configure({ asyncUtilTimeout: 5000 });
 
-export const TEST_OPTIONS: Partial<AppOptions> = { autosaveMs: 0, reconcileDebounceMs: 15 };
+// No starter server: tests that want one pass it, so no test depends on the real demo address.
+export const TEST_OPTIONS: Partial<AppOptions> = { autosaveMs: 0, reconcileDebounceMs: 15, starterServer: null };
 
 export async function openApp(root: string, options: Partial<AppOptions> = {}, platform = createNodePlatform({ vault: root })): Promise<Harness> {
   const user = userEvent.setup();

@@ -412,10 +412,23 @@ AC:
     bytes variant when they reach the client.
   - **Tauri permission names:** they keep the contract's camelCase
     (`allow-server-signIn`).
+- **Owner decisions (2026-10-24), built:**
+  - **Starter server:** the owner's demo server is suggested in Settings →
+    Servers ("Add Thoth demo server"). The app contacts it only after the
+    user adds it.
+  - **Caution:** the demo server shows one short line ("A free demo … keep
+    anything important in your Private Space"), not a big warning. Other
+    servers show none.
 
 **2c — Website and web client.** `apps/web`: static landing page plus the web
-client at `/app` (connect to a server, browse the tree, read and edit pages
-with both editor modes, conflicts, search). Deployable without a domain.
+client at `/app` (sign in, browse the tree, read and edit pages with both
+editor modes, conflicts, search). Deployable without a domain.
+
+The web client connects **only to the owner's trial server** (owner,
+2026-10-24). Its address is fixed at build time and there is no field to
+connect elsewhere. Self-hosters use the desktop app, or build and host the
+web client themselves with their own address. It shows the same short
+caution as the desktop app.
 
 AC:
 

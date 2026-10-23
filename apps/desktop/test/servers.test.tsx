@@ -130,6 +130,51 @@ describe("Settings → Servers: add", () => {
   });
 });
 
+describe("Settings → Servers: the starter server", () => {
+  const STARTER = { url: "https://trial.example.com", name: "Thoth demo server", caution: "A free demo for trying Thoth, with limits." };
+
+  it("is suggested with its caution, contacted only when added, then shown as a normal server with the caution", async () => {
+    const { app, servers } = await start((s) => s.define(TRIAL), { starterServer: STARTER });
+    const region = await openServersSettings(app);
+    const suggestion = within(region).getByRole("group", { name: "Thoth demo server" });
+    expect(within(suggestion).getByText("https://trial.example.com")).toBeTruthy();
+    expect(within(suggestion).getByText(STARTER.caution)).toBeTruthy();
+    // A suggestion only: the server is not known to the host until the user adds it.
+    expect(await servers.list()).toEqual([]);
+
+    await app.user.click(within(suggestion).getByRole("button", { name: "Add Thoth demo server" }));
+    const trial = await within(region).findByRole("article", { name: "Thoth trial" });
+    expect(within(trial).getByText(STARTER.caution)).toBeTruthy();
+    expect(within(trial).getByRole("button", { name: "Sign in with Google" })).toBeTruthy();
+    expect(within(region).queryByRole("group", { name: "Thoth demo server" })).toBeNull();
+  });
+
+  it("is not suggested once added, and other servers carry no caution", async () => {
+    const { app } = await start((s) => {
+      s.connect(TRIAL, { signedIn: false });
+      s.connect(LOCAL);
+    }, { starterServer: STARTER });
+    const region = await openServersSettings(app);
+    expect(within(region).queryByRole("group", { name: "Thoth demo server" })).toBeNull();
+    expect(within(card("Thoth trial")).getByText(STARTER.caution)).toBeTruthy();
+    expect(within(card("Team server")).queryByText(STARTER.caution)).toBeNull();
+  });
+
+  it("explains a failure to reach it", async () => {
+    const { app } = await start(() => undefined, { starterServer: STARTER });
+    const region = await openServersSettings(app);
+    await app.user.click(within(region).getByRole("button", { name: "Add Thoth demo server" }));
+    await waitFor(() => expect(within(region).getByRole("alert").textContent).toMatch(/could not reach a thoth server/i));
+    expect(within(region).queryAllByRole("article")).toHaveLength(0);
+  });
+
+  it("is not suggested when the app has none", async () => {
+    const { app } = await start();
+    const region = await openServersSettings(app);
+    expect(within(region).queryByRole("group")).toBeNull();
+  });
+});
+
 describe("Settings → Servers: sign in", () => {
   it("waits for the browser with a Cancel button, then shows the account", async () => {
     let id = "";

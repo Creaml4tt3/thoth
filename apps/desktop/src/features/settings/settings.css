@@ -14,5 +14,7 @@
 .server-account { color: var(--thoth-ink-secondary); }
 .server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); }
 .server-waiting { display: flex; gap: var(--thoth-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); }
+.server-starter { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px dashed var(--thoth-border-strong); }
+.server-caution { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-token { margin-top: var(--thoth-space-1); }
 .server-add { display: grid; grid-template-columns: 1fr auto; gap: var(--thoth-space-3); align-items: end; }

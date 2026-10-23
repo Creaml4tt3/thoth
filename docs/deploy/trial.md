@@ -104,8 +104,15 @@ names do not work for sign-in cookies.
 ## 6. Website project
 
 Static files from `apps/web`, either on Vercel (a second project) or on
-Cloudflare Pages, with the domain `thoth.creaml4tt3.me`. Set the default server
-URL to `https://api.thoth.creaml4tt3.me` (planned variable: `VITE_DEFAULT_SERVER`).
+Cloudflare Pages, with the domain `thoth.creaml4tt3.me`. The web client
+connects only to this trial server (owner, 2026-10-24): its server address is
+fixed at build time (planned variable: `VITE_DEFAULT_SERVER`,
+`https://api.thoth.creaml4tt3.me`), and it has no "connect to another server"
+field. Self-hosters use the desktop app, or host the web client themselves.
+
+The desktop app suggests this server as its starter server (Settings →
+Servers), with a short caution. The address is in
+`apps/desktop/src/features/servers/starter.ts`.
 
 ## Before the trial goes public
 
@@ -122,7 +129,13 @@ URL to `https://api.thoth.creaml4tt3.me` (planned variable: `VITE_DEFAULT_SERVER
 
 1. Add the new domains in Vercel (or Pages) and DNS.
 2. Update `PUBLIC_URL`, `CORS_ORIGINS`, `WEB_REDIRECT_URIS`, the Google
-   redirect URI, the GitHub callback URL, and the website's default server.
-3. Keep the old domains redirecting for a while.
+   redirect URI, the GitHub callback URL, the website's default server, and
+   the desktop starter server (`apps/desktop/src/features/servers/starter.ts`).
+3. Keep the old website domain redirecting for a while.
+4. Keep the old API domain **serving** (an alias of the same project), not
+   redirecting, until desktop users have updated. The desktop app never follows
+   a redirect (so a token cannot leak), and it remembers a server by its
+   address, so an API redirect would cut existing installs off.
 
-Signed-in users sign in once more: cookies belong to the old domain.
+Signed-in users sign in once more: cookies belong to the old domain. Desktop
+users add the new address and remove the old one.

@@ -8,6 +8,7 @@ import type { Platform, VaultConnection } from "@thoth/platform";
 import type { ImportService } from "../features/import/service.ts";
 import type { OpenImportSource } from "../features/import/open-source.ts";
 import type { ServerDirectory, WorkspacePageRef } from "../features/servers/directory.ts";
+import type { StarterServer } from "../features/servers/starter.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -20,6 +21,8 @@ export interface AppOptions {
   now: () => Date;
   /** Change-feed polling interval for open workspaces (only while the window is visible). 0 disables polling. */
   pollMs: number;
+  /** Suggested in Settings → Servers until added; null suggests nothing. */
+  starterServer: StarterServer | null;
 }
 
 export interface Session {

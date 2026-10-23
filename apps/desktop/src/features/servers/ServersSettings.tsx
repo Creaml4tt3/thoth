@@ -4,6 +4,7 @@ import { useSession } from "../../app/context.ts";
 import { Button } from "../../ui/Button.tsx";
 import { Modal } from "../../ui/Modal.tsx";
 import type { ServerDirectory } from "./directory.ts";
+import { isStarter } from "./starter.ts";
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -69,6 +70,8 @@ type Busy = null | { kind: "browser"; provider: string } | { kind: "token" | "si
 
 /** One server: account, limits, sign-in (browser or token), sign out, remove. `signInOnly` hides sign out and remove (sign-in prompt over an open page). */
 export function ServerCard({ info, error, directory, signInOnly = false }: { info: ServerInfo; error: string | null; directory: ServerDirectory; signInOnly?: boolean }) {
+  const { options } = useSession();
+  const caution = isStarter(options.starterServer, info.url) ? options.starterServer?.caution : undefined;
   const [busy, setBusy] = useState<Busy>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -136,6 +139,8 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
             : `Signed in${info.auth === "token" ? " with a personal access token" : ""}.`
           : "Not signed in."}
       </p>
+
+      {caution && <p className="server-caution">{caution}</p>}
 
       {limits.length > 0 && (
         <div className="server-limits">
@@ -249,12 +254,30 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
 
 /** Settings → Servers: add a server, sign in (browser or token), sign out, remove. */
 export function ServersSettings({ focus }: { focus: boolean }) {
-  const { servers } = useSession();
+  const { servers, options } = useSession();
   const state = useSyncExternalStore(servers.subscribe, servers.getState);
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addingStarter, setAddingStarter] = useState(false);
+  const [starterError, setStarterError] = useState<string | null>(null);
   const section = useRef<HTMLElement>(null);
+  const starter = options.starterServer;
+  // Suggested until added. Nothing is sent to it before the user chooses Add.
+  const suggestStarter = starter !== null && state.loaded && !state.servers.some((s) => isStarter(starter, s.info.url));
+
+  const addStarter = async () => {
+    if (!starter) return;
+    setAddingStarter(true);
+    setStarterError(null);
+    try {
+      await servers.add(starter.url);
+    } catch (e) {
+      setStarterError(addError(e));
+    } finally {
+      setAddingStarter(false);
+    }
+  };
 
   useEffect(() => {
     if (focus) section.current?.scrollIntoView({ block: "start" });
@@ -291,6 +314,30 @@ export function ServersSettings({ focus }: { focus: boolean }) {
       {state.servers.map((entry) => (
         <ServerCard key={entry.info.id} info={entry.info} error={entry.error} directory={servers} />
       ))}
+      {suggestStarter && (
+        <div className="server-starter" role="group" aria-labelledby="server-starter-name">
+          <div className="server-head">
+            <div>
+              <p id="server-starter-name" className="server-name">
+                {starter.name}
+              </p>
+              <p className="mono muted">{starter.url}</p>
+            </div>
+            <span className="badge badge-muted">Suggested</span>
+          </div>
+          <p className="server-caution">{starter.caution}</p>
+          <div className="set-actions">
+            <Button variant="primary" small disabled={addingStarter} onClick={() => void addStarter()}>
+              {addingStarter ? "Connecting…" : `Add ${starter.name}`}
+            </Button>
+          </div>
+          {starterError && (
+            <p role="alert" className="alert alert-danger">
+              {starterError}
+            </p>
+          )}
+        </div>
+      )}
       <form className="server-add" onSubmit={(e) => void add(e)} aria-label="Add server">
         <label className="field">
           <span>Server address</span>
