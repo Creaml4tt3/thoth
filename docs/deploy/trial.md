@@ -106,13 +106,21 @@ names do not work for sign-in cookies.
 Static files from `apps/web`, either on Vercel (a second project) or on
 Cloudflare Pages, with the domain `thoth.creaml4tt3.me`. The web client
 connects only to this trial server (owner, 2026-10-24): its server address is
-fixed at build time (planned variable: `VITE_DEFAULT_SERVER`,
+fixed at build time (`VITE_DEFAULT_SERVER`, default
 `https://api.thoth.creaml4tt3.me`), and it has no "connect to another server"
 field. Self-hosters use the desktop app, or host the web client themselves.
 
+The web client is built with `pnpm --filter @thoth/web build` into
+`apps/web/dist`, for the path `/app/` (the site's deploy puts it there). The
+static host must:
+- serve `index.html` for `/app/callback` (and any other `/app/` path without a
+  file extension);
+- send the Content-Security-Policy of `apps/web/index.html` as a response
+  header too, because browsers ignore `frame-ancestors` in a `<meta>` tag.
+
 The desktop app suggests this server as its starter server (Settings →
 Servers), with a short caution. The address is in
-`apps/desktop/src/features/servers/starter.ts`.
+`packages/app-ui/src/workspace/starter.ts`.
 
 ## Before the trial goes public
 
@@ -130,7 +138,7 @@ Servers), with a short caution. The address is in
 1. Add the new domains in Vercel (or Pages) and DNS.
 2. Update `PUBLIC_URL`, `CORS_ORIGINS`, `WEB_REDIRECT_URIS`, the Google
    redirect URI, the GitHub callback URL, the website's default server, and
-   the desktop starter server (`apps/desktop/src/features/servers/starter.ts`).
+   the desktop starter server (`packages/app-ui/src/workspace/starter.ts`).
 3. Keep the old website domain redirecting for a while.
 4. Keep the old API domain **serving** (an alias of the same project), not
    redirecting, until desktop users have updated. The desktop app never follows

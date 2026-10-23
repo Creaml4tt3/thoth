@@ -16,7 +16,7 @@ import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, waitFor, wi
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { guardWrites } from "./support/write-guard.ts";
-import { setDefaultEditorMode } from "../src/features/editor/mode.ts";
+import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
 
 const dirs = tempDirs();
 let root: string;

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { createWorkspaceIn, firstWorkspaceName } from "../admin.ts";
 import type { SignInConfig } from "../config.ts";
 import type { Deps } from "../deps.ts";
 import { ApiError } from "../errors.ts";
@@ -232,7 +233,7 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
     return back({ code });
   });
 
-  /** Account by (provider, subject), never by email. A new one passes the per-IP sign-up limit and the account cap first. */
+  /** Account by (provider, subject), never by email. A new one passes the per-IP sign-up limit and the account cap first, and gets its first workspace in the same transaction. */
   async function findOrCreateAccount(d: Deps, providerId: string, identity: UpstreamIdentity, ip: string): Promise<string> {
     return d.db.tx(async (tx) => {
       // Serializes two first sign-ins of the same person, so they cannot create two accounts.
@@ -261,6 +262,15 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
       await tx.query("INSERT INTO identities (provider, subject, user_id) VALUES ($1, $2, $3)", [providerId, identity.subject, userId]);
       await tx.query("INSERT INTO sign_ups (ip_hash) VALUES ($1)", [ipHash]);
       await audit(tx, { actorId: null, action: "user.created", detail: { userId, provider: providerId } });
+      // A new account gets one workspace of its own, so its first sign-in does not land in an empty app (the
+      // protocol cannot create one). It counts toward the per-account workspace quota like any other.
+      try {
+        await createWorkspaceIn(tx, { name: firstWorkspaceName(identity.name), exportRestricted: false, ownerId: userId }, d.config);
+      } catch (error) {
+        // Rolls the whole sign-up back: an account is never created without its workspace.
+        if (error instanceof ApiError && error.code === "quota_exceeded") throw new SignUpRefused("workspace quota reached");
+        throw error;
+      }
       return userId;
     });
   }

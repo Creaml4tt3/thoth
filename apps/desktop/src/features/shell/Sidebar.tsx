@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PageSummary } from "@thoth/domain";
-import { Button } from "../../ui/Button.tsx";
-import { Mark } from "../../ui/Mark.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useSession } from "../../app/context.ts";
 import { ancestorFolders, buildTree, type TreeNode } from "./tree.ts";
 import { ServersSidebar } from "../servers/ServersSidebar.tsx";
-import type { WorkspacePageRef } from "../servers/directory.ts";
+import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 
 interface Props {
   pages: PageSummary[];

@@ -7,8 +7,8 @@ import type { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
 import type { ImportService } from "../features/import/service.ts";
 import type { OpenImportSource } from "../features/import/open-source.ts";
-import type { ServerDirectory, WorkspacePageRef } from "../features/servers/directory.ts";
-import type { StarterServer } from "../features/servers/starter.ts";
+import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
+import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {

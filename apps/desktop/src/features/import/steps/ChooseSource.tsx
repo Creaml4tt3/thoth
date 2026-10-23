@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ImportManifest } from "@thoth/importer-core";
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import type { ImportService } from "../service.ts";
 import type { System } from "../model.ts";
 

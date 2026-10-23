@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Platform } from "@thoth/platform";
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import type { Format, System } from "../model.ts";
 
 /** Steps 3 and 4: pick a ZIP or folder, then scan it. Scanning writes nothing. */

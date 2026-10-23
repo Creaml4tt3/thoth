@@ -1,0 +1,32 @@
+{
+  "name": "@thoth/web",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The web client at /app: the trial server's workspaces in the browser (ADR-0015). No filesystem, no Tauri.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.2.8",
+    "@fontsource-variable/noto-sans-thai": "5.2.8",
+    "@thoth/app-ui": "workspace:*",
+    "@thoth/platform": "workspace:*",
+    "@thoth/ui": "workspace:*",
+    "@thoth/workspace-client": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^30.1.3",
+    "vite": "8.3.4"
+  }
+}

@@ -1,4 +1,4 @@
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import type { RunView } from "../useImportRun.ts";
 
 const PHASES = [

@@ -115,6 +115,14 @@ With a provider, the server:
 
    When either limit is reached, redirect with `error=access_denied` and an
    `error_description` saying the server is not accepting new accounts.
+
+   A new account also gets **one workspace it owns**, in the same
+   transaction: "<display name>'s workspace", or "My workspace" when the
+   provider gave no name (or only an email address). The protocol has no way
+   to create a workspace, so without it a new user would sign in to nothing.
+   It counts toward `MAX_WORKSPACES_PER_ACCOUNT`; if that limit is somehow
+   already reached, the sign-up is refused like the other two and nothing is
+   created. Existing accounts are never given one.
 5. Issue an **authorization code**: random, stored hashed, valid 60 s, single
    use, bound to client, redirect URI, PKCE challenge and account. Redirect to
    the client's redirect URI with `code`, the client's `state`, and `iss`

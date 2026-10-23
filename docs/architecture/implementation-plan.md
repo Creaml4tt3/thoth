@@ -504,6 +504,29 @@ AC:
   processes (§14.11). CSP: `connect-src` lists only self, the trial API and
   the GA4 hosts.
 
+**Stream 1 result (2026-10-24): web client + first-run fix.**
+- **Checks:** `pnpm check` 1013/1013, `pnpm test:server` 212/212,
+  `pnpm e2e` 7 passed (`web-client.e2e.ts` included).
+- **First run:** the broker gives a new account one owned workspace in the
+  same transaction (`docs/protocol/sign-in.md` §4). Desktop and web get
+  **New page** (editors and owners; `If-None-Match: *`).
+- **Shared, not copied:** `packages/app-ui` holds the editor (Blocks, Plain,
+  `PageFrame`, page session, conflict dialog), the workspace state
+  (`ServerDirectory` over a `Servers` port, workspace store, tree, limits,
+  starter), the UI primitives and the English and Thai strings. The desktop
+  keeps the vault side (`vaultPageStore`, wikilinks from the index,
+  backlinks) and its English text is unchanged.
+- **`apps/web`:** `thoth-web` sign-in, the access token in memory only,
+  silent refresh, sign-out with revoke; analytics hooks through
+  `window.thothAnalytics` only (no GA code in the bundle).
+- **Deviations:**
+  - the CSP `<meta>` adds `frame-ancestors 'none'` but browsers ignore it
+    there: the static host must also send the policy as a header
+    (docs/deploy/trial.md §6);
+  - the meta adds `referrer` `no-referrer`;
+  - fonts: `@fontsource-variable/inter` and `noto-sans-thai` 5.2.8 (OFL),
+    Latin and Thai subsets only.
+
 ### Phase 3 — Transfer engine
 
 - `packages/transfer`: the ADR-0006 state machine with durable

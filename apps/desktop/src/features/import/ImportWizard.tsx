@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImportManifest } from "@thoth/importer-core";
-import { Button } from "../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { checkDestination, sourceKindFor, type Format, type System } from "./model.ts";
 import type { ScanResult } from "./service.ts";

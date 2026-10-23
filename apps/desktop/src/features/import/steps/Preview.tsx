@@ -1,5 +1,5 @@
 import type { ImportManifest, ImportPreview } from "@thoth/importer-core";
-import { Button } from "../../../ui/Button.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { describeWarning, SEVERITY_ORDER } from "../warnings.ts";
 
 export interface WarningGroup {

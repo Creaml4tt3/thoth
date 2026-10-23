@@ -38,19 +38,36 @@ export async function createUser(db: Database, input: { name: string; email?: st
  * per-account workspace quota applies; without one (an unowned workspace) there is no account to count.
  */
 export async function createWorkspace(db: Database, input: { name: string; exportRestricted: boolean; ownerId?: string }, quotas: Quotas = {}): Promise<{ id: string }> {
+  return db.tx((tx) => createWorkspaceIn(tx, input, quotas));
+}
+
+/** `createWorkspace` inside the caller's transaction (the sign-in broker creates a new account's first workspace with the account). */
+export async function createWorkspaceIn(tx: Queryable, input: { name: string; exportRestricted: boolean; ownerId?: string }, quotas: Quotas = {}): Promise<{ id: string }> {
   const name = input.name.trim();
   if (name.length < 1 || name.length > 200) throw new AdminError("name must be 1 to 200 characters");
   const id = opaqueId("ws");
-  await db.tx(async (tx) => {
-    if (input.ownerId !== undefined) {
-      if ((await tx.query("SELECT 1 FROM users WHERE id = $1", [input.ownerId])).rowCount === 0) throw new AdminError("no such user");
-      await assertCanOwnAnotherWorkspace(tx, quotas, input.ownerId);
-    }
-    await tx.query("INSERT INTO workspaces (id, name, export_restricted) VALUES ($1, $2, $3)", [id, name, input.exportRestricted]);
-    if (input.ownerId !== undefined) await tx.query("INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [id, input.ownerId]);
-    await tx.query("INSERT INTO audit_events (actor_id, workspace_id, action, detail) VALUES (NULL, $1, 'workspace.created', $2)", [id, JSON.stringify({ exportRestricted: input.exportRestricted })]);
-  });
+  if (input.ownerId !== undefined) {
+    if ((await tx.query("SELECT 1 FROM users WHERE id = $1", [input.ownerId])).rowCount === 0) throw new AdminError("no such user");
+    await assertCanOwnAnotherWorkspace(tx, quotas, input.ownerId);
+  }
+  await tx.query("INSERT INTO workspaces (id, name, export_restricted) VALUES ($1, $2, $3)", [id, name, input.exportRestricted]);
+  if (input.ownerId !== undefined) await tx.query("INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [id, input.ownerId]);
+  await tx.query("INSERT INTO audit_events (actor_id, workspace_id, action, detail) VALUES (NULL, $1, 'workspace.created', $2)", [id, JSON.stringify({ exportRestricted: input.exportRestricted })]);
   return { id };
+}
+
+const NAME_MAX = 200;
+
+/**
+ * The name of a new account's first workspace: "<display name>'s workspace", or "My workspace" when there is no
+ * name. A name that is an email address (providers fall back to it) is not used: members would see it.
+ */
+export function firstWorkspaceName(displayName: string | undefined): string {
+  const name = displayName?.trim();
+  if (!name || /^[^\s@]+@[^\s@]+$/.test(name)) return "My workspace";
+  const suffix = "'s workspace";
+  // Cut by code point, so a long name never splits a surrogate pair.
+  return `${[...name].slice(0, NAME_MAX - suffix.length).join("").trimEnd()}${suffix}`;
 }
 
 /**
