@@ -14,6 +14,10 @@ import { HostCallError, encodeBase64, decodeBase64 } from "@thoth/platform/remot
 import type { CommandName, VaultChangedEvent } from "@thoth/platform";
 
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" };
+/**
+ * Commands whose result is raw bytes. Every other result (including `api.call`, whose response body is UTF-8 text)
+ * is JSON. Request bytes (`fs.write`, `source.temp.write`, `api.call`) are forwarded for any command.
+ */
 const BYTE_RESULTS = new Set<string>(["fs.read", "source.file.read"]);
 
 export interface Bridge {
@@ -31,6 +35,7 @@ async function body(req: IncomingMessage): Promise<string> {
 }
 
 export async function startBridge(options: { dist: string; bridgeDir: string; host: StdioTransportOptions }): Promise<Bridge> {
+  // Harness events such as `browser.open` go to the test (options.host.onHostEvent), never to the page.
   const transport = new StdioTransport(options.host);
   const token = randomBytes(24).toString("hex");
   const streams = new Set<ServerResponse>();

@@ -22,11 +22,14 @@ notify.workspace = true
 notify-debouncer-full.workspace = true
 rusqlite.workspace = true
 rustix.workspace = true
+sha2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 unicode-normalization.workspace = true
+ureq.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

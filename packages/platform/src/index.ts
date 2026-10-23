@@ -6,7 +6,7 @@
  */
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, ServerInfo, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -30,4 +30,18 @@ export interface Platform {
   /** Native picker for an import source: an archive file or a folder. */
   pickImportSource(kind: "file" | "directory"): Promise<string | null>;
   openImportSource(location: string): Promise<SourceHost>;
+  /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
+  readonly servers: Servers;
+}
+
+export interface Servers {
+  list(): Promise<ServerInfo[]>;
+  add(url: string): Promise<ServerInfo>;
+  remove(server: string): Promise<void>;
+  signIn(server: string, provider?: string): Promise<ServerInfo>;
+  cancelSignIn(server: string): Promise<void>;
+  useToken(server: string, token: string): Promise<ServerInfo>;
+  signOut(server: string): Promise<ServerInfo>;
+  /** One protocol request; `body` is sent as the request bytes. */
+  call(args: ApiCallArgs, body?: Uint8Array): Promise<ApiCallResult>;
 }

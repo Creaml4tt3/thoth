@@ -5,7 +5,7 @@
  */
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { Platform, VaultConnection } from "./index.ts";
+import type { Platform, Servers, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -259,8 +259,22 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
   };
 }
 
+export function remoteServers(transport: Transport): Servers {
+  return {
+    list: () => transport.call("server.list", {}),
+    add: (url) => transport.call("server.add", { url }),
+    remove: async (server) => void (await transport.call("server.remove", { server })),
+    signIn: (server, provider) => transport.call("server.signIn", { server, ...(provider === undefined ? {} : { provider }) }),
+    cancelSignIn: async (server) => void (await transport.call("server.signInCancel", { server })),
+    useToken: (server, token) => transport.call("server.useToken", { server, token }),
+    signOut: (server) => transport.call("server.signOut", { server }),
+    call: (args, body) => transport.call("api.call", args, body),
+  };
+}
+
 export function createRemotePlatform(transport: Transport, kind: Platform["kind"]): Platform {
   return {
+    servers: remoteServers(transport),
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),

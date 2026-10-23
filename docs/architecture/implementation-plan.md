@@ -309,6 +309,110 @@ AC:
 - Every trial limit returns a clear protocol error at the limit and never
   loses data; limits appear in `GET /capabilities`.
 
+**Part 3 — Desktop connects to servers (2026-10-23 plan).** Any server
+works, not only the trial: self-hosted servers with personal access tokens,
+self-hosted servers with their own Google/GitHub/OIDC, and the hosted trial
+(owner, 2026-10-23: the trial is only a demonstration).
+
+Design:
+- **The Rust host is the client.** Server list, sign-in, token storage and
+  every API request live in the Rust host (`crates/thoth-host`, module
+  `remote`). The webview calls `server.*` and `api.call` commands and never
+  holds an access or refresh token.
+  - The only exception: a personal access token the user types in is passed
+    once to `server.useToken`.
+  - Two side benefits: the CSP keeps `connect-src` to IPC only, and
+    self-hosters need no CORS setting for the app.
+- **Sign-in** (RFC 8252). The host:
+  1. binds `127.0.0.1:0`;
+  2. opens the system browser through a `Browser` port (Tauri: opener; tests:
+     an event);
+  3. runs PKCE S256 and `state` against the server's advertised endpoints;
+  4. checks `state` and `iss` on `/callback`, which is single use and times out
+     after 5 minutes;
+  5. exchanges the code.
+
+  Refresh tokens and personal access tokens go to a `SecretStore` port: the
+  macOS Keychain or another OS keychain via `keyring`, and memory in tests.
+  Refreshes run one at a time per server.
+- **`api.call`** checks every request before it leaves:
+  - **Path:** only `/api/v1/...`.
+  - **Method and headers:** from an allow-list.
+  - **Redirects:** never followed, so the bearer token cannot leak.
+  - **Body:** capped in size.
+  - **Expired access token:** after a 401, it refreshes once and retries.
+- **Addresses:** `https`, or `http` only on a loopback host. The sign-in
+  endpoints must be on the same origin as the server address the user added.
+- **`packages/workspace-client`:** a typed client over a `send(request)`
+  function, shared with the web client (2c). It covers capabilities, me,
+  workspaces, tree, page get/put with `If-Match` and 412 conflicts, the change
+  feed and search.
+- **UI:**
+  - Settings → Servers: add a server, sign in with Google/GitHub or with a
+    token, sign out, remove.
+  - The sidebar lists each signed-in server's workspaces under the Private
+    Space.
+  - Workspace pages open in the same Blocks/Plain editor. A stale save shows
+    the conflict dialog.
+  - Open workspaces poll the change feed while the window is visible.
+  - Moving or copying pages between spaces is Phase 3.
+  - Wikilinks and backlinks are local only for now: in a workspace page,
+    links are not resolved and there is no backlinks panel.
+  - The save and conflict state machine is shared through a `PageStore`
+    seam (`vaultPageStore`, `workspacePageStore`). A server checks the
+    revision itself, so a remote change under local edits is met at the next
+    save (412) rather than at once.
+
+AC:
+- Against the real server and its test OIDC issuer, through the Rust host
+  harness:
+  - add server, sign in, list workspaces, read and write a page;
+  - refresh after the access token expires;
+  - sign out revokes the session on the server and removes the keychain entry.
+- A personal access token sign-in works against a server with no provider
+  configured.
+- Refused, with tests:
+  - a wrong `state` or `iss` on the loopback callback;
+  - a second callback;
+  - a sign-in that times out;
+  - endpoints on another origin;
+  - plain `http` to a non-loopback host;
+  - `api.call` outside `/api/v1`;
+  - a redirect from the server (not followed, no token sent).
+- No token reaches the webview: the stdio and IPC replies are checked.
+- Playwright: add a local server, sign in through the fake provider, open a
+  workspace page, edit it, see a 412 conflict from a concurrent edit and keep
+  both.
+
+**Part 3 result (2026-10-24) ✅**
+- **Checks:** `cargo test --workspace` (host 22 + 12 integration, desktop 5),
+  clippy clean, `pnpm check` 980/980, `pnpm test:server` 205/205 (including
+  `desktop-host.test.ts` against the real server through the harness),
+  `pnpm e2e` 6 passed (`workspace-server.e2e.ts` runs).
+- **Mutation checks**, each caught by at least one test:
+  - state check, same-origin endpoints, single-flight refresh (both paths);
+  - the `..` path filter, following redirects;
+  - `authorization` allowed from the webview, `set-cookie` passed to it;
+  - sign-out without revocation, a rotated refresh token not stored;
+  - a rejected personal access token left signed in.
+- **Deviations:**
+  - **System browser:** opened with `open` / `rundll32 url.dll` / `xdg-open`
+    (one argument, `http(s)` only), not with the opener plugin, so the
+    webview gets no opener permission.
+  - **keyring 3.6.3, not 4.x:** 4.x ties the macOS store to D-Bus Secret
+    Service on Linux. Linux uses kernel keyutils, which do not survive a
+    reboot, so Linux users sign in again after a restart.
+  - **Refresh failures:** a refused refresh (4xx) signs the server out; a 5xx,
+    a 429 or a network failure keeps the secret (`SERVER_UNREACHABLE`), so an
+    outage does not sign anyone out.
+  - **Headers:** headers outside the allow-list are refused
+    (`BAD_ARGUMENT`), not dropped.
+  - **`iss` is required** on the callback (RFC 9207); Thoth servers send it.
+  - **Bodies:** `api.call` bodies are UTF-8 text. Attachments (binary) need a
+    bytes variant when they reach the client.
+  - **Tauri permission names:** they keep the contract's camelCase
+    (`allow-server-signIn`).
+
 **2c — Website and web client.** `apps/web`: static landing page plus the web
 client at `/app` (connect to a server, browse the tree, read and edit pages
 with both editor modes, conflicts, search). Deployable without a domain.

@@ -39,6 +39,10 @@ export type HostErrorCode =
   | "SQLITE_ERROR"
   | "SQLITE_BUSY"
   | "SQLITE_CONSTRAINT"
+  /** A server could not be reached, or answered something that is not a Thoth server. */
+  | "SERVER_UNREACHABLE"
+  /** Browser sign-in did not complete (refused, mismatch, timeout, cancelled). The message says which, in plain words. */
+  | "SIGN_IN_FAILED"
   | "INTERNAL";
 
 export interface HostError {
@@ -90,6 +94,63 @@ export interface Commands {
   /** Request bytes: the data to write at `position`. */
   "source.temp.write": { args: { file: string; position: number }; result: null };
   "source.close": { args: { source: string }; result: null };
+
+  // ---- Workspace servers (Phase 2b part 3). The host is the HTTP client: tokens never enter the webview.
+  "server.list": { args: Record<string, never>; result: ServerInfo[] };
+  /** Fetches `/api/v1/capabilities` from `url` and remembers the server. `https`, or `http` on a loopback host only. */
+  "server.add": { args: { url: string }; result: ServerInfo };
+  /** Signs out (best effort), deletes the stored secrets and forgets the server. */
+  "server.remove": { args: { server: string }; result: null };
+  /**
+   * Browser sign-in (RFC 8252 loopback + PKCE) against the server's advertised `signIn` endpoints. Resolves when the
+   * browser comes back, or rejects with `SIGN_IN_FAILED` (refused, wrong state/iss, timeout after 5 minutes, cancelled).
+   */
+  "server.signIn": { args: { server: string; provider?: string }; result: ServerInfo };
+  "server.signInCancel": { args: { server: string }; result: null };
+  /** Stores a personal access token after checking it with `GET /api/v1/me`. The token is not echoed back. */
+  "server.useToken": { args: { server: string; token: string }; result: ServerInfo };
+  /** Revokes the session on the server (best effort) and deletes the stored secrets. The server stays listed. */
+  "server.signOut": { args: { server: string }; result: ServerInfo };
+  /**
+   * One protocol request, sent by the host with the server's credential. `path` must start with `/api/v1/`.
+   * Request bytes: the body (with `contentType`). After a 401 the host refreshes once and retries; if that fails
+   * the server becomes `signed-out` and the 401 is returned.
+   */
+  "api.call": { args: ApiCallArgs; result: ApiCallResult };
+}
+
+export interface ServerInfo {
+  /** Opaque handle chosen by the host. */
+  id: string;
+  /** Normalized origin, e.g. `https://api.thoth.creaml4tt3.me` or `http://127.0.0.1:8080`. */
+  url: string;
+  /** From `capabilities.server.name`, else the host name. */
+  label: string;
+  auth: "signed-out" | "browser" | "token";
+  /** `GET /me` at sign-in; absent when signed out. */
+  account?: { id: string; displayName: string; email?: string };
+  /** Providers from `capabilities.signIn`; empty when the server offers only tokens. */
+  providers: { id: string; name: string }[];
+  /** Limits advertised by the server (the trial shows them); absent when none. */
+  limits?: Record<string, number>;
+}
+
+export interface ApiCallArgs {
+  server: string;
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  /** `/api/v1/...`, no query string; `..`, `//`, `#` and `?` are refused. */
+  path: string;
+  query?: Record<string, string>;
+  /** Only `if-match`, `if-none-match`, `idempotency-key` and `content-type` are forwarded. */
+  headers?: Record<string, string>;
+}
+
+export interface ApiCallResult {
+  status: number;
+  /** Only `content-type`, `etag`, `location` and `retry-after`. */
+  headers: Record<string, string>;
+  /** The response body as UTF-8 text (JSON or problem JSON). At most 32 MiB. */
+  body: string;
 }
 
 export type CommandName = keyof Commands;

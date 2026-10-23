@@ -32,6 +32,7 @@
     "@thoth/importer-obsidian": "workspace:*",
     "@thoth/local-store": "workspace:*",
     "@thoth/platform": "workspace:*",
+    "@thoth/workspace-client": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",
     "@types/node": "^24.19.2",
     "@types/yazl": "^3.3.1",

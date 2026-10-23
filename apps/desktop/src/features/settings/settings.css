@@ -8,3 +8,11 @@
 .mode-choice input { accent-color: var(--thoth-moon); margin: 0; }
 .mode-choice b { font-weight: 550; }
 .mode-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
+.server-card { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); }
+.server-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--thoth-space-3); }
+.server-name { font: 600 15px / 1.4 var(--thoth-font-sans); }
+.server-account { color: var(--thoth-ink-secondary); }
+.server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); }
+.server-waiting { display: flex; gap: var(--thoth-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); }
+.server-token { margin-top: var(--thoth-space-1); }
+.server-add { display: grid; grid-template-columns: 1fr auto; gap: var(--thoth-space-3); align-items: end; }

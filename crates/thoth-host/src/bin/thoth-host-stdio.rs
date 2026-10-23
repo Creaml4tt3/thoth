@@ -5,6 +5,12 @@
 //! Request:  {"id", "command", "args", "bytes"?: base64}
 //! Response: {"id", "ok", "result"?, "bytes"?: base64, "error"?: {code, message}}
 //! Event:    {"event": "vault.changed", "payload"}
+//!           {"event": "browser.open", "payload": {"url"}}   (server sign-in: the test plays the browser)
+//!
+//! Workspace-server commands (`server.*`, `api.call`) run on their own thread, so `server.signInCancel` and
+//! other calls are answered while a sign-in waits for its browser; responses may then arrive out of order
+//! (match them by `id`). Every other command runs in order on the main thread, as before. Secrets are kept
+//! in memory only and die with the process.
 //!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
 //! --pick-source <path>, --data-dir <dir>. Env: THOTH_TEST_DISABLE_HARDLINK=1
@@ -15,7 +21,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use thoth_host::{Host, HostConfig, HostError, Picker};
+use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker};
 
 /// Longest request line accepted (1 GiB of base64 plus JSON overhead).
 const MAX_LINE: usize = 1024 * 1024 * 1024 / 3 * 4 + 1024 * 1024;
@@ -31,6 +37,18 @@ impl Picker for FixedPicker {
     }
     fn pick_source(&self, _directory: bool) -> Option<PathBuf> {
         self.source.clone()
+    }
+}
+
+/// Hands the sign-in URL to the test as a `browser.open` event instead of opening a browser.
+struct EventBrowser {
+    emit: Arc<dyn Fn(Value) + Send + Sync>,
+}
+
+impl Browser for EventBrowser {
+    fn open(&self, url: &str) -> HostResult<()> {
+        (self.emit)(json!({ "event": "browser.open", "payload": { "url": url } }));
+        Ok(())
     }
 }
 
@@ -66,13 +84,17 @@ fn main() {
         }
     };
     let event_emit = emit.clone();
-    let host = Host::new(HostConfig {
+    let browser_emit = emit.clone();
+    let host = Arc::new(Host::new(HostConfig {
         data_dir,
         allow_roots,
         picker: Arc::new(FixedPicker { vault, source }),
         events: Arc::new(move |event, payload| event_emit(json!({ "event": event, "payload": payload }))),
         disable_hardlink: std::env::var_os("THOTH_TEST_DISABLE_HARDLINK").is_some_and(|v| v == "1"),
-    });
+        secrets: Arc::new(MemorySecretStore::default()),
+        browser: Arc::new(EventBrowser { emit: Arc::new(browser_emit) }),
+    }));
+    let mut workers = Vec::new();
 
     let stdin = std::io::stdin();
     let mut reader = stdin.lock();
@@ -90,8 +112,24 @@ fn main() {
         if line.trim().is_empty() {
             continue;
         }
-        emit(handle(&host, &line));
+        if is_server_command(&line) {
+            let (host, emit, line) = (host.clone(), emit.clone(), line.clone());
+            workers.push(std::thread::spawn(move || emit(handle(&host, &line))));
+            workers.retain(|w| !w.is_finished());
+        } else {
+            emit(handle(&host, &line));
+        }
     }
+    // Cancels sign-ins still waiting for a browser, then lets in-flight server calls answer before exiting.
+    host.shutdown();
+    for worker in workers {
+        let _ = worker.join();
+    }
+}
+
+/// `server.*` and `api.call` may block on the network or a browser; they run off the main loop.
+fn is_server_command(line: &str) -> bool {
+    serde_json::from_str::<Value>(line).ok().and_then(|r| r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c == "api.call")).unwrap_or(false)
 }
 
 fn handle(host: &Host, line: &str) -> Value {

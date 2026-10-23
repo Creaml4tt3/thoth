@@ -17,6 +17,11 @@ export interface StdioTransportOptions {
   pickSource?: string;
   dataDir?: string;
   env?: Record<string, string>;
+  /**
+   * Harness-only host events other than `vault.changed` (for example `browser.open`, where the test harness
+   * reports the sign-in URL instead of opening a browser). The app never depends on them.
+   */
+  onHostEvent?: (event: string, payload: unknown) => void;
 }
 
 interface Pending {
@@ -35,8 +40,10 @@ export class StdioTransport implements Transport {
   private nextId = 1;
   private exited: Error | undefined;
   private stderr = "";
+  private readonly onHostEvent: StdioTransportOptions["onHostEvent"];
 
   constructor(options: StdioTransportOptions) {
+    this.onHostEvent = options.onHostEvent;
     const args: string[] = [];
     for (const root of options.allowRoots ?? []) args.push("--allow-root", root);
     if (options.pickVault !== undefined) args.push("--pick-vault", options.pickVault);
@@ -67,6 +74,10 @@ export class StdioTransport implements Transport {
     }
     if (message.event === "vault.changed") {
       for (const listener of this.listeners) listener(message.payload as VaultChangedEvent);
+      return;
+    }
+    if (typeof message.event === "string") {
+      this.onHostEvent?.(message.event, message.payload);
       return;
     }
     if (typeof message.id !== "number") return;

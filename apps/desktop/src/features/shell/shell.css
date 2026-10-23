@@ -26,3 +26,9 @@
 .result { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--thoth-radius-md); cursor: pointer; }
 .result[aria-selected="true"] { background: var(--thoth-bg-active); }
 .result .snippet { color: var(--thoth-ink-secondary); font: var(--thoth-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-badge { margin-left: auto; flex: none; }
+.tree-note { padding: 4px 8px 4px 36px; font: var(--thoth-text-small); }
+.server-section { margin-top: 6px; }
+.sec-link { all: unset; cursor: pointer; color: var(--thoth-link); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); }
+.sec-link:hover { text-decoration: underline; }
+.sec-link:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 2px; }

@@ -6,6 +6,7 @@ import { createImportService } from "../features/import/service.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
+import { ServerDirectory, type WorkspacePageRef } from "../features/servers/directory.ts";
 
 interface Props {
   platform: Platform;
@@ -22,7 +23,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
-  const [settings, setSettings] = useState(false);
+  const [remote, setRemote] = useState<WorkspacePageRef | null>(null);
+  const [settings, setSettings] = useState<false | "top" | "servers">(false);
   const [showIntro, setShowIntro] = useState(intro);
 
   const flushers = useRef(new Set<() => Promise<boolean>>());
@@ -57,6 +59,13 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     };
   }, [connection, vault, options.reconcileDebounceMs, bump]);
 
+  // Workspace servers: one directory per open window, polling only expanded workspaces.
+  const servers = useMemo(() => new ServerDirectory(platform, { pollMs: options.pollMs }), [platform, options.pollMs]);
+  useEffect(() => {
+    void servers.start();
+    return () => servers.dispose();
+  }, [servers]);
+
   const importService = useMemo(
     () => createImportService(vault, (kind, location) => options.openImportSource(platform, kind, location)),
     [vault, platform, options],
@@ -78,9 +87,17 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         void flushAll().then((ok) => {
           if (!ok) return;
           setSettings(false);
+          setRemote(null);
           setPath(target);
         }),
-      openSettings: () => void flushAll().then((ok) => ok && setSettings(true)),
+      openSettings: (section) => void flushAll().then((ok) => ok && setSettings(section ?? "top")),
+      servers,
+      openWorkspacePage: (ref) =>
+        void flushAll().then((ok) => {
+          if (!ok) return;
+          setSettings(false);
+          setRemote(ref);
+        }),
       openFolder: (folder) =>
         void flushAll().then(async (ok) => {
           if (!ok) return;
@@ -88,7 +105,10 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
           const prefix = folder === "" ? "" : `${folder}/`;
           const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
           setSettings(false);
-          if (first) setPath(first.path);
+          if (first) {
+            setRemote(null);
+            setPath(first.path);
+          }
         }),
       reveal,
       registerFlush,
@@ -96,12 +116,12 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers],
   );
 
   return (
     <SessionContext.Provider value={session}>
-      {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell path={path} settings={settings} />}
+      {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell path={remote ? null : path} remote={remote} settings={settings} />}
     </SessionContext.Provider>
   );
 }

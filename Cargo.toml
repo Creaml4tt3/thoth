@@ -20,6 +20,14 @@ serde_json = { version = "1", features = ["preserve_order"] }
 tempfile = "3"
 thiserror = "2"
 unicode-normalization = "0.1"
+# Workspace-server client (Phase 2b part 3). Exact pins; each release is at least three weeks old.
+# ureq: blocking HTTP, rustls + webpki roots, no gzip (bodies are capped before decoding), no env proxy.
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
+url = "=2.5.8"
+sha2 = "=0.10.9"
+# The OS keychain, desktop shell only. Platform-native stores only: macOS Keychain, Windows Credential
+# Manager, Linux kernel keyutils. No Secret Service/D-Bus, no OpenSSL.
+keyring = { version = "=3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"

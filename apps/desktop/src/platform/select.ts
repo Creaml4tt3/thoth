@@ -19,6 +19,16 @@ export function createUnavailablePlatform(): Platform {
     openVault: async () => fail(),
     pickImportSource: async () => fail(),
     openImportSource: async () => fail(),
+    servers: {
+      list: async () => [],
+      add: async () => fail(),
+      remove: async () => fail(),
+      signIn: async () => fail(),
+      cancelSignIn: async () => undefined,
+      useToken: async () => fail(),
+      signOut: async () => fail(),
+      call: async () => fail(),
+    },
   };
 }
 

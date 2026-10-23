@@ -4,10 +4,14 @@ import { Button } from "../../ui/Button.tsx";
 import { Mark } from "../../ui/Mark.tsx";
 import { useSession } from "../../app/context.ts";
 import { ancestorFolders, buildTree, type TreeNode } from "./tree.ts";
+import { ServersSidebar } from "../servers/ServersSidebar.tsx";
+import type { WorkspacePageRef } from "../servers/directory.ts";
 
 interface Props {
   pages: PageSummary[];
   current: string | null;
+  /** The open workspace page, if any. */
+  currentRemote?: WorkspacePageRef | null;
   onSearch(): void;
   onNewPage(): void;
 }
@@ -44,8 +48,8 @@ function Node({ node, depth, open, toggle, current }: { node: TreeNode; depth: n
   );
 }
 
-/** 260px page tree grouped by folder, with the Local space badge, search and new-page actions. */
-export function Sidebar({ pages, current, onSearch, onNewPage }: Props) {
+/** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
+export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage }: Props) {
   const { connection, reveal, openSettings } = useSession();
   const tree = useMemo(() => buildTree(pages), [pages]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
@@ -97,12 +101,13 @@ export function Sidebar({ pages, current, onSearch, onNewPage }: Props) {
             ))}
           </ul>
         )}
+        <ServersSidebar current={currentRemote} />
       </nav>
       <div className="side-actions">
         <Button variant="ghost" small onClick={onNewPage}>
           New page
         </Button>
-        <Button variant="quiet" small onClick={openSettings}>
+        <Button variant="quiet" small onClick={() => openSettings()}>
           Settings
         </Button>
       </div>

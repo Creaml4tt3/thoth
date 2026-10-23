@@ -12,6 +12,7 @@ export const DEFAULT_OPTIONS: AppOptions = {
   reconcileDebounceMs: 300,
   openImportSource,
   now: () => new Date(),
+  pollMs: 5000,
 };
 
 interface Host {

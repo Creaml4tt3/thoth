@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { Platform, VaultChangedEvent, VaultConnection } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
+import { FakeServers } from "./fake-servers.ts";
 
 type Listener = (event: Omit<VaultChangedEvent, "vault">) => void;
 
@@ -22,9 +23,11 @@ export interface NodePlatform extends Platform {
   watchers(): number;
   /** Connections handed out so far. */
   connections: VaultConnection[];
+  /** In-memory workspace servers (no server known by default). */
+  servers: FakeServers;
 }
 
-export function createNodePlatform(options: { vault?: string | null } = {}): NodePlatform {
+export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers } = {}): NodePlatform {
   const listeners = new Set<Listener>();
   const connections: VaultConnection[] = [];
   const platform: NodePlatform = {
@@ -33,6 +36,7 @@ export function createNodePlatform(options: { vault?: string | null } = {}): Nod
     pickedSource: null,
     recent: [],
     connections,
+    servers: options.servers ?? new FakeServers(),
     async pickVaultFolder() {
       return platform.pickedVault;
     },

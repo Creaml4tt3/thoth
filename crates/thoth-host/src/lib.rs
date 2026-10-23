@@ -12,18 +12,23 @@
 //!   prefix and file handles are bound to the source that opened them.
 //! - Paths are vault/source-relative and resolved with `openat` from a root
 //!   directory fd that is held for the life of the handle.
+//! - Workspace servers are reached only by the host (`remote`): the webview names a server by its handle and
+//!   never receives an access token, refresh token or personal access token.
 mod at;
 pub mod error;
 mod handles;
 pub mod paths;
+pub mod remote;
 pub mod source;
 pub mod sql;
 pub mod vault_fs;
 pub mod watch;
 
 pub use error::{HostError, HostResult};
+pub use remote::{Browser, KEYCHAIN_SERVICE, MemorySecretStore, SecretStore};
 
 use paths::{canonical, check_root_policy};
+use remote::Remote;
 use rustix::fs::{Mode, OFlags};
 use serde_json::{Value, json};
 use source::{OpenFile, Source};
@@ -42,6 +47,8 @@ pub const COMMANDS: &[&str] = &[
     "watch.start", "watch.stop",
     "source.pick", "source.open", "source.list", "source.file.open", "source.file.read", "source.file.close",
     "source.temp.create", "source.temp.write", "source.close",
+    "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
+    "api.call",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -67,6 +74,10 @@ pub struct HostConfig {
     pub events: EventSink,
     /// Test hook: make `link()` fail so no-replace rename takes the exclusive-copy fallback.
     pub disable_hardlink: bool,
+    /// Refresh tokens and personal access tokens of workspace servers (the OS keychain on desktop).
+    pub secrets: Arc<dyn SecretStore>,
+    /// Opens the browser for server sign-in.
+    pub browser: Arc<dyn Browser>,
 }
 
 struct VaultEntry {
@@ -95,6 +106,7 @@ pub struct Host {
     home: Option<PathBuf>,
     allow_roots: Vec<PathBuf>,
     state: Mutex<State>,
+    remote: Remote,
 }
 
 type Reply = (Value, Option<Vec<u8>>);
@@ -103,21 +115,22 @@ impl Host {
     pub fn new(config: HostConfig) -> Self {
         let home = std::env::var_os("HOME").map(PathBuf::from).and_then(|h| std::fs::canonicalize(h).ok());
         let allow_roots = config.allow_roots.iter().filter_map(|r| std::fs::canonicalize(r).ok()).collect();
-        Self { config, home, allow_roots, state: Mutex::new(State::default()) }
+        let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
+        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote }
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    /// Dispatches one command. `bytes` is the out-of-band request body (`fs.write`, `source.temp.write`).
+    /// Dispatches one command. `bytes` is the out-of-band request body (`fs.write`, `source.temp.write`, `api.call`).
     pub fn call(&self, command: &str, args: &Value, bytes: Option<&[u8]>) -> HostResult<Reply> {
         let json = |v: Value| Ok((v, None));
         let null = || Ok((Value::Null, None));
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes = matches!(command, "fs.write" | "source.temp.write");
+        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call");
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -229,6 +242,27 @@ impl Host {
                 self.close_source(str_arg(args, "source")?)?;
                 null()
             }
+            "server.list" => json(self.remote.list()),
+            "server.add" => json(self.remote.add(str_arg(args, "url")?)?),
+            "server.remove" => {
+                self.remote.remove(str_arg(args, "server")?)?;
+                null()
+            }
+            "server.signIn" => {
+                let provider = match args.get("provider") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(p)) => Some(p.as_str()),
+                    Some(_) => return Err(HostError::bad_argument("provider must be a string")),
+                };
+                json(self.remote.sign_in(str_arg(args, "server")?, provider)?)
+            }
+            "server.signInCancel" => {
+                self.remote.cancel_sign_in(str_arg(args, "server")?)?;
+                null()
+            }
+            "server.useToken" => json(self.remote.use_token(str_arg(args, "server")?, str_arg(args, "token")?)?),
+            "server.signOut" => json(self.remote.sign_out(str_arg(args, "server")?)?),
+            "api.call" => json(self.remote.api_call(args, bytes)?),
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }
@@ -412,8 +446,10 @@ impl Host {
 }
 
 impl Host {
-    /// Closes every vault (stopping watchers) and source (deleting temp files). The host stays usable.
+    /// Closes every vault (stopping watchers) and source (deleting temp files) and cancels server sign-ins.
+    /// The host stays usable.
     pub fn shutdown(&self) {
+        self.remote.shutdown();
         let (vaults, sources): (Vec<String>, Vec<String>) = {
             let state = self.state();
             (state.vaults.keys().cloned().collect(), state.sources.keys().cloned().collect())

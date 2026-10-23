@@ -11,9 +11,65 @@
  *   instead. While a conflict is open the editor is frozen and nothing saves.
  * - With no local edits, a changed file reloads silently.
  * - Operations run one at a time, so a save, a reload and a resolution never interleave.
+ *
+ * Where the page lives is behind a `PageStore`: a file in the Private Space
+ * (`vaultPageStore`) or a page on a workspace server (`features/servers`).
+ * A server refuses stale writes itself (`If-Match`, 412), so for a workspace
+ * page the pre-write comparison is skipped and a remote change under local
+ * edits surfaces at the next save rather than at once.
  */
 import { ConflictError, NotFoundError, type Vault } from "@thoth/local-store";
 import { basename, dirname, stripExtension } from "@thoth/domain";
+
+/** One stored version of a page. `hash` identifies it: a content hash for a file, a revision id on a server. */
+export interface StoredPage {
+  source: string;
+  hash: string;
+  /** False when the page may be shown but never written (not UTF-8, or a viewer's role). */
+  editable: boolean;
+}
+
+/** Where an open page is read from and written to. */
+export interface PageStore {
+  /** "file": a Private Space file. "workspace": a server page, which checks revisions itself. */
+  readonly kind: "file" | "workspace";
+  /** The current version, or null when the page does not exist. */
+  read(): Promise<StoredPage | null>;
+  /** Compare-and-swap write on `expected` (null: the page must not exist). Returns the new hash; a stale write throws an error `isConflict` accepts. */
+  write(source: string, expected: string | null): Promise<string>;
+  /** Keeps `source` as a separate conflict copy. `ref` opens it, `label` names it to the user. */
+  writeCopy(source: string, now: Date): Promise<{ ref: string; label: string }>;
+  isConflict(error: unknown): boolean;
+}
+
+export function vaultPageStore(vault: Vault, path: string): PageStore {
+  return {
+    kind: "file",
+    async read() {
+      try {
+        const read = await vault.readPage(path);
+        return { source: read.source, hash: read.hash, editable: read.editable };
+      } catch (error) {
+        if (error instanceof NotFoundError) return null;
+        throw error;
+      }
+    },
+    write: (source, expected) => vault.writePage(path, source, { expectedHash: expected }),
+    async writeCopy(source, now) {
+      for (let attempt = 1; attempt <= 50; attempt++) {
+        const copy = conflictCopyPath(path, now, attempt);
+        try {
+          await vault.writePage(copy, source, { expectedHash: null });
+          return { ref: copy, label: copy };
+        } catch (error) {
+          if (!(error instanceof ConflictError)) throw error;
+        }
+      }
+      throw new Error("Could not find a free name for the conflict copy");
+    },
+    isConflict: (error) => error instanceof ConflictError,
+  };
+}
 
 export interface EditorBridge {
   /** Markdown for the editor's current document, frontmatter included; null when the editor is gone (never written). */
@@ -47,18 +103,17 @@ export interface PageState {
   conflict: Conflict | null;
   /** Failure of the last save or conflict resolution. */
   error: string | null;
-  /** Path of the file that kept "my" version after Keep both. */
-  conflictCopy: string | null;
+  /** The copy that kept "my" version after Keep both. */
+  conflictCopy: { ref: string; label: string } | null;
 }
 
 export interface PageSessionDeps {
-  vault: Vault;
-  path: string;
+  store: PageStore;
   editor: EditorBridge;
   /** Idle time before autosave; 0 disables it. */
   autosaveMs: number;
   now: () => Date;
-  /** Called after Thoth itself wrote to the vault, so views can re-query. */
+  /** Called after Thoth itself wrote the page (or a copy), so views can re-query. */
   onWritten(): void;
 }
 
@@ -96,7 +151,8 @@ export function conflictCopyPath(path: string, date: Date, attempt = 1): string 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export function createPageSession(deps: PageSessionDeps): PageSession {
-  const { vault, path, editor } = deps;
+  const { store, editor } = deps;
+  const serverChecked = store.kind === "workspace";
   let state: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null };
   const listeners = new Set<() => void>();
   /** The last content this page read from or wrote to disk. */
@@ -127,15 +183,7 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
     if (deps.autosaveMs > 0 && !disposed) timer = setTimeout(() => void save(), deps.autosaveMs);
   };
 
-  const readDisk = async (): Promise<(DiskVersion & { editable: boolean }) | null> => {
-    try {
-      const read = await vault.readPage(path);
-      return { source: read.source, hash: read.hash, editable: read.editable };
-    } catch (error) {
-      if (error instanceof NotFoundError) return null;
-      throw error;
-    }
-  };
+  const readDisk = (): Promise<StoredPage | null> => store.read();
 
   const adopt = (disk: DiskVersion & { editable: boolean }): void => {
     base = { source: disk.source, hash: disk.hash };
@@ -164,14 +212,17 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
   const open = (): Promise<void> =>
     enqueue(async () => {
       try {
-        const read = await vault.readPage(path);
+        const read = await store.read();
+        if (!read) {
+          set({ phase: "missing" });
+          return;
+        }
         base = { source: read.source, hash: read.hash };
         editor.load(read.source);
         editor.setEditable(read.editable);
         set({ phase: "ready", editable: read.editable, save: "idle", conflict: null, error: null });
       } catch (error) {
-        if (error instanceof NotFoundError) set({ phase: "missing" });
-        else set({ phase: "error", error: message(error) });
+        set({ phase: "error", error: message(error) });
       }
     });
 
@@ -190,13 +241,15 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
       }
       set({ save: "saving", error: null });
       try {
-        // Compare before writing so a stale hash is never even offered to `writePage`.
-        const disk = await readDisk();
-        if (!disk || disk.hash !== base.hash) {
-          await enterConflict(mine, disk);
-          return state.conflict ? "conflict" : "unchanged";
+        if (!serverChecked) {
+          // Compare before writing so a stale hash is never even offered to `writePage`.
+          const disk = await readDisk();
+          if (!disk || disk.hash !== base.hash) {
+            await enterConflict(mine, disk);
+            return state.conflict ? "conflict" : "unchanged";
+          }
         }
-        const hash = await vault.writePage(path, mine, { expectedHash: base.hash });
+        const hash = await store.write(mine, base.hash);
         base = { source: mine, hash };
         deps.onWritten();
         const after = editor.markdown();
@@ -208,8 +261,8 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         }
         return "saved";
       } catch (error) {
-        if (error instanceof ConflictError) {
-          // Lost a race with another writer between the check and the write; the file was not touched.
+        if (store.isConflict(error)) {
+          // Lost a race with another writer (or, on a server, a 412); nothing was written.
           await enterConflict(mine, await readDisk());
           return state.conflict ? "conflict" : "unchanged";
         }
@@ -243,21 +296,10 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         else adopt(disk);
         return;
       }
+      // A server rejects the stale write itself: the next save meets the conflict.
+      if (serverChecked) return;
       await enterConflict(mine, disk);
     });
-
-  const writeConflictCopy = async (mine: string): Promise<string> => {
-    for (let attempt = 1; attempt <= 50; attempt++) {
-      const copy = conflictCopyPath(path, deps.now(), attempt);
-      try {
-        await vault.writePage(copy, mine, { expectedHash: null });
-        return copy;
-      } catch (error) {
-        if (!(error instanceof ConflictError)) throw error;
-      }
-    }
-    throw new Error("Could not find a free name for the conflict copy");
-  };
 
   const resolveConflict = (choice: ConflictChoice): Promise<void> =>
     enqueue(async () => {
@@ -266,16 +308,16 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
       try {
         if (choice === "mine") {
           // Overwrite deliberately, but still compare-and-swap against the disk version the user saw.
-          const hash = await vault.writePage(path, conflict.mine, { expectedHash: conflict.disk?.hash ?? null });
+          const hash = await store.write(conflict.mine, conflict.disk?.hash ?? null);
           base = { source: conflict.mine, hash };
           editor.setEditable(true);
           set({ conflict: null, save: "saved", error: null, editable: true });
           deps.onWritten();
           return;
         }
-        let copy: string | null = null;
+        let copy: PageState["conflictCopy"] = null;
         if (choice === "both") {
-          copy = await writeConflictCopy(conflict.mine);
+          copy = await store.writeCopy(conflict.mine, deps.now());
           deps.onWritten();
         }
         if (conflict.disk) {
@@ -285,10 +327,11 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         }
         set({ conflictCopy: copy });
       } catch (error) {
-        if (error instanceof ConflictError) {
-          // The file changed again while the dialog was open: show the new disk version and let the user choose again.
+        if (store.isConflict(error)) {
+          // The page changed again while the dialog was open: show the new version and let the user choose again.
           const disk = await readDisk().catch(() => null);
-          set({ conflict: { mine: conflict.mine, disk: disk ? { source: disk.source, hash: disk.hash } : null }, error: "The file changed on disk again. Review the new version and choose again." });
+          const again = serverChecked ? "The page changed on the server again. Review the new version and choose again." : "The file changed on disk again. Review the new version and choose again.";
+          set({ conflict: { mine: conflict.mine, disk: disk ? { source: disk.source, hash: disk.hash } : null }, error: again });
           return;
         }
         set({ error: message(error) });

@@ -30,6 +30,8 @@
     "@thoth/local-store": "workspace:*",
     "@thoth/platform": "workspace:*",
     "@thoth/ui": "workspace:*",
+    "@thoth/workspace-client": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
     "@tiptap/core": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Button } from "../../ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { ImportWizard } from "../import/ImportWizard.tsx";
+import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "../editor/mode.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
-/** Settings: vault location, editor mode, Rebuild index, and Import & Export. */
-export function SettingsView() {
+/** Settings: vault location, workspace servers, editor mode, Rebuild index, and Import & Export. */
+export function SettingsView({ section = "top" }: { section?: "top" | "servers" }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder } = useSession();
   const [rebuild, setRebuild] = useState<Rebuild>({ state: "idle" });
   const [importing, setImporting] = useState(false);
@@ -44,6 +45,8 @@ export function SettingsView() {
             </Button>
           </div>
         </section>
+
+        <ServersSettings focus={section === "servers"} />
 
         <section aria-labelledby="set-editor" className="set-section">
           <h2 id="set-editor">Editor</h2>

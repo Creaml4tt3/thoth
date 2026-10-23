@@ -7,11 +7,13 @@ import { NewPageDialog } from "./NewPageDialog.tsx";
 import { SearchPalette } from "./SearchPalette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { Mark } from "../../ui/Mark.tsx";
+import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
+import type { WorkspacePageRef } from "../servers/directory.ts";
 
 type Dialog = "search" | "new" | null;
 
 /** The Paper shell: sidebar on the left, page or settings on the right. */
-export function Shell({ path, settings }: { path: string | null; settings: boolean }) {
+export function Shell({ path, remote = null, settings }: { path: string | null; remote?: WorkspacePageRef | null; settings: false | "top" | "servers" }) {
   const { vault, revision, watchError, openPage } = useSession();
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -40,12 +42,12 @@ export function Shell({ path, settings }: { path: string | null; settings: boole
 
   // Open the first page when nothing is open yet, so the shell is never blank.
   useEffect(() => {
-    if (!path && !settings && pages.length > 0) openPage(pages[0]!.path);
-  }, [path, settings, pages, openPage]);
+    if (!path && !remote && !settings && pages.length > 0) openPage(pages[0]!.path);
+  }, [path, remote, settings, pages, openPage]);
 
   return (
     <div className="shell" data-theme="light">
-      <Sidebar pages={pages} current={settings ? null : path} onSearch={() => setDialog("search")} onNewPage={() => setDialog("new")} />
+      <Sidebar pages={pages} current={settings ? null : path} currentRemote={settings ? null : remote} onSearch={() => setDialog("search")} onNewPage={() => setDialog("new")} />
       <main className="main">
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
@@ -53,7 +55,9 @@ export function Shell({ path, settings }: { path: string | null; settings: boole
           </p>
         )}
         {settings ? (
-          <SettingsView />
+          <SettingsView section={settings} />
+        ) : remote ? (
+          <WorkspacePageView key={`${remote.server}\n${remote.workspace}\n${remote.page}`} target={remote} />
         ) : path ? (
           <PageView key={path} path={path} />
         ) : (

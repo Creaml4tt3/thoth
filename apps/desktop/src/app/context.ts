@@ -7,6 +7,7 @@ import type { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
 import type { ImportService } from "../features/import/service.ts";
 import type { OpenImportSource } from "../features/import/open-source.ts";
+import type { ServerDirectory, WorkspacePageRef } from "../features/servers/directory.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -17,6 +18,8 @@ export interface AppOptions {
   /** Connects the import wizard to a source. Defaults to the marked function in `features/import/open-source.ts`. */
   openImportSource: OpenImportSource;
   now: () => Date;
+  /** Change-feed polling interval for open workspaces (only while the window is visible). 0 disables polling. */
+  pollMs: number;
 }
 
 export interface Session {
@@ -31,8 +34,12 @@ export interface Session {
   refresh(): Promise<void>;
   /** Opens a page in the editor. */
   openPage(path: string): void;
-  /** Opens Settings (a full view, not a page). */
-  openSettings(): void;
+  /** Opens Settings (a full view, not a page), optionally scrolled to a section. */
+  openSettings(section?: "servers"): void;
+  /** Workspace servers: the host holds the credentials; this is the app's view of them. */
+  servers: ServerDirectory;
+  /** Opens a page of a workspace on a server. */
+  openWorkspacePage(ref: WorkspacePageRef): void;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
   openFolder(path: string): void;
   reveal: { path: string; nonce: number } | null;

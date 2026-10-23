@@ -1,0 +1,16 @@
+{
+  "name": "@thoth/workspace-client",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Typed, framework-free client for the Thoth workspace protocol over an injected send(request) function.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/domain": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

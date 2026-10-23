@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Least privilege for the main window: Thoth's host commands and event listening only. No fs, shell, http or window plugins; native dialogs are opened by the host, not the webview.",
+  "description": "Least privilege for the main window: Thoth's host commands and event listening only. No fs, shell, http, opener or window plugins; native dialogs, the system browser and every server request are opened by the host, not the webview.",
   "windows": [
     "main"
   ],
@@ -33,6 +33,14 @@
     "allow-source-file-close",
     "allow-source-temp-create",
     "allow-source-temp-write",
-    "allow-source-close"
+    "allow-source-close",
+    "allow-server-list",
+    "allow-server-add",
+    "allow-server-remove",
+    "allow-server-signIn",
+    "allow-server-signInCancel",
+    "allow-server-useToken",
+    "allow-server-signOut",
+    "allow-api-call"
   ]
 }

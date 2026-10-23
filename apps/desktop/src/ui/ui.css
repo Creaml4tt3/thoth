@@ -26,6 +26,7 @@ h1, h2, h3, p { margin: 0; }
 /* Badges */
 .badge { font: 500 10px/1 var(--thoth-font-sans); padding: 3px 7px; border-radius: var(--thoth-radius-pill); letter-spacing: 0.02em; }
 .badge-private { background: var(--thoth-bg-active); color: var(--thoth-private); }
+.badge-workspace { background: color-mix(in srgb, var(--thoth-workspace) 12%, transparent); color: var(--thoth-workspace); }
 .badge-muted { background: var(--thoth-bg-hover); color: var(--thoth-ink-tertiary); }
 
 .field { display: grid; gap: 6px; }

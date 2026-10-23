@@ -9,13 +9,17 @@
 //! arguments percent-encoded in the `x-thoth-args` header; byte results
 //! (`fs.read`, `source.file.read`) return a raw body. Host events are emitted
 //! as `vault:changed` (Tauri event names cannot contain `.`).
+//!
+//! Workspace servers: the host is the HTTP client. Refresh tokens and personal access tokens go to the OS
+//! keychain (`KeychainStore`), sign-in opens the system browser from the host (`SystemBrowser`), and the
+//! webview gets no http, opener or shell permission.
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
-use thoth_host::{Host, HostConfig, HostError, Picker};
+use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
 
 pub const ARGS_HEADER: &str = "x-thoth-args";
 pub const VAULT_CHANGED_EVENT: &str = "vault:changed";
@@ -34,6 +38,66 @@ impl Picker for DialogPicker {
         let dialog = self.app.dialog().file().set_title("Choose an import source");
         let picked = if directory { dialog.blocking_pick_folder() } else { dialog.add_filter("Export archive", &["zip"]).blocking_pick_file() };
         picked?.into_path().ok()
+    }
+}
+
+/// Workspace-server secrets in the OS keychain (macOS Keychain, Windows Credential Manager, Linux keyutils),
+/// service `io.github.creaml4tt3.thoth`, account = the server's handle. Errors never include the secret.
+struct KeychainStore;
+
+impl KeychainStore {
+    fn entry(server: &str) -> HostResult<keyring::Entry> {
+        keyring::Entry::new(KEYCHAIN_SERVICE, server).map_err(|_| HostError::internal("The system keychain is not available"))
+    }
+}
+
+impl SecretStore for KeychainStore {
+    fn get(&self, server: &str) -> HostResult<Option<String>> {
+        match Self::entry(server)?.get_password() {
+            Ok(secret) => Ok(Some(secret)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(HostError::internal("Could not read from the system keychain")),
+        }
+    }
+
+    fn set(&self, server: &str, secret: &str) -> HostResult<()> {
+        Self::entry(server)?.set_password(secret).map_err(|_| HostError::internal("Could not write to the system keychain"))
+    }
+
+    fn delete(&self, server: &str) -> HostResult<()> {
+        match Self::entry(server)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err(HostError::internal("Could not delete from the system keychain")),
+        }
+    }
+}
+
+/// Opens sign-in pages in the system browser, from the host: the webview has no opener permission.
+/// Only `http(s)` URLs, passed as one argument (no shell).
+struct SystemBrowser;
+
+impl Browser for SystemBrowser {
+    fn open(&self, url: &str) -> HostResult<()> {
+        if !(url.starts_with("https://") || url.starts_with("http://")) || url.chars().any(char::is_control) {
+            return Err(HostError::bad_argument("Only web addresses can be opened"));
+        }
+        #[cfg(target_os = "macos")]
+        let mut command = std::process::Command::new("/usr/bin/open");
+        #[cfg(target_os = "windows")]
+        let mut command = {
+            // `rundll32 url.dll,FileProtocolHandler <url>` opens the default browser without `cmd /c start`,
+            // whose parser would treat `&` in the query as a command separator.
+            let mut c = std::process::Command::new("rundll32");
+            c.arg("url.dll,FileProtocolHandler");
+            c
+        };
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(url).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        let mut child = command.spawn().map_err(|_| HostError::internal("Could not open the web browser"))?;
+        // Reap the launcher in the background; the browser outlives it.
+        std::thread::spawn(move || child.wait());
+        Ok(())
     }
 }
 
@@ -111,6 +175,8 @@ pub fn run() {
                     let _ = emitter.emit(VAULT_CHANGED_EVENT, payload);
                 }),
                 disable_hardlink: false,
+                secrets: Arc::new(KeychainStore),
+                browser: Arc::new(SystemBrowser),
             });
             let _ = HOST.set(Arc::new(host));
             Ok(())
@@ -153,6 +219,18 @@ mod tests {
             assert!(p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten", "unexpected permission {p}");
         }
         assert!(capability.get("remote").is_none());
+        let text = include_str!("../capabilities/main.json");
+        for plugin in ["http:", "opener:", "shell:", "fs:"] {
+            assert!(!text.contains(plugin), "capability must not grant {plugin}");
+        }
+    }
+
+    #[test]
+    fn system_browser_opens_only_web_addresses() {
+        // Refusals only: nothing here may launch a browser.
+        for bad in ["file:///etc/passwd", "javascript:alert(1)", "-a Calculator", "x-apple.systempreferences:", "https://x.example.org/\nrm", ""] {
+            assert_eq!(SystemBrowser.open(bad).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
+        }
     }
 
     #[test]
