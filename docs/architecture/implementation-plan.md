@@ -730,6 +730,18 @@ AC:
    "Move to…" in the palette.
    - Server: an optional `position` on pages, through a migration, the schema, OpenAPI and conformance.
 
+Status (2026-10-25): AC 1–9 implemented on `main`; `pnpm check` (1618 tests), `pnpm test:server` and `pnpm e2e`
+(incl. `tests/e2e/keyboard.e2e.ts` for AC 6) pass. Not yet checked by a person in a real window: the look of the
+accent, folders and drag feel, Thai strings on screen, and the macOS menu change for Cmd+W. Known gaps and additions:
+
+- Private Space: no inline F2 rename (rename is a file move from the palette) and no "New folder" command.
+- A server without `page-order` cannot reorder; a move under a new parent is a content write (a revision).
+- Folder pages are found by reading each child page once per revision; a `kind` in the tree response would avoid
+  this but is a protocol change (owner decision).
+- Additions beyond ADR-0016: Alt+F10 / Mod+Alt+T focus the style toolbar, Mod+Shift+L cycles the theme, and the
+  web client uses Alt-based alternatives where the browser keeps a key (listed in the shortcuts list).
+- Light accent is `#C2410C` (Moon `#E8590C` fails AA for white button text); owner to confirm.
+
 ### Phase 4 — Agent Hub
 
 - `packages/agent-core` plus the Claude Code CLI adapter first, then Codex.
