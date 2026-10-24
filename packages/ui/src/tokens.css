@@ -50,6 +50,17 @@
   --thoth-workspace: #0B6BCB; /* Workspace badge: connected, blue */
   --thoth-agent: #E8590C;     /* Agent Hub badge: moon */
 
+  /* Text colours (ADR-0016 rule 1): the eight names a page can use. Every value keeps at least WCAG AA (4.5:1) on the
+     page, the sidebar, a callout and the highlight background of its theme (checked in packages/app-ui/test). */
+  --thoth-text-gray: #5C5853;
+  --thoth-text-brown: #85513A;
+  --thoth-text-orange: #A94400;
+  --thoth-text-yellow: #855D00;
+  --thoth-text-green: #1B7444;
+  --thoth-text-blue: #0A62B8;
+  --thoth-text-purple: #7040C8;
+  --thoth-text-red: #BE2D28;
+
   /* Shape — Notion radii in content, Grok pills for actions */
   --thoth-radius-xs: 4px;
   --thoth-radius-sm: 6px;
@@ -95,6 +106,14 @@
   --thoth-moon-soft: rgb(255 122 47 / 0.14);
   --thoth-moon-ink: #FFB386;
   --thoth-link: #5AA9FF;
+  --thoth-text-gray: #A8A29B;
+  --thoth-text-brown: #CE9A78;
+  --thoth-text-orange: #FF9A52;
+  --thoth-text-yellow: #E7BC4B;
+  --thoth-text-green: #4FC081;
+  --thoth-text-blue: #5AA9FF;
+  --thoth-text-purple: #B794F6;
+  --thoth-text-red: #FF7B72;
   --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -113,6 +132,14 @@
     --thoth-moon-soft: rgb(255 122 47 / 0.14);
     --thoth-moon-ink: #FFB386;
     --thoth-link: #5AA9FF;
+    --thoth-text-gray: #A8A29B;
+    --thoth-text-brown: #CE9A78;
+    --thoth-text-orange: #FF9A52;
+    --thoth-text-yellow: #E7BC4B;
+    --thoth-text-green: #4FC081;
+    --thoth-text-blue: #5AA9FF;
+    --thoth-text-purple: #B794F6;
+    --thoth-text-red: #FF7B72;
     color-scheme: dark;
   }
 }
