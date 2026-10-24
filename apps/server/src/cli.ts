@@ -2,6 +2,7 @@
  * Admin CLI. Reads DATABASE_URL from the environment.
  *
  *   node src/cli.ts migrate
+ *   node src/cli.ts backfill-kind [--batch <n>]
  *   node src/cli.ts create-user --name "Ada" [--email ada@example.org]
  *   node src/cli.ts create-workspace --name "Team" [--export-restricted]
  *   node src/cli.ts add-member --workspace <id> --user <id> --role owner|editor|viewer
@@ -13,6 +14,7 @@
  * printed, logged, or accepted on the command line.
  */
 import { parseArgs } from "node:util";
+import { BACKFILL_BATCH_DEFAULT, BACKFILL_BATCH_MAX, backfillPageKind } from "./backfill.ts";
 import { AdminError, addMember, createToken, createUser, createWorkspace, revokeToken } from "./admin.ts";
 import { ConfigError, loadConfig } from "./config.ts";
 import { createDatabase } from "./db.ts";
@@ -24,6 +26,9 @@ const USAGE = `Usage: node src/cli.ts <command> [options]   (DATABASE_URL must b
 
 Commands:
   migrate                                                   apply pending SQL migrations
+  backfill-kind [--batch <n>]                               fill in the page kind (ADR-0017) of pages and change entries written
+                                                            before migration 009; run once after it, safe to repeat and to run
+                                                            while the server is serving; prints the counts as JSON
   create-user --name <name> [--email <email>]               prints the user ID
   create-workspace --name <name> [--export-restricted] [--owner <user id>]   prints the workspace ID
   add-member --workspace <id> --user <id> --role <role>     role: owner | editor | viewer
@@ -60,6 +65,7 @@ async function main(argv: string[]): Promise<number> {
       label: { type: "string" },
       "token-id": { type: "string" },
       "expires-days": { type: "string" },
+      batch: { type: "string" },
       "export-restricted": { type: "boolean" },
     },
     strict: true,
@@ -75,6 +81,15 @@ async function main(argv: string[]): Promise<number> {
       case "migrate": {
         const result = await migrate(db.pool);
         console.log(result.applied.length ? `applied: ${result.applied.join(", ")}` : `up to date (${result.alreadyApplied} migration(s) applied)`);
+        // SQL cannot parse Markdown: pages written before 009 have no kind until the backfill has run.
+        if (result.applied.includes("009_page_kind.sql")) console.log("hint: existing pages have no page kind yet. Run `node src/cli.ts backfill-kind` once so that folders written earlier show as folders (ADR-0017).");
+        return 0;
+      }
+      case "backfill-kind": {
+        const raw = values.batch;
+        if (raw !== undefined && (!/^[1-9]\d{0,3}$/.test(raw) || Number(raw) > BACKFILL_BATCH_MAX)) fail(`--batch must be an integer from 1 to ${BACKFILL_BATCH_MAX} (default ${BACKFILL_BATCH_DEFAULT})`);
+        const result = await backfillPageKind(db, raw === undefined ? {} : { batchSize: Number(raw) });
+        console.log(JSON.stringify(result));
         return 0;
       }
       case "create-user": {

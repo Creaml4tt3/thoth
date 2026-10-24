@@ -1,4 +1,5 @@
-import { parseFrontmatter } from "@thoth/content";
+// The narrow entry point: it loads only the YAML front matter code, not the whole Markdown pipeline (server cold start).
+import { parseFrontmatter } from "@thoth/content/frontmatter";
 import type { PageKind } from "./pages.ts";
 
 /** The one frontmatter key a server reads (capability `page-kind`, ADR-0017). The rest of the Markdown stays opaque. */
