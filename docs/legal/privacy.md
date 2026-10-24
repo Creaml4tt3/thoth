@@ -62,7 +62,7 @@ If you accept, Google collects on our behalf:
   which recognise your browser but not you by name;
 - the pages of this website you view, and the page that sent you here;
 - these events: playing the showcase video and how far it plays (25, 50, 75
-  and 100 percent), turning its sound on, clicking "Try the web version" or
+  and 100 percent), turning its sound on, clicking "Open the web app" or
   "Download", switching language, and opening a question in the FAQ;
 - your approximate location (country or city), which Google derives from your
   IP address, and your device type, operating system, browser and screen size.
