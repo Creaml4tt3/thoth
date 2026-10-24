@@ -70,6 +70,8 @@ export interface PageFrameProps {
   /** Shown under a save error (for example a Sign in button). */
   errorAction?: ReactNode;
   footer?: ReactNode;
+  /** Extra controls in the breadcrumb bar (the desktop's Copy / Move to Private Space). */
+  actions?: ReactNode;
   /** Told when the conflict dialog opens and how it was resolved (the web client's anonymous analytics). */
   onConflict?(event: { kind: "shown" } | { kind: "resolved"; choice: "mine" | "theirs" | "both" }): void;
   /** Told after each save that wrote the page (the web client's anonymous analytics). */
@@ -161,6 +163,7 @@ export function PageFrame(props: PageFrameProps) {
   return (
     <section className="page-view" aria-label={props.label}>
       <Breadcrumbs badge={props.crumbs.badge} parts={props.crumbs.parts} status={state.save}>
+        {props.actions}
         <ModeSwitch mode={mode} disabled={!canSwitch} onChange={switchMode} />
       </Breadcrumbs>
       <div className="page-scroll">

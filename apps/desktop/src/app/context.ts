@@ -8,6 +8,7 @@ import type { Platform, VaultConnection } from "@thoth/platform";
 import type { ImportService } from "../features/import/service.ts";
 import type { OpenImportSource } from "../features/import/open-source.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
+import type { TransferService } from "../features/transfer/service.ts";
 import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 
 /** Tunables that tests (and later settings) override. */
@@ -43,6 +44,8 @@ export interface Session {
   servers: ServerDirectory;
   /** Opens a page of a workspace on a server. */
   openWorkspacePage(ref: WorkspacePageRef): void;
+  /** Copy and move between this Private Space and workspaces (ADR-0006). */
+  transfers: TransferService;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
   openFolder(path: string): void;
   reveal: { path: string; nonce: number } | null;

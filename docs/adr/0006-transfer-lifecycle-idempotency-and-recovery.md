@@ -1,6 +1,7 @@
 # ADR-0006: Transfer lifecycle, idempotency, and recovery
 
-- **Status:** Proposed (implementation phase P3)
+- **Status:** Proposed (implementation phase P3). Implemented 2026-10-24 in `packages/transfer`; the open
+  questions below are answered in "Resolved in implementation". Acceptance is the owner's decision.
 - **Date:** 2026-10-20
 
 ## Context
@@ -75,3 +76,43 @@ Section 2 (transfers), 9.1-9.4, 12, 14 (steps 5-8), 15 step 6, 18.
 - Behavior for transfers that include pages without `thoth_id` beyond adoption
   (ADR-0003).
 - Per-item partial-success semantics for large selections.
+
+## Resolved in implementation (2026-10-24)
+
+Each answer below is pinned by tests in `packages/transfer/test` and `apps/server/test-db/transfer-engine.test.ts`.
+
+- **Deleting uncommitted staged items.** The reference server's `abort` discards staged items and is
+  idempotent; a committed transfer answers 409 `invalid_transfer_state` (protocol §11). Recovery uses
+  it as the rollback point:
+  - every operation interrupted before COMMIT_DESTINATION is aborted at the server, and our own
+    unedited local files (Workspace → Private) are removed;
+  - a 409 on abort means the server committed and the response was lost, so the operation continues
+    forward and is never reported as rolled back;
+  - when the server cannot be reached, the operation waits and is retried on the next open;
+  - staged items are invisible, so a transfer that could not be aborted is harmless at the server.
+- **Record retention.** Records of `done`, `failed` and `aborted` operations are removed 30 days after
+  their last update, on open. `destination_committed_source_cleanup_pending` records are kept until
+  the user dismisses them, because they describe something still to do. Records are small and never
+  hold content.
+- **Pages without `thoth_id`.** They are adopted before VALIDATE completes (ADR-0003 §2), and adoption
+  is the only change a transfer makes to a copied original. Pages that cannot be adopted (not UTF-8,
+  unreadable frontmatter, edited during adoption) are refused with a reason, in the preview and at
+  VALIDATE. Two selected files that claim one `thoth_id` are refused.
+- **Per-item partial success.** A transfer is all-or-nothing at the destination (one server commit).
+  Partial results exist only on the source side, per item:
+  - a move whose source changed after it was sent keeps that source, so the item and the operation
+    are `destination_committed_source_cleanup_pending`;
+  - for Workspace → Private, the server reports per-item `revision_conflict`, with the same state.
+  Selections larger than one request (32 MiB, or the server's limits) are refused in the preview
+  rather than split.
+- **Move preserves IDs "when the destination supports it".** A move keeps the ID unless the workspace
+  has had a page with it before (`.thoth/sync/` says so), because servers never reuse a page ID. It
+  then gets a fresh ID and a mapping, as a copy does.
+- **Verification.**
+  - Private → Workspace: every created revision is read back and its content hash compared with the
+    hash of the exact payload, which is recorded before it was sent. An item that fails verification
+    is never deleted at the source.
+  - Workspace → Private: the downloaded revision's bytes must hash to the pinned revision's
+    `contentHash`, and each written file is re-read and compared before the server is told
+    `verified`.
+

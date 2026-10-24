@@ -160,3 +160,41 @@ describe("errors", () => {
     expect(error.status).toBe(412);
   });
 });
+
+describe("transfers and attachments", () => {
+  const OP = newStableId();
+  const transfer = (state = "stage") => ({ operationId: OP, workspaceId: "ws1", direction: "to_workspace", mode: "copy", state, items: [{ pageId: PAGE, sourceId: "local:a", revisionId: null, state: "staged" }], createdAt: T, updatedAt: T, error: null });
+
+  it("creates a transfer with Idempotency-Key equal to the operation id", async () => {
+    const { client, requests } = fake(() => ok(transfer(), 201));
+    const plan = { operationId: OP, direction: "to_workspace" as const, mode: "copy" as const, pages: [{ sourceId: "local:a", pageId: PAGE, parentId: null, title: "A", markdown: "# A\n" }] };
+    expect((await client.createTransfer("ws1", plan)).state).toBe("stage");
+    expect(requests[0]).toMatchObject({ method: "POST", path: "/api/v1/workspaces/ws1/transfers", headers: { "idempotency-key": OP, "content-type": "application/json" } });
+    expect(bodyOf(requests[0]!)).toEqual(plan);
+  });
+
+  it("reads, commits (with verified entries) and aborts", async () => {
+    const { client, requests } = fake((req) => ok(transfer(req.path.endsWith("/abort") ? "aborted" : req.path.endsWith("/commit") ? "done" : "stage")));
+    expect((await client.getTransfer(OP)).state).toBe("stage");
+    const verified = [{ pageId: PAGE, revisionId: "r1", contentHash: HASH }];
+    expect((await client.commitTransfer(OP, { verified })).state).toBe("done");
+    expect(bodyOf(requests[1]!)).toEqual({ verified });
+    expect((await client.abortTransfer(OP)).state).toBe("aborted");
+    expect(requests.map((r) => `${r.method} ${r.path}`)).toEqual([`GET /api/v1/transfers/${OP}`, `POST /api/v1/transfers/${OP}/commit`, `POST /api/v1/transfers/${OP}/abort`]);
+  });
+
+  it("uploads raw bytes with the MIME type, file name and an idempotency key", async () => {
+    const id = newStableId();
+    const { client, requests } = fake(() => ok({ id, workspaceId: "ws1", hash: HASH, size: 3, mimeType: "image/png", fileName: "a.png", createdAt: T, createdBy: "u1" }, 201));
+    const bytes = new Uint8Array([1, 2, 3]);
+    expect((await client.uploadAttachment("ws1", bytes, "image/png", { fileName: "a.png", idempotencyKey: "k1" })).id).toBe(id);
+    expect(requests[0]).toMatchObject({ method: "POST", path: "/api/v1/workspaces/ws1/attachments", query: { fileName: "a.png" }, headers: { "content-type": "image/png", "idempotency-key": "k1" } });
+    expect(requests[0]!.body).toEqual(bytes);
+  });
+
+  it("surfaces export_restricted as a problem", async () => {
+    const { client } = fake(() => ok(problem("export_restricted"), 403));
+    const error = (await client.createTransfer("ws1", { operationId: OP, direction: "from_workspace", mode: "copy", pages: [{ pageId: PAGE }] }).catch((e: unknown) => e)) as ProblemError;
+    expect([error.code, error.status]).toEqual(["export_restricted", 403]);
+  });
+});

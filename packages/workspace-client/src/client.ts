@@ -11,14 +11,17 @@ import type { z } from "zod";
 import { newStableId } from "@thoth/domain";
 import {
   API_BASE_PATH,
+  AttachmentResourceSchema,
   CapabilitiesSchema,
   ChangesResponseSchema,
   MeSchema,
   PageResourceSchema,
   SearchResponseSchema,
+  TransferResourceSchema,
   TreePageSchema,
   WorkspaceListSchema,
   formatEtag,
+  type AttachmentResource,
   type Capabilities,
   type ChangesResponse,
   type Me,
@@ -26,6 +29,9 @@ import {
   type PageWrite,
   type SearchRequest,
   type SearchResponse,
+  type TransferCommitRequest,
+  type TransferCreateRequest,
+  type TransferResource,
   type TreeNode,
   type Workspace,
 } from "@thoth/workspace-protocol";
@@ -173,5 +179,46 @@ export class WorkspaceClient {
 
   async search(workspaceId: string, request: SearchRequest): Promise<SearchResponse> {
     return (await this.request(SearchResponseSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/search`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify(request)) })).data;
+  }
+
+  /**
+   * Uploads attachment bytes (capability `attachments`). With an `idempotencyKey`, a retry after a lost
+   * response replays the first upload instead of storing a second attachment.
+   */
+  async uploadAttachment(workspaceId: string, bytes: Uint8Array, mimeType: string, options: { fileName?: string; idempotencyKey?: string } = {}): Promise<AttachmentResource> {
+    const headers: Record<string, string> = { "content-type": mimeType };
+    if (options.idempotencyKey !== undefined) headers["idempotency-key"] = options.idempotencyKey;
+    const query: Record<string, string> = options.fileName === undefined ? {} : { fileName: options.fileName };
+    return (await this.request(AttachmentResourceSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/attachments`, query, headers, body: bytes, ok: [201] })).data;
+  }
+
+  /**
+   * Registers and stages a transfer (capability `transfers`). The `Idempotency-Key` is the plan's
+   * `operationId` (ADR-0006), so re-sending the same plan after a crash returns the original transfer.
+   */
+  async createTransfer(workspaceId: string, plan: TransferCreateRequest): Promise<TransferResource> {
+    return (
+      await this.request(TransferResourceSchema, {
+        method: "POST",
+        path: `/workspaces/${seg(workspaceId)}/transfers`,
+        headers: { ...JSON_HEADERS, "idempotency-key": plan.operationId },
+        body: encoder.encode(JSON.stringify(plan)),
+        ok: [201],
+      })
+    ).data;
+  }
+
+  async getTransfer(operationId: string): Promise<TransferResource> {
+    return (await this.request(TransferResourceSchema, { method: "GET", path: `/transfers/${seg(operationId)}` })).data;
+  }
+
+  /** Commits a transfer; committing a finished one returns it unchanged. `verified` is required to finalize a from_workspace move. */
+  async commitTransfer(operationId: string, body: TransferCommitRequest = {}): Promise<TransferResource> {
+    return (await this.request(TransferResourceSchema, { method: "POST", path: `/transfers/${seg(operationId)}/commit`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify(body)) })).data;
+  }
+
+  /** Discards staged items. Repeating it is harmless; a committed transfer answers 409 `invalid_transfer_state`. */
+  async abortTransfer(operationId: string): Promise<TransferResource> {
+    return (await this.request(TransferResourceSchema, { method: "POST", path: `/transfers/${seg(operationId)}/abort` })).data;
   }
 }

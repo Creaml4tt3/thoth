@@ -36,6 +36,7 @@
     "@thoth/importer-obsidian": "workspace:*",
     "@thoth/local-store": "workspace:*",
     "@thoth/platform": "workspace:*",
+    "@thoth/transfer": "workspace:*",
     "@thoth/workspace-client": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",
     "@types/node": "^24.19.2",

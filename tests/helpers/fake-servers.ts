@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { parseEtag, problem, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role } from "@thoth/workspace-protocol";
+import { parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -18,6 +18,8 @@ export interface FakePage {
   markdown: string;
   revisions: RevisionSummary[];
   deleted: boolean;
+  /** Markdown of each revision, in step with `revisions` (for `?revision=`). */
+  history?: string[];
 }
 
 export interface FakeWorkspace {
@@ -26,6 +28,17 @@ export interface FakeWorkspace {
   role: Role;
   pages: Map<string, FakePage>;
   changes: ChangeEntry[];
+  /** The server refuses Workspace → Private transfers (ADR-0009). */
+  exportRestricted: boolean;
+  members: { userId: string; displayName: string; role: Role }[];
+  attachments: Map<string, { id: string; bytes: Uint8Array; mimeType: string; hash: string; fileName?: string }>;
+}
+
+export interface FakeTransfer {
+  resource: TransferResource;
+  staged: { pageId: string; parentId: string | null; title: string; markdown: string }[];
+  body: string;
+  workspace: FakeWorkspace;
 }
 
 export interface FakeServerConfig {
@@ -38,6 +51,8 @@ export interface FakeServerConfig {
   account?: { id: string; displayName: string; email?: string };
   /** Answers, but not as a Thoth server. */
   notThoth?: boolean;
+  /** Capabilities listed (default: `search`, `transfers`, `attachments`). */
+  capabilities?: string[];
 }
 
 interface Known {
@@ -63,6 +78,13 @@ export class FakeServers implements Servers {
   readonly workspaces = new Map<string, FakeWorkspace[]>();
   /** Every api.call, in order. */
   readonly calls: ApiCallArgs[] = [];
+  readonly transfers = new Map<string, FakeTransfer>();
+  /** Stored replies by (server, Idempotency-Key): a retry with the same key and body replays, another body is 422. */
+  private readonly idempotent = new Map<string, { body: string; reply: ApiCallResult }>();
+  /** Test hook: runs before each protocol request is answered; throwing simulates a network failure. */
+  beforeCall: ((args: ApiCallArgs) => void) | undefined;
+  /** Test hook: runs after a request was answered (its effect is done); throwing simulates a lost response. */
+  afterCall: ((args: ApiCallArgs, result: ApiCallResult) => void) | undefined;
   /** Tokens `useToken` received (to prove the UI sent it once). */
   readonly tokensReceived: string[] = [];
   /** "auto" finishes browser sign-in at once; "manual" waits for `finishSignIn` / `failSignIn`. */
@@ -89,8 +111,17 @@ export class FakeServers implements Servers {
     return info.id;
   }
 
-  addWorkspace(server: string, init: { id?: string; name: string; role?: Role }): FakeWorkspace {
-    const ws: FakeWorkspace = { id: init.id ?? `ws_${this.workspaces.size + 1}${server}`, name: init.name, role: init.role ?? "editor", pages: new Map(), changes: [] };
+  addWorkspace(server: string, init: { id?: string; name: string; role?: Role; exportRestricted?: boolean; members?: FakeWorkspace["members"] }): FakeWorkspace {
+    const ws: FakeWorkspace = {
+      id: init.id ?? `ws_${this.workspaces.size + 1}${server}`,
+      name: init.name,
+      role: init.role ?? "editor",
+      pages: new Map(),
+      changes: [],
+      exportRestricted: init.exportRestricted ?? false,
+      members: init.members ?? [{ userId: "usr_me", displayName: "Me", role: init.role ?? "editor" }],
+      attachments: new Map(),
+    };
     const list = this.workspaces.get(server) ?? [];
     list.push(ws);
     this.workspaces.set(server, list);
@@ -222,17 +253,33 @@ export class FakeServers implements Servers {
       known.expired = false;
     }
     if (known.info.auth === "signed-out") return fail("unauthenticated");
+    this.beforeCall?.(args);
     const headers = Object.fromEntries(Object.entries(args.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
-    return this.route(args.server, args.method, path, args.query ?? {}, headers, body ? decoder.decode(body) : "");
+    const key = headers["idempotency-key"];
+    const text = body ? (path.endsWith("/attachments") ? Buffer.from(body).toString("base64") : decoder.decode(body)) : "";
+    let result: ApiCallResult;
+    const stored = key === undefined ? undefined : this.idempotent.get(`${args.server}\n${key}`);
+    if (stored) result = stored.body === `${args.method} ${path}\n${text}` ? stored.reply : fail("idempotency_key_reused");
+    else {
+      result = this.route(args.server, args.method, path, args.query ?? {}, headers, text, body);
+      if (key !== undefined && result.status < 500) this.idempotent.set(`${args.server}\n${key}`, { body: `${args.method} ${path}\n${text}`, reply: result });
+    }
+    this.afterCall?.(args, result);
+    return result;
   }
 
   // ----------------------------------------------------------------- server
 
-  private route(server: string, method: string, path: string, query: Record<string, string>, headers: Record<string, string>, text: string): ApiCallResult {
+  private route(server: string, method: string, path: string, query: Record<string, string>, headers: Record<string, string>, text: string, bytes?: Uint8Array): ApiCallResult {
     if (path === "/me" && method === "GET") return json(200, this.mustKnow(server).config.account ?? { id: "usr_me", displayName: "Me" });
     if (path === "/workspaces" && method === "GET") {
-      return json(200, { items: (this.workspaces.get(server) ?? []).map((w) => ({ id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: false, memberCount: 2, createdAt: iso(T0) })), nextCursor: null });
+      return json(200, {
+        items: (this.workspaces.get(server) ?? []).map((w) => ({ id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: w.exportRestricted, memberCount: w.members.length, members: w.members, createdAt: iso(T0) })),
+        nextCursor: null,
+      });
     }
+    const tm = /^\/transfers\/([^/]+)(\/commit|\/abort)?$/.exec(path);
+    if (tm) return this.transferRoute(server, method, decodeURIComponent(tm[1]!), tm[2] ?? "", text);
     const m = /^\/workspaces\/([^/]+)(\/.*)$/.exec(path);
     const ws = m ? (this.workspaces.get(server) ?? []).find((w) => w.id === decodeURIComponent(m[1]!)) : undefined;
     if (!m || !ws) return fail("not_found");
@@ -251,6 +298,18 @@ export class FakeServers implements Servers {
       const items = [...ws.pages.values()].filter((p) => !p.deleted && p.markdown.toLowerCase().includes(q)).map((p) => ({ pageId: p.id, title: p.title, revisionId: p.revisions.at(-1)!.id }));
       return json(200, { items, nextCursor: null });
     }
+    if (rest === "/transfers" && method === "POST") return this.createTransfer(server, ws, headers, text);
+    if (rest === "/attachments" && method === "POST") {
+      if (!this.capable(server, "attachments")) return fail("capability_not_supported");
+      if (ws.role === "viewer") return fail("forbidden");
+      const data = bytes ?? new Uint8Array();
+      if (data.length === 0) return fail("validation_failed", "an attachment cannot be empty");
+      const id = newStableId();
+      const hash = sha256Hex(data);
+      const mimeType = headers["content-type"] ?? "application/octet-stream";
+      ws.attachments.set(id, { id, bytes: data, mimeType, hash, ...(query["fileName"] ? { fileName: query["fileName"] } : {}) });
+      return json(201, { id, workspaceId: ws.id, hash, size: data.length, mimeType, ...(query["fileName"] ? { fileName: query["fileName"] } : {}), createdAt: iso(T0), createdBy: "usr_me" });
+    }
     const pm = /^\/pages\/([^/]+)$/.exec(rest);
     if (!pm) return fail("not_found");
     const id = decodeURIComponent(pm[1]!);
@@ -258,7 +317,21 @@ export class FakeServers implements Servers {
     const live = page && !page.deleted ? page : undefined;
     if (method === "GET") {
       if (!live) return fail("not_found");
+      const wanted = query["revision"];
+      if (wanted !== undefined) {
+        const at = live.revisions.findIndex((r) => r.id === wanted);
+        if (at < 0) return fail("not_found");
+        const markdown = live.history?.[at] ?? live.markdown;
+        return json(200, { ...this.resource(ws, live), markdown, revision: live.revisions[at]! });
+      }
       return json(200, this.resource(ws, live), { etag: `"${live.revisions.at(-1)!.id}"` });
+    }
+    if (method === "DELETE") {
+      if (!live) return fail("not_found");
+      if (parseEtag(headers["if-match"]) !== live.revisions.at(-1)!.id) return this.conflict(live);
+      live.deleted = true;
+      this.record(ws, "page.deleted", live, "usr_me");
+      return { status: 204, headers: {}, body: "" };
     }
     if (method === "PUT") {
       if (ws.role === "viewer") return fail("forbidden", "viewers cannot change pages");
@@ -298,10 +371,134 @@ export class FakeServers implements Servers {
   private capabilities(config: FakeServerConfig) {
     return {
       protocolVersion: "1.0",
-      capabilities: ["search"],
+      capabilities: config.capabilities ?? ["search", "transfers", "attachments"],
       ...(config.limits ? { limits: config.limits } : {}),
       server: { name: config.name ?? new URL(config.url).host },
     };
+  }
+
+  private capable(server: string, capability: string): boolean {
+    return (this.capabilities(this.mustKnow(server).config).capabilities as string[]).includes(capability);
+  }
+
+  // -------------------------------------------------------------- transfers
+  // The reference server's rules (apps/server/src/routes/transfers.ts), in memory.
+
+  private createTransfer(server: string, ws: FakeWorkspace, headers: Record<string, string>, text: string): ApiCallResult {
+    if (!this.capable(server, "transfers")) return fail("capability_not_supported");
+    const parsed = TransferCreateRequestSchema.safeParse(JSON.parse(text));
+    if (!parsed.success) return fail("validation_failed", parsed.error.message);
+    const plan = parsed.data;
+    if (headers["idempotency-key"] !== plan.operationId) return fail("validation_failed", "Idempotency-Key must equal operationId");
+    const write = plan.direction === "to_workspace" || plan.mode === "move";
+    if (write && ws.role === "viewer") return fail("forbidden");
+    const existing = this.transfers.get(plan.operationId);
+    if (existing) return existing.body === text && existing.workspace === ws ? json(201, existing.resource) : fail("idempotency_key_reused");
+    const now = iso(T0 + ++this.clock * 1000);
+    let transfer: FakeTransfer;
+    if (plan.direction === "to_workspace") {
+      const ids = plan.pages.map((p) => p.pageId);
+      if (new Set(ids).size !== ids.length || ids.some((id) => ws.pages.has(id))) return fail("validation_failed", "pageId values must be new and unique in the workspace");
+      if (plan.attachmentIds?.some((id) => !ws.attachments.has(id))) return fail("validation_failed", "unknown attachment");
+      const quota = this.quota(server, ws, plan.pages.length);
+      if (quota) return quota;
+      transfer = {
+        body: text,
+        workspace: ws,
+        staged: plan.pages.map((p) => ({ pageId: p.pageId, parentId: p.parentId, title: p.title, markdown: p.markdown })),
+        resource: { operationId: plan.operationId, workspaceId: ws.id, direction: "to_workspace", mode: plan.mode, state: "stage", items: plan.pages.map((p) => ({ pageId: p.pageId, sourceId: p.sourceId, revisionId: null, state: "staged" })), createdAt: now, updatedAt: now, error: null },
+      };
+    } else {
+      if (ws.exportRestricted) return fail("export_restricted", "this workspace forbids exporting content");
+      const items: TransferResource["items"] = [];
+      for (const { pageId } of plan.pages) {
+        const page = ws.pages.get(pageId);
+        if (!page || page.deleted) return fail("not_found", `page ${pageId} not found`);
+        items.push({ pageId, revisionId: page.revisions.at(-1)!.id, state: "staged" });
+      }
+      transfer = { body: text, workspace: ws, staged: [], resource: { operationId: plan.operationId, workspaceId: ws.id, direction: "from_workspace", mode: plan.mode, state: "stage", items, createdAt: now, updatedAt: now, error: null } };
+    }
+    this.transfers.set(plan.operationId, transfer);
+    return json(201, transfer.resource);
+  }
+
+  private quota(server: string, ws: FakeWorkspace, adding: number): ApiCallResult | undefined {
+    const limit = this.mustKnow(server).config.limits?.["maxPagesPerWorkspace"];
+    const count = [...ws.pages.values()].filter((p) => !p.deleted).length;
+    if (limit === undefined || count + adding <= limit) return undefined;
+    return json(409, { ...problem("quota_exceeded", { detail: `this workspace is limited to ${limit} pages` }), quota: "pagesPerWorkspace", limit, current: count });
+  }
+
+  private transferRoute(server: string, method: string, id: string, action: string, text: string): ApiCallResult {
+    if (!this.capable(server, "transfers")) return fail("capability_not_supported");
+    const t = this.transfers.get(id);
+    if (!t || !(this.workspaces.get(server) ?? []).includes(t.workspace)) return fail("not_found", "transfer not found");
+    const r = t.resource;
+    const ws = t.workspace;
+    if (action === "" && method === "GET") return json(200, r);
+    if (method !== "POST") return fail("method_not_allowed");
+    const committed = r.state === "done" || r.state === "destination_committed_source_cleanup_pending";
+    if (action === "/abort") {
+      if (r.state === "aborted") return json(200, r);
+      if (committed) return fail("invalid_transfer_state", "a committed transfer cannot be aborted");
+      t.staged = [];
+      for (const item of r.items) item.state = "skipped";
+      r.state = "aborted";
+      return json(200, r);
+    }
+    if (r.state === "aborted" || r.state === "failed") return fail("invalid_transfer_state", `transfer is ${r.state}`);
+    if (committed) return json(200, r);
+    const body = TransferCommitRequestSchema.safeParse(text === "" ? {} : JSON.parse(text));
+    if (!body.success) return fail("validation_failed");
+    if (r.direction === "to_workspace") {
+      if (t.staged.some((s) => ws.pages.has(s.pageId))) {
+        r.state = "failed";
+        r.error = { code: "validation_failed", detail: "a pageId was taken" };
+        for (const item of r.items) item.state = "failed";
+        return fail("invalid_transfer_state", "a pageId was taken in the workspace after the transfer was staged");
+      }
+      const quota = this.quota(server, ws, t.staged.length);
+      if (quota) return quota;
+      for (const s of t.staged) {
+        const page: FakePage = { id: s.pageId, parentId: s.parentId, title: s.title, markdown: s.markdown, revisions: [], deleted: false };
+        page.revisions.push(this.revision(page, "usr_me"));
+        ws.pages.set(page.id, page);
+        this.record(ws, "page.created", page, "usr_me");
+        const item = r.items.find((i) => i.pageId === s.pageId)!;
+        item.state = "committed";
+        item.revisionId = page.revisions.at(-1)!.id;
+      }
+      t.staged = [];
+      r.state = "done";
+      return json(200, r);
+    }
+    const verified = body.data.verified ?? [];
+    for (const v of verified) {
+      const item = r.items.find((i) => i.pageId === v.pageId);
+      const rev = ws.pages.get(v.pageId)?.revisions.find((x) => x.id === v.revisionId);
+      if (!item || item.revisionId !== v.revisionId || rev?.contentHash !== v.contentHash) return fail("validation_failed", `verified entry for ${v.pageId} does not match the pinned revision`);
+    }
+    if (r.mode === "copy") {
+      for (const item of r.items) item.state = "committed";
+      r.state = "done";
+      return json(200, r);
+    }
+    if (r.items.some((i) => !verified.some((v) => v.pageId === i.pageId))) return fail("validation_failed", "a move commit must verify every item");
+    let pending = false;
+    for (const item of r.items) {
+      const page = ws.pages.get(item.pageId)!;
+      if (!page.deleted && page.revisions.at(-1)!.id === item.revisionId) {
+        page.deleted = true;
+        this.record(ws, "page.deleted", page, "usr_me");
+        item.state = "committed";
+      } else {
+        item.state = "failed";
+        item.error = "revision_conflict";
+        pending = true;
+      }
+    }
+    r.state = pending ? "destination_committed_source_cleanup_pending" : "done";
+    return json(200, r);
   }
 
   private resource(ws: FakeWorkspace, page: FakePage) {
@@ -317,6 +514,7 @@ export class FakeServers implements Servers {
 
   private revision(page: FakePage, author: string): RevisionSummary {
     const bytes = new TextEncoder().encode(page.markdown);
+    page.history = [...(page.history ?? []), page.markdown];
     return { id: `rev_${++this.seq}`, pageId: page.id, parentId: page.revisions.at(-1)?.id ?? null, createdAt: iso(T0 + ++this.clock * 1000), authorId: author, title: page.title, size: bytes.length, contentHash: sha256Hex(bytes) };
   }
 
