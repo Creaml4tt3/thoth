@@ -25,6 +25,12 @@ export interface Bridge {
   token: string;
   /** The page script that injects the bridge platform before the app starts. */
   initScript: string;
+  /**
+   * Holds the next call of `command` until `release()`, so a test can act while an operation is provably still
+   * running (for example: cancel an import mid-run). `when` picks which call (by its arguments). `reached` resolves
+   * once the held call has arrived.
+   */
+  holdNext(command: CommandName, when?: (args: Record<string, unknown>) => boolean): { reached: Promise<void>; release(): void };
   close(): Promise<void>;
 }
 
@@ -39,6 +45,7 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
   const transport = new StdioTransport(options.host);
   const token = randomBytes(24).toString("hex");
   const streams = new Set<ServerResponse>();
+  let hold: { command: CommandName; when: (args: Record<string, unknown>) => boolean; arrive(): void; gate: Promise<void> } | null = null;
   const unlisten = await transport.listen("vault.changed", (event: VaultChangedEvent) => {
     for (const res of streams) res.write(`data: ${JSON.stringify(event)}\n\n`);
   });
@@ -49,6 +56,12 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
       if (url.pathname === "/call" && req.method === "POST") {
         if (req.headers["x-thoth-bridge"] !== token) return void res.writeHead(403).end();
         const { command, args, bytes } = JSON.parse(await body(req)) as { command: CommandName; args: never; bytes?: string };
+        if (hold?.command === command && hold.when(args as Record<string, unknown>)) {
+          const { arrive, gate } = hold;
+          hold = null;
+          arrive();
+          await gate;
+        }
         try {
           const result = await transport.call(command, args, bytes === undefined ? undefined : decodeBase64(bytes));
           const payload = BYTE_RESULTS.has(command) ? { ok: true, bytes: encodeBase64(result as Uint8Array) } : { ok: true, result };
@@ -86,6 +99,14 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
     url,
     token,
     initScript: `window.__THOTH_PLATFORM__ = async () => (await import("/__bridge__.js")).createHttpPlatform(${JSON.stringify(url)}, ${JSON.stringify(token)});`,
+    holdNext(command, when = () => true) {
+      let arrive!: () => void;
+      let release!: () => void;
+      const reached = new Promise<void>((r) => (arrive = r));
+      const gate = new Promise<void>((r) => (release = r));
+      hold = { command, when, arrive, gate };
+      return { reached, release };
+    },
     async close() {
       unlisten();
       for (const res of streams) res.end();

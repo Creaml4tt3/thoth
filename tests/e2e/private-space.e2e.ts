@@ -105,7 +105,7 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
   await writeZip(join(scratch, "source"), entries);
   const sourceBefore = await readFile(join(scratch, "source"));
 
-  const runWizardToStart = async (destination: string) => {
+  const runWizardToStart = async (destination: string, beforeStart?: () => void) => {
     await page.getByRole("radio", { name: /obsidian/i }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: /i have it ready/i }).click();
@@ -115,6 +115,7 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
     const dest = page.getByRole("region", { name: "Import" }).getByRole("textbox");
     await dest.fill(destination);
     await page.getByRole("button", { name: "Continue" }).click();
+    beforeStart?.();
     await page.getByRole("button", { name: /start import/i }).click();
   };
 
@@ -128,8 +129,13 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
   // Second import: cancel mid-run, then resume from "Unfinished imports".
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: /import from notion or obsidian/i }).click();
-  await runWizardToStart("Imports/Second");
+  // The first file landing in the destination (only the run phase writes there) is held, so the import is
+  // provably still running when Cancel is clicked; without this a fast machine could finish first.
+  let held: ReturnType<Bridge["holdNext"]> | undefined;
+  await runWizardToStart("Imports/Second", () => (held = bridge.holdNext("fs.rename", (a) => String(a["to"]).startsWith("Imports/Second/"))));
+  await held!.reached;
   await page.getByRole("button", { name: /cancel import/i }).click({ timeout: 30_000 });
+  held!.release();
   await expect(report.getByText("Import cancelled")).toBeVisible({ timeout: 60_000 });
   await report.getByRole("button", { name: "Close" }).click();
 
