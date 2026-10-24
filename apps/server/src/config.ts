@@ -40,6 +40,8 @@ export interface ServerConfig {
   /** Enables `GET /internal/maintenance` when set. Never logged or echoed. */
   cronSecret: string | undefined;
   capabilities: CapabilityId[];
+  /** Display name advertised as `server.name` in /capabilities (1 to 64 characters, no control characters). */
+  serverName: string;
   /** The sign-in broker (docs/protocol/sign-in.md); `undefined` when no provider is configured. */
   signIn: SignInConfig | undefined;
 }
@@ -225,6 +227,30 @@ export function parseWebRedirectUris(raw: string | undefined): string[] {
   return uris;
 }
 
+export const DEFAULT_SERVER_NAME = "Thoth server";
+const MAX_SERVER_NAME = 64;
+
+/**
+ * `SERVER_NAME`, trimmed: 1 to 64 characters (code points) and no control characters. Unset, it is the host name of
+ * `PUBLIC_URL`, else "Thoth server". PUBLIC_URL is validated only when sign-in needs it; here a value that does not
+ * parse simply gives no default.
+ */
+function serverNameFrom(env: NodeJS.ProcessEnv): string {
+  const raw = present(env, "SERVER_NAME");
+  if (raw === undefined) {
+    const publicUrl = present(env, "PUBLIC_URL");
+    if (publicUrl !== undefined && URL.canParse(publicUrl)) {
+      const host = new URL(publicUrl).hostname;
+      if (host !== "") return host;
+    }
+    return DEFAULT_SERVER_NAME;
+  }
+  const name = raw.trim();
+  const length = [...name].length;
+  if (length < 1 || length > MAX_SERVER_NAME || /\p{Cc}/u.test(name)) throw new ConfigError(`SERVER_NAME must be 1 to ${MAX_SERVER_NAME} characters with no control characters`);
+  return name;
+}
+
 export const GOOGLE_ISSUER = "https://accounts.google.com";
 
 /** Sign-in settings (docs/protocol/sign-in.md section 9). `undefined` when no provider is configured. */
@@ -288,6 +314,7 @@ function signInFrom(env: NodeJS.ProcessEnv, trial: typeof TRIAL_PROFILE | undefi
  *   RATE_LIMIT_PER_ACCOUNT, RATE_LIMIT_PER_IP, RATE_LIMIT_WINDOW_SECONDS   fixed-window rate limits (unset = off)
  *   TRUST_PROXY   trust x-forwarded-for / x-real-ip for the client IP (default false)
  *   CRON_SECRET   enables GET /internal/maintenance (bearer secret, at least 16 characters)
+ *   SERVER_NAME   display name in /capabilities `server.name`, 1 to 64 characters (default: PUBLIC_URL's host name, else "Thoth server")
  *   PUBLIC_URL    the server's public origin; required when a sign-in provider is set
  *   OIDC_GOOGLE_CLIENT_ID/_SECRET, OIDC_ISSUER + OIDC_CLIENT_ID/_SECRET (+ OIDC_NAME), GITHUB_CLIENT_ID/_SECRET
  *                 sign-in providers (secrets, never echoed); GITHUB_URL, GITHUB_API_URL for Enterprise or a test double
@@ -337,6 +364,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
     capabilities: DEFAULT_CAPABILITIES.filter((c) => eventsEnabled || c !== "events.sse"),
+    serverName: serverNameFrom(env),
     signIn: signInFrom(env, trial),
   };
 }

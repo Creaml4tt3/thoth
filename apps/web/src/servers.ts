@@ -10,6 +10,18 @@ import type { AuthSession } from "./auth.ts";
 
 export const SERVER_ID = "trial";
 
+/** Longest label shown, matching the reference server's `SERVER_NAME` limit and the desktop host. */
+const MAX_LABEL = 64;
+
+/**
+ * The server's display name (`capabilities.server.name`) without control characters, trimmed and kept to 64
+ * characters; its host name (without the port) when it sends none, as the desktop host does.
+ */
+export function serverLabel(capabilities: Capabilities, server: string): string {
+  const name = [...(capabilities.server?.name ?? "").replace(/\p{Cc}/gu, "").trim()].slice(0, MAX_LABEL).join("").trimEnd();
+  return name === "" ? new URL(server).hostname : name;
+}
+
 const SAFE_PATH = /^\/api\/v1\/[A-Za-z0-9._~%/-]*$/;
 const RESPONSE_HEADERS = ["content-type", "etag", "location", "retry-after"];
 
@@ -35,7 +47,7 @@ export class WebServers implements Servers {
     return {
       id: SERVER_ID,
       url: server,
-      label: capabilities.server?.name ?? new URL(server).host,
+      label: serverLabel(capabilities, server),
       auth: auth.status === "signed-out" ? "signed-out" : "browser",
       ...(account && auth.status !== "signed-out" ? { account } : {}),
       providers: capabilities.signIn?.providers ?? [],

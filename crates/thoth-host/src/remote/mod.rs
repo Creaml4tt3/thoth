@@ -44,6 +44,8 @@ pub const KEYCHAIN_SERVICE: &str = "io.github.creaml4tt3.thoth";
 const LIST_FILE: &str = "servers.json";
 const MAX_SERVERS: usize = 64;
 const MAX_PROVIDERS: usize = 16;
+/// Longest server label kept (the reference server's `SERVER_NAME` limit).
+const MAX_LABEL: usize = 64;
 const MAX_TOKEN: usize = 4096;
 /// Refresh this long before the access token expires (at most half its lifetime).
 const REFRESH_MARGIN: Duration = Duration::from_secs(60);
@@ -628,7 +630,7 @@ impl Remote {
         if version.split('.').next() != Some("1") {
             return Err(HostError::new("SERVER_UNREACHABLE", format!("{origin} speaks a protocol version this app does not support")));
         }
-        let label = caps.pointer("/server/name").and_then(Value::as_str).map(clean_text).filter(|s| !s.is_empty());
+        let label = caps.pointer("/server/name").and_then(Value::as_str).map(clean_label).filter(|s| !s.is_empty());
         let limits = caps.get("limits").and_then(Value::as_object).map(|m| m.iter().filter(|(k, v)| v.is_number() && k.len() <= 64).take(32).map(|(k, v)| (k.clone(), v.clone())).collect::<Map<_, _>>()).filter(|m| !m.is_empty());
         let sign_in = caps.get("signIn").and_then(Value::as_object);
         let providers = sign_in
@@ -693,6 +695,11 @@ fn token_shape(token: &str) -> bool {
 /// A server-supplied display string: no control characters, at most 200 characters.
 fn clean_text(s: &str) -> String {
     s.chars().filter(|c| !c.is_control()).take(200).collect::<String>().trim().to_owned()
+}
+
+/// A server's display name: `clean_text`, kept to the 64 characters a reference server allows (`SERVER_NAME`).
+fn clean_label(s: &str) -> String {
+    clean_text(s).chars().take(MAX_LABEL).collect::<String>().trim_end().to_owned()
 }
 
 fn random_b64(bytes: usize) -> HostResult<String> {

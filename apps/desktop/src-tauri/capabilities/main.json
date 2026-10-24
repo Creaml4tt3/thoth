@@ -12,6 +12,7 @@
     "allow-vault-recent",
     "allow-vault-open",
     "allow-vault-close",
+    "allow-vault-reveal",
     "allow-fs-stat",
     "allow-fs-read",
     "allow-fs-list",

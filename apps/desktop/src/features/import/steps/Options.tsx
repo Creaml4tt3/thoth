@@ -1,4 +1,5 @@
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { useDesktopStrings } from "../../../strings/index.ts";
 
 export interface WizardOptions {
   conflictPolicy: "rename" | "skip";
@@ -7,16 +8,18 @@ export interface WizardOptions {
 
 /** Step 7: conflict handling and identity frontmatter. */
 export function Options({ value, onChange, busy, error, onBack, onStart }: { value: WizardOptions; onChange(v: WizardOptions): void; busy: boolean; error: string | null; onBack(): void; onStart(): void }) {
+  const w = useDesktopStrings().wizard;
+  const t = w.options;
   return (
     <div className="wz-step">
       <fieldset className="wz-choices">
-        <legend className="wz-q">If a file with the same name already exists</legend>
+        <legend className="wz-q">{t.question}</legend>
         {(["rename", "skip"] as const).map((policy) => (
           <label key={policy} className="wz-choice" data-selected={value.conflictPolicy === policy}>
             <input type="radio" name="conflict" checked={value.conflictPolicy === policy} onChange={() => onChange({ ...value, conflictPolicy: policy })} />
             <span>
-              <b>{policy === "rename" ? "Keep both (rename the new one)" : "Skip it"}</b>
-              <span className="muted">{policy === "rename" ? "The imported file gets a number added. Nothing is overwritten." : "The existing file stays and the imported one is not added."}</span>
+              <b>{t[policy].title}</b>
+              <span className="muted">{t[policy].hint}</span>
             </span>
           </label>
         ))}
@@ -24,8 +27,8 @@ export function Options({ value, onChange, busy, error, onBack, onStart }: { val
       <label className="wz-choice wz-check" data-selected={value.addIdentityFrontmatter}>
         <input type="checkbox" checked={value.addIdentityFrontmatter} onChange={(e) => onChange({ ...value, addIdentityFrontmatter: e.target.checked })} />
         <span>
-          <b>Add identity frontmatter to imported pages</b>
-          <span className="muted">Writes a thoth_id and where the page came from (thoth_source) at the top of each imported page. It keeps links and re-imports stable, and shows up as a small metadata block in the Markdown file. The source itself is never changed.</span>
+          <b>{t.identity}</b>
+          <span className="muted">{t.identityHint}</span>
         </span>
       </label>
       {error && (
@@ -35,10 +38,10 @@ export function Options({ value, onChange, busy, error, onBack, onStart }: { val
       )}
       <div className="wz-actions">
         <Button variant="quiet" onClick={onBack} disabled={busy}>
-          Back
+          {w.back}
         </Button>
         <Button variant="primary" onClick={onStart} disabled={busy}>
-          {busy ? "Preparing…" : "Start import"}
+          {busy ? t.preparing : t.start}
         </Button>
       </div>
     </div>

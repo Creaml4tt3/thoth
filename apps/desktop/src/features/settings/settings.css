@@ -18,3 +18,5 @@
 .server-caution { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-token { margin-top: var(--thoth-space-1); }
 .server-add { display: grid; grid-template-columns: 1fr auto; gap: var(--thoth-space-3); align-items: end; }
+.set-path { overflow-wrap: anywhere; }
+.set-language { max-width: 280px; }

@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use support::{Callback, Config, Fake, follow};
-use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
 
 struct NoPicker;
 impl Picker for NoPicker {
@@ -16,6 +16,13 @@ impl Picker for NoPicker {
     }
     fn pick_source(&self, _: bool) -> Option<std::path::PathBuf> {
         None
+    }
+}
+
+struct NoFileManager;
+impl FileManager for NoFileManager {
+    fn reveal(&self, _: &std::path::Path) -> HostResult<()> {
+        Ok(())
     }
 }
 
@@ -69,6 +76,7 @@ impl Harness {
             disable_hardlink: false,
             secrets: secrets.clone(),
             browser: browser.clone(),
+            file_manager: Arc::new(NoFileManager),
         }));
         Self { host, secrets, browser, dir, seen: Mutex::default() }
     }
@@ -195,6 +203,22 @@ fn add_sign_in_call_refresh_and_sign_out() {
     assert_eq!(h.ok("server.list", json!({})), json!([]));
     assert_eq!(h.call("server.signIn", json!({ "server": id })).unwrap_err().code, "BAD_HANDLE");
     h.assert_no_leaks(&[&fake]);
+}
+
+#[test]
+fn the_label_is_the_servers_name_cleaned_or_else_its_host_name() {
+    let label = |server: Value| {
+        let fake = Fake::start(Config { server, ..Config::default() });
+        Harness::new().ok("server.add", json!({ "url": fake.origin }))["label"].as_str().unwrap().to_owned()
+    };
+    // No name, an empty or blank name, or a name of the wrong type: the host name (without the port).
+    for server in [Value::Null, json!({}), json!({ "name": "" }), json!({ "name": " \u{7} \n " }), json!({ "name": 42 })] {
+        assert_eq!(label(server.clone()), "127.0.0.1", "{server}");
+    }
+    // Control characters are dropped, the name is trimmed and kept to 64 characters (the server's own limit).
+    assert_eq!(label(json!({ "name": "  Team\u{7} notes\n " })), "Team notes");
+    assert_eq!(label(json!({ "name": "บันทึกของทีม" })), "บันทึกของทีม");
+    assert_eq!(label(json!({ "name": "ก".repeat(80) })), "ก".repeat(64));
 }
 
 #[test]

@@ -5,6 +5,7 @@ import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 import { ServerCard } from "./ServersSettings.tsx";
 
 /**
@@ -13,6 +14,7 @@ import { ServerCard } from "./ServersSettings.tsx";
  */
 export function WorkspacePageView({ target }: { target: WorkspacePageRef }) {
   const { servers, openWorkspacePage, openSettings } = useSession();
+  const t = useDesktopStrings().servers;
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const entry = directory.servers.find((s) => s.info.id === target.server);
   const signedOut = entry?.info.auth === "signed-out";
@@ -29,23 +31,23 @@ export function WorkspacePageView({ target }: { target: WorkspacePageRef }) {
         target={target}
         modeSpace={entry?.info.url ?? target.server}
         openPage={openWorkspacePage}
-        goneNotice={<Notice title="This server was removed" detail="Add it again in Settings to open its pages." />}
+        goneNotice={<Notice title={t.removedTitle} detail={t.removedDetail} />}
         signedOutNotice={
-          <Notice title={`Signed out of ${entry?.info.label ?? ""}`} detail="Sign in again to open this page.">
+          <Notice title={t.signedOutOf(entry?.info.label ?? "")} detail={t.signInAgainDetail}>
             <Button variant="primary" small onClick={() => openSettings("servers")}>
-              Sign in
+              {t.signIn}
             </Button>
           </Notice>
         }
         signedOutAction={
           <Button variant="quiet" small onClick={() => setSigningIn(true)}>
-            Sign in
+            {t.signIn}
           </Button>
         }
       />
       {signingIn && signedOut && entry && (
-        <Modal title={`Sign in to ${entry.info.label}`} onClose={() => setSigningIn(false)}>
-          <p className="muted">Your edits stay on this page. After signing in, choose Retry to save them.</p>
+        <Modal title={t.signInTo(entry.info.label)} onClose={() => setSigningIn(false)}>
+          <p className="muted">{t.editsStay}</p>
           <ServerCard info={entry.info} error={null} directory={servers} signInOnly />
         </Modal>
       )}

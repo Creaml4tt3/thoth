@@ -9,16 +9,16 @@ export function sourceKindFor(system: System, format: Format): ImportSourceKind 
   return format === "zip" ? "obsidian-zip" : "obsidian-vault";
 }
 
-/** Validates the destination folder the user typed. "" means the vault root. */
-export function checkDestination(input: string): { ok: true; root: string } | { ok: false; reason: string } {
+/** Validates the destination folder the user typed. "" means the vault root. The reason is a key of the wizard's destination text. */
+export function checkDestination(input: string): { ok: true; root: string } | { ok: false; reason: "reserved" | "invalid" } {
   const trimmed = input.trim().replace(/^\/+|\/+$/g, "");
   if (trimmed === "") return { ok: true, root: "" };
   try {
     const root = normalizeVaultPath(trimmed);
-    if (isReservedPath(root)) return { ok: false, reason: "The .thoth folder is reserved for Thoth." };
+    if (isReservedPath(root)) return { ok: false, reason: "reserved" };
     return { ok: true, root };
   } catch {
-    return { ok: false, reason: "That is not a valid folder path inside your Private Space." };
+    return { ok: false, reason: "invalid" };
   }
 }
 

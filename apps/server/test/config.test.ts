@@ -73,6 +73,20 @@ describe("configuration", () => {
     expect(loadConfig(env({ BLOB_STORE: "postgres" })).blobStore).toBe("postgres");
   });
 
+  it("SERVER_NAME: the operator's display name, else the PUBLIC_URL host name, else Thoth server", () => {
+    expect(loadConfig(env()).serverName).toBe("Thoth server");
+    expect(loadConfig(env({ PUBLIC_URL: "https://notes.example.org" })).serverName).toBe("notes.example.org");
+    expect(loadConfig(env({ PUBLIC_URL: "http://127.0.0.1:8080" })).serverName).toBe("127.0.0.1");
+    // Without a sign-in provider PUBLIC_URL is not required, so a bad one only loses the default.
+    expect(loadConfig(env({ PUBLIC_URL: "not a url" })).serverName).toBe("Thoth server");
+    expect(loadConfig(env({ SERVER_NAME: "  Team notes  ", PUBLIC_URL: "https://notes.example.org" })).serverName).toBe("Team notes");
+    expect(loadConfig(env({ SERVER_NAME: "บันทึกของทีม 📝" })).serverName).toBe("บันทึกของทีม 📝");
+    // 64 code points is the limit, counted as characters, not UTF-16 units.
+    expect(loadConfig(env({ SERVER_NAME: "📝".repeat(64) })).serverName).toBe("📝".repeat(64));
+    expect(loadConfig(env({ SERVER_NAME: "a".repeat(64) })).serverName).toHaveLength(64);
+    for (const bad of ["a".repeat(65), "📝".repeat(65), "   ", "a\nb", "bell\u0007", "tab\there", "del\u007f", "c1\u0085"]) expect(failure({ SERVER_NAME: bad }), JSON.stringify(bad)).toBe("SERVER_NAME must be 1 to 64 characters with no control characters");
+  });
+
   it("rate limits are off unless set, and read their window", () => {
     expect(loadConfig(env({ RATE_LIMIT_PER_ACCOUNT: "30", RATE_LIMIT_PER_IP: "100", RATE_LIMIT_WINDOW_SECONDS: "10" })).rateLimit).toEqual({ perAccount: 30, perIp: 100, windowSeconds: 10 });
   });

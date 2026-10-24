@@ -27,7 +27,8 @@ export const TEST_OPTIONS: Partial<AppOptions> = { autosaveMs: 0, reconcileDebou
 export async function openApp(root: string, options: Partial<AppOptions> = {}, platform = createNodePlatform({ vault: root })): Promise<Harness> {
   const user = userEvent.setup();
   render(<App platform={platform} options={{ ...DEFAULT_OPTIONS, ...TEST_OPTIONS, ...options }} />);
-  await user.click(await screen.findByRole("button", { name: /choose or create a private space/i }));
+  // English or Thai, whichever the test set up.
+  await user.click(await screen.findByRole("button", { name: /choose or create a private space|เลือกหรือสร้าง Private Space/i }));
   return {
     platform,
     root,

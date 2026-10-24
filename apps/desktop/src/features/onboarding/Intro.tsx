@@ -3,10 +3,12 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 
 /** Shown once for an empty Private Space (Night): start writing, or bring notes in first. */
 export function Intro({ onContinue }: { onContinue(): void }) {
   const { connection, openPage, openFolder } = useSession();
+  const t = useDesktopStrings().onboarding;
   const [importing, setImporting] = useState(false);
 
   if (importing) {
@@ -32,17 +34,18 @@ export function Intro({ onContinue }: { onContinue(): void }) {
     <main className="onboarding" data-theme="night">
       <div className="onboarding-inner">
         <h1 className="display onboarding-title">
-          <Mark size={48} /> Ready
+          <Mark size={48} /> {t.ready}
         </h1>
         <p className="lede">
-          <b>{connection.label}</b> is now a Private Space. Everything you write here is a Markdown file in that folder.
+          <b>{connection.label}</b>
+          {t.readyLede}
         </p>
         <div className="ctas">
           <Button variant="primary" onClick={onContinue} data-autofocus>
-            Start writing
+            {t.startWriting}
           </Button>
           <Button variant="ghost" onClick={() => setImporting(true)}>
-            Import from Notion or Obsidian
+            {t.importFrom}
           </Button>
         </div>
       </div>

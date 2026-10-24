@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildTree } from "../src/features/shell/tree.ts";
 import { pagePathFromInput } from "../src/features/shell/NewPageDialog.tsx";
+import { displayPath } from "../src/features/settings/path.ts";
 import { createUnavailablePlatform, selectPlatform } from "../src/platform/select.ts";
 import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
@@ -93,7 +94,9 @@ describe("settings", () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    expect((await screen.findByTestId("vault-location")).textContent).toBe(root);
+    const location = await screen.findByTestId("vault-location");
+    expect(location.getAttribute("title")).toBe(root);
+    expect(location.textContent).toBe(displayPath(root));
     await app.user.click(screen.getByRole("button", { name: "Rebuild index" }));
     await waitFor(() => expect(screen.getByText(/Index rebuilt \(2 pages read\)/)).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Import & Export" })).toBeTruthy();

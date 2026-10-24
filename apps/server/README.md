@@ -48,6 +48,7 @@ node apps/server/src/main.ts
 | `RATE_LIMIT_WINDOW_SECONDS` | 60 | Fixed window length. |
 | `TRUST_PROXY` | `false` | Trust `x-real-ip` / `x-forwarded-for` for the client IP. |
 | `CRON_SECRET` | none | Enables `GET /internal/maintenance` (at least 16 characters). Never logged. |
+| `SERVER_NAME` | host name of `PUBLIC_URL`, else `Thoth server` | Display name in `GET /capabilities` `server.name`, shown in the desktop app and web client. Trimmed; 1 to 64 characters, no control characters. |
 | `PUBLIC_URL` | none | The server's public origin (`https://api.example.org`). Required when a sign-in provider is set; plain `http` only on a loopback host. |
 | `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET` | none | Google sign-in (issuer `https://accounts.google.com`). Secret never logged. |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_NAME` | none | Any other OIDC issuer (Keycloak, Authentik...), provider ID `oidc`. The issuer must be `https` unless it is a loopback host. |

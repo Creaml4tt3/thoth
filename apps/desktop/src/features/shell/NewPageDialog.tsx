@@ -4,24 +4,39 @@ import { isReservedPath, normalizeVaultPath } from "@thoth/domain";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { useSession } from "../../app/context.ts";
+import { en, useDesktopStrings } from "../../strings/index.ts";
 
-/** `Notes/Ideas` or `Ideas.md` becomes a vault path ending in .md; throws on unsafe paths. */
+type PathProblem = keyof typeof en.newPage.errors;
+
+/** Why a typed name is not a page path; the dialog shows the reason in the UI language. */
+export class PagePathError extends Error {
+  readonly problem: PathProblem;
+
+  constructor(problem: PathProblem) {
+    super(en.newPage.errors[problem]);
+    this.name = "PagePathError";
+    this.problem = problem;
+  }
+}
+
+/** `Notes/Ideas` or `Ideas.md` becomes a vault path ending in .md; throws `PagePathError` on unsafe paths. */
 export function pagePathFromInput(input: string): string {
   const trimmed = input.trim().replace(/^\/+/, "");
-  if (trimmed === "") throw new Error("Give the page a name.");
+  if (trimmed === "") throw new PagePathError("empty");
   const withExt = /\.(md|markdown)$/i.test(trimmed) ? trimmed : `${trimmed}.md`;
   let path: string;
   try {
     path = normalizeVaultPath(withExt);
   } catch {
-    throw new Error("That name is not a valid page path.");
+    throw new PagePathError("invalid");
   }
-  if (isReservedPath(path)) throw new Error("The .thoth folder is reserved for Thoth.");
+  if (isReservedPath(path)) throw new PagePathError("reserved");
   return path;
 }
 
 export function NewPageDialog({ onClose }: { onClose(): void }) {
   const { vault, openPage, refresh } = useSession();
+  const t = useDesktopStrings().newPage;
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,16 +53,16 @@ export function NewPageDialog({ onClose }: { onClose(): void }) {
       onClose();
       openPage(path);
     } catch (e) {
-      setError(e instanceof ConflictError ? "A page with that name already exists." : e instanceof Error ? e.message : String(e));
+      setError(e instanceof PagePathError ? t.errors[e.problem] : e instanceof ConflictError ? t.exists : e instanceof Error ? e.message : String(e));
       setBusy(false);
     }
   };
 
   return (
-    <Modal title="New page" onClose={onClose}>
+    <Modal title={t.title} onClose={onClose}>
       <form onSubmit={(e) => void submit(e)} className="form">
         <label className="field">
-          <span>Name (use / for a folder, for example Projects/Plan)</span>
+          <span>{t.name}</span>
           <input data-autofocus className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         {error && (
@@ -57,10 +72,10 @@ export function NewPageDialog({ onClose }: { onClose(): void }) {
         )}
         <div className="modal-actions">
           <Button variant="quiet" onClick={onClose}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button variant="primary" type="submit" disabled={busy}>
-            Create
+            {t.create}
           </Button>
         </div>
       </form>

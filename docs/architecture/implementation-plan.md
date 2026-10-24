@@ -527,6 +527,42 @@ AC:
   - fonts: `@fontsource-variable/inter` and `noto-sans-thai` 5.2.8 (OFL),
     Latin and Thai subsets only.
 
+**Follow-ups from the video recording (2026-10-24)** (`design/video/README.md`,
+"UI notes", items 2, 3, 4 and 6):
+- **Desktop Thai UI.** The desktop follows the system language (`th*` →
+  Thai, else English, from the webview's `navigator.languages`). Settings →
+  Language offers System / English / ไทย, kept in localStorage like the default
+  editor mode. Its own text is in `apps/desktop/src/strings` (`en.ts`,
+  `th.ts`, same shape, checked by a test). The shared editor and workspace
+  text comes from `packages/app-ui` in the same language. `Info.plist`
+  declares `en` and `th`, so macOS hands the webview a Thai system language.
+- **Bundled fonts.** Inter (latin, latin-ext) and Noto Sans Thai (thai), the
+  same Fontsource woff2 files as the web client and video, committed in
+  `apps/desktop/src/fonts` with their OFL texts, which the build copies to
+  `dist/fonts/`. About 156 KB in total. The desktop puts Noto Sans Thai straight
+  after Inter in its font stack.
+- **Server name.** `SERVER_NAME` (trimmed, 1–64 characters, no control
+  characters) is sent as `server.name`. It defaults to the host name of
+  `PUBLIC_URL`, else "Thoth server". The trial's is "Thoth demo server".
+  Clients fall back to the host name. This is additive in protocol 1.0 (§3).
+- **Private Space folder.** Settings shows `~/…`, shortened in the middle to 48
+  characters, with the full path as a tooltip. It adds a Show in Finder / File
+  Explorer / Files button through a new host command, `vault.reveal`, which
+  takes the vault's handle and never a path. Onboarding's Recent list also
+  shows `~`.
+- **Checks:** `pnpm check` 1071/1071, `cargo test --workspace` 42, clippy
+  clean, `pnpm test:server` 212/212, `pnpm e2e` 20 passed
+  (`desktop-language.e2e.ts` included).
+- **Deviations (no locked decision changes):**
+  - The fonts are committed files, not an npm dependency of the desktop app,
+    so the desktop gets no new dependency. They are byte-identical to the
+    web client's Fontsource 5.2.8 files.
+  - On the desktop, Noto Sans Thai comes before the system font
+    (`--thoth-font-sans` is overridden in `apps/desktop/src/fonts/fonts.css`),
+    so Thai looks the same on every machine. `packages/ui/src/tokens.css` is
+    unchanged.
+  - Thai keeps "Private Space" as a name, as the Thai website does.
+
 ### Phase 3 — Transfer engine
 
 - `packages/transfer`: the ADR-0006 state machine with durable

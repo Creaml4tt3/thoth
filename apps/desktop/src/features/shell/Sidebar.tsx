@@ -3,6 +3,7 @@ import type { PageSummary } from "@thoth/domain";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 import { ancestorFolders, buildTree, type TreeNode } from "./tree.ts";
 import { ServersSidebar } from "../servers/ServersSidebar.tsx";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
@@ -51,6 +52,7 @@ function Node({ node, depth, open, toggle, current }: { node: TreeNode; depth: n
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage }: Props) {
   const { connection, reveal, openSettings } = useSession();
+  const t = useDesktopStrings().shell;
   const tree = useMemo(() => buildTree(pages), [pages]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
@@ -76,26 +78,26 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
     });
 
   return (
-    <aside className="sidebar" aria-label="Sidebar">
+    <aside className="sidebar" aria-label={t.sidebar}>
       <div className="ws">
         <Mark size={18} />
         <span className="ws-name">Thoth</span>
       </div>
-      <button type="button" className="search-trigger" onClick={onSearch} aria-label="Search pages" aria-keyshortcuts="Control+K Meta+K">
-        <span>Search</span>
+      <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">
+        <span>{t.search}</span>
         <kbd>⌘K</kbd>
       </button>
       <div className="sec">
         <span className="sec-name" title={connection.root}>
           {connection.label}
         </span>
-        <span className="badge badge-private">Local</span>
+        <span className="badge badge-private">{t.local}</span>
       </div>
-      <nav aria-label="Pages" className="tree-wrap">
+      <nav aria-label={t.pages} className="tree-wrap">
         {tree.length === 0 ? (
-          <p className="muted tree-empty">No pages yet.</p>
+          <p className="muted tree-empty">{t.noPages}</p>
         ) : (
-          <ul role="tree" aria-label="Pages in this Private Space">
+          <ul role="tree" aria-label={t.pagesInSpace}>
             {tree.map((node) => (
               <Node key={`${node.kind}:${node.path}`} node={node} depth={0} open={open} toggle={toggle} current={current} />
             ))}
@@ -105,10 +107,10 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
       </nav>
       <div className="side-actions">
         <Button variant="ghost" small onClick={onNewPage}>
-          New page
+          {t.newPage}
         </Button>
         <Button variant="quiet" small onClick={() => openSettings()}>
-          Settings
+          {t.settings}
         </Button>
       </div>
     </aside>

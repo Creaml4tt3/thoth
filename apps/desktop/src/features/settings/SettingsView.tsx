@@ -1,18 +1,25 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { STRINGS, useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
+import { LANG_PREFERENCES, LangPreferenceContext, useDesktopStrings, type LangPreference } from "../../strings/index.ts";
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
+import { currentOs, displayPath } from "./path.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
-/** Settings: vault location, workspace servers, editor mode, Rebuild index, and Import & Export. */
+/** Settings: vault location, workspace servers, language, editor mode, Rebuild index, and Import & Export. */
 export function SettingsView({ section = "top" }: { section?: "top" | "servers" }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder } = useSession();
+  const t = useDesktopStrings().settings;
+  const modes = useStrings().editor.modes;
+  const { preference, setPreference } = useContext(LangPreferenceContext);
   const [rebuild, setRebuild] = useState<Rebuild>({ state: "idle" });
   const [importing, setImporting] = useState(false);
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
+  const [revealError, setRevealError] = useState<string | null>(null);
 
   const rebuildIndex = async () => {
     setRebuild({ state: "running" });
@@ -25,41 +32,77 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
     }
   };
 
+  const reveal = connection.reveal?.bind(connection);
+  const showFolder = async () => {
+    setRevealError(null);
+    try {
+      await reveal?.();
+    } catch (e) {
+      setRevealError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <div className="page-scroll">
       <div className="page-col settings">
-        <h1 className="page-title">Settings</h1>
+        <h1 className="page-title">{t.title}</h1>
 
         <section aria-labelledby="set-vault" className="set-section">
-          <h2 id="set-vault">Private Space</h2>
+          <h2 id="set-vault">{t.privateSpace}</h2>
           <p>
-            <b>{connection.label}</b> <span className="badge badge-private">Local</span>
+            <b>{connection.label}</b> <span className="badge badge-private">{t.local}</span>
           </p>
-          <p className="mono muted" data-testid="vault-location">
-            {connection.root}
+          {/* Short and without the user's name (screenshots); the full path is the tooltip. */}
+          <p className="mono muted set-path" data-testid="vault-location" title={connection.root}>
+            {displayPath(connection.root)}
           </p>
-          <p className="muted">Pages are Markdown files in this folder. The index lives in .thoth inside it and can always be rebuilt.</p>
+          <p className="muted">{t.vaultNote}</p>
           <div className="set-actions">
+            {reveal && (
+              <Button variant="ghost" small onClick={() => void showFolder()}>
+                {t.reveal[currentOs()]}
+              </Button>
+            )}
             <Button variant="ghost" small onClick={switchVault}>
-              Switch Private Space
+              {t.switchSpace}
             </Button>
           </div>
+          {revealError && (
+            <p role="alert" className="alert alert-danger">
+              {revealError}
+            </p>
+          )}
         </section>
 
         <ServersSettings focus={section === "servers"} />
 
+        <section aria-labelledby="set-language" className="set-section">
+          <h2 id="set-language">{t.language}</h2>
+          <label className="field set-language">
+            <span>{t.languageHint}</span>
+            <select className="input" value={preference} aria-label={t.language} onChange={(e) => setPreference(e.target.value as LangPreference)}>
+              {LANG_PREFERENCES.map((choice) => (
+                // Each language is named in itself, so it can be found whatever the UI language is.
+                <option key={choice} value={choice} lang={choice === "system" ? undefined : choice}>
+                  {choice === "system" ? t.system : STRINGS[choice].name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+
         <section aria-labelledby="set-editor" className="set-section">
-          <h2 id="set-editor">Editor</h2>
-          <p className="muted">Both modes edit the same Markdown file. Switch any page with Ctrl/Cmd+Shift+E or the toggle above it.</p>
+          <h2 id="set-editor">{t.editor}</h2>
+          <p className="muted">{t.editorNote}</p>
           <fieldset className="mode-choices">
-            <legend className="sr-only">Default editor mode</legend>
+            <legend className="sr-only">{t.defaultMode}</legend>
             {EDITOR_MODES.map((m) => (
               <label key={m.id} className="mode-choice">
                 <input
                   type="radio"
                   name="editor-mode"
                   value={m.id}
-                  aria-label={m.label}
+                  aria-label={modes[m.id].label}
                   aria-describedby={`editor-mode-${m.id}`}
                   checked={mode === m.id}
                   onChange={() => {
@@ -67,22 +110,22 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
                     setMode(m.id);
                   }}
                 />
-                <b aria-hidden="true">{m.label}</b>
-                <span id={`editor-mode-${m.id}`}>{m.hint}</span>
+                <b aria-hidden="true">{modes[m.id].label}</b>
+                <span id={`editor-mode-${m.id}`}>{modes[m.id].hint}</span>
               </label>
             ))}
           </fieldset>
         </section>
 
         <section aria-labelledby="set-index" className="set-section">
-          <h2 id="set-index">Search index</h2>
-          <p className="muted">Rebuilding re-reads every file and recreates the index. Your files are not changed.</p>
+          <h2 id="set-index">{t.index}</h2>
+          <p className="muted">{t.indexNote}</p>
           <div className="set-actions">
             <Button variant="ghost" small disabled={rebuild.state === "running"} onClick={() => void rebuildIndex()}>
-              {rebuild.state === "running" ? "Rebuilding…" : "Rebuild index"}
+              {rebuild.state === "running" ? t.rebuilding : t.rebuild}
             </Button>
             <span role="status" className="muted">
-              {rebuild.state === "done" ? `Index rebuilt (${rebuild.pages} pages read).` : ""}
+              {rebuild.state === "done" ? t.rebuilt(rebuild.pages) : ""}
             </span>
           </div>
           {rebuild.state === "error" && (
@@ -93,7 +136,7 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
         </section>
 
         <section aria-labelledby="set-import" className="set-section">
-          <h2 id="set-import">Import & Export</h2>
+          <h2 id="set-import">{t.importExport}</h2>
           {importing ? (
             <ImportWizard
               onClose={() => setImporting(false)}
@@ -105,10 +148,10 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
             />
           ) : (
             <>
-              <p className="muted">Bring pages in from Notion or Obsidian. Your originals are only ever read.</p>
+              <p className="muted">{t.importNote}</p>
               <div className="set-actions">
                 <Button variant="primary" small onClick={() => setImporting(true)}>
-                  Import from Notion or Obsidian
+                  {t.importFrom}
                 </Button>
               </div>
             </>

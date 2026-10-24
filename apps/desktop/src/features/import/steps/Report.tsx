@@ -1,13 +1,8 @@
 import type { ImportReport } from "@thoth/importer-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { useDesktopStrings } from "../../../strings/index.ts";
 import { SEVERITY_ORDER } from "../warnings.ts";
 import { Stat, WarningList, type WarningGroup } from "./Preview.tsx";
-
-const HEADLINE: Record<string, string> = {
-  completed: "Import complete",
-  cancelled: "Import cancelled",
-  failed: "Import finished with errors",
-};
 
 function groupsOf(report: ImportReport): WarningGroup[] {
   const groups = new Map<string, WarningGroup>();
@@ -23,25 +18,27 @@ function groupsOf(report: ImportReport): WarningGroup[] {
 
 /** Steps 9 and 10: the report, a way to open the result, and the "source untouched" note. */
 export function Report({ report, destinationRoot, onOpenFolder, onResume, onDone }: { report: ImportReport; destinationRoot: string; onOpenFolder(): void; onResume(): void; onDone(): void }) {
+  const w = useDesktopStrings().wizard;
+  const t = w.report;
   const groups = groupsOf(report);
   const total = report.imported.pages + report.imported.attachments + report.imported.databases;
   return (
     <div className="wz-step" data-testid="import-report">
       <h3 className="wz-q" role="status">
-        {HEADLINE[report.state] ?? "Import finished"}
+        {report.state === "completed" || report.state === "cancelled" || report.state === "failed" ? t.headline[report.state] : t.headline.other}
       </h3>
-      <div className="wz-stats" role="group" aria-label="Import results">
-        <Stat label="pages imported" value={report.imported.pages} />
-        <Stat label="attachments" value={report.imported.attachments} />
-        <Stat label="databases / CSV" value={report.imported.databases} />
-        <Stat label="skipped" value={report.skipped} />
-        <Stat label="failed" value={report.failed.length} />
-        <Stat label="warnings" value={report.warnings.length} />
+      <div className="wz-stats" role="group" aria-label={t.results}>
+        <Stat label={t.stats.pages} value={report.imported.pages} />
+        <Stat label={t.stats.attachments} value={report.imported.attachments} />
+        <Stat label={t.stats.databases} value={report.imported.databases} />
+        <Stat label={t.stats.skipped} value={report.skipped} />
+        <Stat label={t.stats.failed} value={report.failed.length} />
+        <Stat label={t.stats.warnings} value={report.warnings.length} />
       </div>
       {report.failed.length > 0 && (
         <section aria-labelledby="wz-failed">
           <h4 id="wz-failed" className="label">
-            Failed items
+            {t.failedItems}
           </h4>
           <ul className="wz-examples">
             {report.failed.map((f) => (
@@ -54,28 +51,28 @@ export function Report({ report, destinationRoot, onOpenFolder, onResume, onDone
       )}
       {report.links && (
         <p className="muted">
-          Links: {report.links.resolved} resolved, {report.links.unresolved} unresolved, {report.links.ambiguous} ambiguous.
+          {t.links(report.links.resolved, report.links.unresolved, report.links.ambiguous)}
         </p>
       )}
       <section aria-labelledby="wz-rwarn">
         <h4 id="wz-rwarn" className="label">
-          Warnings
+          {w.preview.warnings}
         </h4>
-        {groups.length === 0 ? <p className="muted">No warnings.</p> : <WarningList groups={groups} />}
+        {groups.length === 0 ? <p className="muted">{w.preview.noWarnings}</p> : <WarningList groups={groups} />}
       </section>
-      <p className="wz-safe">Your source was only read. It was not changed, moved or deleted.</p>
+      <p className="wz-safe">{t.safe}</p>
       <div className="wz-actions">
         {report.state !== "completed" && (
           <Button variant="ghost" onClick={onResume}>
-            Resume
+            {w.source.resume}
           </Button>
         )}
         <Button variant="ghost" onClick={onDone}>
-          Close
+          {w.close}
         </Button>
         {total > 0 && (
-          <Button variant="primary" onClick={onOpenFolder} title={destinationRoot || undefined} aria-label={`Open imported folder ${destinationRoot || "(top level)"}`}>
-            <span className="wz-open-label">Open {destinationRoot ? `“${destinationRoot.slice(destinationRoot.lastIndexOf("/") + 1)}”` : "imported pages"}</span>
+          <Button variant="primary" onClick={onOpenFolder} title={destinationRoot || undefined} aria-label={t.openLabel(destinationRoot || null)}>
+            <span className="wz-open-label">{t.open(destinationRoot ? destinationRoot.slice(destinationRoot.lastIndexOf("/") + 1) : null)}</span>
           </Button>
         )}
       </div>

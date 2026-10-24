@@ -70,6 +70,7 @@ names do not work for sign-in cookies.
    | `CORS_ORIGINS` | `https://thoth.creaml4tt3.me` |
    | `CRON_SECRET` | a long random value, e.g. from `openssl rand -base64 32`; Vercel Cron sends it automatically |
    | `PUBLIC_URL` | `https://api.thoth.creaml4tt3.me` (the sign-in redirect addresses are built from it) |
+   | `SERVER_NAME` | `Thoth demo server` (the name the desktop app and web client show; the same as the starter server's name) |
    | `WEB_REDIRECT_URIS` | `https://thoth.creaml4tt3.me/app/callback` |
 
 5. Add a daily cron job that calls `/internal/maintenance`. The Hobby plan allows

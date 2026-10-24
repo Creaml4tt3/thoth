@@ -1,7 +1,7 @@
 /**
  * UI text, one module per language (`en.ts`, `th.ts`). React views read it with `useStrings()`; the editors'
  * plain-DOM parts (menus, node views) get it through their `EditorContext`. With no provider the text is
- * English, which is what the desktop app uses.
+ * English. The web client and the desktop app each provide the language they resolved.
  */
 import { createContext, useContext } from "react";
 import { en, type Lang, type Strings } from "./en.ts";

@@ -3,7 +3,7 @@
 
 /// `thoth_host::COMMANDS` with `.` replaced by `_` (checked by a unit test in src/lib.rs).
 pub const TAURI_COMMANDS: &[&str] = &[
-    "vault_pick", "vault_recent", "vault_open", "vault_close",
+    "vault_pick", "vault_recent", "vault_open", "vault_close", "vault_reveal",
     "fs_stat", "fs_read", "fs_list", "fs_mkdirp", "fs_write", "fs_rename", "fs_remove",
     "sql_exec", "sql_run", "sql_all", "sql_get",
     "watch_start", "watch_stop",
