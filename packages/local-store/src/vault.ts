@@ -1,4 +1,4 @@
-import { decodeText, encodeText, LinkResolver, NotEditableError, parsePage, updateFrontmatter, type PageDocument } from "@thoth/content";
+import { decodeText, encodeText, LinkResolver, NotEditableError, parsePage, rewriteTargets, updateFrontmatter, type PageDocument, type ParsedReference, type TargetEdit } from "@thoth/content";
 import {
   collisionKey,
   isMarkdownPath,
@@ -7,8 +7,11 @@ import {
   newStableId,
   normalizeVaultPath,
   provisionalPageId,
+  relativeLink,
   sha256Hex,
+  basename,
   dirname,
+  stripExtension,
   type PageSummary,
 } from "@thoth/domain";
 import { ConflictError, NotFoundError } from "./errors.ts";
@@ -86,6 +89,16 @@ export interface WriteOptions {
    * `null` means the file must not exist yet. Required: there is no blind write.
    */
   expectedHash: string | null;
+}
+
+/** What `Vault.move` did. */
+export interface MoveReport {
+  /** The page, attachment or folder that moved (one entry). */
+  moved: { from: string; to: string }[];
+  /** Pages whose links were rewritten to follow the move. */
+  rewritten: string[];
+  /** Pages whose links could not be updated, and why. They are left as they were. */
+  skipped: { path: string; reason: string }[];
 }
 
 interface PageRow {
@@ -575,7 +588,7 @@ export class Vault {
     return this.exclusive(() => this.writeFileAtomicNow(path, data, options));
   }
 
-  private async writeFileAtomicNow(path: string, data: Uint8Array, options: WriteOptions): Promise<string> {
+  private async writeFileAtomicNow(path: string, data: Uint8Array, options: WriteOptions, reconcile = true): Promise<string> {
     const normalized = normalizeVaultPath(path);
     if (isReservedPath(normalized)) throw new Error("Refusing to write vault content into .thoth/");
     const currentHash = await this.currentHash(normalized);
@@ -602,7 +615,7 @@ export class Vault {
       throw error;
     }
     await clearJournalEntry(this.fs, id);
-    await this.reconcileNow();
+    if (reconcile) await this.reconcileNow();
     return newHash;
   }
 
@@ -653,6 +666,170 @@ export class Vault {
       if (!(await this.fs.stat(candidate))) return candidate;
     }
     throw new Error(`No free name next to ${path}`);
+  }
+
+  // ------------------------------------------------------------ moves, folders
+
+  /**
+   * Moves (or renames) a page, an attachment or a folder inside the vault and updates the links that pointed at
+   * what moved (ADR-0016 rule 4: a move in the tree is a file move, and links follow it).
+   *
+   * - The target must not exist (`ConflictError`), except a rename that only changes letter case.
+   * - `expectedHash` (files only) is compare-and-swap on the source bytes, like every other write (ADR-0001 §5).
+   * - Links: every resolved link in the vault is resolved again against the file set after the move. A link that
+   *   no longer reaches the same file is rewritten in place (`rewriteTargets`, byte for byte outside the target):
+   *   a wikilink or embed to the shortest form that resolves, a Markdown link to a relative path. That includes
+   *   relative links inside moved pages. Each rewrite is its own compare-and-swap write on the bytes just read; a
+   *   page that changed meanwhile, is not UTF-8 or cannot carry the new target is left alone and reported.
+   *
+   * Crash safety: the rename is one atomic filesystem operation, so a page is always at its old path or its new
+   * one, never lost or doubled. A crash after the rename and before every link is rewritten leaves some links
+   * unresolved (they show as such and can be fixed), never lost content. Frontmatter (`title:`) is not touched.
+   */
+  async move(from: string, to: string, options: { expectedHash?: string } = {}): Promise<MoveReport> {
+    return this.exclusive(async () => {
+      const src = normalizeVaultPath(from);
+      const dst = normalizeVaultPath(to);
+      if (isReservedPath(src) || isReservedPath(dst)) throw new Error("Refusing to move Thoth metadata (.thoth/)");
+      if (src === dst) throw new Error("The source and the destination are the same");
+      const stat = await this.fs.stat(src);
+      if (!stat) throw new NotFoundError(`"${src}"`);
+      if (stat.kind !== "file" && stat.kind !== "directory") throw new Error(`"${src}" is not a file or a folder`);
+      const folder = stat.kind === "directory";
+      const caseOnly = collisionKey(src) === collisionKey(dst);
+      if (folder && collisionKey(dst).startsWith(`${collisionKey(src)}/`)) throw new Error("A folder cannot move into itself");
+      if (caseOnly ? await this.existsExactly(dst) : await this.fs.stat(dst)) throw new ConflictError(dst, null, (await this.hashOrKind(dst)) ?? "exists");
+      if (!folder && options.expectedHash !== undefined) {
+        const current = await this.currentHash(src);
+        if (current !== options.expectedHash) throw new ConflictError(src, options.expectedHash, current);
+      }
+
+      // The index is the "before" picture: bring it up to date, then remember every resolved link.
+      await this.reconcileNow();
+      const pages = await this.sql.all<{ id: string; path: string }>("SELECT id, path FROM pages");
+      const attachments = await this.sql.all<{ path: string }>("SELECT path FROM attachments");
+      const aliasRows = await this.sql.all<{ page_id: string; alias: string }>("SELECT page_id, alias FROM page_aliases");
+      const refs = await this.sql.all<{ source_page_id: string; ord: number; syntax: string; target: string; target_path: string }>(
+        "SELECT source_page_id, ord, syntax, target, target_path FROM refs WHERE resolution = 'resolved' AND external = 0 AND target_path IS NOT NULL ORDER BY source_page_id, ord",
+      );
+      const map = (path: string): string => (folder ? (path.startsWith(`${src}/`) ? dst + path.slice(src.length) : path) : path === src ? dst : path);
+
+      await this.fs.mkdirp(dirname(dst));
+      await this.fs.rename(src, dst, { noReplace: !folder && !caseOnly });
+      const report: MoveReport = { moved: [{ from: src, to: dst }], rewritten: [], skipped: [] };
+
+      const pathById = new Map(pages.map((p) => [p.id, p.path]));
+      const aliases = new Map<string, string[]>();
+      for (const row of aliasRows) {
+        const path = pathById.get(row.page_id);
+        if (path) aliases.set(map(path), [...(aliases.get(map(path)) ?? []), row.alias]);
+      }
+      const after = new LinkResolver(
+        [...pages.map((p) => map(p.path)), ...attachments.map((a) => map(a.path))],
+        pages.map((p) => ({ path: map(p.path), aliases: aliases.get(map(p.path)) ?? [] })),
+      );
+      // Pages (by their path after the move) with links that would now miss their target.
+      const broken = new Map<string, { ord: number; syntax: string; target: string; want: string }[]>();
+      for (const ref of refs) {
+        const source = pathById.get(ref.source_page_id);
+        if (!source) continue;
+        const at = map(source);
+        const want = map(ref.target_path);
+        const now = after.resolve(at, { syntax: ref.syntax as ParsedReference["syntax"], target: ref.target, external: false });
+        if (now.state === "resolved" && now.path === want) continue;
+        broken.set(at, [...(broken.get(at) ?? []), { ord: ref.ord, syntax: ref.syntax, target: ref.target, want }]);
+      }
+
+      for (const [path, list] of broken) {
+        try {
+          const bytes = await this.fs.readFile(path);
+          const { text, editable } = decodeText(bytes);
+          if (!editable) {
+            report.skipped.push({ path, reason: "not_utf8" });
+            continue;
+          }
+          const doc = parsePage(path, text);
+          const edits: TargetEdit[] = [];
+          let unwritable = false;
+          for (const item of list) {
+            const reference = doc.references[item.ord];
+            // The file must still say what the index saw; otherwise it changed underneath us.
+            if (!reference || reference.syntax !== item.syntax || reference.target !== item.target) throw new ConflictError(path, null, sha256Hex(bytes));
+            const target = newLinkTarget(after, path, reference, item.want);
+            if (target === undefined) unwritable = true;
+            else edits.push({ reference, newTarget: target });
+          }
+          if (unwritable) report.skipped.push({ path, reason: "link_not_rewritable" });
+          if (edits.length === 0) continue;
+          await this.writeFileAtomicNow(path, encodeText(rewriteTargets(text, edits)), { expectedHash: sha256Hex(bytes) }, false);
+          report.rewritten.push(path);
+        } catch (error) {
+          report.skipped.push({ path, reason: error instanceof ConflictError ? "changed" : error instanceof Error ? error.message : String(error) });
+        }
+      }
+      await this.reconcileNow();
+      return report;
+    });
+  }
+
+  /** Every folder in the vault (also empty ones), sorted; the same folders `scanFiles` walks. */
+  async listFolders(): Promise<string[]> {
+    const out: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await this.fs.list(dir)) {
+        if (entry.kind !== "directory" || IGNORED_DIRS.has(entry.name) || isReservedPath(entry.name)) continue;
+        const path = dir ? `${dir}/${entry.name}` : entry.name;
+        out.push(path);
+        await walk(path);
+      }
+    };
+    await walk("");
+    return out.sort();
+  }
+
+  /** Creates an empty folder. Anything already at the path is a `ConflictError`. */
+  async createFolder(path: string): Promise<void> {
+    return this.exclusive(async () => {
+      const normalized = normalizeVaultPath(path);
+      if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
+      if (await this.fs.stat(normalized)) throw new ConflictError(normalized, null, (await this.hashOrKind(normalized)) ?? "exists");
+      await this.fs.mkdirp(normalized);
+    });
+  }
+
+  /** Removes a folder that holds nothing but empty folders (and `.DS_Store`); anything else throws. */
+  async removeEmptyFolder(path: string): Promise<void> {
+    return this.exclusive(async () => {
+      const normalized = normalizeVaultPath(path);
+      if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
+      const stat = await this.fs.stat(normalized);
+      if (!stat) return;
+      if (stat.kind !== "directory") throw new Error(`"${normalized}" is not a folder`);
+      const empty = async (dir: string): Promise<boolean> => {
+        for (const entry of await this.fs.list(dir)) {
+          if (entry.kind === "directory") {
+            if (!(await empty(`${dir}/${entry.name}`))) return false;
+          } else if (!(entry.kind === "file" && entry.name === ".DS_Store")) return false;
+        }
+        return true;
+      };
+      if (!(await empty(normalized))) throw new Error("Folder is not empty");
+      await this.fs.remove(normalized);
+      await this.reconcileNow();
+    });
+  }
+
+  /** True when the parent folder lists exactly this name (case-sensitive), whatever the volume's case rules. */
+  private async existsExactly(path: string): Promise<boolean> {
+    const dir = dirname(path);
+    if (dir !== "" && !(await this.fs.stat(dir))) return false;
+    return (await this.fs.list(dir)).some((e) => e.name === basename(path));
+  }
+
+  private async hashOrKind(path: string): Promise<string | null> {
+    const stat = await this.fs.stat(path);
+    if (!stat) return null;
+    return stat.kind === "file" ? sha256Hex(await this.fs.readFile(path)) : stat.kind;
   }
 
   // --------------------------------------------------------------- records
@@ -756,4 +933,22 @@ export class Vault {
     await this.writePage(current.path, updateFrontmatter(current.source, { thoth_id: id }), { expectedHash: current.hash });
     return id;
   }
+}
+
+/**
+ * The target a link should carry to reach `want` from `from` after a move, or undefined when none resolves or
+ * can be written. Wikilinks and embeds get the shortest form (`Name`, then the vault path, without `.md` for
+ * pages); Markdown links get a relative path.
+ */
+function newLinkTarget(resolver: LinkResolver, from: string, reference: ParsedReference, want: string): string | undefined {
+  const reaches = (target: string) => {
+    const r = resolver.resolve(from, { syntax: reference.syntax, target, external: false });
+    return r.state === "resolved" && r.path === want;
+  };
+  if (reference.syntax === "wikilink" || reference.syntax === "embed") {
+    const candidates = isMarkdownPath(want) ? [stripExtension(basename(want)), stripExtension(want)] : [basename(want), want];
+    return candidates.find((c) => !/[[\]|#\n]/.test(c) && reaches(c));
+  }
+  const relative = relativeLink(from, want);
+  return reaches(relative) ? relative : undefined;
 }

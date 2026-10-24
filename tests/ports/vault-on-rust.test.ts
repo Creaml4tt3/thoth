@@ -149,4 +149,16 @@ describe("Vault on Rust ports", () => {
     await Promise.all(work);
     for (let i = 0; i < 6; i++) expect((await vault.search(`zebramark${i}`)).some((h) => h.path === `Burst/Note ${i}.md`)).toBe(true);
   });
+
+  it("moves a page and a whole folder, updating links, and creates and removes empty folders", async () => {
+    await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
+    expect(await readFile(join(root, "Projects/Thoth/Architecture.md"), "utf8")).toBe("# Architecture\n\nBack to [[Home]]. Missing [[Nowhere]].\n");
+    expect(await readFile(join(root, "Inbox/Welcome.md"), "utf8")).toContain("[[Summary]]");
+    await vault.move("Projects/Thoth", "Archive/Thoth");
+    expect((await vault.listPages()).map((p) => p.path)).toEqual(expect.arrayContaining(["Archive/Thoth/Architecture.md", "Archive/Thoth/Summary.md"]));
+    expect(await vault.listFolders()).toEqual(expect.arrayContaining(["Archive", "Archive/Thoth", "Projects"]));
+    await vault.createFolder("Empty/Inner");
+    await vault.removeEmptyFolder("Empty");
+    expect(await vault.listFolders()).not.toContain("Empty");
+  });
 });

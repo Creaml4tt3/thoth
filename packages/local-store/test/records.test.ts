@@ -32,6 +32,9 @@ describe("durable records", () => {
     for (const bad of ["Notes/A.md", ".thoth/x.json", ".thoth/index.sqlite/x.json", ".thoth/tmp/x.json", ".thoth/operations/journal/x.json", ".thoth/sync/../../A.json", ".thoth/sync/a.txt"]) {
       expect(() => recordPath(bad), bad).toThrow();
     }
+    // The tree order is the one record directly under .thoth/.
+    expect(recordPath(".thoth/order.json")).toBe(".thoth/order.json");
+    expect(() => recordPath(".thoth/other.json")).toThrow();
   });
 
   it("a crash before the rename leaves the previous record and only a temp file, swept on open", async () => {
