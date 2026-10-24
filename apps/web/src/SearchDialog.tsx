@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@thoth/workspace-protocol";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import { CommandOptions, useCommandMode } from "@thoth/app-ui/keyboard/CommandOptions.tsx";
+import type { Command } from "@thoth/app-ui/keyboard/commands.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { SERVER_ID } from "./servers.ts";
 
@@ -14,8 +16,23 @@ interface Hit {
 
 const DEBOUNCE_MS = 250;
 
-/** Searches every workspace the user is in (the server's own search). Reports one `search` per dialog, never the text. */
-export function SearchDialog({ directory, workspaces, onOpen, onClose, onSearched }: { directory: ServerDirectory; workspaces: Workspace[]; onOpen(ref: WorkspacePageRef): void; onClose(): void; onSearched(): void }) {
+interface Props {
+  directory: ServerDirectory;
+  workspaces: Workspace[];
+  /** The server can search; when it cannot, the dialog still lists commands. */
+  canSearch: boolean;
+  commands: readonly Command[];
+  onRun(command: Command): void;
+  onOpen(ref: WorkspacePageRef): void;
+  onClose(): void;
+  onSearched(): void;
+}
+
+/**
+ * Searches every workspace the user is in (the server's own search). Reports one `search` per dialog, never the text.
+ * Starting with `>` it lists commands instead (ADR-0016 rule 7).
+ */
+export function SearchDialog({ directory, workspaces, canSearch, commands, onRun, onOpen, onClose, onSearched }: Props) {
   const t = useStrings();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
@@ -24,10 +41,11 @@ export function SearchDialog({ directory, workspaces, onOpen, onClose, onSearche
   const reported = useRef(false);
   const searched = useRef(onSearched);
   searched.current = onSearched;
+  const cmd = useCommandMode(query, commands, onRun);
 
   useEffect(() => {
     const q = query.trim();
-    if (q === "") {
+    if (q === "" || cmd.on || !canSearch) {
       setHits(null);
       return;
     }
@@ -51,7 +69,7 @@ export function SearchDialog({ directory, workspaces, onOpen, onClose, onSearche
       live = false;
       clearTimeout(timer);
     };
-  }, [query, directory, workspaces]);
+  }, [query, directory, workspaces, cmd.on, canSearch]);
 
   const open = (hit: Hit) => {
     onClose();
@@ -65,13 +83,15 @@ export function SearchDialog({ directory, workspaces, onOpen, onClose, onSearche
         className="input"
         type="search"
         role="combobox"
-        aria-expanded={hits !== null && hits.length > 0}
-        aria-controls="search-results"
+        aria-expanded={cmd.on ? cmd.items.length > 0 : hits !== null && hits.length > 0}
+        aria-controls={cmd.on ? cmd.listId : "search-results"}
+        aria-activedescendant={cmd.on ? cmd.activeId : undefined}
         aria-label={t.web.searchPlaceholder}
-        placeholder={t.web.searchPlaceholder}
+        placeholder={t.keyboard.searchOrCommands}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
+          if (cmd.onKeyDown(e) || cmd.on) return;
           if (!hits || hits.length === 0) return;
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
@@ -82,27 +102,36 @@ export function SearchDialog({ directory, workspaces, onOpen, onClose, onSearche
           }
         }}
       />
-      {error && (
-        <p role="alert" className="alert alert-danger">
-          {error}
-        </p>
-      )}
-      {hits === null ? (
-        <p className="muted">{t.web.searchHint}</p>
-      ) : hits.length === 0 ? (
-        <p className="muted" role="status">
-          {t.web.searchNone}
-        </p>
+      {cmd.on ? (
+        <CommandOptions mode={cmd} />
       ) : (
-        <ul id="search-results" className="results" role="listbox" aria-label={t.web.search}>
-          {hits.map((hit, i) => (
-            <li key={`${hit.workspace.id}/${hit.pageId}`} role="option" aria-selected={i === active} className="result" onMouseDown={(e) => e.preventDefault()} onClick={() => open(hit)}>
-              <b>{hit.title}</b>
-              {workspaces.length > 1 && <span className="muted">{hit.workspace.name}</span>}
-              {hit.snippet && <span className="snippet">{hit.snippet}</span>}
-            </li>
-          ))}
-        </ul>
+        <>
+          {error && (
+            <p role="alert" className="alert alert-danger">
+              {error}
+            </p>
+          )}
+          {hits === null ? (
+            <>
+              {canSearch && <p className="muted">{t.web.searchHint}</p>}
+              <p className="muted">{t.keyboard.palette.hint}</p>
+            </>
+          ) : hits.length === 0 ? (
+            <p className="muted" role="status">
+              {t.web.searchNone}
+            </p>
+          ) : (
+            <ul id="search-results" className="results" role="listbox" aria-label={t.web.search}>
+              {hits.map((hit, i) => (
+                <li key={`${hit.workspace.id}/${hit.pageId}`} role="option" aria-selected={i === active} className="result" onMouseDown={(e) => e.preventDefault()} onClick={() => open(hit)}>
+                  <b>{hit.title}</b>
+                  {workspaces.length > 1 && <span className="muted">{hit.workspace.name}</span>}
+                  {hit.snippet && <span className="snippet">{hit.snippet}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Modal>
   );

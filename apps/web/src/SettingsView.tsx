@@ -5,7 +5,7 @@ import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
 
 /** Settings, a tab of the web client: appearance, language and the account. */
-export function SettingsView({ account, signOut, signingOut }: { account: { displayName: string } | null; signOut(): void; signingOut: boolean }) {
+export function SettingsView({ account, signOut, signingOut, showShortcuts }: { account: { displayName: string } | null; signOut(): void; signingOut: boolean; showShortcuts(): void }) {
   const t = useStrings();
   const s = t.web.settingsView;
   return (
@@ -22,6 +22,16 @@ export function SettingsView({ account, signOut, signingOut }: { account: { disp
           <div className="field">
             <span>{s.languageHint}</span>
             <LanguageSwitch />
+          </div>
+        </section>
+
+        <section aria-labelledby="web-set-keyboard" className="set-section">
+          <h2 id="web-set-keyboard">{s.keyboard}</h2>
+          <p className="muted">{s.keyboardNote}</p>
+          <div className="set-actions">
+            <Button variant="ghost" small onClick={showShortcuts}>
+              {s.showShortcuts}
+            </Button>
           </div>
         </section>
 

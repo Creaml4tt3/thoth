@@ -51,7 +51,7 @@ export const th: DesktopStrings = {
   search: {
     title: "ค้นหา",
     label: "ค้นหาหน้า",
-    placeholder: "ค้นหาหน้า…",
+    placeholder: "ค้นหาหน้า หรือพิมพ์ > เพื่อใช้คำสั่ง",
     results: "ผลการค้นหา",
     none: (query) => `ไม่มีหน้าที่ตรงกับ “${query}”`,
   },

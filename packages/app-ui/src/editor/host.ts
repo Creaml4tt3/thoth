@@ -5,6 +5,8 @@
 import { createContext, useContext } from "react";
 
 export interface PageHost {
+  /** Which app this is, for the keys the editor binds (the web client avoids keys a browser keeps). Default: the desktop app. */
+  client?: "desktop" | "web";
   /** Idle time before an edited page is saved. 0 disables autosave. */
   autosaveMs: number;
   now: () => Date;

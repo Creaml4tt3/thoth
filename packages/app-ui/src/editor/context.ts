@@ -16,8 +16,10 @@ export interface EditorContext {
   views: Set<Refreshable>;
   /** Text for the editors' menus and node views (fixed for the editor's lifetime). */
   strings: EditorStrings;
+  /** Which app the editor is in; the web client binds other style keys where a browser keeps the desktop's. */
+  client: "desktop" | "web";
 }
 
-export function createEditorContext(init: { lookup(): LinkLookup; suggester(): LinkSuggester; openPage(path: string): void; strings?: EditorStrings }): EditorContext {
-  return { ...init, strings: init.strings ?? en.editor, views: new Set() };
+export function createEditorContext(init: { lookup(): LinkLookup; suggester(): LinkSuggester; openPage(path: string): void; strings?: EditorStrings; client?: "desktop" | "web" }): EditorContext {
+  return { ...init, strings: init.strings ?? en.editor, client: init.client ?? "desktop", views: new Set() };
 }

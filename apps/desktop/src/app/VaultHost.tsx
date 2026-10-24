@@ -65,7 +65,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Workspace servers: one directory per open window, polling only expanded workspaces.
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
-  const pageHost = useMemo<PageHost>(() => ({ autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
+  const pageHost = useMemo<PageHost>(() => ({ client: "desktop", autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
   // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
   const transfers = useMemo(() => createTransferService(vault, servers, { now: options.now, onChanged: bump }), [vault, servers, options.now, bump]);
   useEffect(() => {

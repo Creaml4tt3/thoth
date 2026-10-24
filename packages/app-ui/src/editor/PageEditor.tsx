@@ -3,12 +3,18 @@ import { useEffect, useImperativeHandle, useMemo, useRef, type Ref } from "react
 import { docToMarkdown, markdownToDoc } from "@thoth/editor";
 import type { JSONContent } from "@tiptap/core";
 import { EditorState, Selection } from "@tiptap/pm/state";
+import type { FormatCommand } from "../keyboard/editor-actions.ts";
 import type { EditorBridge } from "./page-session.ts";
+import { canFormat, formatSelection } from "./format.ts";
 import { createEditorExtensions } from "./extensions.ts";
 import type { EditorContext } from "./context.ts";
 
 export interface PageEditorHandle extends EditorBridge {
   focus(): void;
+  /** Blocks mode only: text is selected that can be styled. */
+  canFormat?(): boolean;
+  /** Blocks mode only: styles the selection (the command palette). */
+  format?(command: FormatCommand): boolean;
 }
 
 interface Props {
@@ -82,6 +88,8 @@ export function PageEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
       focus() {
         editor?.commands.focus();
       },
+      canFormat: () => (editor ? canFormat(editor) : false),
+      format: (command) => (editor ? formatSelection(editor, command) : false),
     }),
     [editor],
   );

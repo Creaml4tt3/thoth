@@ -21,7 +21,6 @@ import { TEXT_COLORS, type TextColor } from "@thoth/editor";
 import type { EditorStrings } from "../strings/en.ts";
 import {
   MARK_STYLES,
-  STYLE_SHORTCUTS,
   activeLinkHref,
   activeTextColor,
   isStyleActive,
@@ -30,6 +29,7 @@ import {
   setLink,
   setTextColor,
   shortcutLabel,
+  styleShortcuts,
   toggleStyle,
   toolbarApplies,
   type MarkStyle,
@@ -62,8 +62,9 @@ interface Toolbar extends TextToolbarApi {
   destroy(): void;
 }
 
-function createToolbar(view: EditorView, strings: EditorStrings): Toolbar {
+function createToolbar(view: EditorView, strings: EditorStrings, client: "desktop" | "web"): Toolbar {
   const t = strings.styles;
+  const keys = styleShortcuts(client);
   const root = el("div", "text-toolbar");
   root.setAttribute("role", "toolbar");
   root.setAttribute("aria-label", t.toolbar);
@@ -95,7 +96,7 @@ function createToolbar(view: EditorView, strings: EditorStrings): Toolbar {
     b.tabIndex = -1;
     b.dataset["tool"] = tool;
     b.setAttribute("aria-label", labels[tool]);
-    const shortcut = tool === "color" ? undefined : STYLE_SHORTCUTS[tool][0];
+    const shortcut = tool === "color" ? undefined : keys[tool][0];
     b.title = shortcut ? t.withShortcut(labels[tool], shortcutLabel(shortcut)) : labels[tool];
     const glyph = el("span", "text-tool-glyph");
     glyph.setAttribute("aria-hidden", "true");
@@ -410,7 +411,7 @@ function createToolbar(view: EditorView, strings: EditorStrings): Toolbar {
 }
 
 /** Shortcuts and the floating toolbar for the text styles. */
-export function textStylesExtension(strings: EditorStrings) {
+export function textStylesExtension(strings: EditorStrings, client: "desktop" | "web" = "desktop") {
   return Extension.create({
     name: "thothTextStyles",
     addStorage() {
@@ -418,23 +419,24 @@ export function textStylesExtension(strings: EditorStrings) {
     },
     addKeyboardShortcuts() {
       const storage = this.storage;
+      const keys = styleShortcuts(client);
       const bindings: Record<string, () => boolean> = {};
       // A style shortcut always swallows the key: where it cannot apply (a code block), the browser's own bold would be worse.
       for (const style of MARK_STYLES) {
-        for (const shortcut of STYLE_SHORTCUTS[style]) {
+        for (const shortcut of keys[style]) {
           bindings[shortcut] = () => {
             if (this.editor.isEditable) runEdit(this.editor.view, toggleStyle(style));
             return true;
           };
         }
       }
-      for (const shortcut of STYLE_SHORTCUTS.link) {
+      for (const shortcut of keys.link) {
         bindings[shortcut] = () => {
           if (this.editor.isEditable) storage.toolbar?.openLink();
           return true;
         };
       }
-      for (const shortcut of STYLE_SHORTCUTS.toolbar) bindings[shortcut] = () => storage.toolbar?.focus() ?? false;
+      for (const shortcut of keys.toolbar) bindings[shortcut] = () => storage.toolbar?.focus() ?? false;
       return bindings;
     },
     addProseMirrorPlugins() {
@@ -444,7 +446,7 @@ export function textStylesExtension(strings: EditorStrings) {
         new Plugin({
           key,
           view(view) {
-            toolbar = createToolbar(view, strings);
+            toolbar = createToolbar(view, strings, client);
             storage.toolbar = toolbar;
             return {
               update: () => toolbar?.update(),

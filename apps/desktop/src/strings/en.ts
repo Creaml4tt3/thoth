@@ -58,7 +58,7 @@ export const en = {
   search: {
     title: "Search",
     label: "Search pages",
-    placeholder: "Search pages…",
+    placeholder: "Search pages, or type > for commands",
     results: "Results",
     none: (query: string) => `No pages match “${query}”.`,
   },

@@ -75,5 +75,5 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     const view = views[ext.name];
     return view ? ext.extend({ addNodeView: () => view }) : ext;
   });
-  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), textStylesExtension(ctx.strings), linkSuggestExtension(ctx)];
+  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), textStylesExtension(ctx.strings, ctx.client), linkSuggestExtension(ctx)];
 }

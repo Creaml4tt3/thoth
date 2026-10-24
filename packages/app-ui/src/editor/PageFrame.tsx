@@ -6,7 +6,9 @@ import { PageEditor, type PageEditorHandle } from "./PageEditor.tsx";
 import { createEditorContext } from "./context.ts";
 import { EMPTY_LOOKUP, type LinkLookup } from "./links.ts";
 import { EMPTY_SUGGESTER, type LinkSuggester } from "./link-suggest.ts";
+import { registerEditorActions } from "../keyboard/editor-actions.ts";
 import { usePageSession } from "./usePageSession.ts";
+import { usePageHost } from "./host.ts";
 import type { PageStore, SaveStatus } from "./page-session.ts";
 import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode } from "./mode.ts";
 import { PlainEditor } from "./plain/PlainEditor.tsx";
@@ -92,7 +94,8 @@ export function PageFrame(props: PageFrameProps) {
   // One context per page: the link opener changes with every index revision, and node views and the Plain editor hold the context.
   const open = useRef(props.openLink);
   open.current = props.openLink;
-  const ctx = useMemo(() => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p), strings: t }), [t]);
+  const client = usePageHost().client ?? "desktop";
+  const ctx = useMemo(() => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p), strings: t, client }), [t, client]);
   const { session, state } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten });
 
   // Wikilink chips resolve through the index; refresh them when it changes.
@@ -157,6 +160,17 @@ export function PageFrame(props: PageFrameProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mode, switchMode]);
+
+  // The command palette reaches the open page through these: switch the mode, style the selection.
+  useEffect(
+    () =>
+      registerEditorActions({
+        toggleMode: () => switchMode(mode === "blocks" ? "plain" : "blocks"),
+        canFormat: () => mode === "blocks" && canSwitch && (handle.current?.canFormat?.() ?? false),
+        format: (command) => handle.current?.format?.(command) ?? false,
+      }),
+    [mode, canSwitch, switchMode],
+  );
 
   const editorProps = { ctx, handleRef: handle, onEdit: () => session?.noteEdited(), onSaveShortcut: () => void session?.save() };
 

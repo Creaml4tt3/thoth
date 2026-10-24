@@ -5,6 +5,7 @@ import { useTreeDnd, type DropZone, type TreeDnd } from "../order/dnd.ts";
 import { Disclosure, FolderIcon, PageIcon } from "../order/icons.tsx";
 import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
+import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameInput } from "../order/RenameInput.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
 import { useStrings } from "../strings/index.ts";
@@ -159,6 +160,9 @@ export interface WorkspaceSectionProps {
 }
 
 const isThisWorkspace = (server: string, workspace: string) => (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "workspace" }> =>
+  request.kind === "workspace" && request.server === server && request.workspace === workspace;
+
+const isThisWorkspaceReorder = (server: string, workspace: string) => (request: ReorderRequest): request is Extract<ReorderRequest, { kind: "workspace" }> =>
   request.kind === "workspace" && request.server === server && request.workspace === workspace;
 
 /** Pages of the tree below `items`, for the "Move to…" list; the subtree of `except` is left out (it cannot move into itself). */
@@ -370,6 +374,15 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     clearMoveTo();
     if (canWrite && nodes?.some((n) => n.id === request.page)) setMoving(request.page);
   }, [request, canWrite, nodes]);
+
+  // "Move page up / down" asked for from code (the command palette): the same change as Alt+Shift+Up and Down.
+  const reorderRequest = usePendingReorder(isThisWorkspaceReorder(server, workspace.id));
+  useEffect(() => {
+    if (!reorderRequest) return;
+    clearReorder();
+    if (canWrite && nodes?.some((n) => n.id === reorderRequest.page)) reorder(reorderRequest.page, reorderRequest.delta);
+    // `reorder` reads the current tree; the request is what triggers this.
+  }, [reorderRequest]);
 
   const menuItems = (id: string): MenuItem[] => {
     const at = siblingsOf(id);

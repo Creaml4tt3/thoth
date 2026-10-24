@@ -6,6 +6,7 @@ import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
 import { Disclosure, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
+import { clearReorder, usePendingReorder, type ReorderRequest } from "@thoth/app-ui/order/reorder-request.ts";
 import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -25,6 +26,7 @@ export interface Selection {
 const TOP = "\u0000top";
 const END = 1_000_000;
 const isPrivate = (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "private" }> => request.kind === "private";
+const isPrivateReorder = (request: ReorderRequest): request is Extract<ReorderRequest, { kind: "private" }> => request.kind === "private";
 
 interface Props {
   tree: TreeNode[];
@@ -155,6 +157,16 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     if (find(request.path)) setMoving(request.path);
     // `find` reads the current tree; the request is what triggers this.
   }, [request]);
+
+  // "Move page up / down" asked for from code (the command palette): the same change as Alt+Shift+Up and Down.
+  const reorderRequest = usePendingReorder(isPrivateReorder);
+  useEffect(() => {
+    if (!reorderRequest) return;
+    clearReorder();
+    const node = find(reorderRequest.path);
+    if (node) reorder(node, reorderRequest.delta);
+    // `find` and `reorder` read the current tree; the request is what triggers this.
+  }, [reorderRequest]);
 
   const menuItems = (node: TreeNode): MenuItem[] => {
     const list = childrenAt(tree, dirname(node.path));

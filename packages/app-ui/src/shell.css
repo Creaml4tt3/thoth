@@ -98,3 +98,15 @@
 .tab-new { margin: 0 0 4px 4px; }
 .tab-panel { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
 .tab-panel > * { min-height: 0; }
+
+/* The command palette and the shortcuts list. */
+.result-command { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-4); }
+.shortcut { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); background: var(--thoth-bg-hover); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-sm); padding: 1px 6px; white-space: nowrap; }
+.shortcut-groups { display: grid; gap: var(--thoth-space-6); max-height: 60vh; overflow: auto; padding-right: var(--thoth-space-2); }
+.shortcut-group h3 { font: var(--thoth-text-ui); font-weight: 600; margin: 0 0 var(--thoth-space-2); }
+.shortcut-list { display: grid; gap: 2px; margin: 0; }
+.shortcut-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--thoth-space-4); padding: 4px 0; border-bottom: 1px solid var(--thoth-border); }
+.shortcut-row dt { margin: 0; }
+.shortcut-row dd { margin: 0; display: grid; justify-items: end; gap: 2px; }
+.shortcut-other { font: var(--thoth-text-small); }
+.shortcut-row[data-differs] dd .shortcut { border-color: var(--thoth-accent); }
