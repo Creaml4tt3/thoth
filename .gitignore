@@ -17,3 +17,4 @@ tests/.tmp/
 .kiro/settings/
 .agents/skills/
 .codex/skills/
+.mcp.json
