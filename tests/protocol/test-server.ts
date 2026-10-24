@@ -24,6 +24,7 @@ import {
   TransferCommitRequestSchema,
   TransferCreateRequestSchema,
   formatEtag,
+  pageKindOf,
   parseEtag,
   problem,
   roleCan,
@@ -48,11 +49,13 @@ export interface Flaws {
   badIdempotency?: boolean;
   /** Echoes the Authorization header into plain error bodies (to test token redaction). */
   leakAuthorization?: boolean;
+  /** Derives a page's kind only when the page is created, so an update that adds or removes `thoth_kind: folder` leaves it stale. */
+  staleKind?: boolean;
 }
 
 export interface TestServerOptions {
   flaws?: Flaws;
-  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers. */
+  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind. */
   capabilities?: CapabilityId[];
 }
 
@@ -85,6 +88,8 @@ interface PageRecord {
   /** Parent and sibling position now: a move changes them without a revision. */
   parentId: string | null;
   position: string | null;
+  /** Kind from frontmatter `thoth_kind` (capability `page-kind`); null when unknown. */
+  kind: "page" | "folder" | null;
   updatedAt: string;
   deleted: boolean;
   createdAt: string;
@@ -160,7 +165,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -221,6 +226,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
         parentId: rev === currentRevision(page) ? page.parentId : rev.pageParentId,
         title: rev.title,
         ...(caps.has("page-order") ? { position: rev === currentRevision(page) ? page.position : null } : {}),
+        ...(caps.has("page-kind") ? { kind: rev === currentRevision(page) ? page.kind : pageKindOf(rev.markdown) } : {}),
         createdAt: page.createdAt,
         createdBy: page.createdBy,
         updatedAt: rev.createdAt,
@@ -231,7 +237,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
 
   function treeNode(page: PageRecord) {
     const rev = currentRevision(page);
-    return { id: page.id, parentId: page.parentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}), revisionId: rev.id, updatedAt: page.updatedAt };
+    return { id: page.id, parentId: page.parentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}), ...(caps.has("page-kind") ? { kind: page.kind } : {}), revisionId: rev.id, updatedAt: page.updatedAt };
   }
 
   function writeRevision(workspaceId: string, pageId: string, input: { title: string; markdown: string; parentId?: string | null | undefined; position?: string | null | undefined }, userId: string): { page: PageRecord; rev: Revision; created: boolean } {
@@ -240,7 +246,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     const created = !page;
     const now = new Date().toISOString();
     if (!page) {
-      page = { id: pageId, workspaceId, revisions: [], parentId: null, position: null, updatedAt: now, deleted: false, createdAt: now, createdBy: userId };
+      page = { id: pageId, workspaceId, revisions: [], parentId: null, position: null, kind: null, updatedAt: now, deleted: false, createdAt: now, createdBy: userId };
       pages.set(key, page);
     }
     const previous = page.revisions[page.revisions.length - 1];
@@ -259,8 +265,9 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     page.revisions.push(rev);
     page.parentId = rev.pageParentId;
     if (caps.has("page-order") && input.position !== undefined) page.position = input.position;
+    if (created || !flaws.staleKind) page.kind = pageKindOf(input.markdown);
     page.updatedAt = now;
-    record(workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId: rev.id, parentId: rev.pageParentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}) });
+    record(workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId: rev.id, parentId: rev.pageParentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}), ...(caps.has("page-kind") ? { pageKind: page.kind } : {}) });
     return { page, rev, created };
   }
 
@@ -459,7 +466,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       if (parsed.data.position !== undefined) page.position = parsed.data.position;
       page.updatedAt = new Date().toISOString();
       const rev = currentRevision(page);
-      record(ws.id, { kind: "page.updated", actorId: ctx.user.id, pageId, revisionId: rev.id, parentId: page.parentId, title: rev.title, position: page.position });
+      record(ws.id, { kind: "page.updated", actorId: ctx.user.id, pageId, revisionId: rev.id, parentId: page.parentId, title: rev.title, position: page.position, ...(caps.has("page-kind") ? { pageKind: page.kind } : {}) });
       return jsonReply(200, treeNode(page), { etag: formatEtag(rev.id) });
     }),
   );

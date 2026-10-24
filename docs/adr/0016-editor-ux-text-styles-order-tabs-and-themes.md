@@ -5,6 +5,7 @@
 - **Deciders:** project owner
 - **Refines:** ADR-0002 (content model and serialization), ADR-0004 (workspace protocol), ADR-0012 (Blocks
   and Plain modes).
+- **Refined by:** ADR-0017 (rule 3: servers may publish the folder marker as a page `kind`).
 
 ## Context
 

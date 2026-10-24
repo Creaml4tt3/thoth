@@ -19,6 +19,15 @@ export const PagePositionSchema = z
   .describe("Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).");
 export type PagePosition = z.infer<typeof PagePositionSchema>;
 
+/**
+ * Page kind (capability `page-kind`, ADR-0017): `folder` for a page whose frontmatter says `thoth_kind: folder`
+ * (ADR-0016 rule 3), `page` for any other. Servers derive it from the Markdown on every write; clients never send
+ * it. Absent or `null` means unknown, which clients treat as a page.
+ */
+export const PAGE_KINDS = ["page", "folder"] as const;
+export const PageKindSchema = z.enum(PAGE_KINDS).describe("Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page.");
+export type PageKind = z.infer<typeof PageKindSchema>;
+
 /** One immutable revision (ADR-0005). Revisions are never modified after creation. */
 export const RevisionSummarySchema = z.object({
   id: RevisionIdSchema,
@@ -41,6 +50,8 @@ export const PageMetadataSchema = z.object({
   title: z.string(),
   /** Sibling sort key; absent or null when the page has none (or the server does not support `page-order`). */
   position: PagePositionSchema.nullable().optional(),
+  /** Kind of the revision returned, derived by the server from frontmatter `thoth_kind` (capability `page-kind`); absent or null when unknown. */
+  kind: PageKindSchema.nullable().optional(),
   createdAt: TimestampSchema,
   createdBy: OpaqueIdSchema.nullable(),
   updatedAt: TimestampSchema,

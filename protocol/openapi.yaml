@@ -131,7 +131,7 @@ paths:
       tags:
         - Pages
       summary: Page hierarchy of a workspace
-      description: Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from.
+      description: Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content.
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
         - $ref: "#/components/parameters/Cursor"
@@ -227,7 +227,7 @@ paths:
       tags:
         - Pages
       summary: Create or update a page
-      description: "Conditional write. Create with `If-None-Match: *` (201). Update with `If-Match: <etag>` (200). A write with neither header is 428 `precondition_required`; both headers is 400. A stale `If-Match`, or `If-None-Match: *` on an existing page, is 412 `revision_conflict` carrying `currentRevision`; the server never overwrites silently. Every successful write creates a new immutable revision."
+      description: "Conditional write. Create with `If-None-Match: *` (201). Update with `If-Match: <etag>` (200). A write with neither header is 428 `precondition_required`; both headers is 400. A stale `If-Match`, or `If-None-Match: *` on an existing page, is 412 `revision_conflict` carrying `currentRevision`; the server never overwrites silently. Every successful write creates a new immutable revision. A server that lists capability `page-kind` derives the page's `kind` from the frontmatter key `thoth_kind` of the Markdown it receives (ADR-0017); clients do not send it."
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
         - $ref: "#/components/parameters/PageId"
@@ -1176,6 +1176,7 @@ components:
                   - events.sse
                   - transfers
                   - page-order
+                  - page-kind
                   - databases
                   - realtime-collab
               - type: string
@@ -1276,6 +1277,14 @@ components:
             - type: string
               pattern: ^[0-9A-Za-z]{1,128}$
               description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
+        pageKind:
+          anyOf:
+            - type: string
+              enum:
+                - page
+                - folder
+              description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
             - type: "null"
         attachmentId:
           type: string
@@ -1420,6 +1429,14 @@ components:
             - type: string
               pattern: ^[0-9A-Za-z]{1,128}$
               description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
+        kind:
+          anyOf:
+            - type: string
+              enum:
+                - page
+                - folder
+              description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
             - type: "null"
         createdAt:
           type: string
@@ -2032,6 +2049,14 @@ components:
               pattern: ^[0-9A-Za-z]{1,128}$
               description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
             - type: "null"
+        kind:
+          anyOf:
+            - type: string
+              enum:
+                - page
+                - folder
+              description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
+            - type: "null"
         revisionId:
           type: string
           minLength: 1
@@ -2321,5 +2346,6 @@ x-thoth-capabilities:
   - events.sse
   - transfers
   - page-order
+  - page-kind
   - databases
   - realtime-collab

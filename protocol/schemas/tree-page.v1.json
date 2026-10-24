@@ -39,6 +39,21 @@
               }
             ]
           },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "page",
+                  "folder"
+                ],
+                "description": "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revisionId": {
             "type": "string",
             "minLength": 1,

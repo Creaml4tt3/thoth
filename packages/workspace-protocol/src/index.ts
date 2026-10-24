@@ -3,6 +3,7 @@ export * from "./capabilities.ts";
 export * from "./errors.ts";
 export * from "./identity.ts";
 export * from "./pages.ts";
+export * from "./kind.ts";
 export * from "./tree.ts";
 export * from "./search.ts";
 export * from "./attachments.ts";

@@ -8,7 +8,10 @@ import {
   ERROR_CODE_LIST,
   ProblemDetailsSchema,
   PROTOCOL_SCHEMAS,
+  PageKindSchema,
   PageWriteSchema,
+  TreeNodeSchema,
+  pageKindOf,
   RevisionIdSchema,
   TransferCreateRequestSchema,
   checkProblemConsistency,
@@ -68,7 +71,7 @@ describe("protocol schemas: JSON Schema round trip", () => {
 
 describe("capabilities", () => {
   it("accepts registered IDs and x- vendor IDs", () => {
-    for (const id of ["attachments", "search", "events.sse", "transfers", "page-order", "databases", "realtime-collab", "x-acme", "x-acme.graph-view"]) {
+    for (const id of ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "databases", "realtime-collab", "x-acme", "x-acme.graph-view"]) {
       expect(CapabilityIdSchema.safeParse(id).success, id).toBe(true);
     }
   });
@@ -200,3 +203,48 @@ describe("resource rules the type system cannot express", () => {
 });
 
 const SAMPLE_ID = "01a15cc9-7d0d-7982-a22a-e5ae3df6b019";
+
+describe("page kind (capability page-kind, ADR-0017)", () => {
+  const NODE = { id: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", parentId: null, title: "T", revisionId: "rev_1", updatedAt: "2026-10-21T10:00:00Z" };
+
+  it("accepts page, folder, null and absence on tree nodes, and refuses other values", () => {
+    for (const kind of ["page", "folder", null, undefined]) expect(TreeNodeSchema.safeParse({ ...NODE, kind }).success, String(kind)).toBe(true);
+    for (const kind of ["Folder", "database", "", 1]) expect(TreeNodeSchema.safeParse({ ...NODE, kind }).success, String(kind)).toBe(false);
+    expect(PageKindSchema.options).toEqual(["page", "folder"]);
+  });
+
+  it("names the page kind pageKind in change entries, where kind already names the change", () => {
+    const entry = { id: "chg_1", kind: "page.updated", occurredAt: "2026-10-21T10:00:00Z", actorId: null, pageId: NODE.id, revisionId: "rev_1" };
+    expect(ChangeEntrySchema.safeParse({ ...entry, pageKind: "folder" }).success).toBe(true);
+    expect(ChangeEntrySchema.safeParse({ ...entry, pageKind: null }).success).toBe(true);
+    expect(ChangeEntrySchema.safeParse({ ...entry, pageKind: "nope" }).success).toBe(false);
+  });
+
+  it("does not let a client send a kind: PageWrite has no such member", () => {
+    const parsed = PageWriteSchema.parse({ title: "T", markdown: "x", kind: "folder" });
+    expect("kind" in parsed).toBe(false);
+  });
+
+  it("derives folder from frontmatter thoth_kind and nothing else", () => {
+    expect(pageKindOf("---\nthoth_id: x\nthoth_kind: folder\n---\n")).toBe("folder");
+    expect(pageKindOf("---\r\nthoth_kind: folder\r\n---\r\nbody")).toBe("folder");
+    expect(pageKindOf('---\nthoth_kind: "folder"\n---\n')).toBe("folder");
+    expect(pageKindOf("---\nthoth_kind: page\n---\n# x\n")).toBe("page");
+    expect(pageKindOf("---\nthoth_kind: database\n---\n")).toBe("page");
+    expect(pageKindOf("---\ntitle: x\n---\n# x\n")).toBe("page");
+    expect(pageKindOf("# no frontmatter\n")).toBe("page");
+    expect(pageKindOf("")).toBe("page");
+    // Not in the frontmatter: a heading, a body line, or an unclosed fence is not a folder marker.
+    expect(pageKindOf("# thoth_kind: folder\n")).toBe("page");
+    expect(pageKindOf("---\ntitle: x\n---\nthoth_kind: folder\n")).toBe("page");
+    expect(pageKindOf("---\nthoth_kind: folder\n")).toBe("page");
+  });
+
+  it("gives null (unknown) for malformed frontmatter and never throws", () => {
+    expect(pageKindOf("---\nthoth_kind: folder\nthoth_kind: folder\n---\n")).toBeNull(); // duplicate key
+    expect(pageKindOf("---\nthoth_kind: [folder\n---\n")).toBeNull();
+    expect(pageKindOf("---\n- a\n- b\n---\n")).toBeNull(); // not a mapping
+    expect(pageKindOf("---\nkey: *missing\n---\n")).toBeNull();
+    expect(pageKindOf("---\n\t: bad\n---\n")).toBeNull();
+  });
+});
