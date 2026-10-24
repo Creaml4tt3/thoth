@@ -45,6 +45,12 @@ export const PageItemSchema = z.object({
   destRevision: z.string().nullable(),
   title: z.string(),
   state: ItemStateSchema,
+  /**
+   * A folder (ADR-0016 rule 3). to_workspace: a vault folder sent as a folder page (`sourcePath` is the folder,
+   * `sourceId` is `folder:<path>`); it is never deleted. from_workspace: a folder page that becomes the vault
+   * folder `destPath`, with no file of its own.
+   */
+  folder: z.boolean().optional(),
   /** The destination file exists but held other bytes, so the page went to a conflict copy (ADR-0005). */
   conflictCopy: z.boolean().optional(),
   error: z.string().optional(),

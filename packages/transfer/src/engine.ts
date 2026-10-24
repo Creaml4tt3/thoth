@@ -57,6 +57,7 @@ import {
   type InboundContext,
   type OutboundContext,
 } from "./links.ts";
+import { folderMarkdown, folderNameForTitle, folderTitle, isFolderMarkdown, planInboundFolders, planOutboundFolders } from "./folders.ts";
 import { isTerminal, listRecords, loadRecord, saveRecord, type AttachmentItem, type LinkSummary, type OperationRecord, type PageItem, RECORD_VERSION } from "./record.ts";
 import { loadSync, projectAllSync, recordMappings, type SyncEntry, type SyncRecord } from "./sync.ts";
 
@@ -133,6 +134,12 @@ export interface ToWorkspaceRequest {
   paths: string[];
   /** Upload the attachments the pages link to (when the server lists `attachments`). */
   attachments: boolean;
+  /**
+   * The vault folder the selection is taken relative to. Every folder below it on the way to a selected page
+   * travels as a folder page (ADR-0016 rule 3). Default: the deepest folder holding every selected page; pass a
+   * selected folder's parent so the folder itself travels.
+   */
+  base?: string;
 }
 
 export interface FromWorkspaceRequest {
@@ -159,13 +166,16 @@ export interface ToWorkspacePreview extends PreviewBase {
   direction: "to_workspace";
   request: ToWorkspaceRequest;
   pages: { path: string; title: string; size: number; thothId: string | null }[];
+  /** Vault folders that become folder pages, parents first. */
+  folders: string[];
   attachments: { path: string; size: number; mimeType: string; hash: string }[];
 }
 
 export interface FromWorkspacePreview extends PreviewBase {
   direction: "from_workspace";
   request: FromWorkspaceRequest;
-  pages: { pageId: string; title: string; size: number }[];
+  /** `folder`: a folder page (`thoth_kind: folder`), which becomes a vault folder. */
+  pages: { pageId: string; title: string; size: number; folder: boolean; parentId: string | null }[];
 }
 
 export type Preview = ToWorkspacePreview | FromWorkspacePreview;
@@ -274,7 +284,7 @@ export class TransferEngine {
     const availability = await this.availability(request.server);
     if (!availability.ok || !access) {
       if (!availability.ok) problems.push({ code: availability.reason, message: availability.message });
-      return { ...base, pages: [], attachments: [], canStart: false };
+      return { ...base, pages: [], folders: [], attachments: [], canStart: false };
     }
     const limits = availability.capabilities.limits ?? {};
     const ws = await this.workspaceOf(access, request.workspace).catch(() => undefined);
@@ -293,6 +303,7 @@ export class TransferEngine {
       if (limits.maxMarkdownBytes !== undefined && pages.at(-1)!.size > limits.maxMarkdownBytes) problems.push({ code: "page_too_large", path: read.path, size: pages.at(-1)!.size, limit: limits.maxMarkdownBytes });
     }
 
+    const folders = planOutboundFolders(pages.map((p) => p.path), request.base).folders.map((f) => f.path);
     const tree = ws ? await access.client.getTree(ws.id).catch(() => undefined) : undefined;
     const ctx = await this.outboundContext(access.url, request.workspace, tree?.nodes.map((n) => n.id) ?? [], new Map(pages.map((p) => [p.path, PLACEHOLDER_ID])), new Map());
     const resolver = outboundResolver(ctx);
@@ -317,12 +328,13 @@ export class TransferEngine {
 
     if (tree && limits.maxPagesPerWorkspace !== undefined) {
       const current = tree.nodes.length;
-      if (current + pages.length > limits.maxPagesPerWorkspace) problems.push({ code: "quota", limit: limits.maxPagesPerWorkspace, current, adding: pages.length });
-      else if (current + pages.length > limits.maxPagesPerWorkspace * 0.9) warnings.push({ code: "quota_near", limit: limits.maxPagesPerWorkspace, current, adding: pages.length });
+      const adding = pages.length + folders.length;
+      if (current + adding > limits.maxPagesPerWorkspace) problems.push({ code: "quota", limit: limits.maxPagesPerWorkspace, current, adding });
+      else if (current + adding > limits.maxPagesPerWorkspace * 0.9) warnings.push({ code: "quota_near", limit: limits.maxPagesPerWorkspace, current, adding });
     }
     const total = pages.reduce((n, p) => n + p.size, 0);
     if (total > MAX_REQUEST_BYTES) problems.push({ code: "too_large_total", size: total, limit: MAX_REQUEST_BYTES });
-    return { ...base, ...(ws ? { workspace: summaryOf(ws) } : {}), limits, links, pages, attachments, canStart: problems.length === 0 };
+    return { ...base, ...(ws ? { workspace: summaryOf(ws) } : {}), limits, links, pages, folders, attachments, canStart: problems.length === 0 };
   }
 
   /** What a Workspace → Private transfer would do. Downloads the current revisions to classify their links; writes nothing. */
@@ -355,11 +367,13 @@ export class TransferEngine {
       const downloaded: { pageId: string; title: string; markdown: string }[] = [];
       for (const pageId of request.pageIds) {
         const page = await access.client.getPage(ws.id, pageId);
-        downloaded.push({ pageId, title: page.metadata.title, markdown: page.markdown });
-        pages.push({ pageId, title: page.metadata.title, size: page.revision.size });
+        const folder = isFolderMarkdown(page.markdown);
+        if (!folder) downloaded.push({ pageId, title: page.metadata.title, markdown: page.markdown });
+        pages.push({ pageId, title: page.metadata.title, size: page.revision.size, folder, parentId: page.metadata.parentId });
       }
       const sync = await loadSync(this.vault, access.url, ws.id);
-      const planned = new Map(downloaded.map((d) => [d.pageId, joinVaultPath(...pathParts(request.folder), fileNameForTitle(d.title))]));
+      const chains = planInboundFolders(pages);
+      const planned = new Map(downloaded.map((d) => [d.pageId, joinVaultPath(...pathParts(request.folder), ...(chains.get(d.pageId) ?? []), fileNameForTitle(d.title))]));
       const ctx = await this.inboundContext(sync, planned);
       const refs = downloaded.flatMap((d) => classifyInbound(planned.get(d.pageId)!, d.markdown, ctx));
       links = summarize(refs);
@@ -383,34 +397,66 @@ export class TransferEngine {
     let destination: OperationRecord["destination"];
     if (preview.direction === "to_workspace") {
       destination = { parentId: preview.request.parentId, folder: "" };
-      items = preview.pages.map((p) => ({
-        kind: "page",
-        sourcePath: p.path,
-        sourceId: p.thothId ?? "",
-        sourceHash: null,
-        sourceRevision: null,
-        destId: mode === "copy" ? this.newId() : (p.thothId ?? ""),
-        destParentId: preview.request.parentId,
-        destPath: null,
-        destHash: null,
-        destRevision: null,
-        title: p.title,
-        state: "planned",
-      }));
+      // Folders first, parents before children, each a new folder page (ADR-0016 rule 3).
+      const plan = planOutboundFolders(preview.pages.map((p) => p.path), preview.request.base);
+      const folderIds = new Map<string, string>();
+      const folderItems = plan.folders.map((f): PageItem => {
+        const destId = this.newId();
+        folderIds.set(f.path, destId);
+        return {
+          kind: "page",
+          folder: true,
+          sourcePath: f.path,
+          sourceId: `folder:${f.path}`,
+          sourceHash: null,
+          sourceRevision: null,
+          destId,
+          destParentId: f.parent === null ? preview.request.parentId : folderIds.get(f.parent)!,
+          destPath: null,
+          destHash: null,
+          destRevision: null,
+          title: folderTitle(f.path).slice(0, 500),
+          state: "planned",
+        };
+      });
+      const parentFor = (path: string): string | null => {
+        const folder = plan.parentOf.get(path) ?? null;
+        return folder === null ? preview.request.parentId : folderIds.get(folder)!;
+      };
+      items = [
+        ...folderItems,
+        ...preview.pages.map((p): PageItem => ({
+          kind: "page",
+          sourcePath: p.path,
+          sourceId: p.thothId ?? "",
+          sourceHash: null,
+          sourceRevision: null,
+          destId: mode === "copy" ? this.newId() : (p.thothId ?? ""),
+          destParentId: parentFor(p.path),
+          destPath: null,
+          destHash: null,
+          destRevision: null,
+          title: p.title,
+          state: "planned",
+        })),
+      ];
       // The upload key depends only on what is uploaded where, so a retry (even by a new operation after a
       // rollback) replays the first upload within the server's idempotency window instead of storing it twice.
       const workspaceId = preview.workspace.id;
       attachments = preview.attachments.map((a) => ({ kind: "attachment", sourcePath: a.path, sourceHash: a.hash, size: a.size, mimeType: a.mimeType, uploadKey: `thoth-attachment-${sha256Hex(`${access.url}\n${workspaceId}\n${a.path}\n${a.hash}`).slice(0, 40)}`, destId: null, destHash: null, state: "planned" }));
     } else {
       destination = { parentId: null, folder: normalizeFolder(preview.request.folder) };
-      items = preview.pages.map((p) => ({
+      const selected = new Set(preview.pages.map((p) => p.pageId));
+      items = preview.pages.map((p): PageItem => ({
         kind: "page",
+        ...(p.folder ? { folder: true } : {}),
         sourcePath: p.title,
         sourceId: p.pageId,
         sourceHash: null,
         sourceRevision: null,
         destId: mode === "copy" ? this.newId() : p.pageId,
-        destParentId: null,
+        // The parent workspace page, when it is selected too: the page then lands inside that folder.
+        destParentId: p.parentId !== null && selected.has(p.parentId) ? p.parentId : null,
         destPath: null,
         destHash: null,
         destRevision: null,
@@ -674,6 +720,7 @@ export class TransferEngine {
     const items = [...r.items];
     if (r.direction === "from_workspace") {
       for (const [i, item] of items.entries()) {
+        if (item.folder) continue;
         if (!item.destPath || !item.destHash || (item.state !== "written" && item.state !== "verified" && item.state !== "staged" && item.state !== "planned")) continue;
         try {
           await this.vault.deleteFileAtomic(item.destPath, { expectedHash: item.destHash });
@@ -682,6 +729,17 @@ export class TransferEngine {
           if (!(e instanceof ConflictError)) throw e;
           // Missing (never written) or edited since: leave it alone.
           items[i] = { ...item, state: e.actualHash === null ? "skipped" : item.state };
+        }
+      }
+      // Then our folders, innermost first, and only while empty: anything put in them since is left alone.
+      const folders = [...items.entries()].filter(([, item]) => item.folder && item.destPath && (item.state === "written" || item.state === "verified"));
+      folders.sort(([, a], [, b]) => b.destPath!.length - a.destPath!.length);
+      for (const [i, item] of folders) {
+        try {
+          await this.vault.removeEmptyFolder(item.destPath!);
+          items[i] = { ...item, state: "skipped" };
+        } catch {
+          // not empty: keep it
         }
       }
     }
@@ -703,6 +761,10 @@ export class TransferEngine {
     const used = new Set((await loadSync(this.vault, access.url, r.workspace.id)).entries.filter((e) => e.kind === "page").map((e) => e.remoteId));
     const items: PageItem[] = [];
     for (const item of r.items) {
+      if (item.folder) {
+        items.push(item); // a folder page has no source file to adopt; its new ID was chosen in the plan
+        continue;
+      }
       let id: string;
       try {
         // ADR-0003: a page gets its stable ID before it takes part in a transfer. Adding it is the only change to a source.
@@ -755,6 +817,11 @@ export class TransferEngine {
     const pages: { item: PageItem; markdown: string; hash: string; changed: boolean }[] = [];
     const classified: ClassifiedReference[] = [];
     for (const item of r.items) {
+      if (item.folder) {
+        const markdown = folderMarkdown(item.destId);
+        pages.push({ item, markdown, hash: sha256Hex(markdown), changed: false });
+        continue;
+      }
       const read = await this.vault.readPage(item.sourcePath).catch(() => undefined);
       if (!read) throw new TransferRefused("source_missing", `${item.sourcePath} no longer exists.`);
       const refs = classifyOutbound(item.sourcePath, read.source, ctx, resolver);
@@ -833,7 +900,7 @@ export class TransferEngine {
     const at = this.now().toISOString();
     const entries: SyncEntry[] = [
       ...items
-        .filter((i) => i.state === "committed")
+        .filter((i) => i.state === "committed" && !i.folder)
         .map((i): SyncEntry => ({ kind: "page", localId: i.sourceId, remoteId: i.destId, localPath: i.sourcePath, localHash: i.sourceHash, remoteRevision: i.destRevision, remoteHash: i.destHash, direction: "to_workspace", mode: r.mode, operationId: r.id, at })),
       ...attachments
         .filter((a) => a.state === "committed" && a.destId)
@@ -852,6 +919,7 @@ export class TransferEngine {
         continue;
       }
       if (item.state !== "committed") continue;
+      if (item.folder) continue; // a moved folder stays in the vault (it may be empty now); nothing is deleted for it
       let next: PageItem;
       await this.point(`before:delete:${i}`);
       try {
@@ -909,10 +977,27 @@ export class TransferEngine {
     // Every destination path is chosen and recorded before anything is written, so links between the pages
     // can name each other and a crash never makes a page land twice.
     if (record.items.some((i) => i.destPath === null)) record = await this.save({ ...record, items: await this.planPaths(record, sync) }, "paths");
+    // Folder pages become vault folders first (ADR-0016 rule 3); they have no file of their own.
+    for (let i = 0; i < record.items.length; i++) {
+      const item = record.items[i]!;
+      if (!item.folder || item.state !== "staged") continue;
+      const page = await access.client.getPage(record.workspace.id, item.sourceId, { revision: item.sourceRevision! });
+      if (sha256Hex(page.markdown) !== page.revision.contentHash || page.revision.id !== item.sourceRevision) throw new TransferRefused("hash_mismatch", `The server sent different content for ${item.title}.`);
+      await this.point(`before:mkdir:${i}`);
+      try {
+        await this.vault.createFolder(item.destPath!);
+      } catch (error) {
+        // Our own folder from before a crash (its path was recorded first) is accepted as it is.
+        if (!(error instanceof ConflictError) || (await this.vault.fs.stat(item.destPath!))?.kind !== "directory") throw error;
+      }
+      await this.point(`after:mkdir:${i}`);
+      record = await this.save(withItem(record, i, { ...item, sourceHash: page.revision.contentHash, destHash: null, state: "written" }), `written:${i}`);
+    }
+    const files = (items: readonly PageItem[]) => items.filter((x) => !x.folder);
     const classified: ClassifiedReference[] = [];
     for (let i = 0; i < record.items.length; i++) {
       const item = record.items[i]!;
-      if (item.state !== "staged") continue;
+      if (item.state !== "staged" || item.folder) continue;
       const page = await access.client.getPage(record.workspace.id, item.sourceId, { revision: item.sourceRevision! });
       const hash = sha256Hex(page.markdown);
       if (hash !== page.revision.contentHash || page.revision.id !== item.sourceRevision) throw new TransferRefused("hash_mismatch", `The server sent different content for ${item.title}.`);
@@ -920,8 +1005,9 @@ export class TransferEngine {
       // Where it goes: a free path, our own earlier write, or (the same page edited here) a conflict copy.
       const placed = await this.placeInbound(record, target);
       target = placed;
-      const ctx = await this.inboundContext(sync, new Map(record.items.map((x, j) => [x.sourceId, (j === i ? target : x).destPath!])));
-      const resolver = await this.localResolver(record.items.map((x, j) => (j === i ? target : x).destPath!));
+      const now = files(record.items.map((x, j) => (j === i ? target : x)));
+      const ctx = await this.inboundContext(sync, new Map(now.map((x) => [x.sourceId, x.destPath!])));
+      const resolver = await this.localResolver(now.map((x) => x.destPath!));
       const refs = classifyInbound(target.destPath!, page.markdown, ctx, resolver);
       classified.push(...refs);
       let content = compactInbound(applyRewrites(page.markdown, refs, { labelBareWikilinks: false }), target.destPath!, resolver);
@@ -942,26 +1028,48 @@ export class TransferEngine {
     return this.save({ ...record, links, state: "transfer" });
   }
 
-  /** Chooses the vault path of every item: back where a moved page came from if that path is free, else `<folder>/<title>.md`. */
+  /**
+   * Chooses the vault path of every item: back where a moved page came from if that path is free, else
+   * `<folder>/<title>.md`. A folder page becomes the vault folder `<folder>/<title>`, and the selected pages
+   * under it go inside it (ADR-0016 rule 3).
+   */
   private async planPaths(r: OperationRecord, sync: SyncRecord): Promise<PageItem[]> {
     const taken = new Set<string>();
     for (const p of await this.vault.listPages()) taken.add(collisionKey(p.path));
     for (const a of await this.vault.listAttachments()) taken.add(collisionKey(a.path));
+    for (const item of r.items) if (item.destPath !== null) taken.add(collisionKey(item.destPath));
     const free = async (path: string) => !taken.has(collisionKey(path)) && !(await this.vault.fs.stat(path));
-    const out: PageItem[] = [];
-    for (const item of r.items) {
+    const out = new Map<string, PageItem>();
+    const place = async (item: PageItem, depth = 0): Promise<PageItem> => {
+      const done = out.get(item.sourceId);
+      if (done) return done;
       if (item.destPath !== null) {
-        out.push(item);
-        taken.add(collisionKey(item.destPath));
-        continue;
+        out.set(item.sourceId, item);
+        return item;
       }
-      const origin = sync.entries.find((e) => e.kind === "page" && e.remoteId === item.sourceId && e.direction === "to_workspace" && e.mode === "move");
-      let path: string | undefined = origin && (await free(origin.localPath)) ? origin.localPath : undefined;
-      if (!path) path = await this.freePath(joinVaultPath(...pathParts(r.destination.folder), fileNameForTitle(item.title)), free);
+      const parent = depth < 100 && item.destParentId !== null ? r.items.find((x) => x.folder && x.sourceId === item.destParentId) : undefined;
+      const dir = parent ? (await place(parent, depth + 1)).destPath! : r.destination.folder;
+      let path: string | undefined;
+      if (item.folder) path = await this.freeFolderPath(joinVaultPath(...pathParts(dir), folderNameForTitle(item.title)), free);
+      else {
+        const origin = parent ? undefined : sync.entries.find((e) => e.kind === "page" && e.remoteId === item.sourceId && e.direction === "to_workspace" && e.mode === "move");
+        path = origin && (await free(origin.localPath)) ? origin.localPath : undefined;
+        if (!path) path = await this.freePath(joinVaultPath(...pathParts(dir), fileNameForTitle(item.title)), free);
+      }
       taken.add(collisionKey(path));
-      out.push({ ...item, destPath: path });
-    }
-    return out;
+      const placed = { ...item, destPath: path };
+      out.set(item.sourceId, placed);
+      return placed;
+    };
+    const result: PageItem[] = [];
+    for (const item of r.items) result.push(await place(item));
+    return result;
+  }
+
+  private async freeFolderPath(wanted: string, free: (path: string) => Promise<boolean>): Promise<string> {
+    if (await free(wanted)) return wanted;
+    for (let n = 2; n < 1000; n++) if (await free(`${wanted} ${n}`)) return `${wanted} ${n}`;
+    throw new TransferRefused("no_free_name", `No free folder name for ${wanted}.`);
   }
 
   private async freePath(wanted: string, free: (path: string) => Promise<boolean>): Promise<string> {
@@ -1003,6 +1111,10 @@ export class TransferEngine {
     const items = await Promise.all(
       r.items.map(async (item) => {
         if (item.state !== "written") return item;
+        if (item.folder) {
+          if ((await this.vault.fs.stat(item.destPath!))?.kind !== "directory") throw new TransferRefused("hash_mismatch", `The folder ${item.destPath} is gone.`);
+          return { ...item, state: "verified" as const };
+        }
         const actual = await this.hashAt(item.destPath!);
         if (actual !== item.destHash) throw new TransferRefused("hash_mismatch", `${item.destPath} changed while it was being written.`);
         return { ...item, state: "verified" as const };
@@ -1014,7 +1126,7 @@ export class TransferEngine {
   private async commitIn(r: OperationRecord): Promise<OperationRecord> {
     const at = this.now().toISOString();
     const entries = r.items
-      .filter((i) => i.state === "verified")
+      .filter((i) => i.state === "verified" && !i.folder)
       .map((i): SyncEntry => ({ kind: "page", localId: i.destId, remoteId: i.sourceId, localPath: i.destPath!, localHash: i.destHash, remoteRevision: i.sourceRevision, remoteHash: i.sourceHash, direction: "from_workspace", mode: r.mode, operationId: r.id, at }));
     await recordMappings(this.vault, r.server.url, r.workspace.id, entries);
     return this.save({ ...r, state: "commit_destination" });

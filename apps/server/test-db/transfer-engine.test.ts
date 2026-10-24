@@ -197,7 +197,7 @@ describe("transfer engine on the reference server", () => {
       const preview = await l.engine.previewFromWorkspace({ server: "srv", workspace: ws, mode: "copy", pageIds: [page.id], folder: "" });
       expect(preview.problems.map((p) => p.code)).toEqual(["export_restricted"]);
       // The engine refuses too, before asking the server.
-      const forced = await l.engine.start({ ...preview, problems: [], canStart: true, pages: [{ pageId: page.id, title: "Secret", size: 9 }] });
+      const forced = await l.engine.start({ ...preview, problems: [], canStart: true, pages: [{ pageId: page.id, title: "Secret", size: 9, folder: false, parentId: null }] });
       expect([forced.state, forced.error?.code]).toEqual(["failed", "export_restricted"]);
       expect(await readdir(l.root)).toEqual([".thoth"]);
 

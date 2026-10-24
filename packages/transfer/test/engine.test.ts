@@ -220,7 +220,7 @@ describe("Workspace → Private", () => {
     expect(preview.problems.map((p) => p.code)).toEqual(["export_restricted"]);
     expect(preview.pages).toEqual([]); // nothing was even downloaded for the preview
     // A client that ignores the preview is still refused by the server, and nothing is written.
-    const forced = await w.engine.start({ ...preview, problems: [], canStart: true, pages: [{ pageId: page.id, title: "Secret", size: 1 }] });
+    const forced = await w.engine.start({ ...preview, problems: [], canStart: true, pages: [{ pageId: page.id, title: "Secret", size: 1, folder: false, parentId: null }] });
     expect(forced.state).toBe("failed");
     expect(forced.error?.code).toBe("export_restricted");
     expect(await w.exists("Secret.md")).toBe(false);
