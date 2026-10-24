@@ -7,6 +7,7 @@ import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameInput } from "../order/RenameInput.tsx";
+import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
 import { useStrings } from "../strings/index.ts";
 import type { OpenOptions } from "../tabs/model.ts";
@@ -135,12 +136,12 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
       >
         {label}
       </button>
-      {expanded && expandable && (
-        <ul role="group">
+      {expandable && (
+        <TreeGroup open={expanded} count={item.children.length}>
           {item.children.map((child, i) => (
             <PageItem key={child.id} item={child} depth={depth + 1} index={i + 1} size={item.children.length} ctx={ctx} />
           ))}
-        </ul>
+        </TreeGroup>
       )}
     </li>
   );
@@ -445,30 +446,28 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           {createError}
         </p>
       )}
-      {expanded && (
-        <ul role="group" aria-label={t.pagesIn(workspace.name)}>
-          {tree?.error ? (
-            <li role="none" className="tree-note muted">
-              {tree.error}
-            </li>
-          ) : tree?.loading && tree.nodes.length === 0 ? (
-            <li role="none" className="tree-note muted">
-              {t.loading}
-            </li>
-          ) : items.length === 0 ? (
-            <li role="none" className="tree-note muted">
-              {t.noPages}
-            </li>
-          ) : (
-            items.map((item, i) => <PageItem key={item.id} item={item} depth={1} index={i + 1} size={items.length} ctx={ctx} />)
-          )}
-          {canWrite && !ordered && items.length > 1 && (
-            <li role="none" className="tree-note muted">
-              {tt.orderUnavailable}
-            </li>
-          )}
-        </ul>
-      )}
+      <TreeGroup open={expanded} count={items.length} label={t.pagesIn(workspace.name)}>
+        {tree?.error ? (
+          <li role="none" className="tree-note muted">
+            {tree.error}
+          </li>
+        ) : tree?.loading && tree.nodes.length === 0 ? (
+          <li role="none" className="tree-note muted">
+            {t.loading}
+          </li>
+        ) : items.length === 0 ? (
+          <li role="none" className="tree-note muted">
+            {t.noPages}
+          </li>
+        ) : (
+          items.map((item, i) => <PageItem key={item.id} item={item} depth={1} index={i + 1} size={items.length} ctx={ctx} />)
+        )}
+        {canWrite && !ordered && items.length > 1 && (
+          <li role="none" className="tree-note muted">
+            {tt.orderUnavailable}
+          </li>
+        )}
+      </TreeGroup>
       {menu && (
         <ContextMenu
           label={tt.menuLabel(titleOf(menu.id))}

@@ -329,6 +329,8 @@ function createToolbar(view: EditorView, strings: EditorStrings, client: "deskto
     root.style.left = `${Math.max(8, Math.min(start.left, window.innerWidth - width - 8))}px`;
     const above = start.top - height - 8;
     root.style.top = `${above >= 8 ? above : Math.min(end.bottom + 8, Math.max(8, window.innerHeight - height - 8))}px`;
+    // Above the selection or below it: the pop-in grows from the edge that faces the text (editor.css).
+    root.dataset["side"] = above >= 8 ? "top" : "bottom";
   }
 
   function paint(state: EditorState): void {

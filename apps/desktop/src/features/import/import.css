@@ -5,15 +5,15 @@
 .wz-head { display: flex; justify-content: space-between; align-items: start; gap: var(--thoth-space-4); }
 .wz-title { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); outline: none; }
 .wz-steps { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.wz-steps li { flex: 1; height: 3px; border-radius: 2px; background: var(--thoth-border-strong); }
+.wz-steps li { flex: 1; height: 3px; border-radius: 2px; background: var(--thoth-border-strong); transition: background-color var(--thoth-dur-base) var(--thoth-ease-out); }
 .wz-steps li[data-state="done"] { background: var(--thoth-ink-secondary); }
 .wz-steps li[data-state="current"] { background: var(--thoth-ink-primary); }
-.wz-step { display: grid; gap: var(--thoth-space-4); }
+.wz-step { display: grid; gap: var(--thoth-space-4); animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wz-q { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); padding: 0; }
 .wz-name { color: var(--thoth-ink-secondary); }
 .wz-choices { border: 0; padding: 0; margin: 0; display: grid; gap: var(--thoth-space-2); }
 .wz-choices legend { margin-bottom: var(--thoth-space-2); }
-.wz-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--thoth-space-3); align-items: start; padding: 12px 14px; border-radius: var(--thoth-radius-lg); border: 1px solid var(--thoth-border); cursor: pointer; }
+.wz-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--thoth-space-3); align-items: start; padding: 12px 14px; border-radius: var(--thoth-radius-lg); border: 1px solid var(--thoth-border); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wz-choice > span { display: grid; gap: 2px; }
 .wz-choice[data-selected="true"] { border-color: var(--thoth-border-strong); background: var(--thoth-bg-hover); }
 .wz-choice[data-disabled="true"] { opacity: 0.55; cursor: default; }
@@ -37,6 +37,11 @@
 .wz-phases { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-3); }
 .wz-phases li { display: grid; grid-template-columns: 220px 1fr auto; gap: var(--thoth-space-3); align-items: center; }
 .wz-phases progress { width: 100%; height: 6px; accent-color: var(--thoth-accent); }
+/* The bar eases to its new value instead of jumping (WebKit and Blink; elsewhere the native bar). */
+.wz-phases progress[value] { appearance: none; border: 0; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-active); overflow: hidden; }
+.wz-phases progress[value]::-webkit-progress-bar { background: var(--thoth-bg-active); }
+.wz-phases progress[value]::-webkit-progress-value { background: var(--thoth-accent); border-radius: var(--thoth-radius-pill); transition: width var(--thoth-dur-base) var(--thoth-ease-out); }
+.wz-phases progress[value]::-moz-progress-bar { background: var(--thoth-accent); border-radius: var(--thoth-radius-pill); }
 .wz-jobs { display: grid; gap: var(--thoth-space-2); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
 .wz-jobs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
 .wz-job { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-3); padding: 10px 14px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); }
