@@ -51,6 +51,10 @@ Domains used below (change them when you buy your own domain):
    pages. Until the backfill has run, an older folder shows as a page; new and
    edited pages are correct at once.
 
+   On macOS, `scripts/prod-db.sh migrate backfill-kind` does the same through a private dialog (hidden
+   input; the URL is kept in memory only, redacted from output and not saved). It accepts only `migrate` and
+   `backfill-kind` and refuses the pooled URL.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
