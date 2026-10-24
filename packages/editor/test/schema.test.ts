@@ -18,7 +18,7 @@ describe("thothSchema", () => {
     for (const node of ["doc", "text", "paragraph", "heading", "list", "listItem", "taskList", "taskItem", "blockquote", "callout", "code", "table", "tableRow", "tableCell", "tableHeader", "thematicBreak", "image", "embed", "html", "math", "raw", "hardBreak", "wikilink", "inlineImage", "inlineRaw"]) {
       expect(schema.nodes[node], node).toBeDefined();
     }
-    expect(Object.keys(schema.marks).sort()).toEqual(["bold", "inlineCode", "italic", "link", "strike"]);
+    expect(Object.keys(schema.marks).sort()).toEqual(["bold", "highlight", "inlineCode", "italic", "link", "strike", "textColor", "underline"]);
   });
 
   it("is built from the extensions without a DOM", () => {

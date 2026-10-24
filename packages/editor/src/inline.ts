@@ -3,6 +3,7 @@ import {
   ImageAttrsSchema,
   LinkMarkAttrsSchema,
   SourceOnlyAttrsSchema,
+  TextColorMarkAttrsSchema,
   WikiAttrsSchema,
   readAttrs,
 } from "./attrs.ts";
@@ -29,19 +30,27 @@ export interface InlineOptions {
 }
 
 type Mark = { type: string; attrs?: Record<string, unknown> | undefined };
-export const MARK_ORDER = ["link", "bold", "italic", "strike", "inlineCode"];
-const DELIMITERS: Record<string, string> = { bold: "**", italic: "*", strike: "~~" };
+/**
+ * Nesting order, outermost first. The HTML marks (ADR-0016) go outside the delimiter marks: a tag can sit anywhere,
+ * while `==` next to `**` must still pass the flanking rules.
+ */
+export const MARK_ORDER = ["link", "textColor", "underline", "highlight", "bold", "italic", "strike", "inlineCode"];
+const DELIMITERS: Record<string, string> = { highlight: "==", bold: "**", italic: "*", strike: "~~" };
+
+const colorOf = (m: Mark) => readAttrs(TextColorMarkAttrsSchema, m).color;
 
 function markKey(m: Mark): string {
+  if (m.type === "textColor") return `textColor:${colorOf(m)}`;
   if (m.type !== "link") return m.type;
   const a = readAttrs(LinkMarkAttrsSchema, m);
   return `link:${JSON.stringify([a.href, a.title])}`;
 }
 
-/** Known marks, deduplicated and in nesting order (outermost first). */
+/** Known marks, deduplicated and in nesting order (outermost first). A colour outside the palette, or a second one, is dropped. */
 function marksOf(node: JSONContent): Mark[] {
   const seen = new Map<string, Mark>();
   for (const m of (node.marks ?? []) as Mark[]) {
+    if (m.type === "textColor" && (colorOf(m) === null || [...seen.values()].some((s) => s.type === "textColor"))) continue;
     if (MARK_ORDER.includes(m.type) && !seen.has(markKey(m))) seen.set(markKey(m), m);
   }
   return [...seen.values()].sort((a, b) => MARK_ORDER.indexOf(a.type) - MARK_ORDER.indexOf(b.type));
@@ -145,10 +154,14 @@ function plainText(n: JSONContent): string {
   return "";
 }
 
-function renderLeaf(node: JSONContent, o: InlineOptions, atStart: boolean): string {
+/** Which edges of a text leaf touch a highlight's `==` (its `=` there must be escaped, or the run grows). */
+type EqEdges = { start: boolean; end: boolean };
+const NO_EDGES: EqEdges = { start: false, end: false };
+
+function renderLeaf(node: JSONContent, o: InlineOptions, atStart: boolean, eq: EqEdges): string {
   switch (node.type) {
     case "text":
-      return escapeText(node.text ?? "", { blockEscapes: o.blockEscapes, firstLineStart: atStart, flatten: o.flatten, urls: o.inLink ? "off" : o.cell ? "cell" : "verify", endsLine: node === o.last });
+      return escapeText(node.text ?? "", { blockEscapes: o.blockEscapes, firstLineStart: atStart, flatten: o.flatten, urls: o.inLink ? "off" : o.cell ? "cell" : "verify", endsLine: node === o.last, eqStart: eq.start, eqEnd: eq.end });
     case "hardBreak":
       return "\\\n";
     case "wikilink":
@@ -167,7 +180,14 @@ function renderMark(t: Extract<Tree, { kind: "mark" }>, o: InlineOptions): strin
     const text = t.children.map((c) => (c.kind === "leaf" ? plainText(c.node) : "")).join("");
     return text === "" ? "" : codeSpan(text, o.cell);
   }
-  const inner = renderNodes(t.children, false, t.mark.type === "link" ? { ...o, inLink: true } : o);
+  if (t.mark.type === "underline" || t.mark.type === "textColor") {
+    // HTML marks keep their content as is (edge blanks included): a tag needs no flanking.
+    const inner = renderNodes(t.children, false, o);
+    if (inner === "") return "";
+    return t.mark.type === "underline" ? `<u>${inner}</u>` : `<span data-color="${colorOf(t.mark)!}">${inner}</span>`;
+  }
+  const highlight = t.mark.type === "highlight";
+  const inner = renderNodes(t.children, false, t.mark.type === "link" ? { ...o, inLink: true } : o, highlight ? { start: true, end: true } : NO_EDGES);
   if (t.mark.type === "link") {
     const a = readAttrs(LinkMarkAttrsSchema, t.mark);
     const bare = t.children.every((c) => c.kind === "leaf" && c.node.type === "text" && marksOf(c.node).length === 1);
@@ -180,11 +200,15 @@ function renderMark(t: Extract<Tree, { kind: "mark" }>, o: InlineOptions): strin
   return m[2] === "" ? inner : `${m[1]}${d}${m[2]}${d}${m[3]}`;
 }
 
-function renderNodes(children: Tree[], start: boolean, o: InlineOptions): string {
+const isHighlight = (t: Tree | undefined) => t?.kind === "mark" && t.mark.type === "highlight";
+
+/** `edges`: the children sit directly inside `==` (a highlight), so the first and last leaves touch it. */
+function renderNodes(children: Tree[], start: boolean, o: InlineOptions, edges: EqEdges = NO_EDGES): string {
   let out = "";
-  for (const ch of children) {
+  for (const [i, ch] of children.entries()) {
     const atStart = out === "" ? start : out.endsWith("\n");
-    let piece = ch.kind === "leaf" ? renderLeaf(ch.node, o, atStart) : renderMark(ch, o);
+    const eq = { start: i === 0 ? edges.start : isHighlight(children[i - 1]), end: i === children.length - 1 ? edges.end : isHighlight(children[i + 1]) };
+    let piece = ch.kind === "leaf" ? renderLeaf(ch.node, o, atStart, eq) : renderMark(ch, o);
     if (atStart && /^[ \t]/.test(piece)) piece = entityFirst(piece);
     out += piece;
   }

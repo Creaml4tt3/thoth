@@ -3,6 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { ListItem, Nodes, PhrasingContent, Root, RootContent, Table, Text } from "mdast";
 import { canonBlock, isTight } from "./blocks.ts";
 import { MARK_ORDER } from "./inline.ts";
+import { findHighlightDelims, maskHighlights, pairStyles, type StyleItem, type StyleMask } from "./styles.ts";
 import { findWikilinks, maskWikilinks, parseWikiInner, unmask, type Mask, type Span } from "./wikilinks.ts";
 
 /**
@@ -23,6 +24,8 @@ interface Ctx {
   /** Original body text; offsets in the (identically laid-out) parsed text index into it. */
   src: string;
   mask: Mask | undefined;
+  /** Highlight placeholders (ADR-0016), when the body has any. */
+  styles: StyleMask | undefined;
 }
 
 type MarkJSON = { type: string; attrs?: Record<string, unknown> };
@@ -52,16 +55,33 @@ function pushAtom(out: JSONContent[], node: JSONContent, marks: MarkJSON[]): voi
   out.push(marks.length ? { ...node, marks: marks.map((m) => ({ ...m })) } : node);
 }
 
-function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out: JSONContent[]): void {
+function pushPlain(value: string, marks: MarkJSON[], ctx: Ctx, out: JSONContent[]): void {
+  for (const piece of unmask(value, ctx.mask)) {
+    if (typeof piece === "string") pushText(out, piece, marks);
+    else if (piece.embed) pushAtom(out, { type: "inlineRaw", attrs: { source: ctx.src.slice(piece.start, piece.end) } }, marks);
+    else pushAtom(out, { type: "wikilink", attrs: { target: piece.target, fragment: piece.fragment, label: piece.label } }, marks);
+  }
+}
+
+/** Siblings after pairing highlights, `<u>` and colour spans (ADR-0016) into styled runs. */
+function styleItems(items: StyleItem[], marks: MarkJSON[], ctx: Ctx, out: JSONContent[]): void {
+  for (const item of items) {
+    if (item.kind === "text") pushPlain(item.value, marks, ctx, out);
+    else if (item.kind === "styled") styleItems(item.children, [...marks, item.mark], ctx, out);
+    else inlineNodes([item.node], marks, ctx, out, false);
+  }
+}
+
+function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out: JSONContent[], pair = true): void {
+  if (pair) {
+    styleItems(pairStyles(nodes, ctx.styles), marks, ctx, out);
+    return;
+  }
   const raw = (node: Nodes) => pushAtom(out, { type: "inlineRaw", attrs: { source: sliceOf(node, ctx) } }, marks);
   for (const node of nodes) {
     switch (node.type) {
       case "text":
-        for (const piece of unmask(node.value, ctx.mask)) {
-          if (typeof piece === "string") pushText(out, piece, marks);
-          else if (piece.embed) pushAtom(out, { type: "inlineRaw", attrs: { source: ctx.src.slice(piece.start, piece.end) } }, marks);
-          else pushAtom(out, { type: "wikilink", attrs: { target: piece.target, fragment: piece.fragment, label: piece.label } }, marks);
-        }
+        pushPlain(node.value, marks, ctx, out);
         break;
       case "emphasis":
         inlineNodes(node.children, [...marks, { type: "italic" }], ctx, out);
@@ -99,8 +119,10 @@ function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out:
 
 function sortMarks(marks: MarkJSON[]): MarkJSON[] {
   const seen = new Set<string>();
-  return marks
+  return [...marks]
+    .reverse()
     .filter((m) => {
+      // One link per target and one text colour (the innermost span wins, as it does when rendered).
       const key = m.type === "link" ? `link:${JSON.stringify(m.attrs)}` : m.type;
       return !seen.has(key) && seen.add(key);
     })
@@ -335,11 +357,17 @@ export function markdownToDoc(source: string): MarkdownDoc {
 
   let tree = parseMarkdownTree(body);
   let mask: Mask | undefined;
-  if (body.includes("[[")) {
-    mask = maskWikilinks(body, findWikilinks(body, excludedSpans(tree, body)));
-    if (mask) tree = parseMarkdownTree(mask.text);
+  let styles: StyleMask | undefined;
+  if (body.includes("[[") || body.includes("==")) {
+    const links = body.includes("[[") ? findWikilinks(body, excludedSpans(tree, body)) : [];
+    mask = maskWikilinks(body, links);
+    // Highlight delimiters are found on the source, outside wikilinks; both placeholders keep every offset.
+    const delims = body.includes("==") ? findHighlightDelims(body, tree, links) : [];
+    const masked = maskHighlights(mask?.text ?? body, delims);
+    styles = masked?.mask;
+    if (mask || masked) tree = parseMarkdownTree(masked?.text ?? mask!.text);
   }
-  const ctx: Ctx = { src: body, mask };
+  const ctx: Ctx = { src: body, mask, styles };
 
   let content: JSONContent[] = [];
   let cursor = 0;
