@@ -61,6 +61,12 @@ export const CapabilitiesSchema = z.object({
   protocolVersion: z.string().regex(/^\d+\.\d+$/, "Expected MAJOR.MINOR"),
   capabilities: z.array(CapabilityIdSchema).meta({ uniqueItems: true }).refine((ids) => new Set(ids).size === ids.length, "Capability IDs must be unique"),
   limits: LimitsSchema.optional(),
+  /**
+   * Who is answering. `name` is the operator's display name for the server (the reference server's `SERVER_NAME`:
+   * 1 to 64 characters, no control characters). Clients show it after removing control characters, trimming and
+   * keeping 64 characters, and fall back to the server's host name when `server` is absent or the name is empty.
+   * The schema stays lenient on purpose, so a client never rejects an older or unusual server over its name.
+   */
   server: z.object({ name: z.string(), version: z.string().optional() }).optional(),
   signIn: SignInSchema.optional(),
 });

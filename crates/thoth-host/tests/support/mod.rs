@@ -30,11 +30,13 @@ pub struct Config {
     pub callback: Callback,
     /// Delay of the token endpoint's refresh answer, so concurrent refreshes would overlap.
     pub refresh_delay: Duration,
+    /// The `server` member of the capabilities; `Value::Null` leaves it out.
+    pub server: Value,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { endpoint_origin: None, sign_in: true, protocol_version: "1.0".into(), expires_in: 900, callback: Callback::Good, refresh_delay: Duration::from_millis(150) }
+        Self { endpoint_origin: None, sign_in: true, protocol_version: "1.0".into(), expires_in: 900, callback: Callback::Good, refresh_delay: Duration::from_millis(150), server: json!({ "name": "Fake Thoth", "version": "0" }) }
     }
 }
 
@@ -167,7 +169,10 @@ fn serve(mut stream: TcpStream, state: &Arc<Mutex<State>>, origin: &str) {
         ("GET", "/api/v1/capabilities") => {
             let s = state.lock().unwrap();
             let base = s.config.endpoint_origin.clone().unwrap_or_else(|| origin.to_owned());
-            let mut caps = json!({ "protocolVersion": s.config.protocol_version, "capabilities": [], "limits": { "maxPageSize": 200 }, "server": { "name": "Fake Thoth", "version": "0" } });
+            let mut caps = json!({ "protocolVersion": s.config.protocol_version, "capabilities": [], "limits": { "maxPageSize": 200 } });
+            if !s.config.server.is_null() {
+                caps["server"] = s.config.server.clone();
+            }
             if s.config.sign_in {
                 caps["signIn"] = json!({ "authorizationEndpoint": format!("{base}/auth/authorize"), "tokenEndpoint": format!("{base}/auth/token"), "revocationEndpoint": format!("{base}/auth/revoke"), "providers": [{ "id": "google", "name": "Google" }] });
             }

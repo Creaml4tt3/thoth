@@ -12,6 +12,8 @@ describe("smoke", () => {
     const caps = await env.api(null, "GET", "/capabilities");
     expect(caps.status).toBe(200);
     expect(caps.json.capabilities).toEqual(["attachments", "search", "events.sse", "transfers"]);
+    // No SERVER_NAME and no PUBLIC_URL: the default name.
+    expect(caps.json.server).toMatchObject({ name: "Thoth server", version: expect.any(String) });
     const me = await env.api(null, "GET", "/me");
     expect(me.status).toBe(401);
     expect(me.headers.get("www-authenticate")).toBe('Bearer realm="thoth"');

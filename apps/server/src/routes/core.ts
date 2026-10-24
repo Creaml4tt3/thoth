@@ -65,7 +65,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
           ...(config.maxWorkspacesPerAccount === undefined ? {} : { maxWorkspacesPerAccount: config.maxWorkspacesPerAccount }),
           ...(config.revisionRetentionDays === undefined ? {} : { revisionRetentionDays: config.revisionRetentionDays }),
         },
-        server: { name: "thoth-server", version: pkg.version },
+        server: { name: config.serverName, version: pkg.version },
         // Only when a provider is configured (docs/protocol/sign-in.md section 1).
         ...(config.signIn === undefined ? {} : { signIn: signInCapability(config.signIn) }),
       }),

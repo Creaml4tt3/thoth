@@ -124,7 +124,7 @@ export interface ServerInfo {
   id: string;
   /** Normalized origin, e.g. `https://api.thoth.creaml4tt3.me` or `http://127.0.0.1:8080`. */
   url: string;
-  /** From `capabilities.server.name`, else the host name. */
+  /** `capabilities.server.name` without control characters, trimmed, at most 64 characters; else the host name (no port). */
   label: string;
   auth: "signed-out" | "browser" | "token";
   /** `GET /me` at sign-in; absent when signed out. */

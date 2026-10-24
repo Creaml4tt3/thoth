@@ -65,7 +65,10 @@ Keep the password in a password manager if you want to keep the data: the
 database was created with it.
 
 Want the trial limits locally? Add `THOTH_PROFILE=trial` to the server's
-`environment:` in `compose.yaml`. See `apps/server/README.md` for every setting.
+`environment:` in `compose.yaml`. To give the server the name the apps show,
+add `SERVER_NAME` there too (for example `SERVER_NAME: "Home notes"`); without
+it the server is called "Thoth server". See `apps/server/README.md` for every
+setting.
 
 ## 3. Connecting the app to the server (coming)
 

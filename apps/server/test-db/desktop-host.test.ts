@@ -115,7 +115,7 @@ beforeAll(async () => {
   // PUBLIC_URL must be the address the desktop adds: its iss and endpoints are checked against that origin.
   const port = await freePort();
   env = await startTestEnv({
-    env: { PORT: String(port), PUBLIC_URL: `http://127.0.0.1:${port}`, OIDC_GOOGLE_CLIENT_ID: issuer.clientId, OIDC_GOOGLE_CLIENT_SECRET: issuer.clientSecret, ACCESS_TOKEN_TTL_SECONDS: "900" },
+    env: { PORT: String(port), SERVER_NAME: "Team notes", PUBLIC_URL: `http://127.0.0.1:${port}`, OIDC_GOOGLE_CLIENT_ID: issuer.clientId, OIDC_GOOGLE_CLIENT_SECRET: issuer.clientSecret, ACCESS_TOKEN_TTL_SECONDS: "900" },
     configure: (c) => {
       for (const p of c.signIn!.providers) if (p.kind === "oidc") p.issuer = issuer.url;
     },
@@ -142,7 +142,7 @@ afterAll(async () => {
 describe("desktop host against the reference server", () => {
   it("adds, signs in, reads and writes, refreshes an expired token, and signs out (revoked on the server)", async () => {
     const info = await host.add(`${env.url}/`);
-    expect(info).toMatchObject({ url: env.url, label: "thoth-server", auth: "signed-out", providers: [{ id: "google", name: "Google" }] });
+    expect(info).toMatchObject({ url: env.url, label: "Team notes", auth: "signed-out", providers: [{ id: "google", name: "Google" }] });
     const id = info.id;
 
     const { result, page } = await signIn(id);

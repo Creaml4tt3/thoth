@@ -91,6 +91,16 @@ discover a server before signing in.
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
+`server` is optional (protocol 1.0). It names the software answering and how people should see it:
+
+- `name` is the operator's display name for the server, shown by clients in their server lists and
+  sidebars. The reference server reads it from `SERVER_NAME` (1 to 64 characters, no control characters;
+  default: the host name of `PUBLIC_URL`, else `Thoth server`). Clients remove control characters, trim
+  it and keep at most 64 characters. When `server` is absent or the name is empty, clients show the
+  server's host name (without the port).
+- `version` is the server software's version, for diagnostics only. Clients MUST NOT infer features from
+  it; capabilities do that.
+
 `limits` members are optional. When present they are authoritative: a request above
 `maxMarkdownBytes` or `maxAttachmentBytes` is 413 `payload_too_large`. `idempotencyWindowSeconds`,
 when present, MUST be at least 86400.

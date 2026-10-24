@@ -198,6 +198,22 @@ fn add_sign_in_call_refresh_and_sign_out() {
 }
 
 #[test]
+fn the_label_is_the_servers_name_cleaned_or_else_its_host_name() {
+    let label = |server: Value| {
+        let fake = Fake::start(Config { server, ..Config::default() });
+        Harness::new().ok("server.add", json!({ "url": fake.origin }))["label"].as_str().unwrap().to_owned()
+    };
+    // No name, an empty or blank name, or a name of the wrong type: the host name (without the port).
+    for server in [Value::Null, json!({}), json!({ "name": "" }), json!({ "name": " \u{7} \n " }), json!({ "name": 42 })] {
+        assert_eq!(label(server.clone()), "127.0.0.1", "{server}");
+    }
+    // Control characters are dropped, the name is trimmed and kept to 64 characters (the server's own limit).
+    assert_eq!(label(json!({ "name": "  Team\u{7} notes\n " })), "Team notes");
+    assert_eq!(label(json!({ "name": "บันทึกของทีม" })), "บันทึกของทีม");
+    assert_eq!(label(json!({ "name": "ก".repeat(80) })), "ก".repeat(64));
+}
+
+#[test]
 fn concurrent_requests_share_one_refresh() {
     let fake = Fake::start(Config::default());
     let h = Arc::new(Harness::new());
