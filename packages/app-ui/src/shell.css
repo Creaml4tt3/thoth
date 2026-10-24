@@ -50,10 +50,10 @@
 
 /* Folders look like folders: an accent-coloured folder icon, a heavier label, and a disclosure arrow (ADR-0016). */
 .tree-item[data-kind="folder"], .tree-item.tree-folder { color: var(--thoth-ink-primary); font-weight: 500; }
-.tree-icon-folder { color: var(--thoth-moon); }
+.tree-icon-folder { color: var(--thoth-accent); }
 .tree-item[data-kind="folder"][aria-expanded="true"] .tree-icon-folder { color: var(--thoth-moon-ink); }
 .tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
-.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-moon); }
+.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-accent); }
 .tree-item[data-dragging] { opacity: 0.45; }
 
 /* Drag and drop: the drop indicator is the accent colour (a line before or after a row, a tint inside it). */
@@ -65,8 +65,8 @@
 
 /* Rename in place. */
 .tree-renaming { cursor: text; }
-.tree-rename { flex: 1; min-width: 0; font: inherit; padding: 1px 6px; border-radius: var(--thoth-radius-xs); border: 1px solid var(--thoth-moon); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
-.tree-rename:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 0; }
+.tree-rename { flex: 1; min-width: 0; font: inherit; padding: 1px 6px; border-radius: var(--thoth-radius-xs); border: 1px solid var(--thoth-accent); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+.tree-rename:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 0; }
 .tree-rename:disabled { opacity: 0.6; }
 
 /* The row menu and the Move to dialog. */
@@ -74,7 +74,7 @@
 .ctx-item { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; font: var(--thoth-text-ui); }
 .ctx-item kbd { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
 .ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-moon-soft); }
-.ctx-item:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
+.ctx-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .ctx-item:disabled { color: var(--thoth-ink-faint); cursor: default; }
 .move-list { padding: 4px; }
 .move-list option { padding: 4px 8px; }

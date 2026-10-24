@@ -92,3 +92,28 @@ describe("accent role tokens", () => {
     for (const name of ["--thoth-accent", "--thoth-on-accent", "--thoth-accent-soft", "--thoth-accent-ink"]) expect(systemDark[name]).toBe(night[name]);
   });
 });
+
+describe("app CSS uses the tested accent", () => {
+  /** The brand Moon (#E8590C) is for the logo and the website; the app's solid accent is --thoth-accent (AA-tested above). */
+  const files = [
+    "../src/editor.css",
+    "../src/shell.css",
+    "../src/plain.css",
+    "../src/ui.css",
+    "../../../apps/desktop/src/features/transfer/transfer.css",
+    "../../../apps/desktop/src/features/import/import.css",
+    "../../../apps/desktop/src/features/settings/settings.css",
+    "../../../apps/web/src/web.css",
+  ];
+  it.each(files)("%s never uses the brand Moon as a solid colour", (file) => {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    expect(source.match(/var\(--thoth-moon\)/g) ?? []).toEqual([]);
+  });
+
+  it.each(Object.entries(themes))("pressed tools and context items (moon-ink on moon-soft) are at least 4.5:1, %s", (_name, t) => {
+    for (const surface of ["--thoth-bg", "--thoth-bg-sidebar"]) {
+      const wash = over(parse(t["--thoth-moon-soft"]!), parse(t[surface]!).rgb);
+      expect(ratio(parse(t["--thoth-moon-ink"]!).rgb, wash)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});

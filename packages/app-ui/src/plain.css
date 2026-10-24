@@ -2,9 +2,9 @@
 .plain-editor .cm-editor { background: transparent; font: var(--thoth-text-body); }
 .plain-editor .cm-editor.cm-focused { outline: none; }
 .plain-editor .cm-scroller { font-family: inherit; line-height: inherit; overflow: visible; }
-.plain-editor .cm-content { min-height: 40vh; padding: 0 0 var(--thoth-space-16); caret-color: var(--thoth-moon); }
+.plain-editor .cm-content { min-height: 40vh; padding: 0 0 var(--thoth-space-16); caret-color: var(--thoth-accent); }
 .plain-editor .cm-line { padding: 0; }
-.plain-editor .cm-cursor { border-left: 2px solid var(--thoth-moon); }
+.plain-editor .cm-cursor { border-left: 2px solid var(--thoth-accent); }
 .plain-editor .cm-selectionBackground, .plain-editor .cm-focused .cm-selectionBackground { background: var(--thoth-moon-soft) !important; }
 .plain-editor .cm-content[contenteditable="false"] { cursor: default; }
 
@@ -59,6 +59,6 @@
 .mode-option { all: unset; font: 500 12px/1 var(--thoth-font-sans); padding: 5px 10px; border-radius: var(--thoth-radius-pill); color: var(--thoth-ink-tertiary); cursor: pointer; }
 .mode-option[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
 .mode-option:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--thoth-ink-primary); }
-.mode-option:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 1px; }
+.mode-option:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .mode-option:disabled { opacity: 0.45; cursor: default; }
 .plain-editor .wikilink[data-state="resolved"] { color: var(--thoth-link); }
