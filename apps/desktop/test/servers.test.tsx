@@ -8,6 +8,8 @@ import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, waitFor, wi
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
+import { th } from "../src/strings/index.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -531,5 +533,34 @@ describe("helpers", () => {
     const tree = nestWorkspaceTree([n("b", "a", "B"), n("a", null, "A"), n("o", "missing", "Orphan"), n("x", "y", "X"), n("y", "x", "Y")]);
     expect(tree.map((t) => t.title)).toEqual(["A", "Orphan"]);
     expect(tree[0]!.children.map((t) => t.title)).toEqual(["B"]);
+  });
+});
+
+describe("Settings → Servers in Thai", () => {
+  afterEach(() => localStorage.removeItem("thoth.desktop.lang"));
+
+  it("shows the server card, its limits, the demo server and the add form in Thai", async () => {
+    localStorage.setItem("thoth.desktop.lang", "th");
+    const servers = new FakeServers();
+    servers.define({ ...TRIAL, url: STARTER_SERVER.url });
+    servers.define(LOCAL);
+    const app = await openApp(root, { starterServer: STARTER_SERVER }, createNodePlatform({ vault: root, servers }));
+    await screen.findByRole("tree", { name: th.shell.pagesInSpace });
+    await app.user.click(screen.getByRole("button", { name: th.shell.settings }));
+    const region = await screen.findByRole("region", { name: th.servers.title });
+    // The demo server is suggested with its Thai name and caution.
+    const suggestion = within(region).getByRole("group", { name: th.servers.starter.name });
+    expect(within(suggestion).getByText(th.servers.starter.caution)).toBeTruthy();
+    await app.user.type(within(region).getByRole("textbox", { name: th.servers.address }), LOCAL.url);
+    await app.user.click(within(region).getByRole("button", { name: th.servers.addServer }));
+    const team = await within(region).findByRole("article", { name: "Team server" });
+    expect(within(team).getByTestId("server-account").textContent).toBe(th.servers.notSignedIn);
+    expect(within(team).getByRole("button", { name: th.servers.useToken })).toBeTruthy();
+
+    await app.user.click(within(suggestion).getByRole("button", { name: th.servers.addStarter(th.servers.starter.name) }));
+    const trial = await within(region).findByRole("article", { name: "Thoth trial" });
+    expect(within(trial).getByText(th.servers.starter.caution)).toBeTruthy();
+    expect(within(trial).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["200 หน้าต่อเวิร์กสเปซ", "สมาชิก 5 คนต่อเวิร์กสเปซ", "ไฟล์แนบรวม 50 MB ต่อเวิร์กสเปซ"]);
+    expect(within(trial).getByRole("button", { name: th.servers.signInWith("Google") })).toBeTruthy();
   });
 });

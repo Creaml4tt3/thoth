@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { Platform } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
+import { useDesktopStrings } from "../../strings/index.ts";
+import { displayPath } from "../settings/path.ts";
 
 interface Props {
   platform: Platform;
@@ -14,6 +16,7 @@ const leaf = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop()
 
 /** First screen (Night): choose or create the folder that becomes a Private Space. */
 export function Onboarding({ platform, busy, error, onOpen }: Props) {
+  const t = useDesktopStrings().onboarding;
   const [recent, setRecent] = useState<string[]>([]);
   const [pickError, setPickError] = useState<string | null>(null);
 
@@ -44,15 +47,15 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
     <main className="onboarding" data-theme="night">
       <div className="onboarding-inner">
         <h1 className="display onboarding-title">
-          Meet <Mark size={56} /> Thoth
+          {t.meet.before} <Mark size={56} /> {t.meet.after}
         </h1>
-        <p className="lede">A private place for everything you know. Your files stay on your computer as Markdown, in a folder you choose. No account, no cloud.</p>
+        <p className="lede">{t.lede}</p>
         <div className="ctas">
           <Button variant="primary" onClick={() => void pick()} disabled={busy} data-autofocus>
-            {busy ? "Opening…" : "Choose or create a Private Space"}
+            {busy ? t.opening : t.choose}
           </Button>
         </div>
-        <p className="muted onboarding-hint">Pick an existing folder of Markdown files, or create a new empty folder in the dialog. Thoth keeps its index in a hidden .thoth folder inside it, and the index can always be rebuilt from your files.</p>
+        <p className="muted onboarding-hint">{t.hint}</p>
         {shown && (
           <p role="alert" className="alert alert-danger">
             {shown}
@@ -61,14 +64,14 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
         {recent.length > 0 && (
           <section aria-labelledby="recent-heading" className="recent">
             <h2 id="recent-heading" className="label">
-              Recent
+              {t.recent}
             </h2>
             <ul>
               {recent.map((root) => (
                 <li key={root}>
-                  <button type="button" className="recent-item" disabled={busy} onClick={() => onOpen(root)}>
+                  <button type="button" className="recent-item" disabled={busy} onClick={() => onOpen(root)} title={root}>
                     <b>{leaf(root)}</b>
-                    <span className="muted mono">{root}</span>
+                    <span className="muted mono">{displayPath(root, 64)}</span>
                   </button>
                 </li>
               ))}

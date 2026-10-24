@@ -4,28 +4,39 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
-import { isStarter } from "@thoth/app-ui/workspace/starter.ts";
+import { STARTER_SERVER, isStarter, type StarterServer } from "@thoth/app-ui/workspace/starter.ts";
+import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings, type DesktopStrings } from "../../strings/index.ts";
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /** Host errors carry a code; turn the two server ones into plain words. */
-function addError(error: unknown): string {
+function addError(error: unknown, t: DesktopStrings["servers"]): string {
   const code = (error as { code?: unknown } | null)?.code;
   const detail = message(error);
-  if (code === "SERVER_UNREACHABLE") return `Could not reach a Thoth server at that address. ${detail}`;
-  if (code === "BAD_ARGUMENT" || code === "NOT_ALLOWED") return `That address cannot be used. ${detail}`;
+  if (code === "SERVER_UNREACHABLE") return t.unreachable(detail);
+  if (code === "BAD_ARGUMENT" || code === "NOT_ALLOWED") return t.unusable(detail);
   return detail;
 }
 
 export { describeLimits };
+
+/** The built-in demo server is shown with its name and caution in the UI language; any other starter as given. */
+function localStarter(starter: StarterServer | null, t: DesktopStrings["servers"]): StarterServer | null {
+  if (!starter || starter.url !== STARTER_SERVER.url || starter.name !== STARTER_SERVER.name) return starter;
+  return { url: starter.url, ...t.starter };
+}
 
 type Busy = null | { kind: "browser"; provider: string } | { kind: "token" | "signout" | "remove" };
 
 /** One server: account, limits, sign-in (browser or token), sign out, remove. `signInOnly` hides sign out and remove (sign-in prompt over an open page). */
 export function ServerCard({ info, error, directory, signInOnly = false }: { info: ServerInfo; error: string | null; directory: ServerDirectory; signInOnly?: boolean }) {
   const { options } = useSession();
-  const caution = isStarter(options.starterServer, info.url) ? options.starterServer?.caution : undefined;
+  const t = useDesktopStrings().servers;
+  const limitsText = useStrings().limits;
+  const starter = localStarter(options.starterServer, t);
+  const caution = isStarter(starter, info.url) ? starter?.caution : undefined;
   const [busy, setBusy] = useState<Busy>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -35,7 +46,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
   const cancelled = useRef(false);
   const titleId = `server-${info.id}`;
   const signedIn = info.auth !== "signed-out";
-  const limits = info.limits ? describeLimits(info.limits) : [];
+  const limits = info.limits ? describeLimits(info.limits, limitsText) : [];
 
   const run = async (next: Exclude<Busy, null>, work: () => Promise<unknown>) => {
     setBusy(next);
@@ -83,22 +94,18 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
           </h3>
           <p className="mono muted">{info.url}</p>
         </div>
-        <span className={`badge ${signedIn ? "badge-workspace" : "badge-muted"}`}>{signedIn ? "Signed in" : "Signed out"}</span>
+        <span className={`badge ${signedIn ? "badge-workspace" : "badge-muted"}`}>{signedIn ? t.signedIn : t.signedOut}</span>
       </div>
 
       <p className="server-account" data-testid="server-account">
-        {signedIn
-          ? info.account
-            ? `Signed in as ${info.account.displayName}${info.account.email ? ` (${info.account.email})` : ""}${info.auth === "token" ? " with a personal access token" : ""}.`
-            : `Signed in${info.auth === "token" ? " with a personal access token" : ""}.`
-          : "Not signed in."}
+        {signedIn ? t.account(info.account?.displayName ?? null, info.account?.email, info.auth === "token") : t.notSignedIn}
       </p>
 
       {caution && <p className="server-caution">{caution}</p>}
 
       {limits.length > 0 && (
         <div className="server-limits">
-          <p className="muted">This server has limits:</p>
+          <p className="muted">{t.limitsTitle}</p>
           <ul>
             {limits.map((line) => (
               <li key={line}>{line}</li>
@@ -115,7 +122,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
 
       {busy?.kind === "browser" ? (
         <div className="server-waiting" role="status">
-          <span>Finish signing in with {busy.provider} in your browser. Thoth is waiting for it to come back.</span>
+          <span>{t.waiting(busy.provider)}</span>
           <Button
             variant="ghost"
             small
@@ -124,7 +131,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
               void directory.cancelSignIn(info.id).catch(() => undefined);
             }}
           >
-            Cancel
+            {t.cancel}
           </Button>
         </div>
       ) : (
@@ -132,22 +139,22 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
           {!signedIn &&
             info.providers.map((provider) => (
               <Button key={provider.id} variant="primary" small disabled={busy !== null} onClick={() => void signIn(provider)}>
-                Sign in with {provider.name}
+                {t.signInWith(provider.name)}
               </Button>
             ))}
           {!signedIn && !tokenOpen && (
             <Button variant="ghost" small disabled={busy !== null} onClick={() => setTokenOpen(true)}>
-              Use a personal access token
+              {t.useToken}
             </Button>
           )}
           {signedIn && !signInOnly && (
             <Button variant="ghost" small disabled={busy !== null} onClick={() => void run({ kind: "signout" }, () => directory.signOut(info.id))}>
-              {busy?.kind === "signout" ? "Signing out…" : "Sign out"}
+              {busy?.kind === "signout" ? t.signingOut : t.signOut}
             </Button>
           )}
           {!signInOnly && (
             <Button variant="danger" small disabled={busy !== null} onClick={() => setConfirmRemove(true)}>
-              Remove
+              {t.remove}
             </Button>
           )}
         </div>
@@ -156,12 +163,12 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
       {!signedIn && tokenOpen && busy?.kind !== "browser" && (
         <form className="form server-token" onSubmit={submitToken}>
           <label className="field">
-            <span>Personal access token (sent once to the app's host and stored in your system keychain; it is never shown again)</span>
+            <span>{t.tokenLabel}</span>
             <input ref={tokenField} className="input" type="password" name="token" autoComplete="off" spellCheck={false} data-autofocus />
           </label>
           <div className="set-actions">
             <Button variant="primary" small type="submit" disabled={busy !== null}>
-              {busy?.kind === "token" ? "Checking…" : "Sign in with token"}
+              {busy?.kind === "token" ? t.checking : t.signInWithToken}
             </Button>
             <Button
               variant="quiet"
@@ -171,7 +178,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
                 setTokenOpen(false);
               }}
             >
-              Cancel
+              {t.cancel}
             </Button>
           </div>
         </form>
@@ -184,11 +191,11 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
       )}
 
       {confirmRemove && (
-        <Modal title={`Remove ${info.label}?`} onClose={() => setConfirmRemove(false)}>
-          <p>Thoth signs you out of this server and forgets it. Pages on the server are not changed, and nothing in your Private Space is touched.</p>
+        <Modal title={t.removeTitle(info.label)} onClose={() => setConfirmRemove(false)}>
+          <p>{t.removeBody}</p>
           <div className="modal-actions">
             <Button variant="quiet" onClick={() => setConfirmRemove(false)}>
-              Keep it
+              {t.keepIt}
             </Button>
             <Button
               variant="danger"
@@ -197,7 +204,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
                 void run({ kind: "remove" }, () => directory.remove(info.id));
               }}
             >
-              Remove server
+              {t.removeServer}
             </Button>
           </div>
         </Modal>
@@ -209,6 +216,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
 /** Settings → Servers: add a server, sign in (browser or token), sign out, remove. */
 export function ServersSettings({ focus }: { focus: boolean }) {
   const { servers, options } = useSession();
+  const t = useDesktopStrings().servers;
   const state = useSyncExternalStore(servers.subscribe, servers.getState);
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
@@ -216,7 +224,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
   const [addingStarter, setAddingStarter] = useState(false);
   const [starterError, setStarterError] = useState<string | null>(null);
   const section = useRef<HTMLElement>(null);
-  const starter = options.starterServer;
+  const starter = localStarter(options.starterServer, t);
   // Suggested until added. Nothing is sent to it before the user chooses Add.
   const suggestStarter = starter !== null && state.loaded && !state.servers.some((s) => isStarter(starter, s.info.url));
 
@@ -227,7 +235,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
     try {
       await servers.add(starter.url);
     } catch (e) {
-      setStarterError(addError(e));
+      setStarterError(addError(e, t));
     } finally {
       setAddingStarter(false);
     }
@@ -241,7 +249,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
     event.preventDefault();
     const address = url.trim();
     if (address === "") {
-      setError("Enter the server's address, for example https://thoth.example.com.");
+      setError(t.enterAddress);
       return;
     }
     setAdding(true);
@@ -250,7 +258,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
       await servers.add(address);
       setUrl("");
     } catch (e) {
-      setError(addError(e));
+      setError(addError(e, t));
     } finally {
       setAdding(false);
     }
@@ -258,8 +266,8 @@ export function ServersSettings({ focus }: { focus: boolean }) {
 
   return (
     <section ref={section} aria-labelledby="set-servers" className="set-section" id="settings-servers">
-      <h2 id="set-servers">Servers</h2>
-      <p className="muted">Connect to a Thoth server to work in shared workspaces. Thoth keeps your sign-in in the system keychain; this window never sees it.</p>
+      <h2 id="set-servers">{t.title}</h2>
+      <p className="muted">{t.intro}</p>
       {state.error && (
         <p role="alert" className="alert alert-warning">
           {state.error}
@@ -277,12 +285,12 @@ export function ServersSettings({ focus }: { focus: boolean }) {
               </p>
               <p className="mono muted">{starter.url}</p>
             </div>
-            <span className="badge badge-muted">Suggested</span>
+            <span className="badge badge-muted">{t.suggested}</span>
           </div>
           <p className="server-caution">{starter.caution}</p>
           <div className="set-actions">
             <Button variant="primary" small disabled={addingStarter} onClick={() => void addStarter()}>
-              {addingStarter ? "Connecting…" : `Add ${starter.name}`}
+              {addingStarter ? t.connecting : t.addStarter(starter.name)}
             </Button>
           </div>
           {starterError && (
@@ -292,13 +300,13 @@ export function ServersSettings({ focus }: { focus: boolean }) {
           )}
         </div>
       )}
-      <form className="server-add" onSubmit={(e) => void add(e)} aria-label="Add server">
+      <form className="server-add" onSubmit={(e) => void add(e)} aria-label={t.addServer}>
         <label className="field">
-          <span>Server address</span>
+          <span>{t.address}</span>
           <input className="input" type="text" inputMode="url" placeholder="https://thoth.example.com" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="url" spellCheck={false} />
         </label>
         <Button variant="primary" small type="submit" disabled={adding}>
-          {adding ? "Connecting…" : "Add server"}
+          {adding ? t.connecting : t.addServer}
         </Button>
       </form>
       {error && (

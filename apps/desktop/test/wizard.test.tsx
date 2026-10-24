@@ -10,6 +10,7 @@ import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx"
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { createGate, nodeOpenImportSource } from "./support/import-source.ts";
 import { seed } from "./support/fixtures.ts";
+import { th } from "../src/strings/index.ts";
 
 const FIXTURE = resolve(import.meta.dirname, "../../../tests/fixtures/obsidian-vault");
 const dirs = tempDirs();
@@ -144,5 +145,37 @@ describe("import wizard", () => {
     expect(paths.some((p) => / 2\.md$/.test(p))).toBe(false);
     expect(await readdir(join(root, ".thoth/operations/imports"))).toEqual([]);
     expect(gate.opened()).toBe(2);
+  });
+
+  it("runs in Thai from the first step to the report", async () => {
+    localStorage.setItem("thoth.desktop.lang", "th");
+    try {
+      const w = th.wizard;
+      const platform = createNodePlatform({ vault: root });
+      platform.pickedSource = FIXTURE;
+      const app = await openApp(root, { openImportSource: nodeOpenImportSource }, platform);
+      await app.user.click(await screen.findByRole("button", { name: th.onboarding.importFrom }));
+      expect(screen.getByRole("heading", { name: w.titles.source })).toBeTruthy();
+      expect(screen.getByText(w.stepOf(1, 8))).toBeTruthy();
+      await app.user.click(screen.getByRole("radio", { name: /obsidian/i }));
+      await app.user.click(screen.getByRole("button", { name: w.continue }));
+      expect(screen.getByText(w.how.obsidian.title)).toBeTruthy();
+      await app.user.click(screen.getByRole("button", { name: w.ready }));
+      await app.user.click(screen.getByRole("button", { name: w.pick.folder }));
+      await screen.findByText(w.preview.of.trim(), { exact: false });
+      expect(screen.getByRole("group", { name: w.preview.contents })).toBeTruthy();
+      // A known warning is explained in Thai.
+      expect(screen.getByText(w.warnings.malformed_frontmatter!.title)).toBeTruthy();
+      await app.user.click(screen.getByRole("button", { name: w.continue }));
+      expect(screen.getByText(w.destination.later)).toBeTruthy();
+      await app.user.click(screen.getByRole("button", { name: w.continue }));
+      await app.user.click(screen.getByRole("button", { name: w.options.start }));
+      const report = await screen.findByTestId("import-report", {}, { timeout: 15000 });
+      expect(within(report).getByText(w.report.headline.completed)).toBeTruthy();
+      expect(within(report).getByRole("group", { name: w.report.results })).toBeTruthy();
+      expect(within(report).getByText(w.report.safe)).toBeTruthy();
+    } finally {
+      localStorage.removeItem("thoth.desktop.lang");
+    }
   });
 });

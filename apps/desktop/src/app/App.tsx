@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
+import { STRINGS, StringsContext } from "@thoth/app-ui/strings/index.ts";
+import { DESKTOP_STRINGS, DesktopStringsContext, LangPreferenceContext, langPreference, resolveLang, setLangPreference, systemLanguages, type LangPreference } from "../strings/index.ts";
 import { Onboarding } from "../features/onboarding/Onboarding.tsx";
 import { openImportSource } from "../features/import/open-source.ts";
 import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
@@ -29,7 +31,36 @@ async function closeHost(host: Host): Promise<void> {
   await host.connection.close().catch(() => undefined);
 }
 
+/** The UI language: the system's unless one was chosen in Settings, for both the shared and the desktop text. */
+function LanguageRoot({ children }: { children: ReactNode }) {
+  const [preference, setPreferenceState] = useState<LangPreference>(langPreference);
+  const lang = resolveLang(preference, systemLanguages());
+  const setPreference = useCallback((next: LangPreference) => {
+    setLangPreference(next);
+    setPreferenceState(next);
+  }, []);
+  const choice = useMemo(() => ({ preference, setPreference }), [preference, setPreference]);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+  return (
+    <LangPreferenceContext.Provider value={choice}>
+      <StringsContext.Provider value={STRINGS[lang]}>
+        <DesktopStringsContext.Provider value={DESKTOP_STRINGS[lang]}>{children}</DesktopStringsContext.Provider>
+      </StringsContext.Provider>
+    </LangPreferenceContext.Provider>
+  );
+}
+
 export function App({ platform, options }: { platform: Platform; options?: Partial<AppOptions> }) {
+  return (
+    <LanguageRoot>
+      <AppBody platform={platform} options={options} />
+    </LanguageRoot>
+  );
+}
+
+function AppBody({ platform, options }: { platform: Platform; options?: Partial<AppOptions> | undefined }) {
   const [host, setHost] = useState<Host | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

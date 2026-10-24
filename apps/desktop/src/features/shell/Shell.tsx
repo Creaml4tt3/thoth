@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PageSummary } from "@thoth/domain";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 import { PageView } from "../editor/PageView.tsx";
 import { SettingsView } from "../settings/SettingsView.tsx";
 import { NewPageDialog } from "./NewPageDialog.tsx";
@@ -15,6 +16,7 @@ type Dialog = "search" | "new" | null;
 /** The Paper shell: sidebar on the left, page or settings on the right. */
 export function Shell({ path, remote = null, settings }: { path: string | null; remote?: WorkspacePageRef | null; settings: false | "top" | "servers" }) {
   const { vault, revision, watchError, openPage } = useSession();
+  const t = useDesktopStrings().shell;
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [dialog, setDialog] = useState<Dialog>(null);
 
@@ -51,7 +53,7 @@ export function Shell({ path, remote = null, settings }: { path: string | null; 
       <main className="main">
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
-            Changes made outside Thoth may not show up automatically: {watchError}
+            {t.watchError(watchError)}
           </p>
         )}
         {settings ? (
@@ -63,8 +65,8 @@ export function Shell({ path, remote = null, settings }: { path: string | null; 
         ) : (
           <div className="empty">
             <Mark size={40} />
-            <h1>Nothing open</h1>
-            <p className="muted">Create a page with New page, or press Ctrl/Cmd+K to search.</p>
+            <h1>{t.nothingOpen}</h1>
+            <p className="muted">{t.nothingOpenHint}</p>
           </div>
         )}
       </main>

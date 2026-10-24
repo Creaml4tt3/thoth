@@ -1,5 +1,6 @@
 import type { ImportManifest, ImportPreview } from "@thoth/importer-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { useDesktopStrings } from "../../../strings/index.ts";
 import { describeWarning, SEVERITY_ORDER } from "../warnings.ts";
 
 export interface WarningGroup {
@@ -32,11 +33,12 @@ export function Stat({ label, value }: { label: string; value: number }) {
 }
 
 export function WarningList({ groups }: { groups: WarningGroup[] }) {
-  if (groups.length === 0) return <p className="muted">No warnings.</p>;
+  const w = useDesktopStrings().wizard;
+  if (groups.length === 0) return <p className="muted">{w.preview.noWarnings}</p>;
   return (
     <ul className="wz-warnings">
       {groups.map((g) => {
-        const info = describeWarning(g.code);
+        const info = describeWarning(g.code, w);
         return (
           <li key={g.code} data-severity={g.severity}>
             <details>
@@ -51,7 +53,7 @@ export function WarningList({ groups }: { groups: WarningGroup[] }) {
                     {e.message}
                   </li>
                 ))}
-                {g.count > g.examples.length && <li className="muted">and {g.count - g.examples.length} more</li>}
+                {g.count > g.examples.length && <li className="muted">{w.preview.andMore(g.count - g.examples.length)}</li>}
               </ul>
             </details>
           </li>
@@ -63,46 +65,49 @@ export function WarningList({ groups }: { groups: WarningGroup[] }) {
 
 /** Step 5: what the scan found. */
 export function Preview({ preview, manifest, onBack, onNext }: { preview: ImportPreview; manifest: ImportManifest; onBack(): void; onNext(): void }) {
+  const w = useDesktopStrings().wizard;
+  const t = w.preview;
   const groups = groupWarnings(manifest);
   const { links } = preview;
   return (
     <div className="wz-step">
       <h3 className="wz-q">
-        Preview of <span className="wz-name">{preview.sourceLabel}</span>
+        {t.of}
+        <span className="wz-name">{preview.sourceLabel}</span>
       </h3>
-      <div className="wz-stats" role="group" aria-label="Import contents">
-        <Stat label="pages" value={preview.pages} />
-        <Stat label="folders" value={preview.folders} />
-        <Stat label="attachments" value={preview.attachments} />
-        <Stat label="databases / CSV" value={preview.databases} />
-        <Stat label="skipped" value={preview.skipped} />
+      <div className="wz-stats" role="group" aria-label={t.contents}>
+        <Stat label={t.stats.pages} value={preview.pages} />
+        <Stat label={t.stats.folders} value={preview.folders} />
+        <Stat label={t.stats.attachments} value={preview.attachments} />
+        <Stat label={t.stats.databases} value={preview.databases} />
+        <Stat label={t.stats.skipped} value={preview.skipped} />
       </div>
       <section aria-labelledby="wz-links">
         <h4 id="wz-links" className="label">
-          Links
+          {t.links}
         </h4>
-        <div className="wz-stats" role="group" aria-label="Links">
-          <Stat label="resolved" value={links.resolved} />
-          <Stat label="unresolved" value={links.unresolved} />
-          <Stat label="ambiguous" value={links.ambiguous} />
-          <Stat label="external" value={links.external} />
+        <div className="wz-stats" role="group" aria-label={t.links}>
+          <Stat label={t.linkStats.resolved} value={links.resolved} />
+          <Stat label={t.linkStats.unresolved} value={links.unresolved} />
+          <Stat label={t.linkStats.ambiguous} value={links.ambiguous} />
+          <Stat label={t.linkStats.external} value={links.external} />
         </div>
       </section>
       {preview.previousImports.length > 0 && (
         <p role="note" className="alert alert-warning">
-          This exact content was already imported {preview.previousImports.length === 1 ? "once" : `${preview.previousImports.length} times`} (into {preview.previousImports.map((p) => p.destinationRoot || "the top level").join(", ")}). Importing again creates separate copies.
+          {t.already(preview.previousImports.length, preview.previousImports.map((p) => p.destinationRoot || w.source.topLevel).join(", "))}
         </p>
       )}
       {preview.duplicateTitles.length > 0 && (
         <section aria-labelledby="wz-dups">
           <h4 id="wz-dups" className="label">
-            Duplicate titles ({preview.duplicateTitles.length})
+            {t.duplicates(preview.duplicateTitles.length)}
           </h4>
-          <p className="muted">Pages sharing a title are never merged. Each is kept as its own file.</p>
+          <p className="muted">{t.duplicatesNote}</p>
           <ul className="wz-examples">
             {preview.duplicateTitles.slice(0, 5).map((d) => (
               <li key={d.title}>
-                <b>{d.title}</b> <span className="muted mono">{d.sourcePaths.length} pages</span>
+                <b>{d.title}</b> <span className="muted mono">{t.pagesCount(d.sourcePaths.length)}</span>
               </li>
             ))}
           </ul>
@@ -111,24 +116,24 @@ export function Preview({ preview, manifest, onBack, onNext }: { preview: Import
       {preview.collisions.length > 0 && (
         <section aria-labelledby="wz-coll">
           <h4 id="wz-coll" className="label">
-            Name collisions ({preview.collisions.length})
+            {t.collisions(preview.collisions.length)}
           </h4>
-          <p className="muted">These would clash with an existing file or each other. The destination step decides whether they are renamed or skipped.</p>
+          <p className="muted">{t.collisionsNote}</p>
         </section>
       )}
       <section aria-labelledby="wz-warn">
         <h4 id="wz-warn" className="label">
-          Warnings
+          {t.warnings}
         </h4>
         <WarningList groups={groups} />
       </section>
-      <p className="wz-safe">Your source is only read. Thoth never changes, moves or deletes it.</p>
+      <p className="wz-safe">{t.safe}</p>
       <div className="wz-actions">
         <Button variant="quiet" onClick={onBack}>
-          Choose another source
+          {t.another}
         </Button>
         <Button variant="primary" onClick={onNext}>
-          Continue
+          {w.continue}
         </Button>
       </div>
     </div>

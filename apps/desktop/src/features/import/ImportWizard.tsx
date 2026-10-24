@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImportManifest } from "@thoth/importer-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 import { checkDestination, sourceKindFor, type Format, type System } from "./model.ts";
 import type { ScanResult } from "./service.ts";
 import { ChooseSource } from "./steps/ChooseSource.tsx";
@@ -15,17 +16,6 @@ import { RunProgress } from "./steps/RunProgress.tsx";
 import { useImportRun } from "./useImportRun.ts";
 
 type Step = "source" | "instructions" | "pick" | "preview" | "destination" | "options" | "run" | "report";
-
-const TITLES: Record<Step, string> = {
-  source: "Choose a source",
-  instructions: "Prepare your export",
-  pick: "Pick the export",
-  preview: "Preview",
-  destination: "Destination",
-  options: "Options",
-  run: "Importing",
-  report: "Report",
-};
 const ORDER: Step[] = ["source", "instructions", "pick", "preview", "destination", "options", "run", "report"];
 
 interface Props {
@@ -41,6 +31,7 @@ interface Props {
  */
 export function ImportWizard({ onClose, onOpenFolder }: Props) {
   const { platform, importService: service, revision } = useSession();
+  const w = useDesktopStrings().wizard;
   const { view, start, resume, cancel, reset } = useImportRun(service);
   const [step, setStep] = useState<Step>("source");
   const [system, setSystem] = useState<System>("notion");
@@ -123,17 +114,17 @@ export function ImportWizard({ onClose, onOpenFolder }: Props) {
 
   const index = ORDER.indexOf(step);
   return (
-    <div className="wizard" data-theme="night" role="region" aria-label="Import">
+    <div className="wizard" data-theme="night" role="region" aria-label={w.region}>
       <header className="wz-head">
         <div>
-          <p className="label">Import & Export · Step {index + 1} of {ORDER.length}</p>
+          <p className="label">{w.stepOf(index + 1, ORDER.length)}</p>
           <h2 ref={heading} tabIndex={-1} className="wz-title">
-            {TITLES[step]}
+            {w.titles[step]}
           </h2>
         </div>
         {step !== "run" && (
           <Button variant="quiet" small onClick={closeAndReset}>
-            Close
+            {w.close}
           </Button>
         )}
       </header>
@@ -170,7 +161,7 @@ export function ImportWizard({ onClose, onOpenFolder }: Props) {
           ) : (
             <div className="wz-actions">
               <Button variant="ghost" onClick={() => setStep("source")}>
-                Back to start
+                {w.backToStart}
               </Button>
             </div>
           )}

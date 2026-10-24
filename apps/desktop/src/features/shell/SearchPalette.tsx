@@ -2,10 +2,12 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { SearchHit } from "@thoth/local-store";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 
 /** Cmd/Ctrl+K quick search over the index (`vault.search`). */
 export function SearchPalette({ onClose }: { onClose(): void }) {
   const { vault, openPage } = useSession();
+  const t = useDesktopStrings().search;
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [active, setActive] = useState(0);
@@ -53,7 +55,7 @@ export function SearchPalette({ onClose }: { onClose(): void }) {
   };
 
   return (
-    <Modal title="Search" onClose={onClose}>
+    <Modal title={t.title} onClose={onClose}>
       <input
         data-autofocus
         className="input"
@@ -61,8 +63,8 @@ export function SearchPalette({ onClose }: { onClose(): void }) {
         aria-expanded={hits.length > 0}
         aria-controls={listId}
         aria-activedescendant={hits[active] ? `${listId}-${active}` : undefined}
-        aria-label="Search pages"
-        placeholder="Search pages…"
+        aria-label={t.label}
+        placeholder={t.placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
@@ -72,7 +74,7 @@ export function SearchPalette({ onClose }: { onClose(): void }) {
           {error}
         </p>
       )}
-      <ul id={listId} role="listbox" aria-label="Results" className="results">
+      <ul id={listId} role="listbox" aria-label={t.results} className="results">
         {hits.map((hit, i) => (
           <li key={hit.id} id={`${listId}-${i}`} role="option" aria-selected={i === active} className="result" onMouseEnter={() => setActive(i)} onClick={() => choose(hit)}>
             <b>{hit.title}</b>
@@ -81,7 +83,7 @@ export function SearchPalette({ onClose }: { onClose(): void }) {
           </li>
         ))}
       </ul>
-      {query.trim() !== "" && hits.length === 0 && !error && <p className="muted">No pages match “{query.trim()}”.</p>}
+      {query.trim() !== "" && hits.length === 0 && !error && <p className="muted">{t.none(query.trim())}</p>}
     </Modal>
   );
 }

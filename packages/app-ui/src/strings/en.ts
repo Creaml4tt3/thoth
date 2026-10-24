@@ -1,7 +1,7 @@
 /**
  * English UI text: the shared editor and workspace views (desktop and web) and the web client.
- * Thai is in `th.ts` with the same shape. The desktop app is English only and gets these by default,
- * so the editor text here is exactly what the desktop showed before it was shared.
+ * Thai is in `th.ts` with the same shape. The desktop app provides the language it resolved (system or
+ * Settings → Language); its own views' text is in `apps/desktop/src/strings`.
  */
 import type { BlockKind } from "../editor/block-kinds.ts";
 import type { ConflictChoice } from "../editor/page-session.ts";

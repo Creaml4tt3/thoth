@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Backlink } from "@thoth/local-store";
 import { useSession } from "../../app/context.ts";
+import { useDesktopStrings } from "../../strings/index.ts";
 
 /** Pages that link here, from the index. Re-queries when the session revision changes. */
 export function Backlinks({ path }: { path: string }) {
   const { vault, revision, openPage } = useSession();
+  const t = useDesktopStrings().page;
   const [links, setLinks] = useState<Backlink[] | null>(null);
 
   useEffect(() => {
@@ -21,9 +23,9 @@ export function Backlinks({ path }: { path: string }) {
   const pages = links ? [...new Map(links.map((l) => [l.sourcePath, l])).values()] : [];
   return (
     <section className="backlinks" aria-labelledby="backlinks-title">
-      <h2 id="backlinks-title">Backlinks{links ? ` (${pages.length})` : ""}</h2>
+      <h2 id="backlinks-title">{t.backlinks}{links ? ` (${pages.length})` : ""}</h2>
       {links && pages.length === 0 ? (
-        <p className="muted">No page links here yet.</p>
+        <p className="muted">{t.noBacklinks}</p>
       ) : (
         <ul>
           {pages.map((link) => (
