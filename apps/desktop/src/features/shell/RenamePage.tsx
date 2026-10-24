@@ -42,8 +42,8 @@ export function RenamePage({ target, onClose }: { target: RenameTarget; onClose(
         try {
           // Unsaved edits are written first: the file moves with everything the user typed.
           if (!(await flushAll())) return "";
-          // This rename leaves the text of the page alone (its bytes are not touched); the tree's F2 rename also follows a title that was the old name.
-          const renamed = await renamePrivate(vault, target.path, next, { retitle: false });
+          // Same rule as the tree's F2 rename: a title that was the old name follows the new one; any other text is left alone.
+          const renamed = await renamePrivate(vault, target.path, next, { retitle: true });
           tabs.remapPaths(renamed.from, renamed.to);
           await refresh();
           return null;

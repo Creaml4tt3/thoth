@@ -129,7 +129,8 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   expect(created).toMatch(/^---\nthoth_id: [0-9a-f-]{36}\n---\n# Plan\n$/);
   expect(await read("Archive/Old.md")).toMatch(/^---\nthoth_id: [0-9a-f-]{36}\n---\n# Old\n$/);
 
-  // 2. Rename it from the palette. The file is renamed, its bytes are not touched, and the tab follows.
+  // 2. Rename it from the palette, as F2 does: the file is renamed, the heading that was the old name follows, and
+  //    nothing else in the file changes (same thoth_id); the tab follows.
   await command(page, "rename");
   const rename = page.getByRole("dialog", { name: "Rename “Plan”" });
   await expect(rename).toBeVisible();
@@ -139,7 +140,8 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect(current(page)).toHaveText("Roadmap");
   await expect.poll(() => exists("Roadmap.md")).toBe(true);
   expect(await exists("Plan.md")).toBe(false);
-  expect(await read("Roadmap.md")).toBe(created);
+  const renamed = created.replace("# Plan\n", "# Roadmap\n");
+  await expect.poll(() => read("Roadmap.md")).toBe(renamed);
   expect(await exists(".thoth/order.json")).toBe(false); // renaming creates no order record
 
   // 3. Move it into the folder with Move to…: Down picks "Archive", Tab goes to the Move button, Enter presses it.
@@ -153,7 +155,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect(move).toBeHidden();
   await expect.poll(() => exists("Archive/Roadmap.md")).toBe(true);
   expect(await exists("Roadmap.md")).toBe(false);
-  expect(await read("Archive/Roadmap.md")).toBe(created);
+  expect(await read("Archive/Roadmap.md")).toBe(renamed);
   await expect(current(page)).toHaveText("Roadmap");
 
   // 4. And up, ahead of Old in that folder, by command (the tree's Alt+Shift+Up does the same).
@@ -171,7 +173,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await page.keyboard.press("ControlOrMeta+Shift+H");
   await expect(editorOf(page).locator("mark")).toHaveText("Write the plan.");
   await page.keyboard.press("ControlOrMeta+s");
-  const formatted = `${created}\n==Write the plan.==\n`;
+  const formatted = `${renamed}\n==Write the plan.==\n`;
   await expect.poll(() => read("Archive/Roadmap.md")).toBe(formatted);
 
   // 6. Switch tabs. Cmd/Ctrl+T opens an empty tab, the palette fills it with Old; Ctrl+Tab and Cmd/Ctrl+1 go back.
