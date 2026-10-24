@@ -787,14 +787,51 @@ export class Vault {
     return out.sort();
   }
 
-  /** Creates an empty folder. Anything already at the path is a `ConflictError`. */
+  /**
+   * Creates an empty folder (and the folders above it that are missing). A name that is already taken is a
+   * `ConflictError`: also one that differs only in letter case or Unicode form (`collisionKey`), because the vault
+   * may sit on a case-insensitive volume or move to one, and a file where a folder is needed counts as taken.
+   */
   async createFolder(path: string): Promise<void> {
+    return this.exclusive(async () => void (await this.createFolderNow(path)));
+  }
+
+  /**
+   * Creates an empty folder named `name` in `parent` ("" is the top level), or `name 2`, `name 3`… when that is
+   * taken, and returns its vault path. The check and the creation happen under the same lock, so two calls never
+   * get the same name.
+   */
+  async createUniqueFolder(parent: string, name: string): Promise<string> {
     return this.exclusive(async () => {
-      const normalized = normalizeVaultPath(path);
-      if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
-      if (await this.fs.stat(normalized)) throw new ConflictError(normalized, null, (await this.hashOrKind(normalized)) ?? "exists");
-      await this.fs.mkdirp(normalized);
+      const dir = parent === "" ? "" : normalizeVaultPath(parent);
+      const parentStat = dir === "" ? undefined : await this.fs.stat(dir);
+      if (parentStat && parentStat.kind !== "directory") throw new ConflictError(dir, null, parentStat.kind);
+      for (let n = 1; n < 1000; n++) {
+        const candidate = n === 1 ? name : `${name} ${n}`;
+        try {
+          return await this.createFolderNow(dir === "" ? candidate : `${dir}/${candidate}`);
+        } catch (error) {
+          if (!(error instanceof ConflictError)) throw error;
+        }
+      }
+      throw new Error(`No free folder name like "${name}" in "${dir}"`);
     });
+  }
+
+  private async createFolderNow(path: string): Promise<string> {
+    const normalized = normalizeVaultPath(path);
+    if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
+    const parent = dirname(normalized);
+    const parentStat = parent === "" ? { kind: "directory" as const } : await this.fs.stat(parent);
+    if (parentStat && parentStat.kind !== "directory") throw new ConflictError(parent, null, parentStat.kind);
+    if (parentStat) {
+      const key = collisionKey(basename(normalized));
+      const clash = (await this.fs.list(parent)).find((entry) => collisionKey(entry.name) === key);
+      if (clash) throw new ConflictError(parent === "" ? clash.name : `${parent}/${clash.name}`, null, clash.kind);
+    }
+    if (await this.fs.stat(normalized)) throw new ConflictError(normalized, null, (await this.hashOrKind(normalized)) ?? "exists");
+    await this.fs.mkdirp(normalized);
+    return normalized;
   }
 
   /** Removes a folder that holds nothing but empty folders (and `.DS_Store`); anything else throws. */

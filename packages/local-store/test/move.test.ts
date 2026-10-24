@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "@thoth/domain";
-import { ConflictError, emptyOrder, ORDER_PATH, orderChildren, readOrder, renameInOrder, writeOrder, type Vault } from "../src/index.ts";
+import { ConflictError, emptyOrder, entryNameProblem, ORDER_PATH, orderChildren, readOrder, renameInOrder, writeOrder, type Vault } from "../src/index.ts";
 import { openNodeVault } from "../src/node/index.ts";
 
 let root: string;
@@ -123,6 +123,56 @@ describe("folders", () => {
     expect(await exists("Ideas")).toBe(false);
     await expect(vault.removeEmptyFolder("Inbox")).rejects.toThrow(/not empty/);
     expect(await read("Inbox/Welcome.md")).toBe(WELCOME);
+  });
+});
+
+describe("new folders", () => {
+  it("refuses a name that differs from an existing one only in letter case or Unicode form", async () => {
+    await expect(vault.createFolder("inbox")).rejects.toBeInstanceOf(ConflictError);
+    await expect(vault.createFolder("Inbox/WELCOME.MD")).rejects.toBeInstanceOf(ConflictError);
+    await vault.createFolder("Café");
+    await expect(vault.createFolder("Cafe\u0301")).rejects.toBeInstanceOf(ConflictError); // e + combining accent
+    await expect(vault.createFolder("CAFÉ")).rejects.toBeInstanceOf(ConflictError);
+    await expect(vault.createFolder("Inbox/Welcome.md/Inner")).rejects.toBeInstanceOf(ConflictError); // a file in the way
+    await expect(vault.createFolder(".THOTH/x")).rejects.toThrow(/reserved/);
+    expect(await readdir(root)).not.toContain("inbox"); // nothing was created under the refused names
+  });
+
+  it("creates 'Untitled folder', then 'Untitled folder 2', 3… at the top level and inside a folder", async () => {
+    expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder");
+    expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder 2");
+    await mkdir(join(root, "untitled folder 3")); // taken in another letter case
+    expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder 4");
+    expect(await vault.createUniqueFolder("Projects", "Untitled folder")).toBe("Projects/Untitled folder");
+    expect(await vault.createUniqueFolder("Projects/Thoth", "Untitled folder")).toBe("Projects/Thoth/Untitled folder");
+    expect(await vault.createUniqueFolder("Projects", "Untitled folder")).toBe("Projects/Untitled folder 2");
+    expect(await vault.listFolders()).toEqual(expect.arrayContaining(["Untitled folder", "Untitled folder 2", "Untitled folder 4", "Projects/Untitled folder", "Projects/Untitled folder 2", "Projects/Thoth/Untitled folder"]));
+    // Two at once never get the same name.
+    const both = await Promise.all([vault.createUniqueFolder("Assets", "New"), vault.createUniqueFolder("Assets", "New")]);
+    expect([...both].sort()).toEqual(["Assets/New", "Assets/New 2"]);
+  });
+
+  it("refuses .thoth and a parent that is a file", async () => {
+    await expect(vault.createUniqueFolder(".thoth", "Untitled folder")).rejects.toThrow(/reserved/);
+    await expect(vault.createUniqueFolder("Inbox/Welcome.md", "Untitled folder")).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("checks names before touching the disk", () => {
+    expect(entryNameProblem("Plan.md", "file")).toBeNull();
+    expect(entryNameProblem("การประชุม 🚀", "folder")).toBeNull();
+    expect(entryNameProblem("", "folder")).toBe("empty");
+    expect(entryNameProblem("   ", "file")).toBe("empty");
+    expect(entryNameProblem("a/b", "file")).toBe("separator");
+    expect(entryNameProblem("a\\b", "folder")).toBe("separator");
+    expect(entryNameProblem(".thoth", "folder")).toBe("reserved");
+    expect(entryNameProblem(".THOTH", "folder")).toBe("reserved");
+    expect(entryNameProblem(".thoth", "file")).toBe("reserved");
+    expect(entryNameProblem(".git", "folder")).toBe("reserved"); // never scanned: it would vanish from the tree
+    expect(entryNameProblem(".git", "file")).toBeNull();
+    for (const bad of ["a:b", "a*b", 'a"b', "a<b", "a>b", "a|b", "a?b", "a\u0007b", ".", "..", "name.", "CON", "nul.md", "Lpt1"]) expect(entryNameProblem(bad, "folder"), bad).toBe("invalid");
+    expect(entryNameProblem("a".repeat(256), "folder")).toBe("tooLong");
+    expect(entryNameProblem("ก".repeat(86), "folder")).toBe("tooLong"); // 3 bytes each
+    expect(entryNameProblem("ก".repeat(85), "folder")).toBeNull();
   });
 });
 
