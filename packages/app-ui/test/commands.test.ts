@@ -37,6 +37,22 @@ function spies() {
 const titles = (list: readonly { title: string }[]) => list.map((c) => c.title);
 const find = (list: ReturnType<typeof buildCommands>, id: string) => list.find((c) => c.id === id);
 
+describe("New folder", () => {
+  it("is offered with its shortcut, and the workspace one is a second command without one", () => {
+    const { actions, log } = spies();
+    const both: CommandActions = { ...actions, newFolder: { run: vi.fn(() => void log.push("newFolder")) }, newWorkspaceFolder: { workspace: "Design", run: vi.fn(() => void log.push("newWorkspaceFolder")) } };
+    const list = buildCommands(both, en, "desktop", "mac");
+    expect(titles(list).filter((t) => t.startsWith("New folder"))).toEqual(["New folder", "New folder in Design"]);
+    expect(find(list, "folder.new")?.shortcut).toBe("Cmd+Shift+N");
+    expect(find(list, "folder.newWorkspace")?.shortcut).toBeUndefined();
+    find(list, "folder.new")!.run();
+    find(list, "folder.newWorkspace")!.run();
+    expect(log).toEqual(["newFolder", "newWorkspaceFolder"]);
+    expect(titles(buildCommands(both, th, "desktop", "mac"))).toContain("โฟลเดอร์ใหม่ใน Design");
+    expect(filterCommands("> new folder", list).map((c) => c.id)).toEqual(["folder.new", "folder.newWorkspace"]);
+  });
+});
+
 describe("the palette's commands", () => {
   it("offers what the app can do now, in the UI language", () => {
     const { actions } = spies();

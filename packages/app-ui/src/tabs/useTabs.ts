@@ -18,6 +18,8 @@ export interface TabsController {
   jump(n: number): void;
   /** Closes background tabs whose target is gone. */
   prune(gone: (target: TabTarget) => boolean): void;
+  /** A page or folder moved or was renamed: every tab on it (or on a page under it) follows. */
+  remapPaths(from: string, to: string): void;
 }
 
 interface Options {
@@ -49,6 +51,11 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
     void flushRef.current().then((ok) => ok && setState(change));
   }, []);
 
+  // These only ever read the state they are given, so their identity never changes: an effect that lists them as a
+  // dependency (the shell prunes when the page list changes) must not re-run because a tab changed.
+  const prune = useCallback((gone: (target: TabTarget) => boolean) => setState((s) => model.prune(s, gone)), []);
+  const remapPaths = useCallback((from: string, to: string) => setState((s) => model.remapPaths(s, from, to)), []);
+
   return useMemo<TabsController>(
     () => ({
       state,
@@ -64,8 +71,9 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
       activate: (id) => guarded((s) => model.activate(s, id)),
       step: (delta) => guarded((s) => model.step(s, delta)),
       jump: (n) => guarded((s) => model.jump(s, n)),
-      prune: (gone) => setState((s) => model.prune(s, gone)),
+      prune,
+      remapPaths,
     }),
-    [state, guarded],
+    [state, guarded, prune, remapPaths],
   );
 }

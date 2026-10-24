@@ -12,6 +12,7 @@ import {
   open,
   parseTabs,
   prune,
+  remapPaths,
   retarget,
   sameTarget,
   serializeTabs,
@@ -157,6 +158,23 @@ describe("pruning", () => {
   it("returns the same state when nothing is gone", () => {
     const s = initialTabs([page("A.md")]);
     expect(prune(s, () => false)).toBe(s);
+  });
+});
+
+describe("renamed and moved pages", () => {
+  const s0 = initialTabs([page("Docs/Notes.md"), page("Docs/Deep/Inner.md"), page("Docs.md"), ws("p1"), page("Other/Docs/x.md")], 1);
+
+  it("a renamed page keeps its tab, and so does every page under a renamed folder", () => {
+    expect(paths(remapPaths(s0, "Docs/Notes.md", "Docs/Memo.md"))).toEqual(["Docs/Memo.md", "Docs/Deep/Inner.md", "Docs.md", "workspace", "Other/Docs/x.md"]);
+    const folder = remapPaths(s0, "Docs", "Papers");
+    expect(paths(folder)).toEqual(["Papers/Notes.md", "Papers/Deep/Inner.md", "Docs.md", "workspace", "Other/Docs/x.md"]);
+    expect(folder.active).toBe(s0.active); // same tabs, same current one
+    expect(folder.tabs.map((t) => t.id)).toEqual(s0.tabs.map((t) => t.id));
+  });
+
+  it("returns the same state when no tab is on it", () => {
+    expect(remapPaths(s0, "Nowhere", "Elsewhere")).toBe(s0);
+    expect(remapPaths(s0, "Doc", "Papers")).toBe(s0); // a prefix of a name is not a parent folder
   });
 });
 
