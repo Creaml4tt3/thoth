@@ -42,6 +42,13 @@
   --thoth-moon-ink: #8A3200;
   --thoth-link: #0B6BCB;
 
+  /* Accent roles (ADR-0016, Phase 3b AC 2). The accent is a shade of Moon that keeps white text at 4.5:1 and the
+     focus ring at 3:1 on paper. Tested in packages/app-ui/test/contrast.test.ts. */
+  --thoth-accent: #C2410C;            /* primary buttons, focus rings, links, active-tab line */
+  --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
+  --thoth-accent-soft: #FFE8D6;       /* selected tree item */
+  --thoth-accent-ink: #8A3200;        /* text on --thoth-accent-soft */
+
   /* Semantic */
   --thoth-success: #2F8F5B;
   --thoth-warning: #B7791F;
@@ -95,6 +102,10 @@
   --thoth-moon-soft: rgb(255 122 47 / 0.14);
   --thoth-moon-ink: #FFB386;
   --thoth-link: #5AA9FF;
+  --thoth-accent: #FF7A2F;
+  --thoth-on-accent: #0A0A0A;
+  --thoth-accent-soft: rgb(255 122 47 / 0.14);
+  --thoth-accent-ink: #FFB386;
   --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -113,6 +124,10 @@
     --thoth-moon-soft: rgb(255 122 47 / 0.14);
     --thoth-moon-ink: #FFB386;
     --thoth-link: #5AA9FF;
+    --thoth-accent: #FF7A2F;
+    --thoth-on-accent: #0A0A0A;
+    --thoth-accent-soft: rgb(255 122 47 / 0.14);
+    --thoth-accent-ink: #FFB386;
     color-scheme: dark;
   }
 }
@@ -126,6 +141,11 @@
   --thoth-ink-faint: rgb(var(--thoth-ink) / 0.28);
   --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
   --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);
+  /* Derived accent roles, re-declared per theme scope like the ramp. Other agents' tabs and drag and drop use these. */
+  --thoth-tab-active-bg: var(--thoth-bg);
+  --thoth-tab-active-ink: var(--thoth-ink-primary);
+  --thoth-tab-active-line: var(--thoth-accent);
+  --thoth-drop-indicator: var(--thoth-accent);
   color: var(--thoth-ink-primary);
 }
 

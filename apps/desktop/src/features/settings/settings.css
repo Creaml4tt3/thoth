@@ -4,8 +4,8 @@
 .set-actions { display: flex; gap: var(--thoth-space-3); align-items: center; flex-wrap: wrap; margin-top: var(--thoth-space-1); }
 .mode-choices { border: 0; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
 .mode-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); cursor: pointer; }
-.mode-choice:has(input:checked) { border-color: var(--thoth-moon); background: var(--thoth-moon-soft); }
-.mode-choice input { accent-color: var(--thoth-moon); margin: 0; }
+.mode-choice:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); }
+.mode-choice input { accent-color: var(--thoth-accent); margin: 0; }
 .mode-choice b { font-weight: 550; }
 .mode-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-card { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); }
@@ -13,7 +13,7 @@
 .server-name { font: 600 15px / 1.4 var(--thoth-font-sans); }
 .server-account { color: var(--thoth-ink-secondary); }
 .server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); }
-.server-waiting { display: flex; gap: var(--thoth-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); }
+.server-waiting { display: flex; gap: var(--thoth-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-accent-soft); color: var(--thoth-ink-primary); }
 .server-starter { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px dashed var(--thoth-border-strong); }
 .server-caution { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-token { margin-top: var(--thoth-space-1); }

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import "@thoth/ui/tokens.css";
 import "./fonts/fonts.css";
+import "./features/settings/theme.ts"; // applies the saved theme before the first render
 import { App } from "./app/App.tsx";
 import { selectPlatform } from "./platform/select.ts";
 

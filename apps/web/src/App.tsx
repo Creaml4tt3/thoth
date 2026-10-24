@@ -8,6 +8,7 @@ import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { AuthSession, CallbackError, Unreachable, type CallbackFailure } from "./auth.ts";
 import { SetLangContext } from "./LanguageSwitch.tsx";
+import { ThemeStoreContext, webThemeStore } from "./ThemeSwitch.tsx";
 import { SignInView } from "./SignInView.tsx";
 import { WorkspaceApp } from "./WorkspaceApp.tsx";
 import { track } from "./analytics.ts";
@@ -49,6 +50,7 @@ export function sameOrigin(signIn: NonNullable<Capabilities["signIn"]>, server: 
 
 export function App({ env }: { env: WebEnv }) {
   const [lang, setLangState] = useState<Lang>(() => initialLang(env));
+  const [themeStore] = useState(() => webThemeStore(env));
   const strings = STRINGS[lang];
   const setLang = useCallback(
     (next: Lang) => {
@@ -140,7 +142,9 @@ export function App({ env }: { env: WebEnv }) {
 
   return (
     <StringsContext.Provider value={strings}>
-      <SetLangContext.Provider value={setLang}>{body}</SetLangContext.Provider>
+      <ThemeStoreContext.Provider value={themeStore}>
+        <SetLangContext.Provider value={setLang}>{body}</SetLangContext.Provider>
+      </ThemeStoreContext.Provider>
     </StringsContext.Provider>
   );
 }

@@ -10,6 +10,7 @@ import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { WorkspaceSection } from "@thoth/app-ui/workspace/WorkspaceTree.tsx";
+import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { SearchDialog } from "./SearchDialog.tsx";
 import { track } from "./analytics.ts";
@@ -143,6 +144,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             {account && <p className="muted web-who">{t.web.signedInAs(account.displayName)}</p>}
             <div className="side-actions">
               <LanguageSwitch />
+              <ThemeSwitch />
               <Button variant="quiet" small disabled={signingOut} onClick={() => void doSignOut()}>
                 {signingOut ? t.web.signingOut : t.web.signOut}
               </Button>

@@ -76,7 +76,7 @@ export function Shell({ path, remote = null, settings }: { path: string | null; 
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
 
   return (
-    <div className="shell" data-theme="light">
+    <div className="shell">
       <Sidebar pages={pages} current={settings ? null : path} currentRemote={settings ? null : remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onTransfer={transfer} />
       <main className="main">
         {watchError && (

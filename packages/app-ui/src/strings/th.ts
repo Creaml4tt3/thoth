@@ -117,6 +117,9 @@ export const th: Strings = {
     bytes: (n) => `${count(n)} ไบต์`,
   },
 
+  /** ตัวเลือกธีม (การตั้งค่าบนเดสก์ท็อป, ส่วนบัญชีบนเว็บ) */
+  theme: { label: "ธีม", light: "สว่าง", dark: "มืด", system: "ตามระบบ" },
+
   web: {
     loading: "กำลังโหลด…",
     signInTitle: "เข้าสู่ระบบ Thoth",
