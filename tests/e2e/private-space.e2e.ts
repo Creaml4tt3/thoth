@@ -293,3 +293,66 @@ test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact byte
   const expected = "# Blocks\n\nalpha  para\n\nomega para   \n\n> [!toggle]+ Fold me\n> hidden line\n\n* star   bullet\n\n- [ ] buy milk\n- [ ] bread\n";
   await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).toBe(expected);
 });
+
+test("Blocks mode: select text, highlight with Ctrl/Cmd+Shift+H, colour it from the toolbar, exact bytes on disk", async ({ page }) => {
+  // Phase 3b AC 3 and 4 (ADR-0016): highlight is `==x==`, colour is a named span; untouched blocks keep their bytes.
+  const source = "# Styles\n\nalpha  para\n\nomega para   \n";
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await writeFile(join(vault, "Styles.md"), source); // the Rust watcher picks it up
+  await page.getByRole("treeitem", { name: "Styles" }).click({ timeout: 15_000 });
+  const box = await editor(page);
+  await expect(box).toContainText("omega para");
+  const toolbar = page.getByRole("toolbar", { name: "Text formatting" });
+  await expect(toolbar).toBeHidden(); // nothing selected yet
+
+  // Select the first paragraph with a triple click, as a person would.
+  await box.getByText("alpha  para").click({ clickCount: 3 });
+  await expect
+    .poll(() =>
+      box.evaluate((el) => {
+        const { state } = (el as unknown as { editor: { state: { selection: { from: number; to: number }; doc: { textBetween(from: number, to: number, sep: string): string } } } }).editor;
+        return state.doc.textBetween(state.selection.from, state.selection.to, "|");
+      }),
+    )
+    .toBe("alpha  para");
+  await expect(toolbar).toBeVisible();
+  // It floats next to the selection, inside the window.
+  const selected = (await box.locator("p", { hasText: "alpha  para" }).boundingBox())!;
+  const bar = (await toolbar.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(bar.x).toBeGreaterThanOrEqual(0);
+  expect(bar.x + bar.width).toBeLessThanOrEqual(viewport.width);
+  expect(bar.y).toBeGreaterThanOrEqual(0);
+  expect(Math.abs(bar.y + bar.height - selected.y) < 80 || Math.abs(bar.y - (selected.y + selected.height)) < 80).toBe(true);
+
+  // Highlight by shortcut: the button shows it, the page shows a <mark> in the accent tint.
+  await page.keyboard.press("ControlOrMeta+Shift+H");
+  await expect(toolbar.getByRole("button", { name: "Highlight" })).toHaveAttribute("aria-pressed", "true");
+  const mark = box.locator("mark");
+  await expect(mark).toHaveText("alpha  para");
+  expect(await mark.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+
+  // Colour from the toolbar with the real mouse: the text stays selected and focused.
+  await toolbar.getByRole("button", { name: "Text colour" }).click();
+  await page.getByRole("menuitemradio", { name: /Red/ }).click();
+  const colored = box.locator('span.text-color[data-color="red"]');
+  await expect(colored).toHaveText("alpha  para");
+  expect(await colored.evaluate((el) => getComputedStyle(el).color)).not.toBe(await box.locator("p", { hasText: "omega para" }).evaluate((el) => getComputedStyle(el).color));
+  await expect(box).toBeFocused();
+
+  // Escape from the toolbar returns to the text.
+  await page.keyboard.press("Alt+F10"); // focus lands on the first style that is on (Highlight), else on Bold
+  await expect(toolbar.getByRole("button", { name: "Highlight" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(box).toBeFocused();
+
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Styles.md"), "utf8")).toMatch(/^# Styles\n\n.*==.*alpha {2}para.*==.*\n\nomega para {3}\n$/s);
+  const saved = await readFile(join(vault, "Styles.md"), "utf8");
+  expect(saved).toContain('<span data-color="red">');
+  expect(saved).toContain("==");
+  // The same shortcut again takes the highlight off; the colour stays, and so does everything else in the file.
+  await page.keyboard.press("ControlOrMeta+Shift+H");
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Styles.md"), "utf8")).toBe('# Styles\n\n<span data-color="red">alpha  para</span>\n\nomega para   \n');
+});
