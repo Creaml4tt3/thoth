@@ -105,7 +105,18 @@ The editor's content column is 720px.
 - Moon on white is about 3.9:1, so it is not used for text. Use
   `--thoth-moon-ink` (`#8A3200`) for text on `moon-soft` instead.
 - Focus rings use the moon colour, 2px, with a 2px offset.
-- `prefers-reduced-motion` zeroes durations.
+- `prefers-reduced-motion` removes motion: the motion duration and distance tokens become 0, and `ui.css` forces
+  animation and transition off everywhere in the app.
+
+### Motion
+
+Calm, quick and purposeful (tokens and rules: the "Motion" note in `packages/ui/src/tokens.css`).
+
+- Durations: instant 80ms (dense list hover), fast 140ms (menus, tabs, tree, page fade), base 200ms (dialogs, banners),
+  slow 280ms (first-run screens only). An exit is a step shorter than its enter.
+- Easings: ease-out for arriving, ease-in for leaving, an overshoot-free spring for dialogs.
+- Only transform and opacity move; the exceptions are the grid row of an opening tree folder and a tab's width.
+- Never animated: typing, the caret, list rows, filtering, keyboard navigation inside a list, focus rings.
 
 ## 7. Open design questions
 

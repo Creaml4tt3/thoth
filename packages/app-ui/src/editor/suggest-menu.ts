@@ -121,7 +121,10 @@ export function createSuggestMenu<T>(owner: HTMLElement, o: SuggestMenuOptions<T
       root.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
       const below = rect.bottom + 6;
       const height = root.offsetHeight || 240;
-      root.style.top = `${below + height > window.innerHeight - 8 && rect.top - height - 6 > 8 ? rect.top - height - 6 : below}px`;
+      const above = below + height > window.innerHeight - 8 && rect.top - height - 6 > 8;
+      root.style.top = `${above ? rect.top - height - 6 : below}px`;
+      // Which side of the caret the menu sits on: the pop-in grows from that edge (editor.css).
+      root.dataset["side"] = above ? "top" : "bottom";
       owner.setAttribute("aria-controls", id);
       owner.setAttribute("aria-expanded", "true");
       paintActive();

@@ -9,6 +9,7 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui
 import { clearNewFolder, usePendingNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
 import { RenameInput, RenameRejected } from "@thoth/app-ui/order/RenameInput.tsx";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "@thoth/app-ui/order/reorder-request.ts";
+import { TreeGroup } from "@thoth/app-ui/order/TreeGroup.tsx";
 import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -399,11 +400,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           <FolderIcon open={expanded} />
           <span className="tree-label">{node.name}</span>
         </button>
-        {expanded && (
-          <ul role="group">
-            {node.children.map((child, i) => row(child, depth + 1, i + 1, node.children.length))}
-          </ul>
-        )}
+        <TreeGroup open={expanded} count={node.children.length}>
+          {node.children.map((child, i) => row(child, depth + 1, i + 1, node.children.length))}
+        </TreeGroup>
       </li>
     );
   };

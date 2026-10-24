@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useStrings } from "../strings/index.ts";
+import { leaveAsGhost } from "./presence.ts";
 
 interface ModalProps {
   title: string;
@@ -15,13 +16,25 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
 /**
  * Accessible modal: labelled, focus moves in and is restored, Tab is trapped. When it may be dismissed it
  * has a visible Close button, and Escape or a click on the backdrop closes it too.
+ *
+ * Motion (ui.css): the backdrop fades and the dialog rises in; on the way out both leave a step faster. The parent
+ * still removes the modal at once, however it was closed: focus is back where it was in that same moment, and the exit
+ * plays on an inert copy (`leaveAsGhost`), so a dialog never holds focus or the keyboard while it fades.
  */
 export function Modal({ title, onClose, theme = "paper", wide, children }: ModalProps) {
   const titleId = useId();
   const t = useStrings().modal;
   const box = useRef<HTMLDivElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+
+  useLayoutEffect(() => {
+    const node = scrim.current;
+    return () => {
+      if (node) leaveAsGhost(node, ".modal");
+    };
+  }, []);
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -52,6 +65,7 @@ export function Modal({ title, onClose, theme = "paper", wide, children }: Modal
 
   return (
     <div
+      ref={scrim}
       className="modal-scrim"
       data-theme={theme === "night" ? "night" : undefined}
       // Only a press that starts on the backdrop itself closes: a text selection dragged out of the dialog does not.

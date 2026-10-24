@@ -1,5 +1,5 @@
 .onboarding { min-height: 100%; display: grid; place-items: center; padding: var(--thoth-space-12) var(--thoth-space-6); background: var(--thoth-bg); color: var(--thoth-ink-primary); text-align: center; }
-.onboarding-inner { max-width: 620px; display: grid; gap: var(--thoth-space-4); justify-items: center; }
+.onboarding-inner { max-width: 620px; display: grid; gap: var(--thoth-space-4); justify-items: center; animation: thoth-rise-in var(--thoth-dur-slow) var(--thoth-ease-out); }
 .onboarding-wizard { place-items: start center; text-align: left; }
 .display { font: var(--thoth-text-display); letter-spacing: var(--thoth-tracking-display); display: flex; gap: 0.22em; justify-content: center; align-items: center; flex-wrap: wrap; }
 .onboarding-title { margin-bottom: var(--thoth-space-2); }
@@ -10,7 +10,7 @@
 .label { font: var(--thoth-text-small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--thoth-ink-tertiary); }
 .recent { width: min(520px, 100%); text-align: left; display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-6); }
 .recent ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.recent-item { width: 100%; display: grid; gap: 2px; text-align: left; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: transparent; cursor: pointer; }
+.recent-item { width: 100%; display: grid; gap: 2px; text-align: left; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: transparent; cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .recent-item:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .recent-item b { font-weight: 550; }
 .recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

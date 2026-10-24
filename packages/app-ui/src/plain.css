@@ -56,7 +56,7 @@
 /* Mode switch in the page header */
 .crumb-tools { display: inline-flex; gap: var(--thoth-space-3); align-items: center; }
 .mode-switch { display: inline-flex; padding: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); }
-.mode-option { all: unset; font: 500 12px/1 var(--thoth-font-sans); padding: 5px 10px; border-radius: var(--thoth-radius-pill); color: var(--thoth-ink-tertiary); cursor: pointer; }
+.mode-option { all: unset; font: 500 12px/1 var(--thoth-font-sans); padding: 5px 10px; border-radius: var(--thoth-radius-pill); color: var(--thoth-ink-tertiary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out); }
 .mode-option[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
 .mode-option:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--thoth-ink-primary); }
 .mode-option:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }

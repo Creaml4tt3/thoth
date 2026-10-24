@@ -2,7 +2,7 @@
 .shell { display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .sidebar { background: var(--thoth-bg-sidebar); border-right: 1px solid var(--thoth-border); padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
 .ws { display: flex; gap: 8px; align-items: center; padding: 6px 8px; font-weight: 600; letter-spacing: -0.03em; }
-.search-trigger { display: flex; justify-content: space-between; align-items: center; margin: 8px 4px 8px; padding: 6px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border: 0; color: var(--thoth-ink-tertiary); cursor: pointer; text-align: left; }
+.search-trigger { display: flex; justify-content: space-between; align-items: center; margin: 8px 4px 8px; padding: 6px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border: 0; color: var(--thoth-ink-tertiary); cursor: pointer; text-align: left; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .search-trigger:hover { background: var(--thoth-bg-active); }
 .search-trigger kbd { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
 .sec { padding: 10px 8px 4px; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -10,18 +10,33 @@
 .tree-wrap { flex: 1; min-height: 0; overflow: auto; }
 .tree-wrap ul { list-style: none; margin: 0; padding: 0; }
 .tree-empty { padding: 4px 8px; }
-.tree-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 4px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; white-space: nowrap; overflow: hidden; }
+.tree-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 4px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; white-space: nowrap; overflow: hidden; transition: background-color var(--thoth-dur-instant) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-item:hover { background: var(--thoth-bg-hover); }
 .tree-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .tree-item[aria-selected="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
 .tree-caret { width: 12px; height: 12px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); flex: none; border-radius: var(--thoth-radius-xs); }
-.tree-caret svg { transition: transform var(--thoth-dur-fast) var(--thoth-ease); }
+.tree-caret svg { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-caret[data-open] svg { transform: rotate(90deg); }
 .tree-item:hover .tree-caret:not([data-empty]) { color: var(--thoth-ink-secondary); }
 .tree-icon { flex: none; width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); }
 .tree-icon svg { display: block; }
-.side-actions { display: flex; flex-wrap: wrap; gap: 2px 4px; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
+/* A folder draws both shapes in one cell and cross-fades them, so opening one is not a pop. (No colour transitions on a
+   row's children: Chromium restarts a child's colour transition on every frame while its parent's is running.) */
+.tree-icon-folder { display: inline-grid; }
+.tree-icon-folder > svg { grid-area: 1 / 1; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tree-icon-folder > .folder-open { opacity: 0; }
+.tree-icon-folder[data-open] > .folder-open { opacity: 1; }
+.tree-icon-folder[data-open] > .folder-closed { opacity: 0; }
+
+/* Opening and closing a folder (TreeGroup.tsx): the row grid goes 0fr to 1fr, so the rows below slide instead of jumping
+   and nothing is measured in script. The list is inert while it closes, so nothing in it can be focused or read. A folder
+   with a lot of rows (TREE_MOTION_MAX) skips this and opens at once. */
+.tree-collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--thoth-dur-fast) var(--thoth-ease-emphasized), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tree-collapse[data-state="closed"] { grid-template-rows: 0fr; opacity: 0; transition-timing-function: var(--thoth-ease-in), var(--thoth-ease-in); }
+.tree-collapse > ul { min-height: 0; overflow: hidden; }
+.side-actions { display: flex; align-items: center; gap: 4px; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
+.side-actions > .side-icon { margin-left: auto; padding-inline: 6px; }
 .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .banner { margin: 8px 16px; }
 .empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--thoth-ink-secondary); text-align: center; }
@@ -34,13 +49,13 @@
 .tree-badge { margin-left: auto; flex: none; }
 .tree-note { padding: 4px 8px 4px 36px; font: var(--thoth-text-small); }
 .server-section { margin-top: 6px; }
-.sec-link { all: unset; cursor: pointer; color: var(--thoth-accent); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); }
+.sec-link { all: unset; cursor: pointer; color: var(--thoth-accent); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .sec-link:hover { text-decoration: underline; }
 .sec-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 /* A workspace row: the folder item plus New page, shown on hover or focus (always on touch screens). */
 .tree-row { display: flex; align-items: center; gap: 2px; }
 .tree-row > .tree-item { flex: 1; min-width: 0; }
-.tree-add { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; opacity: 0; }
+.tree-add { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; opacity: 0; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-row:hover .tree-add, .tree-add:focus-visible, .tree-add:disabled { opacity: 1; }
 .tree-add:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .tree-add:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
@@ -60,7 +75,7 @@
 .tree-item[data-drop="before"] { box-shadow: inset 0 2px 0 0 var(--thoth-drop-indicator); }
 .tree-item[data-drop="after"] { box-shadow: inset 0 -2px 0 0 var(--thoth-drop-indicator); }
 .tree-item[data-drop="inside"] { background: var(--thoth-accent-soft); box-shadow: inset 0 0 0 1.5px var(--thoth-drop-indicator); }
-.tree-root-drop { margin: 6px 4px 0; padding: 8px; border-radius: var(--thoth-radius-sm); border: 1.5px dashed var(--thoth-border-strong); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); text-align: center; }
+.tree-root-drop { margin: 6px 4px 0; padding: 8px; border-radius: var(--thoth-radius-sm); border: 1.5px dashed var(--thoth-border-strong); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); text-align: center; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-root-drop[data-drop] { border-color: var(--thoth-drop-indicator); background: var(--thoth-accent-soft); color: var(--thoth-ink-primary); }
 
 /* Rename in place. */
@@ -73,7 +88,7 @@
 .tree-rename-problem { flex: 0 0 calc(100% - 28px); box-sizing: border-box; min-width: 0; margin: 2px 0 2px 28px; overflow-wrap: anywhere; padding: 2px 8px; border-radius: var(--thoth-radius-xs); background: color-mix(in srgb, var(--thoth-danger) 12%, var(--thoth-bg)); color: var(--thoth-ink-primary); font: var(--thoth-text-small); }
 
 /* The row menu and the Move to dialog. */
-.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); transform-origin: top left; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .ctx-item { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; font: var(--thoth-text-ui); }
 .ctx-item kbd { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
 .ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-moon-soft); }
@@ -86,13 +101,20 @@
 /* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator. */
 .tabstrip { flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
 .tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.tab { position: relative; display: flex; align-items: center; flex: 0 1 180px; min-width: 96px; max-width: 220px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); }
+.tab { position: relative; display: flex; align-items: center; flex: 0 1 180px; min-width: 96px; max-width: 220px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+/* A tab the user opened enters by widening and fading in; one that closes narrows and fades out (TabBar.tsx keeps it for
+   that long, inert). The strip is a few elements wide, so width is the one layout property animated here. Tabs that
+   were there at start do not animate. The current tab's line fades in and out, since the tab itself changes colour. */
+@keyframes thoth-tab-in { from { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; } }
+@keyframes thoth-tab-out { to { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; margin-right: -2px; } }
+.tab[data-enter] { animation: thoth-tab-in var(--thoth-dur-fast) var(--thoth-ease-out); overflow: hidden; }
+.tab[data-leaving] { overflow: hidden; pointer-events: none; animation: thoth-tab-out var(--thoth-dur-fast) var(--thoth-ease-in) both; }
 .tab:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .tab[data-selected] { background: var(--thoth-tab-active-bg); color: var(--thoth-tab-active-ink); border-color: var(--thoth-border); border-top-color: var(--thoth-tab-active-line); border-bottom: 1px solid var(--thoth-tab-active-bg); }
 .tab-label { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 7px 4px 7px 12px; cursor: pointer; font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
 .tab-text { overflow: hidden; text-overflow: ellipsis; }
-.tab-close, .tab-new { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; }
+.tab-close, .tab-new { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-close svg { pointer-events: none; }
 .tab-close { margin-right: 4px; opacity: 0; }
 .tab:hover .tab-close, .tab[data-selected] .tab-close { opacity: 1; }
@@ -117,3 +139,6 @@
 .shortcut-other { font: var(--thoth-text-small); }
 .shortcut-groups:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .shortcut-row[data-differs] dd .shortcut { border-color: var(--thoth-accent); }
+
+/* Switching tabs or pages: the content fades in, nothing slides, and the editor is never waiting for it. */
+.tab-panel > * { animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }

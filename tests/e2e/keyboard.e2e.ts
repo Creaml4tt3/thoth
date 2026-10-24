@@ -13,6 +13,7 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
+import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
@@ -54,8 +55,9 @@ async function press(page: Page, name: RegExp | string) {
   await page.keyboard.press("Enter");
 }
 
-/** No serious or critical accessibility problem in the part of the page under `selector`. */
+/** No serious or critical accessibility problem in the part of the page under `selector` (once its motion has finished, so no colour is read half faded). */
 async function expectAccessible(page: Page, selector: string) {
+  await settled(page);
   const results = await new AxeBuilder({ page }).include(selector).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]).analyze();
   const bad = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);

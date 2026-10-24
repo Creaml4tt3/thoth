@@ -138,7 +138,9 @@ export function createBlockMenu(opts: Options): BlockMenu {
     const height = root.offsetHeight || 200;
     root.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))}px`;
     const below = anchor.bottom + 4;
-    root.style.top = `${below + height > window.innerHeight - 8 && anchor.top - height - 4 > 8 ? anchor.top - height - 4 : below}px`;
+    const above = below + height > window.innerHeight - 8 && anchor.top - height - 4 > 8;
+    root.style.top = `${above ? anchor.top - height - 4 : below}px`;
+    root.dataset["side"] = above ? "top" : "bottom";
     focusItem(root, items(root)[0]);
     document.addEventListener("mousedown", outside, true);
   }

@@ -26,10 +26,10 @@ export interface TreeKeyHandlers {
 
 const ITEMS = '[role="treeitem"]';
 
-/** The rows of the tree that holds `from`, in the order they are on screen. */
+/** The rows of the tree that holds `from`, in the order they are on screen. Rows of a folder that is closing (inert) are not there any more. */
 function rowsAround(from: HTMLElement): HTMLElement[] {
   const tree = from.closest<HTMLElement>('[role="tree"]');
-  return tree ? [...tree.querySelectorAll<HTMLElement>(ITEMS)] : [];
+  return tree ? [...tree.querySelectorAll<HTMLElement>(ITEMS)].filter((row) => !row.closest("[inert]")) : [];
 }
 
 /** The row's own element (the treeitem) in a list item, not those of its children. */
@@ -94,7 +94,7 @@ export function treeKeyDown(event: KeyboardEvent<HTMLElement>, h: TreeKeyHandler
         return handled();
       }
       // Already open: step into the first child.
-      return focus(ownItem(el.closest("li")?.querySelector(':scope > [role="group"] > li') ?? null));
+      return focus(ownItem(el.closest("li")?.querySelector(':scope > .tree-collapse > [role="group"] > li, :scope > [role="group"] > li') ?? null));
     }
     case "ArrowLeft": {
       if (h.expandable && h.expanded) {

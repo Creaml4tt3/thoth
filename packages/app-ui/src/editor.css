@@ -27,7 +27,7 @@
 .ProseMirror-selectednode { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: var(--thoth-radius-sm); }
 
 /* Wikilink chips: content uses Notion radii, not pills */
-.wikilink { display: inline-block; padding: 0 6px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); text-decoration: none; cursor: pointer; line-height: 1.5; }
+.wikilink { display: inline-block; padding: 0 6px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); text-decoration: none; cursor: pointer; line-height: 1.5; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wikilink:hover { background: var(--thoth-bg-active); }
 .wikilink[data-state="resolved"] { text-decoration: underline; text-decoration-color: var(--thoth-ink-faint); text-underline-offset: 3px; }
 .wikilink[data-state="unresolved"] { color: var(--thoth-ink-tertiary); border: 1px dashed var(--thoth-border-strong); padding: 0 5px; cursor: default; }
@@ -40,6 +40,7 @@
 .callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
 .callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
 .callout-fold { all: unset; box-sizing: border-box; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
+.callout-fold { transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .callout-fold:focus-visible { outline: 2px solid var(--thoth-accent); }
 .callout-fold[hidden] { display: none; }
@@ -84,7 +85,7 @@
 .crumb-trail ol { display: contents; margin: 0; padding: 0; }
 .crumb-trail li + li::before { content: "/"; color: var(--thoth-ink-faint); }
 .crumb-current { color: var(--thoth-ink-secondary); }
-.save-status { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.save-status { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .save-status[data-state="error"] { color: var(--thoth-danger); }
 
 .readonly-note { margin-bottom: var(--thoth-space-4); }
@@ -93,7 +94,7 @@
 .backlinks { margin-top: var(--thoth-space-8); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
 .backlinks h2 { font: var(--thoth-text-small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-2); }
 .backlinks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.backlinks button { all: unset; box-sizing: border-box; display: flex; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-secondary); }
+.backlinks button { all: unset; box-sizing: border-box; display: flex; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .backlinks button:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .backlinks button:focus-visible { outline: 2px solid var(--thoth-accent); }
 
@@ -108,10 +109,16 @@
 .diff-key::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--thoth-danger); opacity: 0.6; }
 .diff-key[data-side="mine"]::before { background: var(--thoth-success); }
 .conflict-choices { display: grid; gap: var(--thoth-space-2); }
-.conflict-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; text-align: left; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); background: transparent; cursor: pointer; }
+.conflict-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; text-align: left; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); background: transparent; cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .conflict-choice:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .conflict-choice b { font-weight: 550; }
 .conflict-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
+
+/* Floating layers that open from a place: the `[[` and `/` menus, the block menu and the selection toolbar. They pop in
+   once when they open, from the side that faces what opened them (`data-side` says which side of it they sit on, set where
+   they are placed), and leave at once. Their rows never animate: the lists change on every keystroke and key press. */
+.link-menu, .slash-menu, .block-menu, .text-toolbar, .text-color-menu { --pop-y: calc(var(--thoth-shift) * -1); transform-origin: top left; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.link-menu[data-side="top"], .slash-menu[data-side="top"], .block-menu[data-side="top"], .text-toolbar[data-side="top"] { --pop-y: var(--thoth-shift); transform-origin: bottom left; }
 
 /* `[[` link suggestions (both modes). Floats over the page, so it uses the popover radius and shadow. */
 .link-menu { position: fixed; z-index: 40; width: 320px; max-height: 280px; overflow: auto; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
@@ -132,10 +139,10 @@
 
 /* Block handle (gutter), drop indicator and block menu */
 .editor-surface { position: relative; }
-.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; }
+.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .block-handle:hover, .block-handle:active { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
 .block-handle[hidden] { display: none; }
-.block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; }
+.block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-instant) var(--thoth-ease-out); }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
 .block-menu { position: fixed; z-index: 50; min-width: 220px; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
@@ -172,7 +179,7 @@
 .text-toolbar { position: fixed; z-index: 45; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); color: var(--thoth-ink-primary); }
 .text-toolbar[hidden], .text-toolbar [hidden] { display: none; }
 .text-toolbar-row { display: flex; gap: 2px; align-items: center; }
-.text-tool { all: unset; box-sizing: border-box; min-width: 32px; height: 32px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; font: 600 14px / 1 var(--thoth-font-sans); }
+.text-tool { all: unset; box-sizing: border-box; min-width: 32px; height: 32px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; font: 600 14px / 1 var(--thoth-font-sans); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .text-tool:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .text-tool:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .text-tool[aria-pressed="true"] { background: var(--thoth-moon-soft); color: var(--thoth-moon-ink); }
@@ -201,7 +208,7 @@
 .text-color-sample { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-sm); font: 600 13px / 1 var(--thoth-font-sans); }
 
 .text-toolbar-link { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: min(420px, calc(100vw - 32px)); }
-.text-toolbar-input { flex: 1 1 200px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: var(--thoth-text-ui); }
+.text-toolbar-input { flex: 1 1 200px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: var(--thoth-text-ui); transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .text-toolbar-input:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -1px; }
 .text-toolbar-input[aria-invalid="true"] { border-color: var(--thoth-danger); }
 .text-toolbar-apply, .text-toolbar-remove { all: unset; box-sizing: border-box; height: 32px; padding: 0 12px; display: inline-grid; place-items: center; border-radius: var(--thoth-radius-sm); cursor: pointer; font: 500 13px / 1 var(--thoth-font-sans); }

@@ -8,6 +8,7 @@
 .xfer-check input { accent-color: var(--thoth-accent); margin: 0; }
 .xfer .small { font: var(--thoth-text-small); }
 .xfer-preview { display: grid; gap: var(--thoth-space-4); padding: var(--thoth-space-4); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); }
+.xfer-preview { transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .xfer-preview[aria-busy="true"] { opacity: 0.7; }
 .xfer-members { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--thoth-space-2) var(--thoth-space-4); color: var(--thoth-ink-secondary); }
 .xfer-list { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; color: var(--thoth-ink-secondary); overflow-wrap: anywhere; max-height: 9.5em; overflow: auto; }
@@ -19,18 +20,24 @@
 .xfer-problems, .xfer-warnings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
 .xfer-progress { display: grid; gap: var(--thoth-space-2); }
 .xfer-progress progress { width: 100%; height: 6px; accent-color: var(--thoth-accent); }
+/* The bar eases to its new value instead of jumping (WebKit and Blink; elsewhere the native bar). */
+.xfer-progress progress[value] { appearance: none; border: 0; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-active); overflow: hidden; }
+.xfer-progress progress[value]::-webkit-progress-bar { background: var(--thoth-bg-active); }
+.xfer-progress progress[value]::-webkit-progress-value { background: var(--thoth-accent); border-radius: var(--thoth-radius-pill); transition: width var(--thoth-dur-base) var(--thoth-ease-out); }
+.xfer-progress progress[value]::-moz-progress-bar { background: var(--thoth-accent); border-radius: var(--thoth-radius-pill); }
 .xfer-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.xfer-steps li { transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .xfer-steps li[data-state="done"] { color: var(--thoth-ink-secondary); }
 .xfer-steps li[data-state="current"] { color: var(--thoth-ink-primary); font-weight: 600; }
-.xfer-result { display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-4); border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-hover); outline: none; }
+.xfer-result { animation: thoth-rise-in var(--thoth-dur-base) var(--thoth-ease-out); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-4); border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-hover); outline: none; }
 .xfer-result:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 
 /* Sidebar: page selection for "Copy / Move to workspace…". */
 .tree-select { flex: none; margin: 0 2px 0 4px; accent-color: var(--thoth-accent); }
-.select-bar { display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2) var(--thoth-space-2) 0; border-radius: var(--thoth-radius-md); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); font: var(--thoth-text-small); }
+.select-bar { animation: thoth-rise-in var(--thoth-dur-fast) var(--thoth-ease-out); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2) var(--thoth-space-2) 0; border-radius: var(--thoth-radius-md); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); font: var(--thoth-text-small); }
 .select-bar .set-actions { margin: 0; gap: var(--thoth-space-2); }
 .sec-actions { display: flex; gap: 4px; align-items: center; }
-.xfer-pending { display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2); border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); font: var(--thoth-text-small); }
+.xfer-pending { animation: thoth-rise-in var(--thoth-dur-base) var(--thoth-ease-out); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2); border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); font: var(--thoth-text-small); }
 .xfer-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .xfer-pending li { display: flex; justify-content: space-between; gap: var(--thoth-space-2); align-items: center; }
 .page-actions { display: flex; gap: 4px; }
