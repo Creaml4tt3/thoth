@@ -1,6 +1,6 @@
 import { Extension, Mark, Node, getSchema, type AnyExtension } from "@tiptap/core";
 import type { Schema } from "@tiptap/pm/model";
-import { SOURCE_ATTR_NAMES } from "./attrs.ts";
+import { SOURCE_ATTR_NAMES, TEXT_COLORS, isTextColor } from "./attrs.ts";
 
 /**
  * Tiptap extensions, one per v1 block type (ADR-0002 section 3) plus the
@@ -275,6 +275,31 @@ const Link = Mark.create({
   renderHTML: ({ HTMLAttributes }) => ["a", HTMLAttributes, 0],
 });
 
+/** `==x==` (ADR-0016 rule 1): one highlight style, in the accent colour. */
+const Highlight = Mark.create({ name: "highlight", parseHTML: () => [{ tag: "mark" }], renderHTML: () => ["mark", 0] });
+
+/** `<u>x</u>`. */
+const Underline = Mark.create({ name: "underline", parseHTML: () => [{ tag: "u" }], renderHTML: () => ["u", 0] });
+
+/**
+ * `<span data-color="NAME">x</span>`, NAME from the fixed palette (ADR-0016 rule 1). The file names the colour,
+ * never a CSS value; the theme gives each name a light and a dark value. Other spans stay `inlineRaw`.
+ */
+const TextColor = Mark.create({
+  name: "textColor",
+  addAttributes: () => ({ color: attr<string>(TEXT_COLORS[0]) }),
+  parseHTML: () => [
+    {
+      tag: "span[data-color]",
+      getAttrs: (el) => {
+        const color = (el as HTMLElement).getAttribute("data-color");
+        return isTextColor(color) ? { color } : false;
+      },
+    },
+  ],
+  renderHTML: ({ mark }) => ["span", { "data-color": mark.attrs["color"] as string, class: "text-color" }, 0],
+});
+
 export function thothExtensions(): AnyExtension[] {
   return [
     Doc, Text, Paragraph, Heading, List, ListItem, TaskList, TaskItem, Blockquote, Callout, CalloutTitle, Code,
@@ -282,7 +307,7 @@ export function thothExtensions(): AnyExtension[] {
     rawBlock("html"), rawBlock("math"), rawBlock("raw"),
     HardBreak, Wikilink, InlineImage, InlineRaw,
     simpleMark("bold", "strong"), simpleMark("italic", "em"), simpleMark("strike", "s"), simpleMark("inlineCode", "code"),
-    Link, SourceAttrs,
+    Link, Highlight, Underline, TextColor, SourceAttrs,
   ];
 }
 

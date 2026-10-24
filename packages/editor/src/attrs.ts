@@ -53,6 +53,13 @@ export const WikiAttrsSchema = z.object({ target: str, fragment: optStr, label: 
 export const SourceOnlyAttrsSchema = z.object({ source: str });
 export const LinkMarkAttrsSchema = z.object({ href: str, title: optStr });
 
+/** The text colour palette (ADR-0016 rule 1). Each name has a light and a dark design token (`--thoth-text-NAME`). */
+export const TEXT_COLORS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "red"] as const;
+export type TextColor = (typeof TEXT_COLORS)[number];
+export const isTextColor = (value: unknown): value is TextColor => (TEXT_COLORS as readonly unknown[]).includes(value);
+/** A colour outside the palette reads as `null`, and the serializer then drops the mark (it never writes raw CSS). */
+export const TextColorMarkAttrsSchema = z.object({ color: z.enum(TEXT_COLORS).nullable().catch(null) });
+
 export function readAttrs<S extends z.ZodType>(schema: S, node: { attrs?: Record<string, unknown> | undefined }): z.infer<S> {
   return schema.parse(node.attrs ?? {});
 }

@@ -1,5 +1,6 @@
 import { parseMarkdownTree } from "@thoth/content";
 import type { Nodes } from "mdast";
+import { findHighlightDelims } from "./styles.ts";
 
 /**
  * Text escaping for the canonical serializer.
@@ -18,6 +19,10 @@ import type { Nodes } from "mdast";
  *   4. everything escaped (only reached when parsing cannot be verified).
  * The parser side keeps literal autolinks as plain text (see `parse.ts`), so
  * they are stable under reparse.
+ *
+ * `==` is a highlight delimiter (ADR-0016), so a run of exactly two `=` in text
+ * is written `\==`, and `=` touching a highlight's own `==` is written `\=`.
+ * Longer runs (`===`) are never delimiters and stay as they are.
  */
 const ALNUM = /[\p{L}\p{N}]/u;
 const ENTITY = /^#?[A-Za-z0-9]+;/;
@@ -36,6 +41,9 @@ export interface EscapeOptions {
   urls?: "verify" | "cell" | "off";
   /** The text ends the line: a trailing blank becomes a character reference (verified with the rest). */
   endsLine?: boolean;
+  /** The text starts or ends right next to a highlight's `==`: its `=` there are all escaped. */
+  eqStart?: boolean;
+  eqEnd?: boolean;
 }
 
 export function entityFirst(s: string): string {
@@ -127,6 +135,8 @@ function survives(md: string, expected: string, cell: boolean, exact: boolean): 
   const want = `(${expected.replace(/\n+$/, "")}`;
   const same = (got: string) => (exact ? got === want : got.trimEnd() === want.trimEnd());
   if (tree.children.length !== 1) return false;
+  // A raw run must not turn into a highlight delimiter either.
+  if (findHighlightDelims(md, tree, []).length > 0) return false;
   if (!cell) return only?.type === "paragraph" && same(plainOf(only));
   const body = only?.type === "table" ? only.children[1] : undefined;
   return only?.type === "table" && only.children.length === 2 && body?.children.length === 1 && same(plainOf(body.children[0]!));
@@ -134,7 +144,9 @@ function survives(md: string, expected: string, cell: boolean, exact: boolean): 
 
 // ---------------------------------------------------------------------------
 
-function escapeChars(s: string, runs: Run[], cell: boolean, breaks: Set<number> = new Set()): string {
+type Edges = { eqStart?: boolean | undefined; eqEnd?: boolean | undefined };
+
+function escapeChars(s: string, runs: Run[], cell: boolean, breaks: Set<number> = new Set(), edges: Edges = {}): string {
   let out = "";
   let r = 0;
   for (let i = 0; i < s.length; i++) {
@@ -168,6 +180,14 @@ function escapeChars(s: string, runs: Run[], cell: boolean, breaks: Set<number> 
       case "&":
         out += ENTITY.test(s.slice(i + 1)) ? "\\&" : "&";
         break;
+      case "=": {
+        let n = 1;
+        while (s[i + n] === "=") n++;
+        const edge = (edges.eqStart && i === 0) || (edges.eqEnd && i + n === s.length);
+        out += edge ? "\\=".repeat(n) : n === 2 ? "\\==" : "=".repeat(n);
+        i += n - 1;
+        break;
+      }
       default:
         out += c;
     }
@@ -194,13 +214,14 @@ export function escapeText(raw: string, o: EscapeOptions): string {
   let s = raw.replace(/\r\n?/g, "\n");
   s = o.flatten ? s.replace(/\n+/g, " ") : s.replace(/\n{2,}/g, "\n");
   const mode = o.urls ?? "verify";
-  const plain = () => perLine(escapeChars(s, [], false), o);
+  const edges: Edges = { eqStart: o.eqStart, eqEnd: o.eqEnd };
+  const plain = () => perLine(escapeChars(s, [], false, new Set(), edges), o);
   if (mode === "off" || !MAYBE_URL.test(s)) return plain();
   const cell = mode === "cell";
   const candidates = [
-    perLine(escapeChars(s, urlRuns(s, true), cell), o),
-    perLine(escapeChars(s, urlRuns(s, false), cell), o),
-    perLine(escapeChars(s, [], cell, breakPoints(s)), o),
+    perLine(escapeChars(s, urlRuns(s, true), cell, new Set(), edges), o),
+    perLine(escapeChars(s, urlRuns(s, false), cell, new Set(), edges), o),
+    perLine(escapeChars(s, [], cell, breakPoints(s), edges), o),
   ];
   return candidates.find((c) => survives(c, s, cell, o.endsLine === true)) ?? plain();
 }
