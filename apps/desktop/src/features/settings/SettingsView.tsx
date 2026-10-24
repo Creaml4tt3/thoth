@@ -6,6 +6,8 @@ import { LANG_PREFERENCES, LangPreferenceContext, useDesktopStrings, type LangPr
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
+import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
+import { desktopTheme } from "./theme.ts";
 import { currentOs, displayPath } from "./path.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
@@ -16,6 +18,8 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
   const t = useDesktopStrings().settings;
   const modes = useStrings().editor.modes;
   const { preference, setPreference } = useContext(LangPreferenceContext);
+  const { theme, setTheme } = useTheme(desktopTheme);
+  const themeNames = useStrings().theme;
   const [rebuild, setRebuild] = useState<Rebuild>({ state: "idle" });
   const [importing, setImporting] = useState(false);
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
@@ -85,6 +89,20 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
                 // Each language is named in itself, so it can be found whatever the UI language is.
                 <option key={choice} value={choice} lang={choice === "system" ? undefined : choice}>
                   {choice === "system" ? t.system : STRINGS[choice].name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+
+        <section aria-labelledby="set-theme" className="set-section">
+          <h2 id="set-theme">{t.theme}</h2>
+          <label className="field set-language">
+            <span>{t.themeHint}</span>
+            <select className="input" value={theme} aria-label={t.theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])}>
+              {THEMES.map((choice) => (
+                <option key={choice} value={choice}>
+                  {themeNames[choice]}
                 </option>
               ))}
             </select>

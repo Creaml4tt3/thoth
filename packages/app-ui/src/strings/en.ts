@@ -130,6 +130,9 @@ export const en = {
     bytes: (n: number) => plural(n, "byte"),
   },
 
+  /** The theme choice (Settings on the desktop, the account area on the web). */
+  theme: { label: "Theme", light: "Light", dark: "Dark", system: "System" },
+
   web: {
     loading: "Loading…",
     signInTitle: "Sign in to Thoth",

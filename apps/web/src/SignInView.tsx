@@ -5,6 +5,7 @@ import { LegalLinks } from "./LegalLinks.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
+import { ThemeSwitch } from "./ThemeSwitch.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { track } from "./analytics.ts";
 import type { WebEnv } from "./env.ts";
@@ -30,7 +31,10 @@ export function SignInView({ env, signIn, limits, error, begin }: Props) {
       <div className="signin-card">
         <div className="signin-head">
           <Mark size={32} />
-          <LanguageSwitch />
+          <span className="signin-switches">
+            <ThemeSwitch />
+            <LanguageSwitch />
+          </span>
         </div>
         <h1 id="signin-title" className="signin-title">
           {t.web.signInTitle}

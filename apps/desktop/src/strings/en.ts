@@ -81,6 +81,8 @@ export const en = {
     language: "Language",
     languageHint: "System follows your computer's language.",
     system: "System",
+    theme: "Theme",
+    themeHint: "System follows your computer's light or dark setting.",
     editor: "Editor",
     editorNote: "Both modes edit the same Markdown file. Switch any page with Ctrl/Cmd+Shift+E or the toggle above it.",
     defaultMode: "Default editor mode",
