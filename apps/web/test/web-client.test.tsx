@@ -82,6 +82,22 @@ describe("sign-in", () => {
     expect(browser.session.size).toBe(0);
   });
 
+  it("completes on /app/callback/ too: the static host adds a trailing slash before the page loads", async () => {
+    const browser = fakeBrowser();
+    browser.server.workspace("Ada Lovelace's workspace");
+    const first = open(browser);
+    await browser.user.click(await screen.findByRole("button", { name: "Sign in with Google" }));
+    await waitFor(() => expect(browser.navigations).toHaveLength(1));
+    const back = new URL(browser.server.callbackUrl(browser.navigations[0]!));
+    first.unmount();
+    browser.location.pathname = `${back.pathname}/`;
+    browser.location.search = back.search;
+    open(browser);
+    expect(await screen.findByText("Signed in as Ada Lovelace")).toBeTruthy();
+    expect(browser.location.pathname).toBe("/app/");
+    expect(browser.location.search).toBe("");
+  });
+
   it("a callback can be used once: reloading it does not sign in again", async () => {
     const browser = fakeBrowser();
     const first = open(browser);

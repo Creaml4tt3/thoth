@@ -88,7 +88,8 @@ export function App({ env }: { env: WebEnv }) {
       }
       auth = new AuthSession({ server: env.server, signIn, redirectUri: `${env.origin}${callbackPath}`, fetch: env.fetch, storage: env.sessionStorage, navigate: env.navigate, random: env.random, sha256: env.sha256, now: env.now, setTimer: env.setTimer, clearTimer: env.clearTimer });
       let failure: CallbackFailure | "unreachable" | null = null;
-      if (env.location.pathname === callbackPath) {
+      // `/app/callback/` too: the website's host adds a trailing slash to paths without a file extension.
+      if (env.location.pathname === callbackPath || env.location.pathname === `${callbackPath}/`) {
         const query = new URLSearchParams(env.location.search);
         // The code and state leave the address bar (and the history) before anything else happens.
         env.replaceUrl(env.basePath);
