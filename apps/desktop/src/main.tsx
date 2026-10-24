@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import "@thoth/ui/tokens.css";
+import "./fonts/fonts.css";
 import { App } from "./app/App.tsx";
 import { selectPlatform } from "./platform/select.ts";
 
