@@ -281,7 +281,8 @@ export const en = {
     list: "Open pages",
     new: "New tab",
     newWith: (shortcut: string) => `New tab (${shortcut})`,
-    close: (label: string) => `Close ${label}`,
+    /** The button in a tab. It does not repeat the page name: the name is its description, so a search for the page finds one thing. */
+    close: "Close tab",
     blank: "New tab",
     settings: "Settings",
     untitled: "Untitled",

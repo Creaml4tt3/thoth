@@ -17,9 +17,10 @@ export function ShortcutsDialog({ client, platform = currentPlatform(), onClose 
   const groups = useMemo(() => GROUPS.map((group) => ({ group, items: defs.filter((d) => d.group === group) })).filter((g) => g.items.length > 0), [defs]);
   return (
     <Modal title={t.title} onClose={onClose} wide>
-      <p className="muted">{t.intro}</p>
-      {client === "web" && <p className="muted">{t.webNote}</p>}
-      <div className="shortcut-groups">
+      <p className="shortcut-note">{t.intro}</p>
+      {client === "web" && <p className="shortcut-note">{t.webNote}</p>}
+      {/* Focusable, so the keyboard can scroll the list. */}
+      <div className="shortcut-groups" role="region" aria-label={t.title} tabIndex={0}>
         {groups.map(({ group, items }) => (
           <section key={group} aria-labelledby={`shortcuts-${group}`} className="shortcut-group">
             <h3 id={`shortcuts-${group}`}>{t.groups[group]}</h3>
@@ -31,7 +32,7 @@ export function ShortcutsDialog({ client, platform = currentPlatform(), onClose 
                     <dt>{t.names[def.id]}</dt>
                     <dd>
                       <kbd className="shortcut">{formatShortcut(def, client, platform)}</kbd>
-                      {differs && <span className="muted shortcut-other">{client === "web" ? t.desktopKeys(formatShortcut(def, other, platform)) : t.webKeys(formatShortcut(def, other, platform))}</span>}
+                      {differs && <span className="shortcut-other">{client === "web" ? t.desktopKeys(formatShortcut(def, other, platform)) : t.webKeys(formatShortcut(def, other, platform))}</span>}
                     </dd>
                   </div>
                 );

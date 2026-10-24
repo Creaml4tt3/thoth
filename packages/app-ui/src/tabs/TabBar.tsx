@@ -25,7 +25,7 @@ interface BarProps {
 /**
  * Browser-like tabs above the page (WAI-ARIA tabs, manual activation). Left and Right move between tabs and Home
  * and End jump to the ends, with one tab in the Tab order (roving); Enter or Space opens the tab that has focus,
- * Delete closes it. Middle-click closes. The current tab uses the accent tokens `--thoth-tab-active-*`.
+ * Delete closes it. Middle-click and the × on the tab close it with a pointer. The current tab uses the accent tokens `--thoth-tab-active-*`.
  */
 export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }: BarProps) {
   const t = useStrings().tabs;
@@ -89,6 +89,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }
                 id={tabDomId(tab.id)}
                 aria-selected={selected}
                 aria-controls={panelDomId(tab.id)}
+                aria-keyshortcuts="Delete"
                 tabIndex={tab.id === stop ? 0 : -1}
                 className="tab-label"
                 title={tab.title ?? tab.label}
@@ -105,11 +106,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }
               >
                 <span className="tab-text">{tab.label}</span>
               </button>
-              <button type="button" tabIndex={-1} className="tab-close" aria-label={t.close(tab.label)} title={t.close(tab.label)} onClick={() => onClose(tab.id)}>
+              {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. */}
+              <span className="tab-close" aria-hidden="true" title={t.close} onClick={() => onClose(tab.id)}>
                 <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true">
                   <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-              </button>
+              </span>
             </div>
           );
         })}

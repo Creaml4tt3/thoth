@@ -25,6 +25,8 @@ afterEach(async () => {
 });
 
 const tabs = () => screen.queryAllByRole("tab");
+/** The × next to the tab named `name`: a pointer affordance, not a button (a tablist owns tabs only). */
+const closeButton = (name: string) => tabs().find((t) => t.textContent === name)!.parentElement!.querySelector<HTMLElement>(".tab-close")!;
 const tabNames = () => tabs().map((t) => t.textContent);
 const current = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const row = async (name: string) => within(await screen.findByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name });
@@ -92,7 +94,7 @@ describe("opening pages in tabs", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
     expect(tabNames()).toEqual(["Alpha", "Settings"]);
-    await app.user.click(screen.getByRole("button", { name: "Close Settings" }));
+    await app.user.click(closeButton("Settings"));
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
     expect(current()).toBe("Alpha");
   });
@@ -222,7 +224,8 @@ describe("accessibility", () => {
     await app.user.click(await row("Beta"));
     await app.user.keyboard("{/Control}");
     await waitFor(() => expect(tabs()).toHaveLength(2));
-    await app.user.click(screen.getByRole("button", { name: "Close Alpha" }));
+    expect(closeButton("Alpha").getAttribute("aria-hidden")).toBe("true");
+    await app.user.click(closeButton("Alpha"));
     await waitFor(() => expect(tabNames()).toEqual(["Beta"]));
   });
 

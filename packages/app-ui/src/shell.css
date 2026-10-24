@@ -90,11 +90,12 @@
 .tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
 .tab-text { overflow: hidden; text-overflow: ellipsis; }
 .tab-close, .tab-new { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; }
+.tab-close svg { pointer-events: none; }
 .tab-close { margin-right: 4px; opacity: 0; }
-.tab:hover .tab-close, .tab[data-selected] .tab-close, .tab-close:focus-visible { opacity: 1; }
+.tab:hover .tab-close, .tab[data-selected] .tab-close { opacity: 1; }
 @media (hover: none) { .tab-close { opacity: 1; } }
 .tab-close:hover, .tab-new:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
-.tab-close:focus-visible, .tab-new:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+.tab-new:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .tab-new { margin: 0 0 4px 4px; }
 .tab-panel { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
 .tab-panel > * { min-height: 0; }
@@ -108,5 +109,8 @@
 .shortcut-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--thoth-space-4); padding: 4px 0; border-bottom: 1px solid var(--thoth-border); }
 .shortcut-row dt { margin: 0; }
 .shortcut-row dd { margin: 0; display: grid; justify-items: end; gap: 2px; }
+.shortcut-note, .shortcut-other { color: var(--thoth-ink-secondary); }
+.shortcut-note { margin: 0; }
 .shortcut-other { font: var(--thoth-text-small); }
+.shortcut-groups:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .shortcut-row[data-differs] dd .shortcut { border-color: var(--thoth-accent); }

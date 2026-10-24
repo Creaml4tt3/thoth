@@ -257,7 +257,7 @@ export const th: Strings = {
     list: "หน้าที่เปิดอยู่",
     new: "แท็บใหม่",
     newWith: (shortcut) => `แท็บใหม่ (${shortcut})`,
-    close: (label) => `ปิด ${label}`,
+    close: "ปิดแท็บ",
     blank: "แท็บใหม่",
     settings: "การตั้งค่า",
     untitled: "ไม่มีชื่อ",
