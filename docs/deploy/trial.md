@@ -11,9 +11,10 @@ Domains used below (change them when you buy your own domain):
 | Website (`apps/site`, with `apps/web` at `/app/`) | `https://thoth.creaml4tt3.me` |
 | API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
 
-> Status: steps 1–5 can be done once the sign-in broker (Phase 2b part 2) is
-> merged; its contract is `docs/protocol/sign-in.md`. Step 6 needs Phase 2c
-> (the website).
+> Status (2026-10-24): steps 1, 2, 3 and 6 are done. The Neon project is
+> `thoth`, and the Vercel projects are `thoth-api` and `thoth-site`. Left for
+> the owner: the API's `DATABASE_URL` (step 3) and the sign-in providers
+> (steps 4 and 5).
 
 ## 1. Database: Neon (free plan)
 
@@ -52,11 +53,23 @@ names do not work for sign-in cookies.
 
 ## 3. API project on Vercel
 
-1. Create a Vercel project from this repository, with root directory
-   `apps/server`. The deploy configuration (`vercel.json`) is added with the
-   sign-in work.
-2. Choose the **function region** that matches the Neon region, for example
-   `sin1` for Singapore.
+1. Create a Vercel project (no framework, no Git connection needed). The API
+   is deployed **prebuilt**: `apps/server/scripts/build-vercel.ts` bundles
+   `src/vercel.ts` into `apps/server/.vercel/output` (Build Output API v3:
+   one Node 24 function in region `sin1`, every path routed to it, and the
+   daily cron below). From `apps/server`:
+
+   ```sh
+   vercel link --project thoth-api        # once
+   pnpm build:vercel
+   vercel deploy --prebuilt --prod
+   ```
+
+   The function refuses to start unless `MIGRATE_ON_START=false` and events
+   are off (the trial profile turns them off). Until it can start it answers
+   `503 service_unavailable` and tries again on the next request.
+2. The function region is `sin1`, next to the Neon region (Singapore). It is
+   set by the build.
 3. Add the domain `api.thoth.creaml4tt3.me`.
 4. Environment variables (Production). Enter the values in the Vercel
    dashboard only:
@@ -73,8 +86,8 @@ names do not work for sign-in cookies.
    | `SERVER_NAME` | `Thoth demo server` (the name the desktop app and web client show; the same as the starter server's name) |
    | `WEB_REDIRECT_URIS` | `https://thoth.creaml4tt3.me/app/callback` |
 
-5. Add a daily cron job that calls `/internal/maintenance`. The Hobby plan allows
-   once a day.
+5. The daily cron job that calls `/internal/maintenance` is part of the build
+   (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.
 
 ## 4. Google sign-in (first provider)
 
@@ -116,6 +129,18 @@ builds (ADR-0015):
 `pnpm build:website` (`scripts/build-website.ts`) builds the site, builds
 `apps/web` when it exists, and copies `apps/web/dist` into
 `apps/site/dist/app`. Without `apps/web` it builds the site alone.
+
+The site has no secrets, so it is built on your computer and uploaded
+prebuilt; that avoids installing the whole monorepo (Playwright, Tauri) on
+Vercel. `vercel build` reads `apps/site/vercel.json`, so the headers below
+apply unchanged. From `apps/site`:
+
+```sh
+vercel link --project thoth-site       # once
+vercel pull --environment=production   # SITE_URL, VITE_DEFAULT_SERVER, VITE_GA4_ID
+vercel build --prod
+vercel deploy --prebuilt --prod
+```
 
 1. Create a second Vercel project from this repository with **root directory
    `apps/site`**. `apps/site/vercel.json` sets the install and build commands
