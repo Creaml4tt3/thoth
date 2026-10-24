@@ -8,6 +8,17 @@ export type PageId = z.infer<typeof PageIdSchema>;
 
 export const PAGE_TITLE_MAX = 500;
 
+/**
+ * Sibling sort key (capability `page-order`): an opaque fractional index chosen by the client. Siblings are
+ * ordered by comparing keys as byte strings (ASCII order, never locale order). Pages without a position come
+ * after the positioned ones, A-Z by title; ties fall back to title, then id.
+ */
+export const PagePositionSchema = z
+  .string()
+  .regex(/^[0-9A-Za-z]{1,128}$/, "Expected 1-128 characters from [0-9A-Za-z]")
+  .describe("Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).");
+export type PagePosition = z.infer<typeof PagePositionSchema>;
+
 /** One immutable revision (ADR-0005). Revisions are never modified after creation. */
 export const RevisionSummarySchema = z.object({
   id: RevisionIdSchema,
@@ -28,6 +39,8 @@ export const PageMetadataSchema = z.object({
   workspaceId: WorkspaceIdSchema,
   parentId: PageIdSchema.nullable(),
   title: z.string(),
+  /** Sibling sort key; absent or null when the page has none (or the server does not support `page-order`). */
+  position: PagePositionSchema.nullable().optional(),
   createdAt: TimestampSchema,
   createdBy: OpaqueIdSchema.nullable(),
   updatedAt: TimestampSchema,
@@ -54,8 +67,26 @@ export const PageWriteSchema = z.object({
    * parent, `null` moves the page to the root.
    */
   parentId: PageIdSchema.nullable().optional(),
+  /**
+   * Sibling sort key (capability `page-order`). On create: omitted means none. On update: omitted keeps the
+   * current position, `null` clears it. A server without `page-order` ignores it.
+   */
+  position: PagePositionSchema.nullable().optional(),
 });
 export type PageWrite = z.infer<typeof PageWriteSchema>;
+
+/**
+ * Body of `POST .../pages/{pageId}/move` (capability `page-order`): a metadata-only change of parent and/or
+ * position. No new revision is created. Omitted members are unchanged; `null` moves to the root or clears the
+ * position. At least one member is required.
+ */
+export const PageMoveSchema = z
+  .object({
+    parentId: PageIdSchema.nullable().optional(),
+    position: PagePositionSchema.nullable().optional(),
+  })
+  .refine((m) => m.parentId !== undefined || m.position !== undefined, { message: "parentId or position is required" });
+export type PageMove = z.infer<typeof PageMoveSchema>;
 
 export const GetPageQuerySchema = z.object({
   /** Return the page as of this revision instead of the current one. */

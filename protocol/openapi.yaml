@@ -400,6 +400,98 @@ paths:
         - rate_limited
         - internal_error
         - service_unavailable
+  /api/v1/workspaces/{workspaceId}/pages/{pageId}/move:
+    post:
+      operationId: movePage
+      tags:
+        - Pages
+      summary: Move or reorder a page without a new revision
+      description: |-
+        Metadata-only change of the page's parent and/or sibling position (capability `page-order`). `If-Match` is required and names the page's current revision: a stale one is 412 `revision_conflict`, none is 428. No revision is created, so the ETag is unchanged; the change feed records `page.updated` with the current revision. Moving a page under itself or one of its descendants is 400.
+
+        Requires capability `page-order`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: If-Match
+          in: header
+          required: true
+          description: Strong entity tag of the revision being replaced or deleted, for example `"01J..."`. `*` is not accepted.
+          schema:
+            type: string
+            pattern: ^"[A-Za-z0-9_.~-]{1,128}"$
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: New parent and/or position; at least one member.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageMove"
+      responses:
+        "200":
+          description: The page's tree node after the move.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreeNode"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "412":
+          $ref: "#/components/responses/Problem412"
+          description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "428":
+          $ref: "#/components/responses/Problem428"
+          description: "`precondition_required`: The write must carry If-Match or If-None-Match."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: page-order
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - revision_conflict
+        - idempotency_key_reused
+        - precondition_required
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
   /api/v1/workspaces/{workspaceId}/pages/{pageId}/revisions:
     get:
       operationId: listPageRevisions
@@ -1083,6 +1175,7 @@ components:
                   - search
                   - events.sse
                   - transfers
+                  - page-order
                   - databases
                   - realtime-collab
               - type: string
@@ -1178,6 +1271,12 @@ components:
             - type: "null"
         title:
           type: string
+        position:
+          anyOf:
+            - type: string
+              pattern: ^[0-9A-Za-z]{1,128}$
+              description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
         attachmentId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -1316,6 +1415,12 @@ components:
             - type: "null"
         title:
           type: string
+        position:
+          anyOf:
+            - type: string
+              pattern: ^[0-9A-Za-z]{1,128}$
+              description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
         createdAt:
           type: string
           format: date-time
@@ -1346,6 +1451,20 @@ components:
         - createdBy
         - updatedAt
         - updatedBy
+    PageMove:
+      type: object
+      properties:
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        position:
+          anyOf:
+            - type: string
+              pattern: ^[0-9A-Za-z]{1,128}$
+              description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
     PageResource:
       type: object
       properties:
@@ -1377,6 +1496,12 @@ components:
           anyOf:
             - type: string
               pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        position:
+          anyOf:
+            - type: string
+              pattern: ^[0-9A-Za-z]{1,128}$
+              description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
             - type: "null"
       required:
         - title
@@ -1901,6 +2026,12 @@ components:
             - type: "null"
         title:
           type: string
+        position:
+          anyOf:
+            - type: string
+              pattern: ^[0-9A-Za-z]{1,128}$
+              description: Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order).
+            - type: "null"
         revisionId:
           type: string
           minLength: 1
@@ -2189,5 +2320,6 @@ x-thoth-capabilities:
   - search
   - events.sse
   - transfers
+  - page-order
   - databases
   - realtime-collab

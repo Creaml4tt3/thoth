@@ -17,6 +17,7 @@ import {
   PAGE_SIZE_MAX,
   PROBLEM_CONTENT_TYPE,
   PageIdSchema,
+  PageMoveSchema,
   PageWriteSchema,
   SSE_EVENT_NAME,
   SearchRequestSchema,
@@ -81,6 +82,10 @@ interface PageRecord {
   id: string;
   workspaceId: string;
   revisions: Revision[];
+  /** Parent and sibling position now: a move changes them without a revision. */
+  parentId: string | null;
+  position: string | null;
+  updatedAt: string;
   deleted: boolean;
   createdAt: string;
   createdBy: string;
@@ -155,7 +160,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -211,17 +216,31 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       id: page.id,
       markdown: rev.markdown,
       revision: summary(rev),
-      metadata: { workspaceId: page.workspaceId, parentId: rev.pageParentId, title: rev.title, createdAt: page.createdAt, createdBy: page.createdBy, updatedAt: rev.createdAt, updatedBy: rev.authorId },
+      metadata: {
+        workspaceId: page.workspaceId,
+        parentId: rev === currentRevision(page) ? page.parentId : rev.pageParentId,
+        title: rev.title,
+        ...(caps.has("page-order") ? { position: rev === currentRevision(page) ? page.position : null } : {}),
+        createdAt: page.createdAt,
+        createdBy: page.createdBy,
+        updatedAt: rev.createdAt,
+        updatedBy: rev.authorId,
+      },
     };
   }
 
-  function writeRevision(workspaceId: string, pageId: string, input: { title: string; markdown: string; parentId?: string | null | undefined }, userId: string): { page: PageRecord; rev: Revision; created: boolean } {
+  function treeNode(page: PageRecord) {
+    const rev = currentRevision(page);
+    return { id: page.id, parentId: page.parentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}), revisionId: rev.id, updatedAt: page.updatedAt };
+  }
+
+  function writeRevision(workspaceId: string, pageId: string, input: { title: string; markdown: string; parentId?: string | null | undefined; position?: string | null | undefined }, userId: string): { page: PageRecord; rev: Revision; created: boolean } {
     const key = pageKey(workspaceId, pageId);
     let page = pages.get(key);
     const created = !page;
     const now = new Date().toISOString();
     if (!page) {
-      page = { id: pageId, workspaceId, revisions: [], deleted: false, createdAt: now, createdBy: userId };
+      page = { id: pageId, workspaceId, revisions: [], parentId: null, position: null, updatedAt: now, deleted: false, createdAt: now, createdBy: userId };
       pages.set(key, page);
     }
     const previous = page.revisions[page.revisions.length - 1];
@@ -233,12 +252,15 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       authorId: userId,
       title: input.title,
       markdown: input.markdown,
-      pageParentId: input.parentId === undefined ? (previous?.pageParentId ?? null) : input.parentId,
+      pageParentId: input.parentId === undefined ? page.parentId : input.parentId,
       size: Buffer.byteLength(input.markdown),
       contentHash: sha256(input.markdown),
     };
     page.revisions.push(rev);
-    record(workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId: rev.id, parentId: rev.pageParentId, title: rev.title });
+    page.parentId = rev.pageParentId;
+    if (caps.has("page-order") && input.position !== undefined) page.position = input.position;
+    page.updatedAt = now;
+    record(workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId: rev.id, parentId: rev.pageParentId, title: rev.title, ...(caps.has("page-order") ? { position: page.position } : {}) });
     return { page, rev, created };
   }
 
@@ -362,10 +384,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       head = Number(parts[1]);
     }
     const live = [...pages.values()].filter((p) => p.workspaceId === ws.id && !p.deleted);
-    const slice = live.slice(offset, offset + limit).map((p) => {
-      const rev = currentRevision(p);
-      return { id: p.id, parentId: rev.pageParentId, title: rev.title, revisionId: rev.id, updatedAt: rev.createdAt };
-    });
+    const slice = live.slice(offset, offset + limit).map(treeNode);
     return jsonReply(200, {
       workspaceId: ws.id,
       items: slice,
@@ -412,6 +431,36 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       }
       const { page, rev, created } = writeRevision(ws.id, pageId, parsed.data, ctx.user.id);
       return jsonReply(created ? 201 : 200, pageResource(page, rev), { etag: formatEtag(rev.id) });
+    }),
+  );
+
+  add("POST", "/workspaces/:workspaceId/pages/:pageId/move", "page-order", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = workspaceFor(ctx, "write");
+      const pageId = parsePageId(ctx.params.pageId);
+      const ifMatch = ctx.headers["if-match"];
+      if (ifMatch === undefined) throw new ApiError("precondition_required", "a move requires If-Match");
+      const expected = parseEtag(ifMatch);
+      if (expected === null) throw new ApiError("validation_failed", "If-Match must be one strong entity tag");
+      const parsed = PageMoveSchema.safeParse(parseJson(ctx));
+      if (!parsed.success) throw zodFail(parsed.error);
+      const page = pages.get(pageKey(ws.id, pageId));
+      if (!page || page.deleted) throw new ApiError("not_found", "page not found");
+      if (expected !== currentRevision(page).id && !flaws.overwriteOnStale) throw conflict(page, "If-Match does not match the current revision");
+      const parentId = parsed.data.parentId;
+      if (parentId !== undefined && parentId !== null) {
+        // Walk up from the new parent: meeting the page itself would make it its own ancestor.
+        for (let at: string | null = parentId, steps = 0; at !== null && steps < 10_000; steps++) {
+          if (at === pageId) throw new ApiError("validation_failed", "parentId would make the page its own ancestor", { errors: [{ pointer: "/parentId", detail: "cycle" }] });
+          at = pages.get(pageKey(ws.id, at))?.parentId ?? null;
+        }
+      }
+      if (parentId !== undefined) page.parentId = parentId;
+      if (parsed.data.position !== undefined) page.position = parsed.data.position;
+      page.updatedAt = new Date().toISOString();
+      const rev = currentRevision(page);
+      record(ws.id, { kind: "page.updated", actorId: ctx.user.id, pageId, revisionId: rev.id, parentId: page.parentId, title: rev.title, position: page.position });
+      return jsonReply(200, treeNode(page), { etag: formatEtag(rev.id) });
     }),
   );
 

@@ -18,6 +18,7 @@ import {
   PageResourceSchema,
   SearchResponseSchema,
   TransferResourceSchema,
+  TreeNodeSchema,
   TreePageSchema,
   WorkspaceListSchema,
   formatEtag,
@@ -25,6 +26,7 @@ import {
   type Capabilities,
   type ChangesResponse,
   type Me,
+  type PageMove,
   type PageResource,
   type PageWrite,
   type SearchRequest,
@@ -163,6 +165,22 @@ export class WorkspaceClient {
   /** Creates a page with a fresh UUIDv7 id. */
   createPage(workspaceId: string, write: PageWrite, options: { idempotencyKey?: string } = {}): Promise<PageResource> {
     return this.putPage(workspaceId, this.newPageId(), write, null, options);
+  }
+
+  /**
+   * Moves or reorders a page without a new revision (capability `page-order`). `expected` is the page's current
+   * revision id (`If-Match`); a stale one throws `RevisionConflict`. Returns the page's tree node after the move.
+   */
+  async movePage(workspaceId: string, pageId: string, move: PageMove, expected: string, options: { idempotencyKey?: string } = {}): Promise<TreeNode> {
+    const headers: Record<string, string> = { ...JSON_HEADERS, "if-match": formatEtag(expected) };
+    if (options.idempotencyKey !== undefined) headers["idempotency-key"] = options.idempotencyKey;
+    const { data } = await this.request(TreeNodeSchema, {
+      method: "POST",
+      path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/move`,
+      headers,
+      body: encoder.encode(JSON.stringify(move)),
+    });
+    return data;
   }
 
   async deletePage(workspaceId: string, pageId: string, expected: string): Promise<void> {

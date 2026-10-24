@@ -9,13 +9,15 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { PageMoveSchema, parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
   parentId: string | null;
   title: string;
   markdown: string;
+  /** Sibling sort key (capability `page-order`); absent means none. */
+  position?: string | null;
   revisions: RevisionSummary[];
   deleted: boolean;
   /** Markdown of each revision, in step with `revisions` (for `?revision=`). */
@@ -51,7 +53,7 @@ export interface FakeServerConfig {
   account?: { id: string; displayName: string; email?: string };
   /** Answers, but not as a Thoth server. */
   notThoth?: boolean;
-  /** Capabilities listed (default: `search`, `transfers`, `attachments`). */
+  /** Capabilities listed (default: `search`, `transfers`, `attachments`, `page-order`). */
   capabilities?: string[];
 }
 
@@ -129,11 +131,12 @@ export class FakeServers implements Servers {
   }
 
   /** Creates or changes a page as another user would (a new revision and a change-feed entry). */
-  writeAsOther(ws: FakeWorkspace, init: { id?: string; title: string; markdown: string; parentId?: string | null }): FakePage {
+  writeAsOther(ws: FakeWorkspace, init: { id?: string; title: string; markdown: string; parentId?: string | null; position?: string | null }): FakePage {
     const id = init.id ?? newStableId();
     const existing = ws.pages.get(id);
-    const page = existing ?? { id, parentId: init.parentId ?? null, title: init.title, markdown: "", revisions: [], deleted: false };
+    const page: FakePage = existing ?? { id, parentId: init.parentId ?? null, title: init.title, markdown: "", revisions: [], deleted: false };
     if (init.parentId !== undefined) page.parentId = init.parentId;
+    if (init.position !== undefined) page.position = init.position;
     page.title = init.title;
     page.markdown = init.markdown;
     page.revisions.push(this.revision(page, "usr_other"));
@@ -285,7 +288,7 @@ export class FakeServers implements Servers {
     if (!m || !ws) return fail("not_found");
     const rest = m[2]!;
     if (rest === "/tree" && method === "GET") {
-      const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => ({ id: p.id, parentId: p.parentId, title: p.title, revisionId: p.revisions.at(-1)!.id, updatedAt: p.revisions.at(-1)!.createdAt }));
+      const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));
       return json(200, { workspaceId: ws.id, items, nextCursor: null, changeCursor: this.cursor(ws.changes.length) });
     }
     if (rest === "/changes" && method === "GET") {
@@ -310,6 +313,8 @@ export class FakeServers implements Servers {
       ws.attachments.set(id, { id, bytes: data, mimeType, hash, ...(query["fileName"] ? { fileName: query["fileName"] } : {}) });
       return json(201, { id, workspaceId: ws.id, hash, size: data.length, mimeType, ...(query["fileName"] ? { fileName: query["fileName"] } : {}), createdAt: iso(T0), createdBy: "usr_me" });
     }
+    const mv = /^\/pages\/([^/]+)\/move$/.exec(rest);
+    if (mv && method === "POST") return this.move(server, ws, decodeURIComponent(mv[1]!), headers, text);
     const pm = /^\/pages\/([^/]+)$/.exec(rest);
     if (!pm) return fail("not_found");
     const id = decodeURIComponent(pm[1]!);
@@ -338,7 +343,8 @@ export class FakeServers implements Servers {
       const ifMatch = headers["if-match"];
       const ifNone = headers["if-none-match"];
       if (ifMatch === undefined && ifNone === undefined) return fail("precondition_required");
-      const write = JSON.parse(text) as { title: string; markdown: string; parentId?: string | null };
+      const write = JSON.parse(text) as { title: string; markdown: string; parentId?: string | null; position?: string | null };
+      const ordered = this.capable(server, "page-order");
       if (ifNone === "*") {
         if (page) return this.conflict(page);
         const limit = this.mustKnow(server).config.limits?.["maxPagesPerWorkspace"];
@@ -346,7 +352,7 @@ export class FakeServers implements Servers {
         if (limit !== undefined && count + 1 > limit) {
           return json(409, { ...problem("quota_exceeded", { detail: `this workspace is limited to ${limit} pages (${count} in use); delete pages to make room` }), quota: "pagesPerWorkspace", limit, current: count });
         }
-        const created: FakePage = { id, parentId: write.parentId ?? null, title: write.title, markdown: write.markdown, revisions: [], deleted: false };
+        const created: FakePage = { id, parentId: write.parentId ?? null, title: write.title, markdown: write.markdown, ...(ordered && write.position ? { position: write.position } : {}), revisions: [], deleted: false };
         created.revisions.push(this.revision(created, "usr_me"));
         ws.pages.set(id, created);
         this.record(ws, "page.created", created, "usr_me");
@@ -357,11 +363,34 @@ export class FakeServers implements Servers {
       live.title = write.title;
       live.markdown = write.markdown;
       if (write.parentId !== undefined) live.parentId = write.parentId;
+      if (ordered && write.position !== undefined) live.position = write.position;
       live.revisions.push(this.revision(live, "usr_me"));
       this.record(ws, "page.updated", live, "usr_me");
       return json(200, this.resource(ws, live), { etag: `"${live.revisions.at(-1)!.id}"` });
     }
     return fail("method_not_allowed");
+  }
+
+  private node(server: string, p: FakePage) {
+    return { id: p.id, parentId: p.parentId, title: p.title, ...(this.capable(server, "page-order") ? { position: p.position ?? null } : {}), revisionId: p.revisions.at(-1)!.id, updatedAt: p.revisions.at(-1)!.createdAt };
+  }
+
+  /** `movePage` (capability `page-order`): parent and position change, no new revision. */
+  private move(server: string, ws: FakeWorkspace, id: string, headers: Record<string, string>, text: string): ApiCallResult {
+    if (!this.capable(server, "page-order")) return fail("capability_not_supported");
+    if (ws.role === "viewer") return fail("forbidden", "viewers cannot move pages");
+    if (headers["if-match"] === undefined) return fail("precondition_required");
+    const parsed = PageMoveSchema.safeParse(JSON.parse(text));
+    if (!parsed.success) return fail("validation_failed", parsed.error.message);
+    const page = ws.pages.get(id);
+    if (!page || page.deleted) return fail("not_found");
+    if (parseEtag(headers["if-match"]) !== page.revisions.at(-1)!.id) return this.conflict(page);
+    const { parentId, position } = parsed.data;
+    for (let at = parentId ?? null; at !== null; at = ws.pages.get(at)?.parentId ?? null) if (at === id) return fail("validation_failed", "parentId would make the page its own ancestor");
+    if (parentId !== undefined) page.parentId = parentId;
+    if (position !== undefined) page.position = position;
+    this.record(ws, "page.updated", page, "usr_me");
+    return json(200, this.node(server, page), { etag: `"${page.revisions.at(-1)!.id}"` });
   }
 
   private conflict(page: FakePage): ApiCallResult {
@@ -371,7 +400,7 @@ export class FakeServers implements Servers {
   private capabilities(config: FakeServerConfig) {
     return {
       protocolVersion: "1.0",
-      capabilities: config.capabilities ?? ["search", "transfers", "attachments"],
+      capabilities: config.capabilities ?? ["search", "transfers", "attachments", "page-order"],
       ...(config.limits ? { limits: config.limits } : {}),
       server: { name: config.name ?? new URL(config.url).host },
     };
@@ -508,7 +537,7 @@ export class FakeServers implements Servers {
       id: page.id,
       markdown: page.markdown,
       revision: last,
-      metadata: { workspaceId: ws.id, parentId: page.parentId, title: page.title, createdAt: first.createdAt, createdBy: first.authorId, updatedAt: last.createdAt, updatedBy: last.authorId },
+      metadata: { workspaceId: ws.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}), createdAt: first.createdAt, createdBy: first.authorId, updatedAt: last.createdAt, updatedBy: last.authorId },
     };
   }
 
@@ -520,7 +549,7 @@ export class FakeServers implements Servers {
 
   private record(ws: FakeWorkspace, kind: "page.created" | "page.updated" | "page.deleted", page: FakePage, actor: string): void {
     const base = { id: `chg_${ws.changes.length + 1}`, kind, occurredAt: iso(T0 + ++this.clock * 1000), actorId: actor, pageId: page.id };
-    ws.changes.push(kind === "page.deleted" ? base : { ...base, revisionId: page.revisions.at(-1)!.id, parentId: page.parentId, title: page.title });
+    ws.changes.push(kind === "page.deleted" ? base : { ...base, revisionId: page.revisions.at(-1)!.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}) });
   }
 
   private cursor(n: number): string {

@@ -19,6 +19,7 @@
               "search",
               "events.sse",
               "transfers",
+              "page-order",
               "databases",
               "realtime-collab"
             ]

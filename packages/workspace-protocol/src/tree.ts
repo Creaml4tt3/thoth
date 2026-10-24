@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { CursorSchema, RevisionIdSchema, TimestampSchema, WorkspaceIdSchema, paginated } from "./common.ts";
-import { PageIdSchema } from "./pages.ts";
+import { PageIdSchema, PagePositionSchema } from "./pages.ts";
 
 /** One page in the workspace hierarchy (adjacency list; parents may appear on later pages). */
 export const TreeNodeSchema = z.object({
   id: PageIdSchema,
   parentId: PageIdSchema.nullable(),
   title: z.string(),
+  /** Sibling sort key (capability `page-order`); absent or null when the page has none. */
+  position: PagePositionSchema.nullable().optional(),
   revisionId: RevisionIdSchema,
   updatedAt: TimestampSchema,
 });

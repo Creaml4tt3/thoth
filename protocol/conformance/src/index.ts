@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { PageResourceSchema, parseEtag } from "@thoth/workspace-protocol";
-import { attachmentChecks, eventChecks, searchChecks, transferChecks } from "./checks-capabilities.ts";
+import { attachmentChecks, eventChecks, pageOrderChecks, searchChecks, transferChecks } from "./checks-capabilities.ts";
 import { coreChecks } from "./checks-core.ts";
 import { createClient } from "./http.ts";
 import { CheckFailure, CheckSkip, type Check, type Context } from "./support.ts";
@@ -49,7 +49,7 @@ const cleanupCheck: Check = {
   },
 };
 
-export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, cleanupCheck, responseContractCheck];
+export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, ...pageOrderChecks, cleanupCheck, responseContractCheck];
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

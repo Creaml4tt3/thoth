@@ -9,10 +9,11 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `search`           routes: searchWorkspace
  * - `events.sse`       routes: streamWorkspaceEvents
  * - `transfers`        routes: createTransfer, getTransfer, commitTransfer, abortTransfer
+ * - `page-order`       routes: movePage; the optional `position` member of pages, tree nodes and changes
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

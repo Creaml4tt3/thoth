@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CursorSchema, LimitSchema, OpaqueIdSchema, RevisionIdSchema, TimestampSchema, WorkspaceIdSchema } from "./common.ts";
-import { PageIdSchema } from "./pages.ts";
+import { PageIdSchema, PagePositionSchema } from "./pages.ts";
 import { AttachmentIdSchema } from "./attachments.ts";
 
 export const KNOWN_CHANGE_KINDS = ["page.created", "page.updated", "page.deleted", "attachment.created"] as const;
@@ -28,6 +28,8 @@ export const ChangeEntrySchema = z
     revisionId: RevisionIdSchema.optional(),
     parentId: PageIdSchema.nullable().optional(),
     title: z.string().optional(),
+    /** `page.created`, `page.updated`: the page's sibling sort key after the change (capability `page-order`). */
+    position: PagePositionSchema.nullable().optional(),
     attachmentId: AttachmentIdSchema.optional(),
   })
   .superRefine((entry, ctx) => {

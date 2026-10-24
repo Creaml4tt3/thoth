@@ -74,6 +74,18 @@
           "title": {
             "type": "string"
           },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z]{1,128}$",
+                "description": "Opaque fractional-index sort key among siblings, compared as a byte string (capability page-order)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "attachmentId": {
             "type": "string",
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"

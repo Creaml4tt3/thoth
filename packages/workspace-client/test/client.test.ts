@@ -108,6 +108,16 @@ describe("writes", () => {
     await client.deletePage("ws1", PAGE, "r3");
     expect(requests[0]).toMatchObject({ method: "DELETE", headers: { "if-match": '"r3"' } });
   });
+
+  it("moves a page with If-Match and returns its tree node; a stale revision is a RevisionConflict", async () => {
+    const parent = newStableId();
+    const node = { id: PAGE, parentId: parent, title: "Plan", position: "a1", revisionId: "r3", updatedAt: T };
+    const { client, requests } = fake((_, n) => (n === 0 ? ok(node, 200, { etag: '"r3"' }) : ok({ ...problem("revision_conflict"), currentRevision: revision("r4") }, 412)));
+    expect(await client.movePage("ws1", PAGE, { parentId: parent, position: "a1" }, "r3", { idempotencyKey: "m1" })).toEqual(node);
+    expect(requests[0]).toMatchObject({ method: "POST", path: `/api/v1/workspaces/ws1/pages/${PAGE}/move`, headers: { "if-match": '"r3"', "idempotency-key": "m1", "content-type": "application/json" } });
+    expect(bodyOf(requests[0]!)).toEqual({ parentId: parent, position: "a1" });
+    await expect(client.movePage("ws1", PAGE, { position: null }, "r3")).rejects.toBeInstanceOf(RevisionConflict);
+  });
 });
 
 describe("errors", () => {

@@ -56,6 +56,7 @@ describe("route registry", () => {
       getTransfer: "transfers",
       commitTransfer: "transfers",
       abortTransfer: "transfers",
+      movePage: "page-order",
     });
   });
 

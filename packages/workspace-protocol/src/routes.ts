@@ -3,8 +3,8 @@ import { API_BASE_PATH, PaginationQuerySchema, WorkspaceIdSchema } from "./commo
 import { CapabilitiesSchema, type CapabilityId } from "./capabilities.ts";
 import { ERROR_CODES, ProblemDetailsSchema, type ErrorCode } from "./errors.ts";
 import { MeSchema, WorkspaceListSchema } from "./identity.ts";
-import { GetPageQuerySchema, PageIdSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema } from "./pages.ts";
-import { TreePageSchema } from "./tree.ts";
+import { GetPageQuerySchema, PageIdSchema, PageMoveSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema } from "./pages.ts";
+import { TreeNodeSchema, TreePageSchema } from "./tree.ts";
 import { SearchRequestSchema, SearchResponseSchema } from "./search.ts";
 import { AttachmentIdSchema, AttachmentResourceSchema, UploadAttachmentQuerySchema } from "./attachments.ts";
 import { ChangesQuerySchema, ChangesResponseSchema } from "./changes.ts";
@@ -214,6 +214,21 @@ export const ROUTES: readonly RouteDefinition[] = [
       json(201, "The page was created.", PageResourceSchema, [ETAG_HEADER]),
     ],
     errors: ["validation_failed", "forbidden", "not_found", "revision_conflict", "quota_exceeded", "payload_too_large", "idempotency_key_reused", "precondition_required"],
+  }),
+  route({
+    operationId: "movePage",
+    method: "post",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/move",
+    tag: "Pages",
+    summary: "Move or reorder a page without a new revision",
+    description:
+      "Metadata-only change of the page's parent and/or sibling position (capability `page-order`). `If-Match` is required and names the page's current revision: a stale one is 412 `revision_conflict`, none is 428. No revision is created, so the ETag is unchanged; the change feed records `page.updated` with the current revision. Moving a page under itself or one of its descendants is 400.",
+    capability: "page-order",
+    pathParams: pageParams,
+    requestHeaders: [{ ...IF_MATCH_HEADER, requirement: "required" }, idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: PageMoveSchema, required: true, description: "New parent and/or position; at least one member." },
+    responses: [json(200, "The page's tree node after the move.", TreeNodeSchema, [ETAG_HEADER])],
+    errors: ["validation_failed", "forbidden", "not_found", "revision_conflict", "idempotency_key_reused", "precondition_required"],
   }),
   route({
     operationId: "deletePage",

@@ -88,6 +88,7 @@ discover a server before signing in.
 | `search` | `searchWorkspace` | |
 | `events.sse` | `streamWorkspaceEvents` | hints only, see section 9 |
 | `transfers` | `createTransfer`, `getTransfer`, `commitTransfer`, `abortTransfer` | a server that accepts `attachmentIds` in transfers also lists `attachments` |
+| `page-order` | `movePage` | the optional `position` member of pages, tree nodes and change entries; section 7 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -274,21 +275,46 @@ problem at a time.)
 ### Resources
 
 - `GET /workspaces/{workspaceId}/tree` returns a paginated adjacency list of
-  `{ id, parentId, title, revisionId, updatedAt }` for readable pages, plus `changeCursor`
+  `{ id, parentId, title, position?, revisionId, updatedAt }` for readable pages, plus `changeCursor`
   (section 9). Parents may appear on a later page than their children.
 - A **page** is `{ id, markdown, revision, metadata }`: the Markdown source of one revision,
-  a `RevisionSummary` and metadata (`workspaceId`, `parentId`, `title`, timestamps and actors).
+  a `RevisionSummary` and metadata (`workspaceId`, `parentId`, `title`, `position?`, timestamps and actors).
 - A **revision summary** is `{ id, pageId, parentId, createdAt, authorId, title, size,
   contentHash }`. `parentId` is the previous revision of the same page, `null` for the first.
   `size` is the UTF-8 byte length of the Markdown; `contentHash` its SHA-256.
-- `PUT /workspaces/{workspaceId}/pages/{pageId}` takes `{ "title", "markdown", "parentId"? }`.
+- `PUT /workspaces/{workspaceId}/pages/{pageId}` takes `{ "title", "markdown", "parentId"?, "position"? }`.
   `parentId` omitted means: root on create, unchanged on update; `null` moves to the root.
-  Every successful PUT, including a pure move or retitle, creates a new revision.
+  `position` is the same (none on create, unchanged on update, `null` clears it); servers without
+  `page-order` ignore it. Every successful PUT, including a pure move or retitle, creates a new revision.
+  The one write that does not is `movePage` (below), which changes only metadata.
 - The `title` is supplied by the client; the server does not derive it from the Markdown
   (open question).
 - `GET .../pages/{pageId}` returns the current revision, or the revision named by
   `?revision=<id>` (the page as it was). The response `ETag` is always the entity tag of the
   revision in the body.
+
+### Page order and moves (capability `page-order`)
+
+ADR-0016 rule 4. A page may carry a `position`: an opaque sort key among its siblings, 1 to 128
+characters from `[0-9A-Za-z]`, chosen by the client (a fractional index, so a page can be placed between
+two others without renumbering them). The server stores and returns it; it never interprets it.
+
+- **Sibling order.** Clients compare positions as byte strings (ASCII order, never a locale collation).
+  Pages without a position come after the positioned ones, A to Z by title; ties fall back to the title,
+  then the page ID. A client that does not know `position` keeps working and shows its own order.
+- **`POST /workspaces/{workspaceId}/pages/{pageId}/move`** takes `{ "parentId"?, "position"? }` (at least
+  one; omitted is unchanged, `null` moves to the root or clears the position) and answers 200 with the
+  page's `TreeNode`. It is a metadata change: **no revision is created**, the `ETag` stays the current
+  revision's, and the change feed records `page.updated` naming the unchanged current revision, with the
+  new `parentId` and `position`. It needs the editor or owner role.
+- **Preconditions.** `If-Match` is required (428 without it) and must name the current revision (412
+  `revision_conflict` with `currentRevision` otherwise), so a client never moves a page it has not seen.
+  `If-Match` guards the content revision only. Moves create no revision, so two moves based on the same
+  revision both succeed and the last one wins; a move is a cheap, repeatable choice, not content.
+  A parent that is the page itself or one of its descendants is 400. `Idempotency-Key` works as in section 8.
+- The parent and position of a page are properties of the page, not of a revision: `GET` of the current
+  revision reports them as they are now; an older revision (`?revision=`) reports the parent it was written
+  with and no position.
 
 ### ETag format
 
@@ -383,13 +409,13 @@ settled (open questions).
 - `hasMore` is true when more entries are available now. A client reads until `hasMore` is
   false.
 - An entry is `{ id, kind, occurredAt, actorId, pageId?, revisionId?, parentId?, title?,
-  attachmentId? }`. `id` is unique within the workspace for the life of the feed, so clients
+  position?, attachmentId? }`. `id` is unique within the workspace for the life of the feed, so clients
   can de-duplicate.
 
 | `kind` | Required members |
 | --- | --- |
 | `page.created` | `pageId`, `revisionId` |
-| `page.updated` | `pageId`, `revisionId` (also used for a move or retitle) |
+| `page.updated` | `pageId`, `revisionId` (also used for a move or retitle; for `movePage`, the unchanged current revision) |
 | `page.deleted` | `pageId` |
 | `attachment.created` | `attachmentId` |
 
@@ -537,7 +563,8 @@ the change-feed envelope, entry kinds and the tree `changeCursor` baseline; SSE 
 with a fixed payload; opaque URL-safe cursors; the error registry and statuses; 404 instead of
 403 for unreadable resources; 501 for unlisted capabilities; public `GET /capabilities`;
 the transfer lifecycle seen by the server (stage, commit, abort, pinned revisions, verified
-move commit). Not covered by the suite: 405, `unsupported_media_type`, the role matrix beyond
+move commit); sibling order through an optional `position` and the metadata-only `movePage`
+(capability `page-order`). Not covered by the suite: 405, `unsupported_media_type`, the role matrix beyond
 the fixture tests, and `Retry-After`.
 
 **Open questions (not decided here):**
@@ -546,16 +573,16 @@ the fixture tests, and `Retry-After`.
    how clients obtain credentials; browser SSE authentication; the final shape of `GET /me`
    (ADR-0004).
 2. **Versioning policy:** what is breaking, deprecation windows, running v1 and v2 together.
-3. **Capability registry:** naming beyond the six IDs; governance of `x-` IDs; semantics of
+3. **Capability registry:** naming beyond the seven IDs; governance of `x-` IDs; semantics of
    `databases` and `realtime-collab`.
 4. **Attachments:** resumable or multipart upload; chunking; how page Markdown refers to an
    attachment (URL form); deduplication; deletion and retention; size limits per MIME type.
 5. **Revision retention and compaction;** whether revisions of deleted pages stay readable;
    undelete; behavior of `PUT` to the ID of a deleted page; whether revision IDs are totally
    ordered or only parent-linked (ADR-0005).
-6. **Tree rules:** sibling ordering, cycle prevention, behavior of `DELETE` for a page with
-   children (cascade, orphan or refuse), moving a page without sending its content, a missing
-   parent.
+6. **Tree rules:** behavior of `DELETE` for a page with children (cascade, orphan or refuse), a
+   missing parent. (Sibling order, cycle prevention and moving a page without sending its content are
+   decided in section 7 for servers that list `page-order`.)
 7. **Titles and frontmatter:** whether the server derives `title` from Markdown, and whether it
    checks that frontmatter `thoth_id` equals the path ID; newline and Unicode normalization of
    stored Markdown.

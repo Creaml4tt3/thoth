@@ -48,6 +48,7 @@ export const SAMPLES: Record<string, unknown> = {
   PageMetadata: META,
   PageResource: { id: REV.pageId, markdown: "# Hello\n", revision: REV, metadata: META },
   PageWrite: { title: "Hello", markdown: "# Hello\n", parentId: null },
+  PageMove: { parentId: null, position: "a0" },
   SearchRequest: { query: "hello", limit: 10, cursor: "s_abc" },
   SearchHit: { pageId: REV.pageId, title: "Hello", revisionId: "rev_1_abc", snippet: "...", score: 0.5 },
   SearchResponse: { items: [{ pageId: REV.pageId, title: "Hello", revisionId: "rev_1_abc" }], nextCursor: null },

@@ -23,6 +23,10 @@ const REQUIRED_CHECKS = [
   "core.changes.includes-write",
   "core.changes.pagination-complete",
   "core.schemas.all-responses-valid",
+  "page-order.position-round-trip",
+  "page-order.move-metadata-only",
+  "page-order.move-preconditions",
+  "page-order.move-idempotent",
 ];
 
 describe("conformance suite against a correct server", () => {
@@ -48,8 +52,8 @@ describe("conformance suite against a correct server", () => {
 
   it("returns structured results grouped by capability", () => {
     expect(report.protocolVersion).toBe("1.0");
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers"]);
-    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers"]);
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order"]);
+    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order"]);
     for (const group of report.groups) {
       expect(group.results.length).toBeGreaterThan(0);
       for (const r of group.results) {
@@ -98,7 +102,7 @@ describe("capability skipping", () => {
       const report = await runConformance({ baseUrl: server.url, token: server.token, ...FAST });
       expect(report.summary.fail).toBe(0);
       expect(report.results.filter((r) => r.capability === "search").every((r) => r.status === "pass")).toBe(true);
-      for (const capability of ["attachments", "events.sse", "transfers"]) {
+      for (const capability of ["attachments", "events.sse", "transfers", "page-order"]) {
         expect(report.results.filter((r) => r.capability === capability).every((r) => r.status === "skip"), capability).toBe(true);
       }
     } finally {
@@ -194,7 +198,7 @@ describe("conformance suite against deliberately broken servers", () => {
 
   it("catches a server that overwrites on stale writes", async () => {
     const report = await runAgainst({ overwriteOnStale: true });
-    expect(failedIds(report)).toEqual(["core.pages.delete", "core.pages.stale-if-match-conflict"]);
+    expect(failedIds(report)).toEqual(["core.pages.delete", "core.pages.stale-if-match-conflict", "page-order.move-preconditions"]);
     expect(report.results.find((r) => r.id === "core.pages.stale-if-match-conflict")!.detail).toMatch(/instead of 412 and it overwrote the page/);
     expect(report.results.find((r) => r.id === "core.pages.delete")!.detail).toMatch(/stale If-Match succeeded/);
     // Everything about the response format is still right.
@@ -217,7 +221,7 @@ describe("conformance suite against deliberately broken servers", () => {
 
   it("catches a server that mishandles idempotency keys", async () => {
     const report = await runAgainst({ badIdempotency: true });
-    expect(failedIds(report)).toEqual(["attachments.idempotent-upload", "core.idempotency.key-reuse-different-body", "core.idempotency.replay"]);
+    expect(failedIds(report)).toEqual(["attachments.idempotent-upload", "core.idempotency.key-reuse-different-body", "core.idempotency.replay", "page-order.move-idempotent"]);
     expect(report.results.find((r) => r.id === "core.idempotency.replay")!.detail).toMatch(/expected HTTP 201, got 412/);
     expect(report.results.find((r) => r.id === "core.idempotency.key-reuse-different-body")!.detail).toMatch(/expected HTTP 422/);
   });

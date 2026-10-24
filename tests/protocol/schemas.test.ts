@@ -68,7 +68,7 @@ describe("protocol schemas: JSON Schema round trip", () => {
 
 describe("capabilities", () => {
   it("accepts registered IDs and x- vendor IDs", () => {
-    for (const id of ["attachments", "search", "events.sse", "transfers", "databases", "realtime-collab", "x-acme", "x-acme.graph-view"]) {
+    for (const id of ["attachments", "search", "events.sse", "transfers", "page-order", "databases", "realtime-collab", "x-acme", "x-acme.graph-view"]) {
       expect(CapabilityIdSchema.safeParse(id).success, id).toBe(true);
     }
   });

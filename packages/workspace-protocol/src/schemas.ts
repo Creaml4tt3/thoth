@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { CapabilitiesSchema, LimitsSchema } from "./capabilities.ts";
 import { ProblemDetailsSchema, QuotaExceededProblemSchema } from "./errors.ts";
 import { MemberSchema, MeSchema, WorkspaceListSchema, WorkspaceSchema } from "./identity.ts";
-import { PageMetadataSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema, RevisionSummarySchema } from "./pages.ts";
+import { PageMetadataSchema, PageMoveSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema, RevisionSummarySchema } from "./pages.ts";
 import { TreeNodeSchema, TreePageSchema } from "./tree.ts";
 import { SearchHitSchema, SearchRequestSchema, SearchResponseSchema } from "./search.ts";
 import { AttachmentResourceSchema } from "./attachments.ts";
@@ -38,6 +38,7 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "PageMetadata", file: "page-metadata.v1", schema: PageMetadataSchema },
   { name: "PageResource", file: "page-resource.v1", schema: PageResourceSchema },
   { name: "PageWrite", file: "page-write.v1", schema: PageWriteSchema },
+  { name: "PageMove", file: "page-move.v1", schema: PageMoveSchema },
   { name: "SearchRequest", file: "search-request.v1", schema: SearchRequestSchema },
   { name: "SearchHit", file: "search-hit.v1", schema: SearchHitSchema },
   { name: "SearchResponse", file: "search-response.v1", schema: SearchResponseSchema },

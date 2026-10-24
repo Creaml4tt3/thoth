@@ -2,11 +2,16 @@ import { randomBytes } from "node:crypto";
 import {
   AttachmentResourceSchema,
   ChangeHintEventSchema,
+  ChangesResponseSchema,
   PageResourceSchema,
+  RevisionListSchema,
   SSE_EVENT_NAME,
   SearchResponseSchema,
   TransferResourceSchema,
+  TreeNodeSchema,
+  TreePageSchema,
   parseEtag,
+  type TreeNode,
 } from "@thoth/workspace-protocol";
 import { newStableId } from "@thoth/domain";
 import { createPage } from "./checks-core.ts";
@@ -336,6 +341,144 @@ export const transferChecks: Check[] = [
       const gone = await ctx.client.call("getPage", { params: { workspaceId, pageId: source.id } });
       expectProblem(gone, 404, "not_found", "GET source after finalized move");
       return "400 without verification; source deleted after verified commit";
+    },
+  },
+];
+
+// ------------------------------------------------------------ page-order
+
+/** Creates a page with `If-None-Match: *` and an optional parent and position; records it for cleanup. */
+async function createPlaced(ctx: Context, label: string, placement: { parentId?: string | null; position?: string | null }): Promise<{ id: string; etag: string }> {
+  const workspaceId = requireWorkspace(ctx);
+  const id = newStableId();
+  ctx.createdPageIds.add(id);
+  const res = await ctx.client.call("putPage", { params: { workspaceId, pageId: id }, headers: { "if-none-match": "*" }, json: { title: `${label} ${ctx.runId}`, markdown: `# ${label}\n`, ...placement } });
+  expectResponse(res, 201, `create ${label}`);
+  const etag = parseEtag(etagOf(res));
+  if (!etag) fail(`create ${label}: no ETag`);
+  return { id, etag };
+}
+
+/** Every tree node of the workspace, and the change cursor of the traversal. */
+async function wholeTree(ctx: Context): Promise<{ nodes: TreeNode[]; changeCursor: string }> {
+  const workspaceId = requireWorkspace(ctx);
+  const nodes: TreeNode[] = [];
+  let cursor: string | undefined;
+  let changeCursor: string | undefined;
+  for (let i = 0; i < 1000; i++) {
+    const res = await ctx.client.call("getWorkspaceTree", { params: { workspaceId }, query: { cursor } });
+    expectResponse(res, 200, "tree");
+    const page = parsed(TreePageSchema, res, "tree page");
+    nodes.push(...page.items);
+    changeCursor ??= page.changeCursor;
+    if (page.nextCursor === null) return { nodes, changeCursor };
+    cursor = page.nextCursor;
+  }
+  return skip("the tree did not end within 1000 pages");
+}
+
+function move(ctx: Context, pageId: string, body: unknown, etag?: string, extra: Record<string, string> = {}) {
+  return ctx.client.call("movePage", { params: { workspaceId: requireWorkspace(ctx), pageId }, json: body, headers: { ...(etag === undefined ? {} : { "if-match": `"${etag}"` }), ...extra } });
+}
+
+export const pageOrderChecks: Check[] = [
+  {
+    id: "page-order.position-round-trip",
+    title: "putPage stores a position; GET and the tree return it; an update without position keeps it",
+    capability: "page-order",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const parent = await createPlaced(ctx, "Order parent", {});
+      const child = await createPlaced(ctx, "Order child", { parentId: parent.id, position: "a0" });
+      const get = await ctx.client.call("getPage", { params: { workspaceId, pageId: child.id } });
+      expectResponse(get, 200, "get child");
+      const page = parsed(PageResourceSchema, get, "child");
+      expect(page.metadata.position === "a0", `metadata.position is ${String(page.metadata.position)}, expected "a0"`);
+      const update = await ctx.client.call("putPage", { params: { workspaceId, pageId: child.id }, headers: { "if-match": `"${child.etag}"` }, json: { title: page.metadata.title, markdown: `${page.markdown}more\n` } });
+      expectResponse(update, 200, "update without position");
+      expect(parsed(PageResourceSchema, update, "updated child").metadata.position === "a0", "an update without position cleared or changed it");
+      const { nodes } = await wholeTree(ctx);
+      const node = nodes.find((n) => n.id === child.id);
+      expect(node?.position === "a0", `tree node position is ${String(node?.position)}, expected "a0"`);
+      const top = nodes.find((n) => n.id === parent.id);
+      expect(top && (top.position === null || top.position === undefined), "a page created without a position has one in the tree");
+      return "position round-trips through putPage, getPage and the tree";
+    },
+  },
+  {
+    id: "page-order.move-metadata-only",
+    title: "movePage changes parent and position without a new revision, and the change feed reports it",
+    capability: "page-order",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const a = await createPlaced(ctx, "Move target", { position: "a0" });
+      const b = await createPlaced(ctx, "Moved page", { position: "a1" });
+      const { changeCursor } = await wholeTree(ctx);
+      const res = await move(ctx, b.id, { parentId: a.id, position: "Zz" }, b.etag);
+      expectResponse(res, 200, "move");
+      const node = parsed(TreeNodeSchema, res, "moved node");
+      expect(node.parentId === a.id && node.position === "Zz", `move answered parentId ${String(node.parentId)}, position ${String(node.position)}`);
+      expect(node.revisionId === b.etag, "the move created a new revision (revisionId changed)");
+      expect(parseEtag(etagOf(res)) === b.etag, "the move changed the ETag");
+      const revisions = await ctx.client.call("listPageRevisions", { params: { workspaceId, pageId: b.id } });
+      expectResponse(revisions, 200, "revisions");
+      const list = parsed(RevisionListSchema, revisions, "revision list");
+      expect(list.items.length === 1, `the page has ${list.items.length} revisions after a move, expected 1`);
+      const get = await ctx.client.call("getPage", { params: { workspaceId, pageId: b.id } });
+      expectResponse(get, 200, "get moved page");
+      const meta = parsed(PageResourceSchema, get, "moved page").metadata;
+      expect(meta.parentId === a.id && meta.position === "Zz", "GET does not show the new parent and position");
+      expect(parseEtag(etagOf(get)) === b.etag, "GET after a move has a different ETag");
+      const feed = await ctx.client.call("listWorkspaceChanges", { params: { workspaceId }, query: { cursor: changeCursor } });
+      expectResponse(feed, 200, "change feed");
+      const entry = parsed(ChangesResponseSchema, feed, "changes").entries.find((e) => e.pageId === b.id);
+      expect(entry?.kind === "page.updated", "the change feed has no page.updated entry for the move");
+      expect(entry.revisionId === b.etag && entry.parentId === a.id && entry.position === "Zz", "the move's change entry does not carry the current revision, the new parent and the position");
+      const clear = await move(ctx, b.id, { position: null }, b.etag);
+      expectResponse(clear, 200, "clear position");
+      const cleared = parsed(TreeNodeSchema, clear, "cleared node");
+      expect(cleared.parentId === a.id && (cleared.position === null || cleared.position === undefined), "position: null did not clear the position, or the parent changed");
+      return "metadata-only move: same revision and ETag, a feed entry with the position";
+    },
+  },
+  {
+    id: "page-order.move-preconditions",
+    title: "movePage requires If-Match (428), refuses a stale one (412), cycles and an empty body (400), unknown pages (404)",
+    capability: "page-order",
+    async run(ctx) {
+      const parent = await createPlaced(ctx, "Cycle parent", {});
+      const child = await createPlaced(ctx, "Cycle child", { parentId: parent.id });
+      expectProblem(await move(ctx, child.id, { position: "a0" }), 428, "precondition_required", "move without If-Match");
+      const stale = await move(ctx, child.id, { position: "a0" }, `${child.etag}x`);
+      expectProblem(stale, 412, "revision_conflict", "move with a stale If-Match");
+      expect((stale.body as { currentRevision?: { id?: string } }).currentRevision?.id === child.etag, "the 412 does not carry the current revision");
+      expectProblem(await move(ctx, child.id, { parentId: child.id }, child.etag), 400, "validation_failed", "move under itself");
+      expectProblem(await move(ctx, parent.id, { parentId: child.id }, parent.etag), 400, "validation_failed", "move under its own child");
+      expectProblem(await move(ctx, child.id, {}, child.etag), 400, "validation_failed", "move with an empty body");
+      expectProblem(await move(ctx, child.id, { position: "not valid!" }, child.etag), 400, "validation_failed", "move with a malformed position");
+      expectProblem(await move(ctx, newStableId(), { position: "a0" }, child.etag), 404, "not_found", "move of an unknown page");
+      return "428, 412, 400 (self, cycle, empty, malformed), 404";
+    },
+  },
+  {
+    id: "page-order.move-idempotent",
+    title: "Replaying a move with the same Idempotency-Key returns the same response and records one change",
+    capability: "page-order",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const page = await createPlaced(ctx, "Replayed move", {});
+      const { changeCursor } = await wholeTree(ctx);
+      const key = { "idempotency-key": `conformance-${ctx.runId}-move` };
+      const first = await move(ctx, page.id, { position: "b0" }, page.etag, key);
+      expectResponse(first, 200, "first move");
+      const replay = await move(ctx, page.id, { position: "b0" }, page.etag, key);
+      expectResponse(replay, 200, "replayed move");
+      expect(deepEqual(replay.body, first.body), "the replay returned a different body");
+      const feed = await ctx.client.call("listWorkspaceChanges", { params: { workspaceId }, query: { cursor: changeCursor } });
+      expectResponse(feed, 200, "change feed");
+      const entries = parsed(ChangesResponseSchema, feed, "changes").entries.filter((e) => e.pageId === page.id);
+      expect(entries.length === 1, `the replayed move recorded ${entries.length} change entries, expected 1`);
+      return "the replay returned the original response";
     },
   },
 ];
