@@ -2,13 +2,14 @@
 # https://download.thoth.creaml4tt3.me/). Runs on a `v*` tag or by hand. See docs/deploy/release.md.
 #
 #   v0.1.0/Thoth_0.1.0_universal.dmg            macOS, Apple silicon and Intel
-#   v0.1.0/Thoth_0.1.0_x64-setup.exe, ..._x64_en-US.msi   Windows
 #   v0.1.0/Thoth_0.1.0_amd64.AppImage, ..._amd64.deb      Linux
+#   (Windows later: see the matrix)
 #   v0.1.0/SHA256SUMS                          checksums of the files above
 #   latest.json                                the newest release (version, date, files, sizes, SHA-256)
 #
-# The builds are not code-signed yet (no Apple Developer ID or Windows certificate): macOS Gatekeeper and
-# Windows SmartScreen warn on first launch, and the website says how to open them.
+# The builds are not code-signed with a Developer ID yet: the macOS app is ad-hoc signed (tauri.conf.json
+# signingIdentity "-"), so it is a sealed bundle but Gatekeeper still asks the user to choose Open Anyway once;
+# the website says how.
 #
 # Actions are pinned to commit SHAs of releases at least three weeks old.
 name: Release desktop
@@ -42,11 +43,9 @@ jobs:
             targets: aarch64-apple-darwin,x86_64-apple-darwin
             args: --target universal-apple-darwin --bundles dmg
             out: target/universal-apple-darwin/release/bundle
-          - name: Windows x64
-            os: windows-latest
-            targets: x86_64-pc-windows-msvc
-            args: --bundles nsis,msi
-            out: target/release/bundle
+          # Windows is not built yet: crates/thoth-host's file layer uses POSIX *at() calls (openat, O_NOFOLLOW)
+          # to keep every path inside the Private Space, and has no Windows implementation. Add it back with:
+          #   - name: Windows x64 / os: windows-latest / targets: x86_64-pc-windows-msvc / args: --bundles nsis,msi
           - name: Linux x64
             os: ubuntu-22.04
             targets: x86_64-unknown-linux-gnu
