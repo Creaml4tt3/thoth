@@ -18,7 +18,7 @@
 .server-limits summary { cursor: pointer; font: var(--thoth-text-small); }
 
 /* Privacy and cookie settings */
-.web-legal { display: flex; gap: var(--thoth-space-3); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.web-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--thoth-space-3); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
 .web-legal a { color: inherit; }
 .web-legal .link-button { all: unset; cursor: pointer; text-decoration: underline; }
 .web-legal .link-button:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 2px; }

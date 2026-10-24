@@ -148,6 +148,7 @@ export const en = {
     signOut: "Sign out",
     privacy: "Privacy",
     cookieSettings: "Cookie settings",
+    knownAs: ", known as",
     signingOut: "Signing out…",
     signedInAs: (name: string) => `Signed in as ${name}`,
     caution: "A free demo for trying Thoth, with limits. Accounts unused for 90 days are deleted, and the demo may be reset, so keep a copy of anything important.",
