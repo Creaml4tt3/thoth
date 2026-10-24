@@ -12,8 +12,8 @@
 .tree-empty { padding: 4px 8px; }
 .tree-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 4px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; white-space: nowrap; overflow: hidden; }
 .tree-item:hover { background: var(--thoth-bg-hover); }
-.tree-item:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
-.tree-item[aria-selected="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.tree-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+.tree-item[aria-selected="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
 .tree-caret { width: 12px; color: var(--thoth-ink-faint); flex: none; }
 .side-actions { display: flex; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
@@ -29,16 +29,16 @@
 .tree-badge { margin-left: auto; flex: none; }
 .tree-note { padding: 4px 8px 4px 36px; font: var(--thoth-text-small); }
 .server-section { margin-top: 6px; }
-.sec-link { all: unset; cursor: pointer; color: var(--thoth-link); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); }
+.sec-link { all: unset; cursor: pointer; color: var(--thoth-accent); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); }
 .sec-link:hover { text-decoration: underline; }
-.sec-link:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 2px; }
+.sec-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 /* A workspace row: the folder item plus New page, shown on hover or focus (always on touch screens). */
 .tree-row { display: flex; align-items: center; gap: 2px; }
 .tree-row > .tree-item { flex: 1; min-width: 0; }
 .tree-add { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; opacity: 0; }
 .tree-row:hover .tree-add, .tree-add:focus-visible, .tree-add:disabled { opacity: 1; }
 .tree-add:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
-.tree-add:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
+.tree-add:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .tree-add:disabled { cursor: progress; }
 @media (hover: none) { .tree-add { opacity: 1; } }
 .tree-error { color: var(--thoth-danger); }
