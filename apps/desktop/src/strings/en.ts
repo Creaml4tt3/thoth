@@ -36,6 +36,13 @@ export const en = {
     pagesInSpace: "Pages in this Private Space",
     noPages: "No pages yet.",
     newPage: "New page",
+    newFolder: "New folder",
+    /** The name a new folder starts with; a number follows when it is taken ("Untitled folder 2"). */
+    untitledFolder: "Untitled folder",
+    folderCreated: (name: string) => `Created the folder ${name}`,
+    /** Said after a rename when the page changed meanwhile, so the title inside it was left alone. */
+    titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
+    unsavedChanges: "The open page has changes that could not be saved yet.",
     settings: "Settings",
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
     nothingOpen: "Nothing open",

@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { basename, dirname } from "@thoth/domain";
+import { basename, dirname, stripExtension } from "@thoth/domain";
 import type { OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
 import { Disclosure, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
+import { clearNewFolder, usePendingNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
+import { RenameInput, RenameRejected } from "@thoth/app-ui/order/RenameInput.tsx";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "@thoth/app-ui/order/reorder-request.ts";
 import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
-import { focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
+import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
+import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 
 export interface Selection {
@@ -25,6 +28,8 @@ export interface Selection {
 /** The drop target for the top level, shown as a strip under the tree while something is dragged. */
 const TOP = "\u0000top";
 const END = 1_000_000;
+/** The longest name the rename field takes, in characters (`entryNameProblem` also limits it in bytes). */
+const NAME_MAX = 200;
 const isPrivate = (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "private" }> => request.kind === "private";
 const isPrivateReorder = (request: ReorderRequest): request is Extract<ReorderRequest, { kind: "private" }> => request.kind === "private";
 
@@ -43,11 +48,15 @@ interface Props {
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
 export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder }: Props) {
-  const { vault, openPage, flushAll, refresh } = useSession();
+  const { vault, openPage, flushAll, refresh, tabs } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
-  const [menu, setMenu] = useState<{ path: string; at: { x: number; y: number } } | null>(null);
+  /** `path` is null for the menu of the empty area (the top level). */
+  const [menu, setMenu] = useState<{ path: string | null; at: { x: number; y: number } } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  /** Where the entry being renamed is after a successful rename: focus goes there. */
+  const renamedTo = useRef<string | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [said, setSaid] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +124,84 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   };
   const arrange = (from: string, folder: string, index: number) => enqueue(() => arrangeNow(from, folder, index));
 
+  const stemOf = (node: TreeNode) => (node.kind === "folder" ? node.name : stripExtension(basename(node.path)));
+
+  /**
+   * Gives focus to a row once it is on screen (a renamed row has a new id, and the tree catches up a moment later).
+   * `field` is the rename field that is going away: focus moves only while it is still in that field (or nowhere), so
+   * a click or key press that went elsewhere in the meantime is left alone.
+   */
+  const restoreFocus = (id: string, field: Element | null) => {
+    let tries = 0;
+    const attempt = () => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== field) return;
+      if (!focusTreeItem(id) && ++tries < 40) setTimeout(attempt, 30);
+    };
+    setTimeout(attempt, 0);
+  };
+
+  /**
+   * Renames a page (its file name) or a folder, from the inline field. The field stays open with the reason when the
+   * name is refused. Unsaved edits are written first, the open tabs follow, and the order entry keeps its place.
+   */
+  const commitRename = async (node: TreeNode, next: string): Promise<void> => {
+    setError(null);
+    if (!(await flushAll())) throw new RenameRejected(t.unsavedChanges);
+    let renamed;
+    try {
+      renamed = await enqueue(() => renamePrivate(vault, node.path, next, { retitle: true }));
+    } catch (failure) {
+      if (failure instanceof RenameError) throw new RenameRejected(renameProblemText(failure.problem, tt));
+      throw new RenameRejected(tt.renameFailed(failure instanceof Error ? failure.message : String(failure)));
+    }
+    onOrder(renamed.order);
+    if (renamed.kind === "folder") remapFolders(renamed.from, renamed.to);
+    tabs.remapPaths(renamed.from, renamed.to);
+    renamedTo.current = renamed.to;
+    await refresh();
+    setSaid(tt.renamed(next));
+    if (renamed.titleSkipped) setError(t.titleNotUpdated(next));
+  };
+  const endRename = (node: TreeNode) => {
+    const active = document.activeElement;
+    const field = active instanceof HTMLInputElement && active.classList.contains("tree-rename") ? active : null;
+    setRenaming(null);
+    restoreFocus(renamedTo.current ?? node.path, field);
+    renamedTo.current = null;
+  };
+
+  /** Creates an empty folder in `parent` ("" is the top level), shows it and puts it into rename. */
+  const newFolder = (parent: string) =>
+    enqueue(async () => {
+      setError(null);
+      try {
+        const path = await vault.createUniqueFolder(parent, t.untitledFolder);
+        if (parent !== "") setFolder(parent, true);
+        setRenaming(path);
+        setSaid(t.folderCreated(basename(path)));
+        await refresh();
+      } catch (failure) {
+        setError(tt.newFolderFailed(failure instanceof Error ? failure.message : String(failure)));
+      }
+    });
+
+  /** The folder a "New folder" without a place goes into: the one the tree has focus in, else the top level. */
+  const contextFolder = (): string => {
+    const id = document.activeElement?.closest<HTMLElement>("[data-tree-id]")?.dataset["treeId"];
+    const node = id !== undefined ? find(id) : undefined;
+    return node ? (node.kind === "folder" ? node.path : dirname(node.path)) : "";
+  };
+
+  // "New folder" asked for from code (the shortcut, the command palette, the sidebar button).
+  const folderRequest = usePendingNewFolder();
+  useEffect(() => {
+    if (!folderRequest) return;
+    clearNewFolder();
+    void newFolder(folderRequest.parent ?? contextFolder());
+    // `newFolder` reads the current tree; the request is what triggers this.
+  }, [folderRequest]);
+
   const reorder = (node: TreeNode, delta: -1 | 1) =>
     void enqueue(async () => {
       const folder = dirname(node.path);
@@ -172,6 +259,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     const list = childrenAt(tree, dirname(node.path));
     const i = list.findIndex((n) => n.path === node.path);
     return [
+      { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(node.path) },
+      ...(node.kind === "folder" ? [{ id: "new-folder", label: tt.newFolderInside, onSelect: () => void newFolder(node.path) }] : []),
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
@@ -194,6 +283,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         expanded: open.has(node.path),
         expand: () => setFolder(node.path, true),
         collapse: () => setFolder(node.path, false),
+        ...(selection.active ? {} : { rename: () => setRenaming(node.path) }),
         reorder: (delta) => reorder(node, delta),
         menu: () => {
           const r = event.currentTarget.getBoundingClientRect();
@@ -204,6 +294,38 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       event.preventDefault();
       setMenu({ path: node.path, at: { x: event.clientX, y: event.clientY } });
     };
+
+    if (renaming === node.path && !selection.active) {
+      const field = (
+        <RenameInput value={stemOf(node)} label={tt.renameLabel(stemOf(node))} maxLength={NAME_MAX} emptyMessage={tt.renameDialog.empty} onCommit={(next) => commitRename(node, next)} onDone={() => endRename(node)} />
+      );
+      if (node.kind === "page") {
+        return (
+          <li role="none" key={`page:${node.path}`}>
+            <div role="treeitem" aria-selected={node.path === current} className="tree-item tree-renaming" data-kind="page" style={indent} {...common}>
+              <Disclosure open={false} hidden />
+              <PageIcon />
+              {field}
+            </div>
+          </li>
+        );
+      }
+      const open_ = open.has(node.path);
+      return (
+        <li role="none" key={`folder:${node.path}`}>
+          <div role="treeitem" aria-expanded={open_} className="tree-item tree-folder tree-renaming" data-kind="folder" style={indent} {...common}>
+            <Disclosure open={open_} />
+            <FolderIcon open={open_} />
+            {field}
+          </div>
+          {open_ && (
+            <ul role="group">
+              {node.children.map((child, i) => row(child, depth + 1, i + 1, node.children.length))}
+            </ul>
+          )}
+        </li>
+      );
+    }
 
     if (node.kind === "page") {
       const checked = selection.paths.has(node.path);
@@ -288,17 +410,30 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
 
   const { draggable: _draggable, onDragStart: _onDragStart, ...topDrop } = dnd.rowProps(TOP);
   const movingNode = moving ? find(moving) : undefined;
+  const menuNode = menu?.path != null ? find(menu.path) : undefined;
 
   return (
-    <>
-      <TreeList label={t.pagesInSpace} multiselectable={selection.active}>
-        {tree.map((node, i) => row(node, 0, i + 1, tree.length))}
-        {dnd.dragging !== null && dirname(dnd.dragging) !== "" && (
-          <li role="none" className="tree-root-drop" {...topDrop}>
-            {tt.moveDialog.topLevel}
-          </li>
-        )}
-      </TreeList>
+    <div
+      className="private-tree"
+      onContextMenu={(event) => {
+        // A row has already opened its own menu; this is the empty area around the rows.
+        if (event.defaultPrevented) return;
+        event.preventDefault();
+        setMenu({ path: null, at: { x: event.clientX, y: event.clientY } });
+      }}
+    >
+      {tree.length === 0 ? (
+        <p className="muted tree-empty">{t.noPages}</p>
+      ) : (
+        <TreeList label={t.pagesInSpace} multiselectable={selection.active}>
+          {tree.map((node, i) => row(node, 0, i + 1, tree.length))}
+          {dnd.dragging !== null && dirname(dnd.dragging) !== "" && (
+            <li role="none" className="tree-root-drop" {...topDrop}>
+              {tt.moveDialog.topLevel}
+            </li>
+          )}
+        </TreeList>
+      )}
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tree-said>
         {said}
       </div>
@@ -307,14 +442,17 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           {error}
         </p>
       )}
-      {menu && find(menu.path) && (
+      {menu && menu.path === null && (
+        <ContextMenu label={t.pagesInSpace} at={menu.at} items={[{ id: "new-folder", label: t.newFolder, onSelect: () => void newFolder("") }]} onClose={() => setMenu(null)} />
+      )}
+      {menu && menuNode && (
         <ContextMenu
-          label={tt.menuLabel(label(menu.path))}
+          label={tt.menuLabel(label(menuNode.path))}
           at={menu.at}
-          items={menuItems(find(menu.path)!)}
+          items={menuItems(menuNode)}
           onClose={(restoreFocus) => {
             setMenu(null);
-            if (restoreFocus) focusTreeItemSoon(menu.path);
+            if (restoreFocus) focusTreeItemSoon(menuNode.path);
           }}
         />
       )}
@@ -327,6 +465,6 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           onClose={() => setMoving(null)}
         />
       )}
-    </>
+    </div>
   );
 }

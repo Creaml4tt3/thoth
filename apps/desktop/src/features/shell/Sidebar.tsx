@@ -19,6 +19,8 @@ interface Props {
   currentRemote?: WorkspacePageRef | null;
   onSearch(): void;
   onNewPage(): void;
+  /** Creates a folder in the Private Space (inside the folder the tree has focus in, else at the top level). */
+  onNewFolder(): void;
   /** Opens the copy/move dialog for the selected pages. */
   onTransfer(target: TransferTarget): void;
 }
@@ -58,7 +60,7 @@ function PendingTransfers() {
 }
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
-export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onTransfer }: Props) {
+export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer }: Props) {
   const { connection, reveal, openSettings, vault } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useDesktopStrings().transfer;
@@ -179,17 +181,16 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         </div>
       )}
       <nav aria-label={t.pages} className="tree-wrap">
-        {tree.length === 0 ? (
-          <p className="muted tree-empty">{t.noPages}</p>
-        ) : (
-          <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
-        )}
+        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
         <ServersSidebar current={currentRemote} />
       </nav>
       <PendingTransfers />
       <div className="side-actions">
         <Button variant="ghost" small onClick={onNewPage}>
           {t.newPage}
+        </Button>
+        <Button variant="ghost" small onClick={onNewFolder}>
+          {t.newFolder}
         </Button>
         <Button variant="quiet" small onClick={() => openSettings()}>
           {t.settings}

@@ -199,7 +199,7 @@ describe("commands", () => {
     // The link in Alpha follows the file.
     await waitFor(async () => expect(await app.read("Alpha.md")).toContain("[[Delta]]"));
     await waitFor(() => expect(tabNames()).toEqual(["Delta"]));
-    expect(await rows()).toContain("Delta");
+    await waitFor(async () => expect(await rows()).toContain("Delta"));
     expect(await rows()).not.toContain("Beta");
     // No order file just because of a rename.
     await expect(app.read(".thoth/order.json")).rejects.toThrow();

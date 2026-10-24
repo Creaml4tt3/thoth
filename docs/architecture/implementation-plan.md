@@ -734,7 +734,13 @@ Status (2026-10-25): AC 1–9 implemented on `main`; `pnpm check` (1618 tests), 
 (incl. `tests/e2e/keyboard.e2e.ts` for AC 6) pass. Not yet checked by a person in a real window: the look of the
 accent, folders and drag feel, Thai strings on screen, and the macOS menu change for Cmd+W. Known gaps and additions:
 
-- Private Space: no inline F2 rename (rename is a file move from the palette) and no "New folder" command.
+- Private Space (added after the first pass, owner-approved): F2 and a "Rename" menu item rename a page or folder in
+  place. The field edits the file name without `.md` and commits `Vault.move` (links follow, the order entry keeps its
+  place, open tabs follow). A frontmatter `title:` or first `# ` heading that was exactly the old name is rewritten with
+  a compare-and-swap write; any other text is untouched. The palette's "Rename page" is the same move but leaves the
+  page text alone. "New folder" (row menu, empty-area menu, sidebar button, `> New folder`, Cmd/Ctrl+Shift+N) creates an
+  empty `Untitled folder` (`… 2`, `… 3`) inside the folder the tree has focus in, else at the top level, and starts the
+  rename.
 - A server without `page-order` cannot reorder; a move under a new parent is a content write (a revision).
 - Folder pages are found by reading each child page once per revision; a `kind` in the tree response would avoid
   this but is a protocol change (owner decision).

@@ -20,6 +20,7 @@ import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
+import { requestNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -117,6 +118,8 @@ export function Shell() {
   const attempt = (job: () => Promise<void>) => void job().catch((error: unknown) => setProblem(error instanceof Error ? error.message : String(error)));
   const makeActions = (): CommandActions => ({
     newPage: () => setDialog({ kind: "new" }),
+    // The Private Space, like New page; with a workspace page open, "New folder in <workspace>" is offered as well.
+    newFolder: { run: () => requestNewFolder() },
     ...(here && canWriteHere && hereWorkspace
       ? {
           newWorkspacePage: {
@@ -128,7 +131,7 @@ export function Shell() {
                 openWorkspacePage({ server: here.server, workspace: here.workspace, page: page.id });
               }),
           },
-          newFolder: {
+          newWorkspaceFolder: {
             workspace: hereWorkspace.name,
             run: () =>
               attempt(async () => {
@@ -170,6 +173,7 @@ export function Shell() {
     "theme.cycle": cycle,
     "settings.open": () => openSettings(),
     "page.new": () => setDialog({ kind: "new" }),
+    "folder.new": () => requestNewFolder(),
     "tab.new": () => tabs.newTab(),
     "tab.close": () => tabs.close(),
     "tab.next": () => tabs.step(1),
@@ -213,7 +217,7 @@ export function Shell() {
 
   return (
     <div className="shell">
-      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onTransfer={transfer} />
+      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} />
       <main className="main">
         <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} newShortcut={shortcutText("tab.new", "desktop", platform)} />
         {watchError && (

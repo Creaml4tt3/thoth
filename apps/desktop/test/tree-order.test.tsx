@@ -592,7 +592,8 @@ describe("Private Space tree", () => {
     await app.user.keyboard("{ArrowDown}{ArrowDown}");
     fireEvent.contextMenu(document.activeElement!);
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…"]);
+    // The row is the "Empty" folder: Rename and New folder inside come first.
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…"]);
     await app.user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
   });
