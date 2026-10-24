@@ -27,7 +27,7 @@ Toolchain verified on the dev machine:
 | Import pipeline (P1) | **Done: domain layer** | `importer-core`, `importer-obsidian`, `importer-notion`, with all four adapters from §7.4 |
 | Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; auth decided (OIDC, ADR-0013); server 2a done (Podman + PostgreSQL) | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
-| Transfer engine (P3) | Not started | ADR-0006 is Proposed. The state enum and `operation_journal` table are reserved. |
+| Transfer engine (P3) | **Done (2026-10-24)** | `packages/transfer` (ADR-0006, Accepted for its decisions; see the ADR's resolved questions), desktop copy/move UI, fault injection at every state boundary, e2e on the real server. Attachments go Private → Workspace only (see Phase 3). |
 | Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
 | Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
 
@@ -577,6 +577,131 @@ AC:
 - `destination_committed_source_cleanup_pending` is reported correctly.
 - The server's export restriction is enforced.
 
+Result (2026-10-24) ✅
+
+What was built:
+- **`packages/transfer`** (`TransferEngine`). One loop drives each operation through the ADR-0006 states.
+  Each step records its state in `.thoth/operations/<uuidv7>.json`. The record holds per-item states,
+  source hash and revision, destination ID, hash and revision, the link summary and errors, and never
+  page content or credentials. Every step can run again from the last record without repeating an
+  effect:
+  - the operation ID is the server's idempotency key;
+  - each attachment upload has a key derived from server, workspace, path and hash;
+  - local writes are recognized by their recorded hash.
+- **Recovery** (`recover()`, run by the desktop once the server list is known):
+  - Before the commit, the operation is rolled back: the server transfer is aborted, and our own
+    unedited local files are removed. A 409 on abort means the server did commit, and the operation
+    continues forward instead.
+  - After the commit, the operation is finished.
+  - Projections are rebuilt from the records. Completed records older than 30 days are removed.
+- **Private → Workspace:**
+  - preview: read-only, covering members and roles, the link classification, problems (capability,
+    role, size, quota, unreadable frontmatter) and warnings;
+  - adopt `thoth_id` (ADR-0003), then upload attachments and check the hash the server echoes;
+  - rewrite links through the ID mapping, record the hash of every payload, then createTransfer and
+    verify the echo;
+  - commit, then read every created revision back and compare hashes;
+  - for a move, `Vault.deleteFileAtomic` deletes a source only if it still has the hash that was
+    sent. An edited one is kept, and the item and the operation are
+    `destination_committed_source_cleanup_pending`.
+- **Workspace → Private:**
+  - createTransfer from_workspace, which pins the revisions; then download exactly those and check
+    their hashes;
+  - destination paths are recorded before anything is written. A moved page goes back to its old
+    path when that path is free; otherwise it goes to `<folder>/<title>.md`;
+  - files are written with no-replace CAS. A taken name gets ` 2`, ` 3`. The same page already
+    present with other bytes gets a conflict copy with a new ID (ADR-0005);
+  - re-read and verify every file, record the mapping, then commit with `verified` entries. For a
+    move, the server deletes the sources. One edited at the server stays there, and the operation is
+    cleanup pending.
+- **Links:**
+  - In a workspace, links travel as `thoth:page/<id>` and `thoth:attachment/<id>`. Bare wikilinks get
+    their original text as a label, so `[[Notes]]` still reads "Notes".
+  - When a page comes back, its links become vault paths again: the shortest path suffix that the
+    vault's own `LinkResolver` maps to exactly that file. The label is dropped when it resolves to
+    the same file.
+  - Every reference is classified before any rewrite: included, already at destination, left at
+    source, external, or unresolved. Unresolved and left-at-source links keep their target and are
+    flagged. Nothing is retargeted by title.
+- **`.thoth/sync/<hash>.json`**: one durable mapping record per workspace, local ID → remote ID with
+  paths, hashes and revisions. It is projected into `external_locations` and `sync_state`.
+- **`packages/local-store`:**
+  - `writeRecord`/`readRecord`, written through Thoth's temp file and a rename;
+  - `deleteFileAtomic`, a CAS delete. The file is renamed to its temp path under a new `delete-file`
+    journal entry and hashed there. A mismatch puts it back. A crash is undone on open: the file is
+    restored, and never over a newer one;
+  - the operation and sync projections.
+- **`packages/workspace-client`**: `createTransfer`, `getTransfer`, `commitTransfer`, `abortTransfer`
+  and `uploadAttachment`.
+- **Desktop UI:**
+  - "Select pages" in the Private Space tree (checkboxes, with Space to toggle), then
+    "Copy to workspace…" or "Move to workspace…";
+  - on a workspace page, "Copy to Private Space…" or "Move to Private Space…";
+  - one dialog in three phases:
+    - choose: the workspace and parent, or a vault folder; copy or move; attachments;
+    - preview: who can see the pages, the link summary with the flagged links, problems and warnings,
+      and "Nothing has left this computer yet.";
+    - run: progress through the states, then the result. A cleanup-pending result is titled
+      "Done, originals kept" and says the move is not finished. Interrupted runs offer Try again and,
+      before the commit, Stop and undo;
+  - a sidebar list of moves with originals kept, until dismissed;
+  - a one-time notice of what startup recovery did.
+
+  Strings are in English and Thai; the unsure Thai is marked `REVIEW` in `apps/desktop/src/strings/th.ts`.
+  The dialog is the shared accessible `Modal`, with labelled controls, `role=status`/`alert` results
+  and focus moved to the result.
+
+AC evidence:
+- **Copy, move, move back**, with verified hashes, attachments and link mapping:
+  - `apps/server/test-db/transfer-engine.test.ts` › "copy, then move, then move back" (real server on
+    PostgreSQL; the attachment's bytes are checked through `GET .../attachments`);
+  - `packages/transfer/test/engine.test.ts` (copy, move, move back, a later transfer linking to pages
+    already at the destination);
+  - `tests/e2e/transfer.e2e.ts` (UI → Rust host → server: copy, move, move back from the workspace
+    page).
+- **Fault injection at every state boundary:**
+  - `packages/transfer/test/faults.test.ts`:
+    - a dry run records every checkpoint (after each durable write, and before and after each server
+      call, local write and delete). Then a crash is injected at each one, for both directions and
+      both modes (96 crash points);
+    - each crash is followed by a restart, `recover()` and a retry, asserting that the source
+      survives, there is exactly one copy at the destination, one committed server transfer, the
+      hashes verify, and no temp files remain;
+    - also lost responses (`/attachments`, `/transfers`, `/commit` applied but unanswered), a network
+      down across a restart, and a rollback that never deletes a file the user edited.
+  - The same crash loop runs for both move directions on PostgreSQL
+    (`transfer-engine.test.ts` › "fault injection on the reference server").
+  - `packages/local-store/test/records.test.ts` covers the CAS delete: a race, a crash after the
+    move-away, and recovery beside a newer file.
+- **`destination_committed_source_cleanup_pending`**:
+  - engine tests: an edited source is kept; a page edited at the server after pinning stays there;
+  - `transfer-engine.test.ts` › "an edited source is not deleted … both directions" (the server
+    records the same state);
+  - `apps/desktop/test/transfer.test.tsx` › "an edited original is listed in the sidebar as kept
+    until dismissed".
+- **Export restriction:**
+  - `transfer-engine.test.ts` › "an export-restricted workspace refuses…": the preview refuses, the
+    engine refuses, and the server refuses a restriction switched on after the client checked. Nothing
+    is written, and `export.refused` is audited;
+  - the UI explains it: `transfer.test.tsx` › "an export-restricted workspace refuses, and the dialog
+    explains why".
+
+Checks: `pnpm check` 1253/1253, `pnpm test:server` 217/217, `pnpm e2e` 25 passed and 1 skipped (the
+site's Windows download, which has no Windows file in this release; `transfer.e2e.ts` included).
+`cargo test` was not needed: no Rust was changed.
+
+Deviations and follow-ups (no locked decision changes; see §4 items 8–11):
+- Attachments travel only Private → Workspace. Workspace → Private brings pages, and links to
+  workspace-only attachments stay `thoth:attachment/<id>`; the preview warns about them. Downloading
+  attachments needs a byte-returning host call (`api.call` returns UTF-8 text), so this is left for
+  later.
+- Copying a page from the workspace into a vault that already holds a copy of it makes another
+  numbered copy. Merging is not attempted (ADR-0005: keep both).
+- Selections are limited to what one request carries: the host's 32 MiB, and the server's
+  `MAX_TRANSFER_BYTES` and 5000 pages. Larger selections are refused in the preview.
+- Pages without `thoth_id` are adopted before a transfer (ADR-0003). Pages that cannot be adopted
+  (not UTF-8, unreadable frontmatter) are refused with a reason.
+
 ### Phase 4 — Agent Hub
 
 - `packages/agent-core` plus the Claude Code CLI adapter first, then Codex.
@@ -624,6 +749,26 @@ All twelve steps of spec §14 as one automated scenario.
    `docs/architecture/import-formats.md` (VERIFIED/INFERRED). Fixtures follow
    the best-supported reading. The importer should be re-validated against a
    real current export before release.
+8. **Links in workspace Markdown name IDs** (Phase 3). Workspaces have no
+   paths, so a transferred link to an included or already-mapped page or
+   attachment becomes `thoth:page/<uuidv7>` or `thoth:attachment/<uuidv7>`, and
+   it becomes a vault path again when it comes back. Workspace pages are
+   still opaque Markdown to the protocol (§7 of the protocol README), so this
+   is a client convention, not a protocol change. The workspace editor does
+   not yet open these links; that is a follow-up.
+9. **A move keeps the page ID unless the workspace has had it** (ADR-0006
+   §4, "when the destination supports it"). A server never reuses a page ID,
+   including a deleted page's. So a page moved out, back, and out again gets
+   a fresh workspace ID the second time, and `.thoth/sync/` maps it.
+10. **Adoption before transfer edits the source.** Adding `thoth_id`
+    (ADR-0003 §2) is the only change a copy makes to its original, and it is
+    a pure frontmatter append.
+11. **CAS delete through a journaled rename.** ADR-0001 has no delete
+    primitive. `Vault.deleteFileAtomic` adds a `delete-file` journal kind
+    whose recovery restores the file rather than discarding anything, so a
+    forged entry can only put bytes back. The narrow window of review item 13
+    (an edit between the hash check and the rename) is closed for deletes:
+    the hash is taken after the rename.
 
 ## 5. Independent review (2026-10-21) — status
 

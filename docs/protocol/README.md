@@ -494,6 +494,12 @@ Visible to principals with access to the transfer's workspace; otherwise 404.
 - A retry after any crash, with the same `operationId`, never duplicates content.
 - Servers record operation state without logging page content or secrets (spec section 9.4).
 
+The Thoth desktop client (`packages/transfer`) writes links between transferred pages and attachments as
+`thoth:page/<pageId>` and `thoth:attachment/<attachmentId>` inside the Markdown, and turns them back into vault
+paths when pages come back. This is a client convention. Page Markdown stays opaque to the protocol, and
+servers need not understand it (implementation plan §4 item 8). Clients send attachment uploads in a transfer
+with an `Idempotency-Key`, so a retry after a lost response does not store a second attachment.
+
 ## 12. Conformance
 
 `protocol/conformance/` is a framework-independent runner:
