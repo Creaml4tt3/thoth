@@ -85,7 +85,8 @@ export function tempDirs() {
       return path;
     },
     async cleanup(): Promise<void> {
-      await Promise.all(made.splice(0).map((p) => rm(p, { recursive: true, force: true })));
+      // A just-unmounted app may still finish a write into the vault; retry instead of failing with ENOTEMPTY.
+      await Promise.all(made.splice(0).map((p) => rm(p, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })));
     },
   };
 }
