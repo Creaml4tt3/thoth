@@ -25,6 +25,7 @@ trade-off.
 | [0013](0013-authentication-hosted-trial-and-website.md) | Authentication (OIDC), a hosted trial server, and the project website | Accepted 2026-10-22 (limits and hosting in ADR-0014) |
 | [0014](0014-hosted-trial-deployment-and-sign-in-broker.md) | Hosted trial deployment (Vercel + Neon) and the sign-in broker | Accepted 2026-10-22 |
 | [0015](0015-website-web-client-and-analytics.md) | Website, trial-only web client, and analytics (GA4) | Accepted 2026-10-24 |
+| [0016](0016-editor-ux-text-styles-order-tabs-and-themes.md) | Text styles, page order, folders, tabs and themes | Accepted 2026-10-24 |
 
 Template: [0000-template.md](0000-template.md).
 

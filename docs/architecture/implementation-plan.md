@@ -577,6 +577,34 @@ AC:
 - `destination_committed_source_cleanup_pending` is reported correctly.
 - The server's export restriction is enforced.
 
+### Phase 3b — Editor and navigation UX (ADR-0016)
+
+Requested by the owner on 2026-10-24 while testing the web version. Starts after Phase 3. Applies to the desktop
+app and the web client (shared `packages/app-ui`) unless noted.
+
+AC:
+
+1. **Rename and folders in the web version.** A workspace page can be renamed from the tree (F2 and the context
+   menu) and from its title. "New folder" creates a folder page (`thoth_kind: folder`).
+2. **More accent colour** is used where it helps orientation: the selected item, the active tab, primary
+   buttons, focus rings, links, the highlight and the drop indicator. Contrast is at least WCAG AA in both themes.
+3. **Text styles in Blocks mode:** a selection toolbar with bold, italic, underline, strikethrough, code, link,
+   text colour (eight named colours) and highlight. Storage follows ADR-0016 rule 1, and untouched text
+   round-trips byte for byte.
+4. **Highlight** is in the toolbar and on Cmd/Ctrl+Shift+H, in the accent colour only.
+5. **Themes:** Light, Dark and System, in Settings and in the command palette, remembered on both clients.
+6. **Keyboard only:** a command palette (Cmd/Ctrl+K with `>` commands) and a shortcuts list (Cmd/Ctrl+/). Every
+   feature is reachable without a mouse. A Playwright test drives create, rename, move, format, switch tab, change
+   theme and open settings with the keyboard only.
+7. **Tabs:** browser-like tabs above the editor (ADR-0016 rule 5). Settings is a tab, and tabs are restored on
+   restart.
+8. **Folders look like folders:** a folder icon with open and closed states, a disclosure arrow, an item count on
+   hover, and distinct styling from pages.
+9. **Drag and drop** reorders pages and moves them into folders in the tree, in both the Private Space and
+   workspaces. The order is stored as ADR-0016 rule 4 says. Keyboard alternatives are Alt+Shift+↑/↓ to reorder and
+   "Move to…" in the palette.
+   - Server: an optional `position` on pages, through a migration, the schema, OpenAPI and conformance.
+
 ### Phase 4 — Agent Hub
 
 - `packages/agent-core` plus the Claude Code CLI adapter first, then Codex.
