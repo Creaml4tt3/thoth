@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { PageSummary } from "@thoth/domain";
+import { emptyOrder, readOrder, type OrderRecord } from "@thoth/local-store";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
-import { ancestorFolders, buildTree, type TreeNode } from "./tree.ts";
+import { ancestorFolders, buildTree } from "./tree.ts";
+import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { ServersSidebar } from "../servers/ServersSidebar.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
@@ -19,57 +21,6 @@ interface Props {
   onNewPage(): void;
   /** Opens the copy/move dialog for the selected pages. */
   onTransfer(target: TransferTarget): void;
-}
-
-interface Selection {
-  active: boolean;
-  paths: ReadonlySet<string>;
-  toggle(path: string): void;
-}
-
-function Node({ node, depth, open, toggle, current, selection }: { node: TreeNode; depth: number; open: Set<string>; toggle(path: string): void; current: string | null; selection: Selection }) {
-  const { openPage } = useSession();
-  const t = useDesktopStrings().transfer;
-  const indent = { paddingLeft: 8 + depth * 14 };
-  if (node.kind === "page") {
-    const checked = selection.paths.has(node.path);
-    if (selection.active) {
-      // While selecting, the row is a checkbox: Space toggles it, the tree keeps its keyboard order.
-      return (
-        <li role="none">
-          <label className="tree-item" style={indent} title={node.path}>
-            <input type="checkbox" className="tree-select" checked={checked} onChange={() => selection.toggle(node.path)} aria-label={t.selectPage(node.title)} />
-            <span className="tree-label">{node.title}</span>
-          </label>
-        </li>
-      );
-    }
-    return (
-      <li role="none">
-        <button type="button" role="treeitem" aria-selected={node.path === current} aria-current={node.path === current ? "page" : undefined} className="tree-item" style={indent} onClick={() => openPage(node.path)} title={node.path}>
-          <span className="tree-label">{node.title}</span>
-        </button>
-      </li>
-    );
-  }
-  const expanded = open.has(node.path);
-  return (
-    <li role="none">
-      <button type="button" role="treeitem" aria-expanded={expanded} className="tree-item tree-folder" style={indent} onClick={() => toggle(node.path)}>
-        <span className="tree-caret" aria-hidden="true">
-          {expanded ? "⌄" : "›"}
-        </span>
-        <span className="tree-label">{node.name}</span>
-      </button>
-      {expanded && (
-        <ul role="group">
-          {node.children.map((child) => (
-            <Node key={`${child.kind}:${child.path}`} node={child} depth={depth + 1} open={open} toggle={toggle} current={current} selection={selection} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -108,10 +59,24 @@ function PendingTransfers() {
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onTransfer }: Props) {
-  const { connection, reveal, openSettings } = useSession();
+  const { connection, reveal, openSettings, vault } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useDesktopStrings().transfer;
-  const tree = useMemo(() => buildTree(pages), [pages]);
+  // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
+  const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void Promise.all([readOrder(vault), vault.listFolders().catch(() => [] as string[])]).then(([record, folders]) => {
+      if (!live) return;
+      setOrder(record);
+      setEmptyFolders(folders);
+    });
+    return () => {
+      live = false;
+    };
+  }, [vault, pages]);
+  const tree = useMemo(() => buildTree(pages, { folders: emptyFolders, order }), [pages, emptyFolders, order]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
@@ -138,12 +103,24 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
     });
   }, [pages]);
 
-  const toggle = (path: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(path)) next.add(path);
-      return next;
-    });
+  /** Opens (true), closes (false) or flips a folder. */
+  const setFolder = useCallback(
+    (path: string, force?: boolean) =>
+      setOpen((prev) => {
+        const next = new Set(prev);
+        if (force === true || (force === undefined && !next.has(path))) next.add(path);
+        else next.delete(path);
+        return next.size === prev.size && [...next].every((p) => prev.has(p)) ? prev : next;
+      }),
+    [],
+  );
+  /** A folder moved: it and the folders in it stay open under their new paths. */
+  const remapFolders = useCallback(
+    (from: string, to: string) =>
+      setOpen((prev) => new Set([...prev].map((p) => (p === from || p.startsWith(`${from}/`) ? to + p.slice(from.length) : p))),
+      ),
+    [],
+  );
   const selection: Selection = {
     active: selecting,
     paths: picked,
@@ -205,11 +182,7 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         {tree.length === 0 ? (
           <p className="muted tree-empty">{t.noPages}</p>
         ) : (
-          <ul role="tree" aria-label={t.pagesInSpace} aria-multiselectable={selecting || undefined}>
-            {tree.map((node) => (
-              <Node key={`${node.kind}:${node.path}`} node={node} depth={0} open={open} toggle={toggle} current={current} selection={selection} />
-            ))}
-          </ul>
+          <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
         )}
         <ServersSidebar current={currentRemote} />
       </nav>
