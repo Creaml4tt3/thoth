@@ -29,7 +29,7 @@ release. Released files are never replaced: a fix is a new version.
    Linux and uploads them. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
    without a tag; untick "Upload to R2" to build only.
 3. Copy the published `latest.json` into the website's download manifest
-   (`apps/site/src/content/downloads.ts`) and deploy the website (docs/deploy/trial.md §6).
+   (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website.
 
 ## Windows (not yet)
 

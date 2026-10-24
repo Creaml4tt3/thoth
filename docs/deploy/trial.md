@@ -11,9 +11,10 @@ Domains used below (change them when you buy your own domain):
 | Website (`apps/site`, with `apps/web` at `/app/`) | `https://thoth.creaml4tt3.me` |
 | API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
 
-> Status (2026-10-24): steps 1, 2, 3 and 6 are done and live. The Neon
-> project is `thoth`, and the Vercel projects are `thoth-api` and
-> `thoth-site`. Left for the owner: the sign-in providers (steps 4 and 5).
+> Status (2026-10-24): every step is done and live. The Neon project is
+> `thoth`; the Vercel projects `thoth-api` and `thoth-site` are connected to
+> the GitHub repository `Creaml4tt3/thoth` and deploy on every push to
+> `main`.
 
 ## 1. Database: Neon (free plan)
 
@@ -52,17 +53,18 @@ names do not work for sign-in cookies.
 
 ## 3. API project on Vercel
 
-1. Create a Vercel project (no framework, no Git connection needed). The API
-   is deployed **prebuilt**: `apps/server/scripts/build-vercel.ts` bundles
-   `src/vercel.ts` into `apps/server/.vercel/output` (Build Output API v3:
-   one Node 24 function in region `sin1`, every path routed to it, and the
-   daily cron below). From `apps/server`:
+1. Create a Vercel project connected to the repository, with root directory
+   `apps/server`, no framework, Node 24, and "Include files outside the root
+   directory" on. Settings:
+   - Install: `cd ../.. && corepack enable && pnpm install --frozen-lockfile --filter @thoth/server...`
+   - Build: `pnpm build:vercel`
 
-   ```sh
-   vercel link --project thoth-api        # once
-   pnpm build:vercel
-   vercel deploy --prebuilt --prod
-   ```
+   `apps/server/scripts/build-vercel.ts` bundles `src/vercel.ts` into
+   `apps/server/.vercel/output` (Build Output API v3: one Node 24 function in
+   region `sin1`, every path routed to it, and the daily cron below), which
+   Vercel deploys as is. Every push to `main` deploys it. To deploy from your
+   computer instead: `vercel link --project thoth-api`, `pnpm build:vercel`,
+   `vercel deploy --prebuilt --prod` (from `apps/server`).
 
    The function refuses to start unless `MIGRATE_ON_START=false` and events
    are off (the trial profile turns them off). Until it can start it answers
@@ -129,17 +131,13 @@ builds (ADR-0015):
 `apps/web` when it exists, and copies `apps/web/dist` into
 `apps/site/dist/app`. Without `apps/web` it builds the site alone.
 
-The site has no secrets, so it is built on your computer and uploaded
-prebuilt; that avoids installing the whole monorepo (Playwright, Tauri) on
-Vercel. `vercel build` reads `apps/site/vercel.json`, so the headers below
-apply unchanged. From `apps/site`:
-
-```sh
-vercel link --project thoth-site       # once
-vercel pull --environment=production   # SITE_URL, VITE_DEFAULT_SERVER, VITE_GA4_ID
-vercel build --prod
-vercel deploy --prebuilt --prod
-```
+The project is connected to the repository with root directory `apps/site`
+and deploys on every push to `main`. `apps/site/vercel.json` installs only the
+site and the web client (`--filter @thoth/site... --filter @thoth/web...`) and
+runs `pnpm build:website`. To deploy from your computer instead (from
+`apps/site`): `vercel link --project thoth-site`, `vercel pull
+--environment=production`, `vercel build --prod`, `vercel deploy --prebuilt
+--prod`.
 
 1. Create a second Vercel project from this repository with **root directory
    `apps/site`**. `apps/site/vercel.json` sets the install and build commands
