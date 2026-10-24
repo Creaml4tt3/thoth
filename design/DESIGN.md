@@ -40,7 +40,7 @@ as a disc island. It is a single closed shape, monochrome, and uses
 |---|---|
 | `mark.svg` | Inline UI; inherits `color` |
 | `mark-white.svg`, `mark-ink.svg` | Fixed-colour exports |
-| `favicon.svg` | ≤16px. Drops the eye island, which disappears below 20px. |
+| `favicon.svg` | ≤16px. Same shape with a slightly larger eye (r 16 instead of 11.4) so the eye still reads at 16px. |
 | `app-icon-dark.svg`, `app-icon-light.svg` | 1024 squircle tiles: Night or Paper |
 
 Rules:
