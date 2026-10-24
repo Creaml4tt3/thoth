@@ -11,10 +11,9 @@ Domains used below (change them when you buy your own domain):
 | Website (`apps/site`, with `apps/web` at `/app/`) | `https://thoth.creaml4tt3.me` |
 | API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
 
-> Status (2026-10-24): steps 1, 2, 3 and 6 are done. The Neon project is
-> `thoth`, and the Vercel projects are `thoth-api` and `thoth-site`. Left for
-> the owner: the API's `DATABASE_URL` (step 3) and the sign-in providers
-> (steps 4 and 5).
+> Status (2026-10-24): steps 1, 2, 3 and 6 are done and live. The Neon
+> project is `thoth`, and the Vercel projects are `thoth-api` and
+> `thoth-site`. Left for the owner: the sign-in providers (steps 4 and 5).
 
 ## 1. Database: Neon (free plan)
 
