@@ -17,8 +17,10 @@ import {
   JOURNAL_DIR,
   journalTempPath,
   readPendingJournal,
+  recordPath,
   TEMP_DIR,
   writeJournalEntry,
+  writeRecordAtomic,
   type JournalEntry,
 } from "./journal.ts";
 import { mimeTypeFor } from "./mime.ts";
@@ -135,7 +137,7 @@ export class Vault {
   }
 
   private async ensureLayout(): Promise<void> {
-    for (const dir of [THOTH_DIR, `${THOTH_DIR}/operations`, JOURNAL_DIR, `${THOTH_DIR}/manifests`, TEMP_DIR]) await this.fs.mkdirp(dir);
+    for (const dir of [THOTH_DIR, `${THOTH_DIR}/operations`, JOURNAL_DIR, `${THOTH_DIR}/manifests`, `${THOTH_DIR}/sync`, TEMP_DIR]) await this.fs.mkdirp(dir);
     if (!(await this.fs.stat(CONFIG_PATH))) {
       const config = { configVersion: CONFIG_VERSION, vaultId: newStableId(this.now()), createdAt: new Date(this.now()).toISOString() };
       await this.fs.writeFile(CONFIG_PATH, encodeText(JSON.stringify(config, null, 2) + "\n"), { exclusive: true });
@@ -163,6 +165,17 @@ export class Vault {
   private async recoverJournal(): Promise<{ recovered: number; invalid: string[] }> {
     const { entries, invalid } = await readPendingJournal(this.fs);
     for (const entry of entries) {
+      // An interrupted delete: put the file back where it was (never over something new); the caller retries.
+      if (entry.kind === "delete-file" && (await this.fs.stat(journalTempPath(entry.id)))?.kind === "file") {
+        await this.fs.mkdirp(dirname(entry.path));
+        try {
+          await this.fs.rename(journalTempPath(entry.id), entry.path, { noReplace: true });
+        } catch (error) {
+          if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+          // Something new took the path meanwhile: keep the old bytes next to it rather than lose either.
+          await this.fs.rename(journalTempPath(entry.id), await this.freeSiblingPath(entry.path, "recovered"), { noReplace: true });
+        }
+      }
       await this.fs.remove(journalTempPath(entry.id));
       await clearJournalEntry(this.fs, entry.id);
     }
@@ -591,6 +604,123 @@ export class Vault {
     await clearJournalEntry(this.fs, id);
     await this.reconcileNow();
     return newHash;
+  }
+
+  /**
+   * Deletes a file only if it still has `expectedHash` (compare-and-swap, ADR-0001 §5). The file is first
+   * renamed to Thoth's own temp path under a `delete-file` journal entry and hashed there, so an edit that
+   * lands before the rename is caught by the hash and one that lands after it creates a new file that is
+   * left alone. A mismatch puts the bytes back and throws `ConflictError`; a crash at any point is undone
+   * by recovery, which restores the file. Used by transfers to finalize a move (ADR-0006 §6).
+   */
+  async deleteFileAtomic(path: string, options: { expectedHash: string }): Promise<void> {
+    return this.exclusive(async () => {
+      const normalized = normalizeVaultPath(path);
+      if (isReservedPath(normalized)) throw new Error("Refusing to delete Thoth metadata through the content API");
+      const before = await this.currentHash(normalized);
+      if (before !== options.expectedHash) throw new ConflictError(normalized, options.expectedHash, before);
+      const id = newStableId(this.now());
+      const tempPath = journalTempPath(id);
+      await writeJournalEntry(this.fs, { id, kind: "delete-file", path: normalized, tempPath, expectedHash: options.expectedHash, newHash: null, createdAt: this.now() });
+      await this.fs.rename(normalized, tempPath);
+      const moved = sha256Hex(await this.fs.readFile(tempPath));
+      if (moved !== options.expectedHash) {
+        try {
+          await this.fs.rename(tempPath, normalized, { noReplace: true });
+        } catch (error) {
+          if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+          await this.fs.rename(tempPath, await this.freeSiblingPath(normalized, "recovered"), { noReplace: true });
+        }
+        await clearJournalEntry(this.fs, id);
+        await this.reconcileNow();
+        throw new ConflictError(normalized, options.expectedHash, moved);
+      }
+      await this.fs.remove(tempPath);
+      await clearJournalEntry(this.fs, id);
+      await this.reconcileNow();
+    });
+  }
+
+  /** `Name (label).md`, then `Name (label 2).md`… next to `path`, the first that does not exist. */
+  private async freeSiblingPath(path: string, label: string): Promise<string> {
+    const dir = dirname(path);
+    const base = path.slice(dir === "" ? 0 : dir.length + 1);
+    const dot = base.lastIndexOf(".");
+    const [stem, ext] = dot > 0 ? [base.slice(0, dot), base.slice(dot)] : [base, ""];
+    for (let n = 1; n < 1000; n++) {
+      const name = `${stem} (${label}${n === 1 ? "" : ` ${n}`})${ext}`;
+      const candidate = dir === "" ? name : `${dir}/${name}`;
+      if (!(await this.fs.stat(candidate))) return candidate;
+    }
+    throw new Error(`No free name next to ${path}`);
+  }
+
+  // --------------------------------------------------------------- records
+
+  /** Writes a durable `.thoth/` JSON record (see `writeRecordAtomic`). Never page content or secrets. */
+  async writeRecord(path: string, value: unknown): Promise<void> {
+    await writeRecordAtomic(this.fs, path, encodeText(JSON.stringify(value, null, 2) + "\n"), newStableId(this.now()));
+  }
+
+  /** The parsed record, or undefined when it does not exist. Malformed JSON throws. */
+  async readRecord(path: string): Promise<unknown> {
+    const normalized = recordPath(path);
+    const stat = await this.fs.stat(normalized);
+    if (!stat) return undefined;
+    if (stat.kind !== "file") throw new Error(`${normalized} is not a file`);
+    return JSON.parse(decodeText(await this.fs.readFile(normalized)).text) as unknown;
+  }
+
+  /** Record file names (`*.json`) directly inside a `.thoth/` directory; empty when it does not exist. */
+  async listRecords(dir: string): Promise<string[]> {
+    const normalized = normalizeVaultPath(dir);
+    if (!isReservedPath(normalized)) throw new Error("Records live under .thoth/");
+    if (!(await this.fs.stat(normalized))) return [];
+    return (await this.fs.list(normalized)).filter((e) => e.kind === "file" && e.name.endsWith(".json")).map((e) => e.name).sort();
+  }
+
+  async removeRecord(path: string): Promise<void> {
+    await this.fs.remove(recordPath(path));
+  }
+
+  // ----------------------------------------------------------- projections
+
+  /**
+   * Index projections of durable records (ADR-0001 §2): `operation_journal`, `external_locations` and
+   * `sync_state`. The records are the truth; these rows only make them queryable and are rebuilt from the
+   * records by their owner (the transfer engine on open).
+   */
+  async projectOperation(row: { id: string; kind: string; state: string; updatedAt: number }): Promise<void> {
+    await this.exclusive(() => this.sql.run("INSERT OR REPLACE INTO operation_journal (id, kind, state, updated_at) VALUES (?, ?, ?, ?)", [row.id, row.kind, row.state, row.updatedAt]));
+  }
+
+  async listOperationJournal(): Promise<{ id: string; kind: string; state: string; updatedAt: number }[]> {
+    const rows = await this.sql.all<{ id: string; kind: string; state: string; updated_at: number }>("SELECT id, kind, state, updated_at FROM operation_journal ORDER BY id");
+    return rows.map((r) => ({ id: r.id, kind: r.kind, state: r.state, updatedAt: r.updated_at }));
+  }
+
+  /** Replaces every projection row of one workspace (`workspaceUrl`) with `rows`. */
+  async projectSyncRecords(workspaceUrl: string, rows: { pageId: string; remoteId: string; remoteRevision: string | null; baseHash: string | null }[]): Promise<void> {
+    await this.exclusive(async () => {
+      await this.sql.exec("BEGIN");
+      try {
+        await this.sql.run("DELETE FROM external_locations WHERE workspace_url = ?", [workspaceUrl]);
+        await this.sql.run("DELETE FROM sync_state WHERE workspace_url = ?", [workspaceUrl]);
+        for (const r of rows) {
+          await this.sql.run("INSERT OR REPLACE INTO external_locations (page_id, workspace_url, remote_id) VALUES (?, ?, ?)", [r.pageId, workspaceUrl, r.remoteId]);
+          await this.sql.run("INSERT OR REPLACE INTO sync_state (page_id, workspace_url, remote_revision, base_hash, pending) VALUES (?, ?, ?, ?, 0)", [r.pageId, workspaceUrl, r.remoteRevision, r.baseHash]);
+        }
+        await this.sql.exec("COMMIT");
+      } catch (error) {
+        await this.sql.exec("ROLLBACK");
+        throw error;
+      }
+    });
+  }
+
+  async listExternalLocations(): Promise<{ pageId: string; workspaceUrl: string; remoteId: string }[]> {
+    const rows = await this.sql.all<{ page_id: string; workspace_url: string; remote_id: string }>("SELECT page_id, workspace_url, remote_id FROM external_locations ORDER BY workspace_url, page_id");
+    return rows.map((r) => ({ pageId: r.page_id, workspaceUrl: r.workspace_url, remoteId: r.remote_id }));
   }
 
   private async currentHash(path: string): Promise<string | null> {
