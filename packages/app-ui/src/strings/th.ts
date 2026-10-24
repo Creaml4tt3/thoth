@@ -47,6 +47,26 @@ export const th: Strings = {
     embed: "ฝัง · ",
     done: "เสร็จแล้ว",
 
+    styles: {
+      toolbar: "จัดรูปแบบข้อความ",
+      bold: "ตัวหนา",
+      italic: "ตัวเอียง",
+      underline: "ขีดเส้นใต้",
+      strike: "ขีดฆ่า",
+      code: "โค้ดในบรรทัด",
+      link: "ลิงก์",
+      color: "สีข้อความ",
+      highlight: "ไฮไลต์",
+      colorMenu: "สีข้อความ",
+      colorNames: { default: "ค่าเริ่มต้น", gray: "เทา", brown: "น้ำตาล", orange: "ส้ม", yellow: "เหลือง", green: "เขียว", blue: "น้ำเงิน", purple: "ม่วง", red: "แดง" },
+      linkAddress: "ที่อยู่ลิงก์",
+      linkPlaceholder: "วางลิงก์ หรือพิมพ์ที่อยู่ของหน้า",
+      linkApply: "ใช้",
+      linkRemove: "เอาลิงก์ออก",
+      linkInvalid: "ที่อยู่ต้องขึ้นต้นด้วย http, https, mailto หรือ tel หรือเป็นที่อยู่ของหน้า",
+      withShortcut: (label, shortcut) => `${label} (${shortcut})`,
+    },
+
     blocks: {
       text: { title: "ข้อความ", description: "ย่อหน้าธรรมดา" },
       h1: { title: "หัวข้อ 1", description: "หัวข้อใหญ่ของส่วน" },

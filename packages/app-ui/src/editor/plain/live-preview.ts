@@ -1,14 +1,16 @@
 /**
  * Live preview for Plain mode (Obsidian-style): Markdown markup is hidden on
  * lines the cursor is not on, wikilinks become chips, task markers become
- * checkboxes and a callout's `[!kind]` marker becomes its label. It is display only. The document is never rewritten to show it,
+ * checkboxes and a callout's `[!kind]` marker becomes its label. `==x==`, `<u>x</u>` and palette colour spans
+ * (`<span data-color="red">x</span>`, ADR-0016) show as highlighted, underlined and coloured text with their
+ * markers hidden. It is display only. The document is never rewritten to show it,
  * and the line being edited always shows its exact source.
  */
 import { RangeSet, StateEffect, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNodeRef } from "@lezer/common";
-import { parseWikiInner } from "@thoth/editor";
+import { isTextColor, parseWikiInner, type TextColor } from "@thoth/editor";
 import type { EditorContext } from "../context.ts";
 import type { LinkTarget } from "../links.ts";
 import { kindClass, kindIcon, kindLabel } from "../callout-kinds.ts";
@@ -135,6 +137,24 @@ class CalloutLabel extends WidgetType {
 }
 
 const HEADING = /^(?:ATX|Setext)Heading([1-6])$/;
+
+// Inline HTML tags that make a text style, read like `@thoth/editor` reads them (case-insensitive `u`, exact `data-color`).
+const U_OPEN = /^<u>$/i;
+const U_CLOSE = /^<\/u[ \t]*>$/i;
+const SPAN_OPEN = /^<span[\s>]/i;
+const COLOR_OPEN = /^<span[ \t]+data-color[ \t]*=[ \t]*(?:"([a-z]+)"|'([a-z]+)'|([a-z]+))[ \t]*>$/;
+const SPAN_CLOSE = /^<\/span[ \t]*>$/i;
+/** Inline nodes that can wrap a tag without being the block it belongs to. */
+const INLINE_WRAPPERS = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "Highlight", "Link", "Image"]);
+
+interface OpenTag {
+  tag: "u" | "span";
+  from: number;
+  to: number;
+  /** The palette colour of a `span`, null for any other span (its `</span>` is still consumed). */
+  color: TextColor | null;
+}
+
 /** What follows a quote's first `>` on a callout's first line, as `@thoth/editor` reads it (`> [!kind]+ title`). */
 const CALLOUT = /^([ \t]*)\[!([A-Za-z0-9_-]+)\][+-]?[ \t]*/;
 const BLOCK_LINE: Record<string, string> = { FencedCode: "md-line-code", CodeBlock: "md-line-code", Blockquote: "md-line-quote", Frontmatter: "md-line-meta" };
@@ -182,6 +202,41 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
     seen.add(key);
     out.push(deco.range(from, to));
   };
+  // Style marks (highlight, underline, colour). A tag pairs with the nearest earlier opener of its kind in the same block.
+  const openTags = new Map<number, OpenTag[]>();
+  const style = (from: number, to: number, cls: string, attributes?: Record<string, string>) => {
+    const key = `${from}-${to}:${cls}`;
+    if (to <= from || seen.has(key)) return;
+    seen.add(key);
+    out.push(Decoration.mark({ class: cls, ...(attributes ? { attributes } : {}) }).range(from, to));
+  };
+  const blockKey = (node: SyntaxNodeRef): number => {
+    let parent = node.node.parent;
+    while (parent && INLINE_WRAPPERS.has(parent.name)) parent = parent.parent;
+    return parent?.from ?? -1;
+  };
+  const htmlTag = (node: SyntaxNodeRef) => {
+    const text = doc.sliceString(node.from, node.to);
+    const key = blockKey(node);
+    const stack = openTags.get(key) ?? [];
+    openTags.set(key, stack);
+    if (U_OPEN.test(text)) return void stack.push({ tag: "u", from: node.from, to: node.to, color: null });
+    if (SPAN_OPEN.test(text)) {
+      const m = COLOR_OPEN.exec(text);
+      const color = m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+      return void stack.push({ tag: "span", from: node.from, to: node.to, color: isTextColor(color) ? color : null });
+    }
+    const tag = U_CLOSE.test(text) ? "u" : SPAN_CLOSE.test(text) ? "span" : null;
+    if (!tag) return;
+    const at = stack.findLastIndex((o) => o.tag === tag);
+    if (at < 0) return;
+    const open = stack[at]!;
+    stack.length = at; // openers above it stay unpaired, as in the serializer
+    if (tag === "span" && !open.color) return;
+    if (tag === "u") style(open.to, node.from, "md-underline");
+    else style(open.to, node.from, "text-color", { "data-color": open.color! });
+    for (const [from, to] of [[open.from, open.to], [node.from, node.to]] as const) if (!onActiveLine(from)) replace(from, to);
+  };
   // Markers shown as labels: lezer reads `[!kind]` as a link, whose brackets must not be hidden on their own.
   const markers: [number, number][] = [];
   const inMarker = (pos: number) => markers.some(([from, to]) => pos >= from && pos < to);
@@ -213,6 +268,11 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
         const heading = HEADING.exec(name);
         if (heading) styleLines(node.from, node.to, `md-line-h${Math.min(Number(heading[1]), 3)}`);
         if (name === "Blockquote") callout(node);
+        if (name === "HTMLTag") return void htmlTag(node);
+        if (name === "Highlight") {
+          const marks = node.node.getChildren("HighlightMark");
+          if (marks.length >= 2) style(marks[0]!.to, marks[marks.length - 1]!.from, "md-highlight");
+        }
         if (name === "FencedCode" || name === "CodeBlock" || name === "Frontmatter") return false;
         if (onActiveLine(node.from)) return;
 
@@ -227,6 +287,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
           }
           case "EmphasisMark":
           case "StrikethroughMark":
+          case "HighlightMark":
           case "Escape":
             replace(node.from, name === "Escape" ? node.from + 1 : node.to);
             break;

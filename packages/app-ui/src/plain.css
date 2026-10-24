@@ -39,6 +39,10 @@
 .plain-editor .md-quote { color: var(--thoth-ink-secondary); }
 .plain-editor .md-meta { color: var(--thoth-ink-tertiary); }
 .plain-editor .md-key { color: var(--thoth-ink-secondary); }
+/* Text styles (ADR-0016): highlight is the accent only; colours come from the same tokens as Blocks mode (editor.css). */
+.plain-editor .md-highlight { background: var(--thoth-moon-soft); border-radius: var(--thoth-radius-xs); }
+.plain-editor .md-underline { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+@media (forced-colors: active) { .plain-editor .md-highlight { background: Mark; color: MarkText; } }
 
 /* Widgets */
 .plain-editor .md-bullet { display: inline-block; width: 1.1em; color: var(--thoth-ink-tertiary); }

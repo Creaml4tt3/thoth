@@ -3,6 +3,7 @@
  * Thai is in `th.ts` with the same shape. The desktop app provides the language it resolved (system or
  * Settings → Language); its own views' text is in `apps/desktop/src/strings`.
  */
+import type { TextColor } from "@thoth/editor";
 import type { BlockKind } from "../editor/block-kinds.ts";
 import type { ConflictChoice } from "../editor/page-session.ts";
 
@@ -58,6 +59,29 @@ export const en = {
     linkState: { resolved: "open page", ambiguous: "ambiguous link", unresolved: "unresolved link" },
     embed: "Embed · ",
     done: "Done",
+
+    /** The toolbar on selected text in Blocks mode (ADR-0016 rule 1). */
+    styles: {
+      toolbar: "Text formatting",
+      bold: "Bold",
+      italic: "Italic",
+      underline: "Underline",
+      strike: "Strikethrough",
+      code: "Inline code",
+      link: "Link",
+      color: "Text colour",
+      highlight: "Highlight",
+      colorMenu: "Text colour",
+      /** Shown for `default` and each palette name. */
+      colorNames: { default: "Default", gray: "Gray", brown: "Brown", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple", red: "Red" } satisfies Record<"default" | TextColor, string>,
+      linkAddress: "Link address",
+      linkPlaceholder: "Paste a link or type a page path",
+      linkApply: "Apply",
+      linkRemove: "Remove link",
+      linkInvalid: "Use an address that starts with http, https, mailto or tel, or a page path.",
+      /** Tooltip: the action and its shortcut. */
+      withShortcut: (label: string, shortcut: string) => `${label} (${shortcut})`,
+    },
 
     blocks: {
       text: { title: "Text", description: "Plain paragraph" },

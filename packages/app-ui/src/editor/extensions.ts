@@ -1,11 +1,10 @@
 /**
  * Editor extensions for the app: the schema from `@thoth/editor`, plus node
- * views, history, keymaps, Markdown input rules, the `/` menu and the block
- * handle. The schema itself is never changed here (it defines the round-trip
- * guarantees).
+ * views, history, keymaps, Markdown input rules, the `/` menu, the block
+ * handle and the text style toolbar and shortcuts. The schema itself is
+ * never changed here (it defines the round-trip guarantees).
  */
 import { Extension, InputRule, textblockTypeInputRule, wrappingInputRule, type AnyExtension, type NodeViewRenderer } from "@tiptap/core";
-import { toggleMark } from "@tiptap/pm/commands";
 import { history, redo, undo } from "@tiptap/pm/history";
 import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
@@ -13,6 +12,7 @@ import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wik
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
+import { textStylesExtension } from "./selection-toolbar.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
 import { slashTarget, turnInto } from "./block-ops.ts";
@@ -36,14 +36,10 @@ const Editing = Extension.create({
   name: "thothEditing",
   addProseMirrorPlugins: () => [history()],
   addKeyboardShortcuts() {
-    const mark = (name: string) => () => toggleMark(this.editor.schema.marks[name]!)(this.editor.state, this.editor.view.dispatch);
     return {
       "Mod-z": () => undo(this.editor.state, this.editor.view.dispatch),
       "Mod-y": () => redo(this.editor.state, this.editor.view.dispatch),
       "Mod-Shift-z": () => redo(this.editor.state, this.editor.view.dispatch),
-      "Mod-b": mark("bold"),
-      "Mod-i": mark("italic"),
-      "Mod-e": mark("inlineCode"),
       "Shift-Enter": () => this.editor.commands.insertContent({ type: "hardBreak" }),
     };
   },
@@ -79,5 +75,5 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     const view = views[ext.name];
     return view ? ext.extend({ addNodeView: () => view }) : ext;
   });
-  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), linkSuggestExtension(ctx)];
+  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), textStylesExtension(ctx.strings), linkSuggestExtension(ctx)];
 }
