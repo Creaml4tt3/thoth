@@ -168,6 +168,13 @@ export const en = {
     newFolderTitle: "New folder",
     newFolder: "New folder",
     newFolderIn: (name: string) => `New folder in ${name}`,
+    newFolderFailed: (detail: string) => `Could not create the folder: ${detail}`,
+    /** Why a name was refused in the Private Space tree (the others are in `renameDialog`). */
+    nameProblem: {
+      reserved: "That name is reserved.",
+      invalid: "A name cannot contain : * ? \" < > | or control characters, end with a dot, or be a system name like CON.",
+      tooLong: "That name is too long.",
+    },
     renameDialog: {
       title: (name: string) => `Rename “${name}”`,
       name: "New name",

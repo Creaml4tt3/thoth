@@ -124,6 +124,22 @@ export function jump(state: TabsState, n: number): TabsState {
 }
 
 /**
+ * Pages that moved: tabs showing `from` (a page) or a page under `from` (a folder that moved) follow to `to`, so
+ * renaming or moving something keeps its tabs open on it instead of leaving them on a path that is gone.
+ */
+export function remapPaths(state: TabsState, from: string, to: string): TabsState {
+  let changed = false;
+  const tabs = state.tabs.map((t) => {
+    if (t.target.kind !== "page") return t;
+    const path = t.target.path;
+    if (path !== from && !path.startsWith(`${from}/`)) return t;
+    changed = true;
+    return { ...t, target: { kind: "page" as const, path: to + path.slice(from.length) } };
+  });
+  return changed ? { ...state, tabs } : state;
+}
+
+/**
  * Closes the background tabs whose target is gone (`gone` says so only when it is sure). The current tab stays: it
  * shows the "not found" state itself, so the user sees what happened.
  */

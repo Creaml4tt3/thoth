@@ -150,6 +150,25 @@ describe("Vault on Rust ports", () => {
     for (let i = 0; i < 6; i++) expect((await vault.search(`zebramark${i}`)).some((h) => h.path === `Burst/Note ${i}.md`)).toBe(true);
   });
 
+  it("creates folders through the Rust mkdir: numbered default names, nested, and the vault's name rules", async () => {
+    expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder");
+    expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder 2");
+    expect(await vault.createUniqueFolder("Projects/Thoth", "Untitled folder")).toBe("Projects/Thoth/Untitled folder");
+    expect(await vault.createUniqueFolder("บันทึก", "โฟลเดอร์ไม่มีชื่อ")).toBe("บันทึก/โฟลเดอร์ไม่มีชื่อ");
+    expect((await stat(join(root, "Projects/Thoth/Untitled folder"))).isDirectory()).toBe(true);
+    expect(await vault.listFolders()).toEqual(expect.arrayContaining(["Untitled folder", "Untitled folder 2", "Projects/Thoth/Untitled folder", "บันทึก/โฟลเดอร์ไม่มีชื่อ"]));
+    // Case-insensitive conflicts, a file in the way and the reserved folder, whatever the volume's case rules.
+    await expect(vault.createFolder("inbox")).rejects.toBeInstanceOf(ConflictError);
+    await expect(vault.createFolder("untitled FOLDER")).rejects.toBeInstanceOf(ConflictError);
+    await expect(vault.createFolder("Inbox/welcome.MD/Inner")).rejects.toBeInstanceOf(ConflictError);
+    await expect(vault.createFolder(".thoth/x")).rejects.toThrow(/reserved/);
+    expect(await readdir(root)).not.toContain("inbox");
+    // The folder is a rename target like any other: its place in the tree follows `Vault.move`.
+    await vault.move("Untitled folder 2", "Ideas");
+    expect(await vault.listFolders()).toEqual(expect.arrayContaining(["Ideas"]));
+    expect(await vault.listFolders()).not.toContain("Untitled folder 2");
+  });
+
   it("moves a page and a whole folder, updating links, and creates and removes empty folders", async () => {
     await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
     expect(await readFile(join(root, "Projects/Thoth/Architecture.md"), "utf8")).toBe("# Architecture\n\nBack to [[Home]]. Missing [[Nowhere]].\n");

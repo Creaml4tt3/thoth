@@ -147,6 +147,12 @@ export const th: Strings = {
     newFolderTitle: "โฟลเดอร์ใหม่",
     newFolder: "โฟลเดอร์ใหม่",
     newFolderIn: (name) => `โฟลเดอร์ใหม่ใน ${name}`,
+    newFolderFailed: (detail) => `สร้างโฟลเดอร์ไม่สำเร็จ: ${detail}`,
+    nameProblem: {
+      reserved: "ชื่อนี้ถูกสงวนไว้",
+      invalid: "ชื่อห้ามมี : * ? \" < > | หรืออักขระควบคุม ห้ามลงท้ายด้วยจุด และห้ามเป็นชื่อระบบ เช่น CON",
+      tooLong: "ชื่อยาวเกินไป",
+    },
     renameDialog: {
       title: (name) => `เปลี่ยนชื่อ “${name}”`,
       name: "ชื่อใหม่",

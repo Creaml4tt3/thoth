@@ -43,9 +43,11 @@ function ownItem(li: Element | null): HTMLElement | null {
   return null;
 }
 
-export function focusTreeItem(id: string): void {
+/** Focuses the row with this id. False when there is no such row (yet). */
+export function focusTreeItem(id: string): boolean {
   const el = [...document.querySelectorAll<HTMLElement>("[data-tree-id]")].find((e) => e.dataset["treeId"] === id);
   el?.focus();
+  return el !== undefined;
 }
 
 /** Focuses a row once the tree has re-rendered (the moved row may have been re-created). */

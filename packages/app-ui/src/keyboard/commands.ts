@@ -29,7 +29,10 @@ export interface CommandActions {
   newPage?(): void;
   /** A new page in the workspace of the open page, named for the menu (the desktop, when a workspace page is open). */
   newWorkspacePage?: { workspace: string; run(): void };
+  /** A new folder where the app creates them (the Private Space on the desktop), or in the workspace named (the web). */
   newFolder?: { workspace?: string; run(): void };
+  /** A new folder in the workspace of the open page, named for the menu (the desktop, when a workspace page is open). */
+  newWorkspaceFolder?: { workspace: string; run(): void };
   rename?(): void;
   moveTo?(): void;
   reorder?(delta: -1 | 1): void;
@@ -54,6 +57,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.newPage) add("page.new", t.newPage, a.newPage, { ...key("page.new"), keywords: "create add" });
   if (a.newWorkspacePage) add("page.newWorkspace", t.newPageIn(a.newWorkspacePage.workspace), a.newWorkspacePage.run, { keywords: "create add workspace" });
   if (a.newFolder) add("folder.new", a.newFolder.workspace ? t.newFolderIn(a.newFolder.workspace) : t.newFolder, a.newFolder.run, { ...key("folder.new"), keywords: "create add" });
+  if (a.newWorkspaceFolder) add("folder.newWorkspace", t.newFolderIn(a.newWorkspaceFolder.workspace), a.newWorkspaceFolder.run, { keywords: "create add workspace" });
   if (a.rename) add("page.rename", t.rename, a.rename, { ...key("tree.rename"), keywords: "name title" });
   if (a.moveTo) add("page.moveTo", t.moveTo, a.moveTo, { keywords: "folder nest" });
   if (a.reorder) {

@@ -21,7 +21,7 @@
 .tree-item:hover .tree-caret:not([data-empty]) { color: var(--thoth-ink-secondary); }
 .tree-icon { flex: none; width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); }
 .tree-icon svg { display: block; }
-.side-actions { display: flex; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
+.side-actions { display: flex; flex-wrap: wrap; gap: 2px 4px; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
 .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .banner { margin: 8px 16px; }
 .empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--thoth-ink-secondary); text-align: center; }
@@ -68,6 +68,9 @@
 .tree-rename { flex: 1; min-width: 0; font: inherit; padding: 1px 6px; border-radius: var(--thoth-radius-xs); border: 1px solid var(--thoth-accent); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .tree-rename:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 0; }
 .tree-rename:disabled { opacity: 0.6; }
+.tree-renaming { flex-wrap: wrap; white-space: normal; }
+.tree-rename[aria-invalid] { border-color: var(--thoth-danger); }
+.tree-rename-problem { flex: 0 0 calc(100% - 28px); box-sizing: border-box; min-width: 0; margin: 2px 0 2px 28px; overflow-wrap: anywhere; padding: 2px 8px; border-radius: var(--thoth-radius-xs); background: color-mix(in srgb, var(--thoth-danger) 12%, var(--thoth-bg)); color: var(--thoth-ink-primary); font: var(--thoth-text-small); }
 
 /* The row menu and the Move to dialog. */
 .ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
