@@ -35,8 +35,9 @@ export interface TreeState {
   /** Bumped per page whenever the change feed reports it, so an open page re-checks itself. */
   ticks: Record<string, number>;
   /**
-   * Which pages are folder pages (`thoth_kind: folder`), known as of the revision named. The tree protocol has no
-   * page kind, so it is read from the page's Markdown once per revision.
+   * Which pages are folder pages (`thoth_kind: folder`), known as of the revision named. With the `page-kind`
+   * capability (ADR-0017) it comes from the tree and the change feed. Without it the tree has no page kind, so it is
+   * read from each page's Markdown once per revision.
    */
   kinds: Record<string, { revisionId: string; folder: boolean }>;
 }
@@ -63,7 +64,12 @@ export const workspaceKey = (server: string, workspace: string): string => `${se
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const EMPTY_TREE: TreeState = { nodes: [], cursor: null, loading: true, error: null, ticks: {}, kinds: {} };
-/** How many pages are read at once to find out which are folders. */
+/** The folder flags of a tree whose server lists `page-kind`: `kind` is the server's word, unknown counts as a page. */
+function kindsOf(nodes: readonly TreeNode[]): TreeState["kinds"] {
+  return Object.fromEntries(nodes.map((n) => [n.id, { revisionId: n.revisionId, folder: n.kind === "folder" }]));
+}
+
+/** How many pages are read at once to find out which are folders (servers without `page-kind`). */
 const KIND_WORKERS = 4;
 
 export class ServerDirectory {
@@ -112,6 +118,14 @@ export class ServerDirectory {
 
   workspace(server: string, workspace: string): Workspace | undefined {
     return this.server(server)?.workspaces?.find((w) => w.id === workspace);
+  }
+
+  /**
+   * Does the server say which pages are folders (`page-kind`, ADR-0017)? Then folders are drawn from the `kind` of the
+   * tree and the change feed, and no page is downloaded to find them. Without it each page is read once per revision.
+   */
+  hasPageKinds(server: string): boolean {
+    return this.state.capabilities[server]?.includes("page-kind") ?? false;
   }
 
   /** Does the server keep page order and moves (`page-order`)? Without it pages are A–Z and cannot be reordered. */
@@ -266,8 +280,10 @@ export class ServerDirectory {
     const key = workspaceKey(server, workspace);
     this.patchTree(key, { loading: true, error: null });
     try {
+      // The capability decides how folders are found, so it must be known before the tree is read.
+      await this.loadCapabilities(server);
       const tree = await this.client(server).getTree(workspace);
-      this.patchTree(key, { nodes: tree.nodes, cursor: tree.changeCursor, loading: false, error: null });
+      this.patchTree(key, { nodes: tree.nodes, cursor: tree.changeCursor, loading: false, error: null, ...(this.hasPageKinds(server) ? { kinds: kindsOf(tree.nodes) } : {}) });
       void this.resolveKinds(server, workspace);
     } catch (error) {
       this.patchTree(key, { loading: false, error: message(error) });
@@ -284,10 +300,12 @@ export class ServerDirectory {
       parentId: page.metadata.parentId,
       title: page.metadata.title,
       ...(page.metadata.position !== undefined ? { position: page.metadata.position } : {}),
+      ...(page.metadata.kind !== undefined ? { kind: page.metadata.kind } : {}),
       revisionId: page.revision.id,
       updatedAt: page.metadata.updatedAt,
     };
     const rest = tree.nodes.filter((n) => n.id !== page.id);
+    // We hold the Markdown we just wrote, so a page of ours is known at once, with or without `page-kind`.
     const kinds = { ...tree.kinds, [page.id]: { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown) } };
     this.patchTree(key, { nodes: [...rest, node], kinds });
   }
@@ -393,11 +411,13 @@ export class ServerDirectory {
   }
 
   /**
-   * Finds out which pages of a workspace are folder pages. The tree has only titles and parents, so each page is
-   * read once per revision, a few at a time; a page this client wrote is already known. Failures are ignored: such
-   * a page is drawn as a page until the next change reaches it.
+   * Fallback for servers without `page-kind`: finds out which pages of a workspace are folder pages. The tree has
+   * only titles and parents, so each page is read once per revision, a few at a time; a page this client wrote is
+   * already known. Failures are ignored: such a page is drawn as a page until the next change reaches it.
    */
   private async resolveKinds(server: string, workspace: string): Promise<void> {
+    // `page-kind` (ADR-0017): the server already said which pages are folders. Reading pages for it is the fallback.
+    if (this.hasPageKinds(server)) return;
     const key = workspaceKey(server, workspace);
     const tree = this.state.trees[key];
     if (!tree) return;
@@ -429,26 +449,36 @@ export class ServerDirectory {
     flush();
   }
 
-  private apply(tree: TreeState, entries: readonly ChangeEntry[]): Pick<TreeState, "nodes" | "ticks"> {
+  private apply(server: string, tree: TreeState, entries: readonly ChangeEntry[]): Pick<TreeState, "nodes" | "ticks" | "kinds"> {
     const nodes = new Map(tree.nodes.map((n) => [n.id, n]));
     const ticks = { ...tree.ticks };
+    // With `page-kind` the feed carries the kind after each change (`pageKind`); otherwise `resolveKinds` reads pages.
+    const withKinds = this.hasPageKinds(server);
+    const kinds = { ...tree.kinds };
     for (const entry of entries) {
       if (!entry.pageId) continue;
-      if (entry.kind === "page.deleted") nodes.delete(entry.pageId);
-      else if (entry.kind === "page.created" || entry.kind === "page.updated") {
+      if (entry.kind === "page.deleted") {
+        nodes.delete(entry.pageId);
+        if (withKinds) delete kinds[entry.pageId];
+      } else if (entry.kind === "page.created" || entry.kind === "page.updated") {
         const old = nodes.get(entry.pageId);
         nodes.set(entry.pageId, {
           id: entry.pageId,
           parentId: entry.parentId !== undefined ? entry.parentId : (old?.parentId ?? null),
           title: entry.title ?? old?.title ?? "Untitled",
           ...(entry.position !== undefined ? { position: entry.position } : old?.position !== undefined ? { position: old.position } : {}),
+          ...(entry.pageKind !== undefined ? { kind: entry.pageKind } : old?.kind !== undefined ? { kind: old.kind } : {}),
           revisionId: entry.revisionId ?? old?.revisionId ?? "",
           updatedAt: entry.occurredAt,
         });
+        if (withKinds) {
+          const kind = entry.pageKind !== undefined ? entry.pageKind : (old?.kind ?? null);
+          kinds[entry.pageId] = { revisionId: entry.revisionId ?? old?.revisionId ?? "", folder: kind === "folder" };
+        }
       } else continue; // unknown kinds are ignored
       ticks[entry.pageId] = (ticks[entry.pageId] ?? 0) + 1;
     }
-    return { nodes: [...nodes.values()], ticks };
+    return { nodes: [...nodes.values()], ticks, kinds };
   }
 
   /** Reads the change feed of one workspace up to its head and applies it to the tree. */
@@ -471,7 +501,7 @@ export class ServerDirectory {
     }
     const tree = this.state.trees[key];
     if (!tree || tree.cursor !== start.cursor) return; // reloaded meanwhile
-    this.patchTree(key, { ...(entries.length > 0 ? this.apply(tree, entries) : {}), cursor });
+    this.patchTree(key, { ...(entries.length > 0 ? this.apply(server, tree, entries) : {}), cursor });
     if (entries.length > 0) void this.resolveKinds(server, workspace);
   }
 

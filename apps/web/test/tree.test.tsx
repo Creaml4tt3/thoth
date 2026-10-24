@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The shared workspace tree in the web client: rename (F2), folders, keyboard order (ADR-0016, Phase 3b AC 1, 9).
 import { afterEach, describe, expect, it } from "vitest";
-import { isFolderMarkdown } from "@thoth/app-ui/workspace/folders.ts";
+import { folderMarkdown, isFolderMarkdown } from "@thoth/app-ui/workspace/folders.ts";
 import { FakeWebServer } from "./support/fake-web-server.ts";
 import { cleanup, fakeBrowser, screen, signInThroughUi, waitFor, within } from "./support/render.tsx";
 
@@ -60,3 +60,39 @@ describe("the workspace tree in the web client", () => {
     expect(row.getAttribute("title")).toBe("Folder · Empty");
   });
 });
+
+/** Protocol requests that download a page (not the tree, the feed or the list of workspaces). */
+const pageDownloads = (server: FakeWebServer) => server.requests.filter((r) => r.method === "GET" && /\/pages\/[^/]+$/.test(new URL(r.url).pathname));
+
+describe("folders and the page-kind capability (ADR-0017)", () => {
+  async function withFolder(config: ConstructorParameters<typeof FakeWebServer>[0] = {}) {
+    const server = new FakeWebServer(config);
+    const ws = server.workspace("Notes");
+    const research = server.servers.writeAsOther(ws, { title: "Research", markdown: folderMarkdown("f") });
+    server.servers.writeAsOther(ws, { title: "Interviews", markdown: "# Interviews\n", parentId: research.id });
+    server.servers.writeAsOther(ws, { title: "Survey", markdown: "# Survey\n", parentId: research.id });
+    server.servers.writeAsOther(ws, { title: "Plan", markdown: "# Plan\n" });
+    const browser = fakeBrowser(server);
+    await signInThroughUi(browser);
+    const group = await within(screen.getByRole("tree", { name: "Workspaces" })).findByRole("group", { name: "Pages in Notes" });
+    return { server, group };
+  }
+
+  it("draws the folder with its icon and item count without downloading any page", async () => {
+    const { server, group } = await withFolder();
+    const row = await within(group).findByRole("treeitem", { name: "Research" });
+    expect(row.getAttribute("data-kind")).toBe("folder");
+    expect(row.getAttribute("title")).toBe("Folder · 2 items");
+    expect(within(group).getByRole("treeitem", { name: "Plan" }).getAttribute("data-kind")).toBe("page");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(pageDownloads(server)).toEqual([]);
+  });
+
+  it("without the capability the folder is still found, by reading the pages", async () => {
+    const { server, group } = await withFolder({ capabilities: ["search", "transfers", "attachments", "page-order"] });
+    await waitFor(() => expect(within(group).getByRole("treeitem", { name: "Research" }).getAttribute("data-kind")).toBe("folder"));
+    expect(within(group).getByRole("treeitem", { name: "Research" }).getAttribute("title")).toBe("Folder · 2 items");
+    expect(pageDownloads(server).length).toBe(4);
+  });
+});
+

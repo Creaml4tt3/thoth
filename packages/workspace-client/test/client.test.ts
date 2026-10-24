@@ -69,6 +69,23 @@ describe("reads", () => {
     expect(requests[0]!.query).toEqual({ cursor: "c1", limit: "50" });
   });
 
+  it("passes the page kind through the tree, a page and the change feed (page-kind), and accepts servers that omit it", async () => {
+    const a = newStableId();
+    const b = newStableId();
+    const node = (id: string, extra: object) => ({ id, parentId: null, title: id, revisionId: "r1", updatedAt: T, ...extra });
+    const tree = fake(() => ok({ workspaceId: "ws1", items: [node(a, { kind: "folder" }), node(b, { kind: null }), node(newStableId(), {})], nextCursor: null, changeCursor: "base" }));
+    expect((await tree.client.getTree("ws1")).nodes.map((n) => n.kind)).toEqual(["folder", null, undefined]);
+    const withKind = page();
+    const resource = fake(() => ok({ ...withKind, metadata: { ...withKind.metadata, kind: "page" } }));
+    expect((await resource.client.getPage("ws1", PAGE)).metadata.kind).toBe("page");
+    const entry = { id: "e1", kind: "page.created", occurredAt: T, actorId: "u2", pageId: PAGE, revisionId: "r2", pageKind: "folder" };
+    const feed = fake(() => ok({ entries: [entry], cursor: "c2", hasMore: false }));
+    expect((await feed.client.listChanges("ws1", "c1")).entries[0]!.pageKind).toBe("folder");
+    // A kind the protocol does not define is refused like any other malformed response.
+    const bad = fake(() => ok({ workspaceId: "ws1", items: [node(a, { kind: "database" })], nextCursor: null, changeCursor: "base" }));
+    await expect(bad.client.getTree("ws1")).rejects.toBeInstanceOf(ProtocolError);
+  });
+
   it("searches with a JSON body", async () => {
     const { client, requests } = fake(() => ok({ items: [{ pageId: PAGE, title: "Plan", revisionId: "r1", snippet: "…plan…" }], nextCursor: null }));
     expect((await client.search("ws1", { query: "plan" })).items).toHaveLength(1);
