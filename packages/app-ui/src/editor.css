@@ -135,7 +135,7 @@
 .block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; }
 .block-handle:hover, .block-handle:active { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
 .block-handle[hidden] { display: none; }
-.block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-moon); pointer-events: none; }
+.block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
 .block-menu { position: fixed; z-index: 50; min-width: 220px; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }

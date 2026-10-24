@@ -11,6 +11,7 @@ import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { WorkspaceSection } from "@thoth/app-ui/workspace/WorkspaceTree.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
+import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { SearchDialog } from "./SearchDialog.tsx";
 import { track } from "./analytics.ts";
@@ -113,7 +114,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             ) : workspaces.length === 0 ? (
               <p className="muted tree-empty">{t.web.noWorkspaces}</p>
             ) : (
-              <ul role="tree" aria-label={t.web.workspaces}>
+              <TreeList label={t.web.workspaces}>
                 {workspaces.map((workspace) => (
                   <WorkspaceSection
                     key={workspace.id}
@@ -123,10 +124,11 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                     workspace={workspace}
                     current={current}
                     openPage={openPage}
+                    flush={flushAll}
                     onPageCreated={() => track({ name: "page_create" }, target)}
                   />
                 ))}
-              </ul>
+              </TreeList>
             )}
           </nav>
           <div className="web-account">

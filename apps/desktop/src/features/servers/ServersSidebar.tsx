@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspaceSection } from "@thoth/app-ui/workspace/WorkspaceTree.tsx";
+import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 
@@ -10,7 +11,7 @@ interface Props {
 
 /** One section per known server, under the Private Space: its workspaces when signed in, a Sign in link when not. */
 export function ServersSidebar({ current }: Props) {
-  const { servers, openSettings, openWorkspacePage } = useSession();
+  const { servers, openSettings, openWorkspacePage, flushAll } = useSession();
   const t = useDesktopStrings().servers;
   const state = useSyncExternalStore(servers.subscribe, servers.getState);
   if (state.servers.length === 0) return null;
@@ -36,11 +37,11 @@ export function ServersSidebar({ current }: Props) {
             ) : entry.workspaces.length === 0 ? (
               <p className="muted tree-empty">{t.noWorkspaces}</p>
             ) : (
-              <ul role="tree" aria-label={t.workspacesOn(entry.info.label)}>
+              <TreeList label={t.workspacesOn(entry.info.label)}>
                 {entry.workspaces.map((workspace) => (
-                  <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} />
+                  <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} />
                 ))}
-              </ul>
+              </TreeList>
             ))}
         </section>
       ))}
