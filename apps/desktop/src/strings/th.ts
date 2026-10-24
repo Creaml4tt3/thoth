@@ -134,6 +134,136 @@ export const th: DesktopStrings = {
     editsStay: "สิ่งที่คุณแก้ไขยังอยู่ในหน้านี้ หลังเข้าสู่ระบบแล้ว ให้กด ลองอีกครั้ง เพื่อบันทึก",
   },
 
+  // Thai for transfers was written by the implementer, not a native reviewer. Strings marked REVIEW are the
+  // least certain (terminology for "move", "original", "conflict copy", and long result sentences).
+  transfer: {
+    select: "เลือกหน้า",
+    selectDone: "เลือกเสร็จแล้ว",
+    selectPage: (title) => `เลือก ${title}`,
+    selected: (n) => `เลือกแล้ว ${count(n)} หน้า`,
+    copyTo: "คัดลอกไปยังเวิร์กสเปซ…",
+    moveTo: "ย้ายไปยังเวิร์กสเปซ…",
+    copyHere: "คัดลอกมาที่ Private Space…",
+    moveHere: "ย้ายมาที่ Private Space…",
+    transfers: "การโอนย้าย", // REVIEW
+    noWorkspaces: "เพิ่มเซิร์ฟเวอร์และเข้าสู่ระบบเวิร์กสเปซก่อน (การตั้งค่า → เซิร์ฟเวอร์)",
+
+    titleTo: (mode, n) => `${mode === "copy" ? "คัดลอก" : "ย้าย"} ${count(n)} หน้าไปยังเวิร์กสเปซ`,
+    titleFrom: (mode, title) => `${mode === "copy" ? "คัดลอก" : "ย้าย"} “${title}” มาที่ Private Space`,
+
+    destination: "ปลายทาง",
+    workspace: "เวิร์กสเปซ",
+    chooseWorkspace: "เลือกเวิร์กสเปซ",
+    parent: "วางหน้าไว้",
+    topLevel: "ที่ระดับบนสุด",
+    under: (title) => `ข้างใน “${title}”`,
+    folder: "โฟลเดอร์ใน Private Space (เว้นว่างไว้เพื่อวางที่ระดับบนสุด)",
+    folderHint: "หน้าที่เคยย้ายออกไปจาก Private Space นี้จะกลับไปที่เดิม ถ้าที่นั้นยังว่างอยู่",
+    mode: "ต้นฉบับจะเป็นอย่างไร", // REVIEW
+    copy: { title: "คัดลอก", hint: "ต้นฉบับอยู่ที่เดิม สำเนาจะมีตัวตนของตัวเอง" },
+    moveToWs: { title: "ย้าย", hint: "ต้นฉบับจะถูกลบออกจาก Private Space หลังจากเวิร์กสเปซยืนยันครบทุกหน้าแล้ว หน้าที่คุณแก้ไขระหว่างนั้นจะยังเก็บไว้" },
+    moveFromWs: { title: "ย้าย", hint: "หน้านี้จะถูกลบออกจากเวิร์กสเปซหลังจากอยู่ใน Private Space อย่างปลอดภัยแล้ว ถ้ามีคนแก้ไขระหว่างนั้น หน้าจะยังอยู่ในเวิร์กสเปซ" },
+    attachments: "รวมไฟล์แนบที่หน้าเหล่านี้ลิงก์ถึง",
+
+    checking: "กำลังตรวจดูว่าการโอนย้ายนี้จะทำอะไรบ้าง…", // REVIEW
+    whoCanSee: "ใครเห็นได้บ้าง",
+    visibleTo: (n) => (n === 1 ? "มีแค่คุณ ซึ่งเป็นสมาชิกคนเดียวของเวิร์กสเปซนี้" : `ทุกคนในเวิร์กสเปซนี้ (สมาชิก ${count(n)} คน) จะเห็นหน้าเหล่านี้`),
+    membersHidden: (n) => `สมาชิก ${count(n)} คนจะเห็นหน้าเหล่านี้ เซิร์ฟเวอร์นี้ไม่แสดงรายชื่อ`,
+    roles: { owner: "เจ้าของ", editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
+    you: (role) => `บทบาทของคุณ: ${role}`,
+    pagesHeading: "หน้า",
+    attachmentsHeading: (n) => `จะอัปโหลดไฟล์แนบ ${count(n)} ไฟล์`,
+    linksHeading: "ลิงก์",
+    links: {
+      included: "ชี้ไปยังหน้าหรือไฟล์ในการโอนย้ายนี้ และจะถูกปรับให้ถูกต้อง",
+      already_at_destination: "ชี้ไปยังหน้าที่อยู่ในเวิร์กสเปซแล้ว และจะถูกปรับให้ถูกต้อง",
+      left_at_source: "ชี้ไปยังหน้าที่ไม่ได้ไปด้วย จึงคงเป้าหมายเดิมไว้",
+      external: "เป็นลิงก์เว็บ และคงไว้ตามเดิม",
+      unresolved: "ไม่ได้ชี้ไปยังสิ่งที่มีอยู่ จึงคงไว้ตามที่เขียน",
+    },
+    linksIn: "มองจากฝั่งเวิร์กสเปซ", // REVIEW
+    flaggedTitle: "ลิงก์ที่จะใช้ไม่ได้ที่ปลายทาง",
+    noLinks: "หน้าเหล่านี้ไม่มีลิงก์",
+    nothingLeaves: "ยังไม่มีอะไรออกจากคอมพิวเตอร์เครื่องนี้",
+    nothingLeavesFrom: "ยังไม่มีอะไรถูกเขียนลงใน Private Space",
+
+    problems: {
+      server_unknown: "เซิร์ฟเวอร์นี้ไม่อยู่ในรายการของคุณแล้ว",
+      unreachable: (detail) => `ติดต่อเซิร์ฟเวอร์ไม่ได้ ${detail}`,
+      signed_out: "คุณออกจากระบบเซิร์ฟเวอร์นี้แล้ว เข้าสู่ระบบอีกครั้งที่ การตั้งค่า → เซิร์ฟเวอร์",
+      incompatible: "เซิร์ฟเวอร์นี้ใช้โปรโตคอลเวิร์กสเปซคนละเวอร์ชัน",
+      no_transfers: "เซิร์ฟเวอร์นี้ไม่รับการโอนย้าย จึงปิดการคัดลอกและย้ายหน้าสำหรับเซิร์ฟเวอร์นี้",
+      workspace_not_found: "เวิร์กสเปซนี้ไม่มีแล้ว หรือคุณไม่ได้เป็นสมาชิกแล้ว",
+      forbidden: (role) => `คุณเป็น${role}ในเวิร์กสเปซนี้ ซึ่งทำสิ่งนี้ไม่ได้`,
+      export_restricted: "เวิร์กสเปซนี้ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกไป เจ้าของเปิดการจำกัดการส่งออกไว้ และเซิร์ฟเวอร์บังคับใช้ข้อจำกัดนี้",
+      not_editable: (path) => `${path} ไม่ใช่ข้อความ UTF-8 จึงใส่รหัสถาวรที่การโอนย้ายต้องใช้ไม่ได้`, // REVIEW
+      malformed_frontmatter: (path) => `${path} มี frontmatter ที่ Thoth อ่านได้ไม่ปลอดภัย จึงใส่รหัสถาวรที่การโอนย้ายต้องใช้ไม่ได้`, // REVIEW
+      page_too_large: (path, size, limit) => `${path} มีขนาด ${size} เซิร์ฟเวอร์นี้รับหน้าได้ไม่เกิน ${limit}`,
+      too_large_total: (size, limit) => `หน้าเหล่านี้รวมกันมีขนาด ${size} เกินกว่าที่ส่งได้ในครั้งเดียว (${limit}) เลือกให้น้อยลง`,
+      quota: (limit, current, adding) => `เวิร์กสเปซมีอยู่ ${count(current)} หน้า จากที่รับได้สูงสุด ${count(limit)} หน้า จึงเพิ่มอีก ${count(adding)} หน้าไม่ได้`,
+      bad_folder: "ใช้โฟลเดอร์นี้ใน Private Space ไม่ได้",
+      nothing_selected: "เลือกอย่างน้อยหนึ่งหน้า",
+    },
+
+    warnings: {
+      unresolved_links: (n) => `มีลิงก์ ${count(n)} ลิงก์ที่ไม่ได้ชี้ไปยังสิ่งที่มีอยู่ จะคงไว้ตามที่เขียนทุกตัวอักษร`,
+      left_at_source: (n) => `มีลิงก์ ${count(n)} ลิงก์ที่ชี้ไปยังหน้าที่ไม่ได้อยู่ในการโอนย้ายนี้ จึงจะเปิดไม่ได้ที่ปลายทาง`,
+      attachments_unsupported: (n) => `เซิร์ฟเวอร์นี้ไม่รับไฟล์แนบ ไฟล์ที่ลิงก์ไว้ ${count(n)} ไฟล์จึงไม่ได้ไปด้วย`,
+      attachment_too_large: (path, size, limit) => `${path} มีขนาด ${size} เกินขีดจำกัดต่อไฟล์ของเซิร์ฟเวอร์นี้ (${limit}) จึงไม่ได้ไปด้วย`,
+      attachments_stay_in_workspace: (n) => `ไฟล์ที่ลิงก์ไว้ ${count(n)} ไฟล์ยังอยู่ในเวิร์กสเปซ การโอนย้ายจากเวิร์กสเปซมาที่ Private Space นำมาเฉพาะหน้า`,
+      quota_near: (limit, current, adding) => `หลังจากนี้เวิร์กสเปซจะมี ${count(current + adding)} หน้า จากที่รับได้สูงสุด ${count(limit)} หน้า`,
+    },
+
+    cancel: "ยกเลิก",
+    startCopy: "คัดลอก",
+    startMove: "ย้าย",
+    close: "ปิด",
+    retry: "ลองอีกครั้ง",
+    stop: "หยุดและย้อนกลับ", // REVIEW
+    dismiss: "ซ่อน",
+    openResult: "เปิด",
+
+    working: "กำลังโอนย้าย…",
+    states: {
+      plan: "กำลังวางแผน",
+      validate: "กำลังตรวจสิทธิ์และข้อจำกัด",
+      stage: "กำลังเตรียมที่ปลายทาง",
+      transfer: "กำลังส่ง",
+      verify: "กำลังตรวจสอบ",
+      commit_destination: "กำลังบันทึกที่ปลายทาง",
+      finalize_source: "กำลังลบต้นฉบับ",
+      done: "เสร็จแล้ว",
+      destination_committed_source_cleanup_pending: "เสร็จแล้ว แต่ยังเก็บต้นฉบับไว้", // REVIEW
+      failed: "ไม่ได้โอนย้าย",
+      aborted: "หยุดแล้ว",
+    },
+    progressLabel: "ความคืบหน้าของการโอนย้าย",
+
+    resultDone: (mode, n, where) => `${mode === "copy" ? "คัดลอก" : "ย้าย"} ${count(n)} หน้าไปยัง ${where} แล้ว ทุกหน้าได้รับการตรวจสอบที่ปลายทางแล้ว`,
+    resultPending: (moved, kept, where) =>
+      `ตอนนี้ ${count(moved)} หน้าอยู่ใน ${where} แล้ว แต่การย้ายยังไม่เสร็จ: เก็บต้นฉบับไว้ ${count(kept)} หน้า เพราะมีการแก้ไขหลังจากเริ่มโอนย้าย ไม่มีอะไรหาย ลองเทียบทั้งสองฉบับ แล้วลบฉบับที่ไม่ต้องการ`, // REVIEW
+    resultFailed: (detail) => `ไม่มีอะไรถูกโอนย้าย และต้นฉบับไม่ได้เปลี่ยนแปลง ${detail}`,
+    resultAborted: "หยุดและย้อนกลับการโอนย้ายแล้ว ปลายทางไม่มีอะไรเปลี่ยน และต้นฉบับไม่ได้เปลี่ยนแปลง",
+    resultInterrupted: (detail) => `การโอนย้ายถูกขัดจังหวะ: ${detail} ต้นฉบับของคุณปลอดภัย ลองอีกครั้ง หรือหยุดและย้อนกลับ`,
+    keptItems: "ต้นฉบับที่เก็บไว้",
+    keptReason: {
+      source_changed: "ถูกแก้ไขหลังเริ่มโอนย้าย",
+      source_moved: "ถูกย้ายที่หลังเริ่มโอนย้าย",
+      revision_conflict: "ถูกแก้ไขในเวิร์กสเปซหลังเริ่มโอนย้าย",
+      hash_mismatch: "ตรวจสอบที่ปลายทางไม่ผ่าน",
+    },
+    keptOther: "เก็บไว้เพื่อความปลอดภัย",
+    conflictCopies: (n) => `มี ${count(n)} หน้าที่อยู่ที่นี่แล้วและมีการแก้ไขอื่น จึงบันทึกไว้ข้างต้นฉบับเป็นสำเนาที่ขัดแย้ง`, // REVIEW
+    privateSpace: "Private Space ของคุณ",
+
+    recoveredTitle: "การโอนย้ายที่ยังไม่เสร็จ",
+    recoveredCompleted: (n) => `ทำการโอนย้าย ${count(n)} รายการที่ถูกขัดจังหวะเมื่อปิด Thoth ครั้งก่อนให้เสร็จแล้ว`,
+    recoveredRolledBack: (n) => `ย้อนกลับการโอนย้าย ${count(n)} รายการที่ถูกขัดจังหวะก่อนบันทึกที่ปลายทางแล้ว ต้นฉบับไม่ได้เปลี่ยนแปลง`,
+    recoveredWaiting: (n) => `ยังจัดการการโอนย้าย ${count(n)} รายการไม่ได้ เพราะติดต่อเซิร์ฟเวอร์ไม่ได้ Thoth จะลองใหม่ครั้งหน้า`,
+    pendingList: "การย้ายที่ยังเก็บต้นฉบับไว้",
+    pendingItem: (n, where) => `เก็บต้นฉบับไว้ ${count(n)} หน้า · ${where}`,
+  },
+
   wizard: {
     region: "นำเข้า",
     titles: {

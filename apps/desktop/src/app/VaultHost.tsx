@@ -3,6 +3,7 @@ import type { Vault } from "@thoth/local-store";
 import type { Platform, VaultConnection } from "@thoth/platform";
 import { Intro } from "../features/onboarding/Intro.tsx";
 import { createImportService } from "../features/import/service.ts";
+import { createTransferService } from "../features/transfer/service.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
@@ -63,10 +64,18 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   // Workspace servers: one directory per open window, polling only expanded workspaces.
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
   const pageHost = useMemo<PageHost>(() => ({ autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
+  // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
+  const transfers = useMemo(() => createTransferService(vault, servers, { now: options.now, onChanged: bump }), [vault, servers, options.now, bump]);
   useEffect(() => {
-    void servers.start();
-    return () => servers.dispose();
-  }, [servers]);
+    let live = true;
+    void servers.start().then(() => {
+      if (live) void transfers.recover();
+    });
+    return () => {
+      live = false;
+      servers.dispose();
+    };
+  }, [servers, transfers]);
 
   const importService = useMemo(
     () => createImportService(vault, (kind, location) => options.openImportSource(platform, kind, location)),
@@ -94,6 +103,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         }),
       openSettings: (section) => void flushAll().then((ok) => ok && setSettings(section ?? "top")),
       servers,
+      transfers,
       openWorkspacePage: (ref) =>
         void flushAll().then((ok) => {
           if (!ok) return;
@@ -118,7 +128,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers],
   );
 
   return (

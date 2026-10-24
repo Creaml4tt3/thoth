@@ -22,6 +22,8 @@ export interface WorkspacePageProps {
   onSaved?: PageFrameProps["onSaved"];
   /** Once per page, when it loads. */
   onOpened?(): void;
+  /** Extra controls in the breadcrumb bar. */
+  actions?: ReactNode;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface WorkspacePageProps {
  * workspace yet (they come from the local index), so links show unresolved and
  * there is no backlinks panel.
  */
-export function WorkspacePage({ directory, target, modeSpace, openPage, signedOutNotice, signedOutAction, goneNotice, onConflict, onSaved, onOpened }: WorkspacePageProps) {
+export function WorkspacePage({ directory, target, modeSpace, openPage, signedOutNotice, signedOutAction, goneNotice, onConflict, onSaved, onOpened, actions }: WorkspacePageProps) {
   const t = useStrings().workspace;
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const entry = state.servers.find((s) => s.info.id === target.server);
@@ -86,6 +88,7 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
       readOnlyNote={t.readOnly(name)}
       missing={{ title: t.missingTitle, detail: t.missingDetail }}
       errorAction={signedOut ? signedOutAction : undefined}
+      actions={actions}
       {...(onConflict ? { onConflict } : {})}
       {...(onSaved ? { onSaved } : {})}
     />
