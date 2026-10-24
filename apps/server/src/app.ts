@@ -69,6 +69,7 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "attachments", test: (_m, p) => /^\/workspaces\/[^/]+\/attachments(\/[^/]+)?$/.test(p) },
   { capability: "search", test: (m, p) => m === "POST" && /^\/workspaces\/[^/]+\/search$/.test(p) },
   { capability: "events.sse", test: (m, p) => m === "GET" && /^\/workspaces\/[^/]+\/events$/.test(p) },
+  { capability: "page-order", test: (m, p) => m === "POST" && /^\/workspaces\/[^/]+\/pages\/[^/]+\/move$/.test(p) },
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
 ];
 

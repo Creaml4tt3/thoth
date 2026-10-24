@@ -3,6 +3,7 @@ import {
   API_BASE_PATH,
   PAGE_SIZE_MAX,
   PROTOCOL_VERSION,
+  PageMoveSchema,
   PageWriteSchema,
   RevisionIdSchema,
   formatEtag,
@@ -26,9 +27,11 @@ import {
   loadCurrentRevision,
   loadPage,
   loadRevision,
+  movePage,
   pageResource,
   parsePageId,
   revisionSummary,
+  treeNode,
   writeRevision,
   type RevisionRow,
 } from "../pages.ts";
@@ -116,8 +119,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       afterId = id;
       head = Number(seq);
     }
-    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; current_revision_id: string; updated_at: Date }>(
-      `SELECT id, parent_id, title, current_revision_id, updated_at FROM pages
+    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; current_revision_id: string; updated_at: Date }>(
+      `SELECT id, parent_id, title, position, current_revision_id, updated_at FROM pages
         WHERE workspace_id = $1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id > $2)
         ORDER BY id LIMIT $3`,
       [ws.id, afterId, limit + 1],
@@ -127,7 +130,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       reply,
       jsonReply(200, {
         workspaceId: ws.id,
-        items: page.map((p) => ({ id: p.id, parentId: p.parent_id, title: p.title, revisionId: p.current_revision_id, updatedAt: p.updated_at.toISOString() })),
+        items: page.map(treeNode),
         nextCursor: rows.length > limit ? encodeCursor("t", ws.id, `${page[page.length - 1]!.id}:${head}`) : null,
         changeCursor: changeCursorOf(ws.id, head),
       }),
@@ -186,6 +189,28 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       }),
   );
 
+  // Capability `page-order`: a metadata-only move (no new revision). The capability gate in app.ts answers 501 when it is off.
+  app.post<{ Params: PageParams }>(`${API_BASE_PATH}/workspaces/:workspaceId/pages/:pageId/move`, (request, reply) =>
+    mutate(deps, request, reply, async (tx, _info, now) => {
+      const me = principalOf(request);
+      const ws = await workspaceAccess(tx, request.params.workspaceId, me.id, "write", { lock: true });
+      const pageId = parsePageId(request.params.pageId);
+      const ifMatch = request.headers["if-match"];
+      if (ifMatch === undefined) throw new ApiError("precondition_required", "a move requires If-Match");
+      const expected = parseEtag(Array.isArray(ifMatch) ? ifMatch.join(", ") : ifMatch);
+      if (expected === null) throw new ApiError("validation_failed", "If-Match must be one strong entity tag", fieldError("header:If-Match", "expected one strong entity tag"));
+      const parsed = PageMoveSchema.safeParse(parseJsonBody(request));
+      if (!parsed.success) throw zodFailure(parsed.error);
+      const page = await loadPage(tx, ws.id, pageId, { forUpdate: true });
+      if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+      // If-Match guards the content revision; moves themselves do not create one, so the last move wins.
+      if (expected !== page.current_revision_id) throw new ApiError("revision_conflict", "If-Match does not match the current revision", { currentRevision: revisionSummary(await loadCurrentRevision(tx, page)) });
+      await checkParent(tx, ws.id, pageId, parsed.data.parentId);
+      const moved = await movePage(tx, { page, parentId: parsed.data.parentId, position: parsed.data.position, userId: me.id, now });
+      return jsonReply(200, treeNode(moved), { etag: formatEtag(moved.current_revision_id) });
+    }),
+  );
+
   app.delete<{ Params: PageParams }>(`${API_BASE_PATH}/workspaces/:workspaceId/pages/:pageId`, (request, reply) =>
     mutate(deps, request, reply, async (tx, _info, now) => {
       const me = principalOf(request);
@@ -229,7 +254,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     // Entries are read after the head, and an entry at seq <= head is always fully committed
     // (writers hold the workspace lock until commit), so no entry can appear below a cursor we hand out.
     const { rows } = await db.query<ChangeRow>(
-      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, attachment_id
+      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, attachment_id
          FROM changes WHERE workspace_id = $1 AND seq > $2 AND seq <= $3 ORDER BY seq LIMIT $4`,
       [ws.id, position, head, limit],
     );

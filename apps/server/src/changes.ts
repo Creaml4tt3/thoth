@@ -12,6 +12,7 @@ export interface NewChange {
   revisionId?: string;
   parentId?: string | null;
   title?: string;
+  position?: string | null;
   attachmentId?: string;
 }
 
@@ -25,9 +26,9 @@ export interface NewChange {
 export async function appendChange(tx: Queryable, workspaceId: string, change: NewChange, occurredAt: Date): Promise<number> {
   const seq = (await tx.query<{ change_seq: number }>("UPDATE workspaces SET change_seq = change_seq + 1 WHERE id = $1 RETURNING change_seq", [workspaceId])).rows[0]!.change_seq;
   await tx.query(
-    `INSERT INTO changes (workspace_id, seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, attachment_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [workspaceId, seq, change.kind, occurredAt, change.actorId, change.pageId ?? null, change.revisionId ?? null, change.parentId ?? null, change.title ?? null, change.attachmentId ?? null],
+    `INSERT INTO changes (workspace_id, seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, attachment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [workspaceId, seq, change.kind, occurredAt, change.actorId, change.pageId ?? null, change.revisionId ?? null, change.parentId ?? null, change.title ?? null, change.position ?? null, change.attachmentId ?? null],
   );
   return seq;
 }
@@ -41,6 +42,7 @@ export interface ChangeRow {
   revision_id: string | null;
   parent_id: string | null;
   title: string | null;
+  position: string | null;
   attachment_id: string | null;
 }
 
@@ -53,7 +55,7 @@ export function changeEntryOf(row: ChangeRow): ChangeEntry {
     actorId: row.actor_id,
     ...(row.page_id === null ? {} : { pageId: row.page_id }),
     ...(row.revision_id === null ? {} : { revisionId: row.revision_id }),
-    ...(row.kind === "page.created" || row.kind === "page.updated" ? { parentId: row.parent_id } : {}),
+    ...(row.kind === "page.created" || row.kind === "page.updated" ? { parentId: row.parent_id, position: row.position } : {}),
     ...(row.title === null ? {} : { title: row.title }),
     ...(row.attachment_id === null ? {} : { attachmentId: row.attachment_id }),
   };

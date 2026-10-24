@@ -84,7 +84,7 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order"];
 
 const KIB = 1024;
 const MIB = 1_048_576;

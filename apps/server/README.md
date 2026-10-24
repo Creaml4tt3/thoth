@@ -8,7 +8,8 @@ contract is the route registry in `packages/workspace-protocol` and the conforma
 Phase 2a scope: pages and immutable revisions, change feed, attachments, search, SSE hints, transfers,
 personal-access-token authentication, an admin CLI, a container image. Phase 2b adds the hosted trial mode
 (quotas, a trial profile, Postgres blob storage, CORS, rate limiting, maintenance) and the sign-in broker
-(Google / any OIDC issuer / GitHub, see Sign-in).
+(Google / any OIDC issuer / GitHub, see Sign-in). Phase 3b adds page order (capability `page-order`: `position` and the
+metadata-only `movePage`, migration `008_page_position.sql`).
 
 ## Run it
 
@@ -134,6 +135,8 @@ not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
   the migration runner uses a session-level `pg_advisory_lock`, which does not work through a PgBouncer
   transaction-mode pooler. `MIGRATE_ON_START=false` skips the runner and its lock entirely. The function itself
   uses the pooled URL.
+- **Apply new migrations before deploying** a server build that needs them (for example `008_page_position.sql` before
+  the build that reads `pages.position`). Every migration so far is additive, so the running build keeps working.
 - **No LISTEN/NOTIFY.** The pooled endpoint cannot carry it, and an always-open connection keeps a scale-to-zero
   database awake and burns compute hours. The trial profile sets `EVENTS=off`: no listener is started and `events.sse` is not
   advertised (clients poll the change feed).

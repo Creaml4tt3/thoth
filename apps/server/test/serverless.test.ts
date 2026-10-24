@@ -43,7 +43,7 @@ describe("serverless handler", () => {
       env.DATABASE_URL = "postgres://user:s3cretpw@127.0.0.1:1/thoth";
       const second = await fetch(url);
       expect(second.status).toBe(200);
-      expect((await second.json()).capabilities).toEqual(["attachments", "search", "transfers"]);
+      expect((await second.json()).capabilities).toEqual(["attachments", "search", "transfers", "page-order"]);
     } finally {
       server.close();
       errors.mockRestore();

@@ -10,6 +10,8 @@ export interface PageRow {
   id: string;
   parent_id: string | null;
   title: string;
+  /** Sibling sort key (capability `page-order`); lives on the page row only, never in a revision. */
+  position: string | null;
   current_revision_id: string;
   revision_count: number;
   created_at: Date;
@@ -51,15 +53,22 @@ export function revisionSummary(rev: Omit<RevisionRow, "markdown">) {
   };
 }
 
+/**
+ * The page as of `rev`. For the current revision, parent and position come from the page row: a move
+ * (`movePage`) changes them there without creating a revision. A historical revision shows where the page was
+ * when that revision was written, and no position.
+ */
 export function pageResource(page: PageRow, rev: RevisionRow) {
+  const current = rev.id === page.current_revision_id;
   return {
     id: page.id,
     markdown: rev.markdown,
     revision: revisionSummary(rev),
     metadata: {
       workspaceId: page.workspace_id,
-      parentId: rev.page_parent_id,
+      parentId: current ? page.parent_id : rev.page_parent_id,
       title: rev.title,
+      position: current ? page.position : null,
       createdAt: page.created_at.toISOString(),
       createdBy: page.created_by,
       updatedAt: rev.created_at.toISOString(),
@@ -140,7 +149,9 @@ export async function writeRevision(
   const { workspaceId, pageId, input, userId, existing, now } = args;
   const created = existing === undefined;
   const previous = existing ? await loadCurrentRevision(tx, existing) : undefined;
-  const pageParentId = input.parentId === undefined ? (previous?.page_parent_id ?? null) : input.parentId;
+  // Unchanged parent and position come from the page row, which a metadata-only move may have changed since the last revision.
+  const pageParentId = input.parentId === undefined ? (existing?.parent_id ?? null) : input.parentId;
+  const position = input.position === undefined ? (existing?.position ?? null) : input.position;
   const revisionId = opaqueId("rev");
   const revNo = (existing?.revision_count ?? 0) + 1;
   const size = Buffer.byteLength(input.markdown, "utf8");
@@ -149,9 +160,9 @@ export async function writeRevision(
   if (created) {
     // The pages -> page_revisions pointer is deferred, so the page row may precede its first revision.
     await tx.query(
-      `INSERT INTO pages (workspace_id, id, parent_id, title, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $6, $7)`,
-      [workspaceId, pageId, pageParentId, input.title, revisionId, now, userId],
+      `INSERT INTO pages (workspace_id, id, parent_id, title, position, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $7, $8)`,
+      [workspaceId, pageId, pageParentId, input.title, position, revisionId, now, userId],
     );
   }
   await tx.query(
@@ -160,9 +171,9 @@ export async function writeRevision(
     [revisionId, workspaceId, pageId, revNo, previous?.id ?? null, now, userId, input.title, input.markdown, pageParentId, size, contentHash],
   );
   if (!created) {
-    await tx.query("UPDATE pages SET parent_id = $3, title = $4, current_revision_id = $5, revision_count = $6, updated_at = $7, updated_by = $8 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, revisionId, revNo, now, userId]);
+    await tx.query("UPDATE pages SET parent_id = $3, title = $4, position = $5, current_revision_id = $6, revision_count = $7, updated_at = $8, updated_by = $9 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, position, revisionId, revNo, now, userId]);
   }
-  await appendChange(tx, workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId, parentId: pageParentId, title: input.title }, now);
+  await appendChange(tx, workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId, parentId: pageParentId, title: input.title, position }, now);
 
   const revision: RevisionRow = { id: revisionId, page_id: pageId, rev_no: revNo, parent_revision_id: previous?.id ?? null, created_at: now, author_id: userId, title: input.title, markdown: input.markdown, page_parent_id: pageParentId, size, content_hash: contentHash };
   const page: PageRow = {
@@ -170,6 +181,7 @@ export async function writeRevision(
     id: pageId,
     parent_id: pageParentId,
     title: input.title,
+    position,
     current_revision_id: revisionId,
     revision_count: revNo,
     created_at: existing?.created_at ?? now,
@@ -179,6 +191,25 @@ export async function writeRevision(
     deleted_at: null,
   };
   return { page, revision, created };
+}
+
+/**
+ * Metadata-only move (capability `page-order`): a new parent and/or position on the page row, no new revision.
+ * The caller holds the workspace lock, has checked `If-Match` against `page` (locked) and the parent. The
+ * change feed records `page.updated` naming the unchanged current revision.
+ */
+export async function movePage(tx: Queryable, args: { page: PageRow; parentId: string | null | undefined; position: string | null | undefined; userId: string | null; now: Date }): Promise<PageRow> {
+  const { page, userId, now } = args;
+  const parentId = args.parentId === undefined ? page.parent_id : args.parentId;
+  const position = args.position === undefined ? page.position : args.position;
+  await tx.query("UPDATE pages SET parent_id = $3, position = $4, updated_at = $5, updated_by = $6 WHERE workspace_id = $1 AND id = $2", [page.workspace_id, page.id, parentId, position, now, userId]);
+  await appendChange(tx, page.workspace_id, { kind: "page.updated", actorId: userId, pageId: page.id, revisionId: page.current_revision_id, parentId, title: page.title, position }, now);
+  return { ...page, parent_id: parentId, position, updated_at: now, updated_by: userId };
+}
+
+/** The tree node of a page row (`getWorkspaceTree`, `movePage`). */
+export function treeNode(p: Pick<PageRow, "id" | "parent_id" | "title" | "position" | "current_revision_id" | "updated_at">) {
+  return { id: p.id, parentId: p.parent_id, title: p.title, position: p.position, revisionId: p.current_revision_id, updatedAt: p.updated_at.toISOString() };
 }
 
 /** Marks a page deleted and records `page.deleted`. Revisions are kept. */
