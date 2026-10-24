@@ -65,6 +65,8 @@ export interface Commands {
   "vault.recent": { args: Record<string, never>; result: string[] };
   "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string } };
   "vault.close": { args: { vault: string }; result: null };
+  /** Shows the open vault's folder in the system file manager. By handle only: the webview cannot name a path. */
+  "vault.reveal": { args: { vault: string }; result: null };
 
   "fs.stat": { args: { vault: string; path: string }; result: FileStat | null };
   "fs.read": { args: { vault: string; path: string }; result: Bytes };

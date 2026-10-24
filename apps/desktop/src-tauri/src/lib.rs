@@ -19,7 +19,7 @@ use std::sync::{Arc, OnceLock};
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
-use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
 
 pub const ARGS_HEADER: &str = "x-thoth-args";
 pub const VAULT_CHANGED_EVENT: &str = "vault:changed";
@@ -101,6 +101,37 @@ impl Browser for SystemBrowser {
     }
 }
 
+/// Shows a vault folder in Finder, File Explorer or the Linux file manager. The host passes only the canonical root
+/// of an open vault; it goes to the launcher as one argument (no shell). An absolute path starts with `/` or a
+/// drive letter, so the launcher cannot read it as an option.
+struct SystemFileManager;
+
+impl SystemFileManager {
+    fn command(root: &std::path::Path) -> HostResult<std::process::Command> {
+        if !root.is_absolute() || root.as_os_str().to_string_lossy().chars().any(char::is_control) {
+            return Err(HostError::bad_argument("Only an open Private Space folder can be shown"));
+        }
+        #[cfg(target_os = "macos")]
+        let mut command = std::process::Command::new("/usr/bin/open");
+        #[cfg(target_os = "windows")]
+        let mut command = std::process::Command::new("explorer");
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(root);
+        Ok(command)
+    }
+}
+
+impl FileManager for SystemFileManager {
+    fn reveal(&self, root: &std::path::Path) -> HostResult<()> {
+        let mut command = Self::command(root)?;
+        command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        let mut child = command.spawn().map_err(|_| HostError::internal("Could not open the file manager"))?;
+        std::thread::spawn(move || child.wait());
+        Ok(())
+    }
+}
+
 /// Decodes `%XX` escapes (the header carries `encodeURIComponent(JSON.stringify(args))`).
 fn percent_decode(input: &str) -> Option<String> {
     let bytes = input.as_bytes();
@@ -177,6 +208,7 @@ pub fn run() {
                 disable_hardlink: false,
                 secrets: Arc::new(KeychainStore),
                 browser: Arc::new(SystemBrowser),
+                file_manager: Arc::new(SystemFileManager),
             });
             let _ = HOST.set(Arc::new(host));
             Ok(())
@@ -231,6 +263,19 @@ mod tests {
         for bad in ["file:///etc/passwd", "javascript:alert(1)", "-a Calculator", "x-apple.systempreferences:", "https://x.example.org/\nrm", ""] {
             assert_eq!(SystemBrowser.open(bad).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
         }
+    }
+
+    #[test]
+    fn file_manager_gets_the_folder_as_one_argument() {
+        // Builds the command only: nothing here may launch a file manager.
+        for bad in ["relative/folder", "/tmp/a\nb"] {
+            assert_eq!(SystemFileManager::command(std::path::Path::new(bad)).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
+        }
+        let root = std::path::Path::new("/tmp/-a Calculator; rm -rf ~");
+        let command = SystemFileManager::command(root).unwrap();
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![root.as_os_str()]);
+        #[cfg(target_os = "macos")]
+        assert_eq!(command.get_program(), "/usr/bin/open");
     }
 
     #[test]

@@ -17,6 +17,8 @@ export interface VaultConnection {
   readonly sql: SqlDriver;
   /** Starts the filesystem watcher. It is a trigger only: listeners should debounce into `vault.reconcile()`. */
   watch(listener: (event: Omit<VaultChangedEvent, "vault">) => void): Promise<() => Promise<void>>;
+  /** Shows this folder in Finder, File Explorer or Files. Absent where there is no file manager to open. */
+  reveal?(): Promise<void>;
   close(): Promise<void>;
 }
 

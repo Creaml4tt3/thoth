@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker};
 
 /// Longest request line accepted (1 GiB of base64 plus JSON overhead).
 const MAX_LINE: usize = 1024 * 1024 * 1024 / 3 * 4 + 1024 * 1024;
@@ -48,6 +48,18 @@ struct EventBrowser {
 impl Browser for EventBrowser {
     fn open(&self, url: &str) -> HostResult<()> {
         (self.emit)(json!({ "event": "browser.open", "payload": { "url": url } }));
+        Ok(())
+    }
+}
+
+/// Reports `vault.reveal` as a `vault.revealed` event instead of opening a file manager.
+struct EventFileManager {
+    emit: Arc<dyn Fn(Value) + Send + Sync>,
+}
+
+impl FileManager for EventFileManager {
+    fn reveal(&self, root: &std::path::Path) -> HostResult<()> {
+        (self.emit)(json!({ "event": "vault.revealed", "payload": { "root": root.to_string_lossy() } }));
         Ok(())
     }
 }
@@ -85,6 +97,7 @@ fn main() {
     };
     let event_emit = emit.clone();
     let browser_emit = emit.clone();
+    let reveal_emit = emit.clone();
     let host = Arc::new(Host::new(HostConfig {
         data_dir,
         allow_roots,
@@ -93,6 +106,7 @@ fn main() {
         disable_hardlink: std::env::var_os("THOTH_TEST_DISABLE_HARDLINK").is_some_and(|v| v == "1"),
         secrets: Arc::new(MemorySecretStore::default()),
         browser: Arc::new(EventBrowser { emit: Arc::new(browser_emit) }),
+        file_manager: Arc::new(EventFileManager { emit: Arc::new(reveal_emit) }),
     }));
     let mut workers = Vec::new();
 

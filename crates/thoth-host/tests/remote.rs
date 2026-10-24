@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use support::{Callback, Config, Fake, follow};
-use thoth_host::{Browser, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
 
 struct NoPicker;
 impl Picker for NoPicker {
@@ -16,6 +16,13 @@ impl Picker for NoPicker {
     }
     fn pick_source(&self, _: bool) -> Option<std::path::PathBuf> {
         None
+    }
+}
+
+struct NoFileManager;
+impl FileManager for NoFileManager {
+    fn reveal(&self, _: &std::path::Path) -> HostResult<()> {
+        Ok(())
     }
 }
 
@@ -69,6 +76,7 @@ impl Harness {
             disable_hardlink: false,
             secrets: secrets.clone(),
             browser: browser.clone(),
+            file_manager: Arc::new(NoFileManager),
         }));
         Self { host, secrets, browser, dir, seen: Mutex::default() }
     }

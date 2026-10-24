@@ -41,7 +41,7 @@ use watch::Watcher;
 
 /// Every command name in the contract (`Commands` in ipc.ts).
 pub const COMMANDS: &[&str] = &[
-    "vault.pick", "vault.recent", "vault.open", "vault.close",
+    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal",
     "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
     "sql.exec", "sql.run", "sql.all", "sql.get",
     "watch.start", "watch.stop",
@@ -62,6 +62,12 @@ pub trait Picker: Send + Sync {
     fn pick_source(&self, directory: bool) -> Option<PathBuf>;
 }
 
+/// Shows an open vault's folder in the system file manager (Finder, File Explorer, Files). The desktop shell
+/// launches it; the harness and tests record the path. `root` is always the canonical root of an open vault.
+pub trait FileManager: Send + Sync {
+    fn reveal(&self, root: &Path) -> HostResult<()>;
+}
+
 /// Receives host events (`vault.changed` with its JSON payload).
 pub type EventSink = Arc<dyn Fn(&str, Value) + Send + Sync>;
 
@@ -78,6 +84,8 @@ pub struct HostConfig {
     pub secrets: Arc<dyn SecretStore>,
     /// Opens the browser for server sign-in.
     pub browser: Arc<dyn Browser>,
+    /// Shows a vault folder in the file manager (`vault.reveal`).
+    pub file_manager: Arc<dyn FileManager>,
 }
 
 struct VaultEntry {
@@ -140,6 +148,12 @@ impl Host {
             "vault.open" => json(self.open_vault(str_arg(args, "root")?)?),
             "vault.close" => {
                 self.close_vault(str_arg(args, "vault")?)?;
+                null()
+            }
+            // Names a vault by its handle, never a path: only a folder the user opened can be shown.
+            "vault.reveal" => {
+                let entry = self.vault(args)?;
+                self.config.file_manager.reveal(&entry.root)?;
                 null()
             }
             "fs.stat" => json(self.vault(args)?.fs.stat(str_arg(args, "path")?)?),

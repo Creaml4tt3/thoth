@@ -48,6 +48,22 @@ describe("allow-list", () => {
     await expect(platform.openImportSource(other)).rejects.toMatchObject({ code: "NOT_ALLOWED" });
   });
 
+  it("reveals an open vault's own folder, by handle, and nothing after it is closed", async () => {
+    const picked = join(base, "picked");
+    await mkdir(picked);
+    const revealed: unknown[] = [];
+    const t = await transport({ pickVault: picked, dataDir: join(base, "data"), onHostEvent: (event, payload) => event === "vault.revealed" && revealed.push(payload) });
+    const platform = createRemotePlatform(t, "bridge");
+    await platform.pickVaultFolder();
+    const vault = await platform.openVault(picked);
+    await vault.reveal!();
+    expect(revealed).toEqual([{ root: vault.root }]);
+    await expect(t.call("vault.reveal", { vault: picked })).rejects.toMatchObject({ code: "BAD_HANDLE" });
+    await vault.close();
+    await expect(vault.reveal!()).rejects.toMatchObject({ code: "BAD_HANDLE" });
+    expect(revealed).toHaveLength(1);
+  });
+
   it("opens an import source only after source.pick returned it", async () => {
     const archive = join(base, "export.zip");
     await writeFile(archive, "zip");
