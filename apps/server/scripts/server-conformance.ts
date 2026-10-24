@@ -58,6 +58,61 @@ async function waitForServer(url: string): Promise<void> {
   throw new Error(`the server did not become ready within 120 s (${last})`);
 }
 
+interface Stack {
+  kind: string;
+  up(): Promise<void>;
+  down(): Promise<void>;
+}
+
+/** `podman compose` needs an external provider (podman-compose or docker-compose), which many machines lack. */
+async function hasCompose(): Promise<boolean> {
+  return podman(["compose", "version"]).then(
+    () => true,
+    () => false,
+  );
+}
+
+/** compose.yaml as written. */
+function composeStack(port: number): Stack {
+  const compose = (...args: string[]) => run("podman", ["compose", "-f", "compose.yaml", "-p", project, ...args], { cwd: ROOT, env: composeEnv(port), maxBuffer: 64 * 1024 * 1024 });
+  return {
+    kind: "podman compose",
+    up: async () => void (await compose("up", "--no-build", "-d")),
+    down: async () => void (await compose("down", "--volumes", "--remove-orphans", "--timeout", "3")),
+  };
+}
+
+/**
+ * The same two services as compose.yaml with plain Podman (a network, two volumes, two containers), for machines
+ * without a compose provider. Secrets reach the containers as `-e NAME` (value from this process's environment),
+ * never on a command line.
+ */
+function plainStack(port: number): Stack {
+  const net = `${project}-net`;
+  const db = `${project}-postgres-1`;
+  const volumes = [`${project}-pgdata`, `${project}-blobs`];
+  const env = { ...process.env, POSTGRES_PASSWORD: password, DATABASE_URL: `postgres://thoth:${password}@postgres:5432/thoth` };
+  return {
+    kind: "plain podman",
+    async up() {
+      await podman(["network", "create", net]);
+      for (const v of volumes) await podman(["volume", "create", v]);
+      await podman(["run", "-d", "--name", db, "--network", net, "--network-alias", "postgres", "-e", "POSTGRES_USER=thoth", "-e", "POSTGRES_DB=thoth", "-e", "POSTGRES_PASSWORD", "-v", `${volumes[0]}:/var/lib/postgresql`, "docker.io/library/postgres:18-alpine"], env);
+      const deadline = Date.now() + 90_000;
+      while (!(await podman(["exec", db, "pg_isready", "-U", "thoth", "-d", "thoth"]).then(() => true, () => false))) {
+        if (Date.now() > deadline) throw new Error("PostgreSQL did not become ready within 90 s");
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      await podman(["run", "-d", "--name", server, "--network", net, "-e", "DATABASE_URL", "-e", "BLOB_DIR=/data/blobs", "-e", "HOST=0.0.0.0", "-e", "PORT=8080", "-p", `127.0.0.1:${port}:8080`, "-v", `${volumes[1]}:/data/blobs`, "localhost/thoth-server:dev"], env);
+    },
+    async down() {
+      await podman(["rm", "-f", "-t", "3", server, db]).catch(() => undefined);
+      await podman(["volume", "rm", "-f", ...volumes]).catch(() => undefined);
+      await podman(["network", "rm", "-f", net]).catch(() => undefined);
+    },
+  };
+}
+
 async function main(): Promise<number> {
   try {
     await podman(["info", "--format", "{{.Host.Arch}}"]);
@@ -69,13 +124,13 @@ async function main(): Promise<number> {
   const url = `http://127.0.0.1:${port}`;
   const dir = await mkdtemp(join(tmpdir(), "thoth-conformance-"));
   await chmod(dir, 0o700);
-  const compose = (...args: string[]) => run("podman", ["compose", "-f", "compose.yaml", "-p", project, ...args], { cwd: ROOT, env: composeEnv(port), maxBuffer: 64 * 1024 * 1024 });
+  const stack = (await hasCompose()) ? composeStack(port) : plainStack(port);
   let code = 1;
   try {
-    console.log(`[server:conformance] starting ${project} (build + postgres + server) on ${url}`);
+    console.log(`[server:conformance] starting ${project} (build + postgres + server, ${stack.kind}) on ${url}`);
     // Built by Podman itself, not through `compose --build`: the external docker-compose provider can hang in its build step.
     await podman(["build", "-f", "apps/server/Containerfile", "-t", "localhost/thoth-server:dev", "."]);
-    await compose("up", "--no-build", "-d");
+    await stack.up();
     await waitForServer(url);
 
     const userId = await adminCli("create-user", "--name", "Conformance Owner");
@@ -107,7 +162,7 @@ async function main(): Promise<number> {
     code = 1;
   } finally {
     console.log(`[server:conformance] tearing down ${project}`);
-    await compose("down", "--volumes", "--remove-orphans", "--timeout", "3").catch(() => undefined);
+    await stack.down().catch(() => undefined);
     await podman(["rmi", "-f", "localhost/thoth-server:dev"]).catch(() => undefined);
     await rm(dir, { recursive: true, force: true });
   }
