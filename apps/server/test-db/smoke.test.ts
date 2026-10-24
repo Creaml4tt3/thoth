@@ -11,7 +11,7 @@ describe("smoke", () => {
   it("serves capabilities and rejects anonymous callers", async () => {
     const caps = await env.api(null, "GET", "/capabilities");
     expect(caps.status).toBe(200);
-    expect(caps.json.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order"]);
+    expect(caps.json.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"]);
     // No SERVER_NAME and no PUBLIC_URL: the default name.
     expect(caps.json.server).toMatchObject({ name: "Thoth server", version: expect.any(String) });
     const me = await env.api(null, "GET", "/me");

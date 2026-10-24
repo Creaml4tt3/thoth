@@ -9,7 +9,9 @@ Phase 2a scope: pages and immutable revisions, change feed, attachments, search,
 personal-access-token authentication, an admin CLI, a container image. Phase 2b adds the hosted trial mode
 (quotas, a trial profile, Postgres blob storage, CORS, rate limiting, maintenance) and the sign-in broker
 (Google / any OIDC issuer / GitHub, see Sign-in). Phase 3b adds page order (capability `page-order`: `position` and the
-metadata-only `movePage`, migration `008_page_position.sql`).
+metadata-only `movePage`, migration `008_page_position.sql`) and the page kind (capability `page-kind`: `kind` on tree
+nodes and page metadata, `pageKind` in the change feed, derived from the frontmatter key `thoth_kind` on every write,
+migration `009_page_kind.sql`; run `node src/cli.ts backfill-kind` once after it for pages written earlier, ADR-0017).
 
 ## Run it
 
@@ -76,6 +78,7 @@ node apps/server/src/cli.ts create-workspace --name "Team" [--export-restricted]
 node apps/server/src/cli.ts add-member --workspace <id> --user <id> --role owner|editor|viewer
 node apps/server/src/cli.ts create-token --user <id> --out ./ada.token  # token goes ONLY to the file (0600)
 node apps/server/src/cli.ts revoke-token --token-id <id>
+node apps/server/src/cli.ts backfill-kind [--batch <n>]  # once after migration 009: fills the page kind of older pages (ADR-0017)
 ```
 
 `create-token` writes the token to `--out` with mode 0600, refuses to overwrite an existing file, and prints
@@ -136,7 +139,8 @@ not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
   transaction-mode pooler. `MIGRATE_ON_START=false` skips the runner and its lock entirely. The function itself
   uses the pooled URL.
 - **Apply new migrations before deploying** a server build that needs them (for example `008_page_position.sql` before
-  the build that reads `pages.position`). Every migration so far is additive, so the running build keeps working.
+  the build that reads `pages.position`, or `009_page_kind.sql` before the build that reads `pages.kind`, followed by
+  `backfill-kind` once). Every migration so far is additive, so the running build keeps working.
 - **No LISTEN/NOTIFY.** The pooled endpoint cannot carry it, and an always-open connection keeps a scale-to-zero
   database awake and burns compute hours. The trial profile sets `EVENTS=off`: no listener is started and `events.sse` is not
   advertised (clients poll the change feed).

@@ -1,4 +1,4 @@
-import { SSE_EVENT_NAME, type ChangeEntry } from "@thoth/workspace-protocol";
+import { SSE_EVENT_NAME, type ChangeEntry, type PageKind } from "@thoth/workspace-protocol";
 import pg from "pg";
 import { encodeCursor } from "./cursor.ts";
 import type { Queryable } from "./db.ts";
@@ -13,6 +13,8 @@ export interface NewChange {
   parentId?: string | null;
   title?: string;
   position?: string | null;
+  /** The page kind after the change (capability `page-kind`); stored as `changes.page_kind`. */
+  pageKind?: PageKind | null;
   attachmentId?: string;
 }
 
@@ -26,9 +28,9 @@ export interface NewChange {
 export async function appendChange(tx: Queryable, workspaceId: string, change: NewChange, occurredAt: Date): Promise<number> {
   const seq = (await tx.query<{ change_seq: number }>("UPDATE workspaces SET change_seq = change_seq + 1 WHERE id = $1 RETURNING change_seq", [workspaceId])).rows[0]!.change_seq;
   await tx.query(
-    `INSERT INTO changes (workspace_id, seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, attachment_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [workspaceId, seq, change.kind, occurredAt, change.actorId, change.pageId ?? null, change.revisionId ?? null, change.parentId ?? null, change.title ?? null, change.position ?? null, change.attachmentId ?? null],
+    `INSERT INTO changes (workspace_id, seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, page_kind, attachment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [workspaceId, seq, change.kind, occurredAt, change.actorId, change.pageId ?? null, change.revisionId ?? null, change.parentId ?? null, change.title ?? null, change.position ?? null, change.pageKind ?? null, change.attachmentId ?? null],
   );
   return seq;
 }
@@ -43,11 +45,12 @@ export interface ChangeRow {
   parent_id: string | null;
   title: string | null;
   position: string | null;
+  page_kind: PageKind | null;
   attachment_id: string | null;
 }
 
 /** Entry IDs are unique within the workspace for the life of the feed: the position, prefixed. */
-export function changeEntryOf(row: ChangeRow): ChangeEntry {
+export function changeEntryOf(row: ChangeRow, withKind = false): ChangeEntry {
   return {
     id: `chg_${row.seq}`,
     kind: row.kind,
@@ -55,7 +58,7 @@ export function changeEntryOf(row: ChangeRow): ChangeEntry {
     actorId: row.actor_id,
     ...(row.page_id === null ? {} : { pageId: row.page_id }),
     ...(row.revision_id === null ? {} : { revisionId: row.revision_id }),
-    ...(row.kind === "page.created" || row.kind === "page.updated" ? { parentId: row.parent_id, position: row.position } : {}),
+    ...(row.kind === "page.created" || row.kind === "page.updated" ? { parentId: row.parent_id, position: row.position, ...(withKind ? { pageKind: row.page_kind } : {}) } : {}),
     ...(row.title === null ? {} : { title: row.title }),
     ...(row.attachment_id === null ? {} : { attachmentId: row.attachment_id }),
   };

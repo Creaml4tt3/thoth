@@ -27,6 +27,9 @@ const REQUIRED_CHECKS = [
   "page-order.move-metadata-only",
   "page-order.move-preconditions",
   "page-order.move-idempotent",
+  "page-kind.derived-from-frontmatter",
+  "page-kind.follows-the-latest-write",
+  "page-kind.change-feed",
 ];
 
 describe("conformance suite against a correct server", () => {
@@ -52,8 +55,8 @@ describe("conformance suite against a correct server", () => {
 
   it("returns structured results grouped by capability", () => {
     expect(report.protocolVersion).toBe("1.0");
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order"]);
-    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order"]);
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"]);
+    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind"]);
     for (const group of report.groups) {
       expect(group.results.length).toBeGreaterThan(0);
       for (const r of group.results) {
@@ -102,9 +105,22 @@ describe("capability skipping", () => {
       const report = await runConformance({ baseUrl: server.url, token: server.token, ...FAST });
       expect(report.summary.fail).toBe(0);
       expect(report.results.filter((r) => r.capability === "search").every((r) => r.status === "pass")).toBe(true);
-      for (const capability of ["attachments", "events.sse", "transfers", "page-order"]) {
+      for (const capability of ["attachments", "events.sse", "transfers", "page-order", "page-kind"]) {
         expect(report.results.filter((r) => r.capability === capability).every((r) => r.status === "skip"), capability).toBe(true);
       }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("skips page-kind checks, and passes everything else, for a server without the capability (it omits kind)", async () => {
+    const server = await startTestServer({ capabilities: ["attachments", "search", "events.sse", "transfers", "page-order"] });
+    try {
+      const report = await runConformance({ baseUrl: server.url, token: server.token, ...FAST });
+      expect(report.summary.fail).toBe(0);
+      expect(report.results.filter((r) => r.capability === "page-kind").every((r) => r.status === "skip")).toBe(true);
+      const tree = await fetch(`${server.url}/api/v1/workspaces/ws_main/tree`, { headers: { authorization: `Bearer ${EDITOR_TOKEN}` } });
+      expect(JSON.stringify(await tree.json())).not.toContain('"kind"');
     } finally {
       await server.close();
     }
@@ -224,6 +240,12 @@ describe("conformance suite against deliberately broken servers", () => {
     expect(failedIds(report)).toEqual(["attachments.idempotent-upload", "core.idempotency.key-reuse-different-body", "core.idempotency.replay", "page-order.move-idempotent"]);
     expect(report.results.find((r) => r.id === "core.idempotency.replay")!.detail).toMatch(/expected HTTP 201, got 412/);
     expect(report.results.find((r) => r.id === "core.idempotency.key-reuse-different-body")!.detail).toMatch(/expected HTTP 422/);
+  });
+
+  it("catches a server that derives the page kind only on create", async () => {
+    const report = await runAgainst({ staleKind: true });
+    expect(failedIds(report)).toEqual(["page-kind.follows-the-latest-write"]);
+    expect(report.results.find((r) => r.id === "page-kind.follows-the-latest-write")!.detail).toMatch(/did not make the page a folder/);
   });
 
   it("fails each of them at once on the fully broken server, but still returns a complete report", async () => {

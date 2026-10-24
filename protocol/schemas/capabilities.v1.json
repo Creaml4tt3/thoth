@@ -20,6 +20,7 @@
               "events.sse",
               "transfers",
               "page-order",
+              "page-kind",
               "databases",
               "realtime-collab"
             ]

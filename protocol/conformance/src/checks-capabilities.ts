@@ -482,3 +482,102 @@ export const pageOrderChecks: Check[] = [
     },
   },
 ];
+
+// ------------------------------------------------------------ page-kind (ADR-0017)
+
+const FOLDER_MARKDOWN = "---\nthoth_kind: folder\n---\n";
+const PLAIN_MARKDOWN = "# Plain page\n\nthoth_kind: folder\n";
+/** Frontmatter that does not parse (an unclosed flow sequence). A write with it must still succeed. */
+const MALFORMED_MARKDOWN = "---\nthoth_kind: [folder\n---\n# Broken frontmatter\n";
+
+/** Creates a page with the given Markdown; records it for cleanup. */
+async function createWithMarkdown(ctx: Context, label: string, markdown: string): Promise<{ id: string; etag: string; kind: unknown }> {
+  const workspaceId = requireWorkspace(ctx);
+  const id = newStableId();
+  ctx.createdPageIds.add(id);
+  const res = await ctx.client.call("putPage", { params: { workspaceId, pageId: id }, headers: { "if-none-match": "*" }, json: { title: `${label} ${ctx.runId}`, markdown } });
+  expectResponse(res, 201, `create ${label}`);
+  const etag = parseEtag(etagOf(res));
+  if (!etag) fail(`create ${label}: no ETag`);
+  return { id, etag, kind: parsed(PageResourceSchema, res, label).metadata.kind };
+}
+
+/** The `kind` member as the protocol defines it: `null` and absent both mean unknown. */
+const unknownKind = (kind: unknown): boolean => kind === null || kind === undefined;
+
+export const pageKindChecks: Check[] = [
+  {
+    id: "page-kind.derived-from-frontmatter",
+    title: "putPage derives kind from frontmatter thoth_kind; getPage and the tree report it; malformed frontmatter does not fail the write",
+    capability: "page-kind",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const folder = await createWithMarkdown(ctx, "Kind folder", FOLDER_MARKDOWN);
+      const plain = await createWithMarkdown(ctx, "Kind plain", PLAIN_MARKDOWN);
+      const broken = await createWithMarkdown(ctx, "Kind malformed", MALFORMED_MARKDOWN);
+      expect(folder.kind === "folder", `putPage answered metadata.kind ${String(folder.kind)} for a folder page, expected "folder"`);
+      expect(plain.kind === "page", `putPage answered metadata.kind ${String(plain.kind)} for a page without the folder marker, expected "page"`);
+      expect(unknownKind(broken.kind), `a page with malformed frontmatter has kind ${String(broken.kind)}, expected null or absent`);
+      for (const [label, page, want] of [["folder", folder, "folder"], ["plain page", plain, "page"]] as const) {
+        const get = await ctx.client.call("getPage", { params: { workspaceId, pageId: page.id } });
+        expectResponse(get, 200, `get ${label}`);
+        const kind = parsed(PageResourceSchema, get, label).metadata.kind;
+        expect(kind === want, `getPage metadata.kind is ${String(kind)} for the ${label}, expected "${want}"`);
+      }
+      const { nodes } = await wholeTree(ctx);
+      const kindOf = (id: string) => nodes.find((n) => n.id === id)?.kind;
+      expect(kindOf(folder.id) === "folder", `tree node kind is ${String(kindOf(folder.id))} for the folder page, expected "folder"`);
+      expect(kindOf(plain.id) === "page", `tree node kind is ${String(kindOf(plain.id))} for the plain page, expected "page"`);
+      expect(unknownKind(kindOf(broken.id)), `tree node kind is ${String(kindOf(broken.id))} for malformed frontmatter, expected null or absent`);
+      return "folder, page and unknown kinds round-trip through putPage, getPage and the tree";
+    },
+  },
+  {
+    id: "page-kind.follows-the-latest-write",
+    title: "An update that adds or removes thoth_kind: folder changes kind; an older revision reports the kind it was written with",
+    capability: "page-kind",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const page = await createWithMarkdown(ctx, "Kind changes", PLAIN_MARKDOWN);
+      const put = (etag: string, markdown: string) => ctx.client.call("putPage", { params: { workspaceId, pageId: page.id }, headers: { "if-match": `"${etag}"` }, json: { title: `Kind changes ${ctx.runId}`, markdown } });
+      const toFolder = await put(page.etag, FOLDER_MARKDOWN);
+      expectResponse(toFolder, 200, "update to a folder");
+      expect(parsed(PageResourceSchema, toFolder, "folder revision").metadata.kind === "folder", "an update adding thoth_kind: folder did not make the page a folder");
+      const folderEtag = parseEtag(etagOf(toFolder));
+      if (!folderEtag) fail("update to a folder: no ETag");
+      const tree = await wholeTree(ctx);
+      expect(tree.nodes.find((n) => n.id === page.id)?.kind === "folder", "the tree does not show the page as a folder after the update");
+      const toPage = await put(folderEtag, "# Plain again\n");
+      expectResponse(toPage, 200, "update back to a page");
+      expect(parsed(PageResourceSchema, toPage, "page revision").metadata.kind === "page", "an update removing thoth_kind: folder left the page a folder");
+      const old = await ctx.client.call("getPage", { params: { workspaceId, pageId: page.id }, query: { revision: folderEtag } });
+      expectResponse(old, 200, "get the folder revision");
+      expect(parsed(PageResourceSchema, old, "old revision").metadata.kind === "folder", "?revision= of the folder revision does not report kind folder");
+      return "kind follows the Markdown of each write";
+    },
+  },
+  {
+    id: "page-kind.change-feed",
+    title: "page.created and page.updated entries carry pageKind; a metadata-only move keeps it",
+    capability: "page-kind",
+    async run(ctx) {
+      const workspaceId = requireWorkspace(ctx);
+      const { changeCursor } = await wholeTree(ctx);
+      const folder = await createWithMarkdown(ctx, "Kind feed", FOLDER_MARKDOWN);
+      const moved = ctx.capabilities?.capabilities.includes("page-order") === true;
+      if (moved) expectResponse(await move(ctx, folder.id, { position: "a0" }, folder.etag), 200, "move the folder page");
+      const feed = await ctx.client.call("listWorkspaceChanges", { params: { workspaceId }, query: { cursor: changeCursor } });
+      expectResponse(feed, 200, "change feed");
+      const entries = parsed(ChangesResponseSchema, feed, "changes").entries.filter((e) => e.pageId === folder.id);
+      const created = entries.find((e) => e.kind === "page.created");
+      expect(created?.pageKind === "folder", `the page.created entry has pageKind ${String(created?.pageKind)}, expected "folder"`);
+      if (moved) {
+        const updated = entries.find((e) => e.kind === "page.updated");
+        expect(updated?.pageKind === "folder", `the page.updated entry for a move has pageKind ${String(updated?.pageKind)}, expected "folder"`);
+        const { nodes } = await wholeTree(ctx);
+        expect(nodes.find((n) => n.id === folder.id)?.kind === "folder", "a move changed the page kind in the tree");
+      }
+      return moved ? "pageKind on page.created and on the entry for a move" : "pageKind on page.created (page-order is not listed, so no move was tried)";
+    },
+  },
+];

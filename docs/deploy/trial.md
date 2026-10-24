@@ -33,6 +33,24 @@ Domains used below (change them when you buy your own domain):
    unset DATABASE_URL
    ```
 
+   Migration `009_page_kind.sql` (ADR-0017) only adds empty columns, because SQL
+   cannot read Markdown. `migrate` prints a hint when it applies it. Right
+   after that migration, and once only, fill in the page kind of the pages
+   written before it, so that existing folders show as folders. It is safe to
+   run while the API is serving, and safe to repeat:
+
+   ```sh
+   read -rs DATABASE_URL && export DATABASE_URL   # the direct URL again
+   node apps/server/src/cli.ts backfill-kind      # optional: --batch <n>, 1 to 1000, default 200
+   unset DATABASE_URL
+   ```
+
+   It prints the counts as JSON, for example
+   `{"pages":{"scanned":42,"updated":41,"unknown":1},"changes":{...}}`. `unknown`
+   counts pages whose frontmatter is malformed: they have no kind and show as
+   pages. Until the backfill has run, an older folder shows as a page; new and
+   edited pages are correct at once.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.

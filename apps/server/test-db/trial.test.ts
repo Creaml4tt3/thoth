@@ -24,7 +24,7 @@ describe("EVENTS=off", () => {
       expect(env.server.deps.hub).toBeNull();
       expect(await listeners(env)).toBe(0);
       const caps = (await env.api(null, "GET", "/capabilities")).json;
-      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order"]);
+      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind"]);
       const events = await env.api(who, "GET", `/workspaces/${ws}/events`);
       expect([events.status, events.json.code]).toEqual([501, "capability_not_supported"]);
       expect(events.headers.get("content-type")).toContain("application/problem+json");

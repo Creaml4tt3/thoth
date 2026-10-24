@@ -8,6 +8,7 @@ import {
   RevisionIdSchema,
   formatEtag,
   parseEtag,
+  type PageKind,
   type Role,
 } from "@thoth/workspace-protocol";
 import { workspaceAccess } from "../access.ts";
@@ -49,6 +50,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
   const { db, config } = deps;
+  // ADR-0017: `kind` and `pageKind` are reported only when the server lists the capability (older clients ignore them either way).
+  const withKind = config.capabilities.includes("page-kind");
 
   app.get(`${API_BASE_PATH}/capabilities`, { config: { public: true } }, async (_request, reply) =>
     send(
@@ -119,8 +122,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       afterId = id;
       head = Number(seq);
     }
-    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; current_revision_id: string; updated_at: Date }>(
-      `SELECT id, parent_id, title, position, current_revision_id, updated_at FROM pages
+    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; kind: PageKind | null; current_revision_id: string; updated_at: Date }>(
+      `SELECT id, parent_id, title, position, kind, current_revision_id, updated_at FROM pages
         WHERE workspace_id = $1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id > $2)
         ORDER BY id LIMIT $3`,
       [ws.id, afterId, limit + 1],
@@ -130,7 +133,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       reply,
       jsonReply(200, {
         workspaceId: ws.id,
-        items: page.map(treeNode),
+        items: page.map((row) => treeNode(row, withKind)),
         nextCursor: rows.length > limit ? encodeCursor("t", ws.id, `${page[page.length - 1]!.id}:${head}`) : null,
         changeCursor: changeCursorOf(ws.id, head),
       }),
@@ -147,7 +150,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
     const rev = wanted === undefined ? await loadCurrentRevision(db, page) : await loadRevision(db, ws.id, pageId, wanted);
     if (!rev) throw new ApiError("not_found", "revision not found");
-    return send(reply, jsonReply(200, pageResource(page, rev), { etag: formatEtag(rev.id) }));
+    return send(reply, jsonReply(200, pageResource(page, rev, withKind), { etag: formatEtag(rev.id) }));
   });
 
   app.put<{ Params: PageParams }>(
@@ -185,7 +188,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
         // Under the workspace lock taken above, so concurrent creates cannot both pass at limit - 1. Updates never count.
         if (!existing) await assertCanCreatePages(tx, config, ws.id, 1);
         const { page, revision, created } = await writeRevision(tx, { workspaceId: ws.id, pageId, input: parsed.data, userId: me.id, existing, now });
-        return jsonReply(created ? 201 : 200, pageResource(page, revision), { etag: formatEtag(revision.id) });
+        return jsonReply(created ? 201 : 200, pageResource(page, revision, withKind), { etag: formatEtag(revision.id) });
       }),
   );
 
@@ -207,7 +210,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       if (expected !== page.current_revision_id) throw new ApiError("revision_conflict", "If-Match does not match the current revision", { currentRevision: revisionSummary(await loadCurrentRevision(tx, page)) });
       await checkParent(tx, ws.id, pageId, parsed.data.parentId);
       const moved = await movePage(tx, { page, parentId: parsed.data.parentId, position: parsed.data.position, userId: me.id, now });
-      return jsonReply(200, treeNode(moved), { etag: formatEtag(moved.current_revision_id) });
+      return jsonReply(200, treeNode(moved, withKind), { etag: formatEtag(moved.current_revision_id) });
     }),
   );
 
@@ -254,11 +257,11 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     // Entries are read after the head, and an entry at seq <= head is always fully committed
     // (writers hold the workspace lock until commit), so no entry can appear below a cursor we hand out.
     const { rows } = await db.query<ChangeRow>(
-      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, attachment_id
+      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, page_kind, attachment_id
          FROM changes WHERE workspace_id = $1 AND seq > $2 AND seq <= $3 ORDER BY seq LIMIT $4`,
       [ws.id, position, head, limit],
     );
     const next = rows.length ? rows[rows.length - 1]!.seq : position;
-    return send(reply, jsonReply(200, { entries: rows.map(changeEntryOf), cursor: changeCursorOf(ws.id, next), hasMore: next < head }));
+    return send(reply, jsonReply(200, { entries: rows.map((row) => changeEntryOf(row, withKind)), cursor: changeCursorOf(ws.id, next), hasMore: next < head }));
   });
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX, PageIdSchema, type PageWrite } from "@thoth/workspace-protocol";
+import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX, PageIdSchema, pageKindOf, type PageKind, type PageWrite } from "@thoth/workspace-protocol";
 import { ApiError, fieldError } from "./errors.ts";
 import { appendChange } from "./changes.ts";
 import type { Queryable } from "./db.ts";
@@ -12,6 +12,8 @@ export interface PageRow {
   title: string;
   /** Sibling sort key (capability `page-order`); lives on the page row only, never in a revision. */
   position: string | null;
+  /** Page kind (capability `page-kind`, ADR-0017) of the current revision, derived on every write; null = unknown. Page row only. */
+  kind: PageKind | null;
   current_revision_id: string;
   revision_count: number;
   created_at: Date;
@@ -56,9 +58,11 @@ export function revisionSummary(rev: Omit<RevisionRow, "markdown">) {
 /**
  * The page as of `rev`. For the current revision, parent and position come from the page row: a move
  * (`movePage`) changes them there without creating a revision. A historical revision shows where the page was
- * when that revision was written, and no position.
+ * when that revision was written, and no position. `kind` is only reported when `withKind` (the server lists
+ * `page-kind`): the stored kind for the current revision, and the one read from the revision's own frontmatter
+ * for an older one.
  */
-export function pageResource(page: PageRow, rev: RevisionRow) {
+export function pageResource(page: PageRow, rev: RevisionRow, withKind = false) {
   const current = rev.id === page.current_revision_id;
   return {
     id: page.id,
@@ -69,6 +73,7 @@ export function pageResource(page: PageRow, rev: RevisionRow) {
       parentId: current ? page.parent_id : rev.page_parent_id,
       title: rev.title,
       position: current ? page.position : null,
+      ...(withKind ? { kind: current ? page.kind : pageKindOf(rev.markdown) } : {}),
       createdAt: page.created_at.toISOString(),
       createdBy: page.created_by,
       updatedAt: rev.created_at.toISOString(),
@@ -152,6 +157,8 @@ export async function writeRevision(
   // Unchanged parent and position come from the page row, which a metadata-only move may have changed since the last revision.
   const pageParentId = input.parentId === undefined ? (existing?.parent_id ?? null) : input.parentId;
   const position = input.position === undefined ? (existing?.position ?? null) : input.position;
+  // ADR-0017: the only frontmatter key the server reads. Never throws: malformed frontmatter is kind null.
+  const kind = pageKindOf(input.markdown);
   const revisionId = opaqueId("rev");
   const revNo = (existing?.revision_count ?? 0) + 1;
   const size = Buffer.byteLength(input.markdown, "utf8");
@@ -160,9 +167,9 @@ export async function writeRevision(
   if (created) {
     // The pages -> page_revisions pointer is deferred, so the page row may precede its first revision.
     await tx.query(
-      `INSERT INTO pages (workspace_id, id, parent_id, title, position, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $7, $8)`,
-      [workspaceId, pageId, pageParentId, input.title, position, revisionId, now, userId],
+      `INSERT INTO pages (workspace_id, id, parent_id, title, position, kind, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $9, $8, $9)`,
+      [workspaceId, pageId, pageParentId, input.title, position, kind, revisionId, now, userId],
     );
   }
   await tx.query(
@@ -171,9 +178,9 @@ export async function writeRevision(
     [revisionId, workspaceId, pageId, revNo, previous?.id ?? null, now, userId, input.title, input.markdown, pageParentId, size, contentHash],
   );
   if (!created) {
-    await tx.query("UPDATE pages SET parent_id = $3, title = $4, position = $5, current_revision_id = $6, revision_count = $7, updated_at = $8, updated_by = $9 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, position, revisionId, revNo, now, userId]);
+    await tx.query("UPDATE pages SET parent_id = $3, title = $4, position = $5, kind = $6, current_revision_id = $7, revision_count = $8, updated_at = $9, updated_by = $10 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, position, kind, revisionId, revNo, now, userId]);
   }
-  await appendChange(tx, workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId, parentId: pageParentId, title: input.title, position }, now);
+  await appendChange(tx, workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId, parentId: pageParentId, title: input.title, position, pageKind: kind }, now);
 
   const revision: RevisionRow = { id: revisionId, page_id: pageId, rev_no: revNo, parent_revision_id: previous?.id ?? null, created_at: now, author_id: userId, title: input.title, markdown: input.markdown, page_parent_id: pageParentId, size, content_hash: contentHash };
   const page: PageRow = {
@@ -182,6 +189,7 @@ export async function writeRevision(
     parent_id: pageParentId,
     title: input.title,
     position,
+    kind,
     current_revision_id: revisionId,
     revision_count: revNo,
     created_at: existing?.created_at ?? now,
@@ -203,13 +211,13 @@ export async function movePage(tx: Queryable, args: { page: PageRow; parentId: s
   const parentId = args.parentId === undefined ? page.parent_id : args.parentId;
   const position = args.position === undefined ? page.position : args.position;
   await tx.query("UPDATE pages SET parent_id = $3, position = $4, updated_at = $5, updated_by = $6 WHERE workspace_id = $1 AND id = $2", [page.workspace_id, page.id, parentId, position, now, userId]);
-  await appendChange(tx, page.workspace_id, { kind: "page.updated", actorId: userId, pageId: page.id, revisionId: page.current_revision_id, parentId, title: page.title, position }, now);
+  await appendChange(tx, page.workspace_id, { kind: "page.updated", actorId: userId, pageId: page.id, revisionId: page.current_revision_id, parentId, title: page.title, position, pageKind: page.kind }, now);
   return { ...page, parent_id: parentId, position, updated_at: now, updated_by: userId };
 }
 
-/** The tree node of a page row (`getWorkspaceTree`, `movePage`). */
-export function treeNode(p: Pick<PageRow, "id" | "parent_id" | "title" | "position" | "current_revision_id" | "updated_at">) {
-  return { id: p.id, parentId: p.parent_id, title: p.title, position: p.position, revisionId: p.current_revision_id, updatedAt: p.updated_at.toISOString() };
+/** The tree node of a page row (`getWorkspaceTree`, `movePage`). `kind` only when `withKind` (the server lists `page-kind`). */
+export function treeNode(p: Pick<PageRow, "id" | "parent_id" | "title" | "position" | "kind" | "current_revision_id" | "updated_at">, withKind = false) {
+  return { id: p.id, parentId: p.parent_id, title: p.title, position: p.position, ...(withKind ? { kind: p.kind } : {}), revisionId: p.current_revision_id, updatedAt: p.updated_at.toISOString() };
 }
 
 /** Marks a page deleted and records `page.deleted`. Revisions are kept. */

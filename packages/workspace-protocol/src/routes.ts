@@ -180,7 +180,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     path: "/workspaces/{workspaceId}/tree",
     tag: "Pages",
     summary: "Page hierarchy of a workspace",
-    description: "Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from.",
+    description: "Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content.",
     pathParams: workspaceParams,
     query: PaginationQuerySchema,
     responses: [json(200, "A page of tree nodes.", TreePageSchema)],
@@ -205,7 +205,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     tag: "Pages",
     summary: "Create or update a page",
     description:
-      "Conditional write. Create with `If-None-Match: *` (201). Update with `If-Match: <etag>` (200). A write with neither header is 428 `precondition_required`; both headers is 400. A stale `If-Match`, or `If-None-Match: *` on an existing page, is 412 `revision_conflict` carrying `currentRevision`; the server never overwrites silently. Every successful write creates a new immutable revision.",
+      "Conditional write. Create with `If-None-Match: *` (201). Update with `If-Match: <etag>` (200). A write with neither header is 428 `precondition_required`; both headers is 400. A stale `If-Match`, or `If-None-Match: *` on an existing page, is 412 `revision_conflict` carrying `currentRevision`; the server never overwrites silently. Every successful write creates a new immutable revision. A server that lists capability `page-kind` derives the page's `kind` from the frontmatter key `thoth_kind` of the Markdown it receives (ADR-0017); clients do not send it.",
     pathParams: pageParams,
     requestHeaders: [IF_MATCH_HEADER, IF_NONE_MATCH_HEADER, idempotencyHeader("optional")],
     requestBody: { contentType: JSON_CT, schema: PageWriteSchema, required: true, description: "New title, Markdown source, and optional parent." },

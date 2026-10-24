@@ -42,7 +42,8 @@ when either is stale.
   revisions) or of the raw bytes (attachments).
 - **Markdown is the wire content.** Pages travel as Markdown source (ADR-0001, ADR-0002),
   including any frontmatter. The server stores and returns it byte-for-byte as UTF-8. The
-  protocol never carries a block tree.
+  protocol never carries a block tree. Page content is opaque to the protocol, with one exception: a server
+  that lists `page-kind` reads the frontmatter key `thoth_kind` (section 7).
 
 ## 2. Versioning
 
@@ -89,6 +90,7 @@ discover a server before signing in.
 | `events.sse` | `streamWorkspaceEvents` | hints only, see section 9 |
 | `transfers` | `createTransfer`, `getTransfer`, `commitTransfer`, `abortTransfer` | a server that accepts `attachmentIds` in transfers also lists `attachments` |
 | `page-order` | `movePage` | the optional `position` member of pages, tree nodes and change entries; section 7 |
+| `page-kind` | none | the optional `kind` member of tree nodes and page metadata, and `pageKind` of change entries, derived from frontmatter `thoth_kind`; section 7, ADR-0017 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -275,10 +277,10 @@ problem at a time.)
 ### Resources
 
 - `GET /workspaces/{workspaceId}/tree` returns a paginated adjacency list of
-  `{ id, parentId, title, position?, revisionId, updatedAt }` for readable pages, plus `changeCursor`
+  `{ id, parentId, title, position?, kind?, revisionId, updatedAt }` for readable pages, plus `changeCursor`
   (section 9). Parents may appear on a later page than their children.
 - A **page** is `{ id, markdown, revision, metadata }`: the Markdown source of one revision,
-  a `RevisionSummary` and metadata (`workspaceId`, `parentId`, `title`, `position?`, timestamps and actors).
+  a `RevisionSummary` and metadata (`workspaceId`, `parentId`, `title`, `position?`, `kind?`, timestamps and actors).
 - A **revision summary** is `{ id, pageId, parentId, createdAt, authorId, title, size,
   contentHash }`. `parentId` is the previous revision of the same page, `null` for the first.
   `size` is the UTF-8 byte length of the Markdown; `contentHash` its SHA-256.
@@ -315,6 +317,31 @@ two others without renumbering them). The server stores and returns it; it never
 - The parent and position of a page are properties of the page, not of a revision: `GET` of the current
   revision reports them as they are now; an older revision (`?revision=`) reports the parent it was written
   with and no position.
+
+### Page kind (capability `page-kind`)
+
+ADR-0017, refining ADR-0016 rule 3. **Page content is opaque to the protocol: the server stores Markdown byte for
+byte and does not interpret it. A server that lists `page-kind` is the one exception, and it reads exactly one
+frontmatter key, `thoth_kind`.** Nothing else in the Markdown is read.
+
+- **The member.** `kind` is `"page"` or `"folder"`. It is optional in tree nodes and in page `metadata`; change
+  entries name it `pageKind`, because `kind` already names the change. `null` or absent means unknown, and clients
+  treat unknown as a page. An older server does not list the capability and omits it; an older client ignores it.
+- **Derivation.** On every write that stores Markdown (`putPage`, and a transfer commit) the server parses the
+  frontmatter. If it parses and `thoth_kind` is the string `folder`, the kind is `folder`. If it parses (or there is
+  none) and `thoth_kind` is anything else or absent, the kind is `page`. If the frontmatter is malformed the kind is
+  `null`. A write is never refused because of its frontmatter. Clients do not send `kind`; `PageWrite` has no such
+  member, so the Markdown stays the single source of truth.
+- **Where it appears.** Tree nodes (`kind`), the page `metadata` of `getPage` and `putPage` (`kind`), and the
+  `page.created` and `page.updated` change entries (`pageKind`, the kind after the change). `movePage` changes only
+  the parent and position, so the kind it returns, and records in the feed, is the page's unchanged kind.
+- **Revisions.** `GET ...?revision=<id>` reports the kind of the revision returned, from that revision's own
+  frontmatter. The current revision's `kind` is the stored value, the same one the tree shows.
+- **Clients.** With the capability, a client draws folders from `kind` and does not download child pages to find them.
+  Without it, a client has to read each child page and look for `thoth_kind: folder` itself (ADR-0016 rule 3).
+- **Existing data.** A server that gains the capability on existing data reports `null` for pages written earlier
+  until it has filled them in. The reference server does this with `node src/cli.ts backfill-kind` (see
+  `docs/deploy/trial.md`).
 
 ### ETag format
 
@@ -409,7 +436,7 @@ settled (open questions).
 - `hasMore` is true when more entries are available now. A client reads until `hasMore` is
   false.
 - An entry is `{ id, kind, occurredAt, actorId, pageId?, revisionId?, parentId?, title?,
-  position?, attachmentId? }`. `id` is unique within the workspace for the life of the feed, so clients
+  position?, pageKind?, attachmentId? }`. `id` is unique within the workspace for the life of the feed, so clients
   can de-duplicate.
 
 | `kind` | Required members |
@@ -523,7 +550,7 @@ Visible to principals with access to the transfer's workspace; otherwise 404.
 The Thoth desktop client (`packages/transfer`) writes links between transferred pages and attachments as
 `thoth:page/<pageId>` and `thoth:attachment/<attachmentId>` inside the Markdown, and turns them back into vault
 paths when pages come back. This is a client convention. Page Markdown stays opaque to the protocol, and
-servers need not understand it (implementation plan §4 item 8). Clients send attachment uploads in a transfer
+servers need not understand it (implementation plan §4 item 8; only a server that lists `page-kind` reads `thoth_kind`, section 7). Clients send attachment uploads in a transfer
 with an `Idempotency-Key`, so a retry after a lost response does not store a second attachment.
 
 ## 12. Conformance
@@ -564,7 +591,8 @@ with a fixed payload; opaque URL-safe cursors; the error registry and statuses; 
 403 for unreadable resources; 501 for unlisted capabilities; public `GET /capabilities`;
 the transfer lifecycle seen by the server (stage, commit, abort, pinned revisions, verified
 move commit); sibling order through an optional `position` and the metadata-only `movePage`
-(capability `page-order`). Not covered by the suite: 405, `unsupported_media_type`, the role matrix beyond
+(capability `page-order`); the optional page `kind`, derived by the server from frontmatter `thoth_kind`
+(capability `page-kind`, ADR-0017). Not covered by the suite: 405, `unsupported_media_type`, the role matrix beyond
 the fixture tests, and `Retry-After`.
 
 **Open questions (not decided here):**

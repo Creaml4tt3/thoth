@@ -729,6 +729,8 @@ AC:
    workspaces. The order is stored as ADR-0016 rule 4 says. Keyboard alternatives are Alt+Shift+↑/↓ to reorder and
    "Move to…" in the palette.
    - Server: an optional `position` on pages, through a migration, the schema, OpenAPI and conformance.
+   - Server: an optional page `kind` (capability `page-kind`, ADR-0017) on tree nodes, page metadata and the change
+     feed, through migration 009, the schema, OpenAPI, conformance and the `backfill-kind` command.
 
 Status (2026-10-25): AC 1–9 implemented on `main`; `pnpm check` (1618 tests), `pnpm test:server` and `pnpm e2e`
 (incl. `tests/e2e/keyboard.e2e.ts` for AC 6) pass. Not yet checked by a person in a real window: the look of the
@@ -742,8 +744,11 @@ accent, folders and drag feel, Thai strings on screen, and the macOS menu change
   empty `Untitled folder` (`… 2`, `… 3`) inside the folder the tree has focus in, else at the top level, and starts the
   rename.
 - A server without `page-order` cannot reorder; a move under a new parent is a content write (a revision).
-- Folder pages are found by reading each child page once per revision; a `kind` in the tree response would avoid
-  this but is a protocol change (owner decision).
+- Folders in workspaces: with the optional capability `page-kind` (ADR-0017, approved 2026-10-25) the server derives a
+  page `kind` from the frontmatter key `thoth_kind`, and the client draws folders from the tree and the change feed
+  without downloading pages. A server without it keeps the fallback: each child page is read once per revision.
+  Operators run `node apps/server/src/cli.ts backfill-kind` once after migration 009 (docs/deploy/trial.md §1), so
+  folders written earlier show as folders.
 - Additions beyond ADR-0016: Alt+F10 / Mod+Alt+T focus the style toolbar, Mod+Shift+L cycles the theme, and the
   web client uses Alt-based alternatives where the browser keeps a key (listed in the shortcuts list).
 - Light accent is `#C2410C` (Moon `#E8590C` fails AA for white button text); owner to confirm.

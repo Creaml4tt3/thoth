@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { PageMoveSchema, parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { PageMoveSchema, pageKindOf, parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -53,7 +53,7 @@ export interface FakeServerConfig {
   account?: { id: string; displayName: string; email?: string };
   /** Answers, but not as a Thoth server. */
   notThoth?: boolean;
-  /** Capabilities listed (default: `search`, `transfers`, `attachments`, `page-order`). */
+  /** Capabilities listed (default: `search`, `transfers`, `attachments`, `page-order`, `page-kind`). */
   capabilities?: string[];
 }
 
@@ -78,6 +78,8 @@ export class FakeServers implements Servers {
   private readonly registry = new Map<string, FakeServerConfig>();
   private readonly known = new Map<string, Known>();
   readonly workspaces = new Map<string, FakeWorkspace[]>();
+  /** Which server holds a workspace, so responses can follow that server's capabilities. */
+  private readonly serverOf = new WeakMap<FakeWorkspace, string>();
   /** Every api.call, in order. */
   readonly calls: ApiCallArgs[] = [];
   readonly transfers = new Map<string, FakeTransfer>();
@@ -124,6 +126,7 @@ export class FakeServers implements Servers {
       members: init.members ?? [{ userId: "usr_me", displayName: "Me", role: init.role ?? "editor" }],
       attachments: new Map(),
     };
+    this.serverOf.set(ws, server);
     const list = this.workspaces.get(server) ?? [];
     list.push(ws);
     this.workspaces.set(server, list);
@@ -327,7 +330,10 @@ export class FakeServers implements Servers {
         const at = live.revisions.findIndex((r) => r.id === wanted);
         if (at < 0) return fail("not_found");
         const markdown = live.history?.[at] ?? live.markdown;
-        return json(200, { ...this.resource(ws, live), markdown, revision: live.revisions[at]! });
+        const current = this.resource(ws, live);
+        // ADR-0017: the kind of the revision returned, from that revision's own Markdown.
+        const metadata = this.kinded(ws) ? { ...current.metadata, kind: pageKindOf(markdown) } : current.metadata;
+        return json(200, { ...current, markdown, revision: live.revisions[at]!, metadata });
       }
       return json(200, this.resource(ws, live), { etag: `"${live.revisions.at(-1)!.id}"` });
     }
@@ -372,7 +378,7 @@ export class FakeServers implements Servers {
   }
 
   private node(server: string, p: FakePage) {
-    return { id: p.id, parentId: p.parentId, title: p.title, ...(this.capable(server, "page-order") ? { position: p.position ?? null } : {}), revisionId: p.revisions.at(-1)!.id, updatedAt: p.revisions.at(-1)!.createdAt };
+    return { id: p.id, parentId: p.parentId, title: p.title, ...(this.capable(server, "page-order") ? { position: p.position ?? null } : {}), ...(this.capable(server, "page-kind") ? { kind: pageKindOf(p.markdown) } : {}), revisionId: p.revisions.at(-1)!.id, updatedAt: p.revisions.at(-1)!.createdAt };
   }
 
   /** `movePage` (capability `page-order`): parent and position change, no new revision. */
@@ -400,10 +406,16 @@ export class FakeServers implements Servers {
   private capabilities(config: FakeServerConfig) {
     return {
       protocolVersion: "1.0",
-      capabilities: config.capabilities ?? ["search", "transfers", "attachments", "page-order"],
+      capabilities: config.capabilities ?? ["search", "transfers", "attachments", "page-order", "page-kind"],
       ...(config.limits ? { limits: config.limits } : {}),
       server: { name: config.name ?? new URL(config.url).host },
     };
+  }
+
+  /** Does the server that holds `ws` list `page-kind`? Then it derives the kind from frontmatter, like the reference server. */
+  private kinded(ws: FakeWorkspace): boolean {
+    const server = this.serverOf.get(ws);
+    return server !== undefined && this.capable(server, "page-kind");
   }
 
   private capable(server: string, capability: string): boolean {
@@ -537,7 +549,7 @@ export class FakeServers implements Servers {
       id: page.id,
       markdown: page.markdown,
       revision: last,
-      metadata: { workspaceId: ws.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}), createdAt: first.createdAt, createdBy: first.authorId, updatedAt: last.createdAt, updatedBy: last.authorId },
+      metadata: { workspaceId: ws.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}), ...(this.kinded(ws) ? { kind: pageKindOf(page.markdown) } : {}), createdAt: first.createdAt, createdBy: first.authorId, updatedAt: last.createdAt, updatedBy: last.authorId },
     };
   }
 
@@ -549,7 +561,7 @@ export class FakeServers implements Servers {
 
   private record(ws: FakeWorkspace, kind: "page.created" | "page.updated" | "page.deleted", page: FakePage, actor: string): void {
     const base = { id: `chg_${ws.changes.length + 1}`, kind, occurredAt: iso(T0 + ++this.clock * 1000), actorId: actor, pageId: page.id };
-    ws.changes.push(kind === "page.deleted" ? base : { ...base, revisionId: page.revisions.at(-1)!.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}) });
+    ws.changes.push(kind === "page.deleted" ? base : { ...base, revisionId: page.revisions.at(-1)!.id, parentId: page.parentId, title: page.title, ...(page.position !== undefined ? { position: page.position } : {}), ...(this.kinded(ws) ? { pageKind: pageKindOf(page.markdown) } : {}) });
   }
 
   private cursor(n: number): string {
