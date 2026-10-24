@@ -7,6 +7,7 @@
  * localStorage key that holds only the theme name. A command palette calls `cycleTheme` / `store.set`.
  */
 import { useCallback, useSyncExternalStore } from "react";
+import { motionOff } from "./presence.ts";
 
 export type Theme = "light" | "dark" | "system";
 export const THEMES: readonly Theme[] = ["light", "dark", "system"];
@@ -25,6 +26,27 @@ export function cycleTheme(current: Theme): Theme {
 /** Puts a theme on the page (the root element unless one is given). */
 export function applyTheme(theme: Theme, root: Pick<Element, "setAttribute"> | undefined = globalThis.document?.documentElement): void {
   root?.setAttribute("data-theme", THEME_ATTRIBUTE[theme]);
+}
+
+/** The part of the View Transitions API used here. */
+interface ViewTransitionApi {
+  startViewTransition?(update: () => void): { ready: Promise<unknown>; finished: Promise<unknown> };
+}
+
+/**
+ * Runs `apply` (which changes `data-theme`) inside a view transition where the browser has them, so the old page dissolves
+ * into the new one (the duration and curve are in ui.css) instead of snapping. Colours are never transitioned element by
+ * element: that would restart every colour transition on every frame (inherited colours animate under their children's own
+ * transitions). Only a choice made while the app runs fades: the saved theme is applied before the first render. Where there is
+ * no View Transitions API, or under reduced motion, or no layout (a test), `apply` just runs.
+ */
+function fadeThemeChange(apply: () => void): void {
+  const doc = globalThis.document as (Document & ViewTransitionApi) | undefined;
+  if (!doc || typeof doc.startViewTransition !== "function" || motionOff()) return apply();
+  // A second choice made while the first is fading skips the first; that rejects its promises, which is fine.
+  const transition = doc.startViewTransition(apply);
+  transition.ready.catch(() => undefined);
+  transition.finished.catch(() => undefined);
 }
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -86,7 +108,8 @@ export function createThemeStore(storage: ThemeStorage, root?: Pick<Element, "se
     get: () => current,
     set(theme) {
       current = theme;
-      applyTheme(theme, root);
+      if (root === undefined) fadeThemeChange(() => applyTheme(theme, root));
+      else applyTheme(theme, root);
       try {
         storage.write(theme);
       } catch {

@@ -92,10 +92,26 @@
   --thoth-content-width: 720px;
   --thoth-sidebar-width: 260px;
 
-  /* Motion */
-  --thoth-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --thoth-dur-fast: 120ms;
-  --thoth-dur: 200ms;
+  /* Motion — calm, quick, purposeful (see the "Motion" note at the end of this file).
+     Durations: instant for dense list hovers, fast for popovers, tab and tree changes and colour changes, base for
+     dialogs, slow for first-run moments only. Exits are one step faster than their enter.
+     Easings: out for things arriving, in for things leaving, emphasized for a larger surface settling,
+     in-out for something that moves while staying on screen, spring for a dialog (no overshoot). */
+  --thoth-dur-instant: 80ms;
+  --thoth-dur-fast: 140ms;
+  --thoth-dur-base: 200ms;
+  --thoth-dur-slow: 280ms;
+  --thoth-dur: var(--thoth-dur-base); /* the website still uses this name */
+  --thoth-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --thoth-ease: var(--thoth-ease-out); /* the website still uses this name */
+  --thoth-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --thoth-ease-emphasized: cubic-bezier(0.32, 0.72, 0, 1);
+  --thoth-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --thoth-ease-spring: var(--thoth-ease-emphasized); /* replaced by a real spring below where linear() exists */
+  /* Distances: how far a popover or dialog travels, and the size it grows from. Never from scale(0). */
+  --thoth-shift: 6px;
+  --thoth-pop-scale: 0.97;
+  --thoth-exit-scale: 0.985;
 
   color-scheme: light;
 }
@@ -176,6 +192,37 @@
   color: var(--thoth-ink-primary);
 }
 
+/* Motion
+ *
+ * Rules the app follows (packages/app-ui/src/ui.css has the keyframes and the global reduced-motion override):
+ *   1. Only transform and opacity move. Two deliberate exceptions, both tiny: the grid row of an opening tree folder
+ *      (grid-template-rows 0fr to 1fr) and the width of a tab opening or closing in the tab strip.
+ *   2. Nothing animates while typing, on keyboard navigation inside a list, or on every keystroke of a filter.
+ *      A popover pops in once when it opens; its rows do not move.
+ *   3. Enter uses ease-out, exit uses ease-in and is one duration step shorter.
+ *   4. Popovers grow from where they came from (transform-origin), never from the centre, never from scale(0).
+ *   5. `prefers-reduced-motion: reduce` removes motion: every duration below becomes 0 and every distance 0, and
+ *      ui.css forces animation and transition off for anything else.
+ *
+ *   instant 80ms  dense list hover        fast 140ms  menus, tabs, tree, page fade, colour changes
+ *   base 200ms    dialogs, banners        slow 280ms  first-run screens only
+ */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    /* A critically damped spring (no overshoot), sampled at 24 points. */
+    --thoth-ease-spring: linear(0, 0.055, 0.173, 0.31, 0.442, 0.559, 0.657, 0.737, 0.801, 0.85, 0.888, 0.917, 0.939, 0.955, 0.967, 0.976, 0.983, 0.987, 0.991, 0.993, 0.995, 0.997, 0.998, 0.998, 1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  :root { --thoth-dur-fast: 0ms; --thoth-dur: 0ms; }
+  :root {
+    --thoth-dur-instant: 0ms;
+    --thoth-dur-fast: 0ms;
+    --thoth-dur-base: 0ms;
+    --thoth-dur-slow: 0ms;
+    --thoth-dur: 0ms;
+    --thoth-shift: 0px;
+    --thoth-pop-scale: 1;
+    --thoth-exit-scale: 1;
+  }
 }
