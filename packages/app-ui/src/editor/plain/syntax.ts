@@ -1,6 +1,6 @@
 /**
  * Markdown language for Plain mode: CommonMark + GFM (as in `@thoth/content`),
- * YAML frontmatter, and wikilinks. Only used for highlighting and live preview;
+ * YAML frontmatter, wikilinks and `==highlight==`. Only used for highlighting and live preview;
  * it never decides what is written to disk.
  */
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -40,9 +40,37 @@ export const wikilinkSyntax: MarkdownConfig = {
   ],
 };
 
+const EQUALS = 61;
+const PUNCTUATION = /[\p{P}\p{S}]/u;
+const HighlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
+
+/**
+ * `==highlight==` (ADR-0016). A run of exactly two `=` opens or closes, by the same flanking rule as `~~` in GFM,
+ * so it agrees with `@thoth/editor`: `a == b`, `===` and `\==` are text. Code never reaches this parser.
+ */
+export const highlightSyntax: MarkdownConfig = {
+  defineNodes: [{ name: "Highlight" }, { name: "HighlightMark", style: tags.processingInstruction }],
+  parseInline: [
+    {
+      name: "Highlight",
+      parse(cx, next, pos) {
+        if (next !== EQUALS || cx.char(pos + 1) !== EQUALS || cx.char(pos + 2) === EQUALS || cx.char(pos - 1) === EQUALS) return -1;
+        const before = cx.slice(pos - 1, pos);
+        const after = cx.slice(pos + 2, pos + 3);
+        const spaceBefore = /\s|^$/.test(before);
+        const spaceAfter = /\s|^$/.test(after);
+        const punctBefore = PUNCTUATION.test(before);
+        const punctAfter = PUNCTUATION.test(after);
+        return cx.addDelimiter(HighlightDelim, pos, pos + 2, !spaceAfter && (!punctAfter || spaceBefore || punctBefore), !spaceBefore && (!punctBefore || spaceAfter || punctAfter));
+      },
+      after: "Emphasis",
+    },
+  ],
+};
+
 export function markdownSupport() {
   // No URL-to-link paste rewriting and no tag completion: Plain mode inserts exactly what was typed or pasted.
-  return yamlFrontmatter({ content: markdown({ base: markdownLanguage, extensions: [wikilinkSyntax], completeHTMLTags: false, pasteURLAsLink: false }) });
+  return yamlFrontmatter({ content: markdown({ base: markdownLanguage, extensions: [wikilinkSyntax, highlightSyntax], completeHTMLTags: false, pasteURLAsLink: false }) });
 }
 
 /** Token classes; colours and sizes live in plain.css (tokens only). */
