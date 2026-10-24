@@ -119,6 +119,39 @@ export const en = {
     creating: "Creating…",
   },
 
+  /** Both page trees (Private Space and workspaces): rename, folders, moving and ordering. */
+  tree: {
+    rename: "Rename",
+    renameLabel: (title: string) => `Rename ${title}`,
+    menuLabel: (title: string) => `Actions for ${title}`,
+    newPageInside: "New page inside",
+    newFolderInside: "New folder inside",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    moveTo: "Move to…",
+    folder: "Folder",
+    /** Shown as a tooltip on a folder row. */
+    itemCount: (n: number) => (n === 0 ? "Empty" : plural(n, "item")),
+    /** Said by screen readers after a move, for example "Plan moved to position 2 of 5". */
+    movedTo: (title: string, position: number, total: number) => `${title} moved to position ${position} of ${total}`,
+    movedInto: (title: string, folder: string) => `${title} moved into ${folder}`,
+    movedToTop: (title: string) => `${title} moved to the top level`,
+    renamed: (title: string) => `Renamed to ${title}`,
+    renameFailed: (detail: string) => `Could not rename: ${detail}`,
+    moveFailed: (detail: string) => `Could not move: ${detail}`,
+    orderUnavailable: "This server cannot keep a custom order, so pages are sorted A–Z and cannot be reordered.",
+    newFolderTitle: "New folder",
+    newFolder: "New folder",
+    newFolderIn: (name: string) => `New folder in ${name}`,
+    moveDialog: {
+      title: (name: string) => `Move “${name}” to…`,
+      destination: "Move into",
+      topLevel: "Top level",
+      move: "Move",
+      cancel: "Cancel",
+    },
+  },
+
   limits: {
     pages: (n: number) => `${plural(n, "page")} per workspace`,
     members: (n: number) => `${plural(n, "member")} per workspace`,

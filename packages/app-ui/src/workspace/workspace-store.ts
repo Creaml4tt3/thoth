@@ -8,6 +8,7 @@
  * `title:` or the first H1), so a page titled differently from its heading
  * (a conflict copy, a page made elsewhere) is not renamed by a save.
  */
+import { updateFrontmatter } from "@thoth/content";
 import { ProblemError, RevisionConflict, type WorkspaceClient } from "@thoth/workspace-client";
 import { roleCan, type PageResource, type Role } from "@thoth/workspace-protocol";
 import type { PageStore, StoredPage } from "../editor/page-session.ts";
@@ -31,6 +32,31 @@ export function titleFromMarkdown(markdown: string, fallback: string): string {
   const heading = /^#[ \t]+(.+?)[ \t#]*$/m.exec(body)?.[1]?.trim();
   const title = fmTitle || heading || fallback.trim() || "Untitled";
   return title.slice(0, TITLE_MAX);
+}
+
+/**
+ * `markdown` with its title changed to `title`, in the place `titleFromMarkdown` reads it from: frontmatter
+ * `title:`, else the first `# ` heading. Text that names no title, or whose title cannot be written back so that it
+ * reads as `title` again (a heading that would lose a trailing `#`), is returned unchanged: the server's title
+ * alone then carries the new name.
+ */
+export function renameInMarkdown(markdown: string, title: string): string {
+  const fm = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/.exec(markdown);
+  const named = (text: string) => titleFromMarkdown(text, "") === title.trim().slice(0, TITLE_MAX);
+  if (fm && /^title:/m.test(fm[1]!)) {
+    try {
+      const next = updateFrontmatter(markdown, { title });
+      return named(next) ? next : markdown;
+    } catch {
+      return markdown; // malformed frontmatter is never rewritten
+    }
+  }
+  const offset = fm ? fm[0].length : 0;
+  const heading = /^#[ \t]+(.+?)[ \t#]*$/m.exec(markdown.slice(offset));
+  if (!heading) return markdown;
+  const at = offset + heading.index;
+  const next = `${markdown.slice(0, at)}# ${title}${markdown.slice(at + heading[0].length)}`;
+  return named(next) ? next : markdown;
 }
 
 export function workspacePageStore(deps: WorkspaceStoreDeps): PageStore {

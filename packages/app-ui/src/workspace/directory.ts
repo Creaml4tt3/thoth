@@ -9,9 +9,14 @@
  * could not refresh: the server is shown as signed out until the user signs in
  * again.
  */
+import { newStableId } from "@thoth/domain";
 import type { ServerInfo, Servers } from "@thoth/platform";
-import { ProblemError, WorkspaceClient, type Send } from "@thoth/workspace-client";
-import type { ChangeEntry, PageResource, TreeNode, Workspace } from "@thoth/workspace-protocol";
+import { ProblemError, RevisionConflict, WorkspaceClient, type Send } from "@thoth/workspace-client";
+import { PAGE_TITLE_MAX, type ChangeEntry, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
+import { placeAt } from "../order/fractional.ts";
+import { folderMarkdown, isFolderMarkdown } from "./folders.ts";
+import { childrenOf, isWithin } from "./tree.ts";
+import { renameInMarkdown } from "./workspace-store.ts";
 
 export interface ServerEntry {
   info: ServerInfo;
@@ -29,6 +34,11 @@ export interface TreeState {
   error: string | null;
   /** Bumped per page whenever the change feed reports it, so an open page re-checks itself. */
   ticks: Record<string, number>;
+  /**
+   * Which pages are folder pages (`thoth_kind: folder`), known as of the revision named. The tree protocol has no
+   * page kind, so it is read from the page's Markdown once per revision.
+   */
+  kinds: Record<string, { revisionId: string; folder: boolean }>;
 }
 
 export interface DirectoryState {
@@ -39,6 +49,8 @@ export interface DirectoryState {
   trees: Record<string, TreeState>;
   /** Workspaces expanded in the sidebar (or holding the open page); only these are polled. */
   expanded: string[];
+  /** Capability IDs each server lists (`/capabilities`), by server. Missing until the server answered. */
+  capabilities: Record<string, string[]>;
 }
 
 export interface WorkspacePageRef {
@@ -50,10 +62,13 @@ export interface WorkspacePageRef {
 export const workspaceKey = (server: string, workspace: string): string => `${server}\n${workspace}`;
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-const EMPTY_TREE: TreeState = { nodes: [], cursor: null, loading: true, error: null, ticks: {} };
+const EMPTY_TREE: TreeState = { nodes: [], cursor: null, loading: true, error: null, ticks: {}, kinds: {} };
+/** How many pages are read at once to find out which are folders. */
+const KIND_WORKERS = 4;
 
 export class ServerDirectory {
-  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [] };
+  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {} };
+  private readonly kindWork = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private readonly servers: Servers;
   private readonly pollMs: number;
@@ -97,6 +112,11 @@ export class ServerDirectory {
 
   workspace(server: string, workspace: string): Workspace | undefined {
     return this.server(server)?.workspaces?.find((w) => w.id === workspace);
+  }
+
+  /** Does the server keep page order and moves (`page-order`)? Without it pages are A–Z and cannot be reordered. */
+  canOrder(server: string): boolean {
+    return this.state.capabilities[server]?.includes("page-order") ?? false;
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -165,12 +185,23 @@ export class ServerDirectory {
 
   async loadWorkspaces(server: string): Promise<void> {
     try {
-      const workspaces = await this.client(server).listWorkspaces();
+      const [workspaces] = await Promise.all([this.client(server).listWorkspaces(), this.loadCapabilities(server)]);
       if (this.server(server)?.info.auth === "signed-out") return;
       this.patchServer(server, { workspaces, error: null });
     } catch (error) {
       if (error instanceof ProblemError && error.status === 401) return; // shown as signed out
       this.patchServer(server, { error: message(error) });
+    }
+  }
+
+  /** What the server can do. A server that does not answer is treated as having no optional capability. */
+  private async loadCapabilities(server: string): Promise<void> {
+    if (this.state.capabilities[server]) return;
+    try {
+      const { capabilities } = await this.client(server).getCapabilities();
+      this.set({ capabilities: { ...this.state.capabilities, [server]: [...capabilities] } });
+    } catch {
+      // retried the next time the workspaces load
     }
   }
 
@@ -185,7 +216,8 @@ export class ServerDirectory {
     await this.servers.remove(server);
     this.dropTrees(server);
     this.clients.delete(server);
-    this.set({ servers: this.state.servers.filter((s) => s.info.id !== server) });
+    const { [server]: _gone, ...capabilities } = this.state.capabilities;
+    this.set({ servers: this.state.servers.filter((s) => s.info.id !== server), capabilities });
   }
 
   private async signedIn(info: ServerInfo): Promise<ServerInfo> {
@@ -236,6 +268,7 @@ export class ServerDirectory {
     try {
       const tree = await this.client(server).getTree(workspace);
       this.patchTree(key, { nodes: tree.nodes, cursor: tree.changeCursor, loading: false, error: null });
+      void this.resolveKinds(server, workspace);
     } catch (error) {
       this.patchTree(key, { loading: false, error: message(error) });
     }
@@ -246,20 +279,154 @@ export class ServerDirectory {
     const key = workspaceKey(server, page.metadata.workspaceId);
     const tree = this.state.trees[key];
     if (!tree) return;
-    const node: TreeNode = { id: page.id, parentId: page.metadata.parentId, title: page.metadata.title, revisionId: page.revision.id, updatedAt: page.metadata.updatedAt };
+    const node: TreeNode = {
+      id: page.id,
+      parentId: page.metadata.parentId,
+      title: page.metadata.title,
+      ...(page.metadata.position !== undefined ? { position: page.metadata.position } : {}),
+      revisionId: page.revision.id,
+      updatedAt: page.metadata.updatedAt,
+    };
     const rest = tree.nodes.filter((n) => n.id !== page.id);
-    this.patchTree(key, { nodes: [...rest, node] });
+    const kinds = { ...tree.kinds, [page.id]: { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown) } };
+    this.patchTree(key, { nodes: [...rest, node], kinds });
+  }
+
+  /** Makes an open page re-read itself (a rename wrote a new revision under it). */
+  private bumpTick(key: string, id: string): void {
+    const tree = this.state.trees[key];
+    if (tree) this.patchTree(key, { ticks: { ...tree.ticks, [id]: (tree.ticks[id] ?? 0) + 1 } });
   }
 
   /**
    * New page: created with a fresh id and `If-None-Match: *`, so it can never overwrite a page. Shown in the
    * tree at once; the caller opens it. A full workspace answers `quota_exceeded`, thrown as `QuotaExceeded`.
+   * `parentId` puts it inside another page.
    */
-  async createPage(server: string, workspace: string, title: string): Promise<PageResource> {
-    const created = await this.client(server).createPage(workspace, { title, markdown: "" });
+  async createPage(server: string, workspace: string, title: string, parentId?: string | null): Promise<PageResource> {
+    const created = await this.client(server).createPage(workspace, { title, markdown: "", ...(parentId !== undefined ? { parentId } : {}) });
     if (!this.state.trees[workspaceKey(server, workspace)]) await this.loadTree(server, workspace);
     this.notePageSaved(server, created);
     return created;
+  }
+
+  /** New folder: a page marked `thoth_kind: folder` (ADR-0016 rule 3) that the tree draws as a folder. */
+  async createFolder(server: string, workspace: string, title: string, parentId?: string | null): Promise<PageResource> {
+    const id = newStableId();
+    const created = await this.client(server).putPage(workspace, id, { title, markdown: folderMarkdown(id), ...(parentId !== undefined ? { parentId } : {}) }, null);
+    if (!this.state.trees[workspaceKey(server, workspace)]) await this.loadTree(server, workspace);
+    this.notePageSaved(server, created);
+    return created;
+  }
+
+  /**
+   * Renames a page from the tree. The title lives in the page's text when the text names one (frontmatter `title:`
+   * or the first heading), so the text is changed with it; otherwise only the server's title changes. This writes a
+   * new revision, on top of the one just read, so a page someone else changed meanwhile is a `RevisionConflict`.
+   */
+  async renamePage(server: string, workspace: string, pageId: string, title: string): Promise<PageResource> {
+    const next = title.trim().slice(0, PAGE_TITLE_MAX);
+    if (next === "") throw new Error("A title cannot be empty");
+    const client = this.client(server);
+    const page = await client.getPage(workspace, pageId);
+    const written = await client.putPage(workspace, pageId, { title: next, markdown: renameInMarkdown(page.markdown, next) }, page.revision.id);
+    this.notePageSaved(server, written);
+    this.bumpTick(workspaceKey(server, workspace), pageId);
+    return written;
+  }
+
+  private patchNode(key: string, node: TreeNode): void {
+    const tree = this.state.trees[key];
+    if (tree) this.patchTree(key, { nodes: tree.nodes.map((n) => (n.id === node.id ? { ...n, ...node } : n)) });
+  }
+
+  /**
+   * Moves a page under `parentId` (null: the top level) at `index` among that parent's other children, in display
+   * order. With `page-order` this is metadata only: just the moved page gets a new `position`, unless the keys
+   * around it have no room left (or some siblings have none yet and would sort below it), in which case the
+   * siblings are renumbered too. Without `page-order` there are no positions and no move route: the page can still
+   * change parent, as a normal write of its own text, and `index` is ignored. Reordering within one parent throws.
+   * A page changed by someone else meanwhile (412) is retried once on the fresh tree.
+   */
+  async movePage(server: string, workspace: string, pageId: string, target: { parentId: string | null; index: number }): Promise<void> {
+    const key = workspaceKey(server, workspace);
+    for (let attempt = 0; ; attempt++) {
+      const tree = this.state.trees[key];
+      const node = tree?.nodes.find((n) => n.id === pageId);
+      if (!tree || !node) throw new Error("That page is not in the tree");
+      if (target.parentId !== null && isWithin(tree.nodes, target.parentId, pageId)) throw new Error("A page cannot move into itself");
+      const parentChanged = (node.parentId ?? null) !== target.parentId;
+      try {
+        if (!this.canOrder(server)) {
+          if (!parentChanged) throw new Error("This server does not keep a page order");
+          await this.reparent(server, workspace, pageId, target.parentId);
+          return;
+        }
+        const siblings = childrenOf(tree.nodes, target.parentId).filter((n) => n.id !== pageId);
+        const writes = placeAt(
+          siblings.map((n) => ({ id: n.id, position: n.position ?? null })),
+          pageId,
+          target.index,
+        );
+        // The moved page goes last, so a failure part-way leaves it where it was.
+        writes.sort((a, b) => Number(a.id === pageId) - Number(b.id === pageId));
+        for (const write of writes) {
+          const current = tree.nodes.find((n) => n.id === write.id)!;
+          const move: PageMove = write.id === pageId && parentChanged ? { parentId: target.parentId, position: write.position } : { position: write.position };
+          this.patchNode(key, await this.client(server).movePage(workspace, write.id, move, current.revisionId));
+        }
+        return;
+      } catch (error) {
+        if (!(error instanceof RevisionConflict) || attempt > 0) throw error;
+        await this.loadTree(server, workspace); // someone changed a page: start again from what the server has
+      }
+    }
+  }
+
+  /** Changing the parent without `page-order`: a write of the page's own text with a new `parentId`. */
+  private async reparent(server: string, workspace: string, pageId: string, parentId: string | null): Promise<void> {
+    const client = this.client(server);
+    const page = await client.getPage(workspace, pageId);
+    const written = await client.putPage(workspace, pageId, { title: page.metadata.title, markdown: page.markdown, parentId }, page.revision.id);
+    this.notePageSaved(server, written);
+    this.bumpTick(workspaceKey(server, workspace), pageId);
+  }
+
+  /**
+   * Finds out which pages of a workspace are folder pages. The tree has only titles and parents, so each page is
+   * read once per revision, a few at a time; a page this client wrote is already known. Failures are ignored: such
+   * a page is drawn as a page until the next change reaches it.
+   */
+  private async resolveKinds(server: string, workspace: string): Promise<void> {
+    const key = workspaceKey(server, workspace);
+    const tree = this.state.trees[key];
+    if (!tree) return;
+    const queue = tree.nodes.filter((n) => tree.kinds[n.id]?.revisionId !== n.revisionId && !this.kindWork.has(`${key}\n${n.id}`));
+    if (queue.length === 0) return;
+    for (const n of queue) this.kindWork.add(`${key}\n${n.id}`);
+    let found: TreeState["kinds"] = {};
+    const flush = () => {
+      if (Object.keys(found).length === 0) return;
+      const now = this.state.trees[key];
+      if (now) this.patchTree(key, { kinds: { ...now.kinds, ...found } });
+      found = {};
+    };
+    const worker = async () => {
+      for (let n = queue.shift(); n; n = queue.shift()) {
+        try {
+          const page = await this.client(server).getPage(workspace, n.id);
+          found[n.id] = { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown) };
+          if (Object.keys(found).length >= 8) flush();
+        } catch {
+          // drawn as a page for now
+        } finally {
+          this.kindWork.delete(`${key}\n${n.id}`);
+        }
+        if (this.disposed) return;
+      }
+    };
+    await Promise.all(Array.from({ length: KIND_WORKERS }, worker));
+    flush();
   }
 
   private apply(tree: TreeState, entries: readonly ChangeEntry[]): Pick<TreeState, "nodes" | "ticks"> {
@@ -274,6 +441,7 @@ export class ServerDirectory {
           id: entry.pageId,
           parentId: entry.parentId !== undefined ? entry.parentId : (old?.parentId ?? null),
           title: entry.title ?? old?.title ?? "Untitled",
+          ...(entry.position !== undefined ? { position: entry.position } : old?.position !== undefined ? { position: old.position } : {}),
           revisionId: entry.revisionId ?? old?.revisionId ?? "",
           updatedAt: entry.occurredAt,
         });
@@ -304,6 +472,7 @@ export class ServerDirectory {
     const tree = this.state.trees[key];
     if (!tree || tree.cursor !== start.cursor) return; // reloaded meanwhile
     this.patchTree(key, { ...(entries.length > 0 ? this.apply(tree, entries) : {}), cursor });
+    if (entries.length > 0) void this.resolveKinds(server, workspace);
   }
 
   async pollNow(): Promise<void> {

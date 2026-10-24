@@ -15,7 +15,12 @@
 .tree-item:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
 .tree-item[aria-selected="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
-.tree-caret { width: 12px; color: var(--thoth-ink-faint); flex: none; }
+.tree-caret { width: 12px; height: 12px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); flex: none; border-radius: var(--thoth-radius-xs); }
+.tree-caret svg { transition: transform var(--thoth-dur-fast) var(--thoth-ease); }
+.tree-caret[data-open] svg { transform: rotate(90deg); }
+.tree-item:hover .tree-caret:not([data-empty]) { color: var(--thoth-ink-secondary); }
+.tree-icon { flex: none; width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); }
+.tree-icon svg { display: block; }
 .side-actions { display: flex; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
 .main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
 .banner { margin: 8px 16px; }
@@ -42,3 +47,35 @@
 .tree-add:disabled { cursor: progress; }
 @media (hover: none) { .tree-add { opacity: 1; } }
 .tree-error { color: var(--thoth-danger); }
+
+/* Folders look like folders: an accent-coloured folder icon, a heavier label, and a disclosure arrow (ADR-0016). */
+.tree-item[data-kind="folder"], .tree-item.tree-folder { color: var(--thoth-ink-primary); font-weight: 500; }
+.tree-icon-folder { color: var(--thoth-moon); }
+.tree-item[data-kind="folder"][aria-expanded="true"] .tree-icon-folder { color: var(--thoth-moon-ink); }
+.tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
+.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-moon); }
+.tree-item[data-dragging] { opacity: 0.45; }
+
+/* Drag and drop: the drop indicator is the accent colour (a line before or after a row, a tint inside it). */
+.tree-item[data-drop="before"] { box-shadow: inset 0 2px 0 0 var(--thoth-moon); }
+.tree-item[data-drop="after"] { box-shadow: inset 0 -2px 0 0 var(--thoth-moon); }
+.tree-item[data-drop="inside"] { background: var(--thoth-moon-soft); box-shadow: inset 0 0 0 1.5px var(--thoth-moon); }
+.tree-root-drop { margin: 6px 4px 0; padding: 8px; border-radius: var(--thoth-radius-sm); border: 1.5px dashed var(--thoth-border-strong); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); text-align: center; }
+.tree-root-drop[data-drop] { border-color: var(--thoth-moon); background: var(--thoth-moon-soft); color: var(--thoth-ink-primary); }
+
+/* Rename in place. */
+.tree-renaming { cursor: text; }
+.tree-rename { flex: 1; min-width: 0; font: inherit; padding: 1px 6px; border-radius: var(--thoth-radius-xs); border: 1px solid var(--thoth-moon); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+.tree-rename:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: 0; }
+.tree-rename:disabled { opacity: 0.6; }
+
+/* The row menu and the Move to dialog. */
+.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.ctx-item { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; font: var(--thoth-text-ui); }
+.ctx-item kbd { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-moon-soft); }
+.ctx-item:focus-visible { outline: 2px solid var(--thoth-moon); outline-offset: -2px; }
+.ctx-item:disabled { color: var(--thoth-ink-faint); cursor: default; }
+.move-list { padding: 4px; }
+.move-list option { padding: 4px 8px; }
+.move-actions { display: flex; gap: var(--thoth-space-3); justify-content: flex-end; align-items: center; }

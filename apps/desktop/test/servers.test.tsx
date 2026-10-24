@@ -283,7 +283,7 @@ describe("sidebar", () => {
     const section = screen.getByRole("region", { name: "Server Team server" });
     const list = await within(section).findByRole("tree", { name: "Workspaces on Team server" });
     const items = within(list).getAllByRole("treeitem");
-    expect(items.map((i) => i.textContent)).toEqual(["›DesignWorkspace", "›ResearchWorkspace"]);
+    expect(items.map((i) => i.textContent)).toEqual(["DesignWorkspace", "ResearchWorkspace"]);
     expect(within(items[0]!).getByText("Workspace").className).toContain("badge-workspace");
     // The Private Space keeps its Local badge and comes first.
     const nav = screen.getByRole("navigation", { name: "Pages" });
