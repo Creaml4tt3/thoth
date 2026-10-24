@@ -1,0 +1,248 @@
+import { describe, expect, it } from "vitest";
+import {
+  BLANK,
+  MAX_TABS,
+  activate,
+  activeIndex,
+  activeTab,
+  close,
+  initialTabs,
+  jump,
+  newTab,
+  open,
+  parseTabs,
+  prune,
+  retarget,
+  sameTarget,
+  serializeTabs,
+  step,
+  type TabTarget,
+  type TabsState,
+} from "../src/tabs/model.ts";
+import { remoteGone, remoteTitle } from "../src/tabs/remote.ts";
+import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../src/tabs/open-keys.ts";
+import type { DirectoryState } from "../src/workspace/directory.ts";
+
+const page = (path: string): TabTarget => ({ kind: "page", path });
+const ws = (id: string, workspace = "w1"): TabTarget => ({ kind: "workspace", server: "s", workspace, page: id });
+const paths = (s: TabsState) => s.tabs.map((t) => (t.target.kind === "page" ? t.target.path : t.target.kind));
+
+describe("opening", () => {
+  it("starts with one empty tab", () => {
+    const s = initialTabs();
+    expect(s.tabs).toHaveLength(1);
+    expect(activeTab(s).target).toEqual(BLANK);
+  });
+
+  it("a click opens in the current tab", () => {
+    let s = initialTabs([page("A.md"), page("B.md")], 0);
+    s = open(s, page("C.md"));
+    expect(paths(s)).toEqual(["C.md", "B.md"]);
+    expect(activeIndex(s)).toBe(0);
+  });
+
+  it("Cmd/Ctrl+click, middle-click and Cmd/Ctrl+Enter open a new tab right after the current one, and show it", () => {
+    let s = initialTabs([page("A.md"), page("B.md")], 0);
+    s = open(s, page("C.md"), { newTab: true });
+    expect(paths(s)).toEqual(["A.md", "C.md", "B.md"]);
+    expect(activeIndex(s)).toBe(1);
+    expect(new Set(s.tabs.map((t) => t.id)).size).toBe(3);
+  });
+
+  it("opens a page that is already open in a new tab too, as a browser does", () => {
+    const s = open(initialTabs([page("A.md")]), page("A.md"), { newTab: true });
+    expect(paths(s)).toEqual(["A.md", "A.md"]);
+  });
+
+  it("Settings is one tab: opening it again goes to it, and an empty current tab becomes Settings", () => {
+    let s = initialTabs([page("A.md")]);
+    s = open(s, { kind: "settings" });
+    expect(paths(s)).toEqual(["A.md", "settings"]);
+    expect(activeIndex(s)).toBe(1);
+    s = activate(s, s.tabs[0]!.id);
+    s = open(s, { kind: "settings", section: "servers" });
+    expect(paths(s)).toEqual(["A.md", "settings"]);
+    expect(activeTab(s).target).toEqual({ kind: "settings", section: "servers" });
+
+    const blank = open(initialTabs(), { kind: "settings" });
+    expect(paths(blank)).toEqual(["settings"]);
+  });
+
+  it("a new tab is empty, goes after the current tab and is shown", () => {
+    const s = newTab(initialTabs([page("A.md"), page("B.md")], 0));
+    expect(paths(s)).toEqual(["A.md", "blank", "B.md"]);
+    expect(activeTab(s).target).toEqual(BLANK);
+  });
+
+  it("stops adding tabs at the limit and uses the current tab instead", () => {
+    let s = initialTabs(Array.from({ length: MAX_TABS }, (_, i) => page(`P${i}.md`)));
+    s = open(s, page("Extra.md"), { newTab: true });
+    expect(s.tabs).toHaveLength(MAX_TABS);
+    expect(activeTab(s).target).toEqual(page("Extra.md"));
+  });
+
+  it("compares targets by what they show", () => {
+    expect(sameTarget(page("A.md"), page("A.md"))).toBe(true);
+    expect(sameTarget(page("A.md"), page("B.md"))).toBe(false);
+    expect(sameTarget(ws("1"), ws("1"))).toBe(true);
+    expect(sameTarget(ws("1"), ws("1", "w2"))).toBe(false);
+    expect(sameTarget(page("A.md"), BLANK)).toBe(false);
+  });
+});
+
+describe("closing", () => {
+  it("the current tab passes to its right neighbour, else its left", () => {
+    let s = initialTabs([page("A.md"), page("B.md"), page("C.md")], 1);
+    s = close(s, s.active);
+    expect(paths(s)).toEqual(["A.md", "C.md"]);
+    expect(activeTab(s).target).toEqual(page("C.md"));
+    s = close(s, s.active);
+    expect(activeTab(s).target).toEqual(page("A.md"));
+  });
+
+  it("a background tab closes without changing the current tab", () => {
+    const s0 = initialTabs([page("A.md"), page("B.md"), page("C.md")], 2);
+    const s = close(s0, s0.tabs[0]!.id);
+    expect(paths(s)).toEqual(["B.md", "C.md"]);
+    expect(s.active).toBe(s0.active);
+  });
+
+  it("closing the last tab leaves one empty tab", () => {
+    const s0 = initialTabs([page("A.md")]);
+    const s = close(s0, s0.active);
+    expect(paths(s)).toEqual(["blank"]);
+    expect(s.active).not.toBe(s0.active);
+  });
+
+  it("ignores an id that is not a tab", () => {
+    const s = initialTabs([page("A.md")]);
+    expect(close(s, "nope")).toBe(s);
+  });
+});
+
+describe("switching", () => {
+  const three = initialTabs([page("A.md"), page("B.md"), page("C.md")], 0);
+
+  it("Ctrl+Tab and Ctrl+Shift+Tab go round", () => {
+    expect(activeTab(step(three, 1)).target).toEqual(page("B.md"));
+    expect(activeTab(step(three, -1)).target).toEqual(page("C.md"));
+    expect(activeTab(step(step(step(three, 1), 1), 1)).target).toEqual(page("A.md"));
+  });
+
+  it("with one tab, switching changes nothing", () => {
+    const one = initialTabs([page("A.md")]);
+    expect(step(one, 1)).toBe(one);
+  });
+
+  it("Cmd/Ctrl+1–8 jump to that tab, 9 to the last, a missing number does nothing", () => {
+    expect(activeTab(jump(three, 2)).target).toEqual(page("B.md"));
+    expect(activeTab(jump(three, 9)).target).toEqual(page("C.md"));
+    expect(jump(three, 5)).toBe(three);
+  });
+
+  it("retargets a tab in place", () => {
+    const s = retarget(three, three.tabs[1]!.id, page("Z.md"));
+    expect(paths(s)).toEqual(["A.md", "Z.md", "C.md"]);
+  });
+});
+
+describe("pruning", () => {
+  it("closes background tabs that are gone and keeps the current one to say so", () => {
+    const s0 = initialTabs([page("Gone.md"), page("Here.md"), page("Gone2.md")], 2);
+    const s = prune(s0, (t) => t.kind === "page" && t.path.startsWith("Gone"));
+    expect(paths(s)).toEqual(["Here.md", "Gone2.md"]);
+    expect(activeTab(s).target).toEqual(page("Gone2.md"));
+  });
+
+  it("returns the same state when nothing is gone", () => {
+    const s = initialTabs([page("A.md")]);
+    expect(prune(s, () => false)).toBe(s);
+  });
+});
+
+describe("storage", () => {
+  it("restores the same targets and the current tab", () => {
+    const s0 = initialTabs([page("A.md"), ws("p1"), { kind: "settings", section: "servers" }, BLANK], 1);
+    const back = parseTabs(serializeTabs(s0))!;
+    expect(back.tabs.map((t) => t.target)).toEqual(s0.tabs.map((t) => t.target));
+    expect(activeIndex(back)).toBe(1);
+  });
+
+  it("keeps only ids for workspace pages: no title, no text, nothing but the three ids", () => {
+    const text = serializeTabs(initialTabs([ws("page-id-1", "workspace-id-1")]));
+    expect(JSON.parse(text)).toEqual({ v: 1, active: 0, tabs: [{ k: "ws", server: "s", workspace: "workspace-id-1", page: "page-id-1" }] });
+  });
+
+  it("falls back to nothing on unreadable text, and drops a tab it cannot read", () => {
+    for (const bad of [null, undefined, "", "{", "[]", '{"v":2,"tabs":[]}', '{"v":1}', '{"v":1,"tabs":"x"}']) expect(parseTabs(bad as string | null)).toBeNull();
+    const partly = parseTabs(JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }, { k: "page" }, { k: "nope" }, 7, null, { k: "ws", server: "s", workspace: "", page: "p" }] }))!;
+    expect(paths(partly)).toEqual(["A.md"]);
+  });
+
+  it("lets the app drop targets it knows are invalid, and lands on a neighbour when the current tab is dropped", () => {
+    const text = serializeTabs(initialTabs([page("A.md"), page("B.md"), page("C.md")], 1));
+    const s = parseTabs(text, (t) => !(t.kind === "page" && t.path === "B.md"))!;
+    expect(paths(s)).toEqual(["A.md", "C.md"]);
+    expect(activeTab(s).target).toEqual(page("C.md"));
+    const none = parseTabs(text, () => false)!;
+    expect(paths(none)).toEqual(["blank"]);
+  });
+
+  it("never restores more than the limit", () => {
+    const many = serializeTabs({ tabs: Array.from({ length: MAX_TABS + 10 }, (_, i) => ({ id: `t${i}`, target: page(`P${i}.md`) })), active: "t0", seq: 99 });
+    expect(parseTabs(many)!.tabs).toHaveLength(MAX_TABS);
+  });
+});
+
+describe("workspace pages in tabs", () => {
+  const dir = (patch: Partial<DirectoryState["trees"][string]> | null, workspaces: { id: string }[] | null = [{ id: "w1" }], auth = "signed-in"): DirectoryState =>
+    ({
+      loaded: true,
+      error: null,
+      servers: [{ info: { id: "s", auth }, workspaces, error: null }],
+      trees: patch === null ? {} : { "s\nw1": { nodes: [{ id: "p1", title: "Plan", parentId: null }], cursor: "1", loading: false, error: null, ticks: {}, kinds: {}, ...patch } },
+      expanded: [],
+      capabilities: {},
+    }) as unknown as DirectoryState;
+  const ref = { server: "s", workspace: "w1", page: "p1" };
+
+  it("reads the title from the loaded tree and nowhere else", () => {
+    expect(remoteTitle(dir({}), ref)).toBe("Plan");
+    expect(remoteTitle(dir(null), ref)).toBeNull();
+  });
+
+  it("calls a page gone only when the server has said so", () => {
+    expect(remoteGone(dir({}), ref)).toBe(false);
+    expect(remoteGone(dir({}), { ...ref, page: "p2" })).toBe(true);
+    expect(remoteGone(dir({}, [{ id: "other" }]), ref)).toBe(true);
+    // Not known is not gone: loading, an error, no tree yet, signed out, an unknown server.
+    expect(remoteGone(dir({ loading: true }), { ...ref, page: "p2" })).toBe(false);
+    expect(remoteGone(dir({ error: "offline" }), { ...ref, page: "p2" })).toBe(false);
+    expect(remoteGone(dir({ cursor: null }), { ...ref, page: "p2" })).toBe(false);
+    expect(remoteGone(dir(null), ref)).toBe(false);
+    expect(remoteGone(dir({ loading: true }, null), { ...ref, page: "p2" })).toBe(false);
+    expect(remoteGone(dir({}, [{ id: "other" }], "signed-out"), ref)).toBe(false);
+    expect(remoteGone(dir({}), { ...ref, server: "nope" })).toBe(false);
+  });
+});
+
+describe("the gestures that open a new tab", () => {
+  const mods = { metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
+  it("Cmd or Ctrl on a click", () => {
+    expect(clickOpens({ metaKey: true, ctrlKey: false })).toEqual({ newTab: true });
+    expect(clickOpens({ metaKey: false, ctrlKey: true })).toEqual({ newTab: true });
+    expect(clickOpens({ metaKey: false, ctrlKey: false })).toBeUndefined();
+  });
+  it("the middle button", () => {
+    expect(isMiddleClick({ button: 1 })).toBe(true);
+    expect(isMiddleClick({ button: 0 })).toBe(false);
+    expect(isMiddleClick({ button: 2 })).toBe(false);
+  });
+  it("Cmd/Ctrl+Enter and nothing else", () => {
+    expect(isOpenInNewTabKey({ ...mods, key: "Enter", ctrlKey: true })).toBe(true);
+    expect(isOpenInNewTabKey({ ...mods, key: "Enter", metaKey: true })).toBe(true);
+    expect(isOpenInNewTabKey({ ...mods, key: "Enter" })).toBe(false);
+    expect(isOpenInNewTabKey({ ...mods, key: "Enter", ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(isOpenInNewTabKey({ ...mods, key: "a", ctrlKey: true })).toBe(false);
+  });
+});

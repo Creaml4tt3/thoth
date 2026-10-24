@@ -8,6 +8,8 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move
 import { RenameInput } from "../order/RenameInput.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
 import { useStrings } from "../strings/index.ts";
+import type { OpenOptions } from "../tabs/model.ts";
+import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
 
@@ -25,7 +27,7 @@ interface Ctx {
   current: WorkspacePageRef | null;
   open: Set<string>;
   toggle(id: string, force?: boolean): void;
-  openPage(ref: WorkspacePageRef): void;
+  openPage(ref: WorkspacePageRef, options?: OpenOptions): void;
   renaming: string | null;
   startRename(id: string): void;
   endRename(id: string): void;
@@ -105,16 +107,28 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
         data-dragging={ctx.dnd.dragging === item.id || undefined}
         style={indent}
         title={item.folder ? `${t.folder} · ${t.itemCount(item.children.length)}` : undefined}
-        onKeyDown={onKeyDown}
+        onKeyDown={(event) => {
+          if (!item.folder && event.target === event.currentTarget && isOpenInNewTabKey(event)) {
+            event.preventDefault();
+            ctx.openPage({ server, workspace, page: item.id }, { newTab: true });
+            return;
+          }
+          onKeyDown(event);
+        }}
         onContextMenu={(event: MouseEvent<HTMLElement>) => {
           if (!ctx.canWrite) return;
           event.preventDefault();
           ctx.openMenu(item.id, { x: event.clientX, y: event.clientY });
         }}
-        onClick={() => {
+        onClick={(event) => {
           if (item.folder) return ctx.toggle(item.id, !expanded);
           if (hasChildren) ctx.toggle(item.id, true);
-          ctx.openPage({ server, workspace, page: item.id });
+          ctx.openPage({ server, workspace, page: item.id }, clickOpens(event));
+        }}
+        onAuxClick={(event) => {
+          if (item.folder || !isMiddleClick(event)) return;
+          event.preventDefault();
+          ctx.openPage({ server, workspace, page: item.id }, { newTab: true });
         }}
         {...ctx.dnd.rowProps(item.id)}
       >
@@ -137,7 +151,7 @@ export interface WorkspaceSectionProps {
   serverLabel: string;
   workspace: Workspace;
   current: WorkspacePageRef | null;
-  openPage(ref: WorkspacePageRef): void;
+  openPage(ref: WorkspacePageRef, options?: OpenOptions): void;
   /** After New page created a page (before it opens). */
   onPageCreated?(): void;
   /** Writes the open page's pending edits before the tree changes a page; false keeps everything as it is. */

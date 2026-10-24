@@ -7,8 +7,10 @@ import { createTransferService } from "../features/transfer/service.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
-import { ServerDirectory, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
+import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
+import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
+import { loadTabs, saveTabs } from "./tabs-store.ts";
 
 interface Props {
   platform: Platform;
@@ -24,9 +26,6 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const [revision, setRevision] = useState(0);
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
-  const [path, setPath] = useState<string | null>(null);
-  const [remote, setRemote] = useState<WorkspacePageRef | null>(null);
-  const [settings, setSettings] = useState<false | "top" | "servers">(false);
   const [showIntro, setShowIntro] = useState(intro);
 
   const flushers = useRef(new Set<() => Promise<boolean>>());
@@ -38,6 +37,9 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const flushAll = useCallback(async () => (await Promise.all([...flushers.current].map((f) => f().catch(() => false)))).every(Boolean), []);
 
   const bump = useCallback(() => setRevision((r) => r + 1), []);
+
+  // Tabs: restored per Private Space, saved on every change. Leaving the page on screen writes its edits first.
+  const tabs = useTabs({ initial: () => loadTabs(connection.root), flush: flushAll, save: (state) => saveTabs(connection.root, state) });
 
   useEffect(() => {
     let cancelled = false;
@@ -94,33 +96,19 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         await vault.reconcile();
         bump();
       },
-      openPage: (target) =>
-        void flushAll().then((ok) => {
-          if (!ok) return;
-          setSettings(false);
-          setRemote(null);
-          setPath(target);
-        }),
-      openSettings: (section) => void flushAll().then((ok) => ok && setSettings(section ?? "top")),
+      openPage: (path, options) => tabs.open({ kind: "page", path }, options),
+      openSettings: (section) => tabs.open(section ? { kind: "settings", section } : { kind: "settings" }),
+      tabs,
       servers,
       transfers,
-      openWorkspacePage: (ref) =>
-        void flushAll().then((ok) => {
-          if (!ok) return;
-          setSettings(false);
-          setRemote(ref);
-        }),
+      openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
       openFolder: (folder) =>
         void flushAll().then(async (ok) => {
           if (!ok) return;
           setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
           const prefix = folder === "" ? "" : `${folder}/`;
           const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
-          setSettings(false);
-          if (first) {
-            setRemote(null);
-            setPath(first.path);
-          }
+          if (first) tabs.open({ kind: "page", path: first.path });
         }),
       reveal,
       registerFlush,
@@ -128,13 +116,13 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, tabs],
   );
 
   return (
     <SessionContext.Provider value={session}>
       <PageHostContext.Provider value={pageHost}>
-        {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell path={remote ? null : path} remote={remote} settings={settings} />}
+        {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell />}
       </PageHostContext.Provider>
     </SessionContext.Provider>
   );

@@ -20,27 +20,8 @@ import { applyAsOneStep } from "./block-ops.ts";
 export const MARK_STYLES = ["bold", "italic", "underline", "strike", "inlineCode", "highlight"] as const;
 export type MarkStyle = (typeof MARK_STYLES)[number];
 
-/** What a shortcut can do. `link` opens the toolbar's link field and `toolbar` moves focus into the toolbar. */
-export type StyleCommand = MarkStyle | "link" | "toolbar";
-
-/**
- * Shortcuts, in Tiptap's notation (`Mod` is Cmd on macOS and Ctrl elsewhere).
- *
- * - Mod+K is not here: it opens search (and later the command palette), so the link field is Mod+Shift+K.
- * - Mod+S saves, so strikethrough is Mod+Shift+S (the same as Notion).
- * - Mod+Shift+H is highlight (ADR-0016 rule 2).
- * - Alt+F10 is the usual "go to the toolbar" key for editors; Mod+Alt+T is the same for keyboards where F10 is awkward.
- */
-export const STYLE_SHORTCUTS: Readonly<Record<StyleCommand, readonly string[]>> = {
-  bold: ["Mod-b"],
-  italic: ["Mod-i"],
-  underline: ["Mod-u"],
-  strike: ["Mod-Shift-s"],
-  inlineCode: ["Mod-e"],
-  highlight: ["Mod-Shift-h"],
-  link: ["Mod-Shift-k"],
-  toolbar: ["Alt-F10", "Mod-Alt-t"],
-};
+// The shortcut table lives in `keyboard/style-keys.ts`, so the shortcuts list can read it without the editor.
+export { STYLE_SHORTCUTS, WEB_STYLE_SHORTCUTS, styleShortcuts, type StyleCommand } from "../keyboard/style-keys.ts";
 
 /** `Mod-Shift-h` as people read it: `Ctrl/Cmd+Shift+H`. */
 export function shortcutLabel(key: string): string {

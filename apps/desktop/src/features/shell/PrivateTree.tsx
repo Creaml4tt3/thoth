@@ -9,6 +9,7 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui
 import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
@@ -217,8 +218,20 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             data-kind="page"
             data-dragging={dnd.dragging === node.path || undefined}
             style={indent}
-            onClick={() => openPage(node.path)}
-            onKeyDown={keys}
+            onClick={(event) => openPage(node.path, clickOpens(event))}
+            onAuxClick={(event) => {
+              if (!isMiddleClick(event)) return;
+              event.preventDefault();
+              openPage(node.path, { newTab: true });
+            }}
+            onKeyDown={(event) => {
+              if (event.target === event.currentTarget && isOpenInNewTabKey(event)) {
+                event.preventDefault();
+                openPage(node.path, { newTab: true });
+                return;
+              }
+              keys(event);
+            }}
             onContextMenu={onContextMenu}
             title={node.path}
             {...dnd.rowProps(node.path)}

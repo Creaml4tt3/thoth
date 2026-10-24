@@ -22,7 +22,7 @@
 .tree-icon { flex: none; width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); }
 .tree-icon svg { display: block; }
 .side-actions { display: flex; justify-content: space-between; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
-.main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .banner { margin: 8px 16px; }
 .empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--thoth-ink-secondary); text-align: center; }
 .empty h1 { font: var(--thoth-text-h3); color: var(--thoth-ink-primary); }
@@ -79,3 +79,22 @@
 .move-list { padding: 4px; }
 .move-list option { padding: 4px 8px; }
 .move-actions { display: flex; gap: var(--thoth-space-3); justify-content: flex-end; align-items: center; }
+
+/* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator. */
+.tabstrip { flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
+.tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.tab { position: relative; display: flex; align-items: center; flex: 0 1 180px; min-width: 96px; max-width: 220px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); }
+.tab:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.tab[data-selected] { background: var(--thoth-tab-active-bg); color: var(--thoth-tab-active-ink); border-color: var(--thoth-border); border-top-color: var(--thoth-tab-active-line); border-bottom: 1px solid var(--thoth-tab-active-bg); }
+.tab-label { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 7px 4px 7px 12px; cursor: pointer; font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
+.tab-text { overflow: hidden; text-overflow: ellipsis; }
+.tab-close, .tab-new { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; }
+.tab-close { margin-right: 4px; opacity: 0; }
+.tab:hover .tab-close, .tab[data-selected] .tab-close, .tab-close:focus-visible { opacity: 1; }
+@media (hover: none) { .tab-close { opacity: 1; } }
+.tab-close:hover, .tab-new:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.tab-close:focus-visible, .tab-new:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+.tab-new { margin: 0 0 4px 4px; }
+.tab-panel { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.tab-panel > * { min-height: 0; }

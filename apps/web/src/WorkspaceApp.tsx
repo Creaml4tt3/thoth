@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { hasCapability, type Capabilities } from "@thoth/workspace-protocol";
+import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
+import type { OpenOptions, TabTarget } from "@thoth/app-ui/tabs/model.ts";
+import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
+import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
+import { currentPlatform, shortcutText } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { LegalLinks } from "./LegalLinks.tsx";
@@ -17,6 +23,8 @@ import { SearchDialog } from "./SearchDialog.tsx";
 import { track } from "./analytics.ts";
 import type { WebEnv } from "./env.ts";
 import { SERVER_ID } from "./servers.ts";
+import { SettingsView } from "./SettingsView.tsx";
+import { clearTabs, loadTabs, saveTabs } from "./tabs-store.ts";
 
 interface Props {
   env: WebEnv;
@@ -33,7 +41,6 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const entry = state.servers.find((s) => s.info.id === SERVER_ID);
   const workspaces = entry?.workspaces ?? null;
-  const [current, setCurrent] = useState<WorkspacePageRef | null>(null);
   const [searching, setSearching] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const signedOut = entry?.info.auth === "signed-out";
@@ -50,13 +57,12 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const flushAll = useCallback(async () => (await Promise.all([...flushers.current].map((f) => f().catch(() => false)))).every(Boolean), []);
   const pageHost = useMemo<PageHost>(() => ({ autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush }), [env, registerFlush]);
 
-  const openPage = useCallback(
-    (ref: WorkspacePageRef) =>
-      void flushAll().then((ok) => {
-        if (ok) setCurrent(ref);
-      }),
-    [flushAll],
-  );
+  // Tabs: restored per browser (ids only, no titles), saved on every change. Leaving the page on screen writes its edits first.
+  const tabs = useTabs({ initial: () => loadTabs(env.localStorage), flush: flushAll, save: (state) => saveTabs(env.localStorage, state) });
+  const shown = tabs.active.target;
+  const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
+  const openPage = useCallback((ref: WorkspacePageRef, options?: OpenOptions) => tabs.open({ kind: "workspace", ...ref }, options), [tabs]);
+  const openSettings = useCallback(() => tabs.open({ kind: "settings" }), [tabs]);
 
   // The only workspace (a new account has exactly one) opens by itself.
   const only = workspaces?.length === 1 ? workspaces[0]!.id : null;
@@ -66,23 +72,48 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
 
   useEffect(() => track({ name: "screen_view", params: { screen: current ? "/app/page" : "/app" } }, target), [current === null, target]);
 
-  // Ctrl/Cmd+K opens search, as on the desktop.
+  // The keyboard (ADR-0016 rule 7). Where a browser keeps a key, the web client uses another (see the shortcuts table).
+  const platform = useMemo(() => currentPlatform(), []);
+  useShortcuts("web", {
+    ...(canSearch ? { "palette.open": () => setSearching((s) => !s) } : {}),
+    "settings.open": openSettings,
+    "tab.new": tabs.newTab,
+    "tab.close": () => tabs.close(),
+    "tab.next": () => tabs.step(1),
+    "tab.previous": () => tabs.step(-1),
+    "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
+  });
+
+  // Background tabs whose page is gone close; the current tab says "not found" itself.
+  const { prune } = tabs;
   useEffect(() => {
-    if (!canSearch) return;
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setSearching((s) => !s);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [canSearch]);
+    prune((tab) => tab.kind === "workspace" && remoteGone(state, tab));
+  }, [state, prune]);
+
+  // The titles of background tabs come from their workspace trees, so those trees load.
+  const wanted = [...new Set(tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [tab.target.workspace] : [])))].join("\u0000");
+  useEffect(() => {
+    if (signedOut || !workspaces) return;
+    for (const id of wanted ? wanted.split("\u0000") : []) if (workspaces.some((w) => w.id === id)) directory.expand(SERVER_ID, id);
+  }, [directory, wanted, workspaces, signedOut]);
+
+  const label = (tab: TabTarget): string => {
+    switch (tab.kind) {
+      case "workspace":
+        return remoteTitle(state, tab) ?? t.tabs.untitled;
+      case "settings":
+        return t.tabs.settings;
+      default:
+        return t.tabs.blank;
+    }
+  };
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) }));
 
   const doSignOut = async () => {
     if (!(await flushAll())) return;
     setSigningOut(true);
     try {
+      clearTabs(env.localStorage); // a signed-out browser keeps no list of what was open
       await signOut();
     } finally {
       setSigningOut(false);
@@ -155,6 +186,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           </div>
         </aside>
         <main className="main">
+          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} newShortcut={shortcutText("tab.new", "web", platform)} />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
               {t.web.sessionEnded}{" "}
@@ -163,26 +195,30 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
               </Button>
             </p>
           )}
-          {current ? (
-            <WorkspacePage
-              key={`${current.workspace}\n${current.page}`}
-              directory={directory}
-              target={current}
-              modeSpace={env.server}
-              openPage={openPage}
-              goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
-              signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
-              onOpened={() => track({ name: "page_open" }, target)}
-              onSaved={() => track({ name: "page_save" }, target)}
-              onConflict={(event) => track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target)}
-            />
-          ) : (
-            <div className="empty">
-              <Mark size={40} />
-              <h1>{t.web.nothingOpen}</h1>
-              <p className="muted">{t.web.nothingOpenHint}</p>
-            </div>
-          )}
+          <TabPanel id={tabs.active.id}>
+            {shown.kind === "settings" ? (
+              <SettingsView account={account} signOut={() => void doSignOut()} signingOut={signingOut} />
+            ) : current ? (
+              <WorkspacePage
+                key={`${tabs.active.id}\n${current.workspace}\n${current.page}`}
+                directory={directory}
+                target={current}
+                modeSpace={env.server}
+                openPage={openPage}
+                goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
+                signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
+                onOpened={() => track({ name: "page_open" }, target)}
+                onSaved={() => track({ name: "page_save" }, target)}
+                onConflict={(event) => track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target)}
+              />
+            ) : (
+              <div className="empty">
+                <Mark size={40} />
+                <h1>{t.web.nothingOpen}</h1>
+                <p className="muted">{t.web.nothingOpenHint}</p>
+              </div>
+            )}
+          </TabPanel>
         </main>
         {searching && workspaces && <SearchDialog directory={directory} workspaces={workspaces} onOpen={openPage} onClose={() => setSearching(false)} onSearched={() => track({ name: "search" }, target)} />}
       </div>

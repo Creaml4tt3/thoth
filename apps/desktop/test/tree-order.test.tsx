@@ -522,7 +522,8 @@ describe("Private Space tree", () => {
     const notes = await within(tree).findByRole("treeitem", { name: "Notes" });
     expect(drag(within(tree).getByRole("treeitem", { name: "Gamma" }), notes, 0.1)).toBe("before");
     await waitFor(async () => expect(await app.read("Docs/Gamma.md")).toBe("# Gamma\n"));
-    expect(await orderFile(app)).toMatchObject({ folders: { Docs: ["Gamma.md", "Notes.md"] } });
+    // The order record is written just after the file moves.
+    await waitFor(async () => expect(await orderFile(app)).toMatchObject({ folders: { Docs: ["Gamma.md", "Notes.md"] } }));
     await waitFor(() => expect(rows(tree)).toEqual(["Docs", "Gamma", "Notes", "Empty", "Alpha", "Beta"]));
   });
 

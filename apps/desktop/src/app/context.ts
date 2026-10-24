@@ -10,6 +10,8 @@ import type { OpenImportSource } from "../features/import/open-source.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferService } from "../features/transfer/service.ts";
 import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
+import type { OpenOptions } from "@thoth/app-ui/tabs/model.ts";
+import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -36,14 +38,16 @@ export interface Session {
   revision: number;
   /** Call after mutating the vault outside the shell (e.g. an import) to refresh views. */
   refresh(): Promise<void>;
-  /** Opens a page in the editor. */
-  openPage(path: string): void;
-  /** Opens Settings (a full view, not a page), optionally scrolled to a section. */
+  /** Opens a page in the current tab, or in a new one (`newTab`: Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter). */
+  openPage(path: string, options?: OpenOptions): void;
+  /** Opens Settings as a tab (one only), optionally scrolled to a section. */
   openSettings(section?: "servers"): void;
+  /** The window's tabs (ADR-0016 rule 5). */
+  tabs: TabsController;
   /** Workspace servers: the host holds the credentials; this is the app's view of them. */
   servers: ServerDirectory;
-  /** Opens a page of a workspace on a server. */
-  openWorkspacePage(ref: WorkspacePageRef): void;
+  /** Opens a page of a workspace on a server, in the current tab or a new one. */
+  openWorkspacePage(ref: WorkspacePageRef, options?: OpenOptions): void;
   /** Copy and move between this Private Space and workspaces (ADR-0006). */
   transfers: TransferService;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */

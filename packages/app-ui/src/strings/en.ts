@@ -6,6 +6,7 @@
 import type { TextColor } from "@thoth/editor";
 import type { BlockKind } from "../editor/block-kinds.ts";
 import type { ConflictChoice } from "../editor/page-session.ts";
+import type { ShortcutGroup, ShortcutId } from "../keyboard/shortcuts.ts";
 
 export type Lang = "en" | "th";
 type Where = "disk" | "server";
@@ -190,6 +191,65 @@ export const en = {
   /** The theme choice (Settings on the desktop, the account area on the web). */
   theme: { label: "Theme", light: "Light", dark: "Dark", system: "System" },
 
+  /** The shortcuts list (Cmd/Ctrl+/) and the command palette (ADR-0016 rule 7). */
+  keyboard: {
+    title: "Keyboard shortcuts",
+    intro: "Every command can be reached with the keyboard. Press Ctrl/Cmd+K and type > to find a command by name.",
+    close: "Close",
+    groups: { general: "Everywhere", tabs: "Tabs", tree: "Page tree", editor: "Editor" } satisfies Record<ShortcutGroup, string>,
+    /** Marks a shortcut that has other keys in the web version. */
+    webDiffers: "Different on the desktop app",
+    desktopDiffers: "Different in the web version",
+    webNote: "Browsers keep some keys for themselves (new tab, close tab, switching tabs), so the web version uses these keys instead. Where they differ, the desktop keys are shown as well.",
+    desktopKeys: (keys: string) => `Desktop app: ${keys}`,
+    webKeys: (keys: string) => `Web: ${keys}`,
+    names: {
+      "palette.open": "Search pages, or type > for commands",
+      "shortcuts.open": "Show keyboard shortcuts",
+      "settings.open": "Open Settings",
+      "page.new": "New page",
+      "folder.new": "New folder",
+      "theme.cycle": "Change theme (light, dark, system)",
+      "tab.new": "New tab",
+      "tab.close": "Close tab",
+      "tab.next": "Next tab",
+      "tab.previous": "Previous tab",
+      "tab.jump": "Go to tab 1–9 (9 is the last tab)",
+      "tab.openNew": "Open a page in a new tab",
+      "tree.move": "Move between pages and folders",
+      "tree.expand": "Open or close a folder",
+      "tree.open": "Open the page",
+      "tree.rename": "Rename",
+      "tree.reorder": "Move the page up or down",
+      "tree.menu": "Open the page's menu",
+      "editor.save": "Save now",
+      "editor.mode": "Switch between Blocks and Plain",
+      "editor.blockMenu": "Block menu",
+      "editor.blockMove": "Move the block up or down",
+      "style.bold": "Bold",
+      "style.italic": "Italic",
+      "style.underline": "Underline",
+      "style.strike": "Strikethrough",
+      "style.code": "Inline code",
+      "style.highlight": "Highlight",
+      "style.link": "Link",
+      "style.toolbar": "Go to the formatting toolbar",
+      "dialog.close": "Close a dialog or menu",
+    } satisfies Record<ShortcutId, string>,
+  },
+
+  /** Tabs above the page (ADR-0016 rule 5). */
+  tabs: {
+    list: "Open pages",
+    new: "New tab",
+    newWith: (shortcut: string) => `New tab (${shortcut})`,
+    close: (label: string) => `Close ${label}`,
+    blank: "New tab",
+    settings: "Settings",
+    untitled: "Untitled",
+    loading: "Loading…",
+  },
+
   web: {
     loading: "Loading…",
     signInTitle: "Sign in to Thoth",
@@ -227,6 +287,17 @@ export const en = {
     signInAgain: "Sign in again",
     sidebar: "Sidebar",
     pages: "Pages",
+    /** The Settings tab of the web client. */
+    settingsView: {
+      title: "Settings",
+      account: "Account",
+      appearance: "Appearance",
+      themeHint: "Light, dark, or the same as your system.",
+      languageHint: "The language of menus and labels.",
+      keyboard: "Keyboard",
+      keyboardNote: "Every command can be reached with the keyboard. Browsers keep some keys, so the web version uses other keys there, and the list says which.",
+      showShortcuts: "Show keyboard shortcuts",
+    },
   },
 };
 

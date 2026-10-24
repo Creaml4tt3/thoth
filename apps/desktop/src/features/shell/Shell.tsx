@@ -1,5 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import type { PageSummary } from "@thoth/domain";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { basename, stripExtension, type PageSummary } from "@thoth/domain";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { PageView } from "../editor/PageView.tsx";
@@ -11,7 +11,12 @@ import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
-import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
+import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
+import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
+import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
+import { currentPlatform, shortcutText } from "@thoth/app-ui/keyboard/shortcuts.ts";
+import { useStrings } from "@thoth/app-ui/strings/index.ts";
 
 type Dialog = { kind: "search" } | { kind: "new" } | { kind: "transfer"; target: TransferTarget } | null;
 
@@ -38,12 +43,17 @@ function RecoveryNotice() {
   );
 }
 
-/** The Paper shell: sidebar on the left, page or settings on the right. */
-export function Shell({ path, remote = null, settings }: { path: string | null; remote?: WorkspacePageRef | null; settings: false | "top" | "servers" }) {
-  const { vault, revision, watchError, openPage, flushAll } = useSession();
+/** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
+export function Shell() {
+  const { vault, revision, watchError, openPage, openSettings, flushAll, tabs, servers } = useSession();
   const t = useDesktopStrings().shell;
-  const [pages, setPages] = useState<PageSummary[]>([]);
+  const tt = useStrings().tabs;
+  const [pages, setPages] = useState<PageSummary[] | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const directory = useSyncExternalStore(servers.subscribe, servers.getState);
+  const target = tabs.active.target;
+  const path = target.kind === "page" ? target.path : null;
+  const remote = target.kind === "workspace" ? { server: target.server, workspace: target.workspace, page: target.page } : null;
 
   useEffect(() => {
     let live = true;
@@ -56,48 +66,91 @@ export function Shell({ path, remote = null, settings }: { path: string | null; 
     };
   }, [vault, revision]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  const toggleSearch = () => setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
+  const platform = useMemo(() => currentPlatform(), []);
+  useShortcuts("desktop", {
+    "palette.open": toggleSearch,
+    "settings.open": () => openSettings(),
+    "page.new": () => setDialog({ kind: "new" }),
+    "tab.new": () => tabs.newTab(),
+    "tab.close": () => tabs.close(),
+    "tab.next": () => tabs.step(1),
+    "tab.previous": () => tabs.step(-1),
+    "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
+  });
 
-  // Open the first page when nothing is open yet, so the shell is never blank.
+  // Open the first page when nothing is open at start, so the shell is never blank. Once: closing every tab leaves it empty.
+  const startedEmpty = useRef(tabs.state.tabs.length === 1 && tabs.active.target.kind === "blank");
   useEffect(() => {
-    if (!path && !remote && !settings && pages.length > 0) openPage(pages[0]!.path);
-  }, [path, remote, settings, pages, openPage]);
+    if (!startedEmpty.current || !pages || pages.length === 0) return;
+    startedEmpty.current = false;
+    openPage(pages[0]!.path);
+  }, [pages, openPage]);
+
+  // Background tabs whose page is gone (moved out, deleted, renamed) close; the current tab says "not found" itself.
+  const { prune } = tabs;
+  useEffect(() => {
+    if (!pages) return;
+    const known = new Set(pages.map((p) => p.path));
+    prune((tab) => (tab.kind === "page" ? !known.has(tab.path) : tab.kind === "workspace" ? remoteGone(directory, tab) : false));
+  }, [pages, directory, prune]);
+
+  // Titles of background workspace tabs come from their trees, so those trees load.
+  const wanted = tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : []));
+  const wantedKey = [...new Set(wanted)].join("\u0000");
+  useEffect(() => {
+    for (const key of wantedKey ? wantedKey.split("\u0000") : []) {
+      const [server, workspace] = key.split("\n") as [string, string];
+      const entry = directory.servers.find((s) => s.info.id === server);
+      if (entry && entry.info.auth !== "signed-out" && entry.workspaces) servers.expand(server, workspace);
+    }
+    // `directory` changes with every poll; only the set of workspaces and the servers' state matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedKey, servers, directory.servers]);
+
+  const label = (tab: TabTarget): TabItem["label"] => {
+    switch (tab.kind) {
+      case "page":
+        return pages?.find((p) => p.path === tab.path)?.title ?? stripExtension(basename(tab.path));
+      case "workspace":
+        return remoteTitle(directory, tab) ?? tt.untitled;
+      case "settings":
+        return tt.settings;
+      case "blank":
+        return tt.blank;
+    }
+  };
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}) }));
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
 
   return (
     <div className="shell">
-      <Sidebar pages={pages} current={settings ? null : path} currentRemote={settings ? null : remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onTransfer={transfer} />
+      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onTransfer={transfer} />
       <main className="main">
+        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} newShortcut={shortcutText("tab.new", "desktop", platform)} />
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
             {t.watchError(watchError)}
           </p>
         )}
         <RecoveryNotice />
-        {settings ? (
-          <SettingsView section={settings} />
-        ) : remote ? (
-          <WorkspacePageView key={`${remote.server}\n${remote.workspace}\n${remote.page}`} target={remote} onTransfer={transfer} />
-        ) : path ? (
-          <PageView key={path} path={path} />
-        ) : (
-          <div className="empty">
-            <Mark size={40} />
-            <h1>{t.nothingOpen}</h1>
-            <p className="muted">{t.nothingOpenHint}</p>
-          </div>
-        )}
+        <TabPanel id={tabs.active.id}>
+          {target.kind === "settings" ? (
+            <SettingsView section={target.section ?? "top"} />
+          ) : target.kind === "workspace" ? (
+            <WorkspacePageView key={`${tabs.active.id}\n${target.server}\n${target.workspace}\n${target.page}`} target={target} onTransfer={transfer} />
+          ) : target.kind === "page" ? (
+            <PageView key={`${tabs.active.id}\n${target.path}`} path={target.path} />
+          ) : (
+            <div className="empty">
+              <Mark size={40} />
+              <h1>{t.nothingOpen}</h1>
+              <p className="muted">{t.nothingOpenHint}</p>
+            </div>
+          )}
+        </TabPanel>
       </main>
       {dialog?.kind === "search" && <SearchPalette onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
