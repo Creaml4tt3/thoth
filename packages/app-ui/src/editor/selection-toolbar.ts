@@ -79,8 +79,10 @@ function createToolbar(view: EditorView, strings: EditorStrings): Toolbar {
   menu.setAttribute("aria-label", t.colorMenu);
   menu.hidden = true;
   root.append(row, form, menu);
-  // Inside the themed element (`data-theme`), not on the body: the tokens resolve per theme where they are declared.
-  (view.dom.closest<HTMLElement>("[data-theme]") ?? document.body).append(root);
+  // Inside the themed element (`data-theme`): the tokens resolve per theme where they are declared. When the theme
+  // is on <html> (applyTheme), the body inherits it, and the toolbar must stay inside the body.
+  const themed = view.dom.closest<HTMLElement>("[data-theme]");
+  (themed && themed !== document.documentElement ? themed : document.body).append(root);
 
   // Buttons ---------------------------------------------------------------
   const labels: Record<Tool, string> = { bold: t.bold, italic: t.italic, underline: t.underline, strike: t.strike, inlineCode: t.code, link: t.link, color: t.color, highlight: t.highlight };
