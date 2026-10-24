@@ -9,3 +9,11 @@ coverage/
 tests/.tmp/
 # Showcase video intermediates (design/video/README.md)
 .tmp/
+# Local AI agent skills, steering and worktrees (large, per-developer; never commit)
+.claude/skills/
+.claude/worktrees/
+.claude/settings.local.json
+.kiro/steering/*/
+.kiro/settings/
+.agents/skills/
+.codex/skills/
