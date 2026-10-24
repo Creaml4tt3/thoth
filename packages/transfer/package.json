@@ -1,0 +1,19 @@
+{
+  "name": "@thoth/transfer",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The ADR-0006 transfer engine: Private Space <-> Workspace copy and move with durable operation records, reference classification and crash recovery.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/local-store": "workspace:*",
+    "@thoth/workspace-client": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

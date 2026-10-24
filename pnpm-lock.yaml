@@ -44,6 +44,9 @@ importers:
       '@thoth/platform':
         specifier: workspace:*
         version: link:packages/platform
+      '@thoth/transfer':
+        specifier: workspace:*
+        version: link:packages/transfer
       '@thoth/workspace-client':
         specifier: workspace:*
         version: link:packages/workspace-client
@@ -501,6 +504,27 @@ importers:
       '@thoth/local-store':
         specifier: workspace:*
         version: link:../local-store
+
+  packages/transfer:
+    dependencies:
+      '@thoth/content':
+        specifier: workspace:*
+        version: link:../content
+      '@thoth/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@thoth/local-store':
+        specifier: workspace:*
+        version: link:../local-store
+      '@thoth/workspace-client':
+        specifier: workspace:*
+        version: link:../workspace-client
+      '@thoth/workspace-protocol':
+        specifier: workspace:*
+        version: link:../workspace-protocol
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
   packages/ui: {}
 
