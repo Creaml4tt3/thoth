@@ -16,6 +16,15 @@
 .plain-editor .md-line-quote { border-left: 3px solid var(--thoth-border-strong); padding-left: 1em !important; color: var(--thoth-ink-secondary); }
 .plain-editor .md-line-meta { font: 13px / 1.6 var(--thoth-font-mono); color: var(--thoth-ink-tertiary); }
 .plain-editor .md-line-done { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
+/* Callouts: the quote lines take the kind's colour (same kinds as editor.css); the `[!kind]` marker shows as a label. */
+.plain-editor .md-line-callout { --callout: var(--thoth-ink-secondary); border-left-color: var(--callout); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.plain-editor .md-line-callout-title { font-weight: 600; }
+.plain-editor .md-line-callout[data-callout="toggle"] { --callout: var(--thoth-border-strong); background: none; }
+.plain-editor .md-line-callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --callout: var(--thoth-success); }
+.plain-editor .md-line-callout:is([data-callout="warning"], [data-callout="caution"], [data-callout="attention"], [data-callout="important"]) { --callout: var(--thoth-warning); }
+.plain-editor .md-line-callout:is([data-callout="danger"], [data-callout="error"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"], [data-callout="bug"]) { --callout: var(--thoth-danger); }
+.plain-editor .md-line-callout:is([data-callout="note"], [data-callout="info"], [data-callout="todo"], [data-callout="question"], [data-callout="help"], [data-callout="faq"]) { --callout: var(--thoth-link); }
+.plain-editor .md-line-callout:is([data-callout="quote"], [data-callout="cite"], [data-callout="example"], [data-callout="abstract"], [data-callout="summary"], [data-callout="tldr"]) { --callout: var(--thoth-stone-600); }
 
 /* Tokens (visible on the active line, and wherever live preview keeps the source) */
 .plain-editor .md-heading { font-weight: 600; }
@@ -35,6 +44,10 @@
 .plain-editor .md-bullet { display: inline-block; width: 1.1em; color: var(--thoth-ink-tertiary); }
 .plain-editor .md-hr { display: inline-block; width: 100%; vertical-align: middle; border-top: 1px solid var(--thoth-border-strong); }
 .plain-editor .task-box { vertical-align: -2px; margin-right: 8px; }
+.plain-editor .md-callout-label { display: inline-flex; gap: 6px; align-items: center; margin-right: 8px; color: var(--callout); font-weight: 600; }
+.plain-editor .md-callout-icon { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); font-size: 11px; }
+.plain-editor .md-line-callout[data-callout="toggle"] .md-callout-label { color: var(--thoth-ink-tertiary); }
+.plain-editor .md-line-callout[data-callout="toggle"] .md-callout-icon { background: none; }
 
 /* Mode switch in the page header */
 .crumb-tools { display: inline-flex; gap: var(--thoth-space-3); align-items: center; }

@@ -684,6 +684,125 @@ describe("toggles", () => {
   });
 });
 
+describe("list items: Enter and Backspace", () => {
+  // Bullet lists need a different marker from the to-do list, or Markdown would merge them into one list.
+  const LIST = "intro\n\n- [ ] buy milk\n- [x] milk,eggs\n\n* one\n* two\n\n1. first\n2. second\n\nend\n";
+  const open = async () => {
+    await seed(root, { "List.md": LIST });
+    return openPage("List.md", "List");
+  };
+  const caretBlock = (ctx: Awaited<ReturnType<typeof openPage>>) => ctx.editor.state.selection.$from;
+
+  it("Enter at the end of a to-do starts a new unchecked to-do below it, at the same level", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "buy milk"));
+    await ctx.app.user.keyboard("{Enter}");
+    const $at = caretBlock(ctx);
+    expect($at.parent.type.name).toBe("paragraph");
+    expect($at.node(-1).type.name).toBe("taskItem");
+    expect($at.node(-1).attrs["checked"]).toBe(false);
+    expect($at.node(-2).childCount).toBe(3);
+    type(ctx.editor, "bread");
+    await ctx.saved(LIST.replace("- [ ] buy milk\n", "- [ ] buy milk\n- [ ] bread\n"));
+  });
+
+  it("Enter in the middle of a to-do splits it; the new to-do is unchecked", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "milk,eggs") - "eggs".length);
+    await ctx.app.user.keyboard("{Enter}");
+    expect(caretBlock(ctx).node(-1).attrs["checked"]).toBe(false);
+    await ctx.saved(LIST.replace("- [x] milk,eggs\n", "- [x] milk,\n- [ ] eggs\n"));
+  });
+
+  it("Enter on an empty to-do turns it into a paragraph after the list", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "milk,eggs"));
+    await ctx.app.user.keyboard("{Enter}{Enter}");
+    expect(caretBlock(ctx).depth).toBe(1);
+    expect(caretBlock(ctx).parent.type.name).toBe("paragraph");
+    type(ctx.editor, "after");
+    await ctx.saved(LIST.replace("- [x] milk,eggs\n", "- [x] milk,eggs\n\nafter\n"));
+  });
+
+  it("Enter on an empty to-do in the middle of the list splits the list around the new paragraph", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "buy milk"));
+    await ctx.app.user.keyboard("{Enter}{Enter}");
+    type(ctx.editor, "between");
+    await ctx.saved(LIST.replace("- [ ] buy milk\n", "- [ ] buy milk\n\nbetween\n\n"));
+  });
+
+  it.each([
+    ["bulleted", "one", "* one\n* two\n", "* one\n* uno\n* two\n"],
+    ["numbered", "first", "1. first\n2. second\n", "1. first\n2. uno\n3. second\n"],
+  ])("%s lists behave the same: Enter adds an item", async (_name, first, md, split) => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, first));
+    await ctx.app.user.keyboard("{Enter}");
+    expect(caretBlock(ctx).node(-1).type.name).toBe("listItem");
+    type(ctx.editor, "uno");
+    await ctx.saved(LIST.replace(md, split));
+  });
+
+  it.each([
+    ["bulleted", "two", "* one\n* two\n", "* one\n* two\n\nafter\n"],
+    ["numbered", "second", "1. first\n2. second\n", "1. first\n2. second\n\nafter\n"],
+  ])("%s lists behave the same: Enter on an empty last item leaves the list", async (_name, last, md, exited) => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, last));
+    await ctx.app.user.keyboard("{Enter}{Enter}");
+    expect(caretBlock(ctx).depth).toBe(1);
+    type(ctx.editor, "after");
+    await ctx.saved(LIST.replace(md, exited));
+  });
+
+  it("Backspace at the start of a to-do turns it into a paragraph and keeps its text, as one undo step", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "milk,eggs") - "milk,eggs".length);
+    await ctx.app.user.keyboard("{Backspace}");
+    expect(caretBlock(ctx).depth).toBe(1);
+    expect(caretBlock(ctx).parent.textContent).toBe("milk,eggs");
+    expect(caretBlock(ctx).parentOffset).toBe(0);
+    await ctx.saved(LIST.replace("- [x] milk,eggs\n", "\nmilk,eggs\n"));
+    expect(undo(ctx.editor.state, ctx.editor.view.dispatch)).toBe(true);
+    await ctx.saved(LIST);
+  });
+
+  it("Backspace at the start of a bullet turns it into a paragraph and keeps its text", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "two") - "two".length);
+    await ctx.app.user.keyboard("{Backspace}");
+    await ctx.saved(LIST.replace("* one\n* two\n", "* one\n\ntwo\n"));
+  });
+
+  it("Backspace inside the text of a to-do still deletes one character", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "buy milk"));
+    await ctx.app.user.keyboard("{Backspace}");
+    await ctx.saved(LIST.replace("- [ ] buy milk\n", "- [ ] buy mil\n"));
+  });
+
+  it("Enter in a code block inside a list item adds a line to the code", async () => {
+    await seed(root, { "Code.md": "- item\n\n  ```\n  code\n  ```\n" });
+    const ctx = await openPage("Code.md", "Code");
+    caretAt(ctx.editor, endOf(ctx.editor, "code"));
+    await ctx.app.user.keyboard("{Enter}");
+    expect(caretBlock(ctx).parent.type.name).toBe("code");
+    expect(caretBlock(ctx).parent.textContent).toBe("code\n");
+  });
+
+  it("the `/` menu still takes Enter inside a list item", async () => {
+    const ctx = await open();
+    caretAt(ctx.editor, endOf(ctx.editor, "buy milk"));
+    await ctx.app.user.keyboard("{Enter}");
+    type(ctx.editor, "/h2");
+    await waitFor(() => expect(slashOpen()).toBe(true));
+    await ctx.app.user.keyboard("{Enter}");
+    await waitFor(() => expect(slashOpen()).toBe(false));
+    expect(caretBlock(ctx).parent.type.name).toBe("heading");
+  });
+});
+
 describe("Markdown input rules", () => {
   async function typeAtNewLine(text: string) {
     const ctx = await openPage();

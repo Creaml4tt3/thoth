@@ -155,6 +155,8 @@ rewrites its list (section 7).
 | Alt+Shift+Up/Down | moves the block at the cursor |
 | Ctrl/Cmd+Alt+M | opens the block menu (Turn into, Duplicate, Delete, Move up, Move down) for the block at the cursor |
 | Mod+Enter in a callout | folds or unfolds it (view only) |
+| Enter in a list item | splits it into a new item of the same list (a new to-do is `- [ ] `); in an empty item, the item becomes a paragraph and the list splits around it |
+| Backspace at the start of a list item | the item becomes a paragraph, text kept; the list splits around it |
 
 ## 4. Escaping
 

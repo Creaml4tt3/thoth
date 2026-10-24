@@ -14,6 +14,7 @@ import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
+import { listKeysExtension } from "./list-keys.ts";
 import { slashTarget, turnInto } from "./block-ops.ts";
 import type { BlockKind } from "./block-kinds.ts";
 
@@ -78,5 +79,5 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     const view = views[ext.name];
     return view ? ext.extend({ addNodeView: () => view }) : ext;
   });
-  return [...base, Editing, calloutKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), linkSuggestExtension(ctx)];
+  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), linkSuggestExtension(ctx)];
 }

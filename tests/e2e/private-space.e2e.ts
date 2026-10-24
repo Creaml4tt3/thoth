@@ -242,6 +242,10 @@ test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact byte
   await page.keyboard.press("Enter");
   await expect(menu).toBeHidden();
   await page.keyboard.type("buy milk");
+  // Enter continues the to-do list (a new unchecked item, not a paragraph nested in the first).
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("bread");
+  await expect(box.locator('li[data-checked="false"]')).toHaveCount(2);
 
   await clickBlock("alpha  para");
   await page.keyboard.press("End");
@@ -286,6 +290,6 @@ test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact byte
 
   // 4. Save and check the file: new blocks canonical, every untouched line byte-identical.
   await page.keyboard.press("ControlOrMeta+s");
-  const expected = "# Blocks\n\nalpha  para\n\nomega para   \n\n> [!toggle]+ Fold me\n> hidden line\n\n* star   bullet\n\n- [ ] buy milk\n";
+  const expected = "# Blocks\n\nalpha  para\n\nomega para   \n\n> [!toggle]+ Fold me\n> hidden line\n\n* star   bullet\n\n- [ ] buy milk\n- [ ] bread\n";
   await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).toBe(expected);
 });

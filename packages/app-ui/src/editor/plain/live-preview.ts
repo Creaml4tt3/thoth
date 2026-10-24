@@ -1,7 +1,7 @@
 /**
  * Live preview for Plain mode (Obsidian-style): Markdown markup is hidden on
- * lines the cursor is not on, wikilinks become chips and task markers become
- * checkboxes. It is display only. The document is never rewritten to show it,
+ * lines the cursor is not on, wikilinks become chips, task markers become
+ * checkboxes and a callout's `[!kind]` marker becomes its label. It is display only. The document is never rewritten to show it,
  * and the line being edited always shows its exact source.
  */
 import { RangeSet, StateEffect, type Extension, type Range } from "@codemirror/state";
@@ -11,12 +11,13 @@ import type { SyntaxNodeRef } from "@lezer/common";
 import { parseWikiInner } from "@thoth/editor";
 import type { EditorContext } from "../context.ts";
 import type { LinkTarget } from "../links.ts";
+import { kindClass, kindIcon, kindLabel } from "../callout-kinds.ts";
 
 /** Dispatched when the link index changes, so chips re-resolve. */
 export const refreshLinks = StateEffect.define<null>();
 
 const hide = Decoration.replace({});
-const line = (cls: string) => Decoration.line({ class: cls });
+const line = (cls: string, attributes?: Record<string, string>) => Decoration.line({ class: cls, ...(attributes ? { attributes } : {}) });
 
 class WikilinkChip extends WidgetType {
   readonly ctx: EditorContext;
@@ -111,7 +112,31 @@ class Rule extends WidgetType {
   }
 }
 
+/** A callout's label (icon and kind) in place of its `[!kind]+` marker, as Blocks mode shows it. */
+class CalloutLabel extends WidgetType {
+  readonly kind: string;
+  constructor(kind: string) {
+    super();
+    this.kind = kind;
+  }
+  override eq(other: CalloutLabel): boolean {
+    return other.kind === this.kind;
+  }
+  toDOM(): HTMLElement {
+    const label = document.createElement("span");
+    label.className = "md-callout-label";
+    const icon = document.createElement("span");
+    icon.className = "md-callout-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = kindIcon(this.kind);
+    label.append(icon, kindLabel(this.kind));
+    return label;
+  }
+}
+
 const HEADING = /^(?:ATX|Setext)Heading([1-6])$/;
+/** What follows a quote's first `>` on a callout's first line, as `@thoth/editor` reads it (`> [!kind]+ title`). */
+const CALLOUT = /^([ \t]*)\[!([A-Za-z0-9_-]+)\][+-]?[ \t]*/;
 const BLOCK_LINE: Record<string, string> = { FencedCode: "md-line-code", CodeBlock: "md-line-code", Blockquote: "md-line-quote", Frontmatter: "md-line-meta" };
 
 /** Lines (by start offset) that hold a cursor or selection: those show their source. */
@@ -136,7 +161,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
   const out: Range<Decoration>[] = [];
   const seen = new Set<string>();
   const onActiveLine = (pos: number) => active.has(doc.lineAt(pos).from);
-  const styleLines = (from: number, end: number, cls: string) => {
+  const styleLines = (from: number, end: number, cls: string, attributes?: Record<string, string>) => {
     // A node that ends at the start of a line (frontmatter ends after its closing fence's line break) does not cover that line.
     const to = end > from && doc.lineAt(end).from === end ? end - 1 : end;
     for (let pos = from; pos <= to; ) {
@@ -144,7 +169,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
       const key = `${l.from}:${cls}`;
       if (!seen.has(key)) {
         seen.add(key);
-        out.push(line(cls).range(l.from));
+        out.push(line(cls, attributes).range(l.from));
       }
       if (l.to >= to) break;
       pos = l.to + 1;
@@ -157,6 +182,25 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
     seen.add(key);
     out.push(deco.range(from, to));
   };
+  // Markers shown as labels: lezer reads `[!kind]` as a link, whose brackets must not be hidden on their own.
+  const markers: [number, number][] = [];
+  const inMarker = (pos: number) => markers.some(([from, to]) => pos >= from && pos < to);
+  /** A quote whose first line starts with `[!kind]` is a callout: its lines take the kind's look, the marker becomes a label. */
+  const callout = (node: SyntaxNodeRef) => {
+    const quote = node.node.getChild("QuoteMark");
+    const first = doc.lineAt(node.from);
+    if (!quote || quote.to > first.to) return;
+    const m = CALLOUT.exec(doc.sliceString(quote.to, first.to));
+    if (!m) return;
+    const kind = m[2]!;
+    styleLines(node.from, node.to, "md-line-callout", { "data-callout": kindClass(kind) });
+    styleLines(first.from, first.from, "md-line-callout-title");
+    if (active.has(first.from)) return;
+    const from = quote.to + m[1]!.length;
+    const to = quote.to + m[0].length;
+    markers.push([from, to]);
+    replace(from, to, Decoration.replace({ widget: new CalloutLabel(kind) }));
+  };
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
@@ -168,6 +212,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
         if (blockClass) styleLines(node.from, node.to, blockClass);
         const heading = HEADING.exec(name);
         if (heading) styleLines(node.from, node.to, `md-line-h${Math.min(Number(heading[1]), 3)}`);
+        if (name === "Blockquote") callout(node);
         if (name === "FencedCode" || name === "CodeBlock" || name === "Frontmatter") return false;
         if (onActiveLine(node.from)) return;
 
@@ -196,7 +241,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
           case "LinkMark":
           case "URL":
           case "LinkTitle":
-            if (node.node.parent?.name === "Link") replace(node.from, node.to);
+            if (node.node.parent?.name === "Link" && !inMarker(node.from)) replace(node.from, node.to);
             break;
           case "ListMark": {
             const item = node.node.parent;

@@ -161,6 +161,46 @@ describe("Plain mode", () => {
     expect(guard.calls).toHaveLength(0);
   });
 
+  it("live preview shows a callout as a callout: a kind label instead of the raw `[!kind]` marker, and the file is untouched", async () => {
+    const source = "Intro line.\n\n> [!note] Read me\n> body text\n\n> [!WARNING]-\n> careful\n\n> [!toggle]+ Fold me\n> inside\n\n> plain quote\n\n> [!not a kind] stays a quote\n";
+    await seed(root, { "Callouts.md": source });
+    setDefaultEditorMode("plain");
+    const guard = guardWrites();
+    const app = await openPage("Callouts");
+    const view = await plainView();
+    await waitFor(() => expect(view.state.doc.toString()).toBe(source));
+    view.dispatch({ selection: { anchor: 0 } }); // the caret on "Intro line.": every callout line is previewed
+    const content = view.contentDOM;
+    const lineOf = (text: string) => [...content.querySelectorAll<HTMLElement>(".cm-line")].find((l) => l.textContent!.includes(text))!;
+
+    await waitFor(() => expect(content.querySelectorAll(".md-callout-label")).toHaveLength(3));
+    expect([...content.querySelectorAll(".md-callout-label")].map((l) => l.textContent)).toEqual(["iNote", "!Warning", "▸Toggle"]);
+    expect(content.textContent).not.toContain("!note");
+    expect(content.textContent).not.toContain("!WARNING");
+    expect(content.textContent).not.toContain("!toggle");
+    expect(lineOf("Read me").dataset["callout"]).toBe("note");
+    expect(lineOf("Read me").classList.contains("md-line-callout-title")).toBe(true);
+    expect(lineOf("body text").dataset["callout"]).toBe("note");
+    expect(lineOf("careful").dataset["callout"]).toBe("warning");
+    expect(lineOf("Fold me").dataset["callout"]).toBe("toggle");
+    // An ordinary quote, and a marker that is not a valid kind, stay quotes.
+    expect(lineOf("plain quote").classList.contains("md-line-callout")).toBe(false);
+    expect(lineOf("stays a quote").classList.contains("md-line-callout")).toBe(false);
+
+    // The line being edited shows its exact source.
+    const at = source.indexOf("Read me");
+    view.dispatch({ selection: { anchor: at } });
+    await waitFor(() => expect(lineOf("Read me").textContent).toBe("> [!note] Read me"));
+    expect(content.querySelectorAll(".md-callout-label")).toHaveLength(2);
+
+    // Display only: nothing was written and the text is the file's.
+    await app.user.keyboard("{Meta>}s{/Meta}");
+    await new Promise((r) => setTimeout(r, 60));
+    expect(guard.calls).toHaveLength(0);
+    expect(view.state.doc.toString()).toBe(source);
+    expect(await app.read("Callouts.md")).toBe(source);
+  });
+
   it("the default mode is chosen in Settings", async () => {
     const app = await openApp(root);
     await app.user.click(await screen.findByRole("button", { name: /settings/i }));

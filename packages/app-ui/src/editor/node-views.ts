@@ -5,6 +5,7 @@
 import type { NodeViewRenderer } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { EditorContext } from "./context.ts";
+import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -12,16 +13,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   if (text !== undefined) node.textContent = text;
   return node;
 };
-
-const CALLOUT_ICONS: Record<string, string> = {
-  note: "i", info: "i", todo: "☐", tip: "✦", hint: "✦", important: "!", success: "✓", check: "✓", done: "✓",
-  question: "?", help: "?", faq: "?", warning: "!", caution: "!", attention: "!", failure: "×", fail: "×", missing: "×",
-  danger: "!", error: "!", bug: "•", example: "§", quote: "“", cite: "“", abstract: "≡", summary: "≡", tldr: "≡",
-};
-
-const kindClass = (kind: string): string => kind.toLowerCase().replace(/[^a-z0-9-]/g, "");
-
-const capitalized = (kind: string): string => kind.charAt(0).toUpperCase() + kind.slice(1).toLowerCase();
 
 /**
  * Obsidian-style callout. The title is the first child (`calloutTitle`), so it
@@ -54,8 +45,8 @@ export const calloutView = (ctx: EditorContext): NodeViewRenderer => ({ node: in
     dom.dataset["fold"] = node.attrs["fold"] as string;
     dom.dataset["foldable"] = String(foldable());
     dom.dataset["collapsed"] = String(foldable() && collapsed);
-    dom.style.setProperty("--callout-label", JSON.stringify(capitalized(kind)));
-    icon.textContent = CALLOUT_ICONS[key] ?? "i";
+    dom.style.setProperty("--callout-label", JSON.stringify(kindLabel(kind)));
+    icon.textContent = kindIcon(kind);
     fold.hidden = !foldable();
     fold.setAttribute("aria-expanded", String(!collapsed));
     fold.setAttribute("aria-label", ctx.strings.fold(collapsed, key === "toggle"));
