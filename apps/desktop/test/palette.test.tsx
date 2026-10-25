@@ -340,7 +340,7 @@ describe("the shortcuts list", () => {
     expect(rowOf("style.highlight").textContent).toContain("Ctrl+Shift+H");
     expect(rowOf("style.strike").textContent).toContain("Ctrl+Shift+S");
     expect(rowOf("editor.mode").textContent).toContain("Ctrl+Shift+E");
-    expect(within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Everywhere", "Tabs", "Page tree", "Editor"]);
+    expect(within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Everywhere", "Thoth assistant", "Tabs", "Page tree", "Editor"]);
     // Where the web has other keys, the desktop list says so.
     expect(rowOf("tab.close").textContent).toContain("Web: Alt+W");
     expect(rowOf("style.strike").textContent).toContain("Web: Ctrl+Alt+S");
