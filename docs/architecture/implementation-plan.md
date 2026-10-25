@@ -912,9 +912,52 @@ Not done / follow-ups (see §4 item 12):
 - Not yet checked by a person in a real window: the look of the tab, Thai on screen, a real long-running task, a
   real long budget/time stop. The Thai strings marked `REVIEW` in `apps/desktop/src/strings/th.ts` need a native reader.
 
+### Track 4 (2026-10-25) — Notifications (ADR-0018)
+
+Scope approved by the owner on 2026-10-25. Desktop and web client unless noted.
+
+AC:
+
+1. **Events:** an agent run ready for review, finished, failed or stopped at a limit; a copy or move between the
+   Private Space and a workspace done or failed; an import done or failed; a save conflict.
+2. **In-app:** a notification list (a bell in the sidebar and a palette command), with unread state, keyboard reach
+   and an accessible live announcement. Agent run events go through the mascot (its state, its announcement and a
+   short message bubble) rather than a separate toast.
+3. **System notifications** (desktop only): only while the window is in the background; on by default; each event
+   kind can be switched off in Settings. Through Tauri's official notification plugin (version pinned, at least three
+   weeks old). Clicking one brings the window forward and opens what it is about.
+4. The web client has the in-app list only (there are no agents or imports there; transfers are desktop only too).
+5. Nothing sensitive in a system notification: page titles at most, never page text or agent output.
+
+### Track 5 (2026-10-25) — Tab drag and windows (ADR-0019)
+
+Requested by the owner on 2026-10-25.
+
+AC:
+
+1. Tabs can be dragged to reorder, by pointer, with a drop indicator; Alt/Option+Shift+←/→ (or the palette) is the
+   keyboard alternative. The order is kept with the restored tabs.
+2. Desktop: a tab dragged out of the tab bar opens in a new window, on the same Private Space; the new window has the
+   whole shell (sidebar, tabs, mascot). Each window keeps and restores its own tabs. Edits in one window show in the
+   other (the vault watcher and compare-and-swap writes already cover two writers).
+3. Web client: reorder only (a browser window per tab is the browser's job).
+
 ### Phase 5 — MVP end-to-end (§14)
 
 All twelve steps of spec §14 as one automated scenario.
+
+### After Phase 5 — the owner's list (2026-10-25), not started
+
+Each needs its own ADR and an owner decision before work starts.
+
+1. **Public share link.** From a connected workspace server, share a page (or workspace) as a public read-only URL on
+   that server, for easy viewing without an account. This widens ADR-0009 (authorization) and touches the trial vs
+   self-host split (the trial's limits and abuse handling), so it must be discussed first.
+2. **An MCP server** so other apps (AI tools) can connect to Thoth: what it exposes (search and read of the Private
+   Space, workspaces), whether it may write (and if so through review and compare-and-swap, as agents do), how it is
+   switched on and which app may connect.
+3. **Update notice.** A popup when a new desktop version is out (Tauri's updater, signed updates, the release feed
+   next to the downloads in docs/deploy/release.md).
 
 ## 4. Deviations and clarifications (none change a locked decision)
 
