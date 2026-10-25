@@ -242,6 +242,7 @@ export const en = {
       ask: "Ask Thoth",
       assistantSize: "Shrink or expand the assistant",
       assistantSettings: "Open the assistant settings",
+      notifications: "Show notifications",
       newTab: "New tab",
       closeTab: "Close tab",
       nextTab: "Next tab",
@@ -294,6 +295,43 @@ export const en = {
   sidebar: {
     resize: "Resize sidebar",
     resizeHint: "Drag to resize. Double-click or press Enter to reset.",
+  },
+
+  /**
+   * Notifications (ADR-0018): the bell, its list, and the text of each event. An event names pages, folders,
+   * workspaces and the agent only; never page text, the task or what the agent wrote.
+   */
+  notifications: {
+    bell: "Notifications",
+    bellUnread: (n: number) => `Notifications, ${n.toLocaleString()} unread`,
+    heading: "Notifications",
+    empty: "Nothing yet. Finished agent runs, transfers, imports and save conflicts show here.",
+    markAllRead: "Mark all read",
+    clear: "Clear",
+    unread: "Unread",
+    /** "Plan", "Plan and 1 more page", "Plan and 4 more pages". */
+    pages: (first: string, more: number) => (more === 0 ? first : `${first} and ${plural(more, "more page", "more pages")}`),
+    agentReview: "Changes ready for review",
+    agentFinished: "The agent finished without changing anything",
+    agentFailed: (reason: string) => `The run failed: ${reason}`,
+    failures: {
+      notSignedIn: (agent: string) => `${agent} is not signed in`,
+      billing: (agent: string) => `${agent} needs a paid plan or credit`,
+      rateLimit: (agent: string) => `${agent} hit its usage limit`,
+      modelNotFound: (agent: string) => `${agent} does not know that model`,
+      error: (agent: string) => `${agent} stopped with an error`,
+    },
+    agentLimitTime: "The run stopped at its time limit",
+    agentLimitBudget: "The run stopped at its spending limit",
+    agentLimitReview: "its work so far can be reviewed",
+    transferDone: (mode: "copy" | "move", where: string) => (mode === "copy" ? `Copied to ${where}` : `Moved to ${where}`),
+    transferFailed: (mode: "copy" | "move", where: string) => `The ${mode} to ${where} did not finish`,
+    privateSpace: "the Private Space",
+    importDone: "Import complete",
+    importFailed: "Import finished with errors",
+    importBody: (pages: number, folder: string) => `${plural(pages, "page")} in ${folder}`,
+    saveConflict: (page: string) => `${page} changed elsewhere while you were editing it`,
+    saveConflictBody: "Choose which version to keep.",
   },
 
   tabs: {

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import { tip } from "./Tooltip.tsx";
 import { Icon, type IconName } from "./Icon.tsx";
 import { useShortcutHint } from "../keyboard/hints.ts";
@@ -10,6 +10,7 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"
   label: string;
   /** The command it runs, if the shortcut table has one: its keys show in the tooltip and are announced (`aria-keyshortcuts`). */
   shortcut?: ShortcutId | undefined;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /** A 28px icon button: always named (`aria-label`), with a tooltip that shows the name and the shortcut. */

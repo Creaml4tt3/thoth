@@ -53,6 +53,20 @@ describe("New folder", () => {
   });
 });
 
+describe("Show notifications", () => {
+  it("is offered where there is a notification list, and found by its words", () => {
+    const { actions, log } = spies();
+    expect(find(buildCommands(actions, en, "web", "mac"), "notifications.open")).toBeUndefined();
+    const list = buildCommands({ ...actions, openNotifications: vi.fn(() => void log.push("notifications")) }, en, "web", "mac");
+    expect(find(list, "notifications.open")?.title).toBe("Show notifications");
+    expect(filterCommands("> bell", list).map((c) => c.id)).toEqual(["notifications.open"]);
+    expect(filterCommands("> unread", list).map((c) => c.id)).toEqual(["notifications.open"]);
+    find(list, "notifications.open")!.run();
+    expect(log).toEqual(["notifications"]);
+    expect(titles(buildCommands({ ...actions, openNotifications: () => undefined }, th, "desktop", "mac"))).toContain("แสดงการแจ้งเตือน");
+  });
+});
+
 describe("the palette's commands", () => {
   it("offers what the app can do now, in the UI language", () => {
     const { actions } = spies();

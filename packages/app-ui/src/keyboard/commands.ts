@@ -42,6 +42,8 @@ export interface CommandActions {
   askAssistant?(): void;
   toggleAssistantSize?(): void;
   openAssistantSettings?(): void;
+  /** Opens the notification list (the bell in the sidebar). */
+  openNotifications?(): void;
   tabs: { newTab(): void; closeTab(): void; next(): void; previous(): void; list: readonly { id: string; label: string }[]; active: string; goTo(id: string): void };
   toggleMode?(): void;
   showShortcuts(): void;
@@ -76,6 +78,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.askAssistant) add("assistant.ask", t.ask, a.askAssistant, { ...key("assistant.ask"), keywords: "agent ai claude codex assistant mascot ibis prompt" });
   if (a.toggleAssistantSize) add("assistant.size", t.assistantSize, a.toggleAssistantSize, { ...key("assistant.size"), keywords: "mascot compact full small big" });
   if (a.openAssistantSettings) add("assistant.settings", t.assistantSettings, a.openAssistantSettings, { keywords: "agent hub ai claude codex history usage permissions mascot preferences" });
+  if (a.openNotifications) add("notifications.open", t.notifications, a.openNotifications, { keywords: "bell notification unread alerts done failed" });
   add("tab.new", t.newTab, a.tabs.newTab, key("tab.new"));
   add("tab.close", t.closeTab, a.tabs.closeTab, key("tab.close"));
   add("tab.next", t.nextTab, a.tabs.next, key("tab.next"));

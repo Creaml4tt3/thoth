@@ -90,7 +90,7 @@ export interface PageFrameProps {
   footer?: ReactNode;
   /** Extra controls in the breadcrumb bar (the desktop's Copy / Move to Private Space). */
   actions?: ReactNode;
-  /** Told when the conflict dialog opens and how it was resolved (the web client's anonymous analytics). */
+  /** Told when the conflict dialog opens and how it was resolved (the web client's anonymous analytics, and the save-conflict notification of ADR-0018). */
   onConflict?(event: { kind: "shown" } | { kind: "resolved"; choice: "mine" | "theirs" | "both" }): void;
   /** Told after each save that wrote the page (the web client's anonymous analytics). */
   onSaved?(): void;
@@ -131,7 +131,7 @@ export function PageFrame(props: PageFrameProps) {
     };
   }, [loadLinks, props.linkTick, ctx]);
 
-  // Analytics hooks (web client only): no page content, title or id is passed on.
+  // Analytics and notification hooks: no page content, title or id is passed on (the caller knows which page it is).
   const conflictOpen = state.conflict !== null;
   const notify = useRef(props.onConflict);
   notify.current = props.onConflict;

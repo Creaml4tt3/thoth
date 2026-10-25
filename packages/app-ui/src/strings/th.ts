@@ -216,6 +216,7 @@ export const th: Strings = {
       ask: "ถาม Thoth",
       assistantSize: "ย่อหรือขยายผู้ช่วย", // REVIEW
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
+      notifications: "แสดงการแจ้งเตือน",
       newTab: "แท็บใหม่",
       closeTab: "ปิดแท็บ",
       nextTab: "แท็บถัดไป",
@@ -267,6 +268,39 @@ export const th: Strings = {
   sidebar: {
     resize: "ปรับความกว้างแถบด้านข้าง", // REVIEW
     resizeHint: "ลากเพื่อปรับขนาด ดับเบิลคลิกหรือกด Enter เพื่อคืนค่าเดิม", // REVIEW
+  },
+
+  // Notifications (ADR-0018). Strings marked REVIEW are the least certain.
+  notifications: {
+    bell: "การแจ้งเตือน",
+    bellUnread: (n) => `การแจ้งเตือน ยังไม่ได้อ่าน ${count(n)} รายการ`,
+    heading: "การแจ้งเตือน",
+    empty: "ยังไม่มีการแจ้งเตือน งานของเอเจนต์ การคัดลอกหรือย้าย การนำเข้า และการบันทึกที่ขัดกันจะแสดงที่นี่", // REVIEW
+    markAllRead: "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
+    clear: "ล้าง",
+    unread: "ยังไม่ได้อ่าน",
+    pages: (first, more) => (more === 0 ? first : `${first} และอีก ${count(more)} หน้า`),
+    agentReview: "การแก้ไขพร้อมให้ตรวจแล้ว", // REVIEW
+    agentFinished: "เอเจนต์ทำงานเสร็จโดยไม่ได้แก้ไขอะไร", // REVIEW
+    agentFailed: (reason) => `งานล้มเหลว: ${reason}`, // REVIEW
+    failures: {
+      notSignedIn: (agent) => `${agent} ยังไม่ได้ลงชื่อเข้าใช้`,
+      billing: (agent) => `${agent} ต้องใช้แพ็กเกจแบบเสียเงินหรือเครดิต`, // REVIEW
+      rateLimit: (agent) => `${agent} ใช้งานถึงขีดจำกัดแล้ว`, // REVIEW
+      modelNotFound: (agent) => `${agent} ไม่รู้จักโมเดลนั้น`, // REVIEW
+      error: (agent) => `${agent} หยุดทำงานเพราะเกิดข้อผิดพลาด`,
+    },
+    agentLimitTime: "งานหยุดเพราะถึงเวลาที่กำหนด", // REVIEW
+    agentLimitBudget: "งานหยุดเพราะถึงวงเงินที่กำหนด", // REVIEW
+    agentLimitReview: "ยังตรวจงานที่ทำไปแล้วได้", // REVIEW
+    transferDone: (mode, where) => (mode === "copy" ? `คัดลอกไปที่ ${where} แล้ว` : `ย้ายไปที่ ${where} แล้ว`),
+    transferFailed: (mode, where) => (mode === "copy" ? `คัดลอกไปที่ ${where} ไม่สำเร็จ` : `ย้ายไปที่ ${where} ไม่สำเร็จ`),
+    privateSpace: "Private Space",
+    importDone: "นำเข้าเสร็จแล้ว",
+    importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด", // REVIEW
+    importBody: (pages, folder) => `${count(pages)} หน้าใน ${folder}`,
+    saveConflict: (page) => `${page} ถูกแก้ไขที่อื่นระหว่างที่คุณกำลังแก้ไข`, // REVIEW
+    saveConflictBody: "เลือกฉบับที่จะเก็บไว้",
   },
 
   tabs: {
