@@ -44,6 +44,7 @@ jobs:
           - name: macOS universal
             os: macos-latest
             targets: aarch64-apple-darwin,x86_64-apple-darwin
+            sidecar: universal-apple-darwin
             args: --target universal-apple-darwin --bundles dmg
             out: target/universal-apple-darwin/release/bundle
           # crates/thoth-host's Windows file layer (src/win) keeps every path inside the Private Space with
@@ -51,11 +52,13 @@ jobs:
           - name: Windows x64
             os: windows-latest
             targets: x86_64-pc-windows-msvc
+            sidecar: x86_64-pc-windows-msvc
             args: --bundles nsis,msi
             out: target/release/bundle
           - name: Linux x64
             os: ubuntu-22.04
             targets: x86_64-unknown-linux-gnu
+            sidecar: x86_64-unknown-linux-gnu
             args: --bundles appimage,deb
             out: target/release/bundle
     runs-on: ${{ matrix.os }}
@@ -85,8 +88,11 @@ jobs:
           key: ${{ matrix.name }}
 
       - run: pnpm install --frozen-lockfile
+      # thoth-mcp, the MCP server other apps start (ADR-0021), goes next to the app's program (Tauri externalBin).
+      - name: Build thoth-mcp
+        run: node scripts/build-mcp-sidecar.ts ${{ matrix.sidecar }}
       - name: Build installers
-        run: pnpm --filter @thoth/desktop tauri build ${{ matrix.args }}
+        run: pnpm --filter @thoth/desktop tauri build --config src-tauri/tauri.sidecar.conf.json ${{ matrix.args }}
 
       - name: Collect installers
         shell: bash
@@ -125,7 +131,7 @@ jobs:
           key: windows-test
       - run: pnpm install --frozen-lockfile
       - name: Host tests (file layer, Agent Hub, servers)
-        run: cargo test -p thoth-host
+        run: cargo test -p thoth-host -p thoth-mcp
       - name: Port contract against the Windows host
         run: pnpm exec vitest run tests/ports/rust.test.ts tests/ports/rust-host.test.ts tests/ports/vault-on-rust.test.ts
       - name: Desktop shell tests (capability, Explorer and browser launchers)
