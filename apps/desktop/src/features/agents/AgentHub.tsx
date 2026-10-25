@@ -201,11 +201,14 @@ function RunPanel({ state, agents }: { state: AgentsState; agents: AgentsService
           {state.phase === "cancelling" ? t.cancelling : t.working}
         </p>
       )}
-      <ol className="agents-log" role="log" aria-label={t.transcript} aria-live="polite">
-        {shown.map((event, i) => (
-          <EventLine key={i} event={event} t={t} />
-        ))}
-      </ol>
+      {/* The log role goes on a wrapper: on the list itself it would take away the list's semantics. */}
+      <div role="log" aria-label={t.transcript} aria-live="polite">
+        <ol className="agents-log">
+          {shown.map((event, i) => (
+            <EventLine key={i} event={event} t={t} />
+          ))}
+        </ol>
+      </div>
       {logs.length > 0 && (
         <details className="agents-stderr">
           <summary>Claude Code ({logs.length})</summary>

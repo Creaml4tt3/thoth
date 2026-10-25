@@ -28,7 +28,7 @@ Toolchain verified on the dev machine:
 | Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; auth decided (OIDC, ADR-0013); server 2a done (Podman + PostgreSQL) | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | **Done (2026-10-24)** | `packages/transfer` (ADR-0006, Accepted for its decisions; see the ADR's resolved questions), desktop copy/move UI, fault injection at every state boundary, e2e on the real server. Attachments go Private → Workspace only (see Phase 3). |
-| Agent Hub (P4) | Not started | ADR-0007 is Proposed. |
+| Agent Hub (P4) | **Claude Code adapter done (2026-10-25)** | `packages/agent-core`, `packages/agent-claude`, the host's `agent.*` commands and the desktop Agent Hub tab. ADR-0007 decisions taken 2026-10-25 (owner to confirm). Codex not started; no OS-level sandbox yet. |
 | Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
 
 ## 3. Phased plan with acceptance criteria
@@ -769,6 +769,55 @@ AC:
 - Browser contexts cannot spawn processes or read files without the local
   bridge (§14.11).
 
+Result (2026-10-25): Claude Code adapter ✅ (Codex not started). ADR-0007's open questions were decided with
+conservative defaults on 2026-10-25, owner to confirm (ADR-0007, "Decisions for Phase 4").
+
+What was built:
+- **`crates/thoth-host/src/agent`**: the `agent.*` host commands (`detect`, `run.create`, `fs.stat/read/list/mkdirp/
+  write`, `start`, `events`, `cancel`, `run.dispose`, `sweep`), in the Tauri shell (commands, permissions) and the
+  stdio harness (`--agent-search-dir` for tests). The host finds the CLI itself, checks every argument against the
+  Claude Code policy (`agent/claude.rs`), runs it in `<app data>/agent-runs/<run>/work` (0700) with the prompt on
+  stdin, in its own process group, with the environment minus `THOTH_*` and anything naming an open vault. Output is
+  pulled with a bounded long poll. Cancel, timeout and shutdown signal the group (SIGTERM, SIGKILL after 3 s).
+- **`packages/agent-core`** (no React, no Tauri): the `AgentProvider` contract (spec §10), the host port,
+  `AgentHub` (detect → stage → start → stream → review → apply/discard), staging with a manifest of path and hash,
+  review that treats the working directory as untrusted (unsafe names, `.thoth/`, symlinks, special files, size,
+  non-UTF-8 pages), apply through `Vault.writeFileAtomic`/`deleteFileAtomic` against the staged hashes, run records
+  in `.thoth/agent/runs/`, recovery (interrupted records, sweep), and `NodeAgentHost` for tests.
+- **`packages/agent-claude`**: the verified command line, detection from the CLI's probes, the stream-json parser,
+  the fake `claude` used by every test, and a README listing each flag and event with its source.
+- **Desktop**: the Agent Hub tab (sidebar icon, `> Open the Agent Hub`, "Ask an agent…" in the page selection):
+  status with fix instructions, page/folder picker, task, optional model and spending limit, live transcript with
+  Cancel, per-file review with the editor's line diff, Apply, conflicts with "Keep the agent's version as a copy",
+  earlier runs. English and Thai (unsure Thai marked `REVIEW`).
+
+AC evidence:
+
+| AC | Evidence |
+|---|---|
+| Detection of a missing or present CLI | `crates/thoth-host/tests/agent.rs` › `detects_a_missing_cli…`, `detects_a_present_cli…`; `tests/agent/hub.test.ts` › "detects a missing, a present and a signed-out CLI" (Rust and Node hosts); `packages/agent-claude/test/detect.test.ts` (too old, missing flags, not logged in, the real 2.1.310 `--help`); `apps/desktop/test/agents.test.tsx` › "says the CLI is missing, where it looked and how to fix it" |
+| Start, stream and cancel | `agent.rs` › `runs_in_the_private_working_directory…`, `cancel_kills_the_whole_process_group` (CLI and grandchild gone), `a_cli_that_ignores_sigterm…`, `a_run_past_its_time_limit…`; `hub.test.ts` › "cancel stops the CLI and its children…"; `tests/e2e/agent-hub.e2e.ts` (both tests) |
+| Only the selected context is in the working directory | The fake CLI records its cwd, argv, environment and the files it saw: `agent.rs` › `runs_in_the_private_working_directory_with_only_the_staged_files`; `hub.test.ts` › "stages only the selected context…" (linked attachment included, unselected pages not; no `THOTH_*` variable and no vault path in argv or env); `agents.test.tsx`; `agent-hub.e2e.ts` › "pick a page, start, …" |
+| Proposed changes are never applied without approval | `hub.test.ts` › "never applies anything without approval: discard writes nothing", "…applies exactly the approved bytes" (one of two approved), "never offers or writes untrusted output"; `packages/agent-core/test/review.test.ts`; `agents.test.tsx` › "discard writes nothing…"; e2e › exact bytes on disk after Apply |
+| A stale page is a conflict, not an overwrite | `hub.test.ts` › "a page changed in the vault since staging is a conflict…", "marks a change stale…"; `agents.test.tsx` › "a page edited meanwhile is a conflict…" (copy kept) |
+| Browser contexts cannot spawn | The web client has no `Platform` and no host commands; `apps/web/test/build.test.ts` refuses `agent.start`, `agent.run.create`, `stream-json` and `--permission-mode` (and `child_process`, Tauri) in the production bundle. The Tauri capability grants only Thoth's commands to the desktop window (`apps/desktop/src-tauri/src/lib.rs` tests); the argument policy holds even for a compromised webview (`agent/claude.rs` tests, `agent.rs` › `refuses_arguments_outside_the_policy…`). `agents.test.tsx` › "is not offered where the host cannot run agents" |
+| Recovery and cleanup | `agent.rs` › `sweep_deletes_only_folders_left_by_earlier_sessions…`; `hub.test.ts` › "after a crash, recovery marks unfinished runs interrupted…" |
+
+A manual smoke test with the real CLI on the Rust host, `THOTH_REAL_CLAUDE=1 pnpm vitest run
+tests/agent/real-claude.test.ts`, is skipped by default. Run once on 2026-10-25 with `--model haiku`: the page was
+edited only after Apply, a read of `../Secret.md` was denied by `--restricted`, cost about US$0.0013.
+
+Checks (2026-10-25): `pnpm check` 1804 passed, 1 skipped (the real-CLI smoke test); `cargo test` 58 passed
+(`thoth-host` 28 unit + 10 agent + 13 remote + 1 reveal, desktop shell 6); `pnpm e2e` 37 passed, 3 skipped (the
+site's Windows download and the two motion captures, as before), `agent-hub.e2e.ts` included.
+
+Not done / follow-ups (see §4 item 12):
+- Codex adapter; Workspace content as context; OS-level sandboxing; git worktrees.
+- Windows: cancel and timeout cannot signal a process group yet (the desktop app ships for macOS).
+- The run history shows metadata; transcripts are not kept (by design) and a finished run cannot be reopened for
+  review after the app restarts (its working directory is gone; the record says `interrupted`).
+- Not yet checked by a person in a real window: the look of the tab, Thai on screen, a real long-running task.
+
 ### Phase 5 — MVP end-to-end (§14)
 
 All twelve steps of spec §14 as one automated scenario.
@@ -820,6 +869,14 @@ All twelve steps of spec §14 as one automated scenario.
     forged entry can only put bytes back. The narrow window of review item 13
     (an edit between the hash check and the rename) is closed for deletes:
     the hash is taken after the rename.
+
+12. **Agent Hub shape vs spec §10** (Phase 4). The `AgentProvider` interface is as illustrated (`detect`,
+    `getCapabilities`, `startTask`, `streamEvents`, `cancelRun`), with two clarifications: `AgentTaskInput` names a
+    working directory the host already prepared (staging and review belong to `AgentHub`, not to each provider),
+    and the run ID is that directory's handle. The host side is a set of dedicated `agent.*` commands rather than a
+    process API, and it re-checks the adapter's argument list against its own policy (ADR-0007 decision 3). Run
+    records keep the task text in the vault's `.thoth/agent/runs/` (ADR-0007 decision 9); spec §3.3's "not a content
+    store" holds: no page text or agent output is kept.
 
 ## 5. Independent review (2026-10-21) — status
 

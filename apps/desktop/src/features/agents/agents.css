@@ -1,5 +1,7 @@
 /* Agent Hub (Paper). Tokens only; layout follows Settings and the transfer dialog. */
 .agents .small { font: var(--thoth-text-small); }
+/* Secondary text here is read, not skimmed (status, transcript, hints): the AA-contrast ink rather than the tertiary one. */
+.agents .muted { color: var(--thoth-ink-secondary); }
 .agents-caution { color: var(--thoth-ink-primary); }
 .agents-ready { color: var(--thoth-ink-primary); }
 .agents-ready::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: var(--thoth-radius-pill); background: var(--thoth-success); vertical-align: 1px; }

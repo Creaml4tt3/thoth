@@ -93,10 +93,10 @@ fn record_path(work: &Path) -> PathBuf {
 fn read_record(work: &Path) -> Value {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        if let Ok(text) = std::fs::read_to_string(record_path(work)) {
-            if let Ok(value) = serde_json::from_str::<Value>(&text) {
-                return value;
-            }
+        if let Ok(text) = std::fs::read_to_string(record_path(work))
+            && let Ok(value) = serde_json::from_str::<Value>(&text)
+        {
+            return value;
         }
         assert!(Instant::now() < deadline, "the fake CLI wrote no record");
         std::thread::sleep(Duration::from_millis(20));
