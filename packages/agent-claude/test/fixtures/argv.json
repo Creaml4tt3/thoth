@@ -1,0 +1,65 @@
+{
+  "comment": "The exact Claude Code argument lists packages/agent-claude builds. args.test.ts checks buildArgs against them; crates/thoth-host/src/agent/claude.rs checks that the host's policy accepts them.",
+  "cases": [
+    {
+      "options": {},
+      "argv": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "text",
+        "--restricted",
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{\"mcpServers\":{}}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--allowedTools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowedTools",
+        "mcp__*",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--no-session-persistence",
+        "--disable-slash-commands"
+      ]
+    },
+    {
+      "options": { "model": "sonnet", "maxBudgetUsd": 1.5 },
+      "argv": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "text",
+        "--restricted",
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{\"mcpServers\":{}}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--allowedTools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowedTools",
+        "mcp__*",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--model",
+        "sonnet",
+        "--max-budget-usd",
+        "1.5"
+      ]
+    }
+  ]
+}

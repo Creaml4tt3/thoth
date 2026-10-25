@@ -14,6 +14,9 @@
 //!   directory fd that is held for the life of the handle.
 //! - Workspace servers are reached only by the host (`remote`): the webview names a server by its handle and
 //!   never receives an access token, refresh token or personal access token.
+//! - Agent CLIs (`agent`, ADR-0007) run only as a known provider's binary found by the host, with an argument list
+//!   the provider's policy accepts, in a private working directory under the data folder.
+pub mod agent;
 mod at;
 pub mod error;
 mod handles;
@@ -27,6 +30,7 @@ pub mod watch;
 pub use error::{HostError, HostResult};
 pub use remote::{Browser, KEYCHAIN_SERVICE, MemorySecretStore, SecretStore};
 
+use agent::Agents;
 use paths::{canonical, check_root_policy};
 use remote::Remote;
 use rustix::fs::{Mode, OFlags};
@@ -49,6 +53,8 @@ pub const COMMANDS: &[&str] = &[
     "source.temp.create", "source.temp.write", "source.close",
     "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
     "api.call",
+    "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
+    "agent.start", "agent.events", "agent.cancel", "agent.run.dispose", "agent.sweep",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -86,6 +92,9 @@ pub struct HostConfig {
     pub browser: Arc<dyn Browser>,
     /// Shows a vault folder in the file manager (`vault.reveal`).
     pub file_manager: Arc<dyn FileManager>,
+    /// Test hook (stdio harness only): search only these folders for agent CLIs instead of `PATH` and the usual
+    /// install locations. The desktop shell always passes `None`.
+    pub agent_search_dirs: Option<Vec<PathBuf>>,
 }
 
 struct VaultEntry {
@@ -115,6 +124,7 @@ pub struct Host {
     allow_roots: Vec<PathBuf>,
     state: Mutex<State>,
     remote: Remote,
+    agents: Agents,
 }
 
 type Reply = (Value, Option<Vec<u8>>);
@@ -124,7 +134,8 @@ impl Host {
         let home = std::env::var_os("HOME").map(PathBuf::from).and_then(|h| std::fs::canonicalize(h).ok());
         let allow_roots = config.allow_roots.iter().filter_map(|r| std::fs::canonicalize(r).ok()).collect();
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
-        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote }
+        let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
+        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents }
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -138,7 +149,7 @@ impl Host {
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call");
+        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start");
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -277,6 +288,42 @@ impl Host {
             "server.useToken" => json(self.remote.use_token(str_arg(args, "server")?, str_arg(args, "token")?)?),
             "server.signOut" => json(self.remote.sign_out(str_arg(args, "server")?)?),
             "api.call" => json(self.remote.api_call(args, bytes)?),
+            "agent.detect" => json(self.agents.detect(str_arg(args, "provider")?, &self.open_roots())?),
+            "agent.run.create" => json(self.agents.create(str_arg(args, "provider")?)?),
+            "agent.fs.stat" => json(self.agents.stat(str_arg(args, "run")?, str_arg(args, "path")?)?),
+            "agent.fs.read" => Ok((Value::Null, Some(self.agents.read(str_arg(args, "run")?, str_arg(args, "path")?)?))),
+            "agent.fs.list" => json(self.agents.list(str_arg(args, "run")?, str_arg(args, "dir")?)?),
+            "agent.fs.mkdirp" => {
+                self.agents.mkdirp(str_arg(args, "run")?, str_arg(args, "dir")?)?;
+                null()
+            }
+            "agent.fs.write" => {
+                let data = bytes.ok_or_else(|| HostError::bad_argument("agent.fs.write needs request bytes"))?;
+                self.agents.write(str_arg(args, "run")?, str_arg(args, "path")?, data)?;
+                null()
+            }
+            "agent.start" => {
+                let argv = match args.get("argv") {
+                    Some(Value::Array(items)) => items.iter().map(|v| v.as_str().map(str::to_owned)).collect::<Option<Vec<_>>>().ok_or_else(|| HostError::bad_argument("argv must be strings"))?,
+                    _ => return Err(HostError::bad_argument("argv must be an array")),
+                };
+                let timeout = match args.get("timeoutMs") {
+                    None | Some(Value::Null) => None,
+                    Some(_) => Some(u64_arg(args, "timeoutMs")?),
+                };
+                self.agents.start(str_arg(args, "run")?, &argv, bytes.unwrap_or_default(), timeout, &self.open_roots())?;
+                null()
+            }
+            "agent.events" => json(self.agents.events(str_arg(args, "run")?, u64_arg(args, "after")?, u64_arg(args, "waitMs")?)?),
+            "agent.cancel" => {
+                self.agents.cancel(str_arg(args, "run")?)?;
+                null()
+            }
+            "agent.run.dispose" => {
+                self.agents.dispose(str_arg(args, "run")?)?;
+                null()
+            }
+            "agent.sweep" => json(json!({ "removed": self.agents.sweep()? })),
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }
@@ -327,6 +374,11 @@ impl Host {
     fn vault(&self, args: &Value) -> HostResult<Arc<VaultEntry>> {
         let handle = str_arg(args, "vault")?;
         self.state().vaults.get(handle).cloned().ok_or_else(|| HostError::bad_handle("vault"))
+    }
+
+    /// Canonical roots of the open vaults: an agent's environment never names one.
+    fn open_roots(&self) -> Vec<PathBuf> {
+        self.state().vaults.values().map(|v| v.root.clone()).collect()
     }
 
     fn watch_start(&self, handle: &str) -> HostResult<()> {
@@ -460,10 +512,12 @@ impl Host {
 }
 
 impl Host {
-    /// Closes every vault (stopping watchers) and source (deleting temp files) and cancels server sign-ins.
+    /// Closes every vault (stopping watchers) and source (deleting temp files), cancels server sign-ins, and stops
+    /// every agent run (deleting its working directory).
     /// The host stays usable.
     pub fn shutdown(&self) {
         self.remote.shutdown();
+        self.agents.shutdown();
         let (vaults, sources): (Vec<String>, Vec<String>) = {
             let state = self.state();
             (state.vaults.keys().cloned().collect(), state.sources.keys().cloned().collect())
@@ -497,7 +551,7 @@ fn discard(entry: Arc<FileEntry>) {
 
 /// Opens a canonical root directory. On macOS `O_NOFOLLOW_ANY` refuses a symlink in any component,
 /// so a component swapped for a symlink after canonicalization cannot redirect the vault.
-fn open_root_dir(root: &Path) -> HostResult<std::os::fd::OwnedFd> {
+pub(crate) fn open_root_dir(root: &Path) -> HostResult<std::os::fd::OwnedFd> {
     rustix::fs::openat(rustix::fs::CWD, root, no_symlinks(at::DIR_FLAGS), Mode::empty()).map_err(|e| HostError::errno(e, "open", &root.to_string_lossy()))
 }
 

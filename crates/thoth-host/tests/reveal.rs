@@ -42,6 +42,7 @@ fn host(allow: &Path, data: &Path, recorder: Arc<Recorder>) -> Host {
         secrets: Arc::new(MemorySecretStore::default()),
         browser: Arc::new(NoBrowser),
         file_manager: recorder,
+        agent_search_dirs: None,
     })
 }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Least privilege for the main window: Thoth's host commands and event listening only. No fs, shell, http, opener or window plugins; native dialogs, the system browser and every server request are opened by the host, not the webview.",
+  "description": "Least privilege for the main window: Thoth's host commands and event listening only. No fs, shell, http, opener or window plugins; native dialogs, the system browser, every server request and the Agent Hub's CLI runs are opened by the host, not the webview.",
   "windows": [
     "main"
   ],
@@ -42,6 +42,18 @@
     "allow-server-signInCancel",
     "allow-server-useToken",
     "allow-server-signOut",
-    "allow-api-call"
+    "allow-api-call",
+    "allow-agent-detect",
+    "allow-agent-run-create",
+    "allow-agent-fs-stat",
+    "allow-agent-fs-read",
+    "allow-agent-fs-list",
+    "allow-agent-fs-mkdirp",
+    "allow-agent-fs-write",
+    "allow-agent-start",
+    "allow-agent-events",
+    "allow-agent-cancel",
+    "allow-agent-run-dispose",
+    "allow-agent-sweep"
   ]
 }

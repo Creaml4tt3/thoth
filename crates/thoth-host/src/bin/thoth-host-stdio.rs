@@ -12,8 +12,11 @@
 //! (match them by `id`). Every other command runs in order on the main thread, as before. Secrets are kept
 //! in memory only and die with the process.
 //!
+//! `agent.events` (a long poll) and `agent.detect` (runs the CLI's probes) also run on their own thread.
+//!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
-//! --pick-source <path>, --data-dir <dir>. Env: THOTH_TEST_DISABLE_HARDLINK=1
+//! --pick-source <path>, --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
+//! there, so tests run a fake `claude` and can make it missing). Env: THOTH_TEST_DISABLE_HARDLINK=1
 //! makes no-replace rename take the exclusive-copy fallback.
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
@@ -65,7 +68,7 @@ impl FileManager for EventFileManager {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR]");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]...");
     std::process::exit(2);
 }
 
@@ -74,6 +77,7 @@ fn main() {
     let mut vault = None;
     let mut source = None;
     let mut data_dir = None;
+    let mut agent_dirs: Option<Vec<PathBuf>> = None;
     let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
         let mut value = || args.next().map(PathBuf::from).unwrap_or_else(|| usage("missing flag value"));
@@ -82,6 +86,7 @@ fn main() {
             Some("--pick-vault") => vault = Some(value()),
             Some("--pick-source") => source = Some(value()),
             Some("--data-dir") => data_dir = Some(value()),
+            Some("--agent-search-dir") => agent_dirs.get_or_insert_with(Vec::new).push(value()),
             _ => usage(&format!("unknown flag {flag:?}")),
         }
     }
@@ -107,6 +112,7 @@ fn main() {
         secrets: Arc::new(MemorySecretStore::default()),
         browser: Arc::new(EventBrowser { emit: Arc::new(browser_emit) }),
         file_manager: Arc::new(EventFileManager { emit: Arc::new(reveal_emit) }),
+        agent_search_dirs: agent_dirs,
     }));
     let mut workers = Vec::new();
 
@@ -126,7 +132,7 @@ fn main() {
         if line.trim().is_empty() {
             continue;
         }
-        if is_server_command(&line) {
+        if runs_off_main(&line) {
             let (host, emit, line) = (host.clone(), emit.clone(), line.clone());
             workers.push(std::thread::spawn(move || emit(handle(&host, &line))));
             workers.retain(|w| !w.is_finished());
@@ -141,9 +147,13 @@ fn main() {
     }
 }
 
-/// `server.*` and `api.call` may block on the network or a browser; they run off the main loop.
-fn is_server_command(line: &str) -> bool {
-    serde_json::from_str::<Value>(line).ok().and_then(|r| r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c == "api.call")).unwrap_or(false)
+/// `server.*` and `api.call` may block on the network or a browser, `agent.events` waits for output and
+/// `agent.detect` runs the CLI; they run off the main loop.
+fn runs_off_main(line: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .ok()
+        .and_then(|r| r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || matches!(c, "api.call" | "agent.events" | "agent.detect")))
+        .unwrap_or(false)
 }
 
 fn handle(host: &Host, line: &str) -> Value {

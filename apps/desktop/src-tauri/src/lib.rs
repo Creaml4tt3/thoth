@@ -10,6 +10,9 @@
 //! (`fs.read`, `source.file.read`) return a raw body. Host events are emitted
 //! as `vault:changed` (Tauri event names cannot contain `.`).
 //!
+//! Agent Hub (ADR-0007): the host finds and runs the user's AI CLI with an argument list its policy accepts, in a
+//! private folder under the app data directory; the webview gets no shell or process permission.
+//!
 //! Workspace servers: the host is the HTTP client. Refresh tokens and personal access tokens go to the OS
 //! keychain (`KeychainStore`), sign-in opens the system browser from the host (`SystemBrowser`), and the
 //! webview gets no http, opener or shell permission.
@@ -263,6 +266,8 @@ pub fn run() {
                 secrets: Arc::new(KeychainStore),
                 browser: Arc::new(SystemBrowser),
                 file_manager: Arc::new(SystemFileManager),
+                // Agent CLIs are found on PATH and in the usual install folders, never in a folder the webview names.
+                agent_search_dirs: None,
             });
             let _ = HOST.set(Arc::new(host));
             Ok(())
