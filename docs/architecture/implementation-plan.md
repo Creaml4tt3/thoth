@@ -28,7 +28,7 @@ Toolchain verified on the dev machine:
 | Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; auth decided (OIDC, ADR-0013); server 2a done (Podman + PostgreSQL) | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | **Done (2026-10-24)** | `packages/transfer` (ADR-0006, Accepted for its decisions; see the ADR's resolved questions), desktop copy/move UI, fault injection at every state boundary, e2e on the real server. Attachments go Private → Workspace only (see Phase 3). |
-| Agent Hub (P4) | **Claude Code adapter done (2026-10-25); owner decisions implemented (2026-10-25)** | `packages/agent-core`, `packages/agent-claude`, the host's `agent.*` commands and the desktop Agent Hub tab. ADR-0007 decisions decided by the owner 2026-10-25: whole-Private-Space and read-only workspace context, time and budget limits, local-only run history with a retention setting. Codex not started; OS-level sandbox deferred (plan in ADR-0007). |
+| Agent Hub (P4) | **Claude Code and Codex adapters done (2026-10-25); owner decisions implemented (2026-10-25)** | `packages/agent-core`, `packages/agent-claude`, `packages/agent-codex`, the host's `agent.*` commands and the desktop Agent Hub tab with an agent picker. ADR-0007 decisions decided by the owner 2026-10-25: whole-Private-Space and read-only workspace context, time and budget limits, local-only run history with a retention setting. Codex runs only inside its own OS sandbox with Thoth's permission profile (ADR-0007 decision 13, proposed for review) and has no spending limit. A Thoth OS-level sandbox is deferred (plan in ADR-0007). |
 | Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
 
 ## 3. Phased plan with acceptance criteria
@@ -805,7 +805,7 @@ AC:
 - Browser contexts cannot spawn processes or read files without the local
   bridge (§14.11).
 
-Result (2026-10-25): Claude Code adapter ✅ (Codex not started). ADR-0007's open questions were first decided with
+Result (2026-10-25): Claude Code adapter ✅, Codex adapter ✅ (see "Codex adapter" below). ADR-0007's open questions were first decided with
 conservative defaults; the owner then answered them the same day (ADR-0007, "Decisions for Phase 4", now "decided by
 the owner") and they are implemented, see "Owner decisions" below.
 
@@ -849,8 +849,48 @@ Checks (2026-10-25): `pnpm check` 1804 passed, 1 skipped (the real-CLI smoke tes
 (`thoth-host` 28 unit + 10 agent + 13 remote + 1 reveal, desktop shell 6); `pnpm e2e` 37 passed, 3 skipped (the
 site's Windows download and the two motion captures, as before), `agent-hub.e2e.ts` included.
 
+**Codex adapter (2026-10-25)** (ADR-0007 decision 13, proposed for the owner's review):
+- **`packages/agent-codex`**: the `codex exec --json` command line verified against Codex CLI 0.164.0 (`--help`,
+  `codex exec --help`, `--strict-config`, `codex sandbox`, `codex debug prompt-input`, the official docs and the CLI's
+  source), the JSONL parser (messages, commands summarised with exit codes, file changes, token usage, reconnects,
+  `turn.completed`/`turn.failed`, signed-out and unknown-model errors), detection (`--version` ≥ 0.164.0,
+  `exec --help` flags, `login status`, a sandbox probe), the fake `codex` and recorded fixtures, and a README listing
+  each flag and event with its source.
+- **The sandbox difference.** Codex runs shell commands, which cannot be taken away; every command and file edit runs
+  inside Codex's own OS sandbox with a Thoth permission profile (read only runtime paths and the working directory,
+  write only the working directory, no `/tmp`, `$TMPDIR` or network), approvals never prompt, no web search, no user
+  config, rules, AGENTS.md, sub-agents, connectors or plugins. Where the sandbox probe fails, Codex is not run.
+  Codex runs by its real path (symlinks resolved), which its own file edits need inside the sandbox.
+- **No spending limit**: Codex has none; the field says "Not supported by Codex", a task asking for one is refused,
+  and records keep the token counts. The time limit applies.
+- **Host**: `Provider::Codex` with its exact argument list (`agent/codex.rs`, the shared `argv.json` fixture),
+  the fourth probe, install folders (Homebrew, `/usr/local/bin`, `~/.local/bin`, `$CODEX_INSTALL_DIR`, npm, and on
+  Windows `%APPDATA%\npm\codex.cmd` and `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`); environment filtering,
+  process group or Job Object kill and limits are shared with Claude Code. `NodeAgentHost` now runs the provider a run
+  was created for (it always ran `claude`).
+- **Desktop**: an agent picker (Claude Code / Codex) with each one's state, per-provider status and fix
+  instructions (including the sandbox), model hints, the budget field off for Codex, the agent and tokens in the
+  history. English and Thai (new Thai marked `REVIEW`).
+- **Evidence**: `packages/agent-codex/test/*` (argv fixture, detection on the real help text, the recorded streams);
+  `crates/thoth-host/src/agent/codex.rs` tests (exact list, every widening refused, the probe) and
+  `crates/thoth-host/tests/agent.rs` › `detects_codex…`, `codex_is_run_by_its_real_path`,
+  `runs_codex_with_exactly_the_policy_arguments…`, `refuses_codex_arguments…`, `cancel_kills_codex…`,
+  `a_codex_run_past_its_time_limit…`; `tests/agent/codex.test.ts` (Rust and Node hosts: detection incl. no sandbox
+  and signed out, exact argv, apply exact bytes, budget refused, time limit, cancel, CLI errors);
+  `apps/desktop/test/agents.test.tsx` › "Agent Hub: Codex"; `tests/e2e/agent-hub.e2e.ts` › three Codex tests (pick,
+  stream, review, apply exact bytes with the argv checked; cancel kills the process tree; a read-only workspace
+  page's edit discarded).
+- **Real runs** (ChatGPT login, no dollar charge; tokens in the adapter README): three model runs and two refused
+  ones (unknown model, signed out with an empty `CODEX_HOME`). The manual smoke test,
+  `THOTH_REAL_CODEX=1 pnpm vitest run tests/agent/real-codex.test.ts`, is skipped by default.
+- **Checks (2026-10-25, with Codex)**: `pnpm check` 1897 passed, 2 skipped (the two real-CLI smoke tests);
+  `cargo test` 82 passed (`thoth-host` 40 unit + 22 agent + 13 remote + 1 reveal, desktop shell 6); `pnpm e2e` 45
+  passed, 2 skipped, `agent-hub.e2e.ts` (9 tests) included.
+
 Not done / follow-ups (see §4 item 12):
-- Codex adapter; OS-level sandboxing (planned in ADR-0007); git worktrees.
+- A Thoth OS-level sandbox (planned in ADR-0007); git worktrees.
+- Codex on Windows and Linux was not tried on a real machine; the sandbox probe decides there. Codex's permission
+  profiles are beta: re-check on each Codex release (`--strict-config` fails a run on a renamed setting).
 - Workspace context is single pages, read-only: no subtree pick for a folder page, no workspace attachments, no
   writing back to a workspace.
 - Windows: cancel and the time limit cannot signal a process group yet (the desktop app ships for macOS; another
@@ -917,7 +957,9 @@ All twelve steps of spec §14 as one automated scenario.
     process API, and it re-checks the adapter's argument list against its own policy (ADR-0007 decision 3). Run
     records keep the task text in the vault's `.thoth/agent/runs/` (ADR-0007 decision 9); spec §3.3's "not a content
     store" holds: the vault's records keep no page text or agent output. Transcripts and proposed files are kept
-    outside the vault, in the app data folder, for a retention period (ADR-0007 decisions 9 and 12).
+    outside the vault, in the app data folder, for a retention period (ADR-0007 decisions 9 and 12). Providers
+    declare a `spending-limit` capability; the hub refuses a budget for one without it (Codex) instead of dropping
+    it, and a probe may include a `sandbox` check (Codex), with the `sandbox_unavailable` state when it fails.
 
 ## 5. Independent review (2026-10-21) — status
 

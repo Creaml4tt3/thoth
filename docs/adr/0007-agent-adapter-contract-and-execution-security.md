@@ -1,7 +1,9 @@
 # ADR-0007: Agent adapter contract and execution security
 
 - **Status:** Accepted for the Claude Code CLI adapter (Phase 4), with the decisions below decided on 2026-10-25 by the
-  owner. Proposed for the Codex adapter. OS-level sandboxing is deferred (see "Future: OS-level sandbox").
+  owner. The Codex CLI adapter follows decision 13 (2026-10-25), implemented within the owner's decisions and
+  proposed for the owner's review. A Thoth OS-level sandbox is deferred (see "Future: OS-level sandbox"); Codex runs
+  inside its own.
 - **Date:** 2026-10-20 (decisions added 2026-10-25; context scope, limits and history answered by the owner the same day)
 
 ## Context
@@ -31,8 +33,9 @@ guessed.
    applied to managed notes only after explicit user review, through the same
    compare-and-swap write path as other writes (ADR-0001). Agent output is
    untrusted input.
-6. **Sandboxing.** Prompts are not a sandbox. OS-level sandboxing is not part of Phase 4 (decision 4 below); the
-   plan for it is under "Future: OS-level sandbox".
+6. **Sandboxing.** Prompts are not a sandbox. A Thoth OS-level sandbox is not part of Phase 4 (decision 4 below); the
+   plan for it is under "Future: OS-level sandbox". Codex, which runs shell commands, runs only inside Codex's own
+   OS sandbox (decision 13).
 7. **Agent Hub data.** It stores task and run metadata (provider, task, selected
    context, changed files, approvals, outcome). It is not a content store.
 
@@ -80,17 +83,21 @@ Phase 4 started with conservative defaults for the open questions. On 2026-10-25
    `--permission-prompts none` (no TTY: anything that would prompt is denied), `--no-session-persistence` and
    `--disable-slash-commands`. The prompt goes to stdin. Verified against Claude Code 2.1.310, its `--help`, the
    official docs and real runs (`packages/agent-claude/README.md`); a real run confirmed that a read outside the
-   working directory is denied and that no shell tool exists.
+   working directory is denied and that no shell tool exists. Codex: decision 13.
 3. **The host enforces the argument list.** The TypeScript adapter builds it; the Rust host runs the CLI only if
    every token is one of the policy's flags with an allowed value (`crates/thoth-host/src/agent/claude.rs`), so a
    compromised webview (ADR-0008: the webview is untrusted) cannot add Bash, `--add-dir`, a permission bypass,
    settings, plugins or MCP servers. Both sides test the same fixture (`packages/agent-claude/test/fixtures/argv.json`).
+   For Codex the host accepts exactly one list, optionally followed by `-m <model>` (`agent/codex.rs`, fixture
+   `packages/agent-codex/test/fixtures/argv.json`), so its sandbox, approval and isolation settings cannot be changed,
+   dropped or widened.
    This is dedicated `agent.*` host commands, not a general process API: the webview never names a program, a path
    or an environment; it names a provider and a run handle.
-4. **No OS-level sandbox in this phase** (the owner decided: not now). The CLI runs with the user's OS permissions;
-   the restrictions above are the CLI's own. The Agent Hub says so on screen: "The agent runs with your user
-   permissions. Thoth limits what it is given, not what it can do." The plan for a sandbox is under "Future:
-   OS-level sandbox".
+4. **No Thoth OS-level sandbox in this phase** (the owner decided: not now). The CLI runs with the user's OS
+   permissions; the restrictions above are the CLI's own. The Agent Hub says so on screen: "The agent runs with your
+   user permissions. Thoth limits what it is given, not what it can do." For Codex the note says that its commands
+   and edits run only inside Codex's own sandbox (decision 13) while Codex itself runs with the user's permissions.
+   The plan for a Thoth sandbox is under "Future: OS-level sandbox".
 5. **Detection.** The host looks for `claude` on `PATH`, then `/opt/homebrew/bin`, `/usr/local/bin`,
    `~/.claude/local`, `~/.local/bin`, `~/.npm-global/bin` and `$NPM_CONFIG_PREFIX/bin` (an app started from the
    Dock has a minimal `PATH`). It runs `--version` (semver, at least 2.1.259, the first with every flag above),
@@ -129,7 +136,8 @@ Phase 4 started with conservative defaults for the open questions. On 2026-10-25
     form; the settings are kept in the webview's `localStorage` with the other desktop preferences).
     - *Time limit:* 5, 15, 30 or 60 minutes, default 30. On expiry the host stops the process group like a cancel
       and reports `timeout`; the record says the run was stopped by the time limit.
-    - *Budget:* the CLI's own `--max-budget-usd`, choices US$0.25, 0.50, 1, 2, 5 or no limit (no flag), default
+    - *Budget:* Codex has none (decision 13): the field says "Not supported by Codex" and a task that asks for one is
+      refused, never silently dropped. For Claude Code: the CLI's own `--max-budget-usd`, choices US$0.25, 0.50, 1, 2, 5 or no limit (no flag), default
       US$1. A budget stop is read from the CLI's own result, never guessed: a real run on 2026-10-25 with
       `--max-budget-usd 0.0001` printed a `result` line with `subtype: "error_max_budget_usd"`, `is_error: true`,
       `errors: ["Reached maximum budget ($0.0001)"]`, `terminal_reason: "budget_exhausted"`, no `result` text, and
@@ -163,6 +171,46 @@ Phase 4 started with conservative defaults for the open questions. On 2026-10-25
       in both cases except for the runs still going and the ones waiting for review (they are work in progress,
       not history). The metadata records stay either way.
 
+## Decision for the Codex adapter (2026-10-25, proposed for the owner's review)
+
+13. **Codex runs commands, inside Codex's own OS sandbox.** Verified against Codex CLI 0.164.0, its `--help`,
+    `codex exec --help`, `--strict-config`, `codex sandbox`, `codex debug prompt-input`, the official docs and the CLI's
+    source, then real runs (`packages/agent-codex/README.md` lists every flag and event with its source).
+    - *The difference.* Claude Code runs without a shell (`--restricted`). Codex's main tool is the shell, and nothing
+      takes it away. So Thoth does not remove the shell; it requires Codex's own OS sandbox (Seatbelt on macOS,
+      bubblewrap and seccomp on Linux and WSL2, the native Windows sandbox) for every command and every file edit,
+      with a permission profile Thoth defines: read only the platform's runtime paths (`:minimal`) and the working
+      directory, write only the working directory, deny `/tmp` and `$TMPDIR`, no network. This is stricter than
+      Codex's `workspace-write` mode, which can read the whole disk. Thoth still limits what Codex is given (the same
+      staged copies, decision 1) and reviews every change (decision 8); the sandbox limits what its commands can do,
+      not what Codex itself (which talks to OpenAI) can do.
+    - *Command line.* `codex exec --json --color never --ephemeral --skip-git-repo-check --ignore-user-config
+      --ignore-rules --strict-config` with `-c` overrides for the profile, `approval_policy=never` (nobody can answer;
+      anything outside the sandbox fails), no automatic approval reviewer, no web search, no parent project root and
+      no AGENTS.md from the working directory, no history, a core environment for commands, and no sub-agents,
+      connectors, plugins, hooks, memories, image generation, browser or computer use; `-m` optional; the prompt on
+      stdin. `--sandbox`, `danger-full-access`, `--dangerously-bypass-approvals-and-sandbox`, `--add-dir`, `--search`,
+      profiles and any other override are refused by the host. The user's own `~/.codex/AGENTS.md` and skills are still
+      read (they live in `CODEX_HOME` with the login); what a skill runs is sandboxed.
+    - *Runs by its real path.* Codex re-runs its own binary inside the sandbox for file edits, and its sandbox allows
+      that only for the path it was started as, so the host resolves symlinks before running it (a real run started
+      through Homebrew's link could not edit with its own tool).
+    - *No sandbox, no run.* Detection adds a probe, `codex sandbox` with the same profile running the CLI's own
+      `--version`. Where it fails (no usable bubblewrap or user namespaces, a Windows sandbox that is not set up, a
+      policy that forbids the profile), the state is `sandbox_unavailable`, the Agent Hub explains it with a fix, and
+      Codex is not run, rather than run without its sandbox.
+    - *Detection.* `codex --version` (at least 0.164.0, the version every setting was checked on), `codex exec
+      --help` (every flag listed), `codex login status` (the CLI's own "Logged in" / "Not logged in"), the sandbox
+      probe. Thoth never reads `~/.codex/auth.json` or the keychain. Install folders: `PATH`, Homebrew, `/usr/local/bin`,
+      `~/.local/bin` and `$CODEX_INSTALL_DIR` (the standalone installer), npm's global folders, and on Windows
+      `%APPDATA%\npm\codex.cmd` and `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe`.
+    - *No spending limit.* Codex has no budget flag or setting. The Agent Hub shows the field as not supported for
+      Codex, the adapter has no `spending-limit` capability, and the hub refuses a task that names a budget for it.
+      The time limit applies as for Claude Code. Records keep Codex's token counts instead of a cost.
+    - *Unchanged.* Environment filtering, the process group (Job Object on Windows) and its kill, the time limit
+      check, staging, review, apply, records and local history are the same code as for Claude Code. Windows was not
+      tried on a real machine: the sandbox probe decides there.
+
 ## Consequences
 
 - Positive: agents never touch live notes directly; a stale or concurrent edit is
@@ -180,7 +228,10 @@ Phase 4 started with conservative defaults for the open questions. On 2026-10-25
   a workspace is never among them (changes to reference copies are not kept), but the transcript can quote it.
 - Negative: a workspace page given to an agent leaves the workspace's access control as soon as it is copied; the
   restriction check is the client's, on top of what the server enforces.
-- Follow-up: detection of installation status with actionable messages (done for Claude Code);
+- Negative: Codex's sandbox is Codex's own code and its permission profiles are marked beta; a change to them can
+  break runs (`--strict-config` makes a renamed setting fail instead of being ignored) and the probe only shows that
+  the sandbox starts, not every rule it enforces.
+- Follow-up: detection of installation status with actionable messages (done for Claude Code and Codex);
   cleanup of temp directories after runs (done); audit of approvals (the run record); limits and local history
   (done, decisions 11 and 12).
 
@@ -229,6 +280,9 @@ With `--restricted` Thoth has no shell tool at all, so enabling that sandbox add
 only if a later phase gives the agent a shell, and then it should be switched on (and its flags added to the host
 policy) before anything of Thoth's own is written. Re-check the docs and `--help` then; do not assume.
 
+**Codex's own sandbox** is already required for Codex (decision 13): it covers that CLI's commands and edits. A Thoth
+sandbox would add the same kind of boundary around the CLI process itself, for every provider.
+
 **Plan (each step behind a setting, off until it has been tested on real machines):**
 
 1. **macOS first**, behind an Agent Hub setting: run the CLI under `sandbox-exec` with a generated Seatbelt profile
@@ -256,7 +310,7 @@ directory is writable, so review before apply stays the control that matters.
 
 - Whether a temporary git worktree is used instead of a plain temp directory when the vault is a git repository.
   Not for now (decision 1).
-- Exact capability detection mechanism per CLI: decided for Claude Code (decision 5); Codex when it is built.
+- ~~Exact capability detection mechanism per CLI.~~ Decided for Claude Code (decision 5) and Codex (decision 13).
 - ~~Windows: cancel and the time limit cannot signal a process group yet.~~ Decided 2026-10-25: each run is a
   kill-on-close Job Object; cancel and the time limit terminate the job at once (no SIGTERM first), see ADR-0008
   "Windows file layer".
