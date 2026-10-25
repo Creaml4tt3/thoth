@@ -4,6 +4,7 @@
  * Thai is in `th.ts` with the same shape.
  */
 import type { System } from "../features/import/model.ts";
+import type { NotificationKind } from "@thoth/app-ui/notifications/core.ts";
 
 type Phase = "staging" | "verifying" | "committing";
 type Step = "source" | "instructions" | "pick" | "preview" | "destination" | "options" | "run" | "report";
@@ -102,6 +103,28 @@ export const en = {
     importExport: "Import & Export",
     importNote: "Bring pages in from Notion or Obsidian. Your originals are only ever read.",
     importFrom: "Import from Notion or Obsidian",
+  },
+
+  /** Settings → Notifications (ADR-0018). The list under the bell always has every event; these are the system's. */
+  notifications: {
+    title: "Notifications",
+    system: "System notifications",
+    systemHint: "Only while Thoth is in the background: its window is not focused, or is hidden. The list under the bell always has every event.",
+    kinds: "Show a system notification for",
+    kind: {
+      agentReview: "Changes ready for review",
+      agentFinished: "Run finished",
+      agentFailed: "Run failed",
+      agentLimit: "Run stopped at a limit",
+      transferDone: "Copy or move done",
+      transferFailed: "Copy or move did not finish",
+      importDone: "Import done",
+      importFailed: "Import finished with errors",
+      saveConflict: "Save conflict",
+    } satisfies Record<NotificationKind, string>,
+    groups: { agent: "Thoth assistant", transfer: "Copy and move", import: "Import", editor: "Editing" },
+    privacy: "A notification names pages, folders, workspaces and the agent. It never shows what a page or the agent wrote, or your task.",
+    click: "Clicking one brings Thoth to the front. What it is about is at the top of the list under the bell.",
   },
 
   servers: {

@@ -14,6 +14,8 @@ import type { AssistantController } from "../features/mascot/controller.ts";
 import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 import type { OpenOptions } from "@thoth/app-ui/tabs/model.ts";
 import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
+import type { NotificationCenter, NotificationTarget, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
+import type { NotificationPrefsStore } from "../features/notifications/prefs.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -28,6 +30,10 @@ export interface AppOptions {
   pollMs: number;
   /** Suggested in Settings → Servers until added; null suggests nothing. */
   starterServer: StarterServer | null;
+  /** Shows system notifications (ADR-0018): the notification plugin in the desktop app, nothing elsewhere. */
+  notifier: SystemNotifier;
+  /** How long the mascot's message after a run stays up. */
+  messageMs: number;
 }
 
 export interface Session {
@@ -67,6 +73,11 @@ export interface Session {
   registerFlush(flush: () => Promise<boolean>): () => void;
   /** Writes every pending edit. False when something (a conflict, an error) still needs the user. */
   flushAll(): Promise<boolean>;
+  /** The notification list of this window (ADR-0018), and the user's settings for system notifications. */
+  notifications: NotificationCenter;
+  notificationPrefs: NotificationPrefsStore;
+  /** Opens what a notification is about: a run's review or outcome, a page, a folder. */
+  openNotification(target: NotificationTarget): void;
   /** Closes this Private Space and returns to onboarding. */
   switchVault(): void;
   /** Set when the filesystem watcher could not start; saving still works. */

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { PageSummary } from "@thoth/domain";
 import { emptyOrder, readOrder, type OrderRecord } from "@thoth/local-store";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
@@ -25,6 +26,9 @@ interface Props {
   onNewFolder(): void;
   /** Opens the copy/move dialog for the selected pages. */
   onTransfer(target: TransferTarget): void;
+  /** Whether the notification list under the bell is open (the palette opens it too). */
+  notificationsOpen: boolean;
+  onNotificationsOpen(open: boolean): void;
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -62,8 +66,8 @@ function PendingTransfers() {
 }
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
-export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer }: Props) {
-  const { connection, reveal, openSettings, vault, agents, askAssistant } = useSession();
+export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
+  const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
@@ -201,6 +205,7 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <IconButton icon="page-plus" label={t.newPage} shortcut="page.new" onClick={onNewPage} />
         <IconButton icon="folder-plus" label={t.newFolder} shortcut="folder.new" onClick={onNewFolder} />
         <span className="side-end">
+          <NotificationBell center={notifications} open={notificationsOpen} onOpenChange={onNotificationsOpen} onOpenTarget={openNotification} />
           <IconButton icon="gear" label={t.settings} shortcut="settings.open" onClick={() => openSettings()} />
         </span>
       </div>

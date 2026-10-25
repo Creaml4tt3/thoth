@@ -18,6 +18,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { Icon } from "@thoth/app-ui/ui/Icon.tsx";
 import { tip } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
+import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { describeNotification, notificationTarget, type NotificationEntry } from "@thoth/app-ui/notifications/core.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import type { AgentsService } from "../agents/service.ts";
@@ -42,6 +44,7 @@ import {
   type Point,
 } from "./placement.ts";
 import "./mascot.css";
+import "../notifications/notifications.css";
 
 /** After the arrow keys stop for this long, a snapping mascot settles on its edge. */
 export const KEY_SNAP_MS = 600;
@@ -64,8 +67,9 @@ interface Drag {
 }
 
 function Layer({ agents, assistant }: { agents: AgentsService; assistant: AssistantController }) {
-  const { tabs, openAgentReview } = useSession();
+  const { tabs, openAgentReview, notifications, openNotification, options } = useSession();
   const t = useDesktopStrings().mascot;
+  const notificationText = useStrings().notifications;
   const prefs = useSyncExternalStore(assistant.prefs.subscribe, assistant.prefs.get);
   const view = useSyncExternalStore(assistant.subscribe, assistant.get);
   const agentState = useSyncExternalStore(agents.subscribe, agents.getState);
@@ -103,6 +107,40 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
     lastState.current = state;
     if (state !== "listening") setAnnounced(t.announce[state]);
   }, [state, t]);
+
+  // A short message after a run ended by itself (ADR-0018). The state and its announcement say it to everyone; this
+  // is the line to see and click. It takes no focus, waits while the pointer or focus is on it, then goes.
+  const [message, setMessage] = useState<NotificationEntry | null>(null);
+  const [held, setHeld] = useState(false);
+  const seen = useRef(notifications.getState().latest?.seq ?? 0);
+  useEffect(
+    () =>
+      notifications.subscribe(() => {
+        const { latest, entries } = notifications.getState();
+        if (!latest || latest.seq === seen.current) return;
+        seen.current = latest.seq;
+        const entry = entries.find((e) => e.id === latest.id);
+        if (entry && entry.event.kind.startsWith("agent") && !assistant.get().bubble) {
+          setHeld(false);
+          setMessage(entry);
+        }
+      }),
+    [notifications, assistant],
+  );
+  useEffect(() => {
+    if (!message || held) return;
+    const timer = setTimeout(() => setMessage(null), options.messageMs);
+    return () => clearTimeout(timer);
+  }, [message, held, options.messageMs]);
+  // The bubble says the same and more.
+  useEffect(() => {
+    if (view.bubble) setMessage(null);
+  }, [view.bubble]);
+  const openMessage = (entry: NotificationEntry) => {
+    notifications.markRead(entry.id);
+    setMessage(null);
+    openNotification(notificationTarget(entry.event));
+  };
 
   // The text selected in the editor when the mascot was pressed (a press can collapse it before the click).
   const pressedSelection = useRef<{ text: string | null; at: number } | null>(null);
@@ -264,6 +302,27 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
           {announced}
         </span>
       </div>
+      {message && !view.bubble && (
+        <div
+          className="mascot-message"
+          data-testid="mascot-message"
+          data-kind={message.event.kind}
+          data-side={position.v === "bottom" ? "above" : "below"}
+          data-motion={motion}
+          style={{
+            ...(position.v === "bottom" ? { bottom: Math.max(8, win.height - point.top + 8) } : { top: point.top + box + 8 }),
+            ...(position.h === "right" ? { right: Math.max(8, win.width - (point.left + box)) } : { left: Math.max(8, point.left) }),
+          }}
+          onPointerEnter={() => setHeld(true)}
+          onPointerLeave={() => setHeld(false)}
+          onFocus={() => setHeld(true)}
+          onBlur={() => setHeld(false)}
+        >
+          <button type="button" className="mascot-message-btn" onClick={() => openMessage(message)}>
+            {describeNotification(message.event, notificationText).title}
+          </button>
+        </div>
+      )}
       {view.bubble && (
         <Bubble
           agents={agents}

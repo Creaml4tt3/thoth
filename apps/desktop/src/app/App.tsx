@@ -6,6 +6,7 @@ import { DESKTOP_STRINGS, DesktopStringsContext, LangPreferenceContext, langPref
 import { Onboarding } from "../features/onboarding/Onboarding.tsx";
 import { openImportSource } from "../features/import/open-source.ts";
 import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
+import { NO_SYSTEM_NOTIFIER } from "@thoth/app-ui/notifications/core.ts";
 import { VaultHost } from "./VaultHost.tsx";
 import type { AppOptions } from "./context.ts";
 import "./app.css";
@@ -17,6 +18,8 @@ export const DEFAULT_OPTIONS: AppOptions = {
   now: () => new Date(),
   pollMs: 5000,
   starterServer: STARTER_SERVER,
+  notifier: NO_SYSTEM_NOTIFIER,
+  messageMs: 6000,
 };
 
 interface Host {

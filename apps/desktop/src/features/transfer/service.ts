@@ -27,7 +27,12 @@ export interface TransferService {
   dismiss(id: string): Promise<void>;
 }
 
-export function createTransferService(vault: Vault, servers: ServerDirectory, options: { now?: () => Date; onChanged?: () => void } = {}): TransferService {
+export function createTransferService(
+  vault: Vault,
+  servers: ServerDirectory,
+  /** `onSettled`: a started or resumed transfer ended (or was interrupted); not called for an undo. */
+  options: { now?: () => Date; onChanged?: () => void; onSettled?: (record: OperationRecord, interrupted: boolean) => void } = {},
+): TransferService {
   let state: TransferState = { records: {}, recovery: null };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<TransferState>) => {
@@ -49,9 +54,13 @@ export function createTransferService(vault: Vault, servers: ServerDirectory, op
   const settle = async (run: () => Promise<OperationRecord>) => {
     try {
       const record = await run();
+      options.onSettled?.(record, false);
       return { record, interrupted: null };
     } catch (error) {
-      if (error instanceof TransferInterrupted) return { record: error.record, interrupted: error.message };
+      if (error instanceof TransferInterrupted) {
+        options.onSettled?.(error.record, true);
+        return { record: error.record, interrupted: error.message };
+      }
       throw error;
     } finally {
       // The vault changed (adopted IDs, deleted or written pages): refresh the views.

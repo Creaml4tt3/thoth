@@ -56,7 +56,10 @@ export interface ImportService {
 
 export type OpenSource = (kind: ImportSourceKind, location: string) => Promise<{ source: ImportSource; provider: ImportProvider }>;
 
-export function createImportService(vault: Vault, openSource: OpenSource): ImportService {
+/** An import run ended: with its report, or null when it threw. Not called for a scan or a discarded plan. */
+export type ImportFinished = (outcome: { jobId: string; destinationRoot: string; report: ImportReport | null }) => void;
+
+export function createImportService(vault: Vault, openSource: OpenSource, onFinished?: ImportFinished): ImportService {
   const running = new Map<string, AbortController>();
 
   const plan = async (source: ImportSource, provider: ImportProvider, options: Partial<ImportOptions> | undefined): Promise<ScanResult> => {
@@ -64,11 +67,16 @@ export function createImportService(vault: Vault, openSource: OpenSource): Impor
     return { preview, manifest, source, provider };
   };
 
-  const execute = async (jobId: string, source: ImportSource, start: (signal: AbortSignal, onProgress: RunHandlers["onProgress"]) => Promise<ImportReport>, handlers?: RunHandlers) => {
+  const execute = async (jobId: string, destinationRoot: string, source: ImportSource, start: (signal: AbortSignal, onProgress: RunHandlers["onProgress"]) => Promise<ImportReport>, handlers?: RunHandlers) => {
     const controller = new AbortController();
     running.set(jobId, controller);
     try {
-      return await start(controller.signal, handlers?.onProgress);
+      const report = await start(controller.signal, handlers?.onProgress);
+      onFinished?.({ jobId, destinationRoot, report });
+      return report;
+    } catch (error) {
+      onFinished?.({ jobId, destinationRoot, report: null });
+      throw error;
     } finally {
       running.delete(jobId);
       await source.close().catch(() => undefined);
@@ -95,6 +103,7 @@ export function createImportService(vault: Vault, openSource: OpenSource): Impor
     run: (scan, handlers) =>
       execute(
         scan.manifest.jobId,
+        scan.manifest.options.destinationRoot,
         scan.source,
         (signal, onProgress) => runImport(vault, scan.source, scan.manifest, { signal, ...(onProgress ? { onProgress } : {}) }),
         handlers,
@@ -106,7 +115,7 @@ export function createImportService(vault: Vault, openSource: OpenSource): Impor
       if (!manifest) throw new Error(`Import job ${jobId} was not found`);
       if (manifest.state === "completed") return buildReport(manifest);
       const { source } = await openSource(manifest.sourceKind, manifest.sourceLocation);
-      return execute(jobId, source, (signal, onProgress) => resumeImport(vault, jobId, source, { signal, ...(onProgress ? { onProgress } : {}) }), handlers);
+      return execute(jobId, manifest.options.destinationRoot, source, (signal, onProgress) => resumeImport(vault, jobId, source, { signal, ...(onProgress ? { onProgress } : {}) }), handlers);
     },
 
     cancel(jobId) {

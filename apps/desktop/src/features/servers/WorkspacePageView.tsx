@@ -15,7 +15,7 @@ import { ServerCard } from "./ServersSettings.tsx";
  * signing in again over the open page through the host, and copying or moving the page into the Private Space.
  */
 export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePageRef; onTransfer?: (target: TransferTarget) => void }) {
-  const { servers, openWorkspacePage, openSettings } = useSession();
+  const { servers, openWorkspacePage, openSettings, notifications } = useSession();
   const t = useDesktopStrings().servers;
   const tt = useDesktopStrings().transfer;
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
@@ -45,6 +45,10 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
         target={target}
         modeSpace={entry?.info.url ?? target.server}
         openPage={openWorkspacePage}
+        onConflict={(event) => {
+          // A save conflict is a notification (ADR-0018): the page's title and where it is, nothing of its text.
+          if (event.kind === "shown") notifications.push({ kind: "saveConflict", page: title || workspace?.name || "", open: { kind: "workspacePage", server: target.server, workspace: target.workspace, page: target.page } });
+        }}
         actions={actions}
         goneNotice={<Notice title={t.removedTitle} detail={t.removedDetail} />}
         signedOutNotice={

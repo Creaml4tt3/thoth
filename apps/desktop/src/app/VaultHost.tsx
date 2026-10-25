@@ -13,6 +13,12 @@ import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { loadTabs, saveTabs } from "./tabs-store.ts";
+import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
+import { createNotificationPrefsStore } from "../features/notifications/prefs.ts";
+import { importEvent, transferEvent, watchAgentRuns } from "../features/notifications/sources.ts";
+import { waitingReviews } from "../features/mascot/hooks.ts";
+import { createWindowPresence } from "../platform/notifier.ts";
 
 interface Props {
   platform: Platform;
@@ -65,11 +71,44 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     };
   }, [connection, vault, options.reconcileDebounceMs, bump]);
 
+  // Notifications (ADR-0018): one list per window, in memory; system notifications only in the background, as the
+  // user's settings allow. Agent runs are said aloud by the mascot when it is shown, so the list does not repeat them.
+  const strings = useStrings();
+  const stringsRef = useRef(strings);
+  stringsRef.current = strings;
+  const notificationPrefs = useMemo(() => createNotificationPrefsStore(), []);
+  const presence = useMemo(() => createWindowPresence(), []);
+  useEffect(() => () => presence.dispose(), [presence]);
+  const mascotShown = useRef<() => boolean>(() => false);
+  const notifications = useMemo(
+    () =>
+      createNotificationCenter({
+        strings: () => stringsRef.current.notifications,
+        notifier: options.notifier,
+        settings: notificationPrefs.get,
+        background: presence.background,
+        announcedElsewhere: (event) => event.kind.startsWith("agent") && mascotShown.current(),
+        now: () => options.now().getTime(),
+      }),
+    [options.notifier, options.now, notificationPrefs, presence],
+  );
+
   // Workspace servers: one directory per open window, polling only expanded workspaces.
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
   const pageHost = useMemo<PageHost>(() => ({ client: "desktop", autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
   // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
-  const transfers = useMemo(() => createTransferService(vault, servers, { now: options.now, onChanged: bump }), [vault, servers, options.now, bump]);
+  const transfers = useMemo(
+    () =>
+      createTransferService(vault, servers, {
+        now: options.now,
+        onChanged: bump,
+        onSettled: (record, interrupted) => {
+          const event = transferEvent(record, interrupted);
+          if (event) notifications.push(event);
+        },
+      }),
+    [vault, servers, options.now, bump, notifications],
+  );
   useEffect(() => {
     let live = true;
     void servers.start().then(() => {
@@ -90,10 +129,65 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   }, [agents]);
   // The mascot: its preferences are the user's (not this Private Space's), read once per window.
   const assistant = useMemo(() => (agents ? createAssistantController() : null), [agents]);
+  mascotShown.current = () => assistant?.prefs.get().show ?? false;
+  useEffect(() => (agents ? watchAgentRuns(agents, notifications) : undefined), [agents, notifications]);
 
   const importService = useMemo(
-    () => createImportService(vault, (kind, location) => options.openImportSource(platform, kind, location)),
-    [vault, platform, options],
+    () =>
+      createImportService(
+        vault,
+        (kind, location) => options.openImportSource(platform, kind, location),
+        ({ jobId, destinationRoot, report }) => {
+          const event = importEvent(jobId, destinationRoot, report);
+          if (event) notifications.push(event);
+        },
+      ),
+    [vault, platform, options, notifications],
+  );
+
+  const openFolder = useCallback(
+    (folder: string) =>
+      void flushAll().then(async (ok) => {
+        if (!ok) return;
+        setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
+        const prefix = folder === "" ? "" : `${folder}/`;
+        const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
+        if (first) tabs.open({ kind: "page", path: first.path });
+      }),
+    [flushAll, vault, tabs],
+  );
+
+  /** A run from a notification: its review or result tab, its outcome in the bubble, or the history. */
+  const openRun = useCallback(
+    (runId: string) => {
+      if (!agents || !assistant) return;
+      const s = agents.getState();
+      if (s.record?.id === runId) {
+        if (s.phase === "review" || s.phase === "applying" || (s.phase === "finished" && s.results !== null)) return tabs.open({ kind: "agents" });
+        if (s.phase !== "idle") return assistant.openBubble();
+      }
+      if ((s.phase === "idle" || s.phase === "finished") && waitingReviews(s).includes(runId)) {
+        void agents.reopenReview(runId).then(() => (agents.getState().phase === "review" ? tabs.open({ kind: "agents" }) : assistant.openBubble()));
+        return;
+      }
+      tabs.open({ kind: "settings", section: "agents" });
+    },
+    [agents, assistant, tabs],
+  );
+  const openNotification = useCallback(
+    (target: NotificationTarget) => {
+      switch (target.kind) {
+        case "page":
+          return tabs.open({ kind: "page", path: target.path });
+        case "workspacePage":
+          return tabs.open({ kind: "workspace", server: target.server, workspace: target.workspace, page: target.page });
+        case "folder":
+          return openFolder(target.path);
+        case "agentRun":
+          return openRun(target.runId);
+      }
+    },
+    [tabs, openFolder, openRun],
   );
 
   const session = useMemo<Session>(
@@ -123,21 +217,17 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       },
       openAgentReview: () => tabs.open({ kind: "agents" }),
       openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
-      openFolder: (folder) =>
-        void flushAll().then(async (ok) => {
-          if (!ok) return;
-          setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
-          const prefix = folder === "" ? "" : `${folder}/`;
-          const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
-          if (first) tabs.open({ kind: "page", path: first.path });
-        }),
+      openFolder,
+      notifications,
+      notificationPrefs,
+      openNotification,
       reveal,
       registerFlush,
       flushAll,
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification],
   );
 
   return (

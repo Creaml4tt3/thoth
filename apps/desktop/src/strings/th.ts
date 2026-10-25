@@ -94,6 +94,28 @@ export const th: DesktopStrings = {
     importFrom: "นำเข้าจาก Notion หรือ Obsidian",
   },
 
+  // Settings → Notifications (ADR-0018). Strings marked REVIEW are the least certain.
+  notifications: {
+    title: "การแจ้งเตือน",
+    system: "การแจ้งเตือนของระบบ",
+    systemHint: "เฉพาะตอนที่ Thoth อยู่เบื้องหลัง คือหน้าต่างไม่ได้อยู่ในโฟกัสหรือถูกซ่อนไว้ รายการใต้กระดิ่งจะมีทุกเหตุการณ์เสมอ", // REVIEW
+    kinds: "แสดงการแจ้งเตือนของระบบเมื่อ", // REVIEW
+    kind: {
+      agentReview: "การแก้ไขพร้อมให้ตรวจ", // REVIEW
+      agentFinished: "งานเสร็จแล้ว",
+      agentFailed: "งานล้มเหลว",
+      agentLimit: "งานหยุดเพราะถึงขีดจำกัด", // REVIEW
+      transferDone: "คัดลอกหรือย้ายเสร็จแล้ว",
+      transferFailed: "คัดลอกหรือย้ายไม่สำเร็จ",
+      importDone: "นำเข้าเสร็จแล้ว",
+      importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด", // REVIEW
+      saveConflict: "การบันทึกขัดกัน", // REVIEW
+    },
+    groups: { agent: "ผู้ช่วย Thoth", transfer: "คัดลอกและย้าย", import: "นำเข้า", editor: "การแก้ไข" },
+    privacy: "การแจ้งเตือนจะบอกชื่อหน้า โฟลเดอร์ เวิร์กสเปซ และเอเจนต์เท่านั้น ไม่แสดงเนื้อหาของหน้า สิ่งที่เอเจนต์เขียน หรืองานที่คุณสั่ง", // REVIEW
+    click: "คลิกการแจ้งเตือนเพื่อนำ Thoth ขึ้นมาด้านหน้า เรื่องที่แจ้งอยู่บนสุดของรายการใต้กระดิ่ง", // REVIEW
+  },
+
   servers: {
     title: "เซิร์ฟเวอร์",
     intro: "เชื่อมต่อกับเซิร์ฟเวอร์ Thoth เพื่อทำงานในเวิร์กสเปซที่แชร์กัน Thoth เก็บการเข้าสู่ระบบไว้ในพวงกุญแจของระบบ หน้าต่างนี้ไม่เคยเห็นข้อมูลนั้น",

@@ -72,6 +72,7 @@ export function Shell() {
   const { theme: themeNow, setTheme, cycle } = useTheme(desktopTheme);
   const [pages, setPages] = useState<PageSummary[] | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const target = tabs.active.target;
   const path = target.kind === "page" ? target.path : null;
@@ -180,6 +181,7 @@ export function Shell() {
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
+    openNotifications: () => setNotificationsOpen(true),
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
@@ -235,7 +237,7 @@ export function Shell() {
   return (
     <HintContext value={hints}>
     <div className="shell" ref={shell} style={sidebar.style}>
-      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} />
+      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
       <main className="main">
         <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} />
         {watchError && (

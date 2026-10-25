@@ -45,3 +45,6 @@ keyring = { version = "=3.6.3", features = ["apple-native", "windows-native", "l
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# System notifications (ADR-0018). Exact pin, released 2026-10-01 (at least three weeks old); the JS side,
+# @tauri-apps/plugin-notification, is pinned to the same version.
+tauri-plugin-notification = "=2.5.1"

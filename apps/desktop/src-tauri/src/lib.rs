@@ -260,6 +260,8 @@ pub fn run() {
     let builder = builder.menu(app_menu);
     builder
         .plugin(tauri_plugin_dialog::init())
+        // System notifications (ADR-0018): the webview may only check and ask for the permission and show one.
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let handle = app.handle().clone();
             let emitter = handle.clone();
@@ -313,13 +315,21 @@ mod tests {
     #[test]
     fn capability_grants_nothing_but_thoth_commands_and_events() {
         let capability: Value = serde_json::from_str(include_str!("../capabilities/main.json")).unwrap();
+        // System notifications (ADR-0018): check and ask for the permission, and show one. Nothing else of the
+        // plugin (no listeners, channels, pending or active lists, no `notification:default`).
+        const NOTIFICATION: [&str; 3] = ["notification:allow-is-permission-granted", "notification:allow-request-permission", "notification:allow-notify"];
+        let mut granted = Vec::new();
         for permission in capability["permissions"].as_array().unwrap() {
             let p = permission.as_str().unwrap();
-            assert!(p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten", "unexpected permission {p}");
+            assert!(p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten" || NOTIFICATION.contains(&p), "unexpected permission {p}");
+            if p.starts_with("notification:") {
+                granted.push(p);
+            }
         }
+        assert_eq!(granted, NOTIFICATION);
         assert!(capability.get("remote").is_none());
         let text = include_str!("../capabilities/main.json");
-        for plugin in ["http:", "opener:", "shell:", "fs:"] {
+        for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
         }
     }

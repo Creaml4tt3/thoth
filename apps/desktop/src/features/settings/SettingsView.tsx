@@ -6,6 +6,7 @@ import { LANG_PREFERENCES, LangPreferenceContext, useDesktopStrings, type LangPr
 import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { AgentSettings } from "../agents/AgentSettings.tsx";
+import { NotificationSettings } from "../notifications/NotificationSettings.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -13,7 +14,7 @@ import { currentOs, displayPath } from "./path.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
-/** Settings: vault location, workspace servers, language, editor mode, Rebuild index, and Import & Export. */
+/** Settings: vault location, workspace servers, the assistant, notifications, language, editor mode, Rebuild index, and Import & Export. */
 export function SettingsView({ section = "top" }: { section?: "top" | "servers" | "agents" }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder } = useSession();
   const t = useDesktopStrings().settings;
@@ -82,6 +83,8 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
         <ServersSettings focus={section === "servers"} />
 
         <AgentSettings focus={section === "agents"} />
+
+        <NotificationSettings />
 
         <section aria-labelledby="set-language" className="set-section">
           <h2 id="set-language">{t.language}</h2>
