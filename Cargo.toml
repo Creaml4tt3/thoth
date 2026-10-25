@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/thoth-host", "apps/desktop/src-tauri"]
+members = ["crates/thoth-host", "crates/thoth-mcp", "apps/desktop/src-tauri"]
 
 [workspace.package]
 edition = "2024"

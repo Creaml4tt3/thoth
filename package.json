@@ -44,6 +44,7 @@
     "@thoth/workspace-protocol": "workspace:*",
     "@types/node": "^24.19.2",
     "@types/yazl": "^3.3.1",
+    "ajv": "8.20.0",
     "turbo": "^2.11.9",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",

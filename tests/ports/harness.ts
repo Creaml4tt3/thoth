@@ -41,6 +41,25 @@ export function buildHarness(): Promise<string> {
   return built;
 }
 
+let mcpBuilt: Promise<string> | undefined;
+
+/**
+ * `cargo build -p thoth-mcp`, the MCP server other apps start (ADR-0021), copied to a private path as
+ * `buildHarness` does.
+ */
+export function buildMcpServer(): Promise<string> {
+  mcpBuilt ??= (async () => {
+    execFileSync("cargo", ["build", "-p", "thoth-mcp"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
+    const dir = await mkdtemp(join(tmpdir(), "thoth-mcp-bin-"));
+    const binary = join(dir, `thoth-mcp${EXE}`);
+    await copyFile(join(REPO, "target", "debug", `thoth-mcp${EXE}`), binary);
+    await chmod(binary, 0o755);
+    process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
+    return binary;
+  })();
+  return mcpBuilt;
+}
+
 /** A fresh canonical temp directory (macOS /var is a symlink to /private/var). */
 export async function tempDir(prefix: string): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), prefix)));
