@@ -15,21 +15,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TestProject } from "vitest/node";
 import { newStableId } from "@thoth/domain";
 import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { actAsBrowser, apiAs, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
-import { loadConfig } from "../../apps/server/src/config.ts";
-import { createDatabase, type Database } from "../../apps/server/src/db.ts";
+import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
-import { startServer, type RunningServer } from "../../apps/server/src/server.ts";
-import startPostgres from "../../apps/server/test-db/global-setup.ts";
-import { startFakeIssuer, type FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
 const HOST_LIB = readFileSync(join(REPO, "crates/thoth-host/src/lib.rs"), "utf8");
 const HOST_HAS_SERVERS = /"server\.add"/.test(HOST_LIB) && /"api\.call"/.test(HOST_LIB);
@@ -37,10 +33,8 @@ const HOST_HAS_SERVERS = /"server\.add"/.test(HOST_LIB) && /"api\.call"/.test(HO
 const SUBJECT = "sub-e2e-ada";
 
 let built: { dist: string; bridgeDir: string; binary: string };
-let stopPostgres: () => Promise<void>;
-let databaseUrl: string;
+let ref: ReferenceServer;
 let issuer: FakeIssuer;
-let server: RunningServer;
 let serverUrl: string;
 let db: Database;
 let scratch: string;
@@ -48,53 +42,8 @@ let bridge: Bridge;
 /** `browser.open` events from the harness: the URLs the host asked the system browser to open. */
 let opened: string[];
 
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      probe.close(() => (typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port"))));
-    });
-  });
-}
-
-/** Follows an authorization URL like a browser would: manual redirects, cookies per origin, down to the host's loopback callback. */
-async function actAsBrowser(start: string): Promise<void> {
-  const jar = new Map<string, Map<string, string>>();
-  let url = start;
-  for (let hop = 0; hop < 20; hop++) {
-    const origin = new URL(url).origin;
-    const cookies = jar.get(origin);
-    const res = await fetch(url, { redirect: "manual", headers: cookies && cookies.size > 0 ? { cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; ") } : {} });
-    for (const line of res.headers.getSetCookie()) {
-      const [pair] = line.split(";");
-      const at = pair!.indexOf("=");
-      const forOrigin = jar.get(origin) ?? new Map<string, string>();
-      forOrigin.set(pair!.slice(0, at), pair!.slice(at + 1));
-      jar.set(origin, forOrigin);
-    }
-    const location = res.headers.get("location");
-    await res.arrayBuffer();
-    if (res.status < 300 || res.status >= 400 || !location) {
-      if (new URL(url).pathname === "/callback") return; // the host's loopback listener answered
-      throw new Error(`Sign-in stopped at ${new URL(url).origin}${new URL(url).pathname} with HTTP ${res.status}`);
-    }
-    url = new URL(location, url).toString();
-  }
-  throw new Error("Too many redirects during sign-in");
-}
-
 /** A second person editing through the API with a personal access token. */
-async function asOther(token: string, method: string, path: string, init: { headers?: Record<string, string>; json?: unknown } = {}) {
-  const res = await fetch(`${serverUrl}/api/v1${path}`, {
-    method,
-    headers: { authorization: `Bearer ${token}`, ...(init.json === undefined ? {} : { "content-type": "application/json" }), ...(init.headers ?? {}) },
-    ...(init.json === undefined ? {} : { body: JSON.stringify(init.json) }),
-  });
-  const text = await res.text();
-  return { status: res.status, json: text ? (JSON.parse(text) as any) : undefined };
-}
+const asOther = (token: string, method: string, path: string, init: { headers?: Record<string, string>; json?: unknown } = {}) => apiAs(serverUrl, token, method, path, init);
 
 async function editor(page: Page) {
   const box = page.getByRole("textbox", { name: /page content/i });
@@ -107,33 +56,16 @@ test.describe("workspace servers", () => {
 
   test.beforeAll(async () => {
     built = await buildAll();
-    // The same throwaway PostgreSQL the server's test-db suite uses (Podman, tmpfs, 127.0.0.1 only).
-    stopPostgres = await startPostgres({ provide: (_key: string, value: string) => void (databaseUrl = value) } as unknown as TestProject);
-    issuer = await startFakeIssuer();
+    // The same throwaway PostgreSQL the server's test-db suite uses (Podman, tmpfs, 127.0.0.1 only), and the test issuer.
+    ref = await startReferenceServer({ issuer: true });
+    issuer = ref.issuer!;
     issuer.reset({ sub: SUBJECT, name: "Ada Lovelace", email: "ada@example.org" });
-    const port = await freePort();
-    serverUrl = `http://127.0.0.1:${port}`;
-    const config = loadConfig({
-      DATABASE_URL: databaseUrl,
-      HOST: "127.0.0.1",
-      PORT: String(port),
-      LOG_LEVEL: "silent",
-      BLOB_STORE: "postgres",
-      PUBLIC_URL: serverUrl,
-      OIDC_GOOGLE_CLIENT_ID: issuer.clientId,
-      OIDC_GOOGLE_CLIENT_SECRET: issuer.clientSecret,
-    });
-    // Google's issuer is fixed in configuration; point it at the local test issuer.
-    for (const p of config.signIn!.providers) if (p.kind === "oidc") p.issuer = issuer.url;
-    server = await startServer(config);
-    db = createDatabase(databaseUrl, { max: 2 });
+    serverUrl = ref.url;
+    db = ref.db;
   });
 
   test.afterAll(async () => {
-    await db?.close().catch(() => undefined);
-    await server?.close().catch(() => undefined);
-    await issuer?.close().catch(() => undefined);
-    await stopPostgres?.();
+    await ref?.close();
   });
 
   test.beforeEach(async ({ page, context }) => {

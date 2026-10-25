@@ -1,15 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { bundleCode, desktopOnlyIn, files } from "./bundle.ts";
 
 const app = resolve(import.meta.dirname, "..");
 const dist = join(app, "dist");
 const SERVER = "http://127.0.0.1:9";
-
-function files(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : [join(dir, e.name)]));
-}
 
 describe("web client production build", () => {
   it("builds under /app/ for the configured server, with no filesystem, Tauri, process or agent code (spec 14.11)", () => {
@@ -19,14 +16,12 @@ describe("web client production build", () => {
 
     const built = files(dist);
     const html = readFileSync(join(dist, "index.html"), "utf8");
-    const code = built.filter((f) => /\.(js|css|html)$/.test(f)).map((f) => ({ f, text: readFileSync(f, "utf8") }));
+    const code = bundleCode(dist);
     expect(code.length).toBeGreaterThan(2);
 
     // The Agent Hub's host commands and the Claude Code adapter are desktop only: a browser can never spawn a CLI.
     // System notifications are desktop only too (ADR-0018): no notification plugin, no permission request.
-    for (const forbidden of ["@tauri-apps", "plugin:fs", "child_process", "__TAURI_INTERNALS__", "@thoth/local-store", "openVault", "node:fs", "node:sqlite", "agent.start", "agent.run.create", "agent_start", "stream-json", "--permission-mode", "--skip-git-repo-check", "default_permissions=thoth", "plugin-notification", "plugin:notification", "sendNotification", "isPermissionGranted", "__THOTH_NOTIFICATION_PLUGIN__"]) {
-      expect(code.filter((c) => c.text.includes(forbidden)).map((c) => c.f), forbidden).toEqual([]);
-    }
+    expect(desktopOnlyIn(dist)).toEqual({});
     // No fonts or scripts from anywhere but /app/ (self-hosted fonts; no Google Fonts).
     for (const c of code) expect(c.text, c.f).not.toMatch(/fonts\.googleapis\.com|fonts\.gstatic\.com/);
     expect(built.filter((f) => f.endsWith(".woff2")).length).toBeGreaterThanOrEqual(2);

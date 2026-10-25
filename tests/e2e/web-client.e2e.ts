@@ -10,80 +10,31 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { createServer as netServer } from "node:net";
-import { extname, join, normalize, sep } from "node:path";
-import type { TestProject } from "vitest/node";
+import type { Server } from "node:http";
+import { join } from "node:path";
 import { REPO } from "../ports/harness.ts";
 import { newStableId } from "@thoth/domain";
 import { startDrag } from "./drag.ts";
 import { settled } from "./settled.ts";
+import { apiAs, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
-import { loadConfig } from "../../apps/server/src/config.ts";
-import { createDatabase, type Database } from "../../apps/server/src/db.ts";
+import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
-import { startServer, type RunningServer } from "../../apps/server/src/server.ts";
-import startPostgres from "../../apps/server/test-db/global-setup.ts";
-import { startFakeIssuer, type FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
 const WEB = join(REPO, "apps", "web");
 const DIST = join(WEB, "dist");
-const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 const TOKEN = /thoth_(at|rt|pat)_/;
 
-let stopPostgres: () => Promise<void>;
-let databaseUrl: string;
+let ref: ReferenceServer;
 let issuer: FakeIssuer;
-let server: RunningServer;
 let serverUrl: string;
 let db: Database;
 let site: Server;
 let siteUrl: string;
 
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = netServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      probe.close(() => (typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port"))));
-    });
-  });
-}
-
-/** The built client under /app/, with the SPA fallback a static host gives it (/app/callback serves index.html). */
-async function serveApp(port: number): Promise<Server> {
-  const http = createServer((req, res) => {
-    const path = new URL(req.url ?? "/", "http://x").pathname;
-    if (!path.startsWith("/app/")) {
-      res.writeHead(404).end();
-      return;
-    }
-    const rel = normalize(path.slice("/app/".length));
-    const file = rel === "." || rel === "" || !extname(rel) ? "index.html" : rel;
-    if (file.split(sep).includes("..")) {
-      res.writeHead(400).end();
-      return;
-    }
-    readFile(join(DIST, file))
-      .then((body) => res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }).end(body))
-      .catch(() => res.writeHead(404).end());
-  });
-  await new Promise<void>((resolve) => http.listen(port, "127.0.0.1", resolve));
-  return http;
-}
-
 /** A second person editing through the API with a personal access token. */
-async function asOther(token: string, method: string, path: string, init: { headers?: Record<string, string>; json?: unknown } = {}) {
-  const res = await fetch(`${serverUrl}/api/v1${path}`, {
-    method,
-    headers: { authorization: `Bearer ${token}`, ...(init.json === undefined ? {} : { "content-type": "application/json" }), ...(init.headers ?? {}) },
-    ...(init.json === undefined ? {} : { body: JSON.stringify(init.json) }),
-  });
-  const text = await res.text();
-  return { status: res.status, json: text ? (JSON.parse(text) as any) : undefined };
-}
+const asOther = (token: string, method: string, path: string, init: { headers?: Record<string, string>; json?: unknown } = {}) => apiAs(serverUrl, token, method, path, init);
 
 /** Everything a script on the page can read: both storages, the cookies it can see, the DOM, the address. */
 const readable = (page: Page) => page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + document.cookie + document.documentElement.outerHTML + location.href);
@@ -102,39 +53,28 @@ test.describe("web client", () => {
     serverUrl = `http://127.0.0.1:${apiPort}`;
     // The client's address for its server is fixed at build time.
     execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: WEB, stdio: "inherit", env: { ...process.env, VITE_DEFAULT_SERVER: serverUrl } });
-    site = await serveApp(sitePort);
+    site = await serveWebClient(DIST, sitePort);
 
-    stopPostgres = await startPostgres({ provide: (_key: string, value: string) => void (databaseUrl = value) } as unknown as TestProject);
-    issuer = await startFakeIssuer();
-    issuer.reset({ sub: `sub-web-${Date.now()}`, name: "Ada Lovelace", email: "ada@example.org" });
-    const config = loadConfig({
-      DATABASE_URL: databaseUrl,
-      HOST: "127.0.0.1",
-      PORT: String(apiPort),
-      LOG_LEVEL: "silent",
-      BLOB_STORE: "postgres",
-      THOTH_PROFILE: "trial",
-      // The trial's rate limits are for people; the test is quick.
-      RATE_LIMIT_PER_IP: "unlimited",
-      RATE_LIMIT_PER_ACCOUNT: "unlimited",
-      PUBLIC_URL: serverUrl,
-      CORS_ORIGINS: siteUrl,
-      WEB_REDIRECT_URIS: `${siteUrl}/app/callback`,
-      OIDC_GOOGLE_CLIENT_ID: issuer.clientId,
-      OIDC_GOOGLE_CLIENT_SECRET: issuer.clientSecret,
+    ref = await startReferenceServer({
+      issuer: true,
+      port: apiPort,
+      env: {
+        THOTH_PROFILE: "trial",
+        // The trial's rate limits are for people; the test is quick.
+        RATE_LIMIT_PER_IP: "unlimited",
+        RATE_LIMIT_PER_ACCOUNT: "unlimited",
+        CORS_ORIGINS: siteUrl,
+        WEB_REDIRECT_URIS: `${siteUrl}/app/callback`,
+      },
     });
-    // Google's issuer is fixed in configuration; point it at the local test issuer.
-    for (const p of config.signIn!.providers) if (p.kind === "oidc") p.issuer = issuer.url;
-    server = await startServer(config);
-    db = createDatabase(databaseUrl, { max: 2 });
+    issuer = ref.issuer!;
+    issuer.reset({ sub: `sub-web-${Date.now()}`, name: "Ada Lovelace", email: "ada@example.org" });
+    db = ref.db;
   });
 
   test.afterAll(async () => {
-    await db?.close().catch(() => undefined);
-    await server?.close().catch(() => undefined);
-    await issuer?.close().catch(() => undefined);
+    await ref?.close();
     await new Promise<void>((resolve) => (site ? site.close(() => resolve()) : resolve()));
-    await stopPostgres?.();
   });
 
   test("tabs are dragged to a new place with a real pointer and come back in that order after a reload (ADR-0019: reorder only)", async ({ page, context }) => {

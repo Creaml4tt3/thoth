@@ -9,42 +9,24 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TestProject } from "vitest/node";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { apiAs, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
-import { loadConfig } from "../../apps/server/src/config.ts";
-import { createDatabase, type Database } from "../../apps/server/src/db.ts";
+import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
-import { startServer, type RunningServer } from "../../apps/server/src/server.ts";
-import startPostgres from "../../apps/server/test-db/global-setup.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
-let stopPostgres: () => Promise<void>;
-let databaseUrl: string;
-let server: RunningServer;
+let ref: ReferenceServer;
 let serverUrl: string;
 let db: Database;
 let scratch: string;
 let bridge: Bridge;
 
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      probe.close(() => (typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port"))));
-    });
-  });
-}
-
 async function api(token: string, path: string) {
-  const res = await fetch(`${serverUrl}/api/v1${path}`, { headers: { authorization: `Bearer ${token}` } });
-  return { status: res.status, json: (await res.json()) as any };
+  return apiAs(serverUrl, token, "GET", path);
 }
 
 async function signInWithToken(page: Page, token: string) {
@@ -62,17 +44,13 @@ async function signInWithToken(page: Page, token: string) {
 test.describe("transfers", () => {
   test.beforeAll(async () => {
     built = await buildAll();
-    stopPostgres = await startPostgres({ provide: (_key: string, value: string) => void (databaseUrl = value) } as unknown as TestProject);
-    const port = await freePort();
-    serverUrl = `http://127.0.0.1:${port}`;
-    server = await startServer(loadConfig({ DATABASE_URL: databaseUrl, HOST: "127.0.0.1", PORT: String(port), LOG_LEVEL: "silent", BLOB_STORE: "postgres", PUBLIC_URL: serverUrl }));
-    db = createDatabase(databaseUrl, { max: 2 });
+    ref = await startReferenceServer();
+    serverUrl = ref.url;
+    db = ref.db;
   });
 
   test.afterAll(async () => {
-    await db?.close().catch(() => undefined);
-    await server?.close().catch(() => undefined);
-    await stopPostgres?.();
+    await ref?.close();
   });
 
   test.beforeEach(async ({ page, context }) => {
