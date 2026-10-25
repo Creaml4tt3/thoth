@@ -12,6 +12,11 @@ Cloudflare R2: bucket `thoth-downloads`, public at `https://download.thoth.cream
 Each release lives under `v<version>/` with a `SHA256SUMS` file. `latest.json` at the root names the newest
 release. Released files are never replaced: a fix is a new version.
 
+The desktop app reads `latest.json` to tell people a new version is out (ADR-0022, a notice only: nothing is downloaded
+or installed by the app). It needs `version` (semver); `date` and an optional `notes` (an `https` link to the release
+notes, shown as "What's new") are read when present. Keep `latest.json` served as `application/json` and under 64 KB.
+A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empty: no notice).
+
 ## One-time setup
 
 1. **R2 token.** Cloudflare → R2 → Manage API tokens → Create API token: permission **Object Read & Write**,
