@@ -53,5 +53,8 @@ Section 3.2, 8, 9.1, 9.4, 11 (authorization, audit events), 12, 14 (step 12),
 - Page-level permissions beyond workspace roles.
 - Guest and public links.
 - Definition of "export" precisely (copy, move, download, agent context) for the
-  restriction flag.
+  restriction flag. For agent context it is decided (ADR-0007, decision 1, 2026-10-25): giving a workspace page to an
+  agent counts as a copy out, so the client refuses it when the workspace is `exportRestricted` or the role cannot
+  read; the pages become read-only reference copies and nothing done to them is written back. Copy, move and
+  download are still as written above.
 - Role-change and ownership-transfer rules; last-owner protection.

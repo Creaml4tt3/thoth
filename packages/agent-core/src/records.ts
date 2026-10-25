@@ -4,6 +4,9 @@
  * version, the task as the user wrote it, the selected context (paths and hashes), the proposed changes with the
  * user's decision and the apply result, and the outcome. Never page content, agent output text or credentials.
  * They live with the vault because the context, approvals and writes are the vault's.
+ *
+ * What a run printed (the transcript) and the files it proposed are kept elsewhere: `details.ts`, in the app data
+ * folder, never in the vault.
  */
 import { z } from "zod";
 import type { Vault } from "@thoth/local-store";
@@ -36,6 +39,17 @@ export type RunState = z.infer<typeof RunStateSchema>;
 
 export const TERMINAL_STATES: ReadonlySet<RunState> = new Set(["applied", "done", "discarded", "cancelled", "failed", "interrupted"]);
 
+export const ContextEntrySchema = z.object({
+  path: z.string(),
+  hash: z.string(),
+  size: z.number(),
+  kind: z.enum(["page", "file"]),
+  via: z.enum(["selected", "folder", "linked", "space", "workspace"]),
+  /** A reference copy (a workspace page): changes to it are discarded. */
+  readOnly: z.boolean().optional(),
+  workspace: z.object({ workspaceId: z.string(), workspaceName: z.string(), pageId: z.string(), title: z.string(), revisionId: z.string() }).optional(),
+});
+
 const ChangeRecordSchema = z.object({
   path: z.string(),
   change: z.enum(["modified", "added", "deleted"]),
@@ -55,8 +69,16 @@ export const RunRecordSchema = z.object({
   version: z.literal(RECORD_VERSION),
   id: z.string(),
   provider: z.object({ id: z.string(), name: z.string(), version: z.string().optional() }),
-  task: z.object({ prompt: z.string(), model: z.string().optional(), maxBudgetUsd: z.number().optional() }),
-  context: z.array(z.object({ path: z.string(), hash: z.string(), size: z.number(), kind: z.enum(["page", "file"]), via: z.enum(["selected", "folder", "linked"]) })),
+  task: z.object({
+    prompt: z.string(),
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().optional(),
+    /** The time limit this run had, in milliseconds. */
+    timeoutMs: z.number().optional(),
+    /** The whole Private Space was the context. */
+    wholeSpace: z.boolean().optional(),
+  }),
+  context: z.array(ContextEntrySchema),
   state: RunStateSchema,
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -69,6 +91,10 @@ export const RunRecordSchema = z.object({
       turns: z.number().optional(),
       durationMs: z.number().optional(),
       error: z.object({ code: z.string(), message: z.string() }).optional(),
+      /** The model that answered, as the CLI reported it. */
+      model: z.string().optional(),
+      /** The run was stopped by its time limit or used up its budget. */
+      stoppedBy: z.enum(["time", "budget"]).optional(),
     })
     .optional(),
   changes: z.array(ChangeRecordSchema),
@@ -77,6 +103,16 @@ export type RunRecord = z.infer<typeof RunRecordSchema>;
 
 export async function writeRun(vault: Vault, record: RunRecord): Promise<void> {
   await vault.writeRecord(runPath(record.id), record);
+}
+
+/** One record, or null when it is missing or unreadable. */
+export async function readRun(vault: Vault, id: string): Promise<RunRecord | null> {
+  try {
+    const parsed = RunRecordSchema.safeParse(await vault.readRecord(runPath(id)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Every readable record, newest first. Unreadable ones are skipped (they are metadata, never content). */

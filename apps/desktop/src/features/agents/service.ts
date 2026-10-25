@@ -1,31 +1,86 @@
 /**
  * The Agent Hub's state for one open Private Space (ADR-0007): detection, the task being written, the current run
- * (its streamed events, then its proposed changes and the apply results) and the run history. It wraps `AgentHub`
- * from `@thoth/agent-core` in a store the views read with `useSyncExternalStore`, so a run goes on while another tab
- * is shown. Nothing here reaches the vault except through `AgentHub.apply` (compare-and-swap) after the user chose.
+ * (its streamed events, then its proposed changes and the apply results), the run history and the Agent Hub's
+ * settings. It wraps `AgentHub` from `@thoth/agent-core` in a store the views read with `useSyncExternalStore`, so a
+ * run goes on while another tab is shown. Nothing here reaches the vault except through `AgentHub.apply`
+ * (compare-and-swap) after the user chose.
  */
-import { AgentHub, AgentUnavailableError, StagingError, type AgentEvent, type AgentHost, type AgentInstallationStatus, type ApplyResult, type ProposedChange, type RunRecord } from "@thoth/agent-core";
+import {
+  AgentHub,
+  AgentUnavailableError,
+  createWorkspaceReader,
+  LimitError,
+  minutesToMs,
+  previewContext,
+  StagingError,
+  workspaceContextAccess,
+  WorkspaceContextError,
+  type AgentEvent,
+  type AgentHost,
+  type AgentInstallationStatus,
+  type ApplyResult,
+  type ContextPreview,
+  type ProposedChange,
+  type RunDetails,
+  type RunRecord,
+  type WorkspaceRefusal,
+} from "@thoth/agent-core";
 import { CLAUDE_PROVIDER_ID, createClaudeProvider, isModelName } from "@thoth/agent-claude";
 import type { Vault } from "@thoth/local-store";
+import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
+import { loadAgentSettings, saveAgentSettings, type AgentSettings } from "./settings.ts";
 
 /** The newest events kept on screen for one run. */
 const MAX_EVENTS = 2000;
 
 export type RunPhase = "idle" | "starting" | "running" | "cancelling" | "review" | "applying" | "finished";
 
-export interface Draft {
-  selection: string[];
-  prompt: string;
-  model: string;
-  budget: string;
+/** A workspace page chosen as read-only context. */
+export interface WorkspaceChoice {
+  server: string;
+  workspace: string;
+  page: string;
+  title: string;
+  workspaceName: string;
 }
 
-export type DraftProblem = "needContext" | "needTask" | "badModel" | "badBudget";
+export const workspaceChoiceKey = (c: Pick<WorkspaceChoice, "server" | "workspace" | "page">): string => `${c.server}\n${c.workspace}\n${c.page}`;
+
+export interface Draft {
+  selection: string[];
+  /** The whole Private Space instead of a selection. */
+  wholeSpace: boolean;
+  workspace: WorkspaceChoice[];
+  prompt: string;
+  model: string;
+  /** Minutes for this run, or the Agent Hub's default. */
+  timeMinutes: number | "default";
+  /** US dollars for this run, "none" for no limit, or the Agent Hub's default. */
+  budget: number | "none" | "default";
+}
+
+export type DraftProblem = "needContext" | "needTask" | "badModel" | "contextTooMany" | "contextTooLarge" | "contextFileTooLarge" | "contextMissing";
+
+/** Something the user should be told that is not part of a run's outcome. */
+export type Notice =
+  /** A workspace page was refused as context (or could not be read). */
+  | { kind: "refused"; refusal: WorkspaceRefusal; workspace?: string }
+  /** A review could not be opened again. */
+  | { kind: "reviewGone" };
+
+export interface DetailState {
+  record: RunRecord;
+  loading: boolean;
+  details: RunDetails | null;
+}
 
 export interface AgentsState {
   status: AgentInstallationStatus | null;
   checking: boolean;
+  settings: AgentSettings;
   draft: Draft;
+  /** The files and size the draft's Private Space context comes to; null until measured. */
+  preview: ContextPreview | null;
   phase: RunPhase;
   record: RunRecord | null;
   events: AgentEvent[];
@@ -35,9 +90,16 @@ export interface AgentsState {
   results: ApplyResult[] | null;
   /** An error that is not part of a run's outcome (staging refused, CLI not ready, apply failed). */
   error: string | null;
+  notice: Notice | null;
   history: RunRecord[];
+  /** Which earlier runs have local details (a transcript, a review) to open. */
+  available: Record<string, { transcript: boolean; review: boolean }>;
+  /** The earlier run whose transcript and changes are open. */
+  detail: DetailState | null;
   /** Runs recovery found interrupted at start; null once dismissed. */
   recovered: number | null;
+  /** How many runs "Delete history now" removed, until the next change. */
+  cleared: number | null;
 }
 
 export interface AgentsService {
@@ -45,14 +107,27 @@ export interface AgentsService {
   getState(): AgentsState;
   detect(): Promise<void>;
   setDraft(patch: Partial<Draft>): void;
+  /** Adds a workspace page as read-only context unless the user's role or the workspace's rules forbid it. */
+  addWorkspacePage(choice: WorkspaceChoice): boolean;
+  removeWorkspacePage(key: string): void;
+  /** Measures the draft's Private Space context (call again when the vault changed). */
+  refreshPreview(): Promise<void>;
   /** Problems with the draft, in the order the form shows them. */
   draftProblems(): DraftProblem[];
+  updateSettings(patch: Partial<AgentSettings>): void;
   start(): Promise<void>;
   cancel(): Promise<void>;
   setApproved(paths: string[]): void;
   apply(): Promise<void>;
   discard(): Promise<void>;
   saveCopy(path: string, name: (attempt: number) => string): Promise<void>;
+  /** Opens again the review of a run that was waiting when Thoth last closed. */
+  reopenReview(id: string): Promise<void>;
+  /** Opens an earlier run's transcript and changes (local details). */
+  openDetails(id: string): Promise<void>;
+  closeDetails(): void;
+  /** "Delete history now": local transcripts and diffs, except for runs waiting for review. */
+  clearHistory(): Promise<void>;
   /** Back to the form (after a run ended); keeps the selection. */
   newTask(): Promise<void>;
   recover(): Promise<void>;
@@ -60,13 +135,41 @@ export interface AgentsService {
   dispose(): Promise<void>;
 }
 
-const EMPTY_DRAFT: Draft = { selection: [], prompt: "", model: "", budget: "" };
+const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default" };
 
-export function createAgentsService(vault: Vault, host: AgentHost, options: { now?: () => number; onApplied?: () => void } = {}): AgentsService {
-  const hub = new AgentHub({ vault, host, providers: [createClaudeProvider(host)], ...(options.now ? { now: options.now } : {}) });
+export function createAgentsService(vault: Vault, host: AgentHost, options: { now?: () => number; onApplied?: () => void; servers?: ServerDirectory; settings?: AgentSettings } = {}): AgentsService {
+  let state: AgentsState = {
+    status: null,
+    checking: false,
+    settings: options.settings ?? loadAgentSettings(),
+    draft: EMPTY_DRAFT,
+    preview: null,
+    phase: "idle",
+    record: null,
+    events: [],
+    changes: null,
+    approved: [],
+    results: null,
+    error: null,
+    notice: null,
+    history: [],
+    available: {},
+    detail: null,
+    recovered: null,
+    cleared: null,
+  };
+  const servers = options.servers;
+  const hub = new AgentHub({
+    vault,
+    host,
+    providers: [createClaudeProvider(host)],
+    ...(options.now ? { now: options.now } : {}),
+    ...(servers ? { workspace: createWorkspaceReader((server) => servers.client(server)) } : {}),
+    retentionDays: () => state.settings.retentionDays,
+  });
   const listeners = new Set<() => void>();
-  let state: AgentsState = { status: null, checking: false, draft: EMPTY_DRAFT, phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, history: [], recovered: null };
   let disposed = false;
+  let previewSeq = 0;
 
   const set = (patch: Partial<AgentsState>) => {
     if (disposed) return;
@@ -74,7 +177,10 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     for (const listener of [...listeners]) listener();
   };
   const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-  const refreshHistory = async () => set({ history: await hub.history().catch(() => state.history) });
+  const refreshHistory = async () => {
+    const [history, available] = await Promise.all([hub.history().catch(() => state.history), hub.detailsAvailable().catch(() => new Map<string, { transcript: boolean; review: boolean }>())]);
+    set({ history, available: Object.fromEntries(available) });
+  };
 
   const service: AgentsService = {
     subscribe(listener) {
@@ -90,30 +196,77 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     },
 
     setDraft(patch) {
-      set({ draft: { ...state.draft, ...patch } });
+      set({ draft: { ...state.draft, ...patch }, notice: state.notice?.kind === "refused" ? null : state.notice });
+      if ("selection" in patch || "wholeSpace" in patch) void service.refreshPreview();
+    },
+
+    addWorkspacePage(choice) {
+      const workspace = servers?.workspace(choice.server, choice.workspace);
+      // The server decides what a person may read; the app also refuses what it would refuse for a copy out.
+      const access = workspace ? workspaceContextAccess(workspace) : "forbidden";
+      if (access !== "allowed") {
+        set({ notice: { kind: "refused", refusal: access, ...(workspace ? { workspace: workspace.name } : {}) } });
+        return false;
+      }
+      if (state.draft.workspace.some((c) => workspaceChoiceKey(c) === workspaceChoiceKey(choice))) return true;
+      set({ draft: { ...state.draft, workspace: [...state.draft.workspace, choice] }, notice: null });
+      return true;
+    },
+
+    removeWorkspacePage(key) {
+      set({ draft: { ...state.draft, workspace: state.draft.workspace.filter((c) => workspaceChoiceKey(c) !== key) } });
+    },
+
+    async refreshPreview() {
+      const seq = ++previewSeq;
+      const { selection, wholeSpace } = state.draft;
+      try {
+        const preview = await previewContext(vault, selection, { wholeSpace });
+        if (seq === previewSeq) set({ preview });
+      } catch {
+        if (seq === previewSeq) set({ preview: null });
+      }
     },
 
     draftProblems() {
-      const { selection, prompt, model, budget } = state.draft;
+      const { selection, wholeSpace, workspace, prompt, model } = state.draft;
       const problems: DraftProblem[] = [];
-      if (selection.length === 0) problems.push("needContext");
+      if (selection.length === 0 && !wholeSpace && workspace.length === 0) problems.push("needContext");
       if (prompt.trim() === "") problems.push("needTask");
       if (model.trim() !== "" && !isModelName(model.trim())) problems.push("badModel");
-      if (budget.trim() !== "") {
-        const n = Number(budget.trim());
-        if (!Number.isFinite(n) || n <= 0 || n > 1000) problems.push("badBudget");
-      }
+      const code = state.preview?.problem?.code;
+      if (code === "too_many") problems.push("contextTooMany");
+      else if (code === "too_large") problems.push("contextTooLarge");
+      else if (code === "file_too_large") problems.push("contextFileTooLarge");
+      else if (code === "not_found" || code === "reserved") problems.push("contextMissing");
       return problems;
+    },
+
+    updateSettings(patch) {
+      const settings = { ...state.settings, ...patch };
+      saveAgentSettings(settings);
+      set({ settings, cleared: null });
     },
 
     async start() {
       if (state.phase !== "idle" && state.phase !== "finished") return;
       if (service.draftProblems().length > 0) return;
-      const { selection, prompt, model, budget } = state.draft;
-      set({ phase: "starting", error: null, events: [], changes: null, approved: [], results: null, record: null });
+      const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget } = state.draft;
+      const budgetUsd = budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
+      const minutes = timeMinutes === "default" ? state.settings.timeMinutes : timeMinutes;
+      set({ phase: "starting", error: null, notice: null, events: [], changes: null, approved: [], results: null, record: null, detail: null });
       try {
         const { record, finished } = await hub.start(
-          { provider: CLAUDE_PROVIDER_ID, prompt, selection, ...(model.trim() ? { model: model.trim() } : {}), ...(budget.trim() ? { maxBudgetUsd: Number(budget.trim()) } : {}) },
+          {
+            provider: CLAUDE_PROVIDER_ID,
+            prompt,
+            selection: wholeSpace ? [] : selection,
+            ...(wholeSpace ? { wholeSpace: true } : {}),
+            ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),
+            ...(model.trim() ? { model: model.trim() } : {}),
+            ...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd } : {}),
+            timeoutMs: minutesToMs(minutes),
+          },
           (event) => {
             const events = state.events.length >= MAX_EVENTS ? [...state.events.slice(1), event] : [...state.events, event];
             set({ events });
@@ -131,7 +284,8 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         });
       } catch (error) {
         if (error instanceof AgentUnavailableError) set({ status: error.status, phase: "idle", error: null });
-        else set({ phase: "idle", error: error instanceof StagingError ? error.message : message(error) });
+        else if (error instanceof WorkspaceContextError) set({ phase: "idle", error: null, notice: { kind: "refused", refusal: error.refusal, ...(error.workspace ? { workspace: error.workspace } : {}) } });
+        else set({ phase: "idle", error: error instanceof StagingError || error instanceof LimitError ? error.message : message(error) });
       }
       await refreshHistory();
     },
@@ -182,10 +336,55 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
       await refreshHistory();
     },
 
+    async reopenReview(id) {
+      if (state.phase !== "idle" && state.phase !== "finished") return;
+      try {
+        const reopened = await hub.reopen(id);
+        if (!reopened) {
+          set({ notice: { kind: "reviewGone" } });
+          await refreshHistory();
+          return;
+        }
+        const details = await hub.details(id).catch(() => null);
+        set({
+          phase: "review",
+          record: reopened.record,
+          events: details?.events ?? [],
+          changes: reopened.changes,
+          approved: reopened.changes.filter((c) => c.problem === undefined).map((c) => c.path),
+          results: null,
+          error: null,
+          notice: null,
+          detail: null,
+        });
+      } catch (error) {
+        set({ error: message(error) });
+      }
+      await refreshHistory();
+    },
+
+    async openDetails(id) {
+      const record = state.history.find((r) => r.id === id);
+      if (!record) return;
+      set({ detail: { record, loading: true, details: null } });
+      const details = await hub.details(id).catch(() => null);
+      if (state.detail?.record.id === id) set({ detail: { record, loading: false, details } });
+    },
+
+    closeDetails() {
+      set({ detail: null });
+    },
+
+    async clearHistory() {
+      const cleared = await hub.clearDetails().catch(() => 0);
+      set({ cleared, detail: null });
+      await refreshHistory();
+    },
+
     async newTask() {
       if (state.phase === "running" || state.phase === "cancelling" || state.phase === "starting" || state.phase === "applying") return;
       if (state.record && state.phase !== "review") await hub.close(state.record.id);
-      set({ phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, draft: { ...state.draft, prompt: "" } });
+      set({ phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "" } });
     },
 
     async recover() {

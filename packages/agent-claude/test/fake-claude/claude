@@ -5,7 +5,7 @@
 // (see ../fixtures/README.md).
 //
 // Environment:
-//   FAKE_CLAUDE_RECORD=<dir>    write <dir>/run-<pid>.json: argv, cwd, env, stdin, the files in cwd, pids
+//   FAKE_CLAUDE_RECORD=<dir>    write <dir>/run-<pid>.json: argv, cwd, env, stdin, the files in cwd and their modes, pids
 //                               (default: fake-claude-record.json next to the working directory, outside it)
 //   FAKE_CLAUDE_VERSION=<text>  what --version prints (default "2.1.310 (Claude Code)")
 //   FAKE_CLAUDE_HELP=old        --help without --restricted and --permission-prompts
@@ -14,10 +14,13 @@
 // Directives (one per prompt line; paths are relative to the working directory):
 //   @replace PATH :: OLD => NEW      @write PATH :: TEXT (\n for a newline)     @delete PATH
 //   @symlink PATH -> TARGET          @mkdir PATH                                @say TEXT
+//   @unlock PATH (make a read-only file writable, as an agent that works around a file mode would)
 //   @sleep MS                        @hang (start a grandchild, then wait to be killed)
 //   @ignore-term (ignore SIGTERM)    @not-logged-in                             @exit CODE
+//   @budget (stop the way Claude Code does when --max-budget-usd is used up: a result with subtype
+//           error_max_budget_usd and no result text, exit 1; see ../fixtures/stream-budget.jsonl)
 import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync, lstatSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, lstatSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const argv = process.argv.slice(2);
@@ -65,7 +68,9 @@ function listing(dir, prefix = "") {
   return entries;
 }
 
-const record = { pid: process.pid, argv, cwd, env: process.env, stdin: prompt, files: listing(cwd), grandchild: null };
+const modes = {};
+for (const { path } of listing(cwd)) modes[path] = lstatSync(join(cwd, path)).mode & 0o777;
+const record = { pid: process.pid, argv, cwd, env: process.env, stdin: prompt, files: listing(cwd), modes, grandchild: null };
 const recordFile = process.env.FAKE_CLAUDE_RECORD ? join(process.env.FAKE_CLAUDE_RECORD, `run-${process.pid}.json`) : join(cwd, "..", "fake-claude-record.json");
 const save = () => recordFile && writeFileSync(recordFile, JSON.stringify(record, null, 2));
 save();
@@ -105,16 +110,26 @@ for (const raw of prompt.split("\n")) {
     const text = readFileSync(file, "utf8");
     if (!text.includes(from)) toolResult(toolId, `String to replace not found in file.\nString: ${from}`, true);
     else {
-      writeFileSync(file, text.replace(from, to));
-      toolResult(toolId, `The file ${file} has been updated successfully.`);
+      try {
+        writeFileSync(file, text.replace(from, to));
+        toolResult(toolId, `The file ${file} has been updated successfully.`);
+      } catch (error) {
+        toolResult(toolId, `${error.code}: permission denied, open '${file}'`, true);
+      }
     }
   } else if (directive === "@write") {
     const [path, text] = arg.split(" :: ");
     const file = join(cwd, path);
     const toolId = useTool("Write", { file_path: file, content: text.replaceAll("\\n", "\n") });
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, text.replaceAll("\\n", "\n"));
-    toolResult(toolId, `File created successfully at: ${file}`);
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, text.replaceAll("\\n", "\n"));
+      toolResult(toolId, `File created successfully at: ${file}`);
+    } catch (error) {
+      toolResult(toolId, `${error.code}: permission denied, open '${file}'`, true);
+    }
+  } else if (directive === "@unlock") {
+    chmodSync(join(cwd, arg), 0o644);
   } else if (directive === "@delete") {
     rmSync(join(cwd, arg), { force: true });
     turns++;
@@ -138,6 +153,11 @@ for (const raw of prompt.split("\n")) {
   } else if (directive === "@not-logged-in") {
     assistant([{ type: "text", text: "Not logged in · Please run /login" }], { error: "authentication_failed" });
     emit({ type: "result", subtype: "success", is_error: true, duration_ms: 40, num_turns: 1, result: "Not logged in · Please run /login", session_id: SESSION, total_cost_usd: 0, terminal_reason: "api_error", uuid: id() });
+    process.exit(1);
+  } else if (directive === "@budget") {
+    const limit = argv.includes("--max-budget-usd") ? argv[argv.indexOf("--max-budget-usd") + 1] : "0.0001";
+    assistant([{ type: "text", text: "Working on it…" }]);
+    emit({ type: "result", subtype: "error_max_budget_usd", is_error: true, duration_ms: 1398, num_turns: turns + 1, session_id: SESSION, total_cost_usd: Number(limit) + 0.0001, errors: [`Reached maximum budget ($${limit})`], permission_denials: [], terminal_reason: "budget_exhausted", uuid: id() });
     process.exit(1);
   } else if (directive === "@exit") {
     process.stderr.write("fake claude: exiting early\n");

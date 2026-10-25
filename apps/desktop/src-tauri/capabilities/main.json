@@ -54,6 +54,10 @@
     "allow-agent-events",
     "allow-agent-cancel",
     "allow-agent-run-dispose",
-    "allow-agent-sweep"
+    "allow-agent-sweep",
+    "allow-agent-history-write",
+    "allow-agent-history-read",
+    "allow-agent-history-list",
+    "allow-agent-history-delete"
   ]
 }

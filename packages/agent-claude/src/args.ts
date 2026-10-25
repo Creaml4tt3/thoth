@@ -8,6 +8,8 @@
  * checked by both sides.
  */
 
+import { MAX_BUDGET_USD } from "@thoth/agent-core";
+
 /** The built-in tools the agent gets: reading and editing files in its working directory, nothing else. */
 export const FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"] as const;
 /** No MCP servers at all (with `--strict-mcp-config`, the user's configured servers are ignored too). */
@@ -18,10 +20,11 @@ export interface ClaudeRunOptions {
   maxBudgetUsd?: number;
 }
 
-/** `5` → "5", `0.5` → "0.5", `1.239` → "1.24". */
+/** `5` → "5", `0.5` → "0.5", `1.239` → "1.24". The host accepts more than 0 and at most US$100, two decimals. */
 export function formatBudget(usd: number): string {
-  if (!Number.isFinite(usd) || usd <= 0 || usd > 1000) throw new RangeError("The spending limit must be more than 0 and at most 1000 USD");
-  return String(Math.round(usd * 100) / 100);
+  const rounded = Math.round(usd * 100) / 100;
+  if (!Number.isFinite(usd) || rounded <= 0 || rounded > MAX_BUDGET_USD) throw new RangeError(`The spending limit must be more than 0 and at most ${MAX_BUDGET_USD} USD`);
+  return String(rounded);
 }
 
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,99}$/;

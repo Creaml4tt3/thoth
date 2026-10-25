@@ -60,6 +60,66 @@
         "--max-budget-usd",
         "1.5"
       ]
+    },
+    {
+      "options": { "maxBudgetUsd": 100 },
+      "argv": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "text",
+        "--restricted",
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{\"mcpServers\":{}}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--allowedTools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowedTools",
+        "mcp__*",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--max-budget-usd",
+        "100"
+      ]
+    },
+    {
+      "options": { "maxBudgetUsd": 0.25 },
+      "argv": [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "text",
+        "--restricted",
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        "{\"mcpServers\":{}}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--allowedTools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowedTools",
+        "mcp__*",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--max-budget-usd",
+        "0.25"
+      ]
     }
   ]
 }

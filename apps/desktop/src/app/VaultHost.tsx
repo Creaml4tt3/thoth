@@ -82,7 +82,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Agent Hub: only where the host can run CLIs. Working directories an earlier session left are deleted and its
   // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
-  const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump }) : null), [platform, vault, bump]);
+  const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers }) : null), [platform, vault, bump, servers]);
   useEffect(() => {
     void agents?.recover();
     return () => void agents?.dispose();

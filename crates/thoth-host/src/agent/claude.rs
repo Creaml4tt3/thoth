@@ -12,6 +12,10 @@ use std::collections::HashSet;
 pub const FILE_TOOLS: &[&str] = &["Read", "Edit", "Write", "Glob", "Grep"];
 /// The only MCP configuration accepted: none at all (with `--strict-mcp-config`).
 pub const EMPTY_MCP_CONFIG: &str = r#"{"mcpServers":{}}"#;
+/// The largest `--max-budget-usd` the host accepts, in US dollars. The Agent Hub offers at most US$5 a run; this is 20
+/// times that, so a person who chose a bigger limit on purpose is not blocked, while a forged value cannot lift the
+/// safety net (the CLI's own estimate, which can overshoot a little) to something that could drain an account.
+pub const MAX_BUDGET_USD: f64 = 100.0;
 const MAX_ARGS: usize = 64;
 const MAX_ARG_BYTES: usize = 1024;
 
@@ -122,14 +126,14 @@ fn model_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= 100 && name.starts_with(|c: char| c.is_ascii_alphanumeric()) && name.chars().all(|c| c.is_ascii_alphanumeric() || "._:-[]".contains(c))
 }
 
-/// A positive dollar amount with at most two decimals and at most 1000.
+/// A positive dollar amount with at most two decimals and at most [`MAX_BUDGET_USD`].
 fn budget(value: &str) -> bool {
     let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
     let digits = |s: &str| s.chars().all(|c| c.is_ascii_digit());
-    if whole.is_empty() || whole.len() > 4 || !digits(whole) || fraction.len() > 2 || !digits(fraction) || (value.contains('.') && fraction.is_empty()) {
+    if whole.is_empty() || whole.len() > 3 || !digits(whole) || fraction.len() > 2 || !digits(fraction) || (value.contains('.') && fraction.is_empty()) {
         return false;
     }
-    matches!(value.parse::<f64>(), Ok(n) if n > 0.0 && n <= 1000.0)
+    matches!(value.parse::<f64>(), Ok(n) if n > 0.0 && n <= MAX_BUDGET_USD)
 }
 
 #[cfg(test)]
@@ -218,10 +222,10 @@ mod tests {
         for bad in ["", "-p", "--add-dir", "a b", "x;rm", &"m".repeat(101)] {
             assert!(!model_name(bad), "{bad}");
         }
-        for good in ["1", "0.5", "5.00", "1000"] {
+        for good in ["1", "0.25", "0.5", "5.00", "100", "100.00", "99.99"] {
             assert!(budget(good), "{good}");
         }
-        for bad in ["0", "-1", "1.", ".5", "1.234", "1e3", "1001", "abc", ""] {
+        for bad in ["0", "0.00", "-1", "1.", ".5", "1.234", "1e3", "100.01", "101", "1000", "1001", "abc", ""] {
             assert!(!budget(bad), "{bad}");
         }
         assert!(denied_name("mcp__*") && denied_name("Bash") && !denied_name("Bash(rm *)") && !denied_name("*"));

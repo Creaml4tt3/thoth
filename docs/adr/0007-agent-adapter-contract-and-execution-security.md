@@ -1,8 +1,8 @@
 # ADR-0007: Agent adapter contract and execution security
 
-- **Status:** Accepted for the Claude Code CLI adapter (Phase 4), with the decisions below taken on 2026-10-25
-  (owner to confirm). Proposed for the Codex adapter and for OS-level sandboxing.
-- **Date:** 2026-10-20 (decisions added 2026-10-25)
+- **Status:** Accepted for the Claude Code CLI adapter (Phase 4), with the decisions below decided on 2026-10-25 by the
+  owner. Proposed for the Codex adapter. OS-level sandboxing is deferred (see "Future: OS-level sandbox").
+- **Date:** 2026-10-20 (decisions added 2026-10-25; context scope, limits and history answered by the owner the same day)
 
 ## Context
 
@@ -31,20 +31,47 @@ guessed.
    applied to managed notes only after explicit user review, through the same
    compare-and-swap write path as other writes (ADR-0001). Agent output is
    untrusted input.
-6. **Sandboxing.** Prompts are not a sandbox. OS-level sandboxing is used where
-   available; per-platform feasibility is an open question.
+6. **Sandboxing.** Prompts are not a sandbox. OS-level sandboxing is not part of Phase 4 (decision 4 below); the
+   plan for it is under "Future: OS-level sandbox".
 7. **Agent Hub data.** It stores task and run metadata (provider, task, selected
    context, changed files, approvals, outcome). It is not a content store.
 
-## Decisions for Phase 4 (decided 2026-10-25, owner to confirm)
+## Decisions for Phase 4 (decided 2026-10-25 by the owner)
 
-The owner asked for Phase 4 to start with conservative defaults for the open questions.
+Phase 4 started with conservative defaults for the open questions. On 2026-10-25 the owner answered them; decisions
+1, 4 and 7 to 10 below were amended accordingly and decisions 11 and 12 were added.
 
-1. **Context.** Copies of the Private Space pages and folders the user selects, plus the attachments those pages
-   link to (resolved links in the index, so relative links still work), at their vault paths in a fresh directory
-   under the app data folder: `<app data>/agent-runs/run_<128-bit hex>/work`, mode `0700`. Not a git worktree, even
-   when the vault is a git repository. Workspace (server) content is out of scope for now. A selection that names
-   something missing or reserved is refused, never silently reduced.
+1. **Context.** Two kinds, with different rules.
+   - **Private Space (editable, reviewed).** The agent may be given any Private Space page or folder, or the **whole
+     Private Space** (every file except `.thoth/` and the folders the index ignores), and may edit all of it.
+     Copies go at their vault paths, with the attachments the selected pages link to (resolved links in the index,
+     so relative links still work), in a fresh directory under the app data folder:
+     `<app data>/agent-runs/run_<128-bit hex>/work`, mode `0700`. Not a git worktree, even when the vault is a git
+     repository. Every change is still reviewed per file and applied only on approval, through compare-and-swap
+     writes (rule 5 and decision 8). The existing limits (2000 files, 32 MiB a file, 256 MiB in all) apply to
+     every selection including the whole space, and the form shows the file count and total size before the task
+     starts, with the limit when it would be exceeded. A selection that names something missing or reserved is
+     refused, never silently reduced.
+   - **Workspace pages (read-only reference).** The user can add pages of a workspace on a server (from the picker
+     in the task form, which lists the workspaces and their page tree). They are fetched with the ordinary
+     `WorkspaceClient` (so the server authorizes every request) and copied into a clearly separate folder of the
+     working directory, `workspace/<workspace name>/<page title>.md` (names made safe and unique; if the Private Space
+     context already uses a top level `workspace`, the folder is `workspace (read-only)`), with file mode read-only
+     (`agent.fs.write` takes `readOnly`; the Node test host does the same). The task framing put in front of the
+     user's prompt says the folder holds reference copies that must not be changed, and that any change is
+     discarded; the record keeps only the user's own words. **Any change under that folder after the run (modify,
+     add, delete) is never offered for apply:** review lists it as "Read-only workspace page: change discarded"
+     (problem `read_only`), it cannot be approved, kept as a copy or written anywhere, whatever the agent did to
+     the file mode, and the check also covers differently cased folder names and a stored review that was edited
+     on disk. The page is not written back to the server either: the client sends only `GET` requests for it.
+   - **Who may add a workspace page.** ADR-0009 left "export" open for agent context. Decided: handing a page to an
+     agent copies it out of the workspace's access control, so it is treated like a Workspace to Private copy. The
+     page is refused unless the caller's role can read (all three MVP roles can) **and** the workspace is not
+     `exportRestricted`; both come from a fresh `GET /workspaces` at the start of every run, so a role or flag
+     that changed after the sidebar loaded still counts. The picker shows a restricted workspace with its reason
+     and offers none of its pages; a page that is refused, gone, or whose server cannot be asked stops the whole
+     task before anything is staged. The server stays the authority (it answers 404 or 403 for what the user may
+     not read, and `export_restricted` for a restricted workspace, which the client also maps).
 2. **Working directory and tools.** The CLI's cwd is that directory. Claude Code runs with `--restricted` (no
    command- or code-running tools, no WebFetch, file tools confined to the working directories, user/project/local
    settings ignored, `bypassPermissions` refused), `--safe-mode` (no CLAUDE.md, skills, plugins, hooks, custom
@@ -60,9 +87,10 @@ The owner asked for Phase 4 to start with conservative defaults for the open que
    settings, plugins or MCP servers. Both sides test the same fixture (`packages/agent-claude/test/fixtures/argv.json`).
    This is dedicated `agent.*` host commands, not a general process API: the webview never names a program, a path
    or an environment; it names a provider and a run handle.
-4. **No OS-level sandbox in this phase.** The CLI runs with the user's OS permissions; the restrictions above are
-   the CLI's own. The Agent Hub says so on screen: "The agent runs with your user permissions. Thoth limits what it
-   is given, not what it can do." Sandboxing per platform stays an open question.
+4. **No OS-level sandbox in this phase** (the owner decided: not now). The CLI runs with the user's OS permissions;
+   the restrictions above are the CLI's own. The Agent Hub says so on screen: "The agent runs with your user
+   permissions. Thoth limits what it is given, not what it can do." The plan for a sandbox is under "Future:
+   OS-level sandbox".
 5. **Detection.** The host looks for `claude` on `PATH`, then `/opt/homebrew/bin`, `/usr/local/bin`,
    `~/.claude/local`, `~/.local/bin`, `~/.npm-global/bin` and `$NPM_CONFIG_PREFIX/bin` (an app started from the
    Dock has a minimal `PATH`). It runs `--version` (semver, at least 2.1.259, the first with every flag above),
@@ -75,25 +103,65 @@ The owner asked for Phase 4 to start with conservative defaults for the open que
    set to the working directory. Prompts and agent output are never sent to analytics or logged (the desktop app
    has no analytics).
 7. **Process lifecycle.** Each run is its own process group. Cancel sends SIGTERM to the group and SIGKILL after
-   3 seconds; a 30-minute timeout (clamped to 1 s – 4 h) does the same; processes left in the group are killed when
-   the CLI exits. Output is pulled by the webview (a bounded long poll), lines are capped at 1 MiB and stdout at
+   3 seconds; the time limit (decision 11) does the same; processes left in the group are killed when the CLI
+   exits. Output is pulled by the webview (a bounded long poll), lines are capped at 1 MiB and stdout at
    64 MiB (beyond that the run is stopped). At most two runs at once.
 8. **Review and apply.** After the run, the working directory is walked through the host's scoped API and compared
    with the staged manifest: modified, added, deleted. Names that are not safe vault paths, anything under a
    `.thoth` folder (any case), symlinks, special files, files over 32 MiB and pages that are not UTF-8 are listed
-   with the reason and can never be approved. Apply writes only the approved paths, each with `writeFileAtomic` or
+   with the reason and can never be approved, and so is anything under the read-only workspace folder (decision 1).
+   Apply writes only the approved paths, each with `writeFileAtomic` or
    `deleteFileAtomic` against the hash recorded at staging, after checking the agent's bytes still have the
    reviewed hash. A file changed in the vault since staging is a conflict and is never overwritten; the user can keep
    the agent's version as a copy, named like the editor's conflict copies.
 9. **Run records.** `.thoth/agent/runs/<uuidv7>.json`, written with the vault's atomic record write (ADR-0001 §2):
-   provider and version, the task text, model and budget, the context (paths, hashes, why each is there), every
-   proposed change with the user's decision and the result, and the outcome (exit, cost estimate, error code). No
-   page text and no agent output. They live with the vault because the context, approvals and writes are the
-   vault's. The newest 200 finished records are kept.
+   provider and version, the task text, model, budget and time limit, whether the whole space was given, the context
+   (paths, hashes, why each is there; for a workspace page also its workspace and page IDs, titles and revision),
+   every proposed change with the user's decision and the result, and the outcome (exit, the model that answered,
+   cost estimate, error code, and whether a limit stopped it). No page text and no agent output. They live with the
+   vault because the context, approvals and writes are the vault's. The newest 200 finished records are kept.
 10. **Cleanup.** A working directory is deleted when a run is cancelled, when it proposed nothing, after apply (or
     once the last conflict copy is made), on discard, when the vault closes and when the app exits. On the next
     start the host deletes every run folder it does not own (`agent.sweep`) and unfinished records become
-    `interrupted`, like the transfer engine's journal recovery.
+    `interrupted`, like the transfer engine's journal recovery, except a run that was waiting for review whose
+    stored details are intact (decision 12), which stays reviewable.
+11. **Limits** (decided by the owner, all adjustable in the Agent Hub settings and overridable per run in the task
+    form; the settings are kept in the webview's `localStorage` with the other desktop preferences).
+    - *Time limit:* 5, 15, 30 or 60 minutes, default 30. On expiry the host stops the process group like a cancel
+      and reports `timeout`; the record says the run was stopped by the time limit.
+    - *Budget:* the CLI's own `--max-budget-usd`, choices US$0.25, 0.50, 1, 2, 5 or no limit (no flag), default
+      US$1. A budget stop is read from the CLI's own result, never guessed: a real run on 2026-10-25 with
+      `--max-budget-usd 0.0001` printed a `result` line with `subtype: "error_max_budget_usd"`, `is_error: true`,
+      `errors: ["Reached maximum budget ($0.0001)"]`, `terminal_reason: "budget_exhausted"`, no `result` text, and
+      exited with 1 (cost US$0.00014; recorded as `packages/agent-claude/test/fixtures/stream-budget.jsonl`). The
+      estimate is the CLI's and can be exceeded a little.
+    - *The host validates, it does not clamp:* a time limit must be a whole number of milliseconds from 1 second to
+      24 hours (`crates/thoth-host/src/agent/limits.rs`) and a budget more than US$0, at most two decimals and at
+      most **US$100** (`claude.rs`). The budget maximum is 20 times the largest choice: a person who set a bigger
+      limit on purpose is not blocked, while a forged value cannot lift the safety net to something that could
+      drain an account. Values outside the bounds are refused with `BAD_ARGUMENT` / `NOT_ALLOWED` and nothing
+      runs. The argument allowlist is otherwise unchanged. The Node test host and the webview apply the same
+      bounds. Both a time-limit stop and a budget stop leave the work done so far reviewable, and the run panel,
+      the review and the history say which limit stopped it.
+12. **History (local only).** The vault keeps the metadata records (decision 9). The transcript (the streamed
+    events) and what is needed to open the review again (the agent's proposed bytes for each change, the staged
+    original of each changed page when the vault still holds it, and a manifest) are kept in the app data folder,
+    `<app data>/agent-history/<run uuid>/` through four dedicated host commands (`agent.history.write/read/list/
+    delete`), **never inside a vault, never synced or backed up with it**. The host accepts only a run UUID and a
+    flat file name (`a-z 0-9 . _ -`), replaces files atomically and bounds file, run and total sizes; the webview is
+    still untrusted. The manifest is written last, so its presence means the files it names are complete.
+    - *Awaiting review:* after a restart a run whose record says `review` and whose stored files are intact is
+      shown as "awaiting review" instead of `interrupted` and can be opened from the history. Its working directory
+      is gone (swept as before); the review is rebuilt from the stored files, `stale` is judged against the vault
+      as it is now, and applying still uses compare-and-swap against the hashes recorded at staging, after checking
+      the stored bytes still have the reviewed hash. A page edited in the meantime is therefore a conflict, never
+      an overwrite. A run whose details are missing, damaged or of the wrong size is `interrupted`.
+    - *History list and details:* date, task, model, cost and outcome for each run (the vault records), and, while
+      the local details exist, its transcript and the diffs (original against proposal).
+    - *Retention:* 30 days by default; 7, 30, 90 days or for ever in the Agent Hub settings; plus "Delete history
+      now". Details are pruned by age at start and after every run, and "Delete history now" removes all of them,
+      in both cases except for the runs still going and the ones waiting for review (they are work in progress,
+      not history). The metadata records stay either way.
 
 ## Consequences
 
@@ -105,9 +173,16 @@ The owner asked for Phase 4 to start with conservative defaults for the open que
 - Negative: without OS sandboxing, an agent process still has the user's OS
   permissions; the temp directory limits intent, not capability.
 - Negative: the argument policy exists twice (TypeScript builds, Rust checks); a shared fixture keeps them equal.
-- Negative: the task text is stored in the vault's `.thoth/` folder, so it travels with the vault (sync, backup).
+- Negative: the task text (and, for a workspace page, its title and workspace name) is stored in the vault's
+  `.thoth/` folder, so it travels with the vault (sync, backup).
+- Negative: transcripts and proposed files stay on the computer for the retention period, outside the vault, so a
+  vault backup does not contain them and they are not protected by anything but the user account. Page text from
+  a workspace is never among them (changes to reference copies are not kept), but the transcript can quote it.
+- Negative: a workspace page given to an agent leaves the workspace's access control as soon as it is copied; the
+  restriction check is the client's, on top of what the server enforces.
 - Follow-up: detection of installation status with actionable messages (done for Claude Code);
-  cleanup of temp directories after runs (done); audit of approvals (the run record).
+  cleanup of temp directories after runs (done); audit of approvals (the run record); limits and local history
+  (done, decisions 11 and 12).
 
 ## Alternatives considered
 
@@ -124,19 +199,67 @@ The owner asked for Phase 4 to start with conservative defaults for the open que
 - **`--bare`.** Rejected: it never reads the subscription login (OAuth or keychain), so most users could not run it.
 - **Pushing output as host events.** Rejected for pulling: nothing is lost before the webview listens, and the same
   call works over Tauri, the stdio harness and the e2e bridge.
-- **Run records in the app data folder.** Rejected: the records describe the vault's pages and writes.
+- **Run records in the app data folder.** Rejected: the records describe the vault's pages and writes. (The
+  transcript and proposed files, which are content, are the opposite case and do live there: decision 12.)
+- **Letting the agent edit workspace pages and applying them through the workspace client.** Rejected by the owner
+  for now: workspace content is read-only reference; a change to it is shown and discarded.
+- **Clamping an out-of-range limit.** Rejected: a limit that was asked for but not applied is worse than an error.
+- **Keeping the transcript in the vault's records.** Rejected: agent output can quote any page, and it must not be
+  synced or backed up with the vault.
 
 ## Spec references
 
 Section 2 (agent integration), 3.3, 4, 10, 12, 13 (P4), 14 (steps 9-10), 15
 step 7.
 
+## Future: OS-level sandbox
+
+Decided 2026-10-25: not now. This is the plan, so the question is not lost.
+
+**What already limits the agent.** Thoth runs Claude Code with `--restricted` (no shell, no code-running tools, no
+WebFetch; file tools confined to the working directory), `--safe-mode`, no MCP servers and `dontAsk` permissions
+(decision 2), and gives it copies, not the vault. Those are the CLI's own controls and Thoth checks that every flag is
+present. They limit the CLI's tools, not the process: a bug in the CLI or a tool it still has runs with the user's
+permissions.
+
+**Claude Code's own sandbox first.** Its sandbox ([docs](https://code.claude.com/docs/en/sandboxing)) wraps only
+shell commands (Bash, PowerShell, Monitor) and their children, with Seatbelt on macOS and bubblewrap on Linux and
+WSL2; it does not cover the file tools, MCP servers or hooks, it is off by default, and native Windows has none.
+With `--restricted` Thoth has no shell tool at all, so enabling that sandbox adds nothing today. It becomes relevant
+only if a later phase gives the agent a shell, and then it should be switched on (and its flags added to the host
+policy) before anything of Thoth's own is written. Re-check the docs and `--help` then; do not assume.
+
+**Plan (each step behind a setting, off until it has been tested on real machines):**
+
+1. **macOS first**, behind an Agent Hub setting: run the CLI under `sandbox-exec` with a generated Seatbelt profile
+   that allows reading the system and the CLI's install and config folders, writing only the run's working
+   directory (and the CLI's own cache and config folders, which it needs for login and settings), and network only to
+   the provider. `sandbox-exec` is deprecated but drives Seatbelt, the mechanism Claude Code's own sandbox uses; the alternative is the App Sandbox
+   through a helper binary, which needs signing and an entitlement set per user.
+2. **Linux:** bubblewrap (`bwrap`: new mount, PID and, where possible, network namespaces, a read-only bind of the
+   system, a writable bind of the working directory) when it is installed, or Landlock (a kernel feature that
+   restricts a process to listed paths, no helper binary, Linux 5.13 and later, network rules from 6.7) applied by a
+   small launcher before `exec`. Landlock alone cannot hide paths, only deny them.
+3. **Windows later:** a Job Object (kills the whole tree, also wanted for cancel) plus a restricted token or an
+   AppContainer for the file and registry access. The most work and the least certain; WSL2 is Claude Code's own
+   answer.
+
+**Pros:** contains a bug or a tool the flags do not cover; protects the rest of the user's files and credentials from
+a compromised or confused agent; makes "Thoth limits what it is given, not what it can do" less true. **Cons:** the
+CLI needs its login (keychain or `~/.claude`) and the network, so the profile must allow both and cannot stop
+exfiltration of what the agent reads; per-platform code and tests; profiles break when the CLI changes where it reads
+or writes; sandbox-exec is deprecated; bubblewrap needs unprivileged user namespaces (disabled on some distributions);
+a sandbox that fails open gives false confidence, so it must fail closed or say so on screen. Even then the working
+directory is writable, so review before apply stays the control that matters.
+
 ## Open questions
 
-- OS-level sandboxing options per platform (macOS, Windows, Linux).
-- ~~Whether a temporary git worktree is used instead of a plain temp directory when the vault is a git
-  repository.~~ Not for now (decision 1).
-- Handling of Workspace content as agent context (requires export permission checks, ADR-0009). Deferred.
-- ~~Exact capability detection mechanism per CLI.~~ Decided for Claude Code (decision 5); Codex when it is built.
-- ~~Windows: cancel cannot signal a process group yet.~~ Decided 2026-10-25: each run is a kill-on-close Job
-  Object; cancel and timeout terminate the job at once (no SIGTERM first), see ADR-0008 "Windows file layer".
+- Whether a temporary git worktree is used instead of a plain temp directory when the vault is a git repository.
+  Not for now (decision 1).
+- Exact capability detection mechanism per CLI: decided for Claude Code (decision 5); Codex when it is built.
+- ~~Windows: cancel and the time limit cannot signal a process group yet.~~ Decided 2026-10-25: each run is a
+  kill-on-close Job Object; cancel and the time limit terminate the job at once (no SIGTERM first), see ADR-0008
+  "Windows file layer".
+- Workspace pages beyond single pages (a folder page does not bring its children; each page is picked on its own),
+  and workspace attachments, which are not copied.
+- Whether the OS-level sandbox should become a default once it exists (see "Future: OS-level sandbox").

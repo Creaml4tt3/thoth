@@ -64,6 +64,7 @@ pub const COMMANDS: &[&str] = &[
     "api.call",
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
     "agent.start", "agent.events", "agent.cancel", "agent.run.dispose", "agent.sweep",
+    "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -158,7 +159,7 @@ impl Host {
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start");
+        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write");
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -308,7 +309,7 @@ impl Host {
             }
             "agent.fs.write" => {
                 let data = bytes.ok_or_else(|| HostError::bad_argument("agent.fs.write needs request bytes"))?;
-                self.agents.write(str_arg(args, "run")?, str_arg(args, "path")?, data)?;
+                self.agents.write(str_arg(args, "run")?, str_arg(args, "path")?, data, bool_arg(args, "readOnly")?)?;
                 null()
             }
             "agent.start" => {
@@ -333,6 +334,17 @@ impl Host {
                 null()
             }
             "agent.sweep" => json(json!({ "removed": self.agents.sweep()? })),
+            "agent.history.write" => {
+                let data = bytes.ok_or_else(|| HostError::bad_argument("agent.history.write needs request bytes"))?;
+                self.agents.history_write(str_arg(args, "id")?, str_arg(args, "name")?, data)?;
+                null()
+            }
+            "agent.history.read" => Ok((Value::Null, Some(self.agents.history_read(str_arg(args, "id")?, str_arg(args, "name")?)?))),
+            "agent.history.list" => json(self.agents.history_list()?),
+            "agent.history.delete" => {
+                self.agents.history_delete(str_arg(args, "id")?)?;
+                null()
+            }
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }

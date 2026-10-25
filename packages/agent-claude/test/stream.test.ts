@@ -72,12 +72,22 @@ describe("stream-json parsing (recorded Claude Code 2.1.310 runs)", () => {
     expect((event as { text: string }).text.length).toBe(20_001);
   });
 
-  it("reports a failed result as an error, and a budget stop as such", () => {
-    const parser = createStreamParser();
-    const events = parser.line(JSON.stringify({ type: "result", subtype: "error_max_budget_usd", is_error: true, total_cost_usd: 0.5 }));
+  it("recognises a budget stop from the CLI's own result (recorded with --max-budget-usd 0.0001)", () => {
+    const events = parse("stream-budget.jsonl", [1]);
     expect(events).toEqual([
+      { type: "session", tools: ["Edit", "Glob", "Grep", "Read", "Write"], model: "claude-haiku-5-5", cliVersion: "2.1.310", permissionMode: "dontAsk" },
+      { type: "result", ok: false, text: "Reached maximum budget ($0.0001)", costUsd: 0.0001442, turns: 1, durationMs: 1398 },
+      { type: "error", code: "budget", message: "Reached maximum budget ($0.0001)" },
+      { type: "exit", reason: "exited", code: 1, signal: null },
+    ]);
+  });
+
+  it("recognises a budget stop by its subtype or terminal reason alone, and still reports other failed results", () => {
+    expect(createStreamParser().line(JSON.stringify({ type: "result", subtype: "error_max_budget_usd", is_error: true, total_cost_usd: 0.5 }))).toEqual([
       { type: "result", ok: false, costUsd: 0.5 },
       { type: "error", code: "budget", message: "error_max_budget_usd" },
     ]);
+    expect(createStreamParser().line(JSON.stringify({ type: "result", subtype: "error_x", is_error: true, terminal_reason: "budget_exhausted" }))[1]).toMatchObject({ code: "budget" });
+    expect(createStreamParser().line(JSON.stringify({ type: "result", subtype: "error_max_turns", is_error: true }))[1]).toMatchObject({ type: "error", code: "cli", message: "error_max_turns" });
   });
 });

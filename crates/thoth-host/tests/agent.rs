@@ -350,3 +350,137 @@ fn runs_need_the_app_data_folder() {
     assert_eq!(f.host.call("agent.run.create", &json!({ "provider": "claude" }), None).unwrap_err().code, "NOT_ALLOWED");
     assert_eq!(call(&f.host, "agent.sweep", json!({})), json!({ "removed": 0 }));
 }
+
+fn with_budget(case: usize, budget: &str) -> Vec<String> {
+    let mut list = argv(case);
+    match list.iter().position(|a| a == "--max-budget-usd") {
+        Some(i) => list[i + 1] = budget.to_owned(),
+        None => list.extend(["--max-budget-usd".to_owned(), budget.to_owned()]),
+    }
+    list
+}
+
+#[test]
+fn a_time_limit_must_be_between_one_second_and_twenty_four_hours() {
+    let f = fixture(Some(vec![fake_dir()]), true);
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "claude" }));
+    let run = created["run"].as_str().unwrap();
+    let work = PathBuf::from(created["dir"].as_str().unwrap());
+    // Refused, not clamped: nothing runs and the run can still be started with a good value.
+    for ms in [json!(0), json!(999), json!(24 * 60 * 60 * 1000 + 1), json!(u64::MAX), json!(-5), json!(1.5), json!("30")] {
+        let error = call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": argv(0), "timeoutMs": ms }), b"hi").unwrap_err();
+        assert_eq!(error.code, "BAD_ARGUMENT", "{ms}");
+    }
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(!record_path(&work).exists(), "the CLI must not have run");
+    // The Agent Hub's choices (5, 15, 30, 60 minutes) and the 24 hour maximum are accepted.
+    call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": argv(0), "timeoutMs": 24 * 60 * 60 * 1000 }), b"hi").unwrap();
+    assert_eq!(drain(&f.host, run).last().unwrap()["reason"], json!("exited"));
+    for minutes in [5u64, 15, 30, 60] {
+        let (run, _) = start(&f, "hi", Some(minutes * 60_000));
+        assert_eq!(drain(&f.host, &run).last().unwrap()["code"], json!(0), "{minutes} minutes");
+    }
+}
+
+#[test]
+fn a_budget_must_be_positive_and_at_most_one_hundred_dollars() {
+    let f = fixture(Some(vec![fake_dir()]), true);
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "claude" }));
+    let run = created["run"].as_str().unwrap();
+    let work = PathBuf::from(created["dir"].as_str().unwrap());
+    for bad in ["0", "0.00", "-1", "100.01", "101", "1000", "1e2", "NaN", "0.001", "five"] {
+        assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": with_budget(0, bad) }), b"hi").unwrap_err().code, "NOT_ALLOWED", "{bad}");
+    }
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(!record_path(&work).exists(), "the CLI must not have run");
+    // The Agent Hub's choices, and the maximum.
+    for good in ["0.25", "0.5", "1", "2", "5", "100"] {
+        let (run, work) = start_with(&f, with_budget(0, good), "hi");
+        assert_eq!(drain(&f.host, &run).last().unwrap()["code"], json!(0), "{good}");
+        let record = read_record(&work);
+        let args = record["argv"].as_array().unwrap();
+        assert_eq!(args[args.iter().position(|a| a == "--max-budget-usd").unwrap() + 1], json!(good));
+    }
+}
+
+fn start_with(f: &Fixture, list: Vec<String>, prompt: &str) -> (String, PathBuf) {
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "claude" }));
+    let run = created["run"].as_str().unwrap().to_owned();
+    call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": list }), prompt.as_bytes()).unwrap();
+    (run, PathBuf::from(created["dir"].as_str().unwrap()))
+}
+
+#[test]
+fn a_budget_stop_is_reported_by_the_cli_itself() {
+    let f = fixture(Some(vec![fake_dir()]), true);
+    let (run, _) = start_with(&f, with_budget(0, "0.25"), "@budget\n");
+    let events = drain(&f.host, &run);
+    let result: Value = events.iter().filter(|e| e["kind"] == "stdout").map(|e| serde_json::from_str::<Value>(e["line"].as_str().unwrap()).unwrap()).find(|v| v["type"] == "result").unwrap();
+    assert_eq!(result["subtype"], json!("error_max_budget_usd"));
+    assert_eq!(result["errors"], json!(["Reached maximum budget ($0.25)"]));
+    assert_eq!(events.last().unwrap()["code"], json!(1));
+}
+
+#[cfg(unix)]
+#[test]
+fn reference_files_can_be_written_read_only() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = fixture(Some(vec![fake_dir()]), true);
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "claude" }));
+    let run = created["run"].as_str().unwrap();
+    let work = PathBuf::from(created["dir"].as_str().unwrap());
+    call(&f.host, "agent.fs.mkdirp", json!({ "run": run, "dir": "workspace/Team" }));
+    call_bytes(&f.host, "agent.fs.write", json!({ "run": run, "path": "workspace/Team/Spec.md", "readOnly": true }), b"# Spec\n").unwrap();
+    call_bytes(&f.host, "agent.fs.write", json!({ "run": run, "path": "Mine.md" }), b"# Mine\n").unwrap();
+    let mode = |p: &str| std::fs::metadata(work.join(p)).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode("workspace/Team/Spec.md") & 0o222, 0, "no write bit");
+    assert_ne!(mode("Mine.md") & 0o200, 0);
+    // Still readable through the API, and a second create is refused like any other.
+    assert_eq!(f.host.call("agent.fs.read", &json!({ "run": run, "path": "workspace/Team/Spec.md" }), None).unwrap().1.unwrap(), b"# Spec\n");
+    assert!(call_bytes(&f.host, "agent.fs.write", json!({ "run": run, "path": "workspace/Team/Spec.md", "readOnly": true }), b"x").is_err());
+    assert_eq!(call_bytes(&f.host, "agent.fs.write", json!({ "run": run, "path": "x.md", "readOnly": "yes" }), b"x").unwrap_err().code, "BAD_ARGUMENT");
+    // A read-only file does not stop the run folder from being deleted.
+    call(&f.host, "agent.run.dispose", json!({ "run": run }));
+    assert!(!work.exists());
+}
+
+const HISTORY_ID: &str = "019e0000-0000-7000-8000-0000000000aa";
+
+#[test]
+fn local_run_details_live_in_the_app_data_folder_only() {
+    let f = fixture(Some(vec![fake_dir()]), true);
+    let write = |name: &str, data: &[u8]| call_bytes(&f.host, "agent.history.write", json!({ "id": HISTORY_ID, "name": name }), data);
+    write("review.json", b"{\"changes\":[]}").unwrap();
+    write("transcript.jsonl", b"{\"type\":\"text\"}\n").unwrap();
+    write("change-0001.bin", &[0, 1, 2, 255]).unwrap();
+    assert_eq!(f.host.call("agent.history.read", &json!({ "id": HISTORY_ID, "name": "change-0001.bin" }), None).unwrap().1.unwrap(), vec![0, 1, 2, 255]);
+    let listed = call(&f.host, "agent.history.list", json!({}));
+    assert_eq!(listed[0]["id"], json!(HISTORY_ID));
+    assert_eq!(listed[0]["files"], json!([{ "name": "change-0001.bin", "size": 4 }, { "name": "review.json", "size": 14 }, { "name": "transcript.jsonl", "size": 16 }]));
+    assert!(listed[0]["modifiedMs"].as_u64().unwrap() > 1_600_000_000_000);
+    assert!(f.data.path().join("agent-history").join(HISTORY_ID).join("review.json").is_file());
+    // Never under a vault.
+    assert!(std::fs::read_dir(f.vault.path()).unwrap().next().is_none());
+
+    // Only a UUID and a flat name can be addressed.
+    for (id, name) in [("../etc", "a.bin"), (HISTORY_ID, "../x"), (HISTORY_ID, "sub/x"), (HISTORY_ID, ".x"), ("run_0123456789abcdef0123456789abcdef", "a.bin")] {
+        assert_eq!(call_bytes(&f.host, "agent.history.write", json!({ "id": id, "name": name }), b"x").unwrap_err().code, "BAD_ARGUMENT", "{id} {name}");
+        assert_eq!(f.host.call("agent.history.read", &json!({ "id": id, "name": name }), None).unwrap_err().code, "BAD_ARGUMENT", "{id} {name}");
+    }
+    assert_eq!(f.host.call("agent.history.read", &json!({ "id": HISTORY_ID, "name": "missing.bin" }), None).unwrap_err().code, "ENOENT");
+    assert_eq!(f.host.call("agent.history.write", &json!({ "id": HISTORY_ID, "name": "a.bin" }), None).unwrap_err().code, "BAD_ARGUMENT");
+
+    // Run folders and the sweep of working directories are separate: a sweep never touches the details.
+    call(&f.host, "agent.sweep", json!({}));
+    assert_eq!(call(&f.host, "agent.history.list", json!({})).as_array().unwrap().len(), 1);
+    call(&f.host, "agent.history.delete", json!({ "id": HISTORY_ID }));
+    call(&f.host, "agent.history.delete", json!({ "id": HISTORY_ID }));
+    assert_eq!(call(&f.host, "agent.history.list", json!({})), json!([]));
+}
+
+#[test]
+fn local_run_details_need_the_app_data_folder() {
+    let f = fixture(Some(vec![fake_dir()]), false);
+    assert_eq!(call(&f.host, "agent.history.list", json!({})), json!([]));
+    assert_eq!(call_bytes(&f.host, "agent.history.write", json!({ "id": HISTORY_ID, "name": "a.bin" }), b"x").unwrap_err().code, "NOT_ALLOWED");
+}

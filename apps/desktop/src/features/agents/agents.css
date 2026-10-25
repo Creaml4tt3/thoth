@@ -2,6 +2,7 @@
 .agents .small { font: var(--thoth-text-small); }
 /* Secondary text here is read, not skimmed (status, transcript, hints): the AA-contrast ink rather than the tertiary one. */
 .agents .muted { color: var(--thoth-ink-secondary); }
+.agents .badge-muted { color: var(--thoth-ink-secondary); }
 .agents-caution { color: var(--thoth-ink-primary); }
 .agents-ready { color: var(--thoth-ink-primary); }
 .agents-ready::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: var(--thoth-radius-pill); background: var(--thoth-success); vertical-align: 1px; }
@@ -33,6 +34,22 @@
 .agents-change .badge[data-kind="deleted"] { background: color-mix(in srgb, var(--thoth-danger) 12%, transparent); color: var(--thoth-ink-primary); }
 .agents-results .agents-change { grid-template-columns: minmax(0, 1fr); padding-bottom: var(--thoth-space-2); border-bottom: 1px solid var(--thoth-border); }
 .agents-results h2:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
-.agents-history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
-.agents-history-list summary { cursor: pointer; display: flex; gap: var(--thoth-space-2); align-items: baseline; justify-content: space-between; }
-.agents-history-task { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.agents-history-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.agents-history-table th { text-align: start; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); padding: var(--thoth-space-1) var(--thoth-space-3) var(--thoth-space-1) 0; border-bottom: 1px solid var(--thoth-border); }
+.agents-history-table td { padding: var(--thoth-space-2) var(--thoth-space-3) var(--thoth-space-2) 0; border-bottom: 1px solid var(--thoth-border); vertical-align: baseline; }
+.agents-history-task { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agents-history-actions { white-space: nowrap; text-align: end; }
+.agents-detail { border-top: 1px solid var(--thoth-border); padding-top: var(--thoth-space-4); }
+.agents-detail h3:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.agents-whole { font-weight: 550; }
+.agents-total { margin: 0; }
+.agents-limits { border: 0; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); min-width: 0; }
+.agents-limits > legend { font-weight: 550; margin-bottom: var(--thoth-space-1); }
+.agents-workspaces { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-1); }
+.agents-workspaces summary { cursor: pointer; padding: 2px 4px; }
+.agents-workspaces .agents-context-list { margin-top: var(--thoth-space-1); }
+.agents-chosen { display: grid; gap: var(--thoth-space-1); }
+.agents-confirm { display: inline-flex; gap: var(--thoth-space-2); align-items: center; flex-wrap: wrap; }
+.agents-limits-grid { align-items: start; }
+.agents-limits-grid .field > label, .agents .set-section .field > label { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.agents-workspace, .agents-limits, .agents-total { margin-top: var(--thoth-space-3); }

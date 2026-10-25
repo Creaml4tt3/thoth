@@ -6,18 +6,23 @@
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
-import { chmod, mkdir, readdir, realpath, rm } from "node:fs/promises";
+import { chmod, lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 import { randomBytes } from "node:crypto";
 import { NodeVaultFs } from "@thoth/local-store/node";
-import type { AgentFiles, AgentHost, AgentProbe, HostAgentEvent, HostEventBatch, ProbeOutput } from "../host.ts";
+import { checkTimeLimitMs } from "../limits.ts";
+import type { AgentFiles, AgentHistoryStore, AgentHost, AgentProbe, HostAgentEvent, HostEventBatch, HostHistoryRun, ProbeOutput } from "../host.ts";
 
 const PROBES: Record<string, { binary: string; probes: [key: "version" | "help" | "auth", args: string[]][] }> = {
   claude: { binary: "claude", probes: [["version", ["--version"]], ["help", ["--help"]], ["auth", ["auth", "status", "--json"]]] },
 };
 const KILL_GRACE_MS = 3000;
 const RUN_NAME = /^run_[0-9a-f]{32}$/;
+const HISTORY_RUN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const HISTORY_FILE = /^[a-z0-9_-][a-z0-9._-]{0,63}$/;
+const HISTORY_MAX_FILE = 64 * 1024 * 1024;
+const HISTORY_MAX_RUN = 512 * 1024 * 1024;
 
 export interface NodeAgentHostOptions {
   /** The app data folder; runs go to `<dataDir>/agent-runs/<run>/work`. */
@@ -44,9 +49,12 @@ interface Run {
 export class NodeAgentHost implements AgentHost {
   private readonly options: NodeAgentHostOptions;
   private readonly runs = new Map<string, Run>();
+  /** Local-only run details under `<dataDir>/agent-history`, with the Rust host's naming and size rules. */
+  readonly history: AgentHistoryStore;
 
   constructor(options: NodeAgentHostOptions) {
     this.options = options;
+    this.history = nodeHistory(join(options.dataDir, "agent-history"));
   }
 
   private resolve(provider: string): string | null {
@@ -124,7 +132,11 @@ export class NodeAgentHost implements AgentHost {
       readFile: (path) => this.run(id).files.readFile(path),
       list: (dir) => this.run(id).files.list(dir),
       mkdirp: (dir) => writable().mkdirp(dir),
-      writeFile: (path, data) => writable().writeFile(path, data, { exclusive: true }),
+      writeFile: async (path, data, options) => {
+        const fs = writable();
+        await fs.writeFile(path, data, { exclusive: true });
+        if (options?.readOnly) await chmod(join(this.run(id).work, path), 0o444);
+      },
     };
   }
 
@@ -149,6 +161,14 @@ export class NodeAgentHost implements AgentHost {
     if (run.started) throw Object.assign(new Error("This agent run has already started"), { code: "NOT_ALLOWED" });
     const bin = this.resolve("claude");
     if (!bin) throw Object.assign(new Error("The claude CLI was not found"), { code: "AGENT_UNAVAILABLE" });
+    // The Rust host refuses, rather than clamps, a time limit outside 1 second to 24 hours.
+    if (timeoutMs !== undefined) {
+      try {
+        checkTimeLimitMs(timeoutMs);
+      } catch (error) {
+        throw Object.assign(error as Error, { code: "BAD_ARGUMENT" });
+      }
+    }
     run.started = true;
     const child = spawn(bin, argv, { cwd: run.work, env: this.env(bin, run.work), detached: true, stdio: ["pipe", "pipe", "pipe"] });
     run.child = child;
@@ -244,4 +264,62 @@ export class NodeAgentHost implements AgentHost {
 function signalNumber(signal: NodeJS.Signals): number | null {
   const table: Partial<Record<NodeJS.Signals, number>> = { SIGHUP: 1, SIGINT: 2, SIGKILL: 9, SIGTERM: 15 };
   return table[signal] ?? null;
+}
+
+/** The history store on Node: a flat folder per run, atomic writes, the same names and bounds as `history.rs`. */
+function nodeHistory(root: string): AgentHistoryStore {
+  const fail = (code: string, message: string) => Object.assign(new Error(message), { code });
+  const dirOf = (id: string) => {
+    if (!HISTORY_RUN.test(id)) throw fail("BAD_ARGUMENT", "A run ID is a lower-case UUID");
+    return join(root, id);
+  };
+  const fileOf = (id: string, name: string) => {
+    if (!HISTORY_FILE.test(name) || name.startsWith(".")) throw fail("BAD_ARGUMENT", "Not a history file name");
+    return join(dirOf(id), name);
+  };
+  const files = async (dir: string): Promise<{ name: string; size: number; mtimeMs: number }[]> => {
+    const out: { name: string; size: number; mtimeMs: number }[] = [];
+    for (const name of await readdir(dir).catch(() => [] as string[])) {
+      if (!HISTORY_FILE.test(name) || name.startsWith(".")) continue;
+      const st = await lstat(join(dir, name)).catch(() => null);
+      if (st?.isFile()) out.push({ name, size: st.size, mtimeMs: Math.floor(st.mtimeMs) });
+    }
+    return out.sort((a, b) => (a.name < b.name ? -1 : 1));
+  };
+  return {
+    async write(id, name, data) {
+      const dir = dirOf(id);
+      const path = fileOf(id, name);
+      if (data.length > HISTORY_MAX_FILE) throw fail("BAD_ARGUMENT", "That history file is too large");
+      await mkdir(dir, { recursive: true, mode: 0o700 });
+      const others = (await files(dir)).filter((f) => f.name !== name).reduce((n, f) => n + f.size, 0);
+      if (others + data.length > HISTORY_MAX_RUN) throw fail("NOT_ALLOWED", "This run's history is full");
+      const temp = join(dir, `.tmp-${randomBytes(8).toString("hex")}`);
+      try {
+        await writeFile(temp, data, { flag: "wx", mode: 0o600 });
+        await rename(temp, path);
+      } catch (error) {
+        await rm(temp, { force: true });
+        throw error;
+      }
+    },
+    async read(id, name) {
+      const path = fileOf(id, name);
+      const st = await lstat(path);
+      if (!st.isFile()) throw fail("UNSAFE_PATH", "Not a regular file");
+      return new Uint8Array(await readFile(path));
+    },
+    async list() {
+      const runs: HostHistoryRun[] = [];
+      for (const id of await readdir(root).catch(() => [] as string[])) {
+        if (!HISTORY_RUN.test(id)) continue;
+        const list = await files(join(root, id));
+        runs.push({ id, modifiedMs: list.reduce((m, f) => Math.max(m, f.mtimeMs), 0), bytes: list.reduce((n, f) => n + f.size, 0), files: list.map((f) => ({ name: f.name, size: f.size })) });
+      }
+      return runs.sort((a, b) => a.modifiedMs - b.modifiedMs || (a.id < b.id ? -1 : 1));
+    },
+    async delete(id) {
+      await rm(dirOf(id), { recursive: true, force: true });
+    },
+  };
 }

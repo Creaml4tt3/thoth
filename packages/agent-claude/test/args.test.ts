@@ -26,6 +26,8 @@ describe("Claude Code arguments", () => {
     expect(formatBudget(5)).toBe("5");
     expect(formatBudget(0.5)).toBe("0.5");
     expect(formatBudget(1.239)).toBe("1.24");
-    for (const bad of [0, -1, 1001, Number.NaN, Infinity]) expect(() => formatBudget(bad)).toThrow(RangeError);
+    expect(formatBudget(100)).toBe("100");
+    expect(formatBudget(0.25)).toBe("0.25");
+    for (const bad of [0, 0.004, -1, 100.01, 101, 1001, Number.NaN, Infinity]) expect(() => formatBudget(bad)).toThrow(RangeError);
   });
 });

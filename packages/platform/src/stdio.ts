@@ -33,7 +33,7 @@ interface Pending {
 }
 
 /** Commands whose result is raw bytes (out of band). */
-const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read", "agent.fs.read"]);
+const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read", "agent.fs.read", "agent.history.read"]);
 
 export class StdioTransport implements Transport {
   private readonly child: ChildProcessWithoutNullStreams;

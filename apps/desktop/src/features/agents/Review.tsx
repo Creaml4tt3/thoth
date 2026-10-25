@@ -10,9 +10,10 @@ import { useDesktopStrings } from "../../strings/index.ts";
 
 export const bytes = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-function Diff({ change }: { change: ProposedChange }) {
+/** A line diff of a page: `before` on the left (null: nothing), `after` on the right (null: deleted). */
+export function DiffView({ path, before, after }: { path: string; before: string | null | undefined; after: string | null | undefined }) {
   const t = useDesktopStrings().agents.review;
-  const lines = useMemo(() => lineDiff(change.before ?? "", change.after ?? ""), [change.before, change.after]);
+  const lines = useMemo(() => lineDiff(before ?? "", after ?? ""), [before, after]);
   return (
     <>
       <div className="diff-head" aria-hidden="true">
@@ -23,7 +24,7 @@ function Diff({ change }: { change: ProposedChange }) {
           {t.after}
         </span>
       </div>
-      <div className="diff" role="group" aria-label={t.differences(change.path)} tabIndex={0}>
+      <div className="diff" role="group" aria-label={t.differences(path)} tabIndex={0}>
         {lines.map((row, i) => (
           <div key={i} className={`diff-line diff-${row.kind}`} data-kind={row.kind}>
             <i aria-hidden="true">{row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}</i>
@@ -67,7 +68,7 @@ export function Review({ changes, approved, busy, onApproved, onApply, onDiscard
               </span>
             </div>
             {change.problem && (
-              <p className="alert alert-danger small" role="note">
+              <p className={change.problem === "read_only" ? "alert alert-warning small" : "alert alert-danger small"} role="note">
                 {t.problems[change.problem]}
               </p>
             )}
@@ -77,7 +78,7 @@ export function Review({ changes, approved, busy, onApproved, onApply, onDiscard
               </p>
             )}
             {!change.problem && change.change === "deleted" && <p className="muted small">{t.deleted}</p>}
-            {!change.problem && change.page && <Diff change={change} />}
+            {!change.problem && change.page && <DiffView path={change.path} before={change.before} after={change.after} />}
             {!change.problem && !change.page && change.change !== "deleted" && change.afterSize !== null && <p className="muted small">{t.file(bytes(change.afterSize))}</p>}
           </li>
         ))}
