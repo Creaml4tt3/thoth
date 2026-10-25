@@ -29,6 +29,7 @@ trade-off.
 | [0017](0017-page-kind-in-the-workspace-protocol.md) | Page kind in the workspace protocol | Accepted 2026-10-25 |
 | [0018](0018-notifications.md) | Notifications: in-app list, mascot, system notifications | Accepted 2026-10-25 |
 | [0019](0019-tab-order-and-windows.md) | Tab order and windows | Proposed 2026-10-25 |
+| [0020](0020-links-from-pasted-urls-and-link-previews.md) | Links from pasted URLs and link previews | Proposed 2026-10-26 |
 
 Template: [0000-template.md](0000-template.md).
 
