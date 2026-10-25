@@ -7,23 +7,37 @@
  * deleted as soon as they are no longer needed: on cancel, when a run proposed nothing, after apply (unless a
  * conflict may still be kept as a copy), on discard, and on `recover()` after a crash (`host.sweep()`), which also
  * marks unfinished records `interrupted`.
+ *
+ * Besides the record, a run leaves local-only details in the app data folder (`details.ts`): its transcript and the
+ * proposed files. A run that was waiting for review when the app stopped is not `interrupted` when those are intact:
+ * `recover()` keeps it, `reopen()` rebuilds its review from them, and `apply()` still uses compare-and-swap against
+ * the hashes recorded at staging. Details are pruned by age (`pruneDetails`) after every run and at start.
  */
 import { newStableId } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
-import { applyChanges, saveAsCopy, type ApplyResult } from "./apply.ts";
+import { applyChanges, saveAsCopy, type ApplyResult, type ReviewedFiles } from "./apply.ts";
+import { loadReview, loadRunDetails, rebuildChanges, reviewIsIntact, saveReview, storedFiles, TranscriptSaver, type RunDetails } from "./details.ts";
 import type { AgentHost } from "./host.ts";
-import { listRuns, MAX_PROMPT_CHARS, pruneRuns, TERMINAL_STATES, writeRun, type ChangeRecord, type RunRecord } from "./records.ts";
+import { checkBudgetUsd, checkTimeLimitMs, DEFAULT_RETENTION_DAYS } from "./limits.ts";
+import { listRuns, MAX_PROMPT_CHARS, pruneRuns, readRun, TERMINAL_STATES, writeRun, type ChangeRecord, type RunRecord } from "./records.ts";
 import { collectChanges, DEFAULT_REVIEW_LIMITS, type ProposedChange, type ReviewLimits } from "./review.ts";
-import { DEFAULT_STAGING_LIMITS, stageContext, type ContextEntry, type StagingLimits } from "./staging.ts";
+import { DEFAULT_STAGING_LIMITS, stageContext, workspaceFraming, type ContextEntry, type StagingLimits } from "./staging.ts";
 import type { AgentEvent, AgentInstallationStatus, AgentProvider } from "./types.ts";
+import { WorkspaceContextError, type WorkspacePageRef, type WorkspaceReader } from "./workspace.ts";
 
 export interface StartTask {
   provider: string;
   prompt: string;
   /** Vault paths of pages, files or folders. */
   selection: readonly string[];
+  /** The whole Private Space (everything but `.thoth/`). */
+  wholeSpace?: boolean;
+  /** Workspace pages, given read-only: any change to them is discarded (needs a `WorkspaceReader`). */
+  workspacePages?: readonly WorkspacePageRef[];
   model?: string;
+  /** US dollars, more than 0 and at most 100; none means no limit. */
   maxBudgetUsd?: number;
+  /** Milliseconds, from 1 second to 24 hours; the host's default (30 minutes) when absent. */
   timeoutMs?: number;
 }
 
@@ -46,12 +60,15 @@ export class RunStateError extends Error {
 
 interface Live {
   record: RunRecord;
-  workspace: string;
-  provider: AgentProvider;
+  /** The host's handle for the working directory; null for a review reopened from stored details. */
+  workspace: string | null;
+  provider: AgentProvider | null;
   context: ContextEntry[];
   changes: ProposedChange[] | null;
-  /** The working directory still exists. */
+  /** Where the agent's bytes can still be read (the working directory, or the stored files). */
   open: boolean;
+  /** Set for a reopened review: the agent's bytes come from the stored files. */
+  stored?: ReviewedFiles;
 }
 
 export interface AgentHubOptions {
@@ -61,6 +78,12 @@ export interface AgentHubOptions {
   now?: () => number;
   staging?: StagingLimits;
   review?: ReviewLimits;
+  /** Reads workspace pages for read-only context; without it a task naming workspace pages is refused. */
+  workspace?: WorkspaceReader;
+  /** How many days local run details are kept (0: for ever), asked each time so a setting change applies at once. */
+  retentionDays?: () => number;
+  /** How often a running transcript is written to the host. */
+  transcriptFlushMs?: number;
 }
 
 export class AgentHub {
@@ -71,6 +94,9 @@ export class AgentHub {
   private readonly staging: StagingLimits;
   private readonly reviewLimits: ReviewLimits;
   private readonly live = new Map<string, Live>();
+  private readonly workspaceReader: WorkspaceReader | undefined;
+  private readonly retentionDays: () => number;
+  private readonly transcriptFlushMs: number | undefined;
   /** Serializes record writes per run, so a late event never overwrites a newer state. */
   private writes: Promise<unknown> = Promise.resolve();
 
@@ -81,6 +107,9 @@ export class AgentHub {
     this.now = options.now ?? Date.now;
     this.staging = options.staging ?? DEFAULT_STAGING_LIMITS;
     this.reviewLimits = options.review ?? DEFAULT_REVIEW_LIMITS;
+    this.workspaceReader = options.workspace;
+    this.retentionDays = options.retentionDays ?? (() => DEFAULT_RETENTION_DAYS);
+    this.transcriptFlushMs = options.transcriptFlushMs;
   }
 
   providers(): readonly AgentProvider[] {
@@ -102,19 +131,30 @@ export class AgentHub {
   }
 
   /**
-   * After a start: runs whose working directory went with the previous session become `interrupted`, and the host
-   * deletes every working directory it no longer owns.
+   * After a start: the host deletes every working directory it no longer owns. Runs that were still going become
+   * `interrupted`; a run that was waiting for review stays so (`awaitingReview`) when its stored details are intact,
+   * because the review can be rebuilt from them. Old details are pruned.
    */
-  async recover(): Promise<{ interrupted: string[]; swept: number }> {
+  async recover(): Promise<{ interrupted: string[]; awaitingReview: string[]; swept: number }> {
     const interrupted: string[] = [];
+    const awaitingReview: string[] = [];
+    const listing = await this.host.history.list().catch(() => []);
     for (const record of await listRuns(this.vault)) {
       if (TERMINAL_STATES.has(record.state) || this.live.has(record.id)) continue;
+      if (record.state === "review") {
+        const review = await loadReview(this.host.history, record.id);
+        if (review && reviewIsIntact(review, listing.find((r) => r.id === record.id))) {
+          awaitingReview.push(record.id);
+          continue;
+        }
+      }
       record.state = "interrupted";
       await this.save(record);
       interrupted.push(record.id);
     }
     const swept = await this.host.sweep().catch(() => 0);
-    return { interrupted, swept };
+    await this.pruneDetails().catch(() => 0);
+    return { interrupted, awaitingReview, swept };
   }
 
   history(): Promise<RunRecord[]> {
@@ -136,13 +176,23 @@ export class AgentHub {
     const prompt = task.prompt.trim();
     if (prompt === "") throw new RunStateError("Write a task for the agent first");
     if (prompt.length > MAX_PROMPT_CHARS) throw new RunStateError(`The task is longer than ${MAX_PROMPT_CHARS} characters`);
+    if (task.maxBudgetUsd !== undefined) checkBudgetUsd(task.maxBudgetUsd);
+    if (task.timeoutMs !== undefined) checkTimeLimitMs(task.timeoutMs);
     const status = await provider.detect();
     if (status.state !== "ready") throw new AgentUnavailableError(status);
+
+    // Workspace pages are read first, with the user's own access: a refusal stops the run before anything is staged.
+    const refs = dedupeRefs(task.workspacePages ?? []);
+    let documents: Awaited<ReturnType<WorkspaceReader["readMany"]>> = [];
+    if (refs.length > 0) {
+      if (!this.workspaceReader) throw new WorkspaceContextError("unavailable", "Workspace pages are not available here");
+      documents = await this.workspaceReader.readMany(refs);
+    }
 
     const { run: workspace } = await this.host.createRun(provider.id);
     let context: ContextEntry[];
     try {
-      context = await stageContext(this.vault, this.host.files(workspace), task.selection, this.staging);
+      context = await stageContext(this.vault, this.host.files(workspace), task.selection, this.staging, { ...(task.wholeSpace ? { wholeSpace: true } : {}), workspace: documents });
     } catch (error) {
       await this.host.dispose(workspace).catch(() => undefined);
       throw error;
@@ -152,8 +202,14 @@ export class AgentHub {
       version: 1,
       id: newStableId(now),
       provider: { id: provider.id, name: provider.name, version: status.version },
-      task: { prompt, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}) },
-      context: context.map((c) => ({ ...c })),
+      task: {
+        prompt,
+        ...(task.model ? { model: task.model } : {}),
+        ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}),
+        ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}),
+        ...(task.wholeSpace ? { wholeSpace: true } : {}),
+      },
+      context: context.map((c) => ({ ...c, ...(c.workspace ? { workspace: { ...c.workspace } } : {}) })),
       state: "running",
       createdAt: now,
       updatedAt: now,
@@ -164,7 +220,10 @@ export class AgentHub {
     await pruneRuns(this.vault).catch(() => undefined);
     await this.save(record);
     try {
-      await provider.startTask({ workspace, prompt, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
+      // The reference folder is announced to the model, in front of the user's own words (the record keeps only those).
+      const readOnly = context.find((c) => c.readOnly);
+      const framed = readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt;
+      await provider.startTask({ workspace, prompt: framed, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
     } catch (error) {
       record.state = "failed";
       record.outcome = { reason: "spawn_failed", code: null, ok: false, error: { code: "spawn", message: error instanceof Error ? error.message : String(error) } };
@@ -178,7 +237,9 @@ export class AgentHub {
 
   /** Never rejects: a run that ends while the vault closes keeps its last saved record (recovery marks it). */
   private follow(live: Live, onEvent: (event: AgentEvent) => void): Promise<RunRecord> {
-    return this.followNow(live, onEvent).catch(() => structuredClone(live.record));
+    return this.followNow(live, onEvent)
+      .catch(() => structuredClone(live.record))
+      .finally(() => this.pruneDetails().catch(() => 0));
   }
 
   private async followNow(live: Live, onEvent: (event: AgentEvent) => void): Promise<RunRecord> {
@@ -186,11 +247,15 @@ export class AgentHub {
     let result: Extract<AgentEvent, { type: "result" }> | null = null;
     let error: Extract<AgentEvent, { type: "error" }> | null = null;
     let exit: Extract<AgentEvent, { type: "exit" }> | null = null;
+    let model: string | undefined;
+    const transcript = new TranscriptSaver(this.host.history, record.id, this.transcriptFlushMs);
     try {
-      for await (const event of live.provider.streamEvents(live.workspace)) {
+      for await (const event of live.provider!.streamEvents(live.workspace!)) {
         if (event.type === "result") result = event;
         else if (event.type === "error") error ??= event;
         else if (event.type === "exit") exit = event;
+        else if (event.type === "session") model ??= event.model;
+        transcript.push(event);
         try {
           onEvent(event);
         } catch {
@@ -200,6 +265,7 @@ export class AgentHub {
     } catch (e) {
       error ??= { type: "error", code: "cli", message: e instanceof Error ? e.message : String(e) };
     }
+    await transcript.close();
     const reason = exit?.reason ?? "exited";
     const ok = reason === "exited" && exit?.code === 0 && result?.ok === true && error === null;
     record.outcome = {
@@ -210,6 +276,9 @@ export class AgentHub {
       ...(result?.turns !== undefined ? { turns: result.turns } : {}),
       ...(result?.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
       ...(error ? { error: { code: error.code, message: error.message.slice(0, 500) } } : reason !== "exited" ? { error: { code: reason, message: reason } } : {}),
+      ...(model ? { model } : {}),
+      // Why it stopped, when it was a limit: the host's time limit, or the CLI's own budget (error_max_budget_usd).
+      ...(reason === "timeout" ? { stoppedBy: "time" as const } : error?.code === "budget" ? { stoppedBy: "budget" as const } : {}),
     };
     if (reason === "cancelled") {
       record.state = "cancelled";
@@ -218,14 +287,17 @@ export class AgentHub {
       return structuredClone(record);
     }
     try {
-      live.changes = await collectChanges(this.vault, this.host.files(live.workspace), live.context, this.reviewLimits);
+      live.changes = await collectChanges(this.vault, this.host.files(live.workspace!), live.context, this.reviewLimits);
     } catch (e) {
       live.changes = [];
       record.outcome.error ??= { code: "review", message: e instanceof Error ? e.message : String(e) };
     }
     record.changes = live.changes.map(toRecord);
-    if (live.changes.length > 0) record.state = "review";
-    else {
+    if (live.changes.length > 0) {
+      record.state = "review";
+      // So the review can be opened again after a restart. If this cannot be stored, it is reviewable only now.
+      await saveReview(this.host.history, record.id, this.vault, this.filesOf(live), live.changes, live.context, this.now()).catch(() => undefined);
+    } else {
       record.state = ok ? "done" : "failed";
       await this.closeWorkspace(live);
     }
@@ -233,9 +305,85 @@ export class AgentHub {
     return structuredClone(record);
   }
 
+  /**
+   * Opens again the review of a run that was waiting when the app stopped (its record says `review` and `recover()`
+   * kept it). The changes are rebuilt from the stored files; `stale` is judged against the vault as it is now, and
+   * applying goes through compare-and-swap against the hashes recorded at staging. Null when there is nothing to open.
+   */
+  async reopen(id: string): Promise<{ record: RunRecord; changes: ProposedChange[] } | null> {
+    const open = this.live.get(id);
+    if (open) return open.record.state === "review" && open.changes ? { record: structuredClone(open.record), changes: open.changes } : null;
+    const record = await readRun(this.vault, id);
+    if (!record || record.state !== "review") return null;
+    const review = await loadReview(this.host.history, id);
+    const listing = await this.host.history.list().catch(() => []);
+    if (!review || !reviewIsIntact(review, listing.find((r) => r.id === id))) return null;
+    const changes = await rebuildChanges(this.vault, this.host.history, review);
+    record.changes = record.changes.map((c) => ({ ...c, decision: "pending" as const }));
+    for (const change of changes) {
+      const recorded = record.changes.find((c) => c.path === change.path);
+      if (recorded) {
+        if (change.problem) recorded.problem = change.problem;
+        else delete recorded.problem;
+        if (change.stale) recorded.stale = true;
+        else delete recorded.stale;
+      }
+    }
+    this.live.set(id, { record, workspace: null, provider: null, context: review.context, changes, open: true, stored: storedFiles(this.host.history, review) });
+    await this.save(record);
+    return { record: structuredClone(record), changes };
+  }
+
+  /** The transcript and diffs kept for a run (null when none are). */
+  details(id: string): Promise<RunDetails | null> {
+    return loadRunDetails(this.host.history, id);
+  }
+
+  /** Which runs have local details, and which kind. */
+  async detailsAvailable(): Promise<Map<string, { transcript: boolean; review: boolean }>> {
+    const listing = await this.host.history.list().catch(() => []);
+    return new Map(listing.map((r) => [r.id, { transcript: r.files.some((f) => f.name === "transcript.jsonl"), review: r.files.some((f) => f.name === "review.json") }]));
+  }
+
+  /** Runs whose details must stay: the ones still going and the ones waiting for review (a finished run is history). */
+  private async keepDetails(): Promise<Set<string>> {
+    const keep = new Set<string>();
+    const open = (state: string) => state === "review" || state === "running" || state === "staging";
+    for (const live of this.live.values()) if (open(live.record.state)) keep.add(live.record.id);
+    for (const record of await listRuns(this.vault)) if (open(record.state)) keep.add(record.id);
+    return keep;
+  }
+
+  /** Deletes details older than the retention setting (never a run still open or waiting for review). Returns how many runs. */
+  async pruneDetails(): Promise<number> {
+    const days = this.retentionDays();
+    if (!(days > 0)) return 0;
+    const limit = this.now() - days * 24 * 60 * 60 * 1000;
+    const keep = await this.keepDetails();
+    let removed = 0;
+    for (const run of await this.host.history.list()) {
+      if (keep.has(run.id) || run.modifiedMs >= limit) continue;
+      await this.host.history.delete(run.id);
+      removed++;
+    }
+    return removed;
+  }
+
+  /** "Delete history now": all details except runs still open or waiting for review. Returns how many runs. */
+  async clearDetails(): Promise<number> {
+    const keep = await this.keepDetails();
+    let removed = 0;
+    for (const run of await this.host.history.list()) {
+      if (keep.has(run.id)) continue;
+      await this.host.history.delete(run.id);
+      removed++;
+    }
+    return removed;
+  }
+
   async cancel(id: string): Promise<void> {
     const live = this.live.get(id);
-    if (!live || live.record.state !== "running") return;
+    if (!live || live.record.state !== "running" || !live.provider || !live.workspace) return;
     await live.provider.cancelRun(live.workspace);
   }
 
@@ -257,7 +405,7 @@ export class AgentHub {
   async apply(id: string, approvedPaths: readonly string[]): Promise<ApplyResult[]> {
     const live = this.reviewing(id);
     const approved = new Set(approvedPaths);
-    const results = await applyChanges(this.vault, this.host.files(live.workspace), live.changes!, approved);
+    const results = await applyChanges(this.vault, this.filesOf(live), live.changes!, approved);
     const byPath = new Map(results.map((r) => [r.path, r]));
     for (const change of live.record.changes) {
       change.decision = approved.has(change.path) && !change.problem ? "approved" : "rejected";
@@ -279,7 +427,7 @@ export class AgentHub {
     const change = live?.changes?.find((c) => c.path === path);
     const recorded = live?.record.changes.find((c) => c.path === path);
     if (!live || !live.open || !change || recorded?.result !== "conflict") throw new RunStateError("Only a conflicting change can be kept as a copy");
-    const copy = await saveAsCopy(this.vault, this.host.files(live.workspace), change, name);
+    const copy = await saveAsCopy(this.vault, this.filesOf(live), change, name);
     recorded.result = "copied";
     recorded.copy = copy;
     if (!live.record.changes.some((c) => c.result === "conflict")) await this.closeWorkspace(live);
@@ -304,21 +452,33 @@ export class AgentHub {
     this.live.delete(id);
   }
 
+  private filesOf(live: Live): ReviewedFiles {
+    return live.stored ?? this.host.files(live.workspace!);
+  }
+
   private async closeWorkspace(live: Live): Promise<void> {
     if (!live.open) return;
     live.open = false;
-    await this.host.dispose(live.workspace).catch(() => undefined);
+    if (live.workspace !== null) await this.host.dispose(live.workspace).catch(() => undefined);
   }
 
   /** Stops every run and deletes every working directory (the vault is closing). Records stay as they are. */
   async dispose(): Promise<void> {
     for (const live of this.live.values()) {
-      if (live.record.state === "running") await live.provider.cancelRun(live.workspace).catch(() => undefined);
+      if (live.record.state === "running" && live.provider && live.workspace) await live.provider.cancelRun(live.workspace).catch(() => undefined);
       await this.closeWorkspace(live);
     }
     this.live.clear();
     await this.writes;
   }
+}
+
+function dedupeRefs(refs: readonly WorkspacePageRef[]): WorkspacePageRef[] {
+  const seen = new Set<string>();
+  return refs.filter((r) => {
+    const key = `${r.server}\n${r.workspace}\n${r.page}`;
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
 }
 
 function toRecord(change: ProposedChange): ChangeRecord {

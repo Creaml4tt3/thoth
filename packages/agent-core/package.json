@@ -13,6 +13,8 @@
     "@thoth/content": "workspace:*",
     "@thoth/domain": "workspace:*",
     "@thoth/local-store": "workspace:*",
+    "@thoth/workspace-client": "workspace:*",
+    "@thoth/workspace-protocol": "workspace:*",
     "zod": "^4.6.7"
   }
 }

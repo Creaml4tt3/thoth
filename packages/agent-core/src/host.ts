@@ -38,8 +38,35 @@ export interface AgentFiles {
   list(dir: string): Promise<DirEntry[]>;
   /** Only before the CLI starts. */
   mkdirp(dir: string): Promise<void>;
-  /** Exclusive create, only before the CLI starts. */
-  writeFile(path: string, data: Uint8Array): Promise<void>;
+  /**
+   * Exclusive create, only before the CLI starts. `readOnly` takes the write permission away afterwards (reference
+   * copies the agent may read but whose changes are never applied).
+   */
+  writeFile(path: string, data: Uint8Array, options?: { readOnly?: boolean }): Promise<void>;
+}
+
+/** What the host keeps locally for one run: when its files last changed and what they are. */
+export interface HostHistoryRun {
+  id: string;
+  modifiedMs: number;
+  bytes: number;
+  files: { name: string; size: number }[];
+}
+
+/**
+ * Local-only run details (ADR-0007, "History"): the transcript and the proposed files of a run, in the app data
+ * folder, never inside a vault. A run is named by its record's UUID and a file by a short flat name
+ * (`a-z 0-9 . _ -`); the host accepts nothing else and bounds the sizes.
+ */
+export interface AgentHistoryStore {
+  /** Creates or replaces a file (atomically). */
+  write(id: string, name: string, data: Uint8Array): Promise<void>;
+  /** Rejects with `ENOENT` when there is no such file. */
+  read(id: string, name: string): Promise<Uint8Array>;
+  /** Every run that has details, oldest first. */
+  list(): Promise<HostHistoryRun[]>;
+  /** Deletes a run's details. Harmless when there are none. */
+  delete(id: string): Promise<void>;
 }
 
 export interface AgentHost {
@@ -57,4 +84,6 @@ export interface AgentHost {
   dispose(run: string): Promise<void>;
   /** Deletes working directories no open run owns (after a crash). Returns how many. */
   sweep(): Promise<number>;
+  /** Local-only run details. */
+  readonly history: AgentHistoryStore;
 }

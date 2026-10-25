@@ -326,6 +326,12 @@ importers:
       '@thoth/local-store':
         specifier: workspace:*
         version: link:../local-store
+      '@thoth/workspace-client':
+        specifier: workspace:*
+        version: link:../workspace-client
+      '@thoth/workspace-protocol':
+        specifier: workspace:*
+        version: link:../workspace-protocol
       zod:
         specifier: ^4.6.7
         version: 4.6.7

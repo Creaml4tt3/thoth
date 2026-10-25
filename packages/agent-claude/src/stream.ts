@@ -10,7 +10,10 @@
  *   assistant                 message.content[]: text → text, tool_use → tool (name, input); `error` (for example
  *                             "authentication_failed") → error
  *   user                      message.content[]: tool_result with is_error → tool_error
- *   result                    result: is_error, subtype, result, total_cost_usd, num_turns, duration_ms
+ *   result                    result: is_error, subtype, result, errors, total_cost_usd, num_turns, duration_ms.
+ *                             A budget stop (--max-budget-usd used up) is subtype "error_max_budget_usd" with
+ *                             is_error true, no `result` text and errors ["Reached maximum budget ($0.0001)"]
+ *                             (recorded 2026-10-25: test/fixtures/stream-budget.jsonl); the CLI exits with 1.
  *
  * Agent output is untrusted: text is kept as text (never HTML), messages are cut to a bounded length, and paths are
  * shown relative to the working directory.
@@ -142,7 +145,9 @@ export function createStreamParser(options: { cwd?: string } = {}): StreamParser
       if (type === "result") {
         sawResult = true;
         const ok = value["is_error"] !== true && subtype === "success";
-        const resultText = str(value["result"]);
+        // A failed result may carry its reasons in `errors` instead of `result` (budget stop).
+        const errors = Array.isArray(value["errors"]) ? value["errors"].filter((e): e is string => typeof e === "string") : [];
+        const resultText = str(value["result"]) ?? (errors.length > 0 ? errors.join("; ") : undefined);
         const costUsd = num(value["total_cost_usd"]);
         const turns = num(value["num_turns"]);
         const durationMs = num(value["duration_ms"]);
@@ -151,7 +156,7 @@ export function createStreamParser(options: { cwd?: string } = {}): StreamParser
         ];
         if (!ok && !sawError) {
           if (resultText && NOT_LOGGED_IN.test(resultText)) out.push(error("not_logged_in", resultText));
-          else if (subtype === "error_max_budget_usd") out.push(error("budget", resultText ?? subtype));
+          else if (subtype === "error_max_budget_usd" || str(value["terminal_reason"]) === "budget_exhausted") out.push(error("budget", resultText ?? subtype ?? "budget_exhausted"));
           else out.push(error("cli", resultText ?? subtype ?? "The agent reported an error"));
         }
         return out;

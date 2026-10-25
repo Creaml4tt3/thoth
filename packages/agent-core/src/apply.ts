@@ -9,6 +9,9 @@
 import { isReservedPath, sha256Hex } from "@thoth/domain";
 import { ConflictError, type Vault } from "@thoth/local-store";
 import type { AgentFiles } from "./host.ts";
+
+/** Where the agent's bytes are read from: the run's working directory, or what was stored for review. */
+export type ReviewedFiles = Pick<AgentFiles, "readFile">;
 import { canApply, type ProposedChange } from "./review.ts";
 
 export type ApplyResult =
@@ -25,7 +28,7 @@ export class ChangedSinceReviewError extends Error {
 }
 
 /** The agent's bytes for a change, checked against the reviewed hash. */
-export async function reviewedBytes(files: AgentFiles, change: ProposedChange): Promise<Uint8Array> {
+export async function reviewedBytes(files: ReviewedFiles, change: ProposedChange): Promise<Uint8Array> {
   const bytes = await files.readFile(change.path);
   if (sha256Hex(bytes) !== change.afterHash) throw new ChangedSinceReviewError(change.path);
   return bytes;
@@ -35,7 +38,7 @@ export async function reviewedBytes(files: AgentFiles, change: ProposedChange): 
  * Applies the approved changes in path order and reports each one. Changes that were not approved, or that have a
  * problem, are never touched. One failure does not stop the others.
  */
-export async function applyChanges(vault: Vault, files: AgentFiles, changes: readonly ProposedChange[], approved: ReadonlySet<string>): Promise<ApplyResult[]> {
+export async function applyChanges(vault: Vault, files: ReviewedFiles, changes: readonly ProposedChange[], approved: ReadonlySet<string>): Promise<ApplyResult[]> {
   const results: ApplyResult[] = [];
   for (const change of changes) {
     if (!approved.has(change.path) || !canApply(change)) continue;
@@ -62,7 +65,7 @@ export async function applyChanges(vault: Vault, files: AgentFiles, changes: rea
  * Keeps the agent's version of a conflicting file next to it, under the first free name `name(attempt)` gives (the
  * desktop passes the editor's conflict-copy names). Never replaces a file. Returns the copy's path.
  */
-export async function saveAsCopy(vault: Vault, files: AgentFiles, change: ProposedChange, name: (attempt: number) => string): Promise<string> {
+export async function saveAsCopy(vault: Vault, files: ReviewedFiles, change: ProposedChange, name: (attempt: number) => string): Promise<string> {
   if (change.change === "deleted" || !canApply(change)) throw new Error("Only an added or modified file can be kept as a copy");
   const bytes = await reviewedBytes(files, change);
   for (let attempt = 1; attempt <= 50; attempt++) {
