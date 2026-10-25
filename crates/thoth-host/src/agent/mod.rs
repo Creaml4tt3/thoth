@@ -18,9 +18,15 @@
 //!   and totals are capped; a run that prints too much is stopped.
 //! - Run folders are deleted on dispose and shutdown, and `agent.sweep` deletes any left by a crash.
 //!
+//! - A run's time limit and spending limit are validated, not clamped (`limits.rs`, `claude.rs`).
+//! - Local-only run details (transcripts, proposed files) live in `<data>/agent-history/<run id>/` (`history.rs`),
+//!   never in a vault.
+//!
 //! There is no OS-level sandbox in this phase: the CLI runs with the user's permissions. The tool restrictions are
 //! the CLI's own (`--restricted`, `--tools`), which the policy makes mandatory.
 pub mod claude;
+pub mod history;
+pub mod limits;
 
 use crate::error::{HostError, HostResult};
 use crate::handles;
@@ -46,9 +52,6 @@ const MAX_STDERR_LINES: usize = 2000;
 const MAX_STDIN_BYTES: usize = 1024 * 1024;
 const MAX_BATCH_EVENTS: usize = 500;
 const MAX_WAIT_MS: u64 = 10_000;
-pub const DEFAULT_TIMEOUT_MS: u64 = 30 * 60 * 1000;
-const MIN_TIMEOUT_MS: u64 = 1000;
-const MAX_TIMEOUT_MS: u64 = 4 * 60 * 60 * 1000;
 const KILL_GRACE: Duration = Duration::from_secs(3);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const PROBE_MAX_OUTPUT: usize = 256 * 1024;
@@ -280,9 +283,21 @@ impl Agents {
         self.writable(handle)?.fs.mkdirp(dir)
     }
 
-    /// Exclusive create: staging never replaces a file.
-    pub fn write(&self, handle: &str, path: &str, data: &[u8]) -> HostResult<()> {
-        self.writable(handle)?.fs.write(path, data, true)
+    /// Exclusive create: staging never replaces a file. `read_only` takes the write permission away afterwards (the
+    /// reference copies of workspace pages, which the agent may read but whose changes are never applied).
+    pub fn write(&self, handle: &str, path: &str, data: &[u8], read_only: bool) -> HostResult<()> {
+        let run = self.writable(handle)?;
+        run.fs.write(path, data, true)?;
+        if read_only {
+            let file = run.work.join(path);
+            if !Path::new(path).components().all(|c| matches!(c, std::path::Component::Normal(_))) {
+                return Err(HostError::unsafe_path(path, "not a plain relative path"));
+            }
+            let mut permissions = std::fs::metadata(&file).map_err(|e| HostError::io(&e, "stat", &file.to_string_lossy()))?.permissions();
+            permissions.set_readonly(true);
+            std::fs::set_permissions(&file, permissions).map_err(|e| HostError::io(&e, "chmod", &file.to_string_lossy()))?;
+        }
+        Ok(())
     }
 
     /// Starts the provider's CLI in the run's working directory with `argv` (checked against the policy) and
@@ -293,7 +308,7 @@ impl Agents {
         if stdin.len() > MAX_STDIN_BYTES {
             return Err(HostError::bad_argument("The task is too long"));
         }
-        let timeout = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).clamp(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS));
+        let timeout = limits::validate_timeout(timeout_ms)?;
         let active = self.runs().values().filter(|r| r.lock().phase == Phase::Running).count();
         if active >= MAX_ACTIVE {
             return Err(HostError::not_allowed("Another agent run is still going"));

@@ -13,6 +13,7 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "api_call",
     "agent_detect", "agent_run_create", "agent_fs_stat", "agent_fs_read", "agent_fs_list", "agent_fs_mkdirp", "agent_fs_write",
     "agent_start", "agent_events", "agent_cancel", "agent_run_dispose", "agent_sweep",
+    "agent_history_write", "agent_history_read", "agent_history_list", "agent_history_delete",
 ];
 
 fn main() {

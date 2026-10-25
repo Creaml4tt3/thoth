@@ -283,7 +283,7 @@ export function remoteAgents(transport: Transport): AgentHost {
     readFile: (path) => transport.call("agent.fs.read", { run, path }),
     list: (dir) => transport.call("agent.fs.list", { run, dir }),
     mkdirp: async (dir) => void (await transport.call("agent.fs.mkdirp", { run, dir })),
-    writeFile: async (path, data) => void (await transport.call("agent.fs.write", { run, path }, data)),
+    writeFile: async (path, data, options) => void (await transport.call("agent.fs.write", { run, path, ...(options?.readOnly ? { readOnly: true } : {}) }, data)),
   });
   return {
     detect: (provider) => transport.call("agent.detect", { provider }),
@@ -294,6 +294,12 @@ export function remoteAgents(transport: Transport): AgentHost {
     cancel: async (run) => void (await transport.call("agent.cancel", { run })),
     dispose: async (run) => void (await transport.call("agent.run.dispose", { run })),
     sweep: async () => (await transport.call("agent.sweep", {})).removed,
+    history: {
+      write: async (id, name, data) => void (await transport.call("agent.history.write", { id, name }, data)),
+      read: (id, name) => transport.call("agent.history.read", { id, name }),
+      list: () => transport.call("agent.history.list", {}),
+      delete: async (id) => void (await transport.call("agent.history.delete", { id })),
+    },
   };
 }
 

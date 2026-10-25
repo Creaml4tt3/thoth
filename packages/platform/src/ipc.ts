@@ -14,7 +14,7 @@
  */
 import type { DirEntry, FileStat } from "@thoth/local-store";
 import type { SourceDirEntry } from "@thoth/importer-core";
-import type { AgentProbe, HostEventBatch } from "@thoth/agent-core";
+import type { AgentProbe, HostEventBatch, HostHistoryRun } from "@thoth/agent-core";
 
 /** SQL values on the wire. Integers outside ±2^53 and blobs are tagged. */
 export type WireValue = null | string | number | { $bigint: string } | { $bytes: string };
@@ -133,8 +133,11 @@ export interface Commands {
   "agent.fs.list": { args: { run: string; dir: string }; result: DirEntry[] };
   /** Only before `agent.start`. */
   "agent.fs.mkdirp": { args: { run: string; dir: string }; result: null };
-  /** Request bytes: the file. Exclusive create, only before `agent.start`. */
-  "agent.fs.write": { args: { run: string; path: string }; result: null };
+  /**
+   * Request bytes: the file. Exclusive create, only before `agent.start`. `readOnly` takes the write permission away
+   * afterwards (reference copies of workspace pages, ADR-0007).
+   */
+  "agent.fs.write": { args: { run: string; path: string; readOnly?: boolean }; result: null };
   /**
    * Request bytes: the CLI's stdin (the prompt). The host runs the provider's binary with `argv` only when its policy
    * accepts every argument (`NOT_ALLOWED` otherwise), in the working directory, in its own process group.
@@ -147,6 +150,17 @@ export interface Commands {
   "agent.run.dispose": { args: { run: string }; result: null };
   /** Deletes working directories left by an earlier session. */
   "agent.sweep": { args: Record<string, never>; result: { removed: number } };
+  /**
+   * Local-only run details (transcript, proposed files) under the app data folder, never in a vault (ADR-0007,
+   * "History"). `id` is a run record's UUID and `name` a short flat file name; the host accepts nothing else. Request
+   * bytes: the file (replaced atomically).
+   */
+  "agent.history.write": { args: { id: string; name: string }; result: null };
+  "agent.history.read": { args: { id: string; name: string }; result: Bytes };
+  /** Every run that has details, oldest first, with when its files last changed. */
+  "agent.history.list": { args: Record<string, never>; result: HostHistoryRun[] };
+  /** Deletes one run's details. Repeating it is harmless. */
+  "agent.history.delete": { args: { id: string }; result: null };
 }
 
 export interface ServerInfo {
