@@ -11,6 +11,8 @@ import type { PortRuntime, SourceFixture, SqlFixture, VaultFixture } from "./har
 import { tempDir } from "./harness.ts";
 
 const text = (s: string) => new TextEncoder().encode(s);
+/** Windows has no FIFOs and no mode bits; those checks run on macOS and Linux only. */
+const WINDOWS = process.platform === "win32";
 const decode = (b: Uint8Array) => new TextDecoder().decode(b);
 
 export function vaultFsContract(runtime: PortRuntime): void {
@@ -266,7 +268,7 @@ export function sourceHostContract(runtime: PortRuntime): void {
       await writeFile(join(outside, "secret.md"), "secret");
       await symlink(join(outside, "secret.md"), join(folder, "link.md"));
       await symlink(outside, join(folder, "linkdir"));
-      execFileSync("mkfifo", [join(folder, "fifo")]);
+      if (!WINDOWS) execFileSync("mkfifo", [join(folder, "fifo")]);
       temps = await tempDir("thoth-port-temps-");
       host = await runtime.sourceHost(base, temps);
     });
@@ -283,7 +285,7 @@ export function sourceHostContract(runtime: PortRuntime): void {
       const entries = (await source.list("")).sort((a, b) => a.name.localeCompare(b.name));
       expect(entries).toEqual([
         { name: "a.md", kind: "file", size: 10 },
-        { name: "fifo", kind: "other", size: 0 },
+        ...(WINDOWS ? [] : [{ name: "fifo", kind: "other", size: 0 }]),
         { name: "link.md", kind: "symlink", size: 0 },
         { name: "linkdir", kind: "symlink", size: 0 },
         { name: "sub", kind: "directory", size: 0 },
@@ -312,7 +314,7 @@ export function sourceHostContract(runtime: PortRuntime): void {
       const source = await host.open(folder);
       await expect(source.open("link.md")).rejects.toThrow();
       await expect(source.open("linkdir/secret.md")).rejects.toThrow(/[Ss]ymlink/);
-      await expect(source.open("fifo")).rejects.toThrow(/regular file/);
+      if (!WINDOWS) await expect(source.open("fifo")).rejects.toThrow(/regular file/);
       await expect(source.open("sub")).rejects.toThrow();
       await expect(source.open("../outside/secret.md")).rejects.toThrow();
       await expect(source.open("")).rejects.toThrow();
@@ -338,8 +340,10 @@ export function sourceHostContract(runtime: PortRuntime): void {
       expect(decode(await temp.read(0, 11))).toBe("hello world");
       const path = await findTempFile(temps);
       expect(path).toBeDefined();
-      expect((await stat(path!)).mode & 0o777).toBe(0o600);
-      expect((await stat(join(path!, ".."))).mode & 0o777).toBe(0o700);
+      if (!WINDOWS) {
+        expect((await stat(path!)).mode & 0o777).toBe(0o600);
+        expect((await stat(join(path!, ".."))).mode & 0o777).toBe(0o700);
+      }
       await temp.close();
       await expect(stat(path!)).rejects.toThrow();
       const second = await source.createTemp();

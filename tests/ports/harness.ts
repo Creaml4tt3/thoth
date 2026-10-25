@@ -17,7 +17,8 @@ import { RemoteSourceHost, openRemoteVault } from "@thoth/platform/remote";
 import { StdioTransport, type StdioTransportOptions } from "@thoth/platform/stdio";
 
 export const REPO = resolve(import.meta.dirname, "../..");
-const BUILT = join(REPO, "target", "debug", "thoth-host-stdio");
+const EXE = process.platform === "win32" ? ".exe" : "";
+const BUILT = join(REPO, "target", "debug", `thoth-host-stdio${EXE}`);
 
 let built: Promise<string> | undefined;
 
@@ -31,7 +32,7 @@ export function buildHarness(): Promise<string> {
   built ??= (async () => {
     execFileSync("cargo", ["build", "-p", "thoth-host", "--bin", "thoth-host-stdio"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
     const dir = await mkdtemp(join(tmpdir(), "thoth-harness-bin-"));
-    const binary = join(dir, "thoth-host-stdio");
+    const binary = join(dir, `thoth-host-stdio${EXE}`);
     await copyFile(BUILT, binary);
     await chmod(binary, 0o755);
     process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
@@ -136,8 +137,8 @@ export const rustRuntime: PortRuntime = {
     };
   },
   async sourceHost(allowed, tempRoot) {
-    // The host's temp files go under the system temp dir, which `tempfile` takes from TMPDIR.
-    const transport = await rustTransport({ allowRoots: [allowed], env: { TMPDIR: tempRoot } });
+    // The host's temp files go under the system temp dir, which `tempfile` takes from TMPDIR (TMP/TEMP on Windows).
+    const transport = await rustTransport({ allowRoots: [allowed], env: { TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot } });
     return { open: (location) => RemoteSourceHost.open(transport, location), dispose: () => transport.close() };
   },
 };

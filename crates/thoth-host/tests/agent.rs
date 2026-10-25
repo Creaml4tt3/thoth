@@ -1,6 +1,7 @@
 //! Agent Hub host commands (ADR-0007) against the fake Claude Code CLI in `packages/agent-claude/test/fake-claude`
-//! (a Node script: no model is ever called). Detection, the argument policy, the scoped working directory, the
-//! child's cwd and environment, streaming, cancel (the whole process group), timeout, cleanup and sweep.
+//! (a Node script: no model is ever called; on Windows through its `claude.cmd` launcher, which also checks how
+//! arguments survive `cmd.exe`). Detection, the argument policy, the scoped working directory, the child's cwd and
+//! environment, streaming, cancel (the whole process group, or Job Object on Windows), timeout, cleanup and sweep.
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -30,8 +31,19 @@ impl FileManager for NoFiles {
 }
 
 fn fake_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/agent-claude/test/fake-claude").canonicalize().unwrap()
+    canonical(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/agent-claude/test/fake-claude"))
 }
+
+/// The host's canonical form (on Windows without the `\\?\` prefix).
+fn canonical(path: &Path) -> PathBuf {
+    thoth_host::paths::canonicalize_path(path).unwrap()
+}
+
+/// The launcher the host finds in the fake CLI's folder.
+#[cfg(not(windows))]
+const FAKE_LAUNCHER: &str = "claude";
+#[cfg(windows)]
+const FAKE_LAUNCHER: &str = "claude.cmd";
 
 fn argv(case: usize) -> Vec<String> {
     let text = include_str!("../../../packages/agent-claude/test/fixtures/argv.json");
@@ -103,6 +115,13 @@ fn read_record(work: &Path) -> Value {
     }
 }
 
+#[cfg(windows)]
+fn alive(pid: i64) -> bool {
+    let out = std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"]).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).contains(&format!("\"{pid}\""))
+}
+
+#[cfg(not(windows))]
 fn alive(pid: i64) -> bool {
     // `kill -0` without libc: a process is alive while `ps` lists it (zombies are reaped by launchd/init quickly).
     let out = std::process::Command::new("ps").args(["-o", "stat=", "-p", &pid.to_string()]).output().unwrap();
@@ -148,7 +167,7 @@ fn detects_a_present_cli_with_its_version_help_and_login() {
     let f = fixture(Some(vec![fake_dir()]), true);
     let probe = call(&f.host, "agent.detect", json!({ "provider": "claude" }));
     assert_eq!(probe["found"], json!(true));
-    assert_eq!(probe["path"], json!(fake_dir().join("claude").to_string_lossy()));
+    assert_eq!(probe["path"], json!(fake_dir().join(FAKE_LAUNCHER).to_string_lossy()));
     assert_eq!(probe["version"]["stdout"], json!("2.1.310 (Claude Code)\n"));
     assert_eq!(probe["version"]["code"], json!(0));
     assert!(probe["help"]["stdout"].as_str().unwrap().contains("--restricted"));
@@ -159,7 +178,7 @@ fn detects_a_present_cli_with_its_version_help_and_login() {
 fn runs_in_the_private_working_directory_with_only_the_staged_files() {
     let f = fixture(Some(vec![fake_dir()]), true);
     // An open vault: no variable naming it may reach the agent.
-    let vault_root = f.vault.path().canonicalize().unwrap();
+    let vault_root = canonical(f.vault.path());
     call(&f.host, "vault.open", json!({ "root": vault_root.to_string_lossy() }));
     unsafe {
         std::env::set_var("THOTH_AGENT_TEST_SECRET", "do-not-pass");
@@ -178,7 +197,7 @@ fn runs_in_the_private_working_directory_with_only_the_staged_files() {
 
     // What the CLI saw: the working directory under the data folder, the exact policy argv, the prompt on stdin.
     let record = read_record(&dir);
-    let data = f.data.path().canonicalize().unwrap();
+    let data = canonical(f.data.path());
     assert_eq!(PathBuf::from(record["cwd"].as_str().unwrap()), dir);
     assert!(dir.starts_with(data.join("agent-runs")) && dir.ends_with("work"));
     assert_eq!(record["argv"], json!(argv(0)));
@@ -272,12 +291,18 @@ fn cancel_kills_the_whole_process_group() {
     call(&f.host, "agent.cancel", json!({ "run": run }));
     let exit = drain(&f.host, &run).pop().unwrap();
     assert_eq!(exit["reason"], json!("cancelled"));
+    // The fake CLI exits 143 on SIGTERM, as Claude Code does; Windows ends the Job Object at once.
+    #[cfg(not(windows))]
     assert_eq!(exit["code"], json!(143));
+    #[cfg(windows)]
+    assert_eq!(exit["code"], json!(thoth_host::agent::kill_windows::TERMINATED_EXIT_CODE));
     wait_dead(cli);
     wait_dead(grandchild);
 }
 
+/// POSIX only: Windows has no SIGTERM to ignore, the Job Object is terminated at once.
 #[test]
+#[cfg(unix)]
 fn a_cli_that_ignores_sigterm_is_killed_after_the_grace_period() {
     let f = fixture(Some(vec![fake_dir()]), true);
     let (run, work) = start(&f, "@ignore-term\n@hang\n", None);
