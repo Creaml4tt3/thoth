@@ -929,6 +929,32 @@ AC:
 4. The web client has the in-app list only (there are no agents or imports there; transfers are desktop only too).
 5. Nothing sensitive in a system notification: page titles at most, never page text or agent output.
 
+Result (2026-10-25) ✅ except the click on a system notification opening its item (ADR-0018 rule 4). ADR-0018
+accepted.
+
+- **Core** (`packages/app-ui/src/notifications/core.ts`, no React or Tauri): nine event kinds, the content rule (only
+  the fields of each kind; names one line, at most 80 characters; at most three titles), the list (unread, a repeat
+  within a minute joins its entry, at most 50, in memory per window), the background-only rule and per-kind switches,
+  the `SystemNotifier` port with the plugin adapter (loaded and the permission asked for at the first notification)
+  and a no-op. `NotificationBell.tsx` is the shared bell and list.
+- **Desktop**: the bell next to the gear in the sidebar, "Show notifications" in the palette, the mascot's message
+  after a run (no focus taken, gone after 6 s, opens the run), Settings → Notifications (all and per kind, per user),
+  `tauri-plugin-notification` / `@tauri-apps/plugin-notification` 2.5.1 (released 2026-10-01) with three plugin
+  permissions only. Sources: the agents service (a run ending by itself), the transfer service (`onSettled`), the
+  import service (`onFinished`), the page views (`onConflict`). English and Thai (new Thai marked `REVIEW`).
+- **Web client**: the bell and list with save conflicts; no system notifier; the bundle has no notification plugin.
+- **Evidence**: `packages/app-ui/test/notifications.test.ts` (entries, unread, de-dup, cap, switches, background rule,
+  content limits, the plugin adapter's permission ask), `notification-bell.test.tsx`, `commands.test.ts`;
+  `apps/desktop/test/notifications.test.tsx` (every kind, the mascot's message, settings kept, the notifier only in
+  the background and for enabled kinds, no task or output text); `apps/web/test/notifications.test.tsx`,
+  `apps/web/test/build.test.ts`; `apps/desktop/src-tauri/src/lib.rs` › `capability_grants_nothing_but_thoth_commands_and_events`;
+  `tests/e2e/notifications.e2e.ts` (fake claude, window in the background, the plugin spied through
+  `window.__THOTH_NOTIFICATION_PLUGIN__`, 1 unread, the entry opens the review; axe on the list and the settings, light
+  and dark).
+- **Checks**: `pnpm check` 2023 passed, 2 skipped; `cargo test` 82 passed; `pnpm e2e` 73 passed, 2 skipped.
+- Not yet checked by a person in a real window: the macOS permission prompt and notification, the click bringing
+  Thoth forward, Thai on screen.
+
 ### Track 5 (2026-10-25) — Tab drag and windows (ADR-0019)
 
 Requested by the owner on 2026-10-25.

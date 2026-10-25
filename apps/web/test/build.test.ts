@@ -23,7 +23,8 @@ describe("web client production build", () => {
     expect(code.length).toBeGreaterThan(2);
 
     // The Agent Hub's host commands and the Claude Code adapter are desktop only: a browser can never spawn a CLI.
-    for (const forbidden of ["@tauri-apps", "plugin:fs", "child_process", "__TAURI_INTERNALS__", "@thoth/local-store", "openVault", "node:fs", "node:sqlite", "agent.start", "agent.run.create", "agent_start", "stream-json", "--permission-mode", "--skip-git-repo-check", "default_permissions=thoth"]) {
+    // System notifications are desktop only too (ADR-0018): no notification plugin, no permission request.
+    for (const forbidden of ["@tauri-apps", "plugin:fs", "child_process", "__TAURI_INTERNALS__", "@thoth/local-store", "openVault", "node:fs", "node:sqlite", "agent.start", "agent.run.create", "agent_start", "stream-json", "--permission-mode", "--skip-git-repo-check", "default_permissions=thoth", "plugin-notification", "plugin:notification", "sendNotification", "isPermissionGranted", "__THOTH_NOTIFICATION_PLUGIN__"]) {
       expect(code.filter((c) => c.text.includes(forbidden)).map((c) => c.f), forbidden).toEqual([]);
     }
     // No fonts or scripts from anywhere but /app/ (self-hosted fonts; no Google Fonts).

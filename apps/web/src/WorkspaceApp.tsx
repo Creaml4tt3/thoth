@@ -15,6 +15,8 @@ import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
+import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
 import { LegalLinks } from "./LegalLinks.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
@@ -77,6 +79,16 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
   const openPage = useCallback((ref: WorkspacePageRef, options?: OpenOptions) => tabs.open({ kind: "workspace", ...ref }, options), [tabs]);
   const openSettings = useCallback(() => tabs.open({ kind: "settings" }), [tabs]);
+
+  // Notifications (ADR-0018): the list under the bell only, in memory for this tab. Its one event is a save conflict;
+  // nothing is shown outside the browser tab (there is no system notifier on the web).
+  const strings = useRef(t);
+  strings.current = t;
+  const notifications = useMemo(() => createNotificationCenter({ strings: () => strings.current.notifications, now: () => env.now() }), [env]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const openNotification = useCallback((to: NotificationTarget) => {
+    if (to.kind === "workspacePage") openPage({ server: to.server, workspace: to.workspace, page: to.page });
+  }, [openPage]);
 
   // The only workspace (a new account has exactly one) opens by itself.
   const only = workspaces?.length === 1 ? workspaces[0]!.id : null;
@@ -167,6 +179,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
+    openNotifications: () => setNotificationsOpen(true),
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
@@ -268,6 +281,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             <div className="side-actions">
               <LanguageSwitch />
               <ThemeSwitch />
+              <NotificationBell center={notifications} open={notificationsOpen} onOpenChange={setNotificationsOpen} onOpenTarget={openNotification} />
               <IconButton icon="sign-out" label={signingOut ? t.web.signingOut : t.web.signOut} disabled={signingOut} onClick={() => void doSignOut()} />
             </div>
             <LegalLinks />
@@ -305,7 +319,11 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
                 onOpened={() => track({ name: "page_open" }, target)}
                 onSaved={() => track({ name: "page_save" }, target)}
-                onConflict={(event) => track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target)}
+                onConflict={(event) => {
+                  track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target);
+                  // The page's title and where it is, nothing of its text (ADR-0018).
+                  if (event.kind === "shown") notifications.push({ kind: "saveConflict", page: remoteTitle(state, current) ?? t.tabs.untitled, open: { kind: "workspacePage", ...current } });
+                }}
               />
             ) : (
               <div className="empty">
