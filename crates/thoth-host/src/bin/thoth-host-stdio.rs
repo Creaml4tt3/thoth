@@ -2,7 +2,7 @@
 //! the e2e dev bridge. TEST INFRASTRUCTURE ONLY: never bundled into the app
 //! (the desktop crate links the library, not this binary).
 //!
-//! Request:  {"id", "command", "args", "bytes"?: base64}
+//! Request:  {"id", "command", "args", "bytes"?: base64, "owner"?: string (the window that asks, ADR-0019)}
 //! Response: {"id", "ok", "result"?, "bytes"?: base64, "error"?: {code, message}}
 //! Event:    {"event": "vault.changed", "payload"}
 //!           {"event": "browser.open", "payload": {"url"}}   (server sign-in: the test plays the browser)
@@ -174,7 +174,14 @@ fn handle(host: &Host, line: &str) -> Value {
             Some(Value::String(s)) => Some(B64.decode(s).map_err(|_| HostError::bad_argument("bytes is not valid base64"))?),
             Some(_) => return Err(HostError::bad_argument("bytes must be a base64 string")),
         };
-        host.call(command, &args, bytes.as_deref())
+        // Which window asked (ADR-0019): a test or the e2e bridge names one per connection, as the desktop shell names
+        // the webview. "" when absent.
+        let owner = match request.get("owner") {
+            None | Some(Value::Null) => "",
+            Some(Value::String(s)) => s.as_str(),
+            Some(_) => return Err(HostError::bad_argument("owner must be a string")),
+        };
+        host.call_as(owner, command, &args, bytes.as_deref())
     })();
     match result {
         Ok((value, None)) => json!({ "id": id, "ok": true, "result": value }),

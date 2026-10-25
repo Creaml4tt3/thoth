@@ -97,9 +97,25 @@ export class StdioTransport implements Transport {
   }
 
   call<C extends CommandName>(command: C, args: Commands[C]["args"], bytes?: Uint8Array): Promise<Commands[C]["result"]> {
+    return this.callAs("", command, args, bytes);
+  }
+
+  /**
+   * This harness as the window `owner` (ADR-0019), as the desktop shell names the webview that calls: vaults it opens
+   * and agent runs it starts are that window's, and a folder is `shared` only with another owner's handles.
+   */
+  as(owner: string): Transport {
+    return {
+      call: (command, args, bytes) => this.callAs(owner, command, args, bytes),
+      listen: (event, handler) => this.listen(event, handler),
+    };
+  }
+
+  private callAs<C extends CommandName>(owner: string, command: C, args: Commands[C]["args"], bytes?: Uint8Array): Promise<Commands[C]["result"]> {
     if (this.exited) return Promise.reject(this.exited);
     const id = this.nextId++;
     const request: Record<string, unknown> = { id, command, args };
+    if (owner !== "") request.owner = owner;
     if (bytes !== undefined) request.bytes = encodeBase64(bytes);
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, wantsBytes: BYTE_RESULTS.has(command) });

@@ -182,11 +182,11 @@ impl Host {
                 self.close_vault(str_arg(args, "vault")?)?;
                 null()
             }
-            // Is another handle (another window) open on this vault's folder right now? (ADR-0019)
+            // Is another window open on this vault's folder right now? (ADR-0019) Its owner's other handles (a page that
+            // reloaded) do not count.
             "vault.shared" => {
                 let entry = self.vault(args)?;
-                let others = self.state().vaults.values().filter(|v| v.root == entry.root).count() > 1;
-                json(json!(others))
+                json(json!(self.shared_with_others(&entry.root, &entry.owner)))
             }
             // Names a vault by its handle, never a path: only a folder the user opened can be shown.
             "vault.reveal" => {
@@ -422,14 +422,20 @@ impl Host {
         let shown = root.to_string_lossy().into_owned();
         let entry = Arc::new(VaultEntry { owner: owner.to_owned(), root: root.clone(), fs, sql: Mutex::new(sql), watcher: Mutex::new(None) });
         // Another window has this folder open: it ran recovery, and what is in `.thoth/tmp` may be its work in flight.
+        // A handle this owner opened before (its page reloaded) is not another window.
         let shared = {
             let mut state = self.state();
-            let shared = state.vaults.values().any(|v| v.root == root);
+            let shared = state.vaults.values().any(|v| v.root == root && v.owner != owner);
             state.vaults.insert(handle.clone(), entry);
             shared
         };
         self.remember(&shown);
         Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared }))
+    }
+
+    /// Has an owner other than `owner` (another window) a handle open on `root`?
+    fn shared_with_others(&self, root: &Path, owner: &str) -> bool {
+        self.state().vaults.values().any(|v| v.root == root && v.owner != owner)
     }
 
     fn close_vault(&self, handle: &str) -> HostResult<()> {
@@ -582,11 +588,19 @@ impl Host {
     /// A window closed (ADR-0019): closes the vaults it opened (and their watchers) and ends the agent runs it started,
     /// deleting their working directories, as quitting does for all of them. Other windows' handles are untouched.
     pub fn release(&self, owner: &str) {
-        let mine: Vec<String> = self.state().vaults.iter().filter(|(_, v)| v.owner == owner).map(|(h, _)| h.clone()).collect();
-        for handle in mine {
-            let _ = self.close_vault(&handle);
-        }
-        self.agents.release(owner);
+        self.detach(owner).end();
+    }
+
+    /// The quick half of `release`, safe to call on the shell's event loop: `owner`'s vault and run handles stop
+    /// working at once (and no longer count for `shared`), so a page that loads next in the same window never loses a
+    /// handle it opens after this. `Detached::end` does the slow part (watchers, index connections, processes, folders).
+    pub fn detach(&self, owner: &str) -> Detached {
+        let vaults = {
+            let mut state = self.state();
+            let mine: Vec<String> = state.vaults.iter().filter(|(_, v)| v.owner == owner).map(|(h, _)| h.clone()).collect();
+            mine.iter().filter_map(|h| state.vaults.remove(h)).collect()
+        };
+        Detached { vaults, runs: self.agents.detach(owner) }
     }
 
     /// Closes every vault (stopping watchers) and source (deleting temp files), cancels server sign-ins, and stops
@@ -611,6 +625,24 @@ impl Host {
 impl Drop for Host {
     fn drop(&mut self) {
         self.shutdown();
+    }
+}
+
+/// What `Host::detach` took from one window, still to be ended.
+#[must_use = "watchers and agent runs go on until `end` is called"]
+pub struct Detached {
+    vaults: Vec<Arc<VaultEntry>>,
+    runs: agent::DetachedRuns,
+}
+
+impl Detached {
+    /// Stops the watchers, closes the index connections (once no call in flight still uses them) and ends the agent
+    /// runs, deleting their folders. Blocks: call it off the event loop.
+    pub fn end(self) {
+        for entry in self.vaults {
+            lock(&entry.watcher).take();
+        }
+        self.runs.end();
     }
 }
 

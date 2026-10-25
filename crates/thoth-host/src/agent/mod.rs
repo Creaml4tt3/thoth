@@ -473,14 +473,18 @@ impl Agents {
     /// Ends the runs `owner` created, as `shutdown` ends all of them: a window that closes takes its runs with it, as
     /// quitting the app always did (ADR-0019). Returns how many.
     pub fn release(&self, owner: &str) -> usize {
-        let runs: Vec<Arc<Run>> = {
-            let mut all = self.runs();
-            let mine: Vec<String> = all.iter().filter(|(_, r)| r.owner == owner).map(|(h, _)| h.clone()).collect();
-            mine.iter().filter_map(|h| all.remove(h)).collect()
-        };
-        let count = runs.len();
-        Self::end_all(runs);
+        let runs = self.detach(owner);
+        let count = runs.0.len();
+        runs.end();
         count
+    }
+
+    /// The first, quick half of `release`: `owner`'s run handles stop working at once. `DetachedRuns::end` then stops
+    /// the processes and deletes the folders, which may take seconds (it waits for each process to exit).
+    pub fn detach(&self, owner: &str) -> DetachedRuns {
+        let mut all = self.runs();
+        let mine: Vec<String> = all.iter().filter(|(_, r)| r.owner == owner).map(|(h, _)| h.clone()).collect();
+        DetachedRuns(mine.iter().filter_map(|h| all.remove(h)).collect())
     }
 
     fn end_all(runs: Vec<Arc<Run>>) {
@@ -492,6 +496,17 @@ impl Agents {
             wait_done(&run, Duration::from_secs(2));
             let _ = remove_run_dir(&run.dir);
         }
+    }
+}
+
+/// Runs taken out of `Agents` by `detach`, still to be ended.
+#[must_use = "the runs go on until `end` is called"]
+pub struct DetachedRuns(Vec<Arc<Run>>);
+
+impl DetachedRuns {
+    /// Cancels the runs, kills their process groups and deletes their folders (blocks while they exit).
+    pub fn end(self) {
+        Agents::end_all(self.0);
     }
 }
 

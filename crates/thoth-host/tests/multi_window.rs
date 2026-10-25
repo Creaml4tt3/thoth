@@ -74,6 +74,31 @@ fn a_second_window_on_a_folder_is_told_it_is_shared() {
 }
 
 #[test]
+fn shared_means_another_window_not_another_handle_of_the_same_window() {
+    let base = tempfile::tempdir().unwrap();
+    let notes = base.path().join("Notes");
+    std::fs::create_dir(&notes).unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let host = host(base.path(), data.path());
+    let shared = |vault: &Value| host.call("vault.shared", &json!({ "vault": vault }), None).unwrap().0;
+
+    let old = open(&host, "main", &notes);
+    // The main window reloads: its old page's handle may still be open, but no other window is.
+    let reloaded = open(&host, "main", &notes);
+    assert_eq!(reloaded["shared"], false);
+    assert_eq!(shared(&reloaded["vault"]), false);
+    assert_eq!(shared(&old["vault"]), false);
+
+    let other = open(&host, "space-1", &notes);
+    assert_eq!(other["shared"], true);
+    assert_eq!(shared(&reloaded["vault"]), true);
+    assert_eq!(shared(&other["vault"]), true);
+
+    host.release("space-1");
+    assert_eq!(shared(&reloaded["vault"]), false, "the other window closed: this one is the only one again");
+}
+
+#[test]
 fn a_closed_window_takes_its_own_vaults_and_agent_runs_with_it() {
     let base = tempfile::tempdir().unwrap();
     let notes = base.path().join("Notes");
@@ -100,6 +125,31 @@ fn a_closed_window_takes_its_own_vaults_and_agent_runs_with_it() {
     // A window that never opened anything closes without touching anyone's.
     host.release("space-9");
     assert!(host.call("fs.stat", &json!({ "vault": theirs, "path": "Plan.md" }), None).is_ok());
+}
+
+#[test]
+fn a_reloaded_page_lets_go_of_what_the_old_page_held_and_keeps_what_it_opens_next() {
+    let base = tempfile::tempdir().unwrap();
+    let notes = base.path().join("Notes");
+    std::fs::create_dir(&notes).unwrap();
+    std::fs::write(notes.join("Plan.md"), "# Plan\n").unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let host = host(base.path(), data.path());
+
+    let old = open(&host, "main", &notes)["vault"].clone();
+    let old_run = host.call_as("main", "agent.run.create", &json!({ "provider": "claude" }), None).unwrap().0;
+    let old_dir = PathBuf::from(old_run["dir"].as_str().unwrap()).parent().unwrap().to_owned();
+
+    // The page starts loading again: the old page's handles stop working at once (the shell ends the rest off the
+    // event loop), so the new page's own handle, opened meanwhile, is never caught up in it.
+    let detached = host.detach("main");
+    assert_eq!(host.call("fs.stat", &json!({ "vault": old, "path": "Plan.md" }), None).unwrap_err().code, "BAD_HANDLE");
+    assert_eq!(host.call("agent.fs.list", &json!({ "run": old_run["run"], "dir": "" }), None).unwrap_err().code, "BAD_HANDLE");
+    let new = open(&host, "main", &notes);
+    assert_eq!(new["shared"], false);
+    detached.end();
+    assert!(!old_dir.exists(), "the old page's run folder is deleted");
+    assert!(host.call("fs.stat", &json!({ "vault": new["vault"], "path": "Plan.md" }), None).is_ok());
 }
 
 #[test]

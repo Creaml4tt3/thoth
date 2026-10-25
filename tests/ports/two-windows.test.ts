@@ -52,14 +52,15 @@ function nodeRuntime(): Runtime {
   };
 }
 
-/** The Rust host: one host process (one app), one handle per window, as the desktop shell has. */
+/** The Rust host: one host process (one app), one handle per window and each window its own owner, as the desktop shell has. */
 function rustRuntime(): Runtime {
   let transport: StdioTransport | undefined;
+  let windows = 0;
   return {
     name: "rust",
     async open(root, wrap = (fs) => fs) {
       transport ??= await rustTransport({ allowRoots: [root] });
-      const connection = await openRemoteVault(transport, root);
+      const connection = await openRemoteVault(transport.as(`space-${++windows}`), root);
       return { fs: wrap(connection.fs), sql: connection.sql, shared: connection.shared ?? false, close: () => connection.close() };
     },
     async dispose() {

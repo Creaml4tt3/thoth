@@ -21,7 +21,8 @@ export class HttpTransport implements Transport {
     const response = await fetch(`${this.base}/call`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-thoth-bridge": this.token },
-      body: JSON.stringify({ command, args, ...(bytes ? { bytes: encodeBase64(bytes) } : {}) }),
+      // `owner`: which window asks (ADR-0019), as the desktop shell knows the webview that calls.
+      body: JSON.stringify({ command, args, owner: thisWindow(), ...(bytes ? { bytes: encodeBase64(bytes) } : {}) }),
     });
     const message = (await response.json()) as { ok: boolean; result?: unknown; bytes?: string; error?: unknown };
     if (message.ok) return (typeof message.bytes === "string" ? decodeBase64(message.bytes) : (message.result ?? null)) as Commands[C]["result"];
@@ -36,6 +37,11 @@ export class HttpTransport implements Transport {
   }
 }
 
+/** This page's window id (`?window=`), "main" by default. */
+function thisWindow(): string {
+  return new URLSearchParams(globalThis.location?.search ?? "").get("window") ?? "main";
+}
+
 /**
  * Thoth's windows for the bridge (ADR-0019): a new window is a browser window on the same page with the address the
  * desktop shell would build (`?window=…&root=…&tabs=…`), so a test can drive both against the one Rust host. A page
@@ -43,7 +49,7 @@ export class HttpTransport implements Transport {
  */
 function bridgeWindows(): Windows {
   const channel = typeof BroadcastChannel === "function" ? new BroadcastChannel("thoth-bridge-windows") : null;
-  const self = new URLSearchParams(globalThis.location?.search ?? "").get("window") ?? "main";
+  const self = thisWindow();
   globalThis.addEventListener?.("pagehide", () => channel?.postMessage({ closed: self }));
   return {
     async open({ id, root, tabs }) {

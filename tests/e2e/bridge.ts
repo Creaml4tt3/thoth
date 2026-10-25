@@ -57,7 +57,7 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
       if (url.pathname === "/call" && req.method === "POST") {
         if (req.headers["x-thoth-bridge"] !== token) return void res.writeHead(403).end();
-        const { command, args, bytes } = JSON.parse(await body(req)) as { command: CommandName; args: never; bytes?: string };
+        const { command, args, bytes, owner } = JSON.parse(await body(req)) as { command: CommandName; args: never; bytes?: string; owner?: unknown };
         if (hold?.command === command && hold.when(args as Record<string, unknown>)) {
           const { arrive, gate } = hold;
           hold = null;
@@ -65,7 +65,9 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
           await gate;
         }
         try {
-          const result = await transport.call(command, args, bytes === undefined ? undefined : decodeBase64(bytes));
+          // Each page is its own window (ADR-0019): the host sees its id as the desktop shell's webview label.
+          const caller = typeof owner === "string" ? transport.as(owner) : transport;
+          const result = await caller.call(command, args, bytes === undefined ? undefined : decodeBase64(bytes));
           const payload = BYTE_RESULTS.has(command) ? { ok: true, bytes: encodeBase64(result as Uint8Array) } : { ok: true, result };
           res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(payload));
         } catch (error) {
