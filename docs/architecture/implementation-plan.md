@@ -896,8 +896,9 @@ Private Space, read-only workspace pages; each only narrows what is offered and 
 own settings (per user). Text selected in the editor can be quoted to the CLI after the task (`StartTask.excerpt`,
 at most 4000 characters): it follows the rules of its page (Permissions; a workspace's export rule) and, like the
 workspace framing, is not kept in the run record. The agent packages and the host are unchanged by this work.
-Checks: `pnpm check` 1976 passed, 2 skipped; `pnpm e2e` 70 passed, 2 skipped, 1 failed (the pre-existing
-`private-tree.e2e.ts` "New folder" flake, also on `main` before this change; being fixed separately).
+Checks: `pnpm check` 1976 passed, 2 skipped; `pnpm e2e` 71 passed, 2 skipped (after the e2e flake fixes of the same
+day: drag-onto-text waits for the settled tree, the app is built once in a global setup, and the private-tree "New
+folder" steps wait for focus to come back after a rename).
 Not yet checked by a person in a real window: the mascot's look and motion, the drag feel, Thai on screen.
 
 Not done / follow-ups (see §4 item 12):
