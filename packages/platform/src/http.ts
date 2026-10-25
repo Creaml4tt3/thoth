@@ -76,10 +76,23 @@ function bridgeWindows(): Windows {
  * as named events on the bridge's event stream.
  */
 function bridgeConnectedApps(transport: HttpTransport, base: string, token: string): ConnectedApps {
+  // One stream for every listener of this page: browsers allow only a few connections per host, and two windows'
+  // streams must not use up the ones their commands need.
+  let source: EventSource | null = null;
+  let listeners = 0;
   const on = async <T>(event: string, listener: (payload: T) => void): Promise<() => void> => {
-    const source = new EventSource(`${base}/events?token=${encodeURIComponent(token)}`);
-    source.addEventListener(event, (e) => listener(JSON.parse((e as MessageEvent<string>).data) as T));
-    return () => source.close();
+    source ??= new EventSource(`${base}/events?token=${encodeURIComponent(token)}`);
+    const stream = source;
+    const receive = (e: Event) => listener(JSON.parse((e as MessageEvent<string>).data) as T);
+    stream.addEventListener(event, receive);
+    listeners++;
+    return () => {
+      stream.removeEventListener(event, receive);
+      if (--listeners === 0 && source === stream) {
+        stream.close();
+        source = null;
+      }
+    };
   };
   return remoteConnectedApps(transport, {
     onRequest: (listener) => on<McpRequest>("mcp.request", listener),
