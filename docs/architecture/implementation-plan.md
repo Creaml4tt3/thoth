@@ -1015,9 +1015,50 @@ Not covered:
 ADR-0019 open questions: closing a window with a running agent; window sizes and positions; macOS Window menu
 items; live state across windows.
 
-### Phase 5 — MVP end-to-end (§14)
+### Phase 5 — MVP end-to-end (§14) ✅
 
 All twelve steps of spec §14 as one automated scenario.
+
+Result (2026-10-26) ✅: `tests/e2e/mvp.e2e.ts`, one `test.describe.serial` of eleven tests (steps 2 and 3 are done per
+source). One person walks the steps in order on the real desktop UI in Chromium (the e2e bridge to the real Rust host),
+the real reference server (PostgreSQL in Podman, the local OIDC test issuer) and the fake `claude` CLI. The tests share
+one browser context, one app data folder and three vaults (`mine`, `notion`, `obsidian`); a failed step skips the rest.
+Every page request that is not for the running session's bridge is aborted and counted.
+
+| §14 step | Evidence (test › assertion) |
+|---|---|
+| 1. Markdown notes, no network | "1. create Markdown notes privately…" › two pages made with New page and typed: the files are exactly `---\nthoth_id: <uuid>\n---\n# Today\n\nWritten with no network.\n` (and Ideas); zero aborted requests; no `servers.json` |
+| 2. Notion and Obsidian into separate vaults | "2–3 (Notion)…": the export as a ZIP through every wizard step into the `notion` vault (9 pages, 3 attachments, 2 databases); "2–3 (Obsidian)…": the fixture vault folder into the `obsidian` vault (11 pages, 2 attachments); the ZIP byte-identical and the folder's snapshot unchanged afterwards |
+| 3. Nested pages, attachments, metadata, links | Same two tests › the tree opens `Notion/Thoth Handbook/Engineering/Deep Dive` and `Obsidian/Projects`, `Obsidian/บันทึก`; the Backlinks panel names the linking pages; attachment and CSV bytes equal the source's; `thoth_source` and `thoth_id` added, Obsidian's unknown and nested frontmatter kept, Home's body byte-identical; the link index (read with the Node runtime once the app is closed): the only unresolved links are the fixtures' deliberate ones (Notion's Archived Roadmap; Obsidian's `[[Does Not Exist]]` and ambiguous `[[Alpha]]`), backlinks of pages and attachments as expected |
+| 4. Connect to the reference server | "4. connect…" › Settings → Servers → Add server, Sign in with Google: the host's `browser.open` URL is followed through the server and the issuer to the loopback callback; "Signed in as Ada Lovelace"; both workspaces listed; no token in the page |
+| 5. Copy, then move, selected pages | "5–6. copy, then move…" › Welcome copied, then Home and Café moved, through Select pages and the dialog (members, link classes, "1 attachment is uploaded"); Home and Café gone from the vault, Welcome and the picture unchanged |
+| 6. Destination content, hashes, attachments, links | Same test › each revision's `contentHash` is the sha256 of its Markdown; moved pages keep their `thoth_id` as page ID, the copy has a new one; Home's Markdown is the vault's bytes with exactly its travelling links rewritten to `thoth:page/<id>` / `thoth:attachment/<id>` (labels kept); the attachment's bytes downloaded from the server and its stored hash and size match the vault file |
+| 7. Edit shared content, move it back | "7. edit the shared page…" › a line typed in the workspace editor reaches the server; Café and Home moved back from their workspace pages: Home's file is the original bytes plus the edit (links in vault form again, the picture is the vault's), Café byte-identical, the workspace keeps only the copy |
+| 8. Interruption and recovery | "8. the app dies in the middle of a transfer…" › a move held at its commit and the host killed: the server has it staged, the vault has the source; after a restart "…was undone. The originals are unchanged.", server transfer aborted with no staged items, Beta byte-identical. A copy killed right after the server committed: after a restart "…has been finished.", one Spec Doc in the workspace with a verified hash, the source unchanged, no unfinished transfer, no temp files |
+| 9. Local AI CLI, user's login, selected context only | "9. ask the local AI CLI from the mascot…" › one page picked in the bubble; the fake CLI recorded only `Obsidian/Café.md` in its own working directory as cwd, the policy's argv, the task on stdin, no `THOTH_*` variable and no vault path in argv or env, and the user's own `HOME`; nothing written before review |
+| 10. Review, apply or discard | "10. review the proposed changes…" › the edit applied (exact bytes on disk), the new file discarded (never written), the working copy removed, the run recorded as applied |
+| 11. No local files or CLIs without the bridge | "11. a browser cannot read local files…" › the web production bundle has none of `apps/web/test/bundle.ts`'s desktop-only names (shared with `build.test.ts`); the web client and the desktop UI loaded without the bridge's script have no `Platform`, no Tauri, no mascot, and "No Thoth host is connected"; `/call` and `/events` without or with a guessed token answer 403 (from the web origin the request fails outright); no agent run was created and no file changed |
+| 12. Server permissions hold against the client | "12. the server's permissions hold…" › with Grace's token (a viewer in Studio), direct HTTP: write, create, move and delete in Studio are 403; read, tree, write, move and delete in Finance (not a member) are 404; no or a made-up token is 401; pages, revisions, attachments and the change feed are unchanged in the database |
+
+Not through the UI, because there is none for it (the test says so too): the server's accounts, workspaces and
+memberships are seeded in SQL; the checks read the server with a token and the vault's link index with the Node
+runtime. Step 8 interrupts by holding the host's `api.call` at a state boundary (the bridge's `holdNext`) and killing
+the host, since the transfer engine's `checkpoint` hook is a unit-test seam the app does not expose (the 96 crash points
+stay in `packages/transfer/test/faults.test.ts`).
+
+Test infrastructure added: `tests/e2e/reference-server.ts` (PostgreSQL, server and issuer, `apiAs`, `actAsBrowser`,
+`serveWebClient`; now also used by `workspace-server.e2e.ts`, `transfer.e2e.ts` and `web-client.e2e.ts`),
+`apps/web/test/bundle.ts`, and `thoth-host-stdio --secrets-file`: the harness kept sign-ins in memory only, so a
+restarted host was signed out and recovery could not reach the server ("could not be settled because the server is
+not reachable"). The file stands in for the system keychain, where the desktop app keeps its sign-in across restarts.
+
+Runs (2026-10-26): the scenario alone about 30 s (the eleven tests 27 s); `--repeat-each=5` 55/55 passed in 2.4 min;
+`pnpm e2e` 88 passed, 3 skipped (as before); `pnpm check` 2091 passed, 4 skipped; `cargo test -p thoth-host` 81 passed.
+
+Found while writing it (not changed, no locked decision touched):
+- Startup recovery runs once per window. If the server cannot be used then (signed out, or a refresh token that no
+  longer works), the notice says the server "is not reachable" and that Thoth "will try again next time", and signing
+  in afterwards does not retry it in that session.
 
 ### After Phase 5 — the owner's list (2026-10-25), not started
 
