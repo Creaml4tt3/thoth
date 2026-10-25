@@ -1,0 +1,18 @@
+{
+  "name": "@thoth/agent-core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The Agent Hub core (ADR-0007): the AgentProvider contract, run records, context staging into a scoped working directory, review of proposed changes and compare-and-swap apply. No React, no Tauri.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@thoth/content": "workspace:*",
+    "@thoth/domain": "workspace:*",
+    "@thoth/local-store": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

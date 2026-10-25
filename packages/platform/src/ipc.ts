@@ -14,6 +14,7 @@
  */
 import type { DirEntry, FileStat } from "@thoth/local-store";
 import type { SourceDirEntry } from "@thoth/importer-core";
+import type { AgentProbe, HostEventBatch } from "@thoth/agent-core";
 
 /** SQL values on the wire. Integers outside ±2^53 and blobs are tagged. */
 export type WireValue = null | string | number | { $bigint: string } | { $bytes: string };
@@ -43,6 +44,8 @@ export type HostErrorCode =
   | "SERVER_UNREACHABLE"
   /** Browser sign-in did not complete (refused, mismatch, timeout, cancelled). The message says which, in plain words. */
   | "SIGN_IN_FAILED"
+  /** The agent CLI could not be found or started. */
+  | "AGENT_UNAVAILABLE"
   | "INTERNAL";
 
 export interface HostError {
@@ -119,6 +122,31 @@ export interface Commands {
    * the server becomes `signed-out` and the 401 is returned.
    */
   "api.call": { args: ApiCallArgs; result: ApiCallResult };
+
+  // ---- Agent Hub (ADR-0007). Desktop only: there is no web equivalent (spec 3.3, 14.11).
+  /** Finds the provider's CLI (PATH and the usual install folders) and runs its fixed probes. */
+  "agent.detect": { args: { provider: string }; result: AgentProbe };
+  /** A new, empty, private working directory under the app data folder. `dir` is for display only. */
+  "agent.run.create": { args: { provider: string }; result: { run: string; dir: string } };
+  "agent.fs.stat": { args: { run: string; path: string }; result: FileStat | null };
+  "agent.fs.read": { args: { run: string; path: string }; result: Bytes };
+  "agent.fs.list": { args: { run: string; dir: string }; result: DirEntry[] };
+  /** Only before `agent.start`. */
+  "agent.fs.mkdirp": { args: { run: string; dir: string }; result: null };
+  /** Request bytes: the file. Exclusive create, only before `agent.start`. */
+  "agent.fs.write": { args: { run: string; path: string }; result: null };
+  /**
+   * Request bytes: the CLI's stdin (the prompt). The host runs the provider's binary with `argv` only when its policy
+   * accepts every argument (`NOT_ALLOWED` otherwise), in the working directory, in its own process group.
+   */
+  "agent.start": { args: { run: string; argv: string[]; timeoutMs?: number }; result: null };
+  /** Output events after `after`; waits up to `waitMs` (at most 10 s) for the first. */
+  "agent.events": { args: { run: string; after: number; waitMs: number }; result: HostEventBatch };
+  "agent.cancel": { args: { run: string }; result: null };
+  /** Stops the run if needed and deletes its working directory. */
+  "agent.run.dispose": { args: { run: string }; result: null };
+  /** Deletes working directories left by an earlier session. */
+  "agent.sweep": { args: Record<string, never>; result: { removed: number } };
 }
 
 export interface ServerInfo {

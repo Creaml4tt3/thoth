@@ -12,6 +12,7 @@
     "./http": "./src/http.ts"
   },
   "dependencies": {
+    "@thoth/agent-core": "workspace:*",
     "@thoth/importer-core": "workspace:*",
     "@thoth/local-store": "workspace:*"
   }

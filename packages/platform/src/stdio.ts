@@ -16,6 +16,8 @@ export interface StdioTransportOptions {
   pickVault?: string;
   pickSource?: string;
   dataDir?: string;
+  /** Test hook: look for agent CLIs only in these folders (`--agent-search-dir`). */
+  agentSearchDirs?: string[];
   env?: Record<string, string>;
   /**
    * Harness-only host events other than `vault.changed` (for example `browser.open`, where the test harness
@@ -31,7 +33,7 @@ interface Pending {
 }
 
 /** Commands whose result is raw bytes (out of band). */
-const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read"]);
+const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read", "agent.fs.read"]);
 
 export class StdioTransport implements Transport {
   private readonly child: ChildProcessWithoutNullStreams;
@@ -49,6 +51,7 @@ export class StdioTransport implements Transport {
     if (options.pickVault !== undefined) args.push("--pick-vault", options.pickVault);
     if (options.pickSource !== undefined) args.push("--pick-source", options.pickSource);
     if (options.dataDir !== undefined) args.push("--data-dir", options.dataDir);
+    for (const dir of options.agentSearchDirs ?? []) args.push("--agent-search-dir", dir);
     this.child = spawn(options.binary, args, { env: { ...process.env, ...options.env }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString("utf8")).slice(-4096);

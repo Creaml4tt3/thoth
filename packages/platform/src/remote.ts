@@ -3,6 +3,7 @@
  * IPC in the desktop app and over the stdio harness in tests, so the shared
  * port contract suite exercises exactly the code the app ships.
  */
+import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
 import type { Platform, Servers, VaultConnection } from "./index.ts";
@@ -275,9 +276,31 @@ export function remoteServers(transport: Transport): Servers {
   };
 }
 
+/** The Agent Hub's host port over the `agent.*` commands. */
+export function remoteAgents(transport: Transport): AgentHost {
+  const files = (run: string): AgentFiles => ({
+    stat: async (path) => (await transport.call("agent.fs.stat", { run, path })) ?? undefined,
+    readFile: (path) => transport.call("agent.fs.read", { run, path }),
+    list: (dir) => transport.call("agent.fs.list", { run, dir }),
+    mkdirp: async (dir) => void (await transport.call("agent.fs.mkdirp", { run, dir })),
+    writeFile: async (path, data) => void (await transport.call("agent.fs.write", { run, path }, data)),
+  });
+  return {
+    detect: (provider) => transport.call("agent.detect", { provider }),
+    createRun: (provider) => transport.call("agent.run.create", { provider }),
+    files,
+    start: async (run, argv, stdin, timeoutMs) => void (await transport.call("agent.start", { run, argv, ...(timeoutMs === undefined ? {} : { timeoutMs }) }, stdin)),
+    events: (run, after, waitMs) => transport.call("agent.events", { run, after, waitMs }),
+    cancel: async (run) => void (await transport.call("agent.cancel", { run })),
+    dispose: async (run) => void (await transport.call("agent.run.dispose", { run })),
+    sweep: async () => (await transport.call("agent.sweep", {})).removed,
+  };
+}
+
 export function createRemotePlatform(transport: Transport, kind: Platform["kind"]): Platform {
   return {
     servers: remoteServers(transport),
+    agents: remoteAgents(transport),
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),

@@ -4,6 +4,7 @@
  * stdio harness. Domain logic (Vault, import pipeline) runs in TypeScript on
  * top of the ports a `Platform` hands out.
  */
+import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, VaultChangedEvent } from "./ipc.ts";
@@ -34,6 +35,11 @@ export interface Platform {
   openImportSource(location: string): Promise<SourceHost>;
   /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
   readonly servers: Servers;
+  /**
+   * Agent CLIs on this computer (ADR-0007). Only a native host has them; absent means the Agent Hub is unavailable
+   * (a browser can never spawn a process, spec 14.11).
+   */
+  readonly agents?: AgentHost;
 }
 
 export interface Servers {

@@ -16,9 +16,10 @@ import type { CommandName, VaultChangedEvent } from "@thoth/platform";
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" };
 /**
  * Commands whose result is raw bytes. Every other result (including `api.call`, whose response body is UTF-8 text)
- * is JSON. Request bytes (`fs.write`, `source.temp.write`, `api.call`) are forwarded for any command.
+ * is JSON. Request bytes (`fs.write`, `source.temp.write`, `api.call`, `agent.fs.write`, `agent.start`) are forwarded
+ * for any command.
  */
-const BYTE_RESULTS = new Set<string>(["fs.read", "source.file.read"]);
+const BYTE_RESULTS = new Set<string>(["fs.read", "source.file.read", "agent.fs.read"]);
 
 export interface Bridge {
   url: string;

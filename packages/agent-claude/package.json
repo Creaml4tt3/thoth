@@ -1,0 +1,14 @@
+{
+  "name": "@thoth/agent-claude",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The Claude Code CLI adapter for the Agent Hub (ADR-0007): verified arguments, stream-json parsing, detection. No React, no Tauri.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/agent-core": "workspace:*"
+  }
+}
