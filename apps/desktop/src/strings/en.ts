@@ -97,6 +97,13 @@ export const en = {
     editor: "Editor",
     editorNote: "Both modes edit the same Markdown file. Switch any page with Ctrl/Cmd+Shift+E or the toggle above it.",
     defaultMode: "Default editor mode",
+    /** Settings → Editor → Link previews (ADR-0020). */
+    linkPreviews: "Link previews",
+    linkPreviewsNote: "A link on its own line can show a card with the page's title, description and image. Thoth fetches it, which tells the site you looked; links in workspace pages wait until you choose Load preview.",
+    linkPreviewModes: { on: "On", paste: "Only for links I paste", off: "Off" } satisfies Record<"on" | "paste" | "off", string>,
+    clearLinkPreviews: "Clear link previews",
+    linkPreviewsCleared: "Link previews cleared.",
+    linkPreviewsClearFailed: "Could not clear the link previews.",
     index: "Search index",
     indexNote: "Rebuilding re-reads every file and recreates the index. Your files are not changed.",
     rebuild: "Rebuild index",

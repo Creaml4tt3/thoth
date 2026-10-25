@@ -85,6 +85,13 @@ export const th: DesktopStrings = {
     editor: "ตัวแก้ไข",
     editorNote: "ทั้งสองโหมดแก้ไขไฟล์ Markdown ไฟล์เดียวกัน สลับโหมดของหน้าไหนก็ได้ด้วย Ctrl/Cmd+Shift+E หรือปุ่มสลับด้านบนของหน้า",
     defaultMode: "โหมดแก้ไขเริ่มต้น",
+    // Settings → Editor → Link previews (ADR-0020). Strings marked REVIEW are the least certain.
+    linkPreviews: "ตัวอย่างลิงก์",
+    linkPreviewsNote: "ลิงก์ที่อยู่บรรทัดเดียวโดด ๆ แสดงการ์ดที่มีชื่อ คำอธิบาย และรูปของหน้านั้นได้ Thoth จะดึงข้อมูลมาให้ ซึ่งทำให้เว็บไซต์รู้ว่าคุณเปิดดู ส่วนลิงก์ในหน้าของเวิร์กสเปซจะรอจนกว่าคุณจะกดโหลดตัวอย่าง", // REVIEW
+    linkPreviewModes: { on: "เปิด", paste: "เฉพาะลิงก์ที่ฉันวาง", off: "ปิด" }, // REVIEW
+    clearLinkPreviews: "ล้างตัวอย่างลิงก์",
+    linkPreviewsCleared: "ล้างตัวอย่างลิงก์แล้ว",
+    linkPreviewsClearFailed: "ล้างตัวอย่างลิงก์ไม่ได้",
     index: "ดัชนีการค้นหา",
     indexNote: "การสร้างดัชนีใหม่จะอ่านทุกไฟล์อีกครั้งแล้วสร้างดัชนีขึ้นใหม่ ไฟล์ของคุณไม่ถูกเปลี่ยน",
     rebuild: "สร้างดัชนีใหม่",

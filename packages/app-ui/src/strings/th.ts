@@ -67,6 +67,18 @@ export const th: Strings = {
       withShortcut: (label, shortcut) => `${label} (${shortcut})`,
     },
 
+    // Link previews (ADR-0020). Strings marked REVIEW are the least certain.
+    linkCard: {
+      label: (name) => `ตัวอย่างลิงก์: ${name}`,
+      loading: "กำลังโหลดตัวอย่าง…",
+      load: "โหลดตัวอย่าง",
+      loadHint: "การโหลดตัวอย่างจะทำให้เว็บไซต์รู้ว่าคุณเปิดดู", // REVIEW
+      options: "ตัวเลือกของตัวอย่างลิงก์",
+      showAsLink: "แสดงเป็นลิงก์", // REVIEW
+      open: "เปิด",
+      copy: "คัดลอกลิงก์",
+    },
+
     blocks: {
       text: { title: "ข้อความ", description: "ย่อหน้าธรรมดา" },
       h1: { title: "หัวข้อ 1", description: "หัวข้อใหญ่ของส่วน" },

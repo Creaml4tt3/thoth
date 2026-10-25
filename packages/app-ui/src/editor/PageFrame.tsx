@@ -110,8 +110,16 @@ export function PageFrame(props: PageFrameProps) {
   // One context per page: the link opener changes with every index revision, and node views and the Plain editor hold the context.
   const open = useRef(props.openLink);
   open.current = props.openLink;
-  const client = usePageHost().client ?? "desktop";
-  const ctx = useMemo(() => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p), strings: t, client }), [t, client]);
+  const pageHost = usePageHost();
+  const client = pageHost.client ?? "desktop";
+  // Link previews (ADR-0020) know where the page lives: links in a workspace page wait for "Load preview".
+  const space = store.kind === "file" ? "private" : "workspace";
+  const linkService = pageHost.links;
+  const links = useMemo(() => linkService?.forPage({ space, key: `${modeKey.space}\n${modeKey.page}` }), [linkService, space, modeKey.space, modeKey.page]);
+  const ctx = useMemo(
+    () => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p), strings: t, client, ...(links ? { links } : {}) }),
+    [t, client, links],
+  );
   const { session, state } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten });
 
   // Wikilink chips resolve through the index; refresh them when it changes.

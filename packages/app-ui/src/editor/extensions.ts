@@ -15,6 +15,8 @@ import { blockHandleExtension } from "./block-handle.ts";
 import { textStylesExtension } from "./selection-toolbar.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
+import { pasteLinksExtension } from "./paste-links.ts";
+import { linkCardsExtension } from "./link-cards.ts";
 import { slashTarget, turnInto } from "./block-ops.ts";
 import type { BlockKind } from "./block-kinds.ts";
 
@@ -75,5 +77,17 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     const view = views[ext.name];
     return view ? ext.extend({ addNodeView: () => view }) : ext;
   });
-  return [...base, Editing, calloutKeysExtension(), listKeysExtension(), slashExtension(ctx.strings), blockHandleExtension(ctx.strings), textStylesExtension(ctx.strings, ctx.client), linkSuggestExtension(ctx)];
+  const links = ctx.links;
+  return [
+    ...base,
+    Editing,
+    calloutKeysExtension(),
+    listKeysExtension(),
+    slashExtension(ctx.strings),
+    blockHandleExtension(ctx.strings),
+    textStylesExtension(ctx.strings, ctx.client),
+    linkSuggestExtension(ctx),
+    pasteLinksExtension(ctx),
+    ...(links ? [linkCardsExtension({ ...ctx, links })] : []),
+  ];
 }

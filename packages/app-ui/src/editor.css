@@ -221,3 +221,28 @@
 .text-toolbar-apply:focus-visible, .text-toolbar-remove:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .text-toolbar-error { flex-basis: 100%; color: var(--thoth-text-red); font: var(--thoth-text-small); }
 .text-toolbar-error:empty { display: none; }
+
+/* Link preview card (ADR-0020): under a link alone in its paragraph, display only. Inside the paragraph as a widget,
+   shown as a block. Text from the page is plain text; the description is cut at two lines. */
+.link-card { display: flex; align-items: stretch; gap: 0; margin: 6px 0 2px; max-width: 560px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: var(--thoth-text-ui); user-select: none; position: relative; animation: thoth-rise-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+/* The body's text and picture sit in the card's own row, so the menu button can go between them (the picture reaches
+   the card's edge). */
+.link-card-body { display: contents; }
+.link-card-media { order: 2; }
+.link-card-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; padding: 10px 4px 10px 14px; order: 0; }
+.link-card-site { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-card-title { font-weight: 600; color: var(--thoth-ink-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-card-description { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.link-card-status { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.link-card-media { flex: none; width: 120px; display: flex; overflow: hidden; border-radius: 0 var(--thoth-radius-md) var(--thoth-radius-md) 0; background: var(--thoth-bg-hover); }
+.link-card-media img { width: 100%; height: 100%; max-height: 96px; object-fit: cover; border-radius: 0; }
+.link-card-load { align-self: flex-start; margin-top: 2px; padding: 3px 10px; border-radius: var(--thoth-radius-sm); border: 1px solid var(--thoth-border-strong); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: var(--thoth-text-small); cursor: pointer; }
+.link-card-load:hover { background: var(--thoth-bg-hover); }
+.link-card-actions { flex: none; display: flex; align-items: flex-start; padding: 6px; position: relative; order: 1; }
+.link-card-more { width: 26px; height: 26px; display: inline-grid; place-items: center; border: 0; border-radius: var(--thoth-radius-sm); background: transparent; color: var(--thoth-ink-secondary); cursor: pointer; }
+.link-card-more svg { fill: currentColor; }
+.link-card-more:hover, .link-card-more[aria-expanded="true"] { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.link-card-menu { position: absolute; top: 34px; right: 6px; z-index: 30; min-width: 160px; display: grid; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-pop); }
+.link-card-menu[hidden] { display: none; }
+.link-card-item { text-align: left; padding: 6px 10px; border: 0; border-radius: var(--thoth-radius-sm); background: transparent; color: var(--thoth-ink-primary); font: var(--thoth-text-ui); cursor: pointer; }
+.link-card-item:hover, .link-card-item:focus-visible { background: var(--thoth-bg-hover); }

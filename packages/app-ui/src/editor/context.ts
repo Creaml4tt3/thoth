@@ -1,5 +1,6 @@
 import type { LinkLookup } from "./links.ts";
 import type { LinkSuggester } from "./link-suggest.ts";
+import type { PageLinks } from "./link-previews.ts";
 import { en, type EditorStrings } from "../strings/en.ts";
 
 /** Something a node view can ask to re-render when the link index changes. */
@@ -18,8 +19,10 @@ export interface EditorContext {
   strings: EditorStrings;
   /** Which app the editor is in; the web client binds other style keys where a browser keeps the desktop's. */
   client: "desktop" | "web";
+  /** Link previews for this page (ADR-0020); absent where the app has none (the web client): links stay links. */
+  links?: PageLinks;
 }
 
-export function createEditorContext(init: { lookup(): LinkLookup; suggester(): LinkSuggester; openPage(path: string): void; strings?: EditorStrings; client?: "desktop" | "web" }): EditorContext {
+export function createEditorContext(init: { lookup(): LinkLookup; suggester(): LinkSuggester; openPage(path: string): void; strings?: EditorStrings; client?: "desktop" | "web"; links?: PageLinks }): EditorContext {
   return { ...init, strings: init.strings ?? en.editor, client: init.client ?? "desktop", views: new Set() };
 }

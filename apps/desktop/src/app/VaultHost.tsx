@@ -11,6 +11,7 @@ import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
 import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
+import { createLinkPreviewService } from "@thoth/app-ui/editor/link-previews.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { parseTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
 import { loadTabs, saveTabs } from "./tabs-store.ts";
@@ -163,7 +164,12 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Workspace servers: one directory per open window, polling only expanded workspaces.
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
-  const pageHost = useMemo<PageHost>(() => ({ client: "desktop", autosaveMs: options.autosaveMs, now: options.now, registerFlush }), [options.autosaveMs, options.now, registerFlush]);
+  // Link previews (ADR-0020): the host fetches them; a platform without `links` shows plain links.
+  const linkPreviews = useMemo(() => (platform.links ? createLinkPreviewService(platform.links) : undefined), [platform]);
+  const pageHost = useMemo<PageHost>(
+    () => ({ client: "desktop", autosaveMs: options.autosaveMs, now: options.now, registerFlush, ...(linkPreviews ? { links: linkPreviews } : {}) }),
+    [options.autosaveMs, options.now, registerFlush, linkPreviews],
+  );
   // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
   const transfers = useMemo(
     () =>

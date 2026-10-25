@@ -7,6 +7,8 @@ import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { AgentSettings } from "../agents/AgentSettings.tsx";
 import { NotificationSettings } from "../notifications/NotificationSettings.tsx";
+import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
+import { usePageHost } from "@thoth/app-ui/editor/host.ts";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -16,7 +18,8 @@ type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages
 
 /** Settings: vault location, workspace servers, the assistant, notifications, language, editor mode, Rebuild index, and Import & Export. */
 export function SettingsView({ section = "top" }: { section?: "top" | "servers" | "agents" }) {
-  const { connection, vault, refresh, switchVault, openPage, openFolder } = useSession();
+  const { connection, vault, refresh, switchVault, openPage, openFolder, platform } = useSession();
+  const previews = usePageHost().links;
   const t = useDesktopStrings().settings;
   const modes = useStrings().editor.modes;
   const { preference, setPreference } = useContext(LangPreferenceContext);
@@ -139,6 +142,7 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
               </label>
             ))}
           </fieldset>
+          {platform.links && <LinkPreviewSettings links={platform.links} {...(previews ? { onCleared: () => previews.clear() } : {})} />}
         </section>
 
         <section aria-labelledby="set-index" className="set-section">

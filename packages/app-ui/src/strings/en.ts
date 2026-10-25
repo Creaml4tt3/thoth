@@ -84,6 +84,20 @@ export const en = {
       withShortcut: (label: string, shortcut: string) => `${label} (${shortcut})`,
     },
 
+    /** The preview card under a link alone in its paragraph (ADR-0020). The page's own text is shown as text only. */
+    linkCard: {
+      /** The card's accessible name: the page's title, or the site when there is none yet. */
+      label: (name: string) => `Link preview: ${name}`,
+      loading: "Loading preview…",
+      load: "Load preview",
+      /** Why a workspace page waits: loading tells the site you looked. */
+      loadHint: "Loading a preview tells the site you looked.",
+      options: "Link preview options",
+      showAsLink: "Show as link",
+      open: "Open",
+      copy: "Copy link",
+    },
+
     blocks: {
       text: { title: "Text", description: "Plain paragraph" },
       h1: { title: "Heading 1", description: "Big section heading" },

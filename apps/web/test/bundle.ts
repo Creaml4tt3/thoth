@@ -7,6 +7,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const DESKTOP_ONLY = [
+  // Link previews are fetched by the desktop host only (ADR-0020): the web client shows plain links.
+  "link.preview",
+  "link_preview",
   "@tauri-apps",
   "plugin:fs",
   "child_process",
