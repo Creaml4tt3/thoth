@@ -148,11 +148,15 @@ fn main() {
 }
 
 /// `server.*` and `api.call` may block on the network or a browser, `agent.events` waits for output and
-/// `agent.detect` runs the CLI; they run off the main loop.
+/// `agent.detect` runs the CLI; they run off the main loop. So do `sql.*` and `fs.*`, as the desktop shell runs every
+/// call on its own blocking thread: with two windows on one folder (ADR-0019), one window's `BEGIN IMMEDIATE` waits
+/// in SQLite's busy handler for the other's transaction, which must be able to go on meanwhile.
 fn runs_off_main(line: &str) -> bool {
     serde_json::from_str::<Value>(line)
         .ok()
-        .and_then(|r| r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || matches!(c, "api.call" | "agent.events" | "agent.detect")))
+        .and_then(|r| {
+            r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c.starts_with("sql.") || c.starts_with("fs.") || matches!(c, "api.call" | "agent.events" | "agent.detect"))
+        })
         .unwrap_or(false)
 }
 

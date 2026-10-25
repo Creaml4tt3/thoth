@@ -134,6 +134,28 @@ for (const make of [nodeRuntime, rustRuntime]) {
       expect(await readFile(join(root, "Notes/Plan.md"), "utf8")).toBe("# Plan\n\nFrom A.\n");
     });
 
+    it.runIf(make === rustRuntime)("saves from both windows at once: other pages all land, the same page gives one write and one conflict", async () => {
+      // Node's SQLite driver is synchronous, so two Vaults in one thread cannot wait for each other; the host's calls
+      // run on their own threads (as the desktop shell's do), so on the Rust host they can.
+      const a = await window();
+      const b = await window();
+      const base = sha256Hex(await readFile(join(root, "Notes/Plan.md")));
+      for (let round = 0; round < 5; round++) {
+        await Promise.all([a.vault.writeFileAtomic(`Notes/A${round}.md`, text(`# A${round}\n`), { expectedHash: null }), b.vault.writeFileAtomic(`Notes/B${round}.md`, text(`# B${round}\n`), { expectedHash: null })]);
+      }
+      const both = await Promise.allSettled([
+        a.vault.writeFileAtomic("Notes/Plan.md", text("# Plan\n\nFrom A.\n"), { expectedHash: base }),
+        b.vault.writeFileAtomic("Notes/Plan.md", text("# Plan\n\nFrom B.\n"), { expectedHash: base }),
+      ]);
+      expect(both.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const lost = both.find((r) => r.status === "rejected") as PromiseRejectedResult;
+      expect(lost.reason).toBeInstanceOf(ConflictError);
+      const winner = both[0]!.status === "fulfilled" ? "From A." : "From B.";
+      expect(await readFile(join(root, "Notes/Plan.md"), "utf8")).toBe(`# Plan\n\n${winner}\n`);
+      await b.vault.reconcile();
+      expect((await b.vault.listPages()).map((p) => p.path)).toHaveLength(11);
+    });
+
     it("still gives a conflict when the other window's save lands between the last check and the rename", async () => {
       let other: (() => Promise<void>) | null = null;
       // Window B's files: just before B renames its temp file over the page, A saves the page (the narrowest race).
