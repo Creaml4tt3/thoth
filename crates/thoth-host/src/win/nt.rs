@@ -113,21 +113,6 @@ pub fn open_path(path: &Path, access: u32, directory: bool) -> Result<OwnedHandl
     Ok(unsafe { OwnedHandle::from_raw_handle(handle as _) })
 }
 
-/// `ReOpenFile`: a new handle (and file object) for the file `handle` refers to, without looking its name up again.
-pub fn reopen(handle: &OwnedHandle, access: u32, directory: bool) -> Result<OwnedHandle, OsError> {
-    let mut flags = fs::FILE_FLAG_OPEN_REPARSE_POINT;
-    if directory {
-        flags |= fs::FILE_FLAG_BACKUP_SEMANTICS;
-    }
-    // SAFETY: `handle` is a live handle.
-    let new = unsafe { fs::ReOpenFile(raw(handle), access | fs::SYNCHRONIZE, SHARE_ALL, flags) };
-    if new == f::INVALID_HANDLE_VALUE || new.is_null() {
-        return Err(OsError::last());
-    }
-    // SAFETY: ReOpenFile succeeded.
-    Ok(unsafe { OwnedHandle::from_raw_handle(new as _) })
-}
-
 pub fn wide_path(path: &Path) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
     path.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
@@ -211,7 +196,13 @@ pub struct Entry {
 }
 
 /// Lists a directory handle (opened with `FILE_LIST_DIRECTORY`), without `.` and `..`, from the start.
+///
+/// The enumeration position belongs to the file object, which duplicated handles share (the vault root is listed
+/// through duplicates, `walk::reopen`), so listings are serialized: each one restarts and runs to the end under
+/// the lock.
 pub fn read_dir(dir: &OwnedHandle) -> Result<Vec<Entry>, OsError> {
+    static ENUMERATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one_at_a_time = ENUMERATION.lock().unwrap_or_else(|p| p.into_inner());
     // u64 storage keeps FILE_FULL_DIR_INFO (which holds i64 fields) aligned.
     let mut buf = vec![0u64; 64 * 1024 / 8];
     let mut out = Vec::new();

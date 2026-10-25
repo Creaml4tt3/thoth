@@ -35,8 +35,7 @@ pub fn disk_name(dir: &OwnedHandle, name: &str) -> Vec<u16> {
         Err(e) if e.is_not_found() => {}
         _ => return wide,
     }
-    // A fresh handle: `dir` may be the vault root, which other calls list concurrently.
-    let Ok(entries) = reopen(dir).and_then(|fresh| nt::read_dir(&fresh)) else { return wide };
+    let Ok(entries) = nt::read_dir(dir) else { return wide };
     entries.into_iter().find(|e| e.name != name && e.name.nfc().eq(name.chars())).map(|e| e.wide).unwrap_or(wide)
 }
 
@@ -66,10 +65,10 @@ pub fn classify_wide(dir: &OwnedHandle, name: &[u16]) -> Result<Kind, OsError> {
     nt::kind(&nt::open_at_wide(dir, name, nt::ATTR_ACCESS, FILE_OPEN, 0)?)
 }
 
-/// A new handle for the directory `root` itself (`ReOpenFile`: the same directory, never a new name lookup). It has
-/// its own enumeration position, so concurrent listings of the root do not share a cursor.
+/// Another handle for the directory `root` itself (`DuplicateHandle`: the same open directory, never a new name
+/// lookup). Duplicates share the enumeration position, which `nt::read_dir` serializes.
 pub fn reopen(root: &OwnedHandle) -> Result<OwnedHandle, OsError> {
-    nt::reopen(root, DIR_ACCESS, true)
+    root.try_clone().map_err(|e| OsError(e.raw_os_error().map_or(f::ERROR_INVALID_HANDLE, |c| c as u32)))
 }
 
 /// Opens the directory reached by `segments` from `root`, never following a reparse point.

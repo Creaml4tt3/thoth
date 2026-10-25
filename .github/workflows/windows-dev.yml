@@ -35,7 +35,7 @@ jobs:
           key: windows-test
       - run: pnpm install --frozen-lockfile
       - name: Host tests
-        run: cargo test -p thoth-host -- --nocapture
+        run: cargo test -p thoth-host --no-fail-fast
       - name: Port contract
         if: always()
         run: pnpm exec vitest run tests/ports/rust.test.ts tests/ports/rust-host.test.ts tests/ports/vault-on-rust.test.ts

@@ -778,7 +778,8 @@ mod tests {
             std::env::set_var("NOTES_FOR_TEST", "/Users/someone/Vault/sub");
         }
         let env = child_env(Path::new("/opt/bin/claude"), Path::new("/data/run/work"), &[PathBuf::from("/Users/someone/Vault")]);
-        let get = |k: &str| env.iter().find(|(key, _)| key == k).map(|(_, v)| v.to_string_lossy().into_owned());
+        // Windows variable names are case-insensitive (`Path`).
+        let get = |k: &str| env.iter().find(|(key, _)| key.eq_ignore_ascii_case(k)).map(|(_, v)| v.to_string_lossy().into_owned());
         assert_eq!(get("THOTH_SECRET_FOR_TEST"), None);
         assert_eq!(get("NOTES_FOR_TEST"), None);
         assert_eq!(get("PWD").as_deref(), Some("/data/run/work"));
