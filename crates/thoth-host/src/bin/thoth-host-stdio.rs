@@ -10,21 +10,24 @@
 //! Workspace-server commands (`server.*`, `api.call`) run on their own thread, so `server.signInCancel` and
 //! other calls are answered while a sign-in waits for its browser; responses may then arrive out of order
 //! (match them by `id`). Every other command runs in order on the main thread, as before. Secrets are kept
-//! in memory only and die with the process.
+//! in memory only and die with the process, unless `--secrets-file` names a file for them.
 //!
 //! `agent.events` (a long poll) and `agent.detect` (runs the CLI's probes) also run on their own thread.
 //!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
 //! --pick-source <path>, --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
-//! there, so tests run a fake `claude` and can make it missing). Env: THOTH_TEST_DISABLE_HARDLINK=1
-//! makes no-replace rename take the exclusive-copy fallback.
+//! there, so tests run a fake `claude` and can make it missing), --secrets-file <path> (keep server secrets in
+//! that file instead of memory: it stands in for the system keychain, so a test can restart the host and still
+//! be signed in, as the desktop app is). Env: THOTH_TEST_DISABLE_HARDLINK=1 makes no-replace rename take the
+//! exclusive-copy fallback.
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
 
 /// Longest request line accepted (1 GiB of base64 plus JSON overhead).
 const MAX_LINE: usize = 1024 * 1024 * 1024 / 3 * 4 + 1024 * 1024;
@@ -67,8 +70,51 @@ impl FileManager for EventFileManager {
     }
 }
 
+/// `--secrets-file`: server secrets in a JSON file (server → secret), in place of the system keychain, so that they
+/// outlive the process as the desktop app's do. Test infrastructure only; the file is created owner-only.
+struct FileSecretStore {
+    path: PathBuf,
+    lock: Mutex<()>,
+}
+
+impl FileSecretStore {
+    fn read(&self) -> BTreeMap<String, String> {
+        std::fs::read(&self.path).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default()
+    }
+
+    fn write(&self, secrets: &BTreeMap<String, String>) -> HostResult<()> {
+        let bytes = serde_json::to_vec(secrets).map_err(|_| HostError::internal("Could not encode the secrets file"))?;
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        options.open(&self.path).and_then(|mut file| file.write_all(&bytes)).map_err(|_| HostError::internal("Could not write the secrets file"))
+    }
+}
+
+impl SecretStore for FileSecretStore {
+    fn get(&self, server: &str) -> HostResult<Option<String>> {
+        let _guard = self.lock.lock().unwrap_or_else(|p| p.into_inner());
+        Ok(self.read().remove(server))
+    }
+    fn set(&self, server: &str, secret: &str) -> HostResult<()> {
+        let _guard = self.lock.lock().unwrap_or_else(|p| p.into_inner());
+        let mut secrets = self.read();
+        secrets.insert(server.to_owned(), secret.to_owned());
+        self.write(&secrets)
+    }
+    fn delete(&self, server: &str) -> HostResult<()> {
+        let _guard = self.lock.lock().unwrap_or_else(|p| p.into_inner());
+        let mut secrets = self.read();
+        if secrets.remove(server).is_some() {
+            self.write(&secrets)?;
+        }
+        Ok(())
+    }
+}
+
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]...");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH]");
     std::process::exit(2);
 }
 
@@ -78,6 +124,7 @@ fn main() {
     let mut source = None;
     let mut data_dir = None;
     let mut agent_dirs: Option<Vec<PathBuf>> = None;
+    let mut secrets_file = None;
     let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
         let mut value = || args.next().map(PathBuf::from).unwrap_or_else(|| usage("missing flag value"));
@@ -87,6 +134,7 @@ fn main() {
             Some("--pick-source") => source = Some(value()),
             Some("--data-dir") => data_dir = Some(value()),
             Some("--agent-search-dir") => agent_dirs.get_or_insert_with(Vec::new).push(value()),
+            Some("--secrets-file") => secrets_file = Some(value()),
             _ => usage(&format!("unknown flag {flag:?}")),
         }
     }
@@ -109,7 +157,10 @@ fn main() {
         picker: Arc::new(FixedPicker { vault, source }),
         events: Arc::new(move |event, payload| event_emit(json!({ "event": event, "payload": payload }))),
         disable_hardlink: std::env::var_os("THOTH_TEST_DISABLE_HARDLINK").is_some_and(|v| v == "1"),
-        secrets: Arc::new(MemorySecretStore::default()),
+        secrets: match secrets_file {
+            Some(path) => Arc::new(FileSecretStore { path, lock: Mutex::new(()) }),
+            None => Arc::new(MemorySecretStore::default()),
+        },
         browser: Arc::new(EventBrowser { emit: Arc::new(browser_emit) }),
         file_manager: Arc::new(EventFileManager { emit: Arc::new(reveal_emit) }),
         agent_search_dirs: agent_dirs,
