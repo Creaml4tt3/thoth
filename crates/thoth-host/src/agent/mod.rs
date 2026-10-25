@@ -21,6 +21,11 @@
 //! There is no OS-level sandbox in this phase: the CLI runs with the user's permissions. The tool restrictions are
 //! the CLI's own (`--restricted`, `--tools`), which the policy makes mandatory.
 pub mod claude;
+// Windows: install folders and launchers (detect_windows), Job Objects instead of process groups (kill_windows).
+#[cfg(windows)]
+mod detect_windows;
+#[cfg(windows)]
+pub mod kill_windows;
 
 use crate::error::{HostError, HostResult};
 use crate::handles;
@@ -166,15 +171,20 @@ impl Agents {
         if let Some(path) = std::env::var_os("PATH") {
             dirs.extend(std::env::split_paths(&path).filter(|p| p.is_absolute()));
         }
-        dirs.push(PathBuf::from("/opt/homebrew/bin"));
-        dirs.push(PathBuf::from("/usr/local/bin"));
-        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from).filter(|h| h.is_absolute()) {
-            for rel in [".claude/local", ".local/bin", ".npm-global/bin"] {
-                dirs.push(home.join(rel));
+        #[cfg(windows)]
+        dirs.extend(detect_windows::install_dirs());
+        #[cfg(not(windows))]
+        {
+            dirs.push(PathBuf::from("/opt/homebrew/bin"));
+            dirs.push(PathBuf::from("/usr/local/bin"));
+            if let Some(home) = std::env::var_os("HOME").map(PathBuf::from).filter(|h| h.is_absolute()) {
+                for rel in [".claude/local", ".local/bin", ".npm-global/bin"] {
+                    dirs.push(home.join(rel));
+                }
             }
-        }
-        if let Some(prefix) = std::env::var_os("NPM_CONFIG_PREFIX").map(PathBuf::from).filter(|p| p.is_absolute()) {
-            dirs.push(prefix.join("bin"));
+            if let Some(prefix) = std::env::var_os("NPM_CONFIG_PREFIX").map(PathBuf::from).filter(|p| p.is_absolute()) {
+                dirs.push(prefix.join("bin"));
+            }
         }
         let mut unique = Vec::new();
         for dir in dirs {
@@ -191,6 +201,9 @@ impl Agents {
             for name in provider.binary_names() {
                 let candidate = dir.join(name);
                 if is_executable(&candidate) {
+                    // An npm launcher for a native binary runs that binary directly, without cmd.exe.
+                    #[cfg(windows)]
+                    let candidate = detect_windows::direct_target(candidate);
                     return (Some(candidate), dirs);
                 }
             }
@@ -239,7 +252,8 @@ impl Agents {
         set_private(&dir)?;
         let work = dir.join(WORK_DIR);
         std::fs::create_dir(&work).map_err(|e| HostError::io(&e, "mkdir", &work.to_string_lossy()))?;
-        let work = std::fs::canonicalize(&work).map_err(|e| HostError::io(&e, "open", &work.to_string_lossy()))?;
+        // Plain form on Windows (`C:\...`, not `\\?\C:\...`): the CLI's working directory, which cmd.exe needs.
+        let work = crate::paths::canonicalize_path(&work).map_err(|e| HostError::io(&e, "open", &work.to_string_lossy()))?;
         let fd = crate::open_root_dir(&work)?;
         let run = Arc::new(Run {
             provider,
@@ -310,6 +324,8 @@ impl Agents {
         command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
         own_group(&mut command);
         let mut child = command.spawn().map_err(|e| HostError::new("AGENT_UNAVAILABLE", format!("Could not start the {} CLI: {e}", run.provider.id())))?;
+        #[cfg(windows)]
+        kill_windows::adopt(&mut child).map_err(|e| HostError::new("AGENT_UNAVAILABLE", format!("Could not start the {} CLI: {e}", run.provider.id())))?;
         state.phase = Phase::Running;
         state.pgid = i32::try_from(child.id()).ok();
         drop(state);
@@ -426,7 +442,12 @@ fn own_group(command: &mut Command) {
     command.process_group(0);
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn own_group(command: &mut Command) {
+    kill_windows::prepare(command);
+}
+
+#[cfg(not(any(unix, windows)))]
 fn own_group(_command: &mut Command) {}
 
 #[cfg(unix)]
@@ -439,7 +460,13 @@ fn signal_group(pgid: i32, signal: Signal) {
     let _ = rustix::process::kill_process_group(pid, signal);
 }
 
-#[cfg(not(unix))]
+/// Windows: the run's Job Object, by the CLI's process id (`kill_windows`).
+#[cfg(windows)]
+fn signal_group(pgid: i32, signal: Signal) {
+    kill_windows::signal(pgid, matches!(signal, Signal::Kill));
+}
+
+#[cfg(not(any(unix, windows)))]
 fn signal_group(_pgid: i32, _signal: Signal) {}
 
 fn kill_group(state: &RunState, signal: Signal) {
@@ -592,6 +619,10 @@ fn probe(bin: &Path, args: &[&str], cwd: &Path, env: &[(OsString, OsString)]) ->
         Ok(child) => child,
         Err(e) => return json!({ "code": null, "stdout": "", "stderr": format!("Could not run it: {e}"), "timedOut": false }),
     };
+    #[cfg(windows)]
+    if let Err(e) = kill_windows::adopt(&mut child) {
+        return json!({ "code": null, "stdout": "", "stderr": format!("Could not run it: {e}"), "timedOut": false });
+    }
     let pgid = i32::try_from(child.id()).ok();
     let capture = |stream: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
@@ -654,6 +685,10 @@ pub fn child_env(bin: &Path, cwd: &Path, exclude: &[PathBuf]) -> Vec<(OsString, 
     }
     let bin_dir = bin.parent().map(Path::to_path_buf);
     if let Some(dir) = bin_dir {
+        // Windows names it `Path`; variable names are case-insensitive there.
+        #[cfg(windows)]
+        let current = env.iter().position(|(k, _)| k.eq_ignore_ascii_case("PATH"));
+        #[cfg(not(windows))]
         let current = env.iter().position(|(k, _)| k == "PATH");
         let mut paths: Vec<PathBuf> = current.map(|i| std::env::split_paths(&env[i].1).collect()).unwrap_or_default();
         if !paths.contains(&dir) {
@@ -680,7 +715,11 @@ fn is_executable(path: &Path) -> bool {
         use std::os::unix::fs::PermissionsExt;
         meta.permissions().mode() & 0o111 != 0
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        detect_windows::launchable(path)
+    }
+    #[cfg(not(any(unix, windows)))]
     true
 }
 
@@ -690,6 +729,9 @@ fn set_private(dir: &Path) -> HostResult<()> {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map_err(|e| HostError::io(&e, "chmod", &dir.to_string_lossy()))?;
     }
+    // Windows has no mode bits: the folder is under %APPDATA% and inherits its ACL (the user, SYSTEM, Administrators).
+    #[cfg(not(unix))]
+    let _ = dir;
     Ok(())
 }
 
