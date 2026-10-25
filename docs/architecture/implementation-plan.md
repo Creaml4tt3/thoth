@@ -968,6 +968,53 @@ AC:
    other (the vault watcher and compare-and-swap writes already cover two writers).
 3. Web client: reorder only (a browser window per tab is the browser's job).
 
+Status (2026-10-25): AC 1–3 implemented on branch `tab-drag-reorder-new-window`, ADR-0019 **Proposed** (owner to
+accept).
+
+- **Reorder.** Pointer drag in the tab bar (`packages/app-ui/src/tabs/drag.ts`), with an accent line, a picture of
+  the tab at the pointer, auto-scroll and a FLIP slide on drop. The slide is transform only and does not run under
+  reduced motion or after a keyboard move.
+  - Keyboard: Alt/Option+Shift+←/→ on the focused tab (new shortcut scope `tabs`, listed in the shortcuts list).
+  - The tab's menu: right click, Menu key, Shift+F10.
+  - Palette: Move tab left / right.
+- **Windows (desktop).** A tab dragged out of the bar, or sent with "Move tab to new window" (menu, palette), opens
+  in a new window on the same Private Space.
+  - Each window restores its own tabs.
+  - The main window reopens the windows that were open.
+  - Cmd/Ctrl+W on the last tab closes the window while another one is open.
+- **Two windows on one folder are made safe** (ADR-0019 rules 5–9):
+  - recovery runs only for the first window (`vault.open` → `shared`);
+  - `BEGIN IMMEDIATE` for index transactions;
+  - `fs.rename` with `replaceHash`, so the host compares and renames as one step;
+  - `vault.shared` gates import resume;
+  - `Host::call_as` / `Host::release` end a closed window's vaults and agent runs.
+- **Shell.** `window_open` / `window_close` (labels `space-*` only, the app's own page, a recent Private Space); the
+  capability covers `main` and `space-*`.
+- **Test harness.** The stdio harness now runs `sql.*` and `fs.*` off its main loop, as the shell does. Before, two
+  windows' transactions deadlocked in it until SQLite's busy timeout.
+
+Evidence:
+
+| What | Tests |
+|---|---|
+| Model and storage | `packages/app-ui/test/tabs-model.test.ts` › "reordering", "moving a tab to a new window" |
+| Tab bar | `packages/app-ui/test/tab-drag.test.tsx`: indicator, Escape, detach zone, keyboard, menu, focus, motion and reduced motion |
+| Desktop and web | `apps/desktop/test/tabs.test.tsx` › "reordering tabs"; `apps/desktop/test/windows.test.tsx` (move, launch, restore, forget, Cmd+W, import resume); `apps/web/test/tabs.test.tsx` |
+| Two windows on one vault | `tests/ports/two-windows.test.ts`, Node and Rust hosts: shared flag, no sweep, edits seen, conflict never a lost write, the race between check and rename, concurrent saves; port contract › replaceHash |
+| Rust | `crates/thoth-host/tests/multi_window.rs`; shell tests in `apps/desktop/src-tauri/src/lib.rs` (labels, page, capability windows, shell command permissions) |
+| e2e (real pointer) | `tests/e2e/tabs.e2e.ts`: reorder and restart; drag out to a second window on the bridge, an edit seen in both, quit and restart brings the second window back; menu move from the keyboard. `tests/e2e/web-client.e2e.ts` › tab reorder and reload |
+
+Checks: `pnpm check` 2032 passed, 3 skipped (the two real-CLI smoke tests, and the Node run of the concurrent-saves test, which needs threads); `cargo test` 88 passed; `pnpm e2e` 75 passed, 3 skipped (as before, plus the opt-in drag recording, `TABS_CAPTURE=1`).
+
+Not covered:
+
+- The native second window itself: its position at the drop point, a release outside a real WKWebView window, and
+  the close event after the red button. The bridge stands in for it with a browser window.
+- Not yet checked by a person in a real window: the drag's feel, the look, and the Thai strings marked `REVIEW`.
+
+ADR-0019 open questions: closing a window with a running agent; window sizes and positions; macOS Window menu
+items; live state across windows.
+
 ### Phase 5 — MVP end-to-end (§14)
 
 All twelve steps of spec §14 as one automated scenario.
