@@ -118,10 +118,34 @@ export const th: DesktopStrings = {
       importDone: "นำเข้าเสร็จแล้ว",
       importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด", // REVIEW
       saveConflict: "การบันทึกขัดกัน", // REVIEW
+      update: "มีเวอร์ชันใหม่ออกแล้ว", // REVIEW
     },
     groups: { agent: "ผู้ช่วย Thoth", transfer: "คัดลอกและย้าย", import: "นำเข้า", editor: "การแก้ไข" },
+    updateEntry: "เพิ่มเวอร์ชันใหม่ลงในรายการใต้กระดิ่ง", // REVIEW
     privacy: "การแจ้งเตือนจะบอกชื่อหน้า โฟลเดอร์ เวิร์กสเปซ และเอเจนต์เท่านั้น ไม่แสดงเนื้อหาของหน้า สิ่งที่เอเจนต์เขียน หรืองานที่คุณสั่ง", // REVIEW
     click: "คลิกการแจ้งเตือนเพื่อนำ Thoth ขึ้นมาด้านหน้า เรื่องที่แจ้งอยู่บนสุดของรายการใต้กระดิ่ง", // REVIEW
+  },
+
+  // The update notice (ADR-0022). Strings marked REVIEW are the least certain.
+  updates: {
+    popup: (version) => `Thoth ${version} ออกแล้ว`, // REVIEW
+    body: (date) => `${date ? `เผยแพร่เมื่อ ${date} ` : ""}ปุ่มดาวน์โหลดจะเปิดหน้าดาวน์โหลดในเบราว์เซอร์ของคุณ Thoth ไม่ติดตั้งให้เอง`, // REVIEW
+    download: "ดาวน์โหลด",
+    whatsNew: "มีอะไรใหม่", // REVIEW
+    later: "ไว้ทีหลัง",
+    skip: "ข้ามเวอร์ชันนี้",
+    announce: (version) => `Thoth เวอร์ชันใหม่ ${version} ออกแล้ว`, // REVIEW
+    openFailed: "เปิดเบราว์เซอร์ไม่ได้",
+    general: "ทั่วไป",
+    notify: "แจ้งฉันเมื่อมีเวอร์ชันใหม่", // REVIEW
+    notifyHint: "วันละครั้ง Thoth จะถามที่ download.thoth.creaml4tt3.me ว่าเวอร์ชันล่าสุดคืออะไร โดยส่งไปเพียงหมายเลขเวอร์ชันของตัวเองเท่านั้น ไม่มีการดาวน์โหลดหรือติดตั้งให้เอง ถ้าปิดไว้ จะไม่มีการส่งคำขอเลย", // REVIEW
+    current: (version) => `คุณใช้ Thoth ${version}`,
+    checkNow: "ตรวจสอบเดี๋ยวนี้",
+    checking: "กำลังตรวจสอบ…",
+    upToDate: "คุณใช้เวอร์ชันล่าสุดแล้ว",
+    available: (version) => `Thoth ${version} ออกแล้ว`, // REVIEW
+    failed: "ตรวจสอบไม่ได้ ลองใหม่ภายหลัง",
+    off: "เปิด “แจ้งฉันเมื่อมีเวอร์ชันใหม่” เพื่อตรวจสอบ", // REVIEW
   },
 
   servers: {

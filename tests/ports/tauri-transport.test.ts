@@ -67,6 +67,26 @@ describe("TauriTransport", () => {
     expect(shell).toContain(`"link.preview", "link.preview.clear", "link.open",`);
   });
 
+  it("sends the update notice's questions to the host's two update commands (ADR-0022)", async () => {
+    const settings = { available: true, current: "0.1.3", notify: true, skipped: null, lastChecked: null };
+    const { api, calls } = fakeApi((command) => (command === "update_check" ? { state: "current", checkedAt: 1 } : settings));
+    const updates = createTauriPlatform(api).updates!;
+    expect(await updates.check()).toEqual({ state: "current", checkedAt: 1 });
+    await updates.check({ force: true });
+    await updates.settings();
+    await updates.setNotify(false);
+    await updates.skip("0.2.0");
+    expect(calls.map((c) => [c[0], c[1]])).toEqual([
+      ["update_check", { args: {} }],
+      ["update_check", { args: { force: true } }],
+      ["update_settings", { args: {} }],
+      ["update_settings", { args: { notify: false } }],
+      ["update_settings", { args: { skip: "0.2.0" } }],
+    ]);
+    const host = readFileSync(join(import.meta.dirname, "../../crates/thoth-host/src/lib.rs"), "utf8");
+    expect(host).toContain(`"update.check", "update.settings",`);
+  });
+
   it("binds to window.__TAURI_INTERNALS__ like @tauri-apps/api", async () => {
     const invoked: unknown[][] = [];
     const api = internalsApi({

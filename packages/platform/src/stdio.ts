@@ -25,6 +25,14 @@ export interface StdioTransportOptions {
   secretsFile?: string;
   /** Test hook: link previews may fetch from loopback addresses, for a local page server (`--link-preview-loopback`). */
   linkPreviewLoopback?: boolean;
+  /**
+   * Test hook: turn the update notice on, reading `latest.json` from this address (`--update-url`; an `http` address on
+   * loopback also needs `linkPreviewLoopback`). `updateCurrent`: the app version it compares with (`--update-current`);
+   * `updateNow`: its clock, fixed at this Unix time in seconds (`--update-now`), so a test can let 24 hours pass (ADR-0022).
+   */
+  updateUrl?: string;
+  updateCurrent?: string;
+  updateNow?: number;
   env?: Record<string, string>;
   /**
    * Harness-only host events other than `vault.changed` (for example `browser.open`, where the test harness
@@ -61,6 +69,9 @@ export class StdioTransport implements Transport {
     for (const dir of options.agentSearchDirs ?? []) args.push("--agent-search-dir", dir);
     if (options.secretsFile !== undefined) args.push("--secrets-file", options.secretsFile);
     if (options.linkPreviewLoopback) args.push("--link-preview-loopback");
+    if (options.updateUrl !== undefined) args.push("--update-url", options.updateUrl);
+    if (options.updateCurrent !== undefined) args.push("--update-current", options.updateCurrent);
+    if (options.updateNow !== undefined) args.push("--update-now", String(options.updateNow));
     this.child = spawn(options.binary, args, { env: { ...process.env, ...options.env }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString("utf8")).slice(-4096);

@@ -16,11 +16,25 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "agent_history_write", "agent_history_read", "agent_history_list", "agent_history_delete",
     // Link previews (ADR-0020): the host fetches and opens web links; the webview has no http or opener plugin.
     "link_preview", "link_preview_clear", "link_open",
+    // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict and no network.
+    "update_check", "update_settings",
     // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
     "window_open", "window_close",
 ];
 
+/// An address from the environment, for the app's build (ADR-0022): `https`, or empty (no update notice); never a
+/// line break, which could add a build directive.
+fn address(name: &str) {
+    println!("cargo:rerun-if-env-changed={name}");
+    let Ok(value) = std::env::var(name) else { return };
+    assert!(value.is_empty() || (value.starts_with("https://") && !value.chars().any(|c| c.is_control() || c.is_whitespace())), "{name} must be empty or an https address");
+    println!("cargo:rustc-env={name}={value}");
+}
+
 fn main() {
+    // A self-built copy may read `latest.json` from its own address (or none: empty) and send "Download" to its own page.
+    address("THOTH_UPDATE_URL");
+    address("THOTH_DOWNLOADS_PAGE_URL");
     let manifest = tauri_build::AppManifest::new().commands(TAURI_COMMANDS);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest)).expect("tauri build script failed");
 }

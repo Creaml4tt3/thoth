@@ -11,7 +11,7 @@ import type { Strings } from "../strings/en.ts";
 
 export type NotificationStrings = Strings["notifications"];
 
-export const NOTIFICATION_KINDS = ["agentReview", "agentFinished", "agentFailed", "agentLimit", "transferDone", "transferFailed", "importDone", "importFailed", "saveConflict"] as const;
+export const NOTIFICATION_KINDS = ["agentReview", "agentFinished", "agentFailed", "agentLimit", "transferDone", "transferFailed", "importDone", "importFailed", "saveConflict", "update"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** What an entry opens. */
@@ -19,7 +19,9 @@ export type NotificationTarget =
   | { kind: "agentRun"; runId: string }
   | { kind: "page"; path: string }
   | { kind: "workspacePage"; server: string; workspace: string; page: string }
-  | { kind: "folder"; path: string };
+  | { kind: "folder"; path: string }
+  /** The popup for a new desktop version (ADR-0022). */
+  | { kind: "update" };
 
 /** Why a run failed, in words Thoth chose (never the CLI's message). */
 export type AgentFailure = "notSignedIn" | "billing" | "rateLimit" | "modelNotFound" | "error";
@@ -38,7 +40,9 @@ export type NotificationEvent =
   /** `where`: the workspace's name, or null for the Private Space. */
   | ({ kind: "transferDone" | "transferFailed"; transferId: string; mode: "copy" | "move"; where: string | null; open: NotificationTarget } & Pages)
   | { kind: "importDone" | "importFailed"; jobId: string; folder: string; pages: number }
-  | { kind: "saveConflict"; page: string; open: NotificationTarget };
+  | { kind: "saveConflict"; page: string; open: NotificationTarget }
+  /** A new desktop version is out (ADR-0022). Only in the list: it is never a system notification. */
+  | { kind: "update"; version: string };
 
 export interface NotificationEntry {
   id: string;
@@ -164,6 +168,8 @@ function target(t: NotificationTarget): NotificationTarget {
       return { kind: "folder", path: id(t.path) };
     case "workspacePage":
       return { kind: "workspacePage", server: id(t.server), workspace: id(t.workspace), page: id(t.page) };
+    case "update":
+      return { kind: "update" };
   }
 }
 
@@ -187,6 +193,8 @@ export function normalizeEvent(e: NotificationEvent): NotificationEvent {
       return { kind: e.kind, jobId: id(e.jobId), folder: safeName(e.folder), pages: count(e.pages) };
     case "saveConflict":
       return { kind: e.kind, page: safeName(e.page), open: target(e.open) };
+    case "update":
+      return { kind: e.kind, version: safeName(e.version) };
   }
 }
 
@@ -201,6 +209,8 @@ export function notificationTarget(e: NotificationEvent): NotificationTarget {
     case "importDone":
     case "importFailed":
       return { kind: "folder", path: e.folder };
+    case "update":
+      return { kind: "update" };
     default:
       return e.open;
   }
@@ -208,8 +218,9 @@ export function notificationTarget(e: NotificationEvent): NotificationTarget {
 
 /** Repeats of the same thing: the same kind about the same run, transfer, import or page. */
 function keyOf(e: NotificationEvent): string {
+  if (e.kind === "update") return `update\n${e.version}`;
   const t = notificationTarget(e);
-  const about = t.kind === "workspacePage" ? `${t.server}\n${t.workspace}\n${t.page}` : t.kind === "agentRun" ? t.runId : t.path;
+  const about = t.kind === "workspacePage" ? `${t.server}\n${t.workspace}\n${t.page}` : t.kind === "agentRun" ? t.runId : t.kind === "update" ? "" : t.path;
   const subject = "transferId" in e ? e.transferId : "jobId" in e ? e.jobId : about;
   return `${e.kind}\n${subject}`;
 }
@@ -237,6 +248,8 @@ export function describeNotification(e: NotificationEvent, t: NotificationString
       return { title: t.importFailed, body: t.importBody(e.pages, e.folder) };
     case "saveConflict":
       return { title: t.saveConflict(e.page), body: t.saveConflictBody };
+    case "update":
+      return { title: t.update(e.version), body: t.updateBody };
   }
 }
 
@@ -281,6 +294,8 @@ export function createNotificationCenter(options: NotificationCenterOptions): No
   };
 
   const system = (event: NotificationEvent, text: SystemNotification) => {
+    // A new version is told in the app only (ADR-0022): the list and its popup, never the system's notification centre.
+    if (event.kind === "update") return;
     const settings = options.settings?.() ?? DEFAULT_NOTIFICATION_SETTINGS;
     if (!settings.system || settings.kinds[event.kind] === false) return;
     if (!(options.background?.() ?? false)) return;

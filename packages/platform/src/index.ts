@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, LinkPreview, ServerInfo, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, LinkPreview, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -51,6 +51,19 @@ export interface Platform {
   readonly windows?: Windows;
   /** Link previews and opening web links (ADR-0020). Only a native host has them; absent: links show as links. */
   readonly links?: Links;
+  /** The notice that a new desktop version is out (ADR-0022). Only the desktop host has it; absent: no notice (the web client is always current). */
+  readonly updates?: Updates;
+}
+
+/** What the host does for the update notice (ADR-0022): it asks `latest.json` and keeps the person's choice. */
+export interface Updates {
+  /** Asks whether a newer version is out (at most once in 24 hours; `force` skips the wait; nothing when the notice is off). */
+  check(options?: { force?: boolean }): Promise<UpdateCheck>;
+  settings(): Promise<UpdateSettings>;
+  /** Turns the notice on or off. Off means no request at all. */
+  setNotify(on: boolean): Promise<UpdateSettings>;
+  /** "Skip this version": no notice for it or any older one. */
+  skip(version: string): Promise<UpdateSettings>;
 }
 
 /** What the host does with web links (ADR-0020): it fetches their previews and opens them in the browser. */

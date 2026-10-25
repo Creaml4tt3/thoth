@@ -31,7 +31,20 @@ use std::time::Duration;
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
+use thoth_host::updates::UpdateOptions;
 use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
+
+/// Where the update notice reads `latest.json` and where "Download" goes (ADR-0022). Fixed when the app is built:
+/// `build.rs` reads `THOTH_UPDATE_URL` and `THOTH_DOWNLOADS_PAGE_URL` for a self-built copy; an empty address turns the
+/// notice off. Nothing at run time, not the webview and not a flag, can change them.
+const UPDATE_URL: &str = match option_env!("THOTH_UPDATE_URL") {
+    Some(url) => url,
+    None => thoth_host::updates::DEFAULT_URL,
+};
+const DOWNLOADS_PAGE_URL: &str = match option_env!("THOTH_DOWNLOADS_PAGE_URL") {
+    Some(url) => url,
+    None => thoth_host::updates::DEFAULT_DOWNLOADS_PAGE,
+};
 
 pub const ARGS_HEADER: &str = "x-thoth-args";
 pub const VAULT_CHANGED_EVENT: &str = "vault:changed";
@@ -484,7 +497,8 @@ pub fn run() {
                 agent_search_dirs: None,
                 // Link previews connect to public addresses only (ADR-0020); the loopback switch is for tests.
                 link_preview_loopback: false,
-            });
+            })
+            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) });
             let _ = HOST.set(Arc::new(host));
             Ok(())
         })
@@ -650,6 +664,31 @@ mod tests {
         for link in ["allow-link-preview", "allow-link-preview-clear", "allow-link-open"] {
             assert!(granted.contains(link), "{link}");
         }
+        // The update notice (ADR-0022) adds `update.check` and `update.settings`: a verdict and the person's choice, no
+        // download, no install, no updater plugin.
+        for update in ["allow-update-check", "allow-update-settings"] {
+            assert!(granted.contains(update), "{update}");
+        }
+        assert!(granted.iter().filter(|p| p.contains("update")).count() == 2);
+        let text = include_str!("../capabilities/main.json");
+        assert!(!text.contains("updater"), "no updater plugin");
+        assert!(!include_str!("../Cargo.toml").contains("updater"));
+    }
+
+    #[test]
+    fn the_update_notice_looks_where_the_build_says_and_only_over_https() {
+        // Compiled in (build.rs reads THOTH_UPDATE_URL for a self-built copy); empty turns the notice off.
+        for address in [UPDATE_URL, DOWNLOADS_PAGE_URL] {
+            assert!(address.is_empty() || address.starts_with("https://"), "{address}");
+        }
+        if option_env!("THOTH_UPDATE_URL").is_none() {
+            assert_eq!(UPDATE_URL, "https://download.thoth.creaml4tt3.me/latest.json");
+        }
+        // Nothing at run time changes it: no flag, no environment variable, no argument from the webview.
+        let source = include_str!("lib.rs");
+        let code = source.split("#[cfg(test)]").next().unwrap();
+        assert!(!code.contains("var(\"THOTH") && !code.contains("var_os(\"THOTH") && !code.contains("env::args"));
+        assert!(include_str!("../build.rs").contains("\"update_check\", \"update_settings\""));
     }
 
     #[test]

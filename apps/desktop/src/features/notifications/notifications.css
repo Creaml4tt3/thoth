@@ -8,6 +8,7 @@
 .notif-kind > input { margin: 0; accent-color: var(--thoth-accent); }
 .notif-kinds:disabled .notif-kind { cursor: default; }
 .notif-settings .small { font: var(--thoth-text-small); }
+.notif-update { margin-top: var(--thoth-space-3); }
 
 /* The mascot's message (Mascot.tsx): a short line next to the mascot after a run ends by itself. It takes no
    focus and closes by itself; a click opens the run. */

@@ -356,6 +356,8 @@ describe("Settings → Notifications", () => {
       "Import done",
       "Import finished with errors",
       "Save conflict",
+      // Not a system notification (ADR-0022): it decides whether a new version is added to the list under the bell.
+      "Add a new version to the list under the bell",
     ]);
     expect(kinds.every((k) => k.checked)).toBe(true);
     await app.user.click(within(section()).getByRole("checkbox", { name: "Save conflict" }));
@@ -364,8 +366,8 @@ describe("Settings → Notifications", () => {
     expect(stored.kinds.saveConflict).toBe(false);
     expect(stored.kinds.importDone).toBe(true);
     await app.user.click(system);
-    // Per-kind choices wait while all are off.
-    for (const k of within(section()).getAllByRole("checkbox")) expect(k.matches(":disabled")).toBe(true);
+    // Per-kind choices wait while all are off. The switch for the list entry of a new version is not about them.
+    for (const k of within(section()).getAllByRole("checkbox") as HTMLInputElement[]) expect(k.matches(":disabled")).toBe(k.labels?.[0]?.textContent !== "Add a new version to the list under the bell");
     expect(JSON.parse(localStorage.getItem(NOTIFICATION_PREFS_KEY)!).system).toBe(false);
 
     cleanup();

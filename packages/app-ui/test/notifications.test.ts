@@ -7,6 +7,7 @@ import {
   REPEAT_MS,
   createNotificationCenter,
   describeNotification,
+  notificationTarget,
   type NotificationCenterOptions,
   type NotificationEvent,
   type NotificationKind,
@@ -25,6 +26,7 @@ const EVENTS = {
   importDone: { kind: "importDone", jobId: "j1", folder: "Imported/Notion", pages: 12 },
   importFailed: { kind: "importFailed", jobId: "j2", folder: "Imported/Obsidian", pages: 3 },
   saveConflict: { kind: "saveConflict", page: "Alpha", open: { kind: "page", path: "Alpha.md" } },
+  update: { kind: "update", version: "0.2.0" },
 } satisfies { [K in NotificationKind]: NotificationEvent & { kind: K } };
 
 function center(options: Partial<NotificationCenterOptions> = {}) {
@@ -53,6 +55,7 @@ describe("notification center: entries", () => {
       importDone: { title: "Import complete", body: "12 pages in Imported/Notion" },
       importFailed: { title: "Import finished with errors", body: "3 pages in Imported/Obsidian" },
       saveConflict: { title: "Alpha changed elsewhere while you were editing it", body: "Choose which version to keep." },
+      update: { title: "Thoth 0.2.0 is out", body: "Open to download it, read what is new, or skip it." },
     });
   });
 
@@ -189,6 +192,20 @@ describe("notification center: system notifications", () => {
     expect(notifier.show).toHaveBeenCalledTimes(1);
     // Switched off or not, every event is in the list.
     expect(c.getState().entries).toHaveLength(3);
+  });
+
+  it("tells a new version in the list only, never as a system notification (ADR-0022)", () => {
+    const { c, notifier } = center({ background: () => true });
+    const entry = c.push(EVENTS.update);
+    expect(c.getState().entries).toHaveLength(1);
+    expect(entry.event).toEqual({ kind: "update", version: "0.2.0" });
+    expect(notifier.show).not.toHaveBeenCalled();
+    // The entry opens the popup again (its own kind of target), and a repeat of the same version joins it.
+    expect(notificationTarget(entry.event)).toEqual({ kind: "update" });
+    c.push({ kind: "update", version: "0.2.0" });
+    expect(c.getState().entries).toHaveLength(1);
+    c.push({ kind: "update", version: "0.3.0" });
+    expect(c.getState().entries).toHaveLength(2);
   });
 
   it("is on by default, for every kind", () => {

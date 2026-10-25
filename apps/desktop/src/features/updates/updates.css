@@ -1,0 +1,11 @@
+/* The popup for a new desktop version (UpdateNotice.tsx, ADR-0022): in the top corner, under the tab bar, clear of the
+   mascot's default corner. It takes no focus, so it must not cover what the person is typing in. */
+.update-notice { position: fixed; z-index: 40; top: 52px; inset-inline-end: var(--thoth-space-4); box-sizing: border-box; width: min(320px, calc(100vw - 32px)); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-4); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); --pop-y: var(--thoth-shift); animation: thoth-pop-in var(--thoth-dur-base) var(--thoth-ease-out); }
+.update-notice h2 { margin: 0; font: 600 14px / 20px var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
+.update-notice p { margin: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.update-actions { display: flex; flex-wrap: wrap; gap: var(--thoth-space-1) var(--thoth-space-2); margin-top: var(--thoth-space-1); }
+@media (prefers-reduced-motion: reduce) { .update-notice { animation: none; } }
+
+/* Settings → General (UpdateSettings.tsx). */
+.update-settings .set-actions { align-items: center; }
+.update-settings .muted { color: var(--thoth-ink-secondary); }

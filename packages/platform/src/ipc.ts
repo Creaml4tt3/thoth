@@ -181,6 +181,53 @@ export interface Commands {
   "link.preview.clear": { args: Record<string, never>; result: null };
   /** Opens an `http(s)` link in the system browser (the webview has no opener). */
   "link.open": { args: { url: string }; result: null };
+
+  // ---- The update notice (ADR-0022). Desktop only: the host asks `latest.json`, the webview gets a verdict.
+  /**
+   * Asks whether a newer version is out. The host makes the request itself (https only, a public address, 5 s, at most
+   * 64 KB) and at most once in 24 hours, counted across restarts; `force` ("Check now") skips that wait. Nothing is
+   * requested when the notice is off. The answer is a verdict, never the file.
+   */
+  "update.check": { args: { force?: boolean }; result: UpdateCheck };
+  /** The person's choice for the notice, after applying `notify` (on or off) and `skip` (a version to skip; `null` forgets it). */
+  "update.settings": { args: { notify?: boolean; skip?: string | null }; result: UpdateSettings };
+}
+
+/** A newer version, as the notice shows it. */
+export interface UpdateInfo {
+  /** Semantic version without a leading "v". */
+  version: string;
+  /** Release date, `yyyy-mm-dd`, when `latest.json` has one. */
+  date?: string;
+  /** The page to download it from (opened in the system browser, `link.open`). */
+  downloadUrl: string;
+  /** The release notes, an `https` link, when `latest.json` has one. */
+  notesUrl?: string;
+  /** The person chose "Skip this version" for this version or a newer one. */
+  skipped: boolean;
+}
+
+/**
+ * What `update.check` found. `unavailable`: this build has no update notice. `off`: the person turned it off. `waiting`:
+ * asked less than 24 hours ago, so nothing was requested. `failed`: the request or the file was no good (it counts as a
+ * check). `current`: nothing newer is offered (a pre-release is never offered to a stable build). `checkedAt`: Unix seconds.
+ */
+export type UpdateCheck =
+  | { state: "unavailable" | "off" }
+  | { state: "waiting" | "current" | "failed"; checkedAt: number }
+  | { state: "available"; checkedAt: number; update: UpdateInfo };
+
+export interface UpdateSettings {
+  /** False when this build has no update notice (nothing to set). */
+  available: boolean;
+  /** The running version. */
+  current: string;
+  /** "Tell me when a new version is out"; on by default. Off means no request at all. */
+  notify: boolean;
+  /** The version the person skipped, if any. */
+  skipped: string | null;
+  /** When the last request was made (Unix seconds), if one was. */
+  lastChecked: number | null;
 }
 
 /** What a page says about itself (ADR-0020). Text is decoded, stripped of control characters and cut. */

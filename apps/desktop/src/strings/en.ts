@@ -130,10 +130,36 @@ export const en = {
       importDone: "Import done",
       importFailed: "Import finished with errors",
       saveConflict: "Save conflict",
+      update: "A new version is out",
     } satisfies Record<NotificationKind, string>,
     groups: { agent: "Thoth assistant", transfer: "Copy and move", import: "Import", editor: "Editing" },
+    /** The new-version switch is not about system notifications (there are none for it): it adds an entry to the list. */
+    updateEntry: "Add a new version to the list under the bell",
     privacy: "A notification names pages, folders, workspaces and the agent. It never shows what a page or the agent wrote, or your task.",
     click: "Clicking one brings Thoth to the front. What it is about is at the top of the list under the bell.",
+  },
+
+  /** The update notice (ADR-0022): the popup in the corner, and Settings → General. */
+  updates: {
+    popup: (version: string) => `Thoth ${version} is out`,
+    body: (date: string | undefined) => `${date ? `Released ${date}. ` : ""}Download opens the downloads page in your browser. Thoth does not install it for you.`,
+    download: "Download",
+    whatsNew: "What's new",
+    later: "Later",
+    skip: "Skip this version",
+    /** Said once, politely, when the popup appears (it takes no focus). */
+    announce: (version: string) => `A new version of Thoth, ${version}, is out.`,
+    openFailed: "Could not open your browser.",
+    general: "General",
+    notify: "Tell me when a new version is out",
+    notifyHint: "Once a day Thoth asks download.thoth.creaml4tt3.me which version is newest, with nothing but its own version number. Nothing is downloaded or installed for you. Off means no request at all.",
+    current: (version: string) => `You have Thoth ${version}.`,
+    checkNow: "Check now",
+    checking: "Checking…",
+    upToDate: "You have the newest version.",
+    available: (version: string) => `Thoth ${version} is out.`,
+    failed: "Could not check. Try again later.",
+    off: "Turn on “Tell me when a new version is out” to check.",
   },
 
   servers: {

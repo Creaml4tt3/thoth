@@ -4,6 +4,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import "./notifications.css";
 
+// The new-version kind is not here: it has no system notification (ADR-0022), so it has its own switch below.
 const GROUPS: { id: "agent" | "transfer" | "import" | "editor"; kinds: NotificationKind[]; agents?: true }[] = [
   { id: "agent", kinds: ["agentReview", "agentFinished", "agentFailed", "agentLimit"], agents: true },
   { id: "transfer", kinds: ["transferDone", "transferFailed"] },
@@ -41,6 +42,11 @@ export function NotificationSettings() {
           </fieldset>
         ))}
       </fieldset>
+      {/* A new version is told in the app only, never as a system notification, so this switch is not about those. */}
+      <label className="notif-kind notif-update">
+        <input type="checkbox" checked={prefs.kinds.update} onChange={(e) => store.setKind("update", e.target.checked)} />
+        <span>{t.updateEntry}</span>
+      </label>
       <p className="muted small">{t.privacy}</p>
       <p className="muted small">{t.click}</p>
     </section>

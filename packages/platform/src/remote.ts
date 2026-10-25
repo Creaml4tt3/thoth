@@ -6,7 +6,7 @@
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { Links, Platform, Servers, VaultConnection } from "./index.ts";
+import type { Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -313,11 +313,21 @@ export function remoteLinks(transport: Transport): Links {
   };
 }
 
+export function remoteUpdates(transport: Transport): Updates {
+  return {
+    check: (options) => transport.call("update.check", options?.force ? { force: true } : {}),
+    settings: () => transport.call("update.settings", {}),
+    setNotify: (on) => transport.call("update.settings", { notify: on }),
+    skip: (version) => transport.call("update.settings", { skip: version }),
+  };
+}
+
 export function createRemotePlatform(transport: Transport, kind: Platform["kind"]): Platform {
   return {
     servers: remoteServers(transport),
     agents: remoteAgents(transport),
     links: remoteLinks(transport),
+    updates: remoteUpdates(transport),
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),

@@ -16,6 +16,7 @@ import type { OpenOptions } from "@thoth/app-ui/tabs/model.ts";
 import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
 import type { NotificationCenter, NotificationTarget, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
 import type { NotificationPrefsStore } from "../features/notifications/prefs.ts";
+import type { UpdateService } from "../features/updates/service.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -34,6 +35,9 @@ export interface AppOptions {
   notifier: SystemNotifier;
   /** How long the mascot's message after a run stays up. */
   messageMs: number;
+  /** The update notice (ADR-0022): time from the start to its first check, and between checks after that. */
+  updateDelayMs: number;
+  updateIntervalMs: number;
 }
 
 export interface Session {
@@ -78,6 +82,8 @@ export interface Session {
   notificationPrefs: NotificationPrefsStore;
   /** Opens what a notification is about: a run's review or outcome, a page, a folder. */
   openNotification(target: NotificationTarget): void;
+  /** The notice that a new desktop version is out (ADR-0022); null where the host has none. */
+  updates: UpdateService | null;
   /** Closes this Private Space and returns to onboarding. */
   switchVault(): void;
   /** Set when the filesystem watcher could not start; saving still works. */

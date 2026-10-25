@@ -8,6 +8,7 @@ import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { AgentSettings } from "../agents/AgentSettings.tsx";
 import { NotificationSettings } from "../notifications/NotificationSettings.tsx";
 import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
+import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -88,6 +89,8 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
         <AgentSettings focus={section === "agents"} />
 
         <NotificationSettings />
+
+        <UpdateSettings />
 
         <section aria-labelledby="set-language" className="set-section">
           <h2 id="set-language">{t.language}</h2>

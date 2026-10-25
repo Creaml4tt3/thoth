@@ -16,6 +16,7 @@ import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
 import { AgentRunView } from "../agents/AgentRunView.tsx";
 import { MascotLayer } from "../mascot/Mascot.tsx";
+import { UpdateNotice } from "../updates/UpdateNotice.tsx";
 import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { tabMoves } from "@thoth/app-ui/tabs/useTabs.ts";
@@ -308,6 +309,7 @@ export function Shell() {
       </main>
       <SidebarResizer sidebar={sidebar} shell={shell} />
       <MascotLayer />
+      <UpdateNotice />
       <TooltipLayer />
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}

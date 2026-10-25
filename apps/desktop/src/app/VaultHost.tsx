@@ -19,6 +19,7 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
 import { createNotificationPrefsStore } from "../features/notifications/prefs.ts";
 import { importEvent, transferEvent, watchAgentRuns } from "../features/notifications/sources.ts";
+import { createUpdateService } from "../features/updates/service.ts";
 import { waitingReviews } from "../features/mascot/hooks.ts";
 import { createWindowPresence } from "../platform/notifier.ts";
 import { MAIN_WINDOW } from "./windows.ts";
@@ -162,6 +163,23 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     [options.notifier, options.now, notificationPrefs, presence],
   );
 
+  // The update notice (ADR-0022): the host asks; the popup is this window's, and the list under the bell gets an entry
+  // for a version it has not told of (when the person has that on).
+  const updates = useMemo(
+    () =>
+      platform.updates
+        ? createUpdateService(platform.updates, platform.links, {
+            delayMs: options.updateDelayMs,
+            intervalMs: options.updateIntervalMs,
+            onOffer: (offer) => {
+              if (notificationPrefs.get().kinds.update) notifications.push({ kind: "update", version: offer.version });
+            },
+          })
+        : null,
+    [platform, options.updateDelayMs, options.updateIntervalMs, notificationPrefs, notifications],
+  );
+  useEffect(() => updates?.start(), [updates]);
+
   // Workspace servers: one directory per open window, polling only expanded workspaces.
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
   // Link previews (ADR-0020): the host fetches them; a platform without `links` shows plain links.
@@ -267,9 +285,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
           return openFolder(target.path);
         case "agentRun":
           return openRun(target.runId);
+        case "update":
+          return updates?.show();
       }
     },
-    [tabs, openFolder, openRun],
+    [tabs, openFolder, openRun, updates],
   );
 
   const session = useMemo<Session>(
@@ -303,6 +323,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       notifications,
       notificationPrefs,
       openNotification,
+      updates,
       reveal,
       registerFlush,
       flushAll,
@@ -316,7 +337,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       watchError,
       windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, windowId],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId],
   );
 
   return (

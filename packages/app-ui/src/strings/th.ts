@@ -318,6 +318,8 @@ export const th: Strings = {
     importBody: (pages, folder) => `${count(pages)} หน้าใน ${folder}`,
     saveConflict: (page) => `${page} ถูกแก้ไขที่อื่นระหว่างที่คุณกำลังแก้ไข`, // REVIEW
     saveConflictBody: "เลือกฉบับที่จะเก็บไว้",
+    update: (version) => `Thoth ${version} ออกแล้ว`, // REVIEW
+    updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้", // REVIEW
   },
 
   tabs: {

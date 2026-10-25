@@ -352,6 +352,9 @@ export const en = {
     importBody: (pages: number, folder: string) => `${plural(pages, "page")} in ${folder}`,
     saveConflict: (page: string) => `${page} changed elsewhere while you were editing it`,
     saveConflictBody: "Choose which version to keep.",
+    /** A new desktop version is out (ADR-0022). */
+    update: (version: string) => `Thoth ${version} is out`,
+    updateBody: "Open to download it, read what is new, or skip it.",
   },
 
   tabs: {

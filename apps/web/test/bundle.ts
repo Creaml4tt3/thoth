@@ -10,6 +10,13 @@ export const DESKTOP_ONLY = [
   // Link previews are fetched by the desktop host only (ADR-0020): the web client shows plain links.
   "link.preview",
   "link_preview",
+  // The update notice asks for the desktop's own releases through the desktop host only (ADR-0022): the web client is
+  // always current, so its bundle has neither the commands nor the address of latest.json.
+  "update.check",
+  "update_check",
+  "update.settings",
+  "update_settings",
+  "latest.json",
   "@tauri-apps",
   "plugin:fs",
   "child_process",
