@@ -284,8 +284,39 @@ export class Vault {
   }
 
   private async reconcileNow(options: { full?: boolean } = {}): Promise<ReconcileReport> {
+    const scanned = await this.scanFiles();
+    return this.inIndexTransaction(() => this.reconcileFiles(scanned, options));
+  }
+
+  /**
+   * `task` in one index transaction that takes the write lock up front (`BEGIN IMMEDIATE`, ADR-0019), so another window's
+   * transaction waits for it rather than interleaving, and other connections see all of it or none of it. Rolls back
+   * when `task` fails. Then the report's frontmatter warnings, read from what was committed.
+   */
+  private async inIndexTransaction(task: () => Promise<ReconcileReport>): Promise<ReconcileReport> {
+    await this.sql.exec("BEGIN IMMEDIATE");
+    let report: ReconcileReport;
+    try {
+      report = await task();
+      await this.sql.exec("COMMIT");
+    } catch (error) {
+      // The failure that matters is the task's; a rollback that fails too (SQLite already rolled back) adds nothing.
+      await this.sql.exec("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+    const fmErrors = await this.sql.all<{ path: string; frontmatter_error: string }>(
+      "SELECT path, frontmatter_error FROM pages WHERE frontmatter_error IS NOT NULL",
+    );
+    for (const row of fmErrors) report.warnings.push({ path: row.path, code: "malformed_frontmatter", message: row.frontmatter_error });
+    return report;
+  }
+
+  /**
+   * The body of a reconcile, inside the caller's transaction. What the index knows is read here, under the write lock:
+   * another window's reconcile that committed just before cannot leave this one working from rows that changed.
+   */
+  private async reconcileFiles({ files, skipped }: { files: string[]; skipped: { path: string; reason: string }[] }, options: { full?: boolean }): Promise<ReconcileReport> {
     const report: ReconcileReport = { added: [], updated: [], removed: [], unchanged: 0, warnings: [], recoveredJournalEntries: 0 };
-    const { files, skipped } = await this.scanFiles();
     for (const s of skipped) report.warnings.push({ path: s.path, code: "skipped_entry", message: s.reason });
 
     const known = new Map<string, PageRow>();
@@ -326,73 +357,64 @@ export class Vault {
       }
     }
 
-    await this.sql.exec("BEGIN IMMEDIATE");
-    try {
-      for (const [path, row] of known) {
-        await this.deletePageRows(row.id);
-        await this.sql.run("DELETE FROM index_warnings WHERE path = ?", [path]);
-        report.removed.push(path);
-        structureChanged = true;
-      }
-      for (const p of parsed) {
-        await this.upsertPage(p.path, p.doc, p.hash, p.size, p.mtimeMs);
-        (p.isNew ? report.added : report.updated).push(p.path);
-      }
-
-      for (const path of others) {
-        const prev = knownAttachments.get(path);
-        knownAttachments.delete(path);
-        let stat;
-        let hash: string;
-        try {
-          stat = await this.fs.stat(path);
-          if (!stat) continue;
-          if (!options.full && prev && prev.size === stat.size && prev.mtime_ms === stat.mtimeMs) continue;
-          hash = sha256Hex(await this.fs.readFile(path));
-        } catch (error) {
-          report.warnings.push({ path, code: "unreadable_file", message: `Not indexed: ${(error as Error).message}` });
-          continue;
-        }
-        await this.sql.run("INSERT OR REPLACE INTO attachments (path, hash, size, mtime_ms, mime_type) VALUES (?, ?, ?, ?, ?)", [
-          path,
-          hash,
-          stat.size,
-          stat.mtimeMs,
-          mimeTypeFor(path),
-        ]);
-        if (!prev) structureChanged = true;
-      }
-      for (const path of knownAttachments.keys()) {
-        await this.sql.run("DELETE FROM attachments WHERE path = ?", [path]);
-        structureChanged = true;
-      }
-
-      if (structureChanged || options.full) await this.settleClaims();
-      // Link targets depend on the whole file set, so re-resolve when it changes.
-      if (structureChanged || options.full) await this.resolveAllReferences();
-      await this.flagDuplicateIds(report);
-      await this.sql.exec("COMMIT");
-    } catch (error) {
-      await this.sql.exec("ROLLBACK");
-      throw error;
+    for (const [path, row] of known) {
+      await this.deletePageRows(row.id);
+      await this.sql.run("DELETE FROM index_warnings WHERE path = ?", [path]);
+      report.removed.push(path);
+      structureChanged = true;
+    }
+    for (const p of parsed) {
+      await this.upsertPage(p.path, p.doc, p.hash, p.size, p.mtimeMs);
+      (p.isNew ? report.added : report.updated).push(p.path);
     }
 
-    const fmErrors = await this.sql.all<{ path: string; frontmatter_error: string }>(
-      "SELECT path, frontmatter_error FROM pages WHERE frontmatter_error IS NOT NULL",
-    );
-    for (const row of fmErrors) report.warnings.push({ path: row.path, code: "malformed_frontmatter", message: row.frontmatter_error });
+    for (const path of others) {
+      const prev = knownAttachments.get(path);
+      knownAttachments.delete(path);
+      let stat;
+      let hash: string;
+      try {
+        stat = await this.fs.stat(path);
+        if (!stat) continue;
+        if (!options.full && prev && prev.size === stat.size && prev.mtime_ms === stat.mtimeMs) continue;
+        hash = sha256Hex(await this.fs.readFile(path));
+      } catch (error) {
+        report.warnings.push({ path, code: "unreadable_file", message: `Not indexed: ${(error as Error).message}` });
+        continue;
+      }
+      await this.sql.run("INSERT OR REPLACE INTO attachments (path, hash, size, mtime_ms, mime_type) VALUES (?, ?, ?, ?, ?)", [
+        path,
+        hash,
+        stat.size,
+        stat.mtimeMs,
+        mimeTypeFor(path),
+      ]);
+      if (!prev) structureChanged = true;
+    }
+    for (const path of knownAttachments.keys()) {
+      await this.sql.run("DELETE FROM attachments WHERE path = ?", [path]);
+      structureChanged = true;
+    }
+
+    if (structureChanged || options.full) await this.settleClaims();
+    // Link targets depend on the whole file set, so re-resolve when it changes.
+    if (structureChanged || options.full) await this.resolveAllReferences();
+    await this.flagDuplicateIds(report);
     return report;
   }
 
-  /** Drops the whole index and rebuilds it from files (index loss is never content loss). */
+  /**
+   * Drops the whole index and rebuilds it from files (index loss is never content loss), in one transaction: other
+   * windows go on reading the old index until the new one is committed, and a rebuild that fails leaves the old one.
+   */
   async rebuildIndex(): Promise<ReconcileReport> {
-    return this.exclusive(async () => {
-      await this.sql.exec("BEGIN IMMEDIATE");
-      for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
-        await this.sql.exec(`DELETE FROM ${table}`);
-      await this.sql.exec("COMMIT");
-      return this.reconcileNow({ full: true });
-    });
+    return this.exclusive(() =>
+      this.inIndexTransaction(async () => {
+        for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
+          await this.sql.exec(`DELETE FROM ${table}`);
+        return this.reconcileFiles(await this.scanFiles(), { full: true });
+      }),
+    );
   }
 
   private pageIdFor(doc: PageDocument): string {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isStableId, newStableId, sha256Hex } from "@thoth/domain";
 import { NotEditableError } from "@thoth/content";
 import { ConflictError, JOURNAL_DIR, journalTempPath, TEMP_DIR, type Vault } from "../src/index.ts";
-import { openNodeVault } from "../src/node/index.ts";
+import { NodeSqlDriver, openNodeVault } from "../src/node/index.ts";
 
 let root: string;
 let vault: Vault;
@@ -260,6 +260,27 @@ describe("Vault robustness", () => {
     await rm(join(root, loser));
     const report = await vault.reconcile();
     expect(report.warnings.filter((w) => w.code === "duplicate_id")).toEqual([]);
+  });
+
+  it("keeps the old index when a rebuild fails, and nobody ever reads an empty one", async () => {
+    const before = (await vault.listPages()).map((p) => p.path);
+    expect(before).toHaveLength(4);
+    // Another window on the same index, reading while this one rebuilds (ADR-0019).
+    const other = new NodeSqlDriver(join(root, ".thoth", "index.sqlite"));
+    const seen: number[] = [];
+    const list = vault.fs.list.bind(vault.fs);
+    let calls = 0;
+    vi.spyOn(vault.fs, "list").mockImplementation(async (dir) => {
+      seen.push(Number((await other.get<{ n: number }>("SELECT count(*) AS n FROM pages"))!.n));
+      if (++calls === 3) throw new Error("The disk went away");
+      return list(dir);
+    });
+    await expect(vault.rebuildIndex()).rejects.toThrow("The disk went away");
+    vi.restoreAllMocks();
+    expect(seen.every((n) => n === 4), `pages seen by the other window: ${seen.join(", ")}`).toBe(true);
+    expect((await vault.listPages()).map((p) => p.path)).toEqual(before);
+    expect(Number((await other.get<{ n: number }>("SELECT count(*) AS n FROM pages"))!.n)).toBe(4);
+    await other.close();
   });
 });
 

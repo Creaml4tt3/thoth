@@ -18,6 +18,7 @@ function kindOf(s: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink()
 export class NodeVaultFs implements VaultFs {
   readonly root: string;
   private readonly link: (from: string, to: string) => Promise<void>;
+  private canonicalRoot: Promise<string> | undefined;
 
   /** `link` is injectable so tests can simulate filesystems without hardlinks. */
   constructor(root: string, options: { link?: (from: string, to: string) => Promise<void> } = {}) {
@@ -91,8 +92,13 @@ export class NodeVaultFs implements VaultFs {
   async rename(from: string, to: string, options: { noReplace?: boolean; replaceHash?: string } = {}): Promise<void> {
     const expected = options.replaceHash;
     if (expected === undefined) return this.renameNow(from, to, options);
-    // Compare and rename as one step for every NodeVaultFs on this root in this process (the Node host's windows).
-    return underRootLock(this.root, async () => {
+    // Compare and rename as one step for every NodeVaultFs on this folder in this process (the Node host's windows),
+    // keyed by the folder's real path so two spellings of it (a symlink, `/var` and `/private/var`) share one lock.
+    this.canonicalRoot ??= fs.realpath(this.root).catch((error: unknown) => {
+      this.canonicalRoot = undefined; // try again next time (the folder may come back)
+      throw error;
+    });
+    return underRootLock(await this.canonicalRoot, async () => {
       await this.assertNoSymlinkAncestors(to);
       let current: string | null = null;
       try {
@@ -137,7 +143,7 @@ export class NodeVaultFs implements VaultFs {
   }
 }
 
-/** One compare-and-rename at a time per vault root in this process. */
+/** One compare-and-rename at a time per vault folder (its real path) in this process. */
 const rootLocks = new Map<string, Promise<unknown>>();
 function underRootLock<T>(root: string, task: () => Promise<T>): Promise<T> {
   const run = (rootLocks.get(root) ?? Promise.resolve()).then(task, task);
