@@ -887,6 +887,19 @@ site's Windows download and the two motion captures, as before), `agent-hub.e2e.
   `cargo test` 82 passed (`thoth-host` 40 unit + 22 agent + 13 remote + 1 reveal, desktop shell 6); `pnpm e2e` 45
   passed, 2 skipped, `agent-hub.e2e.ts` (9 tests) included.
 
+**Mascot and assistant (2026-10-25)** (owner decisions of 2026-10-25): the Agent Hub tab is gone. Runs start from
+the Thoth mascot (`apps/desktop/src/features/mascot/`): a full-body and a compact version driven by one state machine
+(idle, listening, working, needs review, done, error, sleeping), shrinkable (Mod+Shift+J), draggable by pointer and
+keyboard with snap and clamping, and a prompt bubble (Mod+J) with context chips, the agent picker and options. The
+review opens as a tab. Settings → Thoth assistant holds Providers, History, Usage, Permissions (Private pages, whole
+Private Space, read-only workspace pages; each only narrows what is offered and is refused at Start) and the mascot's
+own settings (per user). Text selected in the editor can be quoted to the CLI after the task (`StartTask.excerpt`,
+at most 4000 characters): it follows the rules of its page (Permissions; a workspace's export rule) and, like the
+workspace framing, is not kept in the run record. The agent packages and the host are unchanged by this work.
+Checks: `pnpm check` 1976 passed, 2 skipped; `pnpm e2e` 70 passed, 2 skipped, 1 failed (the pre-existing
+`private-tree.e2e.ts` "New folder" flake, also on `main` before this change; being fixed separately).
+Not yet checked by a person in a real window: the mascot's look and motion, the drag feel, Thai on screen.
+
 Not done / follow-ups (see §4 item 12):
 - A Thoth OS-level sandbox (planned in ADR-0007); git worktrees.
 - Codex on Windows and Linux was not tried on a real machine; the sandbox probe decides there. Codex's permission
