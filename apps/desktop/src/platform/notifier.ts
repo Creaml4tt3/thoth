@@ -19,7 +19,8 @@ export function selectNotifier(win: Window = window): SystemNotifier {
  */
 export function createWindowPresence(win: Window = window): { background(): boolean; dispose(): void } {
   const doc = win.document;
-  let focused = doc.visibilityState !== "hidden";
+  // The window may open behind another app: ask the document, not only the events that follow.
+  let focused = doc.visibilityState !== "hidden" && doc.hasFocus();
   const onFocus = () => void (focused = true);
   const onBlur = () => void (focused = false);
   win.addEventListener("focus", onFocus);
