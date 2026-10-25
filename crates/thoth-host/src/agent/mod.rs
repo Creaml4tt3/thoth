@@ -1,11 +1,11 @@
-//! Agent Hub, host side (ADR-0007). The host runs the user's own AI CLI (Claude Code first) in a scoped working
+//! Agent Hub, host side (ADR-0007). The host runs the user's own AI CLI (Claude Code or Codex) in a scoped working
 //! directory and streams its output; it never reads, copies or passes provider credentials.
 //!
 //! The webview is untrusted (ADR-0008), so this is not a general process API:
 //!
 //! - Only a known provider's binary runs, found by the host (`PATH` plus the usual install folders). The webview
 //!   never names a program or a path.
-//! - Every argument list is checked against the provider's policy (`claude::validate`) before anything runs. The
+//! - Every argument list is checked against the provider's policy (`claude::validate`, `codex::validate`) before anything runs. The
 //!   prompt goes to the child's stdin, never on the command line.
 //! - The working directory is a fresh `0700` folder under the app data directory
 //!   (`<data>/agent-runs/<run>/work`), named by an unguessable handle. The webview fills it before the start through
@@ -22,9 +22,13 @@
 //! - Local-only run details (transcripts, proposed files) live in `<data>/agent-history/<run id>/` (`history.rs`),
 //!   never in a vault.
 //!
-//! There is no OS-level sandbox in this phase: the CLI runs with the user's permissions. The tool restrictions are
-//! the CLI's own (`--restricted`, `--tools`), which the policy makes mandatory.
+//! Thoth adds no OS-level sandbox of its own in this phase: the CLI runs with the user's permissions. The
+//! restrictions are the CLI's own, which the policies make mandatory: Claude Code's tool restrictions
+//! (`--restricted`, `--tools`; no shell at all), and Codex's own OS sandbox (Seatbelt, bubblewrap/Landlock, the
+//! Windows sandbox) under Thoth's permission profile, which its commands and file edits run in (`codex.rs`). Codex is
+//! not run where its sandbox probe fails.
 pub mod claude;
+pub mod codex;
 // Windows: install folders and launchers (detect_windows), Job Objects instead of process groups (kill_windows).
 #[cfg(windows)]
 mod detect_windows;
@@ -61,16 +65,18 @@ const KILL_GRACE: Duration = Duration::from_secs(3);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const PROBE_MAX_OUTPUT: usize = 256 * 1024;
 
-/// A CLI the Agent Hub knows. Codex comes later (ADR-0007 rule 1).
+/// A CLI the Agent Hub knows (ADR-0007 rule 1): Claude Code, then Codex.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Provider {
     Claude,
+    Codex,
 }
 
 impl Provider {
     pub fn parse(id: &str) -> HostResult<Self> {
         match id {
             "claude" => Ok(Self::Claude),
+            "codex" => Ok(Self::Codex),
             _ => Err(HostError::bad_argument(format!("Unknown agent provider {id:?}"))),
         }
     }
@@ -78,6 +84,7 @@ impl Provider {
     pub fn id(self) -> &'static str {
         match self {
             Self::Claude => "claude",
+            Self::Codex => "codex",
         }
     }
 
@@ -87,19 +94,34 @@ impl Provider {
             Self::Claude => &["claude.exe", "claude.cmd"],
             #[cfg(not(windows))]
             Self::Claude => &["claude"],
+            #[cfg(windows)]
+            Self::Codex => &["codex.exe", "codex.cmd"],
+            #[cfg(not(windows))]
+            Self::Codex => &["codex"],
         }
     }
 
-    /// Fixed probe commands: version, help (for the flags this version knows), and the CLI's own login status.
-    fn probes(self) -> [(&'static str, &'static [&'static str]); 3] {
+    /// Codex is run by its real path, symlinks resolved: its sandbox lets the binary run itself again (for its file
+    /// edits) only under the path it was started as, and a link in a folder the sandbox cannot read (Homebrew's
+    /// `bin`, `~/.local/bin`) breaks that.
+    fn canonical(self) -> bool {
+        matches!(self, Self::Codex)
+    }
+
+    /// Fixed probe commands: version, help (for the flags this version knows), the CLI's own login status and, for a
+    /// CLI that runs commands in its own sandbox, whether that sandbox starts here (`bin` is the binary found).
+    fn probes(self, bin: &Path) -> Vec<(&'static str, Vec<OsString>)> {
+        let fixed = |list: &[&str]| list.iter().map(OsString::from).collect::<Vec<_>>();
         match self {
-            Self::Claude => [("version", &["--version"]), ("help", &["--help"]), ("auth", &["auth", "status", "--json"])],
+            Self::Claude => vec![("version", fixed(&["--version"])), ("help", fixed(&["--help"])), ("auth", fixed(&["auth", "status", "--json"]))],
+            Self::Codex => vec![("version", fixed(&["--version"])), ("help", fixed(&["exec", "--help"])), ("auth", fixed(&["login", "status"])), ("sandbox", codex::sandbox_probe(bin))],
         }
     }
 
     fn validate(self, argv: &[String]) -> HostResult<()> {
         match self {
             Self::Claude => claude::validate(argv),
+            Self::Codex => codex::validate(argv),
         }
     }
 }
@@ -188,6 +210,10 @@ impl Agents {
             if let Some(prefix) = std::env::var_os("NPM_CONFIG_PREFIX").map(PathBuf::from).filter(|p| p.is_absolute()) {
                 dirs.push(prefix.join("bin"));
             }
+            // Codex's standalone installer uses `~/.local/bin` (above) unless `CODEX_INSTALL_DIR` names another folder.
+            if let Some(dir) = std::env::var_os("CODEX_INSTALL_DIR").map(PathBuf::from).filter(|p| p.is_absolute()) {
+                dirs.push(dir);
+            }
         }
         let mut unique = Vec::new();
         for dir in dirs {
@@ -207,6 +233,7 @@ impl Agents {
                     // An npm launcher for a native binary runs that binary directly, without cmd.exe.
                     #[cfg(windows)]
                     let candidate = detect_windows::direct_target(candidate);
+                    let candidate = if provider.canonical() { crate::paths::canonicalize_path(&candidate).unwrap_or(candidate) } else { candidate };
                     return (Some(candidate), dirs);
                 }
             }
@@ -223,8 +250,8 @@ impl Agents {
         let cwd = std::env::temp_dir();
         let env = child_env(&bin, &cwd, exclude);
         let mut reply = json!({ "found": true, "path": bin.to_string_lossy(), "searched": searched });
-        for (key, args) in provider.probes() {
-            reply[key] = probe(&bin, args, &cwd, &env);
+        for (key, args) in provider.probes(&bin) {
+            reply[key] = probe(&bin, &args, &cwd, &env);
         }
         Ok(reply)
     }
@@ -626,7 +653,7 @@ fn read_lines(stream: impl Read, mut emit: impl FnMut(String, bool)) {
 }
 
 /// Runs one probe with a deadline and bounded output.
-fn probe(bin: &Path, args: &[&str], cwd: &Path, env: &[(OsString, OsString)]) -> Value {
+fn probe(bin: &Path, args: &[OsString], cwd: &Path, env: &[(OsString, OsString)]) -> Value {
     let mut command = Command::new(bin);
     command.args(args).current_dir(cwd).env_clear().envs(env.iter().cloned()).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     own_group(&mut command);

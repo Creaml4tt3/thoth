@@ -444,6 +444,171 @@ fn reference_files_can_be_written_read_only() {
     assert!(!work.exists());
 }
 
+// ------------------------------------------------------------------------------------------------- Codex
+
+/// The fake Codex CLI (`packages/agent-codex/test/fake-codex`), on Windows through its `codex.cmd` launcher.
+fn fake_codex_dir() -> PathBuf {
+    canonical(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/agent-codex/test/fake-codex"))
+}
+
+#[cfg(not(windows))]
+const FAKE_CODEX_LAUNCHER: &str = "codex";
+#[cfg(windows)]
+const FAKE_CODEX_LAUNCHER: &str = "codex.cmd";
+
+fn codex_argv(case: usize) -> Vec<String> {
+    let text = include_str!("../../../packages/agent-codex/test/fixtures/argv.json");
+    let value: Value = serde_json::from_str(text).unwrap();
+    value["cases"][case]["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_owned()).collect()
+}
+
+fn read_codex_record(work: &Path) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if let Ok(text) = std::fs::read_to_string(work.parent().unwrap().join("fake-codex-record.json"))
+            && let Ok(value) = serde_json::from_str::<Value>(&text)
+        {
+            return value;
+        }
+        assert!(Instant::now() < deadline, "the fake Codex wrote no record");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn start_codex(f: &Fixture, argv: Vec<String>, prompt: &str) -> (String, PathBuf) {
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "codex" }));
+    let run = created["run"].as_str().unwrap().to_owned();
+    let dir = PathBuf::from(created["dir"].as_str().unwrap());
+    call(&f.host, "agent.fs.mkdirp", json!({ "run": run, "dir": "Notes" }));
+    call_bytes(&f.host, "agent.fs.write", json!({ "run": run, "path": "Notes/Pets.md" }), b"# Pets\n\nI have a cat.\n").unwrap();
+    call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": argv }), prompt.as_bytes()).unwrap();
+    (run, dir)
+}
+
+#[test]
+fn detects_codex_with_its_version_help_login_and_sandbox() {
+    let f = fixture(Some(vec![fake_codex_dir()]), true);
+    let probe = call(&f.host, "agent.detect", json!({ "provider": "codex" }));
+    assert_eq!(probe["found"], json!(true));
+    assert_eq!(probe["path"], json!(fake_codex_dir().join(FAKE_CODEX_LAUNCHER).to_string_lossy()));
+    assert_eq!(probe["version"]["stdout"], json!("codex-cli 0.164.0\n"));
+    assert!(probe["help"]["stdout"].as_str().unwrap().contains("--strict-config"), "exec --help");
+    assert!(probe["auth"]["stderr"].as_str().unwrap().contains("Logged in using ChatGPT"));
+    // The sandbox probe ran the CLI itself, by its path, inside `codex sandbox`.
+    assert_eq!((probe["sandbox"]["code"].as_i64(), probe["sandbox"]["stdout"].as_str()), (Some(0), Some("codex-cli 0.164.0\n")));
+    // Claude Code has no sandbox probe.
+    let claude = fixture(Some(vec![fake_dir()]), true);
+    assert!(call(&claude.host, "agent.detect", json!({ "provider": "claude" })).get("sandbox").is_none());
+}
+
+/// A link to the CLI (Homebrew's `bin`, `~/.local/bin`) is resolved: Codex runs by its real path.
+#[cfg(unix)]
+#[test]
+fn codex_is_run_by_its_real_path() {
+    let links = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(fake_codex_dir().join("codex"), links.path().join("codex")).unwrap();
+    let f = fixture(Some(vec![links.path().to_owned()]), true);
+    let probe = call(&f.host, "agent.detect", json!({ "provider": "codex" }));
+    assert_eq!(probe["path"], json!(fake_codex_dir().join("codex").to_string_lossy()));
+}
+
+#[test]
+fn runs_codex_with_exactly_the_policy_arguments_in_the_working_directory() {
+    let f = fixture(Some(vec![fake_codex_dir()]), true);
+    let vault_root = canonical(f.vault.path());
+    call(&f.host, "vault.open", json!({ "root": vault_root.to_string_lossy() }));
+    let (run, dir) = start_codex(&f, codex_argv(1), "Tidy up.\n@replace Notes/Pets.md :: cat => dog\n@run ls\n");
+    let events = drain(&f.host, &run);
+    let stdout: Vec<Value> = events.iter().filter(|e| e["kind"] == "stdout").map(|e| serde_json::from_str(e["line"].as_str().unwrap()).unwrap()).collect();
+    assert_eq!(stdout.first().unwrap()["type"], json!("thread.started"));
+    assert_eq!(stdout.last().unwrap()["type"], json!("turn.completed"));
+    assert!(stdout.iter().any(|e| e["item"]["type"] == "file_change"));
+    let exit = events.last().unwrap();
+    assert_eq!((exit["code"].as_i64(), exit["reason"].as_str()), (Some(0), Some("exited")));
+
+    let record = read_codex_record(&dir);
+    assert_eq!(PathBuf::from(record["cwd"].as_str().unwrap()), dir);
+    assert_eq!(record["argv"], json!(codex_argv(1)));
+    assert_eq!(record["stdin"].as_str().unwrap(), "Tidy up.\n@replace Notes/Pets.md :: cat => dog\n@run ls\n");
+    assert_eq!(record["files"], json!([{ "path": "Notes", "kind": "directory" }, { "path": "Notes/Pets.md", "kind": "file" }]));
+    let env = record["env"].as_object().unwrap();
+    assert!(env.keys().all(|k| !k.to_ascii_uppercase().starts_with("THOTH_")));
+    let root = vault_root.to_string_lossy();
+    assert!(env.values().all(|v| !v.as_str().unwrap_or_default().contains(root.as_ref())));
+    let read = |path: &str| f.host.call("agent.fs.read", &json!({ "run": run, "path": path }), None).unwrap().1.unwrap();
+    assert_eq!(read("Notes/Pets.md"), b"# Pets\n\nI have a dog.\n");
+    call(&f.host, "agent.run.dispose", json!({ "run": run }));
+    assert!(!dir.parent().unwrap().exists());
+}
+
+#[test]
+fn refuses_codex_arguments_outside_the_policy_without_running_anything() {
+    let f = fixture(Some(vec![fake_codex_dir(), fake_dir()]), true);
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "codex" }));
+    let run = created["run"].as_str().unwrap();
+    let work = PathBuf::from(created["dir"].as_str().unwrap());
+    let extras: [&[&str]; 7] = [
+        &["--sandbox", "danger-full-access"],
+        &["--dangerously-bypass-approvals-and-sandbox"],
+        &["-c", "permissions.thoth.network.enabled=true"],
+        &["--add-dir", "/"],
+        &["--search"],
+        &["do something"],
+        &["-m", "--add-dir"],
+    ];
+    for extra in extras {
+        let mut list = codex_argv(0);
+        list.extend(extra.iter().map(|s| (*s).to_owned()));
+        assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": list }), b"hi").unwrap_err().code, "NOT_ALLOWED", "{extra:?}");
+    }
+    // A sandbox setting changed in place, and another provider's list, are refused too.
+    let mut changed = codex_argv(0);
+    let i = changed.iter().position(|a| a == "approval_policy=never").unwrap();
+    changed[i] = "approval_policy=on-request".into();
+    assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": changed }), b"hi").unwrap_err().code, "NOT_ALLOWED");
+    assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": argv(0) }), b"hi").unwrap_err().code, "NOT_ALLOWED");
+    let claude = call(&f.host, "agent.run.create", json!({ "provider": "claude" }));
+    assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": claude["run"], "argv": codex_argv(0) }), b"hi").unwrap_err().code, "NOT_ALLOWED");
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(!work.parent().unwrap().join("fake-codex-record.json").exists(), "the CLI must not have run");
+    // The run can still start with the policy's arguments.
+    call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0) }), b"hi").unwrap();
+    assert_eq!(drain(&f.host, run).last().unwrap()["code"], json!(0));
+}
+
+#[test]
+fn cancel_kills_codex_and_everything_it_started() {
+    let f = fixture(Some(vec![fake_codex_dir()]), true);
+    let (run, work) = start_codex(&f, codex_argv(0), "@hang\n");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let record = loop {
+        let record = read_codex_record(&work);
+        if record["grandchild"].is_number() {
+            break record;
+        }
+        assert!(Instant::now() < deadline, "no grandchild");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let (cli, grandchild) = (record["pid"].as_i64().unwrap(), record["grandchild"].as_i64().unwrap());
+    assert!(alive(cli) && alive(grandchild));
+    call(&f.host, "agent.cancel", json!({ "run": run }));
+    assert_eq!(drain(&f.host, &run).pop().unwrap()["reason"], json!("cancelled"));
+    wait_dead(cli);
+    wait_dead(grandchild);
+}
+
+#[test]
+fn a_codex_run_past_its_time_limit_is_stopped() {
+    let f = fixture(Some(vec![fake_codex_dir()]), true);
+    let created = call(&f.host, "agent.run.create", json!({ "provider": "codex" }));
+    let run = created["run"].as_str().unwrap();
+    for ms in [json!(0), json!(24 * 60 * 60 * 1000 + 1)] {
+        assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0), "timeoutMs": ms }), b"hi").unwrap_err().code, "BAD_ARGUMENT", "{ms}");
+    }
+    call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0), "timeoutMs": 1000 }), b"@hang\n").unwrap();
+    assert_eq!(drain(&f.host, run).pop().unwrap()["reason"], json!("timeout"));
+}
+
 const HISTORY_ID: &str = "019e0000-0000-7000-8000-0000000000aa";
 
 #[test]

@@ -1,4 +1,8 @@
-//! Finding Claude Code on Windows. Checked against https://code.claude.com/docs/en/setup and
+//! Finding the agent CLIs on Windows. Codex (checked against its `install.ps1` and npm package `@openai/codex`
+//! 0.164.0, 2026-10-25): the standalone installer puts `codex.exe` in `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin`
+//! (or `CODEX_INSTALL_DIR`); `npm install -g @openai/codex` creates a `codex.cmd` launcher for a Node script in
+//! npm's folder. Codex's arguments are free of quotes and of `%`, `^`, `&`, `|`, `<`, `>` (`codex::ARGS`), so the
+//! `cmd.exe` notes below hold for its launcher too. Claude Code, checked against https://code.claude.com/docs/en/setup and
 //! https://code.claude.com/docs/en/troubleshoot-install (2026-10-25):
 //!
 //! - The native installer (recommended) puts `claude.exe` in `%USERPROFILE%\.local\bin` and does not always add
@@ -40,6 +44,14 @@ pub fn install_dirs() -> Vec<PathBuf> {
     }
     if let Some(profile) = env("USERPROFILE") {
         dirs.push(profile.join(".claude").join("local"));
+    }
+    // Codex's standalone installer (`install.ps1`): `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe`, or
+    // `CODEX_INSTALL_DIR` when set. Its npm package puts `codex.cmd` in npm's folder (above).
+    if let Some(dir) = env("CODEX_INSTALL_DIR") {
+        dirs.push(dir);
+    }
+    if let Some(local) = env("LOCALAPPDATA") {
+        dirs.push(local.join("Programs").join("OpenAI").join("Codex").join("bin"));
     }
     dirs
 }
