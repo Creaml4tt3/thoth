@@ -8,7 +8,7 @@
  * the not-found page. Pictures of the share page (light, dark, phone width) and of the dialog are saved under
  * tests/.tmp/share/.
  */
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -113,7 +113,7 @@ test.describe("public share links (ADR-0023)", () => {
     const ws = (await ref.db.query<{ id: string; name: string }>("SELECT w.id, w.name FROM workspaces w JOIN memberships m ON m.workspace_id = w.id WHERE m.user_id = $1 AND m.role = 'owner'", [userId])).rows[0]!;
     const token = generateToken();
     await ref.db.query("INSERT INTO access_tokens (id, user_id, token_hash) VALUES ($1, $2, $3)", [opaqueId("tok"), userId, hashToken(token)]);
-    const upload = await fetch(`${serverUrl}/api/v1/workspaces/${ws.id}/attachments?fileName=sunrise.png`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "image/png" }, body: picture(640, 280) });
+    const upload = await fetch(`${serverUrl}/api/v1/workspaces/${ws.id}/attachments?fileName=sunrise.png`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "image/png" }, body: new Uint8Array(picture(640, 280)) });
     expect(upload.status).toBe(201);
     const imageId = ((await upload.json()) as { id: string }).id;
     const rootId = newStableId(Date.now());
