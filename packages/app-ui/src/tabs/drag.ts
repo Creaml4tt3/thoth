@@ -1,8 +1,8 @@
 /**
  * Dragging tabs (ADR-0019), with the pointer: along the bar to reorder, and on the desktop out of it to open the tab in
- * a new window. Pointer events rather than HTML5 drag and drop (which the page trees use, `order/dnd.ts`): the tab
- * follows the pointer along the bar, the bar scrolls when the pointer nears an edge, and a release outside the window
- * still reports where it happened, so the new window can open there.
+ * a new window. Pointer events rather than HTML5 drag and drop (which the page trees use, `order/dnd.ts`): the bar
+ * scrolls when the pointer nears an edge, the tab bar draws its own picture of the tab at the pointer, and a release
+ * outside the window still reports where it happened, so the new window can open there.
  *
  * - A press becomes a drag after it moves `DRAG_PX`; less is a click. Touch never drags (it scrolls the bar).
  * - While dragging, `drop` names the place the tab would land: a line before or after another tab (`data-drop`).
@@ -32,8 +32,6 @@ export function dropIndex(others: readonly { left: number; width: number }[], x:
 
 export interface DragState {
   id: string;
-  /** How far the tab has been carried along the bar, in pixels. */
-  dx: number;
   /** The index it would land at, or null over a place it cannot go (it is outside the bar, for a new window). */
   to: number | null;
   /** Far enough out for a new window. */
@@ -59,7 +57,6 @@ interface Pending {
   pointer: number;
   x: number;
   y: number;
-  scroll: number;
   started: boolean;
 }
 
@@ -86,8 +83,7 @@ export function useTabDrag(options: TabDragOptions) {
     const detach = o.canDetach && (!inWindow(x, y) || y > bar.bottom + DETACH_PX);
     const rtl = getComputedStyle(list).direction === "rtl";
     const others = o.order.filter((id) => id !== p.id).map((id) => o.tab(id)?.getBoundingClientRect() ?? { left: 0, width: 0 });
-    const dx = x - p.x + (list.scrollLeft - p.scroll);
-    return { id: p.id, dx, to: detach ? null : dropIndex(others, x, rtl), detach, x, y };
+    return { id: p.id, to: detach ? null : dropIndex(others, x, rtl), detach, x, y };
   }, []);
 
   const stopFrame = () => {
@@ -158,8 +154,7 @@ export function useTabDrag(options: TabDragOptions) {
     if (event.button !== 0 || event.pointerType === "touch" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if ((event.target as Element).closest?.(".tab-close")) return;
     end();
-    const list = opts.current.list();
-    pending.current = { id, pointer: event.pointerId, x: event.clientX, y: event.clientY, scroll: list?.scrollLeft ?? 0, started: false };
+    pending.current = { id, pointer: event.pointerId, x: event.clientX, y: event.clientY, started: false };
     // Keep getting the pointer when it leaves the window, so a release out there is seen (and opens a new window).
     try {
       (event.target as Element).setPointerCapture?.(event.pointerId);

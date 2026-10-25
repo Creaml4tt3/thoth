@@ -63,7 +63,8 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * Delete closes it. Middle-click and the × on the tab close it with a pointer. The current tab uses the accent tokens `--thoth-tab-active-*`.
  *
  * Order (ADR-0019): a tab is dragged along the bar to reorder it, with an accent line where it would land; on the
- * desktop, dragged well below the bar or out of the window, it opens in a new window. Alt/Option+Shift+Left/Right moves
+ * desktop, dragged well below the bar or out of the window, it opens in a new window. While it is dragged it stays in
+ * place, faded, and a picture of it follows the pointer (as in the page trees). Alt/Option+Shift+Left/Right moves
  * the focused tab, and its menu (right click, the Menu key, Shift+F10) has Move left, Move right, Move to new window and
  * Close. Each move is announced.
  *
@@ -296,7 +297,6 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
               data-dragging={dragged ? "" : undefined}
               data-detach={dragged?.detach ? "" : undefined}
               data-drop={drop?.id === tab.id ? drop.side : undefined}
-              style={dragged && !dragged.detach ? { transform: `translateX(${dragged.dx}px)` } : undefined}
               {...(onMove ? { onPointerDown: (event: PointerEvent<HTMLDivElement>) => onPointerDown(event, tab.id) } : {})}
             >
               <button
@@ -343,11 +343,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
         })}
       </div>
       <IconButton icon="plus" label={t.new} shortcut="tab.new" className="tab-new" onClick={onNew} />
-      {drag?.detach && (
-        // Follows the pointer out of the bar: what letting go will do. The list clips anything below it, so this is fixed.
-        <div className="tab-drag-image" aria-hidden="true" style={{ left: drag.x + 12, top: drag.y + 14 }}>
+      {drag && (
+        // A picture of the tab follows the pointer, below it so the line stays in sight; out of the bar it says what
+        // letting go will do. The list clips anything outside it, so this is fixed to the window.
+        <div className="tab-drag-image" aria-hidden="true" style={{ left: drag.x + 12, top: drag.y + 16 }}>
           <span className="tab-drag-label">{labelOf(drag.id)}</span>
-          <span className="tab-drag-hint">{t.releaseForWindow}</span>
+          {drag.detach && <span className="tab-drag-hint">{t.releaseForWindow}</span>}
         </div>
       )}
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tabs-said="">

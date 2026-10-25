@@ -44,7 +44,8 @@ What the desktop runtime does today, checked in the code before deciding:
 1. The order of a window's tabs is the order of its stored tab list (the ADR-0016 storage, unchanged), saved on every
    change and restored with the tabs. Moving a tab keeps the current tab current and keeps every tab's id.
 2. **Pointer.** A press on a tab that moves 5 px becomes a drag, with mouse or pen only (touch scrolls the bar).
-   - The tab follows the pointer along the bar.
+   - The tab stays in place, faded, and a picture of it follows the pointer, as in the page trees. (A tab that
+     followed the pointer itself would hide the line where it lands.)
    - An accent line (`--thoth-drop-indicator`) shows where it will land.
    - An overflowing bar scrolls when the pointer nears one of its ends.
    - Escape, a cancelled pointer or the window losing focus puts the tab back.
@@ -168,7 +169,7 @@ What the desktop runtime does today, checked in the code before deciding:
 - **A second app process per window.** Two hosts would mean two agent policies, two recent lists and two keychain
   users, with no shared lock for compare-and-swap.
 - **HTML5 drag and drop, as the page trees use.** A drop outside the window ends with `dragend` and no useful point in
-  WebKit. The dragged tab cannot follow the pointer along the bar, and auto-scroll and the line need the same events
+  WebKit, and the browser's own drag picture cannot say "new window". Auto-scroll and the line need the same events
   anyway. Pointer events give all of these. The trees keep HTML5 drag and drop.
 - **Global Alt+Shift+Left/Right for the current tab.** Refused: in the editor it selects by word.
 

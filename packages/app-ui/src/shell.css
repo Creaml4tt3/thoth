@@ -135,16 +135,16 @@
 @media (hover: none) { .tab-close { opacity: 1; } }
 .tab-close:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .tab-new { margin: 0 0 3px 4px; }
-/* Dragging a tab (ADR-0019, tabs/drag.ts): the tab follows the pointer along the bar (an inline transform, no transition: it
-   tracks the hand), the place it would land is an accent line like the tree's drop indicator, and well out of the bar a
-   label follows the pointer to say a new window opens there. The other tabs slide into place on drop (WAAPI, transform only). */
+/* Dragging a tab (ADR-0019, tabs/drag.ts): as in the page trees, the dragged tab stays in place, faded, and a picture of it
+   follows the pointer (below it, so the place it would land, an accent line like the tree's drop indicator, stays in sight).
+   Well out of the bar the picture says a new window opens there. The tabs slide into place on drop (WAAPI, transform only). */
 .tab { -webkit-user-select: none; user-select: none; }
-.tab[data-dragging] { z-index: 2; background: var(--thoth-tab-active-bg); border-color: var(--thoth-border); box-shadow: var(--thoth-shadow-pop); cursor: grabbing; }
-.tab[data-dragging] .tab-label { cursor: grabbing; }
-.tab[data-detach] { opacity: 0.45; }
-.tab[data-drop]::before { content: ""; position: absolute; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; }
-.tab[data-drop="before"]::before { inset-inline-start: -3px; }
-.tab[data-drop="after"]::before { inset-inline-end: -3px; }
+.tab[data-dragging] { opacity: 0.45; }
+[data-tab-dragging], [data-tab-dragging] .tab-label { cursor: grabbing; }
+.tab[data-drop]::before { content: ""; position: absolute; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--thoth-drop-indicator); pointer-events: none; }
+.tab[data-drop="before"]::before { inset-inline-start: 0; }
+/* Inside the tab's edge: the list scrolls, so anything past its first or last tab is clipped. */
+.tab[data-drop="after"]::before { inset-inline-end: 0; }
 [data-tab-dragging] .tab-close { pointer-events: none; }
 .tab-drag-image { position: fixed; z-index: 50; display: grid; gap: 2px; max-width: 240px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-drag-label { overflow: hidden; text-overflow: ellipsis; }
