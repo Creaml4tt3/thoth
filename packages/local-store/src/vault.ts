@@ -14,7 +14,7 @@ import {
   stripExtension,
   type PageSummary,
 } from "@thoth/domain";
-import { ConflictError, NotFoundError } from "./errors.ts";
+import { ConflictError, IndexBusyError, NotFoundError, isIndexBusy } from "./errors.ts";
 import {
   clearJournalEntry,
   JOURNAL_DIR,
@@ -34,6 +34,26 @@ import { tokenize, trigramMatch, wordMatch } from "./search-query.ts";
 export const THOTH_DIR = ".thoth";
 const CONFIG_PATH = ".thoth/config.json";
 const CONFIG_VERSION = 1;
+
+/**
+ * Opening waits this long between tries while another window holds the index (each try already waits SQLite's busy
+ * timeout, 5 s), then gives up with `IndexBusyError` (ADR-0019).
+ */
+const OPEN_BUSY_BACKOFF_MS = [250, 1000];
+
+/** Runs `step` again, after a pause, while it fails only because the index is busy; then `IndexBusyError`. */
+async function whileBusy<T>(step: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await step();
+    } catch (error) {
+      if (!isIndexBusy(error)) throw error;
+      const pause = OPEN_BUSY_BACKOFF_MS[attempt];
+      if (pause === undefined) throw new IndexBusyError({ cause: error });
+      await new Promise((resolve) => setTimeout(resolve, pause));
+    }
+  }
+}
 
 /** Directories never indexed: Thoth metadata, other tools' metadata, VCS. */
 const IGNORED_DIRS = new Set([".thoth", ".obsidian", ".git", ".trash", "node_modules"]);
@@ -138,9 +158,10 @@ export class Vault {
   static async open(options: VaultOptions): Promise<{ vault: Vault; report: ReconcileReport }> {
     const vault = new Vault(options);
     await vault.ensureLayout();
-    await vault.ensureIndexSchema();
+    // Another window may be writing the index right now (ADR-0019): wait for it a little, then say so.
+    await whileBusy(() => vault.ensureIndexSchema());
     const { recovered, invalid } = options.recover === false ? { recovered: 0, invalid: [] } : await vault.recoverJournal();
-    const report = await vault.reconcile();
+    const report = await whileBusy(() => vault.reconcile());
     report.recoveredJournalEntries = recovered;
     for (const path of invalid) report.warnings.push({ path, code: "invalid_journal_entry", message: "Journal file ignored: it is malformed or names a path outside Thoth's temp directory" });
     return { vault, report };
@@ -638,8 +659,21 @@ export class Vault {
       throw error;
     }
     await clearJournalEntry(this.fs, id);
-    if (reconcile) await this.reconcileNow();
+    if (reconcile) await this.reindexAfterChange();
     return newHash;
+  }
+
+  /**
+   * Brings the index up to date after a change to the files has landed. The change stands even if this fails (for
+   * example the index stayed busy in another window past SQLite's wait, ADR-0019): the index is a cache, so the failure
+   * is not the caller's, and a reconcile is queued to catch up (the watcher triggers more).
+   */
+  private async reindexAfterChange(): Promise<void> {
+    try {
+      await this.reconcileNow();
+    } catch {
+      void this.reconcile().catch(() => undefined);
+    }
   }
 
   /**
@@ -668,12 +702,12 @@ export class Vault {
           await this.fs.rename(tempPath, await this.freeSiblingPath(normalized, "recovered"), { noReplace: true });
         }
         await clearJournalEntry(this.fs, id);
-        await this.reconcileNow();
+        await this.reindexAfterChange();
         throw new ConflictError(normalized, options.expectedHash, moved);
       }
       await this.fs.remove(tempPath);
       await clearJournalEntry(this.fs, id);
-      await this.reconcileNow();
+      await this.reindexAfterChange();
     });
   }
 
@@ -790,7 +824,7 @@ export class Vault {
           report.skipped.push({ path, reason: error instanceof ConflictError ? "changed" : error instanceof Error ? error.message : String(error) });
         }
       }
-      await this.reconcileNow();
+      await this.reindexAfterChange();
       return report;
     });
   }
@@ -875,7 +909,7 @@ export class Vault {
       };
       if (!(await empty(normalized))) throw new Error("Folder is not empty");
       await this.fs.remove(normalized);
-      await this.reconcileNow();
+      await this.reindexAfterChange();
     });
   }
 

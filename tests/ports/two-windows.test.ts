@@ -12,7 +12,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "@thoth/domain";
-import { ConflictError, JOURNAL_DIR, TEMP_DIR, Vault, type SqlDriver, type VaultFs } from "@thoth/local-store";
+import { ConflictError, JOURNAL_DIR, TEMP_DIR, Vault, type SqlDriver, type SqlRow, type SqlValue, type VaultFs } from "@thoth/local-store";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openRemoteVault } from "@thoth/platform/remote";
 import type { StdioTransport } from "@thoth/platform/stdio";
@@ -32,8 +32,15 @@ interface Runtime {
   name: string;
   /** Opens one more window on `root`; `wrap` may put itself between the Vault and the files. */
   open(root: string, wrap?: (fs: VaultFs) => VaultFs): Promise<Window>;
+  /** Another connection to `root`'s index takes the write lock (`BEGIN IMMEDIATE`) and holds it until `release`. */
+  lockIndex(root: string): Promise<{ release(): Promise<void> }>;
+  /** How long a connection waits for the lock before it fails with SQLITE_BUSY. */
+  busyMs: number;
   dispose(): Promise<void>;
 }
+
+/** Node's SQLite waits in the calling thread, so its windows wait briefly: the test thread must go on to free the lock. */
+const NODE_BUSY_MS = 200;
 
 /** Node: one process, every connection its own; "shared" is what the host would say (another is open on the root). */
 function nodeRuntime(): Runtime {
@@ -43,11 +50,17 @@ function nodeRuntime(): Runtime {
     async open(root, wrap = (fs) => fs) {
       const fs = new NodeVaultFs(root);
       await fs.mkdirp(".thoth");
-      const sql = new NodeSqlDriver(join(fs.root, ".thoth", "index.sqlite"));
+      const sql = new NodeSqlDriver(join(fs.root, ".thoth", "index.sqlite"), { busyTimeoutMs: NODE_BUSY_MS });
       const shared = (open.get(fs.root) ?? 0) > 0;
       open.set(fs.root, (open.get(fs.root) ?? 0) + 1);
       return { fs: wrap(fs), sql, shared, close: async () => void (await sql.close(), open.set(fs.root, open.get(fs.root)! - 1)) };
     },
+    async lockIndex(root) {
+      const sql = new NodeSqlDriver(join(root, ".thoth", "index.sqlite"));
+      await sql.exec("BEGIN IMMEDIATE");
+      return { release: async () => void (await sql.exec("COMMIT"), await sql.close()) };
+    },
+    busyMs: NODE_BUSY_MS,
     dispose: async () => undefined,
   };
 }
@@ -63,10 +76,40 @@ function rustRuntime(): Runtime {
       const connection = await openRemoteVault(transport.as(`space-${++windows}`), root);
       return { fs: wrap(connection.fs), sql: connection.sql, shared: connection.shared ?? false, close: () => connection.close() };
     },
+    async lockIndex(root) {
+      transport ??= await rustTransport({ allowRoots: [root] });
+      const holder = await openRemoteVault(transport.as("space-holder"), root);
+      await holder.sql.exec("BEGIN IMMEDIATE");
+      return { release: async () => void (await holder.sql.exec("COMMIT"), await holder.close()) };
+    },
+    busyMs: 5000,
     async dispose() {
       await transport?.close();
       transport = undefined;
     },
+  };
+}
+
+/** `sql`, calling `busy` whenever a statement fails because another connection holds the write lock. */
+function whenBusy(sql: SqlDriver, busy: () => void): SqlDriver {
+  const watch = async <T>(call: () => Promise<T>): Promise<T> => {
+    try {
+      return await call();
+    } catch (error) {
+      if (/database is locked|SQLITE_BUSY/.test(`${(error as { code?: string }).code} ${(error as Error).message}`)) busy();
+      throw error;
+    }
+  };
+  return {
+    exec: (text) => watch(() => sql.exec(text)),
+    run: (text, params) => watch(() => sql.run(text, params)),
+    all<T extends SqlRow = SqlRow>(text: string, params?: readonly SqlValue[]) {
+      return watch(() => sql.all<T>(text, params));
+    },
+    get<T extends SqlRow = SqlRow>(text: string, params?: readonly SqlValue[]) {
+      return watch(() => sql.get<T>(text, params));
+    },
+    close: () => sql.close(),
   };
 }
 
@@ -78,9 +121,9 @@ for (const make of [nodeRuntime, rustRuntime]) {
     let runtime: Runtime;
     const opened: { vault: Vault; window: Window }[] = [];
 
-    async function window(wrap?: (fs: VaultFs) => VaultFs) {
+    async function window(wrap?: (fs: VaultFs) => VaultFs, wrapSql: (sql: SqlDriver) => SqlDriver = (sql) => sql) {
       const w = await runtime.open(root, wrap);
-      const { vault } = await Vault.open({ fs: w.fs, sql: w.sql, recover: !w.shared });
+      const { vault } = await Vault.open({ fs: w.fs, sql: wrapSql(w.sql), recover: !w.shared });
       opened.push({ vault, window: w });
       return { vault, window: w };
     }
@@ -155,6 +198,47 @@ for (const make of [nodeRuntime, rustRuntime]) {
       expect(await readFile(join(root, "Notes/Plan.md"), "utf8")).toBe(`# Plan\n\n${winner}\n`);
       await b.vault.reconcile();
       expect((await b.vault.listPages()).map((p) => p.path)).toHaveLength(11);
+    });
+
+    it("keeps a save that landed while the index was busy in another window, and indexes it once the index is free", { timeout: 30_000 }, async () => {
+      const a = await window();
+      const before = (await a.vault.listPages()).find((p) => p.path === "Notes/Plan.md")!;
+      const lock = await runtime.lockIndex(root);
+      const saved = text("# Plan\n\nSaved while the index was busy.\n");
+      let hash: string;
+      try {
+        hash = await a.vault.writeFileAtomic("Notes/Plan.md", saved, { expectedHash: before.contentHash });
+      } finally {
+        await lock.release();
+      }
+      expect(hash).toBe(sha256Hex(saved));
+      expect(await readFile(join(root, "Notes/Plan.md"), "utf8")).toBe("# Plan\n\nSaved while the index was busy.\n");
+      expect(await readdir(join(root, TEMP_DIR))).toEqual([]);
+      expect(await readdir(join(root, JOURNAL_DIR))).toEqual([]);
+      await a.vault.reconcile();
+      expect((await a.vault.listPages()).find((p) => p.path === "Notes/Plan.md")!.contentHash).toBe(hash);
+      expect((await a.vault.search("busy")).map((h) => h.path)).toEqual(["Notes/Plan.md"]);
+    });
+
+    it("opens a second window while the first holds the index, once it is free within a few tries", { timeout: 30_000 }, async () => {
+      await window();
+      const lock = await runtime.lockIndex(root);
+      // Freed once the second window's first try has given up on it.
+      let freed: Promise<void> | null = null;
+      const b = await window(undefined, (sql) => whenBusy(sql, () => void (freed ??= lock.release())));
+      expect(freed).not.toBeNull();
+      await freed;
+      expect((await b.vault.listPages()).map((p) => p.path)).toEqual(["Notes/Plan.md"]);
+    });
+
+    it.runIf(make === nodeRuntime)("says the index is busy when it stays busy, rather than a bare SQLite error", { timeout: 30_000 }, async () => {
+      await window();
+      const lock = await runtime.lockIndex(root);
+      try {
+        await expect(window()).rejects.toThrow(/busy in another window/);
+      } finally {
+        await lock.release();
+      }
     });
 
     it("still gives a conflict when the other window's save lands between the last check and the rename", async () => {
