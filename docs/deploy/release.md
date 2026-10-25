@@ -6,7 +6,7 @@ Cloudflare R2: bucket `thoth-downloads`, public at `https://download.thoth.cream
 | Platform | Files | Built on |
 | --- | --- | --- |
 | macOS (Apple silicon and Intel) | `Thoth_<v>_universal.dmg` | `macos-latest` |
-| Windows x64 | not yet: `crates/thoth-host` needs a Windows file layer (see below) | |
+| Windows x64 | `Thoth_<v>_x64-setup.exe` (NSIS), `Thoth_<v>_x64_en-US.msi` | `windows-latest` |
 | Linux x64 | `Thoth_<v>_amd64.AppImage`, `Thoth_<v>_amd64.deb` | `ubuntu-22.04` (older glibc, so it runs on more distributions) |
 
 Each release lives under `v<version>/` with a `SHA256SUMS` file. `latest.json` at the root names the newest
@@ -25,25 +25,56 @@ release. Released files are never replaced: a fix is a new version.
 1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json` and
    `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`). The publish step
    refuses installers whose version differs from `tauri.conf.json`.
-2. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS and
-   Linux and uploads them. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
+2. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS,
+   Windows and Linux, runs the Windows host tests (`test-windows`), and uploads the installers only if every
+   build and those tests pass. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
    without a tag; untick "Upload to R2" to build only.
 3. Copy the published `latest.json` into the website's download manifest
    (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website.
 
-## Windows (not yet)
+## Windows
 
-The host's file layer keeps every read and write inside the Private Space with POSIX calls that resolve paths
-relative to an open folder and refuse symlinks (`openat`, `O_NOFOLLOW`, `O_NOFOLLOW_ANY` on macOS). Windows has
-no such calls, so the Windows build fails to compile. A Windows implementation (handles opened relative to the
-root, reparse points refused) with its own tests is a separate task; until then the release has no Windows
-files and the website lists macOS and Linux.
+The Windows build has the same host as macOS and Linux, with its own file layer (`crates/thoth-host/src/win`,
+`vault_fs_windows.rs`, `source_windows.rs`). Windows has no `openat`, but the NT API does: every vault and
+import-folder path is opened with `NtCreateFile` relative to the directory handle the host opened for the root,
+one component at a time, so no absolute path is re-resolved per call. Every open carries
+`FILE_OPEN_REPARSE_POINT` and the handle's reparse attribute is checked, so symlinks, junctions and mount points
+are reported and never followed, in any component. The root itself is opened by its canonical path and its final
+path (`GetFinalPathNameByHandleW`) must still be that path, which refuses a junction swapped into an ancestor.
+
+- Renames go through the source's handle with the target named relative to its directory handle
+  (`FileRenameInfoEx`). The compare-and-swap write's temp-to-target replace is atomic, with POSIX semantics, so it
+  works while another program has the page open and on a read-only target. No-replace is the volume's own atomic
+  no-replace rename; any entry answering to the name (another letter case, NFD) is `EEXIST`.
+- Names Windows cannot hold (`CON`, `nul.md`, `a.md:stream`, a trailing dot or space, `<>:"|?*`) are refused when
+  creating and are "not found" when reading. Names match case-insensitively (per-folder case sensitivity is
+  honoured), and a name stored in NFD (copied from a Mac) is found by its NFC spelling.
+- Long paths work: relative opens have no `MAX_PATH` limit and roots are opened with the `\\?\` prefix. The
+  host shows and stores roots without it (`C:\Users\you\Notes`).
+- The Agent Hub runs Claude Code in a Job Object (kill-on-close): cancel, timeout and app exit end the whole
+  process tree at once. It finds `claude.exe` from the native installer (`%USERPROFILE%\.local\bin`), WinGet, or
+  npm's `claude.cmd` (which runs the native `.exe` directly when it is the plain npm shim).
+- `vault.reveal` opens File Explorer (`%SystemRoot%\explorer.exe`, the folder as one argument).
+
+Where the guarantees differ from macOS and Linux, and why, is in ADR-0008 ("Windows file layer").
+
+CI: the `Windows x64` build entry makes the NSIS and MSI installers; `test-windows` runs `cargo test -p
+thoth-host` (including `tests/windows_fs.rs`, which makes a junction) and the port contract in Vitest
+(`tests/ports`). Run both without publishing: Actions → Release desktop → Run workflow with "Upload to R2"
+unticked, or `gh workflow run release-desktop.yml --ref <branch> -f publish=false`.
+
+Not covered by CI: Windows on ARM (only x64 is built), FAT/exFAT and network volumes (renames
+and deletes fall back to the classic, non-POSIX semantics there), and OneDrive folders (Windows shows cloud
+placeholders to apps as plain files, so they should work; if a placeholder is exposed as a reparse point, the host
+refuses it like any other).
 
 ## Signing (not yet)
 
 The builds are not signed with a Developer ID. The macOS app is ad-hoc signed (a sealed bundle, so macOS does
 not call it damaged), but Gatekeeper still says it cannot check the app until the user chooses Open Anyway
-once; the website's download section says how. Signing needs an Apple Developer ID (99 USD a year, plus notarization) and a Windows code-signing certificate. Both plug into
+once; the website's download section says how. The Windows installers are unsigned: SmartScreen warns about an
+unknown publisher until the user chooses More info → Run anyway (the website says so too), and the MSI shows
+"Unknown publisher" in its UAC prompt. Signing needs an Apple Developer ID (99 USD a year, plus notarization) and a Windows code-signing certificate. Both plug into
 the same workflow through Tauri's signing environment variables.
 
 ## Cost

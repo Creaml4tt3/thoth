@@ -138,5 +138,5 @@ step 7.
   repository.~~ Not for now (decision 1).
 - Handling of Workspace content as agent context (requires export permission checks, ADR-0009). Deferred.
 - ~~Exact capability detection mechanism per CLI.~~ Decided for Claude Code (decision 5); Codex when it is built.
-- Windows: the CLI is found and run, but cancel cannot signal a process group yet (Job Objects are the likely
-  answer). The desktop app currently ships for macOS.
+- ~~Windows: cancel cannot signal a process group yet.~~ Decided 2026-10-25: each run is a kill-on-close Job
+  Object; cancel and timeout terminate the job at once (no SIGTERM first), see ADR-0008 "Windows file layer".
