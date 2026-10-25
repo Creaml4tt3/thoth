@@ -42,10 +42,13 @@ export interface FakeWindows extends Windows {
   closed: number;
   /** The shell reports that the window `id` was closed. */
   emitClosed(id: string): void;
+  /** The window's close button (or Quit) was used: the shell asks the page to write its edits and close. */
+  emitCloseRequested(): void;
 }
 
 export function createFakeWindows(): FakeWindows {
   const listeners = new Set<(id: string) => void>();
+  const closeListeners = new Set<() => void>();
   const windows: FakeWindows = {
     opened: [],
     others: 0,
@@ -53,8 +56,8 @@ export function createFakeWindows(): FakeWindows {
     async open(request) {
       windows.opened.push(request);
     },
-    async closeThis() {
-      if (windows.others === 0) return false;
+    async closeThis(options) {
+      if (windows.others === 0 && options?.evenIfLast !== true) return false;
       windows.closed++;
       return true;
     },
@@ -62,8 +65,15 @@ export function createFakeWindows(): FakeWindows {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    async onCloseRequested(listener) {
+      closeListeners.add(listener);
+      return () => void closeListeners.delete(listener);
+    },
     emitClosed(id) {
       for (const listener of [...listeners]) listener(id);
+    },
+    emitCloseRequested() {
+      for (const listener of [...closeListeners]) listener();
     },
   };
   return windows;

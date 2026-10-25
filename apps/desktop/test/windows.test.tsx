@@ -14,7 +14,7 @@ import { App, DEFAULT_OPTIONS } from "../src/app/App.tsx";
 import { readLaunch } from "../src/app/windows.ts";
 import { tabsKey } from "../src/app/tabs-store.ts";
 import { WINDOWS_KEY, rememberWindow, windowsOn } from "../src/app/windows-store.ts";
-import { cleanup, editorBox, openApp, screen, TEST_OPTIONS, waitFor, within } from "./support/render.tsx";
+import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, TEST_OPTIONS, waitFor, within } from "./support/render.tsx";
 import { createFakeWindows, createNodePlatform, tempDirs, type FakeWindows } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 
@@ -190,6 +190,27 @@ describe("an unfinished import with another window open", () => {
     shared = false;
     expect((await service.listJobs()).map((j) => j.jobId)).toEqual([manifest.jobId]);
     await vault.close();
+  });
+});
+
+describe("the window's close button", () => {
+  it("writes the edits first, then closes the window, even the last one", async () => {
+    const app = await openApp(root, { autosaveMs: 60_000 }, createNodePlatform({ vault: root, windows }));
+    const box = await editorBox();
+    await waitFor(() => expect(box.textContent).toContain("First paragraph stays exactly."));
+    box.focus();
+    caretAtEnd(paragraph(box, "First paragraph stays exactly."));
+    await app.user.keyboard(" Typed just before closing.");
+    windows.emitCloseRequested();
+    await waitFor(() => expect(windows.closed).toBe(1));
+    expect(await app.read("Alpha.md")).toContain("First paragraph stays exactly. Typed just before closing.");
+  });
+
+  it("closes a window that has no Private Space open at once", async () => {
+    render(<App platform={createNodePlatform({ vault: root, windows })} options={{ ...DEFAULT_OPTIONS, ...TEST_OPTIONS }} />);
+    await screen.findByRole("button", { name: /choose or create a private space/i });
+    windows.emitCloseRequested();
+    await waitFor(() => expect(windows.closed).toBe(1));
   });
 });
 

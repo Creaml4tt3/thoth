@@ -35,10 +35,12 @@ interface Props {
   /** The tabs this window was opened with (stored form), instead of its saved ones; once. */
   startTabs?: string | null;
   onStarted?(): void;
+  /** Set to this window's `flushAll` while it is shown: the app calls it before the window closes (its close button). */
+  flushOnClose?: { current: () => Promise<boolean> };
 }
 
 /** Owns the live Session of one open Private Space: revision counter, watcher, import service. */
-export function VaultHost({ platform, connection, vault, options, intro, switchVault, windowId = MAIN_WINDOW, startTabs = null, onStarted }: Props) {
+export function VaultHost({ platform, connection, vault, options, intro, switchVault, windowId = MAIN_WINDOW, startTabs = null, onStarted, flushOnClose }: Props) {
   const [revision, setRevision] = useState(0);
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
@@ -53,6 +55,13 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const flushAll = useCallback(async () => (await Promise.all([...flushers.current].map((f) => f().catch(() => false)))).every(Boolean), []);
 
   const bump = useCallback(() => setRevision((r) => r + 1), []);
+  useEffect(() => {
+    if (!flushOnClose) return;
+    flushOnClose.current = flushAll;
+    return () => {
+      if (flushOnClose.current === flushAll) flushOnClose.current = async () => true;
+    };
+  }, [flushOnClose, flushAll]);
 
   // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
   const tabs = useTabs({

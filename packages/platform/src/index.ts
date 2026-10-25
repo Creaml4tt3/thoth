@@ -58,10 +58,18 @@ export interface Windows {
    * list, `serializeTabs`), near the screen point `at` when given. Rejects when it could not be opened.
    */
   open(request: { id: string; root: string; tabs: string; at?: { x: number; y: number } }): Promise<void>;
-  /** Closes this window if another window of the app is open, and says whether it did (the last window stays). */
-  closeThis(): Promise<boolean>;
+  /**
+   * Closes this window if another window of the app is open, and says whether it did (the last window stays). With
+   * `evenIfLast` (the answer to `onCloseRequested`) it closes anyway; closing the last window quits the app.
+   */
+  closeThis(options?: { evenIfLast?: boolean }): Promise<boolean>;
   /** Another window was closed by the user (not by quitting the app); its id. Returns the remover. */
   onClosed(listener: (id: string) => void): Promise<() => void>;
+  /**
+   * The window's close button, or Quit, was used. The page writes its edits, then calls `closeThis({ evenIfLast: true })`;
+   * a page that does not answer within a few seconds is closed anyway. Returns the remover.
+   */
+  onCloseRequested(listener: () => void): Promise<() => void>;
 }
 
 export interface Servers {

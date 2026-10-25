@@ -1,7 +1,9 @@
 /** `TauriTransport` framing against a fake Tauri API: command names, raw bytes, args header, errors and events. */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { HostCallError } from "@thoth/platform/remote";
-import { ARGS_HEADER, TauriTransport, VAULT_CHANGED_EVENT, WINDOW_CLOSED_EVENT, createTauriPlatform, internalsApi, tauriWindows, type TauriApi } from "@thoth/platform/tauri";
+import { ARGS_HEADER, CLOSE_REQUESTED_EVENT, TauriTransport, VAULT_CHANGED_EVENT, WINDOW_CLOSED_EVENT, createTauriPlatform, internalsApi, tauriWindows, type TauriApi } from "@thoth/platform/tauri";
 
 function fakeApi(reply: (command: string, args: unknown, options?: { headers: Record<string, string> }) => unknown): { api: TauriApi; calls: unknown[][] } {
   const calls: unknown[][] = [];
@@ -96,5 +98,35 @@ describe("Thoth's windows over Tauri (ADR-0019)", () => {
     closedHandler!({ payload: "space-ab12" });
     expect(heard).toEqual(["space-ab12"]);
     expect(createTauriPlatform(api).windows).toBeDefined();
+  });
+
+  it("listens to the events under the names the desktop shell sends them by", () => {
+    const shell = readFileSync(join(import.meta.dirname, "../../apps/desktop/src-tauri/src/lib.rs"), "utf8");
+    expect(shell).toContain(`pub const WINDOW_CLOSED_EVENT: &str = "${WINDOW_CLOSED_EVENT}";`);
+    expect(shell).toContain(`pub const CLOSE_REQUESTED_EVENT: &str = "${CLOSE_REQUESTED_EVENT}";`);
+  });
+
+  it("hears its close button and then closes itself, even as the last window", async () => {
+    const calls: unknown[][] = [];
+    let requested: ((event: { payload: unknown }) => void) | undefined;
+    const api: TauriApi = {
+      invoke: async (command, args) => {
+        calls.push([command, args]);
+        return true;
+      },
+      listen: async (event, handler) => {
+        calls.push(["listen", event]);
+        requested = handler as (event: { payload: unknown }) => void;
+        return () => undefined;
+      },
+    };
+    const windows = tauriWindows(api);
+    let asked = 0;
+    await windows.onCloseRequested(() => asked++);
+    expect(calls).toEqual([["listen", CLOSE_REQUESTED_EVENT]]);
+    requested!({ payload: null });
+    expect(asked).toBe(1);
+    expect(await windows.closeThis({ evenIfLast: true })).toBe(true);
+    expect(calls[1]).toEqual(["window_close", { args: { evenIfLast: true } }]);
   });
 });

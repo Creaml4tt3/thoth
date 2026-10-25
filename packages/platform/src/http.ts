@@ -45,7 +45,8 @@ function thisWindow(): string {
 /**
  * Thoth's windows for the bridge (ADR-0019): a new window is a browser window on the same page with the address the
  * desktop shell would build (`?window=…&root=…&tabs=…`), so a test can drive both against the one Rust host. A page
- * that goes away tells the others on a BroadcastChannel. This window never closes itself (`closeThis` is false).
+ * that goes away tells the others on a BroadcastChannel. This window never closes itself (`closeThis` is false) and is
+ * never asked to.
  */
 function bridgeWindows(): Windows {
   const channel = typeof BroadcastChannel === "function" ? new BroadcastChannel("thoth-bridge-windows") : null;
@@ -57,6 +58,8 @@ function bridgeWindows(): Windows {
       if (!window.open(page, id)) throw new Error("The window could not be opened");
     },
     closeThis: async () => false,
+    // A browser window has no close button the page could answer for.
+    onCloseRequested: async () => () => undefined,
     async onClosed(listener) {
       const receive = (event: MessageEvent) => {
         const closed = (event.data as { closed?: unknown } | null)?.closed;

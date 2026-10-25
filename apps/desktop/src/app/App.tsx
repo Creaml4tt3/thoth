@@ -106,6 +106,33 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     void openRoot(launch.root);
   }, [launch.root, openRoot]);
 
+  // The window's close button, or Quit (ADR-0019): write the open page's edits, then close, even the last window. The
+  // shell closes a window that does not answer within a few seconds.
+  const flushOnClose = useRef<() => Promise<boolean>>(async () => true);
+  const windows = platform.windows;
+  useEffect(() => {
+    if (!windows) return;
+    let live = true;
+    let stop: (() => void) | undefined;
+    void windows
+      .onCloseRequested(() => {
+        void flushOnClose
+          .current()
+          .catch(() => false)
+          .then(() => windows.closeThis({ evenIfLast: true }))
+          .catch(() => undefined);
+      })
+      .then((remove) => {
+        if (live) stop = remove;
+        else remove();
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [windows]);
+
   const switchVault = useCallback(() => {
     const current = hostRef.current;
     hostRef.current = null;
@@ -135,6 +162,7 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
       windowId={launch.id}
       startTabs={host.connection.root === launch.root ? launchTabs : null}
       onStarted={() => setLaunchTabs(null)}
+      flushOnClose={flushOnClose}
     />
   );
 }

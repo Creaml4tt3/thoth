@@ -19,6 +19,8 @@ export const ARGS_HEADER = "x-thoth-args";
 export const VAULT_CHANGED_EVENT = "vault:changed";
 /** Sent by the shell to the other windows when the user closes one (ADR-0019). */
 export const WINDOW_CLOSED_EVENT = "thoth:window-closed";
+/** Sent by the shell to a window whose close button (or Quit) was used: write the edits, then `window_close` (ADR-0019). */
+export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<unknown>;
 export type TauriListen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
@@ -105,15 +107,19 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
         throw toError(error);
       }
     },
-    async closeThis() {
+    async closeThis(options) {
       try {
-        return (await api.invoke("window_close", { args: {} })) === true;
+        return (await api.invoke("window_close", { args: options?.evenIfLast === true ? { evenIfLast: true } : {} })) === true;
       } catch (error) {
         throw toError(error);
       }
     },
     async onClosed(listener) {
       const unlisten = await api.listen<string>(WINDOW_CLOSED_EVENT, (e) => listener(e.payload));
+      return () => void unlisten();
+    },
+    async onCloseRequested(listener) {
+      const unlisten = await api.listen<null>(CLOSE_REQUESTED_EVENT, () => listener());
       return () => void unlisten();
     },
   };

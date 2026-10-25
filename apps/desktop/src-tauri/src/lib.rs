@@ -15,15 +15,19 @@
 //!
 //! Windows (ADR-0019): besides the host's commands the shell has two of its own, `window_open` and `window_close`,
 //! for Thoth's own windows on a Private Space (labels `space-…`, always the app's own page). Each host call is made
-//! as the window that asked (`Host::call_as`), and a closed window's vaults and agent runs end with it (`Host::release`).
+//! as the window that asked (`Host::call_as`), and a closed or reloaded window's vaults and agent runs end with it
+//! (`Host::detach` on the event loop, `Detached::end` on a blocking thread). The close button (and Quit on macOS) asks
+//! the page to write its edits first (`thoth:close-requested`), and closes a page that does not answer in a few seconds.
 //!
 //! Workspace servers: the host is the HTTP client. Refresh tokens and personal access tokens go to the OS
 //! keychain (`KeychainStore`), sign-in opens the system browser from the host (`SystemBrowser`), and the
 //! webview gets no http, opener or shell permission.
 use serde_json::Value;
 use std::path::PathBuf;
+use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
@@ -189,6 +193,13 @@ pub const SHELL_COMMANDS: &[&str] = &["window_open", "window_close"];
 pub const WINDOW_CLOSED_EVENT: &str = "thoth:window-closed";
 /// The longest tab list a new window starts with (30 tabs of long paths fit many times over).
 const MAX_LAUNCH_TABS: usize = 64 * 1024;
+/// The most windows the app has open at once (each has its own index connection and watcher in the host).
+const MAX_WINDOWS: usize = 8;
+/// Sent to a window whose close button (or Quit) was used: it writes its edits, then closes itself with
+/// `window_close` and `evenIfLast` (ADR-0019).
+pub const CLOSE_REQUESTED_EVENT: &str = "thoth:close-requested";
+/// How long a window has to answer `CLOSE_REQUESTED_EVENT` before it is closed anyway (a hung page).
+const CLOSE_ANSWER_TIMEOUT: Duration = Duration::from_secs(4);
 
 /// Is `label` one of the windows the app opens (`space-` and 1 to 32 lowercase letters or digits)? The capability
 /// grants Thoth's commands to `main` and `space-*`; nothing else can be made through `window_open`.
@@ -220,7 +231,10 @@ struct NewWindow {
 /// Checks a `window_open` request: a `space-` label, a Private Space the user opened (one of the host's recent
 /// folders, which the host would open anyway), a bounded tab list and, if given, a finite screen point. The page is
 /// always the app's own `index.html`; nothing in the request can name another address.
-fn new_window(args: &Value, recent: &[String]) -> HostResult<NewWindow> {
+fn new_window(args: &Value, recent: &[String], open: usize) -> HostResult<NewWindow> {
+    if open >= MAX_WINDOWS {
+        return Err(HostError::not_allowed(format!("Thoth opens at most {MAX_WINDOWS} windows: close one first")));
+    }
     let text = |key: &str| args.get(key).and_then(Value::as_str).ok_or_else(|| HostError::bad_argument(format!("{key} must be a string")));
     let label = text("id")?;
     if !is_window_label(label) {
@@ -260,7 +274,7 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
         match command.as_str() {
             "window_open" => {
                 let host = host.get().cloned().ok_or_else(|| InvokeError::from(HostError::internal("Host is not ready")))?;
-                let window = new_window(&args, &host.recent()).map_err(InvokeError::from)?;
+                let window = new_window(&args, &host.recent(), app.webview_windows().len()).map_err(InvokeError::from)?;
                 if app.get_webview_window(&window.label).is_some() {
                     return Err(InvokeError::from(HostError::bad_argument("That window is open already")));
                 }
@@ -277,14 +291,19 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 Ok(InvokeResponseBody::Json("null".to_owned()))
             }
             "window_close" => {
-                // The last window stays (Cmd/Ctrl+W leaves it an empty tab); closing it would quit the app.
-                let others = app.webview_windows().keys().any(|label| label != &caller);
-                if others {
-                    if let Some(window) = app.get_webview_window(&caller) {
-                        window.close().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be closed: {e}"))))?;
-                    }
+                // Cmd/Ctrl+W: the last window stays (it gets an empty tab); closing it would quit the app. After its
+                // close button or Quit (`evenIfLast`), the window goes whatever is left. Either way the page has written
+                // its edits first, so the window is destroyed here without asking it again.
+                let even_if_last = match args.get("evenIfLast") {
+                    None | Some(Value::Null) => false,
+                    Some(Value::Bool(b)) => *b,
+                    Some(_) => return Err(InvokeError::from(HostError::bad_argument("evenIfLast must be a boolean"))),
+                };
+                let closes = even_if_last || app.webview_windows().keys().any(|label| label != &caller);
+                if closes && let Some(window) = app.get_webview_window(&caller) {
+                    window.destroy().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be closed: {e}"))))?;
                 }
-                Ok(InvokeResponseBody::Json(others.to_string()))
+                Ok(InvokeResponseBody::Json(closes.to_string()))
             }
             _ => Err(InvokeError::from(HostError::bad_argument("Unknown shell command"))),
         }
@@ -320,11 +339,16 @@ fn handle(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
     true
 }
 
+/// The id of the macOS menu's own Quit item.
+#[cfg(target_os = "macos")]
+const QUIT_MENU_ID: &str = "thoth-quit";
+
 /// The macOS menu bar: Tauri's default menu without "Close Window", whose Cmd+W would close the app window before
-/// the page sees the key. Cmd+W closes a tab (ADR-0016 rule 5); the window's red button still closes the window.
+/// the page sees the key. Cmd+W closes a tab (ADR-0016 rule 5); the window's red button still closes the window, once
+/// its page has written its edits. Quit is the app's own item for the same reason (ADR-0019).
 #[cfg(target_os = "macos")]
 fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri::menu::Menu<R>> {
-    use tauri::menu::{AboutMetadata, Menu, PredefinedMenuItem, Submenu};
+    use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
     let name = app.package_info().name.clone();
     let app_menu = Submenu::with_items(
         app,
@@ -339,7 +363,8 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::quit(app, None)?,
+            // Not the predefined Quit, which ends the app at once: this one lets every window write its edits first.
+            &MenuItem::with_id(app, QUIT_MENU_ID, format!("Quit {name}"), true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
     // Edit keeps the system clipboard and undo keys working in the webview, as in the default menu.
@@ -371,14 +396,72 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri
     Menu::with_items(app, &[&app_menu, &edit, &window])
 }
 
+static HOST: OnceLock<Arc<Host>> = OnceLock::new();
+/// Set once the app is quitting: windows destroyed then are not "closed by the user" (they come back next time).
+static EXITING: AtomicBool = AtomicBool::new(false);
+/// Windows asked to close (their close button, or Quit) that have not closed yet.
+static CLOSING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+/// Releases still ending in the background: the app waits for them before it exits, so no agent run outlives it.
+static RELEASING: Mutex<Vec<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(Vec::new());
+
+fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Ends what the window `label` held (ADR-0019): its handles stop working now, on the event loop; the watchers, index
+/// connections, agent processes and run folders end on a blocking thread, then `then` runs.
+fn release_in_background(label: &str, then: impl FnOnce() + Send + 'static) {
+    let detached = HOST.get().map(|host| host.detach(label));
+    let task = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(detached) = detached {
+            detached.end();
+        }
+        then();
+    });
+    locked(&RELEASING).push(task);
+}
+
+/// Asks the window `label` to write its edits and close itself (`CLOSE_REQUESTED_EVENT`, answered by `window_close`
+/// with `evenIfLast`). A page that does not answer within `CLOSE_ANSWER_TIMEOUT` (hung) is closed anyway.
+fn ask_to_close<R: tauri::Runtime>(app: &AppHandle<R>, label: &str) {
+    if !locked(&CLOSING).insert(label.to_owned()) {
+        return; // asked already: its answer, or its timeout, is on the way
+    }
+    let _ = app.emit_to(label, CLOSE_REQUESTED_EVENT, ());
+    let (app, label) = (app.clone(), label.to_owned());
+    std::thread::spawn(move || {
+        std::thread::sleep(CLOSE_ANSWER_TIMEOUT);
+        // Not under the lock: destroying the window runs the Destroyed handler, which takes it.
+        let unanswered = locked(&CLOSING).contains(&label);
+        if unanswered && let Some(window) = app.get_webview_window(&label) {
+            let _ = window.destroy();
+        }
+    });
+}
+
+/// Quit (Cmd+Q on macOS): every window writes its edits and closes, as with its close button; the app exits when the
+/// last one has gone. The windows open now are not forgotten: they come back with the Private Space.
+#[cfg(target_os = "macos")]
+fn quit<R: tauri::Runtime>(app: &AppHandle<R>) {
+    EXITING.store(true, Ordering::SeqCst);
+    let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
+    if labels.is_empty() {
+        return app.exit(0);
+    }
+    for label in labels {
+        ask_to_close(app, &label);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    static HOST: OnceLock<Arc<Host>> = OnceLock::new();
-    /// Set once the app is quitting: windows destroyed then are not "closed by the user" (they come back next time).
-    static EXITING: AtomicBool = AtomicBool::new(false);
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.menu(app_menu);
+    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_MENU_ID {
+            quit(app);
+        }
+    });
     builder
         .plugin(tauri_plugin_dialog::init())
         // System notifications (ADR-0018): the webview may only check and ask for the permission and show one.
@@ -404,17 +487,35 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| handle(&HOST, invoke))
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                let label = window.label().to_owned();
-                // Its vaults (watchers, index connections) close and its agent runs end, as all of them do at quit.
-                if let Some(host) = HOST.get() {
-                    host.release(&label);
-                }
-                if !EXITING.load(Ordering::SeqCst) {
-                    let _ = window.app_handle().emit(WINDOW_CLOSED_EVENT, label);
-                }
+        // A page that loads anew (a reload) is a new session of the same window: what the old page held ends with it,
+        // as when the window is destroyed (ADR-0019). Otherwise its agent runs would go on with nobody to review them,
+        // and its handles would stay open until the window closes. On the first load the window holds nothing yet.
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Started {
+                release_in_background(webview.label(), || ());
             }
+        })
+        .on_window_event(|window, event| match event {
+            // The close button: the page writes its edits first (ADR-0019), then closes itself.
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                ask_to_close(window.app_handle(), window.label());
+            }
+            tauri::WindowEvent::Destroyed => {
+                let label = window.label().to_owned();
+                locked(&CLOSING).remove(&label);
+                // Its vaults (watchers, index connections) close and its agent runs end, as all of them do at quit; then
+                // the other windows hear of it (and may now be alone on their Private Space).
+                let app = window.app_handle().clone();
+                let by_user = !EXITING.load(Ordering::SeqCst);
+                let closed = label.clone();
+                release_in_background(&label, move || {
+                    if by_user {
+                        let _ = app.emit(WINDOW_CLOSED_EVENT, closed);
+                    }
+                });
+            }
+            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("failed to build the Thoth app")
@@ -424,7 +525,10 @@ pub fn run() {
             }
             if let tauri::RunEvent::Exit = event {
                 EXITING.store(true, Ordering::SeqCst);
-                // Stop watchers and delete import temp files before the process exits.
+                // Windows' releases still ending finish first, then every watcher, import temp file and agent run left.
+                for task in std::mem::take(&mut *locked(&RELEASING)) {
+                    let _ = tauri::async_runtime::block_on(task);
+                }
                 if let Some(host) = HOST.get() {
                     host.shutdown();
                 }
@@ -480,7 +584,7 @@ mod tests {
     fn window_open_makes_only_thoths_own_windows_on_an_opened_private_space() {
         let recent = vec!["/Users/a/Notes & more".to_owned()];
         let ok = json!({ "id": "space-ab12", "root": "/Users/a/Notes & more", "tabs": "{\"v\":1,\"active\":0,\"tabs\":[{\"k\":\"page\",\"path\":\"A#b?c.md\"}]}", "at": { "x": 900.5, "y": 400.0 } });
-        let window = new_window(&ok, &recent).unwrap();
+        let window = new_window(&ok, &recent, 1).unwrap();
         assert_eq!(window.label, "space-ab12");
         assert_eq!(window.at, Some((900.5, 400.0)));
         // Always the app's own page; what it shows travels escaped, so nothing in it adds to or ends the query.
@@ -488,17 +592,27 @@ mod tests {
         assert_eq!(window.page.matches('?').count(), 1);
         assert_eq!(window.page.matches('&').count(), 2);
         assert!(!window.page.contains('#'));
-        assert_eq!(new_window(&json!({ "id": "space-ab12", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent).unwrap().at, None);
+        assert_eq!(new_window(&json!({ "id": "space-ab12", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent, 1).unwrap().at, None);
 
-        let refused = |args: Value| new_window(&args, &recent).unwrap_err().code;
+        let refused = |args: Value| new_window(&args, &recent, 1).unwrap_err().code;
         assert_eq!(refused(json!({ "id": "main", "root": "/Users/a/Notes & more", "tabs": "x" })), "BAD_ARGUMENT");
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Other", "tabs": "x" })), "NOT_ALLOWED");
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more", "tabs": "x".repeat(MAX_LAUNCH_TABS + 1) })), "BAD_ARGUMENT");
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more", "tabs": "x", "at": { "x": "1", "y": 2 } })), "BAD_ARGUMENT");
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more" })), "BAD_ARGUMENT");
         // An address in the request is not used: the page is the app's own whatever else is sent.
-        let elsewhere = new_window(&json!({ "id": "space-x", "url": "https://example.org/", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent).unwrap();
+        let elsewhere = new_window(&json!({ "id": "space-x", "url": "https://example.org/", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent, 1).unwrap();
         assert!(elsewhere.page.starts_with("index.html?window=space-x&") && !elsewhere.page.contains("example.org"));
+    }
+
+    #[test]
+    fn window_open_stops_at_a_bounded_number_of_windows() {
+        let recent = vec!["/Notes".to_owned()];
+        let args = json!({ "id": "space-x", "root": "/Notes", "tabs": "x" });
+        assert!(new_window(&args, &recent, MAX_WINDOWS - 1).is_ok());
+        let refused = new_window(&args, &recent, MAX_WINDOWS).unwrap_err();
+        assert_eq!(refused.code, "NOT_ALLOWED");
+        assert!(refused.message.contains(&MAX_WINDOWS.to_string()), "{}", refused.message);
     }
 
     #[test]
