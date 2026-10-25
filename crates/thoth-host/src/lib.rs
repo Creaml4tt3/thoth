@@ -16,23 +16,32 @@
 //!   never receives an access token, refresh token or personal access token.
 //! - Agent CLIs (`agent`, ADR-0007) run only as a known provider's binary found by the host, with an argument list
 //!   the provider's policy accepts, in a private working directory under the data folder.
+//!
+//! On Windows the file layer is `win/` (`NtCreateFile` relative to a directory handle, reparse points refused),
+//! `vault_fs_windows.rs` and `source_windows.rs`, with the same module names and contract.
 pub mod agent;
+#[cfg(unix)]
 mod at;
 pub mod error;
 mod handles;
 pub mod paths;
 pub mod remote;
+#[cfg_attr(windows, path = "source_windows.rs")]
 pub mod source;
 pub mod sql;
+#[cfg_attr(windows, path = "vault_fs_windows.rs")]
 pub mod vault_fs;
 pub mod watch;
+#[cfg(windows)]
+mod win;
 
 pub use error::{HostError, HostResult};
 pub use remote::{Browser, KEYCHAIN_SERVICE, MemorySecretStore, SecretStore};
 
 use agent::Agents;
-use paths::{canonical, check_root_policy};
+use paths::{canonical, canonicalize_path, check_root_policy};
 use remote::Remote;
+#[cfg(unix)]
 use rustix::fs::{Mode, OFlags};
 use serde_json::{Value, json};
 use source::{OpenFile, Source};
@@ -131,8 +140,8 @@ type Reply = (Value, Option<Vec<u8>>);
 
 impl Host {
     pub fn new(config: HostConfig) -> Self {
-        let home = std::env::var_os("HOME").map(PathBuf::from).and_then(|h| std::fs::canonicalize(h).ok());
-        let allow_roots = config.allow_roots.iter().filter_map(|r| std::fs::canonicalize(r).ok()).collect();
+        let home = std::env::var_os(HOME_VAR).map(PathBuf::from).and_then(|h| canonicalize_path(&h).ok());
+        let allow_roots = config.allow_roots.iter().filter_map(|r| canonicalize_path(r).ok()).collect();
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
         let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
         Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents }
@@ -332,7 +341,7 @@ impl Host {
 
     fn pick_vault(&self) -> Value {
         let Some(picked) = self.config.picker.pick_vault() else { return Value::Null };
-        let Ok(root) = std::fs::canonicalize(&picked) else { return Value::Null };
+        let Ok(root) = canonicalize_path(&picked) else { return Value::Null };
         let shown = root.to_string_lossy().into_owned();
         self.state().picked_vaults.insert(root);
         Value::String(shown)
@@ -355,7 +364,13 @@ impl Host {
         let fs = VaultFs::new(fd, self.config.disable_hardlink);
         fs.mkdirp(".thoth")?;
         // SQLITE_OPEN_NOFOLLOW refuses a symlink anywhere in this path; `.thoth` was just checked through the root fd.
-        let sql = Sql::open(&root.join(".thoth").join("index.sqlite"))?;
+        // On Windows SQLite ignores that flag, so the host checks the database files through the root handle.
+        #[cfg(windows)]
+        fs.refuse_linked_index()?;
+        let db = root.join(".thoth").join("index.sqlite");
+        #[cfg(windows)]
+        let db = win::paths::for_win32(&db);
+        let sql = Sql::open(&db)?;
         let label = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let handle = handles::new_handle("vault")?;
         let shown = root.to_string_lossy().into_owned();
@@ -429,7 +444,7 @@ impl Host {
 
     fn pick_source(&self, directory: bool) -> Value {
         let Some(picked) = self.config.picker.pick_source(directory) else { return Value::Null };
-        let Ok(location) = std::fs::canonicalize(&picked) else { return Value::Null };
+        let Ok(location) = canonicalize_path(&picked) else { return Value::Null };
         let shown = location.to_string_lossy().into_owned();
         self.state().picked_sources.insert(location);
         Value::String(shown)
@@ -549,13 +564,28 @@ fn discard(entry: Arc<FileEntry>) {
     }
 }
 
+/// The user's home folder: `HOME`, or `USERPROFILE` on Windows.
+#[cfg(not(windows))]
+const HOME_VAR: &str = "HOME";
+#[cfg(windows)]
+const HOME_VAR: &str = "USERPROFILE";
+
 /// Opens a canonical root directory. On macOS `O_NOFOLLOW_ANY` refuses a symlink in any component,
 /// so a component swapped for a symlink after canonicalization cannot redirect the vault.
+#[cfg(unix)]
 pub(crate) fn open_root_dir(root: &Path) -> HostResult<std::os::fd::OwnedFd> {
     rustix::fs::openat(rustix::fs::CWD, root, no_symlinks(at::DIR_FLAGS), Mode::empty()).map_err(|e| HostError::errno(e, "open", &root.to_string_lossy()))
 }
 
+/// Opens a canonical root directory on Windows: refused if it is a reparse point or if its final path is not
+/// `root` (a component swapped for a junction after canonicalization), see `win::open_root`.
+#[cfg(windows)]
+pub(crate) fn open_root_dir(root: &Path) -> HostResult<std::os::windows::io::OwnedHandle> {
+    win::open_root(root)
+}
+
 /// Adds "refuse symlinks": every component on macOS (`O_NOFOLLOW_ANY`), the final one elsewhere.
+#[cfg(unix)]
 pub(crate) fn no_symlinks(flags: OFlags) -> OFlags {
     #[cfg(target_os = "macos")]
     {

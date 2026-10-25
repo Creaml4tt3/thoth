@@ -21,7 +21,6 @@ getrandom.workspace = true
 notify.workspace = true
 notify-debouncer-full.workspace = true
 rusqlite.workspace = true
-rustix.workspace = true
 sha2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -30,6 +29,14 @@ thiserror.workspace = true
 unicode-normalization.workspace = true
 ureq.workspace = true
 url.workspace = true
+
+# POSIX *at() calls (openat, O_NOFOLLOW): the file layer on macOS and Linux.
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
+# NtCreateFile relative to a directory handle, reparse-point checks, Job Objects: the same layer on Windows.
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

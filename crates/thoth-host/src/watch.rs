@@ -26,6 +26,9 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn start(root: &Path, sink: ChangeSink) -> HostResult<Self> {
+        // ReadDirectoryChangesW reports paths under the path it was given; a long root needs the `\\?\` form.
+        #[cfg(windows)]
+        let root = &crate::win::paths::for_win32(root);
         let root_buf = root.to_path_buf();
         let handler = move |result: DebounceEventResult| {
             let (paths, rescan) = match result {

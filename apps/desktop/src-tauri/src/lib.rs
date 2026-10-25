@@ -89,8 +89,9 @@ impl Browser for SystemBrowser {
         #[cfg(target_os = "windows")]
         let mut command = {
             // `rundll32 url.dll,FileProtocolHandler <url>` opens the default browser without `cmd /c start`,
-            // whose parser would treat `&` in the query as a command separator.
-            let mut c = std::process::Command::new("rundll32");
+            // whose parser would treat `&` in the query as a command separator. By absolute path, so no
+            // `rundll32.exe` next to the app or on PATH is picked instead.
+            let mut c = std::process::Command::new(windows_tool(r"System32\rundll32.exe"));
             c.arg("url.dll,FileProtocolHandler");
             c
         };
@@ -117,12 +118,19 @@ impl SystemFileManager {
         #[cfg(target_os = "macos")]
         let mut command = std::process::Command::new("/usr/bin/open");
         #[cfg(target_os = "windows")]
-        let mut command = std::process::Command::new("explorer");
+        let mut command = std::process::Command::new(windows_tool("explorer.exe"));
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         let mut command = std::process::Command::new("xdg-open");
         command.arg(root);
         Ok(command)
     }
+}
+
+/// A program in the Windows folder (`%SystemRoot%`, normally `C:\Windows`), by absolute path.
+#[cfg(target_os = "windows")]
+fn windows_tool(relative: &str) -> PathBuf {
+    let root = std::env::var_os("SystemRoot").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    root.join(relative)
 }
 
 impl FileManager for SystemFileManager {
@@ -330,11 +338,16 @@ mod tests {
         for bad in ["relative/folder", "/tmp/a\nb"] {
             assert_eq!(SystemFileManager::command(std::path::Path::new(bad)).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
         }
+        #[cfg(not(windows))]
         let root = std::path::Path::new("/tmp/-a Calculator; rm -rf ~");
+        #[cfg(windows)]
+        let root = std::path::Path::new(r"C:\tmp\-a Calculator & del x");
         let command = SystemFileManager::command(root).unwrap();
         assert_eq!(command.get_args().collect::<Vec<_>>(), vec![root.as_os_str()]);
         #[cfg(target_os = "macos")]
         assert_eq!(command.get_program(), "/usr/bin/open");
+        #[cfg(target_os = "windows")]
+        assert!(std::path::Path::new(command.get_program()).is_absolute());
     }
 
     #[test]

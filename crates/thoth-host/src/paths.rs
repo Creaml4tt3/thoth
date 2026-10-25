@@ -3,7 +3,9 @@
 //! refused instead of collapsed, and segments are re-checked after NFC
 //! normalization. Source paths are names exactly as listed on disk.
 use crate::error::{HostError, HostResult};
-use std::path::{Component, Path, PathBuf};
+#[cfg(not(windows))]
+use std::path::Component;
+use std::path::{Path, PathBuf};
 use unicode_normalization::UnicodeNormalization;
 
 /// Longest path argument accepted, in bytes (PATH_MAX on macOS and Linux is 1024/4096).
@@ -77,9 +79,13 @@ pub fn is_reserved_first_segment(segment: &str) -> bool {
     segment.nfc().collect::<String>().to_lowercase() == ".thoth"
 }
 
+#[cfg(windows)]
+pub use crate::win::paths::check_root_policy;
+
 /// Roots a vault (or import folder) may never be: the filesystem root, the
 /// home directory and its ancestors, the host's own data directory and its
 /// ancestors (a vault there could rewrite the recent list), and system trees.
+#[cfg(not(windows))]
 pub fn check_root_policy(root: &Path, home: Option<&Path>, data_dir: Option<&Path>) -> HostResult<()> {
     let refuse = |why: &str| Err(HostError::not_allowed(format!("{} cannot be opened: {why}", root.display())));
     if !root.is_absolute() || root.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir)) {
@@ -126,7 +132,16 @@ pub fn canonical(raw: &str) -> HostResult<PathBuf> {
     if !path.is_absolute() {
         return Err(HostError::bad_argument("Location must be an absolute path"));
     }
-    std::fs::canonicalize(path).map_err(|e| HostError::io(&e, "open", raw))
+    canonicalize_path(path).map_err(|e| HostError::io(&e, "open", raw))
+}
+
+/// `std::fs::canonicalize`, in the form the host shows and compares roots in: on Windows without the `\\?\`
+/// prefix (`C:\Notes`, as Node's `realpath` and Explorer show it; see `win::paths`).
+pub fn canonicalize_path(path: &Path) -> std::io::Result<PathBuf> {
+    #[cfg(windows)]
+    return crate::win::paths::canonicalize(path);
+    #[cfg(not(windows))]
+    std::fs::canonicalize(path)
 }
 
 #[cfg(test)]
@@ -145,6 +160,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn root_policy_refuses_dangerous_roots() {
         let home = Path::new("/Users/alice");
         let data = Path::new("/Users/alice/Library/Application Support/io.github.creaml4tt3.thoth");

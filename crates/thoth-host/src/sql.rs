@@ -289,7 +289,9 @@ mod tests {
         assert_eq!(sql.conn.limit(Limit::SQLITE_LIMIT_ATTACHED).unwrap(), 0);
     }
 
+    /// SQLite's NOFOLLOW is Unix-only; on Windows the host checks the files first (`VaultFs::refuse_linked_index`).
     #[test]
+    #[cfg(unix)]
     fn symlinked_database_path_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let real = std::fs::canonicalize(dir.path()).unwrap();
