@@ -17,11 +17,12 @@ import { BUDGET_CHOICES_USD, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { basename, stripExtension } from "@thoth/domain";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
+import { tip, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ContextPicker } from "../agents/ContextPicker.tsx";
 import { EventLine, Outcome, StoppedNotice, providerOf } from "../agents/parts.tsx";
-import { excerptAllowed, MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
+import { MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
 import { AGENT_PROVIDERS } from "../agents/settings.ts";
 import type { Insets, Size } from "./placement.ts";
 
@@ -66,9 +67,10 @@ function useDefaultContext(agents: AgentsService, excerpt: string | null) {
       const page = servers.getState().trees[`${target.server}\n${target.workspace}`]?.nodes.find((n) => n.id === target.page);
       if (ws && page) agents.addWorkspacePage({ server: target.server, workspace: target.workspace, page: target.page, title: page.title, workspaceName: ws.name });
     }
-    // The selected text is page text: it is offered only where Permissions allow that kind of page.
-    const source = target.kind === "workspace" ? "workspace" : "private";
-    if (excerpt && excerptAllowed(source, settings)) agents.setDraft({ excerpt: { text: excerpt, from: target.kind === "page" ? target.path : null, source } });
+    // The selected text is page text: the service offers it only where the rules for its page allow (Permissions,
+    // and a workspace's export rule).
+    if (excerpt && target.kind === "page") agents.offerExcerpt({ text: excerpt, from: target.path, source: "private" });
+    if (excerpt && target.kind === "workspace") agents.offerExcerpt({ text: excerpt, from: null, source: "workspace", server: target.server, workspace: target.workspace });
     // Once per opening of the bubble.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -91,8 +93,10 @@ function Chips({ state, agents, onAdd, adding }: { state: AgentsState; agents: A
       </span>
       <ul className="bubble-chips" aria-labelledby="bubble-context-label">
         {chips.map((c) => (
-          <li key={c.key} className="bubble-chip" data-kind={c.kind} title={c.title}>
-            <span className="bubble-chip-text">{c.label}</span>
+          <li key={c.key} className="bubble-chip" data-kind={c.kind}>
+            <span className="bubble-chip-text" {...(c.title ? tip(c.label, undefined, c.title) : tipIfClipped(c.label))}>
+              {c.label}
+            </span>
             <button type="button" className="bubble-chip-remove" aria-label={t.remove(c.label)} onClick={c.remove}>
               <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false">
                 <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -154,7 +158,11 @@ function Form({ state, agents, focusNonce }: { state: AgentsState; agents: Agent
       <Chips state={state} agents={agents} adding={adding} onAdd={() => setAdding((a) => !a)} />
       {adding && (
         <div id="bubble-picker" className="bubble-picker agents">
-          {settings.allowPrivate ? <ContextPicker state={state} agents={agents} disabled={busy} /> : <p className="muted small">{f.privateOff}</p>}
+          {/* The picker offers only what Permissions allow; each kind switched off is named. */}
+          {!settings.allowPrivate && <p className="muted small">{f.privateOff}</p>}
+          {!settings.allowWholeSpace && <p className="muted small">{f.wholeSpaceOff}</p>}
+          {!settings.allowWorkspace && <p className="muted small">{f.workspaceOff}</p>}
+          {(settings.allowPrivate || settings.allowWholeSpace || settings.allowWorkspace) && <ContextPicker state={state} agents={agents} disabled={busy} />}
           <div className="set-actions">
             <Button variant="ghost" small onClick={() => setAdding(false)}>
               {t.addDone}
@@ -381,6 +389,7 @@ export function Bubble({
   onClose,
   mascot,
   excerpt = null,
+  motion = "full",
 }: {
   agents: AgentsService;
   state: AgentsState;
@@ -391,6 +400,8 @@ export function Bubble({
   onClose(refocus: boolean): void;
   mascot: RefObject<HTMLButtonElement | null>;
   excerpt?: string | null;
+  /** The mascot's Motion setting (Off also when the OS asks for reduced motion): Off opens the bubble without its pop. */
+  motion?: "full" | "calm" | "off";
 }) {
   const t = useDesktopStrings().mascot.bubble;
   const box = useRef<HTMLDivElement>(null);
@@ -455,6 +466,7 @@ export function Bubble({
       aria-modal="false"
       aria-labelledby="mascot-bubble-title"
       className="mascot-bubble"
+      data-motion={motion}
       data-side={above ? "above" : "below"}
       style={{ left: Math.round(left), top: Math.round(top), width, maxHeight, ["--tail-x" as string]: `${Math.round(tail)}px`, transformOrigin: `${Math.round(tail)}px ${above ? "100%" : "0"}` }}
       onKeyDown={onKeyDown}

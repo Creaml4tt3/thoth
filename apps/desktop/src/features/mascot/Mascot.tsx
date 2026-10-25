@@ -79,6 +79,7 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
   const suppressClick = useRef(false);
   const [settling, setSettling] = useState(false);
   const keyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [inset, setInset] = useState(TOP_INSET);
   useLayoutEffect(() => setInset(topInset()), [win.width, win.height, tabs.state]);
 
@@ -118,6 +119,7 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
       assistant.closeBubble();
       void agents.reopenReview(waiting[0]!).then(() => {
         if (agents.getState().phase === "review") openAgentReview();
+        else assistant.openBubble(); // it could not be opened again: the bubble says so, next to the mascot that was clicked
       });
       return;
     }
@@ -171,7 +173,9 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
     setDrag(null);
     // The settle to the snapped edge animates from where it was let go (a transition on the layer's transform).
     setSettling(true);
-    setTimeout(() => setSettling(false), SETTLE_MS);
+    // One settle at a time: a second drop restarts it rather than being cut short by the first one's timer.
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => setSettling(false), SETTLE_MS);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -185,7 +189,13 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
     clearTimeout(keyTimer.current);
     if (prefs.snap) keyTimer.current = setTimeout(() => save(placed, true), KEY_SNAP_MS);
   };
-  useEffect(() => () => clearTimeout(keyTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(keyTimer.current);
+      clearTimeout(settleTimer.current);
+    },
+    [],
+  );
 
   const onClick = () => {
     if (suppressClick.current) {
@@ -213,7 +223,8 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
         data-h={position.h}
         data-v={position.v}
         data-dragging={drag ? "" : undefined}
-        data-settling={settling ? "" : undefined}
+        data-settling={settling && motion !== "off" ? "" : undefined}
+        data-motion={motion}
         data-testid="mascot"
         data-state={state}
         style={{ transform: `translate3d(${point.left}px, ${point.top}px, 0)`, width: box, height: box }}
@@ -267,6 +278,7 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
           }}
           mascot={button}
           excerpt={excerpt}
+          motion={motion}
         />
       )}
     </>

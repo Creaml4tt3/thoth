@@ -1,4 +1,4 @@
-/* Agent Hub (Paper). Tokens only; layout follows Settings and the transfer dialog. */
+/* The assistant's agent views: the run and review tab, and Settings → Thoth assistant (Paper). Tokens only; layout follows Settings and the transfer dialog. */
 .agents .small { font: var(--thoth-text-small); }
 /* Secondary text here is read, not skimmed (status, transcript, hints): the AA-contrast ink rather than the tertiary one. */
 .agents .muted { color: var(--thoth-ink-secondary); }

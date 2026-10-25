@@ -7,7 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
-import { MascotArt } from "./MascotArt.tsx";
+import { MascotArt, STAGE } from "./MascotArt.tsx";
 import { MASCOT_MOTIONS, MASCOT_SIZES, SCALE_MAX, SCALE_MIN, SCALE_STEP } from "./prefs.ts";
 import { boxSize } from "./placement.ts";
 import { useReducedMotion } from "./hooks.ts";
@@ -22,7 +22,7 @@ export function MascotSettings() {
   const [reset, setReset] = useState(false);
   if (!store || !prefs) return null;
   const version = prefs.size === "compact" ? "compact" : "full";
-  const stage = Math.round(88 * (prefs.scale / 100));
+  const stage = Math.round(STAGE * (prefs.scale / 100));
   const box = boxSize(version, prefs.scale);
   return (
     <section className="agents-sub mascot-settings" aria-labelledby="mascot-settings-heading">

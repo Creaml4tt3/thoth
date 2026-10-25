@@ -198,6 +198,7 @@ function Usage({ state, now }: { state: AgentsState; now: () => number }) {
   const peak = Math.max(1, ...rows.map((r) => r.claude.runs + r.codex.runs));
   const labels = rows.map((r) => label(r, period, lang, t.weekOf));
   const all = totals.runs + totals.codexRuns;
+  const { providers } = useDesktopStrings().agents;
   const short = (row: UsageRow, i: number) => (period === "week" ? new Date(row.start).toLocaleDateString(lang, { month: "short", day: "numeric" }) : labels[i]!);
   return (
     <section className="agents-sub agents-usage" aria-labelledby="agents-usage-heading">
@@ -216,8 +217,8 @@ function Usage({ state, now }: { state: AgentsState; now: () => number }) {
       </div>
       <p className="muted small">{t.lede}</p>
       <ul className="agents-legend" aria-hidden="true">
-        <li data-provider="claude">Claude Code</li>
-        <li data-provider="codex">Codex</li>
+        <li data-provider="claude">{providers.claude.name}</li>
+        <li data-provider="codex">{providers.codex.name}</li>
       </ul>
       <div className="agents-chart" role="img" aria-label={t.chart(all, labels[0]!, labels[labels.length - 1]!)} data-testid="agent-usage-chart">
         {rows.map((row, i) => (

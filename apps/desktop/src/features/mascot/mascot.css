@@ -9,18 +9,22 @@
  * mascot sits beside the writing, it must never pull the eye from it.
  */
 
-/* Palette: the orange disc stays in both themes; the silhouette is ink on light and warm white on dark. */
+/* Palette, from the theme tokens so it follows Light, Dark and System by itself: the silhouette is the ink (near-black
+   on light, warm white on dark), the eye the surface, the accent the theme's moon orange. Only the disc is fixed: it is
+   lunar orange #E8590C in both themes (design/DESIGN.md), which no theme token holds. */
 .mascot-art {
   --m-moon: #E8590C;
-  --m-crater: #C94A07;
-  --m-ink: #0A0A0A;
-  --m-eye: #F7F5F0;
+  --m-crater: color-mix(in srgb, var(--m-moon) 86%, #000);
+  --m-ink: rgb(var(--thoth-ink));
+  --m-eye: var(--thoth-bg);
   --m-pupil: #0A0A0A;
   --m-glint: #F7F5F0;
   --m-paper: #F7F5F0;
   --m-line: rgb(10 10 10 / 0.42);
-  --m-accent: #E8590C;
-  --m-page-edge: rgb(10 10 10 / 0.26);
+  --m-accent: var(--thoth-moon);
+  /* A prop's edge, a quarter of the way from the surface to black: a soft grey line on light, the near-black surface
+     itself on dark (where a light line would vanish into the paper). */
+  --m-page-edge: color-mix(in srgb, var(--thoth-bg) 74%, #0A0A0A);
   /* The cut-out edge that keeps a prop apart from the silhouette: the surface the mascot floats on. */
   --m-cut: var(--thoth-bg, #FFFFFF);
 
@@ -36,22 +40,6 @@
   display: block;
   overflow: visible;
   color: var(--m-ink);
-}
-[data-theme="night"] .mascot-art {
-  --m-ink: #F7F5F0;
-  --m-eye: #0A0A0A;
-  --m-line: rgb(10 10 10 / 0.5);
-  --m-accent: #FF7A2F;
-  --m-page-edge: var(--m-cut);
-}
-@media (prefers-color-scheme: dark) {
-  [data-theme="system"] .mascot-art {
-    --m-ink: #F7F5F0;
-    --m-eye: #0A0A0A;
-    --m-line: rgb(10 10 10 / 0.5);
-    --m-accent: #FF7A2F;
-    --m-page-edge: var(--m-cut);
-  }
 }
 .mascot-art[data-motion="calm"] { --m-amp: 0.5; --m-tempo: 1.6; }
 
@@ -199,6 +187,8 @@
 
 /* Off: a still pose per state (the OS's reduced-motion setting does the same through ui.css). Nothing moves, nothing fades. */
 .mascot-art[data-motion="off"] *, .mascot-art[data-motion="off"] { animation: none !important; transition: none !important; }
+/* Motion Off stills everything the mascot moves, not only the drawing: the settle after a drop, the press and the bubble. */
+.mascot-layer[data-motion="off"] *, .mascot-layer[data-motion="off"], .mascot-bubble[data-motion="off"] { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .mascot-art, .mascot-art * { animation: none !important; transition: none !important; }
 }

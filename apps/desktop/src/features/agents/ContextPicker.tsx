@@ -88,60 +88,74 @@ export function ContextPicker({ state, agents, disabled }: { state: AgentsState;
   const preview = state.preview;
   const limitsText = t.totalLimits(DEFAULT_STAGING_LIMITS.maxFiles, bytes(DEFAULT_STAGING_LIMITS.maxTotalBytes));
 
+  // Permissions only narrow: what they switch off is not offered at all (and is refused at Start as well).
+  const { allowPrivate, allowWholeSpace, allowWorkspace } = state.settings;
   return (
     <>
-      <fieldset className="agents-context" disabled={disabled}>
-        <legend>{t.context}</legend>
-        <p className="muted small" id="agents-context-hint">
-          {t.contextHint}
-        </p>
-        <label className="xfer-check agents-whole">
-          <input type="checkbox" checked={wholeSpace} onChange={(e) => agents.setDraft({ wholeSpace: e.target.checked })} aria-describedby="agents-whole-hint" />
-          <span>{t.wholeSpace}</span>
-        </label>
-        <p className="muted small" id="agents-whole-hint">
-          {t.wholeSpaceHint}
-        </p>
-        <div className="agents-context-bar">
-          <input className="input" type="search" aria-label={t.filter} placeholder={t.filter} value={filter} onChange={(e) => setFilter(e.target.value)} disabled={wholeSpace} />
-          <span aria-live="polite" className="muted small">
-            {wholeSpace ? t.wholeSpaceOn : t.selected(selection.length)}
-          </span>
-          {selection.length > 0 && !wholeSpace && (
-            <button type="button" className="sec-link" onClick={() => onChange([])}>
-              {t.clear}
-            </button>
+      {(allowPrivate || allowWholeSpace) && (
+        <fieldset className="agents-context" disabled={disabled}>
+          <legend>{t.context}</legend>
+          {allowPrivate && (
+            <p className="muted small" id="agents-context-hint">
+              {t.contextHint}
+            </p>
           )}
-        </div>
-        <ul className="agents-context-list" aria-describedby="agents-context-hint">
-          {loaded && shown.length === 0 && <li className="muted">{t.none}</li>}
-          {shown.map((row) => {
-            const folder = coveredBy(selection, row.path);
-            const checked = wholeSpace || selection.includes(row.path) || folder !== undefined;
-            const label = row.kind === "folder" ? t.folder(row.label, row.pages) : row.label;
-            return (
-              <li key={`${row.kind}:${row.path}`} style={{ paddingInlineStart: `${row.depth * 16}px` }} data-kind={row.kind}>
-                <label className="xfer-check" title={row.path}>
-                  <input type="checkbox" checked={checked} disabled={wholeSpace || folder !== undefined} onChange={() => toggle(row)} aria-label={label} />
-                  <span className={row.kind === "folder" ? "agents-folder" : undefined}>{label}</span>
-                  {folder !== undefined && !wholeSpace && <span className="muted small">{t.inFolder}</span>}
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="small agents-total" role="status" data-testid="agent-total" data-problem={preview?.problem?.code}>
-          {preview && (wholeSpace || selection.length > 0) ? (
+          {allowWholeSpace && (
             <>
-              {t.total(preview.files, bytes(preview.bytes))}
-              {preview.problem && (preview.problem.code === "too_many" || preview.problem.code === "too_large" || preview.problem.code === "file_too_large") ? ` · ${limitsText}` : ""}
+              <label className="xfer-check agents-whole">
+                <input type="checkbox" checked={wholeSpace} onChange={(e) => agents.setDraft({ wholeSpace: e.target.checked })} aria-describedby="agents-whole-hint" />
+                <span>{t.wholeSpace}</span>
+              </label>
+              <p className="muted small" id="agents-whole-hint">
+                {t.wholeSpaceHint}
+              </p>
             </>
-          ) : (
-            <span className="muted">{t.totalNone}</span>
           )}
-        </p>
-      </fieldset>
-      <WorkspacePicker state={state} agents={agents} disabled={disabled} />
+          {allowPrivate && (
+            <>
+              <div className="agents-context-bar">
+                <input className="input" type="search" aria-label={t.filter} placeholder={t.filter} value={filter} onChange={(e) => setFilter(e.target.value)} disabled={wholeSpace} />
+                <span aria-live="polite" className="muted small">
+                  {wholeSpace ? t.wholeSpaceOn : t.selected(selection.length)}
+                </span>
+                {selection.length > 0 && !wholeSpace && (
+                  <button type="button" className="sec-link" onClick={() => onChange([])}>
+                    {t.clear}
+                  </button>
+                )}
+              </div>
+              <ul className="agents-context-list" aria-describedby="agents-context-hint">
+                {loaded && shown.length === 0 && <li className="muted">{t.none}</li>}
+                {shown.map((row) => {
+                  const folder = coveredBy(selection, row.path);
+                  const checked = wholeSpace || selection.includes(row.path) || folder !== undefined;
+                  const label = row.kind === "folder" ? t.folder(row.label, row.pages) : row.label;
+                  return (
+                    <li key={`${row.kind}:${row.path}`} style={{ paddingInlineStart: `${row.depth * 16}px` }} data-kind={row.kind}>
+                      <label className="xfer-check" title={row.path}>
+                        <input type="checkbox" checked={checked} disabled={wholeSpace || folder !== undefined} onChange={() => toggle(row)} aria-label={label} />
+                        <span className={row.kind === "folder" ? "agents-folder" : undefined}>{label}</span>
+                        {folder !== undefined && !wholeSpace && <span className="muted small">{t.inFolder}</span>}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+          <p className="small agents-total" role="status" data-testid="agent-total" data-problem={preview?.problem?.code}>
+            {preview && (wholeSpace || selection.length > 0) ? (
+              <>
+                {t.total(preview.files, bytes(preview.bytes))}
+                {preview.problem && (preview.problem.code === "too_many" || preview.problem.code === "too_large" || preview.problem.code === "file_too_large") ? ` · ${limitsText}` : ""}
+              </>
+            ) : (
+              <span className="muted">{t.totalNone}</span>
+            )}
+          </p>
+        </fieldset>
+      )}
+      {allowWorkspace && <WorkspacePicker state={state} agents={agents} disabled={disabled} />}
     </>
   );
 }

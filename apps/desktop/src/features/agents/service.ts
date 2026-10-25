@@ -70,14 +70,26 @@ export interface Draft {
    * Text selected in the editor when the bubble opened, quoted to the CLI after the task (never kept in the run
    * record); `source` is the kind of page it came from, so Permissions apply to it as to that page. null: none.
    */
-  excerpt: { text: string; from: string | null; source: "private" | "workspace" } | null;
+  excerpt: Excerpt | null;
 }
+
+/** Selected text and the page it came from: a Private Space page (`from` its path) or a workspace page. */
+export type Excerpt = { text: string; from: string | null } & ({ source: "private" } | { source: "workspace"; server: string; workspace: string });
 
 /** The longest excerpt of selected text quoted in a task. */
 export const MAX_EXCERPT = MAX_EXCERPT_CHARS;
 
-/** Whether Permissions let an excerpt from that kind of page be given to an agent. */
-export const excerptAllowed = (source: "private" | "workspace", settings: AgentSettings): boolean => (source === "private" ? settings.allowPrivate : settings.allowWorkspace);
+/**
+ * Whether selected text may be given to an agent: the same rules as its page. A Private Space excerpt needs Private
+ * Space pages on in Permissions; a workspace excerpt needs workspace pages on and a workspace that lets its pages be
+ * copied out (an `exportRestricted` workspace refuses it, as it refuses the page).
+ */
+export function excerptAllowed(excerpt: Excerpt, settings: AgentSettings, servers: ServerDirectory | undefined): boolean {
+  if (excerpt.source === "private") return settings.allowPrivate;
+  if (!settings.allowWorkspace) return false;
+  const workspace = servers?.workspace(excerpt.server, excerpt.workspace);
+  return workspace !== undefined && workspaceContextAccess(workspace) === "allowed";
+}
 
 export type DraftProblem = "needContext" | "needTask" | "badModel" | "privateOff" | "wholeSpaceOff" | "workspaceOff" | "contextTooMany" | "contextTooLarge" | "contextFileTooLarge" | "contextMissing";
 
@@ -139,6 +151,8 @@ export interface AgentsService {
   /** Adds a workspace page as read-only context unless the user's role or the workspace's rules forbid it. */
   addWorkspacePage(choice: WorkspaceChoice): boolean;
   removeWorkspacePage(key: string): void;
+  /** Offers selected text for the next task, unless the rules for its page refuse it (`excerptAllowed`). */
+  offerExcerpt(excerpt: Excerpt): boolean;
   /** Measures the draft's Private Space context (call again when the vault changed). */
   refreshPreview(): Promise<void>;
   /** Problems with the draft, in the order the form shows them. */
@@ -262,6 +276,12 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
       set({ draft: { ...state.draft, workspace: state.draft.workspace.filter((c) => workspaceChoiceKey(c) !== key) } });
     },
 
+    offerExcerpt(excerpt) {
+      if (!excerptAllowed(excerpt, state.settings, servers)) return false;
+      set({ draft: { ...state.draft, excerpt: { ...excerpt, text: excerpt.text.slice(0, MAX_EXCERPT) } } });
+      return true;
+    },
+
     async refreshPreview() {
       const seq = ++previewSeq;
       const { selection, wholeSpace } = state.draft;
@@ -302,7 +322,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         selection: settings.allowPrivate ? d.selection : [],
         wholeSpace: settings.allowWholeSpace && d.wholeSpace,
         workspace: settings.allowWorkspace ? d.workspace : [],
-        excerpt: d.excerpt && excerptAllowed(d.excerpt.source, settings) ? d.excerpt : null,
+        excerpt: d.excerpt && excerptAllowed(d.excerpt, settings, servers) ? d.excerpt : null,
       };
       set({ settings, cleared: null, draft });
       if (draft.selection !== d.selection || draft.wholeSpace !== d.wholeSpace) void service.refreshPreview();
@@ -322,7 +342,8 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
           {
             provider,
             prompt,
-            ...(excerpt && excerptAllowed(excerpt.source, state.settings) ? { excerpt: { text: excerpt.text, ...(excerpt.from ? { from: excerpt.from } : {}) } } : {}),
+            // Checked again at Start: a workspace's rules can change while the bubble is open.
+            ...(excerpt && excerptAllowed(excerpt, state.settings, servers) ? { excerpt: { text: excerpt.text, ...(excerpt.from ? { from: excerpt.from } : {}) } } : {}),
             selection: wholeSpace ? [] : selection,
             ...(wholeSpace ? { wholeSpace: true } : {}),
             ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),

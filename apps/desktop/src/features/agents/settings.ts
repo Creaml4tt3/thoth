@@ -6,7 +6,7 @@
  */
 import { BUDGET_CHOICES_USD, DEFAULT_BUDGET_USD, DEFAULT_RETENTION_DAYS, DEFAULT_TIME_LIMIT_MINUTES, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 
-/** The agent CLIs the Agent Hub offers, in the picker's order. */
+/** The agent CLIs the assistant offers, in the picker's order. */
 export const AGENT_PROVIDERS = ["claude", "codex"] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 

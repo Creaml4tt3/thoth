@@ -14,7 +14,9 @@ import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 import { FAKE_CLAUDE_DIR, FAKE_CODEX_DIR, fakeRecord } from "../../../tests/helpers/agent.ts";
 import { FakeServers, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
-import { AGENT_SETTINGS_KEY } from "../src/features/agents/settings.ts";
+import { AGENT_SETTINGS_KEY, DEFAULT_AGENT_SETTINGS } from "../src/features/agents/settings.ts";
+import { excerptAllowed, type Excerpt } from "../src/features/agents/service.ts";
+import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { setLangPreference } from "../src/strings/index.ts";
 
 const dirs = tempDirs();
@@ -410,7 +412,11 @@ describe("the assistant's runs: context", () => {
     expect(within(bubble()).getByRole("list", { name: "Context" }).textContent).toContain("Nothing yet");
     await app.user.click(within(bubble()).getByRole("button", { name: "Add context" }));
     expect(within(bubble()).getByText("Private Space pages are switched off in Settings → Thoth assistant → Permissions.")).toBeTruthy();
-    expect(screen.queryByRole("group", { name: "Pages for the agent" })).toBeNull();
+    expect(within(bubble()).getByText("Workspace pages are switched off in Settings → Thoth assistant → Permissions.")).toBeTruthy();
+    // Only what is still allowed is offered: the whole Private Space, but no page list and no workspace pages.
+    expect(within(bubble()).getByRole("checkbox", { name: /whole Private Space/i })).toBeTruthy();
+    expect(within(bubble()).queryByRole("checkbox", { name: "Plan" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Workspace pages (read-only)" })).toBeNull();
     await writeAndStart(app, "Anything.");
     expect(within(bubble()).getByRole("alert").textContent).toContain("Pick at least one page or folder");
     expect(await readdir(join(data, "agent-runs")).catch(() => [])).toEqual([]);
@@ -434,6 +440,22 @@ describe("the assistant's runs: context", () => {
     expect((await fakeRecord(await workDir())).stdin).toContain('Explain it.\n@sleep 300\n\nSelected text (from Diary.md):\n"""\nDiary\n"""');
     await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
     expect((await savedRecords())[0]!["task"]["prompt"]).toBe("Explain it.\n@sleep 300");
+  });
+
+  it("gives selected text the rules of its page: Permissions, and a workspace's export rule", () => {
+    const workspaces: Record<string, { role: string; exportRestricted: boolean }> = { open: { role: "editor", exportRestricted: false }, closed: { role: "editor", exportRestricted: true }, guest: { role: "none", exportRestricted: false } };
+    const servers = { workspace: (_server: string, id: string) => workspaces[id] } as unknown as ServerDirectory;
+    const from = (workspace: string): Excerpt => ({ text: "Roadmap", from: null, source: "workspace", server: "s", workspace });
+    const on = DEFAULT_AGENT_SETTINGS;
+    expect(excerptAllowed(from("open"), on, servers)).toBe(true);
+    expect(excerptAllowed(from("closed"), on, servers)).toBe(false); // an exportRestricted workspace refuses it, as it refuses the page
+    expect(excerptAllowed(from("guest"), on, servers)).toBe(false);
+    expect(excerptAllowed(from("gone"), on, servers)).toBe(false);
+    expect(excerptAllowed(from("open"), { ...on, allowWorkspace: false }, servers)).toBe(false);
+    expect(excerptAllowed(from("open"), on, undefined)).toBe(false);
+    const page: Excerpt = { text: "Diary", from: "Diary.md", source: "private" };
+    expect(excerptAllowed(page, on, servers)).toBe(true);
+    expect(excerptAllowed(page, { ...on, allowPrivate: false }, servers)).toBe(false);
   });
 
   it("does not offer selected text from a kind of page Permissions switch off", async () => {

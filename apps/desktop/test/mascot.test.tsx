@@ -362,11 +362,16 @@ describe("the mascot's settings", () => {
     cleanup();
     vi.unstubAllGlobals();
     localStorage.setItem(MASCOT_PREFS_KEY, JSON.stringify({ ...DEFAULT_MASCOT_PREFS, motion: "off" }));
-    await openWithMascot();
+    const app = await openWithMascot();
     expect(art().dataset["motion"]).toBe("off");
     // Off is a still pose: no animation and no transition anywhere in the drawing, under either rule.
     const css = await readFile(join(import.meta.dirname, "../src/features/mascot/mascot.css"), "utf8");
     expect(css).toMatch(/\.mascot-art\[data-motion="off"\] \*, \.mascot-art\[data-motion="off"\] \{ animation: none !important; transition: none !important; \}/);
+    // Off stills more than the drawing: the settle after a drop, the press and the bubble's pop as well.
+    expect(screen.getByTestId("mascot").dataset["motion"]).toBe("off");
+    expect(css).toMatch(/\.mascot-layer\[data-motion="off"\] \*, \.mascot-layer\[data-motion="off"\], \.mascot-bubble\[data-motion="off"\] \{ animation: none !important; transition: none !important; \}/);
+    await app.user.click(screen.getByRole("button", { name: /^Thoth assistant/ }));
+    expect((await screen.findByRole("dialog", { name: "Ask Thoth" })).dataset["motion"]).toBe("off");
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.mascot-art, \.mascot-art \* \{ animation: none !important; transition: none !important; \}/);
     // Every state still has its own still pose (props and eyes are opacity, set without motion).
     for (const state of MASCOT_STATES) expect(css).toContain(`[data-state="${state}"]`);
