@@ -69,7 +69,14 @@
 .tree-item[data-kind="folder"][aria-expanded="true"] .tree-icon-folder { color: var(--thoth-moon-ink); }
 .tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
 .tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-accent); }
+/* `all: unset` on .tree-item also removes the browser's own `[draggable="true"] { -webkit-user-drag: element }`, and a row
+   with `user-drag: auto` never starts a drag (Chromium, WebKit and so Tauri's webviews). Say it again here. */
+.tree-item[draggable="true"] { -webkit-user-drag: element; user-select: none; -webkit-user-select: none; }
 .tree-item[data-dragging] { opacity: 0.45; }
+/* While a drag runs the rows' icons and labels take no pointer events: crossing them is not leaving the row (dnd.ts). */
+[data-tree-dragging] .tree-item > * { pointer-events: none; }
+/* The picture that follows the pointer (dnd.ts puts it off screen for the browser to copy). */
+.tree-drag-image { position: fixed; top: -200px; left: -200px; max-width: 220px; padding: 4px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 
 /* Drag and drop: the drop indicator is the accent colour (a line before or after a row, a tint inside it). */
 .tree-item[data-drop="before"] { box-shadow: inset 0 2px 0 0 var(--thoth-drop-indicator); }

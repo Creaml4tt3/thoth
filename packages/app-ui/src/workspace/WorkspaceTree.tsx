@@ -329,6 +329,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const dnd = useTreeDnd({
     enabled: canWrite && expanded,
     canContain: () => true,
+    onlyInside: (id) => id === TOP,
+    firstChild: (id) => (id !== TOP && open.has(id) && nodes ? (childrenOf(nodes, id, ordered)[0]?.id ?? null) : null),
     canOrder: ordered,
     canDrop: (dragId, overId, zone) => {
       if (!nodes || dragId === overId) return false;

@@ -111,9 +111,10 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       const { to, order } = await moveIntoFolder(vault, from, folder, siblings, index);
       onOrder(order);
       if (find(from)?.kind === "folder") remapFolders(from, to);
+      // Every tab on the page (or on a page in the folder) follows it, the way a rename does; a background tab would otherwise close as "gone".
+      tabs.remapPaths(from, to);
       await refresh();
       setFolder(folder, true);
-      if (current && (current === from || current.startsWith(`${from}/`))) openPage(to + current.slice(from.length));
       setSaid(folder === "" ? tt.movedToTop(title) : tt.movedInto(title, label(folder)));
       focusTreeItemSoon(to);
       return null;
@@ -217,6 +218,11 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const dnd = useTreeDnd({
     enabled: !selection.active,
     canContain: (id) => id !== TOP && find(id)?.kind === "folder",
+    onlyInside: (id) => id === TOP,
+    firstChild: (id) => {
+      const node = id === TOP ? undefined : find(id);
+      return node?.kind === "folder" && open.has(node.path) ? (node.children[0]?.path ?? null) : null;
+    },
     canOrder: true,
     canDrop: (drag, over, zone) => {
       if (over === drag) return false;
