@@ -1,11 +1,13 @@
 /**
- * The fake Claude Code CLI (`packages/agent-claude/test/fake-claude/claude`) and what it records, for Agent Hub
- * tests. CI never calls a real model.
+ * The fake Claude Code and Codex CLIs (`packages/agent-claude/test/fake-claude/claude`,
+ * `packages/agent-codex/test/fake-codex/codex`) and what they record, for Agent Hub tests. CI never calls a real model.
  */
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 export const FAKE_CLAUDE_DIR = resolve(import.meta.dirname, "../../packages/agent-claude/test/fake-claude");
+/** The fake Codex CLI (`packages/agent-codex/test/fake-codex/codex`); it records to `fake-codex-record.json`. */
+export const FAKE_CODEX_DIR = resolve(import.meta.dirname, "../../packages/agent-codex/test/fake-codex");
 
 export interface FakeRecord {
   pid: number;
@@ -20,8 +22,8 @@ export interface FakeRecord {
 }
 
 /** What the fake wrote next to (outside) the working directory `work`; waits until it exists. */
-export async function fakeRecord(work: string, timeoutMs = 20_000): Promise<FakeRecord> {
-  const file = join(dirname(work), "fake-claude-record.json");
+export async function fakeRecord(work: string, timeoutMs = 20_000, fake: "claude" | "codex" = "claude"): Promise<FakeRecord> {
+  const file = join(dirname(work), `fake-${fake}-record.json`);
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {

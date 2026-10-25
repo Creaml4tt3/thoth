@@ -5,6 +5,10 @@
  * The fake records what it was given: only the picked page in its working directory, that directory as its cwd,
  * the policy's argument list, and no argument or environment variable naming the vault.
  *
+ * The same with the FAKE Codex CLI, picked in the Agent Hub: its argument list is exactly the policy's (Codex's own
+ * sandbox with Thoth's permission profile, approvals that never prompt, no bypass, no web search, no spending limit),
+ * cancel stops its whole process tree, and its edit to a read-only workspace page is discarded.
+ *
  * Also: the whole Private Space as context; a workspace page (on the in-memory protocol test server, over real HTTP
  * through the host) as read-only context whose edit is discarded; a review that survives a real restart of the host
  * and the app and is then applied; and a run that used up its budget.
@@ -15,7 +19,7 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { newStableId } from "@thoth/domain";
-import { FAKE_CLAUDE_DIR, alive, fakeRecord, waitDead } from "../helpers/agent.ts";
+import { FAKE_CLAUDE_DIR, FAKE_CODEX_DIR, alive, fakeRecord, waitDead } from "../helpers/agent.ts";
 import { EDITOR_TOKEN, LOCKED_WORKSPACE, MAIN_WORKSPACE, startTestServer, type TestServer } from "../protocol/test-server.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
@@ -41,7 +45,7 @@ function bridgeOptions(): Parameters<typeof startBridge>[0] {
       binary: built.binary,
       pickVault: vault,
       dataDir: data,
-      agentSearchDirs: [FAKE_CLAUDE_DIR],
+      agentSearchDirs: [FAKE_CLAUDE_DIR, FAKE_CODEX_DIR],
       // Neither may reach the CLI: Thoth's own variables, and anything naming the open vault.
       env: { THOTH_E2E_SECRET: "do-not-pass", NOTES_FOR_E2E: join(vault, "Notes") },
     },
@@ -159,6 +163,83 @@ test("cancel stops the CLI and everything it started, and changes nothing", asyn
   expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe(PLAN);
   await expect.poll(async () => readdir(join(data, "agent-runs"))).toEqual([]);
   await expect(page.getByRole("region", { name: "Earlier runs" })).toContainText("Cancelled");
+});
+
+/** Opens the Agent Hub and picks Codex. */
+async function pickCodex(page: Page) {
+  await page.getByRole("button", { name: "Agent Hub" }).click();
+  await expect(page.getByTestId("agent-short-codex")).toHaveText("Ready, 0.164.0", { timeout: 15_000 });
+  await page.getByRole("group", { name: "Agent" }).getByRole("radio", { name: "Codex" }).check();
+  await expect(page.getByTestId("agent-status")).toHaveText("Codex 0.164.0 is ready, with its sandbox. It uses your own Codex login; Thoth never sees it.");
+}
+
+const CODEX_ARGV = async (): Promise<string[]> => JSON.parse(await readFile(join(FAKE_CODEX_DIR, "../fixtures/argv.json"), "utf8")).cases[0].argv;
+
+test("Codex: pick it, start, stream, review, apply exact bytes; it runs only in its own sandbox, with no spending limit", async ({ page }) => {
+  await pickCodex(page);
+  const form = page.getByRole("region", { name: "New task" });
+  await expect(form.getByRole("combobox", { name: "Spending limit" })).toBeDisabled();
+  await expect(form.getByRole("combobox", { name: "Spending limit" })).toHaveText("Not supported by Codex");
+  await page.getByRole("group", { name: "Pages for the agent" }).getByRole("checkbox", { name: "Plan", exact: true }).check();
+  await page.getByRole("textbox", { name: "Task" }).fill("Make it a dog.\n@run ls\n@replace Notes/Plan.md :: cat => dog\n@write Notes/Summary.md :: # Summary\\n");
+  await axe(page);
+  await page.getByRole("button", { name: "Start" }).click();
+  const log = page.getByRole("log", { name: "What the agent is doing" });
+  await expect(log).toContainText("Running ls");
+  await expect(log).toContainText("Editing Notes/Plan.md");
+  await expect(log).toContainText("Tokens: 1,200 in (1,000 cached), 34 out");
+  const review = page.getByRole("region", { name: "Review the changes" });
+  await expect(review).toBeVisible({ timeout: 15_000 });
+
+  // What Codex was given: only the picked page, its folder as cwd, and exactly the policy's arguments.
+  const work = await workDir();
+  const record = await fakeRecord(work, 20_000, "codex");
+  expect(record.files).toEqual([
+    { path: "Notes", kind: "directory" },
+    { path: "Notes/Plan.md", kind: "file" },
+  ]);
+  expect(record.cwd).toBe(work);
+  expect(record.argv).toEqual(await CODEX_ARGV());
+  const config = record.argv.filter((_, i) => record.argv[i - 1] === "-c");
+  expect(config).toEqual(expect.arrayContaining(["approval_policy=never", "default_permissions=thoth", "permissions.thoth.filesystem.:workspace_roots=write", "permissions.thoth.network.enabled=false", "web_search=disabled"]));
+  expect(record.argv).toEqual(expect.arrayContaining(["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--strict-config"]));
+  for (const banned of ["--dangerously-bypass-approvals-and-sandbox", "--sandbox", "-s", "danger-full-access", "--add-dir", "--search", "--profile", "-p", "--max-budget-usd"]) expect(record.argv).not.toContain(banned);
+  expect(record.argv.some((a) => a.includes("Make it a dog") || a.includes(vault))).toBe(false);
+  expect(record.stdin).toContain("Make it a dog.");
+  expect(Object.entries(record.env).filter(([k, v]) => /^THOTH_/i.test(k) || v.includes(vault))).toEqual([]);
+
+  expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe(PLAN);
+  await review.getByRole("checkbox", { name: "Apply the change to Notes/Summary.md" }).uncheck();
+  await review.getByRole("button", { name: "Apply 1 change" }).click();
+  await expect(page.getByRole("region", { name: "Result" })).toContainText("Applied");
+  expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe("# Plan\n\nWe have a dog.\n");
+  await expect(stat(join(vault, "Notes/Summary.md"))).rejects.toThrow();
+  await expect.poll(async () => readdir(join(data, "agent-runs"))).toEqual([]);
+  const row = page.getByRole("region", { name: "Earlier runs" }).getByRole("row", { name: /Make it a dog/ });
+  await expect(row).toContainText("Codex");
+  await expect(row).toContainText("1,234 tokens");
+  const [name] = await readdir(join(vault, ".thoth/agent/runs"));
+  expect(JSON.parse(await readFile(join(vault, ".thoth/agent/runs", name!), "utf8"))).toMatchObject({ state: "applied", provider: { id: "codex", name: "Codex", version: "0.164.0" }, outcome: { tokens: { input: 1200, output: 34 } } });
+  await axe(page);
+});
+
+test("Codex: cancel stops it and everything it started, and changes nothing", async ({ page }) => {
+  await pickCodex(page);
+  await page.getByRole("group", { name: "Pages for the agent" }).getByRole("checkbox", { name: "Plan", exact: true }).check();
+  await writeTask(page, "@replace Notes/Plan.md :: cat => dog\n@hang\n");
+  const cancel = page.getByRole("button", { name: "Cancel" });
+  await expect(cancel).toBeVisible();
+  const work = await workDir();
+  let record = await fakeRecord(work, 20_000, "codex");
+  await expect.poll(async () => (record = await fakeRecord(work, 20_000, "codex")).grandchild).not.toBeNull();
+  expect(await alive(record.pid)).toBe(true);
+  expect(await alive(record.grandchild!)).toBe(true);
+  await cancel.click();
+  await expect(page.getByText("Cancelled. Nothing in your Private Space was changed.")).toBeVisible({ timeout: 15_000 });
+  await waitDead(record.pid);
+  await waitDead(record.grandchild!);
+  expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe(PLAN);
+  await expect.poll(async () => readdir(join(data, "agent-runs"))).toEqual([]);
 });
 
 async function openHub(page: Page) {
@@ -280,6 +361,34 @@ test.describe("workspace pages as read-only context", () => {
     expect(JSON.parse(saved).context.find((c: { readOnly?: boolean }) => c.readOnly)).toMatchObject({ path: "workspace/Main/Spec.md", via: "workspace" });
     expect(saved).not.toContain("Roadmap");
     await axe(page);
+  });
+
+  test("Codex: its edit to a read-only workspace page is discarded, and only the private page is applied", async ({ page }) => {
+    const before = await specNow();
+    await signIn(page);
+    await pickCodex(page);
+    const group = page.getByRole("group", { name: "Workspace pages (read-only)" });
+    await group.locator("details", { hasText: "Main" }).locator("summary").click();
+    await group.getByRole("checkbox", { name: "Spec" }).check();
+    await page.getByRole("group", { name: "Pages for the agent" }).getByRole("checkbox", { name: "Plan", exact: true }).check();
+    await writeTask(page, ["Use the spec.", "@unlock workspace/Main/Spec.md", "@replace workspace/Main/Spec.md :: May => June", "@replace Notes/Plan.md :: cat => dog"].join("\n"));
+    const review = page.getByRole("region", { name: "Review the changes" });
+    await expect(review).toBeVisible({ timeout: 15_000 });
+    const record = await fakeRecord(await workDir(), 20_000, "codex");
+    expect(record.modes["workspace/Main/Spec.md"]! & 0o222).toBe(0);
+    expect(record.stdin).toContain('the folder "workspace/" holds read-only copies of pages');
+    const box = review.getByRole("checkbox", { name: "Apply the change to workspace/Main/Spec.md" });
+    await expect(box).toBeDisabled();
+    await expect(box).not.toBeChecked();
+    await review.getByRole("button", { name: "Apply 1 change" }).click();
+    const results = page.getByRole("region", { name: "Result" });
+    await expect(results).toContainText("workspace/Main/Spec.mdRead-only workspace page: change discarded");
+    await expect(results).toContainText("Notes/Plan.mdApplied");
+    expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe("# Plan\n\nWe have a dog.\n");
+    await expect(stat(join(vault, "workspace"))).rejects.toThrow();
+    const after = await specNow();
+    expect(after.markdown).toBe(SPEC);
+    expect(after.revision.id).toBe(before.revision.id);
   });
 });
 

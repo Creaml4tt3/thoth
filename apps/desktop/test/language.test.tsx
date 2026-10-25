@@ -43,7 +43,7 @@ describe("desktop strings", () => {
     const leaves = (v: unknown): string[] => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
     const english = new Set(leaves(en));
     // Product and format names stay as they are in both languages.
-    const same = new Set(["Thoth", "Private Space", "Agent Hub", "Claude Code"]);
+    const same = new Set(["Thoth", "Private Space", "Agent Hub", "Claude Code", "Codex"]);
     expect(leaves(th).filter((s) => english.has(s) && !same.has(s))).toEqual([]);
   });
 

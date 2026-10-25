@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The Agent Hub UI (Phase 4) on the Node test host with the fake Claude Code CLI: detection with fix instructions,
+ * The Agent Hub UI (Phase 4) on the Node test host with the fake Claude Code and Codex CLIs: the agent picker,
+ * detection with fix instructions (including Codex's sandbox check), Codex without a spending limit,
  * picking pages, start, the streamed transcript, review with per-file approval, apply (exact bytes on disk), the
  * conflict path with a kept copy, cancel, and the sidebar's "Ask an agent…". Never a real model.
  */
@@ -10,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
-import { FAKE_CLAUDE_DIR, fakeRecord } from "../../../tests/helpers/agent.ts";
+import { FAKE_CLAUDE_DIR, FAKE_CODEX_DIR, fakeRecord } from "../../../tests/helpers/agent.ts";
 import { FakeServers, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
 import { AGENT_SETTINGS_KEY } from "../src/features/agents/settings.ts";
 import { setLangPreference } from "../src/strings/index.ts";
@@ -371,7 +372,7 @@ describe("Agent Hub: limits and settings", () => {
     await app.user.selectOptions(select("Time limit", settings), "60");
     await app.user.selectOptions(select("Spending limit", settings), "none");
     await app.user.selectOptions(select("Keep run history for", settings), "0");
-    expect(JSON.parse(localStorage.getItem(AGENT_SETTINGS_KEY)!)).toEqual({ timeMinutes: 60, budgetUsd: null, retentionDays: 0 });
+    expect(JSON.parse(localStorage.getItem(AGENT_SETTINGS_KEY)!)).toEqual({ provider: "claude", timeMinutes: 60, budgetUsd: null, retentionDays: 0 });
     const form = screen.getByRole("region", { name: "New task" });
     expect(select("Time limit", form).selectedOptions[0]!.textContent).toBe("Default (60 minutes)");
     expect(select("Spending limit", form).selectedOptions[0]!.textContent).toBe("Default (No limit)");
@@ -429,8 +430,8 @@ describe("Agent Hub: limits and settings", () => {
     const history = await screen.findByRole("region", { name: "Earlier runs" });
     const row = await within(history).findByRole("row", { name: /Rewrite everything/ });
     const cells = within(row).getAllByRole("cell").map((c) => c.textContent);
-    expect(cells.slice(1, 5)).toEqual(["Rewrite everything", "claude-haiku-5-5", "US$0.43", "Stopped at the time limit"]);
-    expect(within(history).getAllByRole("columnheader").map((h) => h.textContent).slice(0, 5)).toEqual(["Date", "Task", "Model", "Cost", "Outcome"]);
+    expect(cells.slice(1, 6)).toEqual(["Rewrite everything", "Claude Code", "claude-haiku-5-5", "US$0.43", "Stopped at the time limit"]);
+    expect(within(history).getAllByRole("columnheader").map((h) => h.textContent).slice(0, 6)).toEqual(["Date", "Task", "Agent", "Model", "Cost", "Outcome"]);
     // Nothing is saved for it locally, so there is nothing to open.
     expect(within(row).queryByRole("button")).toBeNull();
   });
@@ -445,7 +446,7 @@ describe("Agent Hub: history", () => {
     await screen.findByRole("region", { name: "Result" });
     const history = screen.getByRole("region", { name: "Earlier runs" });
     const row = await within(history).findByRole("row", { name: /Make it a dog\./ });
-    await waitFor(() => expect(within(row).getAllByRole("cell").map((c) => c.textContent).slice(1, 5)).toEqual(["Make it a dog.", "claude-fake-1", "US$0.0012", "Applied"]));
+    await waitFor(() => expect(within(row).getAllByRole("cell").map((c) => c.textContent).slice(1, 6)).toEqual(["Make it a dog.", "Claude Code", "claude-fake-1", "US$0.0012", "Applied"]));
     await app.user.click(await within(row).findByRole("button", { name: /Open transcript and changes/ }));
     const detail = await screen.findByRole("region", { name: "Saved details of this run" });
     await waitFor(() => expect(within(detail).queryByText("Loading…")).toBeNull());
@@ -473,7 +474,7 @@ describe("Agent Hub: history", () => {
     expect(await screen.findByTestId("agent-awaiting")).toHaveProperty("textContent", "1 run is waiting for your review. Open it under Earlier runs.");
     const history = screen.getByRole("region", { name: "Earlier runs" });
     const row = await within(history).findByRole("row", { name: /replace Notes\/Plan\.md/ });
-    expect(within(row).getAllByRole("cell")[4]!.textContent).toBe("Awaiting review");
+    expect(within(row).getAllByRole("cell")[5]!.textContent).toBe("Awaiting review");
     expect((await savedRecords())[0]).toMatchObject({ state: "review" });
     await app.user.click(within(row).getByRole("button", { name: /Review the changes/ }));
 
@@ -551,5 +552,78 @@ describe("Agent Hub: Thai", () => {
     expect(within(settings).getByRole("combobox", { name: "เก็บประวัติการทำงานไว้" })).toBeTruthy();
     expect(within(settings).getByRole("button", { name: "ลบประวัติตอนนี้" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "งานก่อนหน้า" })).toBeTruthy();
+  });
+});
+
+describe("Agent Hub: Codex", () => {
+  const codexArgv = async () => (JSON.parse(await readFile(join(FAKE_CODEX_DIR, "../fixtures/argv.json"), "utf8")) as { cases: { argv: string[] }[] }).cases[0]!.argv;
+
+  it("offers Claude Code and Codex with each one's state, and runs Codex in its sandbox without a spending limit", async () => {
+    const app = await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
+    const agents = screen.getByRole("group", { name: "Agent" });
+    await waitFor(() => expect(screen.getByTestId("agent-short-codex").textContent).toBe("Ready, 0.164.0"));
+    expect(screen.getByTestId("agent-short-claude").textContent).toBe("Ready, 2.1.310");
+    expect((within(agents).getByRole("radio", { name: "Claude Code" }) as HTMLInputElement).checked).toBe(true);
+    await app.user.click(within(agents).getByRole("radio", { name: "Codex" }));
+    expect(status().textContent).toBe("Codex 0.164.0 is ready, with its sandbox. It uses your own Codex login; Thoth never sees it.");
+    expect(screen.getByRole("region", { name: "Codex" })).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toContain("Thoth runs it only inside Codex's own sandbox");
+    // No spending limit is offered for Codex, and none is passed.
+    const budget = within(screen.getByRole("region", { name: "New task" })).getByRole("combobox", { name: "Spending limit" }) as HTMLSelectElement;
+    expect(budget.disabled).toBe(true);
+    expect(budget.textContent).toBe("Not supported by Codex");
+    expect(screen.getByText("Codex has no spending limit of its own, so none is set. The time limit still applies.")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(AGENT_SETTINGS_KEY)!).provider).toBe("codex");
+
+    await startTask(app, ["Plan"], "@run ls\n@replace Notes/Plan.md :: cat => dog\n@write Notes/Summary.md :: # Summary\\n");
+    const review = await screen.findByRole("region", { name: "Review the changes" }, { timeout: 15_000 });
+    const log = screen.getByRole("log", { name: "What the agent is doing" });
+    expect(log.textContent).toContain("Started with Codex. Its commands and edits run in Codex's sandbox: this folder only, no network.");
+    expect(log.textContent).toContain("Running ls");
+    expect(log.textContent).toContain("Editing Notes/Plan.md");
+    expect(log.textContent).toContain("Tokens: 1,200 in (1,000 cached), 34 out");
+    expect((await fakeRecord(await workDir(), 20_000, "codex")).argv).toEqual(await codexArgv());
+
+    await app.user.click(within(review).getByRole("checkbox", { name: "Apply the change to Notes/Summary.md" }));
+    await app.user.click(within(review).getByRole("button", { name: "Apply 1 change" }));
+    await screen.findByRole("region", { name: "Result" });
+    expect(await app.read("Notes/Plan.md")).toBe("# Plan\n\nWe have a dog.\n");
+    await expect(stat(join(root, "Notes/Summary.md"))).rejects.toThrow();
+    const history = screen.getByRole("region", { name: "Earlier runs" });
+    const row = await within(history).findByRole("row", { name: /@run ls/ });
+    await waitFor(() => expect(within(row).getAllByRole("cell").map((c) => c.textContent).slice(2, 6)).toEqual(["Codex", "Default", "1,234 tokens", "Applied"]));
+    // The picker is the remembered default next time.
+    cleanup();
+    await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
+    expect((screen.getByRole("radio", { name: "Codex" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("will not run Codex where its sandbox does not start, and says how to fix it", async () => {
+    process.env["FAKE_CODEX_NO_SANDBOX"] = "1";
+    try {
+      localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify({ provider: "codex" }));
+      await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
+      await waitFor(() => expect(status().dataset["state"]).toBe("sandbox_unavailable"));
+      expect(status().textContent).toBe("Codex's sandbox does not work on this computer, so Thoth will not run Codex: without it, the commands Codex runs would have all your permissions. Codex said: Error: the sandbox could not be started (fake)");
+      expect(screen.getByRole("region", { name: "Codex" }).textContent).toContain("install bubblewrap");
+      expect(screen.getByTestId("agent-short-codex").textContent).toBe("No sandbox here");
+      expect(screen.getByRole("button", { name: "Start" })).toHaveProperty("disabled", true);
+      // Claude Code is still there to pick.
+      expect(screen.getByTestId("agent-short-claude").textContent).toBe("Ready, 2.1.310");
+    } finally {
+      delete process.env["FAKE_CODEX_NO_SANDBOX"];
+    }
+  });
+
+  it("speaks Thai for Codex too", async () => {
+    setLangPreference("th");
+    localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify({ provider: "codex" }));
+    const app = await openApp(root, {}, createNodePlatform({ vault: root, agents: { dataDir: data, searchDirs: [FAKE_CODEX_DIR] } }));
+    await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
+    await app.user.click(screen.getByRole("button", { name: "Agent Hub" }));
+    await waitFor(() => expect(status().dataset["state"]).toBe("ready"));
+    expect(screen.getByRole("group", { name: "เอเจนต์" })).toBeTruthy();
+    expect(status().textContent).toContain("Codex 0.164.0 พร้อมใช้งาน");
+    expect(screen.getByTestId("agent-budget-unsupported").textContent).toBe("Codex ไม่รองรับ");
   });
 });

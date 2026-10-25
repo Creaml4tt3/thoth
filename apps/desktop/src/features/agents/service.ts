@@ -25,10 +25,18 @@ import {
   type RunRecord,
   type WorkspaceRefusal,
 } from "@thoth/agent-core";
-import { CLAUDE_PROVIDER_ID, createClaudeProvider, isModelName } from "@thoth/agent-claude";
+import { createClaudeProvider, isModelName as isClaudeModel } from "@thoth/agent-claude";
+import { createCodexProvider, isModelName as isCodexModel } from "@thoth/agent-codex";
 import type { Vault } from "@thoth/local-store";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
-import { loadAgentSettings, saveAgentSettings, type AgentSettings } from "./settings.ts";
+import { AGENT_PROVIDERS, loadAgentSettings, saveAgentSettings, type AgentProviderId, type AgentSettings } from "./settings.ts";
+
+/** What the form needs to know about each agent CLI. Codex has no spending limit (its adapter refuses one). */
+export const PROVIDER_FEATURES: Record<AgentProviderId, { budget: boolean; isModelName(name: string): boolean; models: readonly string[] }> = {
+  // Suggestions for the model field: Claude Code's aliases, and models in Codex 0.164.0's bundled catalog.
+  claude: { budget: true, isModelName: isClaudeModel, models: ["sonnet", "opus", "haiku"] },
+  codex: { budget: false, isModelName: isCodexModel, models: ["gpt-6.1-sol", "gpt-5.6-luna", "gpt-5.5"] },
+};
 
 /** The newest events kept on screen for one run. */
 const MAX_EVENTS = 2000;
@@ -75,6 +83,11 @@ export interface DetailState {
 }
 
 export interface AgentsState {
+  /** The agent a new task uses. */
+  provider: AgentProviderId;
+  /** What detection found for each agent (missing until it was checked). */
+  statuses: Partial<Record<AgentProviderId, AgentInstallationStatus>>;
+  /** The chosen agent's status. */
   status: AgentInstallationStatus | null;
   checking: boolean;
   settings: AgentSettings;
@@ -106,6 +119,8 @@ export interface AgentsService {
   subscribe(listener: () => void): () => void;
   getState(): AgentsState;
   detect(): Promise<void>;
+  /** Picks the agent for the next task (remembered in the settings). */
+  selectProvider(id: AgentProviderId): void;
   setDraft(patch: Partial<Draft>): void;
   /** Adds a workspace page as read-only context unless the user's role or the workspace's rules forbid it. */
   addWorkspacePage(choice: WorkspaceChoice): boolean;
@@ -138,10 +153,13 @@ export interface AgentsService {
 const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default" };
 
 export function createAgentsService(vault: Vault, host: AgentHost, options: { now?: () => number; onApplied?: () => void; servers?: ServerDirectory; settings?: AgentSettings } = {}): AgentsService {
+  const initialSettings = options.settings ?? loadAgentSettings();
   let state: AgentsState = {
+    provider: initialSettings.provider,
+    statuses: {},
     status: null,
     checking: false,
-    settings: options.settings ?? loadAgentSettings(),
+    settings: initialSettings,
     draft: EMPTY_DRAFT,
     preview: null,
     phase: "idle",
@@ -162,7 +180,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
   const hub = new AgentHub({
     vault,
     host,
-    providers: [createClaudeProvider(host)],
+    providers: [createClaudeProvider(host), createCodexProvider(host)],
     ...(options.now ? { now: options.now } : {}),
     ...(servers ? { workspace: createWorkspaceReader((server) => servers.client(server)) } : {}),
     retentionDays: () => state.settings.retentionDays,
@@ -191,8 +209,17 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
 
     async detect() {
       set({ checking: true });
-      const status = await hub.provider(CLAUDE_PROVIDER_ID).detect();
-      set({ status, checking: false });
+      const found = await Promise.all(AGENT_PROVIDERS.map(async (id) => [id, await hub.provider(id).detect()] as const));
+      const statuses = Object.fromEntries(found) as Record<AgentProviderId, AgentInstallationStatus>;
+      set({ statuses, status: statuses[state.provider], checking: false });
+    },
+
+    selectProvider(id) {
+      if (id === state.provider || (state.phase !== "idle" && state.phase !== "finished")) return;
+      const settings = { ...state.settings, provider: id };
+      saveAgentSettings(settings);
+      // Model names belong to one CLI: a name typed for the other is dropped.
+      set({ provider: id, status: state.statuses[id] ?? null, settings, draft: { ...state.draft, model: "" }, error: null });
     },
 
     setDraft(patch) {
@@ -233,7 +260,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
       const problems: DraftProblem[] = [];
       if (selection.length === 0 && !wholeSpace && workspace.length === 0) problems.push("needContext");
       if (prompt.trim() === "") problems.push("needTask");
-      if (model.trim() !== "" && !isModelName(model.trim())) problems.push("badModel");
+      if (model.trim() !== "" && !PROVIDER_FEATURES[state.provider].isModelName(model.trim())) problems.push("badModel");
       const code = state.preview?.problem?.code;
       if (code === "too_many") problems.push("contextTooMany");
       else if (code === "too_large") problems.push("contextTooLarge");
@@ -252,13 +279,15 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
       if (state.phase !== "idle" && state.phase !== "finished") return;
       if (service.draftProblems().length > 0) return;
       const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget } = state.draft;
-      const budgetUsd = budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
+      const provider = state.provider;
+      // Only a CLI that enforces a spending limit gets one; Codex has none, and none is pretended.
+      const budgetUsd = !PROVIDER_FEATURES[provider].budget ? null : budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
       const minutes = timeMinutes === "default" ? state.settings.timeMinutes : timeMinutes;
       set({ phase: "starting", error: null, notice: null, events: [], changes: null, approved: [], results: null, record: null, detail: null });
       try {
         const { record, finished } = await hub.start(
           {
-            provider: CLAUDE_PROVIDER_ID,
+            provider,
             prompt,
             selection: wholeSpace ? [] : selection,
             ...(wholeSpace ? { wholeSpace: true } : {}),
@@ -283,7 +312,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
           phase: done.state === "review" ? "review" : "finished",
         });
       } catch (error) {
-        if (error instanceof AgentUnavailableError) set({ status: error.status, phase: "idle", error: null });
+        if (error instanceof AgentUnavailableError) set({ status: error.status, statuses: { ...state.statuses, [state.provider]: error.status }, phase: "idle", error: null });
         else if (error instanceof WorkspaceContextError) set({ phase: "idle", error: null, notice: { kind: "refused", refusal: error.refusal, ...(error.workspace ? { workspace: error.workspace } : {}) } });
         else set({ phase: "idle", error: error instanceof StagingError || error instanceof LimitError ? error.message : message(error) });
       }

@@ -141,14 +141,13 @@ export const th: DesktopStrings = {
     editsStay: "สิ่งที่คุณแก้ไขยังอยู่ในหน้านี้ หลังเข้าสู่ระบบแล้ว ให้กด ลองอีกครั้ง เพื่อบันทึก",
   },
 
-  // Thai for the Agent Hub was written by the implementer, not a native reviewer. "Agent Hub" and "Claude Code" stay
-  // in English as names. Strings marked REVIEW are the least certain.
+  // Thai for the Agent Hub was written by the implementer, not a native reviewer. "Agent Hub", "Claude Code" and "Codex"
+  // stay in English as names. Strings marked REVIEW are the least certain.
   agents: {
     title: "Agent Hub",
     open: "Agent Hub",
     askAgent: "ให้เอเจนต์ช่วย…", // REVIEW
     lede: "ส่งหน้าบางหน้าให้เครื่องมือ AI ที่คุณใช้อยู่แล้วช่วยทำงาน เครื่องมือจะทำงานกับสำเนา และคุณตรวจทุกการเปลี่ยนแปลงก่อนที่จะมีอะไรถูกเขียนลงใน Private Space",
-    caution: "เอเจนต์ทำงานด้วยสิทธิ์ผู้ใช้ของคุณ Thoth จำกัดสิ่งที่ส่งให้เอเจนต์ ไม่ได้จำกัดสิ่งที่เอเจนต์ทำได้", // REVIEW
     unavailable: "Agent Hub ต้องใช้แอป Thoth บนเดสก์ท็อป เบราว์เซอร์รันโปรแกรมบนคอมพิวเตอร์ของคุณไม่ได้",
     recovered: (n) => `มี ${count(n)} งานที่หยุดไปตอนปิด Thoth ครั้งล่าสุด สำเนาของงานเหล่านั้นถูกลบแล้ว และไม่มีการเปลี่ยนแปลงใดถูกนำไปใช้`,
     awaiting: (n) => `มี ${count(n)} งานที่รอให้คุณตรวจ เปิดได้ที่ งานก่อนหน้า`, // REVIEW
@@ -161,21 +160,88 @@ export const th: DesktopStrings = {
       reviewGone: "เปิดการตรวจนี้อีกไม่ได้ เพราะสำเนาที่บันทึกไว้ถูกลบหรือเสียหาย ไม่มีการเปลี่ยนแปลงใดถูกนำไปใช้", // REVIEW
     },
 
+    picker: {
+      legend: "เอเจนต์",
+      short: {
+        checking: "กำลังตรวจ…",
+        ready: (version) => `พร้อม ${version}`,
+        missing: "ไม่พบ",
+        too_old: "เก่าเกินไป",
+        unsupported: "ต้องอัปเดต",
+        not_logged_in: "ยังไม่ได้เข้าสู่ระบบ",
+        sandbox_unavailable: "ไม่มีแซนด์บ็อกซ์ที่นี่", // REVIEW
+        error: "ไม่ตอบ",
+      },
+    },
+
     status: {
-      heading: "Claude Code",
-      checking: "กำลังหา Claude Code…",
-      ready: (version) => `Claude Code ${version} พร้อมใช้งาน ใช้การเข้าสู่ระบบ Claude ของคุณเอง Thoth ไม่เห็นข้อมูลนั้น`,
-      missing: "ยังไม่ได้ติดตั้ง Claude Code หรือ Thoth หาไม่พบ",
-      missingFix: "ติดตั้ง Claude Code (ดู code.claude.com/docs/en/setup หรือใช้ brew install --cask claude-code) แล้วกด ตรวจอีกครั้ง",
       searched: "Thoth หาในโฟลเดอร์เหล่านี้:",
-      tooOld: (version, minimum) => `Claude Code ${version} เก่าเกินไป Thoth ต้องใช้เวอร์ชัน ${minimum} ขึ้นไป`,
-      tooOldFix: "รัน claude update ในเทอร์มินัล แล้วกด ตรวจอีกครั้ง",
-      unsupported: (version) => `Claude Code ${version} ไม่มีตัวเลือกที่ Thoth ต้องใช้:`,
-      unsupportedFix: "อัปเดต Claude Code (รัน claude update ในเทอร์มินัล) แล้วกด ตรวจอีกครั้ง",
-      notLoggedIn: "ติดตั้ง Claude Code แล้ว แต่ยังไม่ได้เข้าสู่ระบบ",
-      notLoggedInFix: "รัน claude ในเทอร์มินัลแล้วเข้าสู่ระบบ (หรือ claude auth login) แล้วกด ตรวจอีกครั้ง",
-      error: (message) => `Claude Code ไม่ตอบ: ${message}`,
       check: "ตรวจอีกครั้ง",
+    },
+
+    providers: {
+      claude: {
+        name: "Claude Code",
+        caution: "เอเจนต์ทำงานด้วยสิทธิ์ผู้ใช้ของคุณ Thoth จำกัดสิ่งที่ส่งให้เอเจนต์ ไม่ได้จำกัดสิ่งที่เอเจนต์ทำได้", // REVIEW
+        checking: "กำลังหา Claude Code…",
+        ready: (version) => `Claude Code ${version} พร้อมใช้งาน ใช้การเข้าสู่ระบบ Claude ของคุณเอง Thoth ไม่เห็นข้อมูลนั้น`,
+        missing: "ยังไม่ได้ติดตั้ง Claude Code หรือ Thoth หาไม่พบ",
+        missingFix: "ติดตั้ง Claude Code (ดู code.claude.com/docs/en/setup หรือใช้ brew install --cask claude-code) แล้วกด ตรวจอีกครั้ง",
+        tooOld: (version, minimum) => `Claude Code ${version} เก่าเกินไป Thoth ต้องใช้เวอร์ชัน ${minimum} ขึ้นไป`,
+        tooOldFix: "รัน claude update ในเทอร์มินัล แล้วกด ตรวจอีกครั้ง",
+        unsupported: (version) => `Claude Code ${version} ไม่มีตัวเลือกที่ Thoth ต้องใช้:`,
+        unsupportedFix: "อัปเดต Claude Code (รัน claude update ในเทอร์มินัล) แล้วกด ตรวจอีกครั้ง",
+        notLoggedIn: "ติดตั้ง Claude Code แล้ว แต่ยังไม่ได้เข้าสู่ระบบ",
+        notLoggedInFix: "รัน claude ในเทอร์มินัลแล้วเข้าสู่ระบบ (หรือ claude auth login) แล้วกด ตรวจอีกครั้ง",
+        sandboxUnavailable: (message) => `ตรวจ Claude Code ไม่ได้: ${message}`,
+        sandboxFix: "ตรวจอีกครั้ง",
+        error: (message) => `Claude Code ไม่ตอบ: ${message}`,
+        modelHint: "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นของ Claude Code หรือพิมพ์ชื่อย่อ เช่น sonnet, opus หรือ haiku",
+        badModel: "ชื่อโมเดลนี้ Claude Code ไม่รับ",
+        session: (model) => `เริ่มด้วย ${model} เครื่องมือ: อ่านและแก้ไขไฟล์ในโฟลเดอร์ของตัวเองเท่านั้น`,
+        retry: (attempt) => `Claude Code กำลังลองใหม่ (ครั้งที่ ${count(attempt)})…`,
+        budgetHint: "Claude Code จะหยุดเมื่อค่าใช้จ่ายที่ประมาณเองถึงจำนวนนี้ ค่าประมาณอาจคลาดเคลื่อนเล็กน้อย เปลี่ยนค่าเริ่มต้นได้ที่การตั้งค่า Agent Hub ด้านล่าง", // REVIEW
+        noBudget: "Claude Code ไม่รองรับ",
+        errors: {
+          not_logged_in: "Claude Code ยังไม่ได้เข้าสู่ระบบ รัน claude ในเทอร์มินัลแล้วเข้าสู่ระบบ จากนั้นลองอีกครั้ง",
+          billing: "บัญชี Claude ของคุณยังชำระค่าใช้จ่ายสำหรับงานนี้ไม่ได้",
+          rate_limit: "ใช้งาน Claude ถึงขีดจำกัดแล้ว ลองใหม่ภายหลัง",
+          model_not_found: "Claude Code ไม่รู้จักโมเดลนี้ หรือบัญชีของคุณใช้โมเดลนี้ไม่ได้",
+          cli: "Claude Code แจ้งข้อผิดพลาด:",
+          spawn: "เริ่ม Claude Code ไม่ได้:",
+        },
+      },
+      codex: {
+        name: "Codex",
+        caution: "Codex รันคำสั่งเชลล์ Thoth ให้ Codex ทำงานเฉพาะในแซนด์บ็อกซ์ของ Codex เอง คำสั่งและการแก้ไขของ Codex อ่านได้เฉพาะโฟลเดอร์ของงานนี้และไฟล์ระบบ เขียนได้เฉพาะโฟลเดอร์นี้ และใช้เครือข่ายไม่ได้ ตัว Codex เองทำงานด้วยสิทธิ์ผู้ใช้ของคุณ", // REVIEW
+        checking: "กำลังหา Codex…",
+        ready: (version) => `Codex ${version} พร้อมใช้งานพร้อมแซนด์บ็อกซ์ ใช้การเข้าสู่ระบบ Codex ของคุณเอง Thoth ไม่เห็นข้อมูลนั้น`, // REVIEW
+        missing: "ยังไม่ได้ติดตั้ง Codex หรือ Thoth หาไม่พบ",
+        missingFix: "ติดตั้ง Codex CLI (ดู developers.openai.com/codex/cli: npm install -g @openai/codex หรือ brew install --cask codex) แล้วกด ตรวจอีกครั้ง",
+        tooOld: (version, minimum) => `Codex ${version} เก่าเกินไป Thoth ต้องใช้เวอร์ชัน ${minimum} ขึ้นไป`,
+        tooOldFix: "รัน codex update ในเทอร์มินัล (หรืออัปเดตด้วยเครื่องมือที่ใช้ติดตั้ง) แล้วกด ตรวจอีกครั้ง",
+        unsupported: (version) => `Codex ${version} ไม่มีตัวเลือกที่ Thoth ต้องใช้:`,
+        unsupportedFix: "อัปเดต Codex (รัน codex update ในเทอร์มินัล) แล้วกด ตรวจอีกครั้ง",
+        notLoggedIn: "ติดตั้ง Codex แล้ว แต่ยังไม่ได้เข้าสู่ระบบ",
+        notLoggedInFix: "รัน codex login ในเทอร์มินัล แล้วกด ตรวจอีกครั้ง",
+        sandboxUnavailable: (message) => `แซนด์บ็อกซ์ของ Codex ใช้งานบนคอมพิวเตอร์เครื่องนี้ไม่ได้ Thoth จึงจะไม่รัน Codex เพราะถ้าไม่มีแซนด์บ็อกซ์ คำสั่งที่ Codex รันจะมีสิทธิ์ทั้งหมดของคุณ Codex แจ้งว่า: ${message}`, // REVIEW
+        sandboxFix: "บน Linux ให้ติดตั้ง bubblewrap (เช่น sudo apt install bubblewrap) บน Windows ให้ตั้งค่าแซนด์บ็อกซ์ Windows ของ Codex (developers.openai.com/codex/windows) แล้วกด ตรวจอีกครั้ง", // REVIEW
+        error: (message) => `Codex ไม่ตอบ: ${message}`,
+        modelHint: "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นของ Codex หรือพิมพ์ชื่อโมเดล เช่น gpt-5.5",
+        badModel: "ชื่อโมเดลนี้ Codex ไม่รับ",
+        session: (model) => `เริ่มด้วย ${model} คำสั่งและการแก้ไขทำงานในแซนด์บ็อกซ์ของ Codex: เฉพาะโฟลเดอร์นี้ ไม่มีเครือข่าย`, // REVIEW
+        retry: (attempt) => `Codex กำลังเชื่อมต่อใหม่ (ครั้งที่ ${count(attempt)})…`,
+        budgetHint: "Codex ไม่มีวงเงินค่าใช้จ่ายของตัวเอง จึงไม่ได้ตั้งไว้ เวลาสูงสุดยังใช้อยู่", // REVIEW
+        noBudget: "Codex ไม่รองรับ",
+        errors: {
+          not_logged_in: "Codex ยังไม่ได้เข้าสู่ระบบ รัน codex login ในเทอร์มินัล จากนั้นลองอีกครั้ง",
+          billing: "บัญชี OpenAI ของคุณยังชำระค่าใช้จ่ายสำหรับงานนี้ไม่ได้",
+          rate_limit: "ใช้งาน Codex ถึงขีดจำกัดแล้ว ลองใหม่ภายหลัง",
+          model_not_found: "Codex ไม่รู้จักโมเดลนี้ หรือบัญชีของคุณใช้โมเดลนี้ไม่ได้",
+          cli: "Codex แจ้งข้อผิดพลาด:",
+          spawn: "เริ่ม Codex ไม่ได้:",
+        },
+      },
     },
 
     form: {
@@ -206,7 +272,6 @@ export const th: DesktopStrings = {
       task: "งาน",
       taskHint: "ต้องการให้เอเจนต์ทำอะไรกับหน้าเหล่านี้",
       model: "โมเดล (ไม่บังคับ)",
-      modelHint: "เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นของ Claude Code หรือพิมพ์ชื่อย่อ เช่น sonnet, opus หรือ haiku",
       limits: "ขีดจำกัดของงานนี้",
       timeLimit: "เวลาสูงสุด",
       timeOption: (minutes) => `${count(minutes)} นาที`,
@@ -214,12 +279,10 @@ export const th: DesktopStrings = {
       budgetOption: (usd) => `US$${Number.isInteger(usd) ? usd : usd.toFixed(2)}`,
       noLimit: "ไม่จำกัด",
       useDefault: (what) => `ค่าเริ่มต้น (${what})`,
-      budgetHint: "Claude Code จะหยุดเมื่อค่าใช้จ่ายที่ประมาณเองถึงจำนวนนี้ ค่าประมาณอาจคลาดเคลื่อนเล็กน้อย เปลี่ยนค่าเริ่มต้นได้ที่การตั้งค่า Agent Hub ด้านล่าง", // REVIEW
       start: "เริ่ม",
       starting: "กำลังคัดลอกหน้า…",
       needContext: "เลือกอย่างน้อยหนึ่งหน้าหรือหนึ่งโฟลเดอร์ ทั้ง Private Space หรือหน้าจากเวิร์กสเปซ",
       needTask: "เขียนว่าต้องการให้เอเจนต์ทำอะไร",
-      badModel: "ชื่อโมเดลนี้ Claude Code ไม่รับ",
       contextTooMany: "ไฟล์มากเกินไปสำหรับหนึ่งงาน เลือกหน้าหรือโฟลเดอร์ให้น้อยลง",
       contextTooLarge: "ข้อมูลมากเกินไปสำหรับหนึ่งงาน เลือกหน้าหรือโฟลเดอร์ให้น้อยลง",
       contextFileTooLarge: "มีไฟล์หนึ่งใหญ่เกินกว่าจะส่งให้เอเจนต์ เลือกอย่างอื่น",
@@ -232,28 +295,21 @@ export const th: DesktopStrings = {
       transcript: "สิ่งที่เอเจนต์กำลังทำ",
       cancel: "ยกเลิก",
       cancelling: "กำลังยกเลิก…",
-      session: (model) => `เริ่มด้วย ${model} เครื่องมือ: อ่านและแก้ไขไฟล์ในโฟลเดอร์ของตัวเองเท่านั้น`,
-      tool: { Read: "กำลังอ่าน", Edit: "กำลังแก้ไข", Write: "กำลังเขียน", Glob: "กำลังดูรายการไฟล์", Grep: "กำลังค้นหา" },
+      tool: { Read: "กำลังอ่าน", Edit: "กำลังแก้ไข", Write: "กำลังเขียน", Glob: "กำลังดูรายการไฟล์", Grep: "กำลังค้นหา", Shell: "กำลังรันคำสั่ง", Delete: "กำลังลบ", WebSearch: "กำลังค้นเว็บ", MCP: "กำลังใช้เครื่องมือ" },
       denied: (tool) => `ไม่อนุญาต: ${tool}`,
       toolError: "การเรียกเครื่องมือล้มเหลว",
-      retry: (attempt) => `Claude Code กำลังลองใหม่ (ครั้งที่ ${count(attempt)})…`,
       cost: (usd) => `ค่าใช้จ่ายโดยประมาณ: US$${usd}`,
+      tokens: (input, cached, output) => `โทเคน: เข้า ${input.toLocaleString("th")} (แคช ${cached.toLocaleString("th")}) ออก ${output.toLocaleString("th")}`, // REVIEW
       cancelled: "ยกเลิกแล้ว ไม่มีอะไรใน Private Space ถูกเปลี่ยน",
       stoppedTime: (minutes) => `หยุดเมื่อถึงเวลาสูงสุด${minutes === null ? "" : ` (${count(minutes)} นาที)`} ยังตรวจสิ่งที่เอเจนต์ทำไว้ก่อนหน้านั้นได้`, // REVIEW
       stoppedBudget: (usd) => `หยุดเมื่อถึงวงเงินค่าใช้จ่าย${usd === null ? "" : ` (US$${Number.isInteger(usd) ? usd : usd.toFixed(2)})`} ยังตรวจสิ่งที่เอเจนต์ทำไว้ก่อนหน้านั้นได้`, // REVIEW
       noChanges: "เอเจนต์ทำงานเสร็จโดยไม่ได้เปลี่ยนอะไร",
       failed: "เอเจนต์หยุดเพราะมีข้อผิดพลาด ไม่มีอะไรใน Private Space ถูกเปลี่ยน",
       errors: {
-        not_logged_in: "Claude Code ยังไม่ได้เข้าสู่ระบบ รัน claude ในเทอร์มินัลแล้วเข้าสู่ระบบ จากนั้นลองอีกครั้ง",
-        billing: "บัญชี Claude ของคุณยังชำระค่าใช้จ่ายสำหรับงานนี้ไม่ได้",
-        rate_limit: "ใช้งาน Claude ถึงขีดจำกัดแล้ว ลองใหม่ภายหลัง",
-        model_not_found: "Claude Code ไม่รู้จักโมเดลนี้ หรือบัญชีของคุณใช้โมเดลนี้ไม่ได้",
         budget: "ถึงวงเงินค่าใช้จ่ายแล้ว",
-        cli: "Claude Code แจ้งข้อผิดพลาด:",
         timeout: "งานใช้เวลานานเกินไปจึงถูกหยุด",
         output_limit: "เอเจนต์พิมพ์ผลลัพธ์มากเกินไปจึงถูกหยุด",
         cancelled: "ยกเลิกแล้ว",
-        spawn: "เริ่ม Claude Code ไม่ได้:",
         review: "อ่านการเปลี่ยนแปลงของเอเจนต์ไม่ได้:",
       },
     },
@@ -320,12 +376,14 @@ export const th: DesktopStrings = {
       summary: (pages, applied) => `ส่งให้ ${count(pages)} ไฟล์ · นำไปใช้ ${count(applied)} การเปลี่ยนแปลง`,
       date: "วันที่",
       task: "งาน",
+      agent: "เอเจนต์",
       model: "โมเดล",
       cost: "ค่าใช้จ่าย",
       outcome: "ผลลัพธ์",
       defaultModel: "ค่าเริ่มต้น",
       noCost: "ไม่ทราบ",
       costOf: (usd) => `US$${usd < 0.01 ? usd.toFixed(4) : usd.toFixed(2)}`,
+      tokensOf: (tokens) => `${tokens.toLocaleString("th")} โทเคน`,
       reviewAgain: "ตรวจการเปลี่ยนแปลง",
       openDetails: "เปิดบันทึกการทำงานและการเปลี่ยนแปลง",
       closeDetails: "ปิด",
@@ -343,7 +401,7 @@ export const th: DesktopStrings = {
 
     settings: {
       heading: "การตั้งค่า Agent Hub",
-      lede: "ค่าเริ่มต้นของทุกงาน เปลี่ยนขีดจำกัดเฉพาะงานเดียวได้ในแบบฟอร์มงาน",
+      lede: "ค่าเริ่มต้นของทุกงาน เปลี่ยนขีดจำกัดเฉพาะงานเดียวได้ในแบบฟอร์มงาน Codex ไม่มีวงเงินค่าใช้จ่าย ใช้เฉพาะเวลาสูงสุด", // REVIEW
       time: "เวลาสูงสุด",
       budget: "วงเงินค่าใช้จ่าย",
       retention: "เก็บประวัติการทำงานไว้",

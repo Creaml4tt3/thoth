@@ -1,11 +1,18 @@
 /**
- * The Agent Hub's settings: the default time limit and spending limit of a run (each can be changed per run in the
- * task form) and how long local run details are kept (ADR-0007, "Limits" and "History"). Like the language, the
- * theme and the default editor mode they are an app preference kept in the webview's localStorage.
+ * The Agent Hub's settings: which agent CLI a new task uses (the last one picked), the default time limit and
+ * spending limit of a run (each can be changed per run in the task form; Codex has no spending limit, so it only
+ * applies to Claude Code) and how long local run details are kept (ADR-0007, "Limits" and "History"). Like the
+ * language, the theme and the default editor mode they are an app preference kept in the webview's localStorage.
  */
 import { BUDGET_CHOICES_USD, DEFAULT_BUDGET_USD, DEFAULT_RETENTION_DAYS, DEFAULT_TIME_LIMIT_MINUTES, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 
+/** The agent CLIs the Agent Hub offers, in the picker's order. */
+export const AGENT_PROVIDERS = ["claude", "codex"] as const;
+export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
+
 export interface AgentSettings {
+  /** The agent a new task uses. */
+  provider: AgentProviderId;
   /** Minutes a run may take; one of `TIME_LIMIT_MINUTES`. */
   timeMinutes: number;
   /** US dollars the CLI may spend on a run; null means no limit. */
@@ -15,9 +22,10 @@ export interface AgentSettings {
 }
 
 export const AGENT_SETTINGS_KEY = "thoth.desktop.agents";
-export const DEFAULT_AGENT_SETTINGS: AgentSettings = { timeMinutes: DEFAULT_TIME_LIMIT_MINUTES, budgetUsd: DEFAULT_BUDGET_USD, retentionDays: DEFAULT_RETENTION_DAYS };
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = { provider: "claude", timeMinutes: DEFAULT_TIME_LIMIT_MINUTES, budgetUsd: DEFAULT_BUDGET_USD, retentionDays: DEFAULT_RETENTION_DAYS };
 
 const oneOf = <T extends number>(value: unknown, choices: readonly T[]): value is T => typeof value === "number" && (choices as readonly number[]).includes(value);
+export const isAgentProvider = (value: unknown): value is AgentProviderId => typeof value === "string" && (AGENT_PROVIDERS as readonly string[]).includes(value);
 
 /** Settings from stored text; anything missing or not one of the offered choices falls back to the default. */
 export function parseAgentSettings(raw: string | null | undefined): AgentSettings {
@@ -29,6 +37,7 @@ export function parseAgentSettings(raw: string | null | undefined): AgentSetting
   }
   const o = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   return {
+    provider: isAgentProvider(o["provider"]) ? o["provider"] : DEFAULT_AGENT_SETTINGS.provider,
     timeMinutes: oneOf(o["timeMinutes"], TIME_LIMIT_MINUTES) ? o["timeMinutes"] : DEFAULT_AGENT_SETTINGS.timeMinutes,
     budgetUsd: o["budgetUsd"] === null ? null : oneOf(o["budgetUsd"], BUDGET_CHOICES_USD) ? o["budgetUsd"] : DEFAULT_AGENT_SETTINGS.budgetUsd,
     retentionDays: oneOf(o["retentionDays"], RETENTION_CHOICES_DAYS) ? o["retentionDays"] : DEFAULT_AGENT_SETTINGS.retentionDays,

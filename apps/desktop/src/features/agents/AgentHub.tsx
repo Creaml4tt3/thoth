@@ -1,6 +1,6 @@
 /**
- * The Agent Hub tab (spec 3.3, ADR-0007): whether Claude Code can be used and how to fix it, a task with its context
- * and limits, the live transcript with Cancel, the review of proposed changes, the result, earlier runs (date, task,
+ * The Agent Hub tab (spec 3.3, ADR-0007): which agent runs the task (Claude Code or Codex), whether it can be used
+ * and how to fix it, a task with its context and limits (Codex has no spending limit, so that field is off for it), the live transcript with Cancel, the review of proposed changes, the result, earlier runs (date, task,
  * model, cost, outcome; their transcript and changes open from local details) and the Agent Hub's settings.
  * Agent output is shown as plain text.
  */
@@ -15,13 +15,45 @@ import { useDesktopStrings, type DesktopStrings } from "../../strings/index.ts";
 import { BUDGET_CHOICES_USD, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { ContextPicker } from "./ContextPicker.tsx";
 import { DiffView, Review } from "./Review.tsx";
-import type { AgentsService, AgentsState } from "./service.ts";
+import { PROVIDER_FEATURES, type AgentsService, type AgentsState } from "./service.ts";
+import { AGENT_PROVIDERS, isAgentProvider, type AgentProviderId } from "./settings.ts";
 import "./agents.css";
 
 type T = DesktopStrings["agents"];
+type ProviderStrings = T["providers"][AgentProviderId];
 
-function Status({ status, checking, onCheck }: { status: AgentInstallationStatus | null; checking: boolean; onCheck(): void }) {
-  const t = useDesktopStrings().agents.status;
+/** The strings of the agent a run or record names (an unknown one falls back to Claude Code's wording). */
+const providerOf = (t: T, id: string): ProviderStrings => t.providers[isAgentProvider(id) ? id : "claude"];
+
+/** The agent for the next task: Claude Code or Codex, each with its detection state in a few words. */
+function ProviderPicker({ state, agents }: { state: AgentsState; agents: AgentsService }) {
+  const t = useDesktopStrings().agents;
+  const locked = state.phase !== "idle" && state.phase !== "finished";
+  const short = (status: AgentInstallationStatus | undefined) => {
+    if (!status || state.checking) return t.picker.short.checking;
+    return status.state === "ready" ? t.picker.short.ready(status.version) : t.picker.short[status.state];
+  };
+  return (
+    <fieldset className="set-section agents-picker" disabled={locked}>
+      <legend>{t.picker.legend}</legend>
+      <div className="agents-picker-options">
+        {AGENT_PROVIDERS.map((id) => (
+          <label key={id} className="agents-picker-option" data-provider={id} data-state={state.statuses[id]?.state ?? "checking"}>
+            <input type="radio" name="agents-provider" value={id} checked={state.provider === id} onChange={() => agents.selectProvider(id)} aria-labelledby={`agents-name-${id}`} aria-describedby={`agents-short-${id}`} />
+            <span id={`agents-name-${id}`}>{t.providers[id].name}</span>
+            <span id={`agents-short-${id}`} className="muted small" data-testid={`agent-short-${id}`}>
+              {short(state.statuses[id])}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function Status({ provider, status, checking, onCheck }: { provider: AgentProviderId; status: AgentInstallationStatus | null; checking: boolean; onCheck(): void }) {
+  const strings = useDesktopStrings().agents;
+  const t = { ...strings.status, ...strings.providers[provider] };
   let body: { text: string; fix?: string; list?: string[]; listLabel?: string; ok?: boolean };
   if (!status || checking) body = { text: t.checking };
   else
@@ -41,13 +73,16 @@ function Status({ status, checking, onCheck }: { status: AgentInstallationStatus
       case "not_logged_in":
         body = { text: t.notLoggedIn, fix: t.notLoggedInFix };
         break;
+      case "sandbox_unavailable":
+        body = { text: t.sandboxUnavailable(status.message), fix: t.sandboxFix };
+        break;
       case "error":
         body = { text: t.error(status.message) };
         break;
     }
   return (
     <section className="set-section agents-status" aria-labelledby="agents-status-heading" aria-busy={checking || !status}>
-      <h2 id="agents-status-heading">{t.heading}</h2>
+      <h2 id="agents-status-heading">{t.name}</h2>
       <p role="status" data-testid="agent-status" data-state={checking || !status ? "checking" : status.state} className={body.ok ? "agents-ready" : undefined}>
         {body.text}
       </p>
@@ -78,6 +113,8 @@ const usd = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService }) {
   const t = useDesktopStrings().agents.form;
   const notices = useDesktopStrings().agents.notice;
+  const p = useDesktopStrings().agents.providers[state.provider];
+  const budgetOn = PROVIDER_FEATURES[state.provider].budget;
   const [tried, setTried] = useState(false);
   const problems = agents.draftProblems();
   const ready = state.status?.state === "ready";
@@ -109,12 +146,12 @@ function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService
           <span>{t.model}</span>
           <input className="input" value={draft.model} list="agents-models" onChange={(e) => agents.setDraft({ model: e.target.value })} disabled={busy} aria-describedby="agents-model-hint" spellCheck={false} autoCapitalize="off" />
           <datalist id="agents-models">
-            <option value="sonnet" />
-            <option value="opus" />
-            <option value="haiku" />
+            {PROVIDER_FEATURES[state.provider].models.map((m) => (
+              <option key={m} value={m} />
+            ))}
           </datalist>
           <small id="agents-model-hint" className="muted">
-            {t.modelHint}
+            {p.modelHint}
           </small>
         </label>
       </div>
@@ -134,25 +171,32 @@ function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService
           </div>
           <div className="field">
             <label htmlFor="agents-budget">{t.budget}</label>
-            <select id="agents-budget" className="input" value={String(draft.budget)} onChange={(e) => agents.setDraft({ budget: e.target.value === "default" ? "default" : e.target.value === "none" ? "none" : Number(e.target.value) })} aria-describedby="agents-budget-hint">
-              <option value="default">{t.useDefault(defaultBudget)}</option>
-              {BUDGET_CHOICES_USD.map((b) => (
-                <option key={b} value={b}>
-                  {t.budgetOption(b)}
-                </option>
-              ))}
-              <option value="none">{t.noLimit}</option>
-            </select>
+            {budgetOn ? (
+              <select id="agents-budget" className="input" value={String(draft.budget)} onChange={(e) => agents.setDraft({ budget: e.target.value === "default" ? "default" : e.target.value === "none" ? "none" : Number(e.target.value) })} aria-describedby="agents-budget-hint">
+                <option value="default">{t.useDefault(defaultBudget)}</option>
+                {BUDGET_CHOICES_USD.map((b) => (
+                  <option key={b} value={b}>
+                    {t.budgetOption(b)}
+                  </option>
+                ))}
+                <option value="none">{t.noLimit}</option>
+              </select>
+            ) : (
+              // Codex has no spending limit: the field says so instead of offering one that would not be enforced.
+              <select id="agents-budget" className="input" value="unsupported" disabled aria-describedby="agents-budget-hint" data-testid="agent-budget-unsupported">
+                <option value="unsupported">{p.noBudget}</option>
+              </select>
+            )}
             <small id="agents-budget-hint" className="muted">
-              {t.budgetHint}
+              {p.budgetHint}
             </small>
           </div>
         </div>
       </fieldset>
       {tried && problems.length > 0 && (
         <ul role="alert" className="alert alert-danger agents-problems">
-          {problems.map((p) => (
-            <li key={p}>{t[p]}</li>
+          {problems.map((problem) => (
+            <li key={problem}>{problem === "badModel" ? p.badModel : t[problem]}</li>
           ))}
         </ul>
       )}
@@ -175,10 +219,10 @@ function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService
   );
 }
 
-function EventLine({ event, t }: { event: AgentEvent; t: T["run"] }) {
+function EventLine({ event, t, p }: { event: AgentEvent; t: T["run"]; p: ProviderStrings }) {
   switch (event.type) {
     case "session":
-      return <li className="muted">{t.session(event.model ?? "Claude Code")}</li>;
+      return <li className="muted">{p.session(event.model ?? p.name)}</li>;
     case "text":
       return <li className="agents-text">{event.text}</li>;
     case "tool":
@@ -200,19 +244,23 @@ function EventLine({ event, t }: { event: AgentEvent; t: T["run"] }) {
         </li>
       );
     case "retry":
-      return <li className="muted">{t.retry(event.attempt)}</li>;
+      return <li className="muted">{p.retry(event.attempt)}</li>;
     case "result":
-      return event.costUsd !== undefined ? <li className="muted">{t.cost(event.costUsd.toFixed(4))}</li> : null;
+      if (event.costUsd !== undefined) return <li className="muted">{t.cost(event.costUsd.toFixed(4))}</li>;
+      return event.tokens ? <li className="muted">{t.tokens(event.tokens.input, event.tokens.cachedInput, event.tokens.output)}</li> : null;
     case "error":
       return (
         <li className="agents-error">
-          {t.errors[event.code] ?? t.errors["cli"]} {event.code === "cli" && <span>{event.message}</span>}
+          {errorText(event.code, t, p)} {event.code === "cli" && <span>{event.message}</span>}
         </li>
       );
     default:
       return null;
   }
 }
+
+/** What an error code means, in the words of the agent that reported it. */
+const errorText = (code: string, t: T["run"], p: ProviderStrings): string => p.errors[code] ?? t.errors[code] ?? p.errors["cli"]!;
 
 /** A run that stopped at its time limit or used up its budget says so, whatever else happened. */
 function StoppedNotice({ record, t }: { record: RunRecord; t: T["run"] }) {
@@ -226,7 +274,7 @@ function StoppedNotice({ record, t }: { record: RunRecord; t: T["run"] }) {
   );
 }
 
-function Outcome({ record, t }: { record: RunRecord; t: T["run"] }) {
+function Outcome({ record, t, p }: { record: RunRecord; t: T["run"]; p: ProviderStrings }) {
   if (record.state === "cancelled") return <p className="alert">{t.cancelled}</p>;
   if (record.state === "done") return <p className="alert">{t.noChanges}</p>;
   if (record.state !== "failed" || record.outcome?.stoppedBy) return null;
@@ -236,7 +284,7 @@ function Outcome({ record, t }: { record: RunRecord; t: T["run"] }) {
       <p>{t.failed}</p>
       {error && (
         <p>
-          {t.errors[error.code] ?? t.errors["cli"]} {(error.code === "cli" || error.code === "spawn" || error.code === "review") && error.message}
+          {errorText(error.code, t, p)} {(error.code === "cli" || error.code === "spawn" || error.code === "review") && error.message}
         </p>
       )}
     </div>
@@ -244,7 +292,9 @@ function Outcome({ record, t }: { record: RunRecord; t: T["run"] }) {
 }
 
 function RunPanel({ state, agents }: { state: AgentsState; agents: AgentsService }) {
-  const t = useDesktopStrings().agents.run;
+  const all = useDesktopStrings().agents;
+  const t = all.run;
+  const p = providerOf(all, state.record?.provider.id ?? state.provider);
   const shown = state.events.filter((e) => e.type !== "log" && e.type !== "exit");
   const logs = state.events.filter((e): e is Extract<AgentEvent, { type: "log" }> => e.type === "log");
   const live = state.phase === "starting" || state.phase === "running" || state.phase === "cancelling";
@@ -261,13 +311,15 @@ function RunPanel({ state, agents }: { state: AgentsState; agents: AgentsService
       <div role="log" aria-label={t.transcript} aria-live="polite">
         <ol className="agents-log">
           {shown.map((event, i) => (
-            <EventLine key={i} event={event} t={t} />
+            <EventLine key={i} event={event} t={t} p={p} />
           ))}
         </ol>
       </div>
       {logs.length > 0 && (
         <details className="agents-stderr">
-          <summary>Claude Code ({logs.length})</summary>
+          <summary>
+            {p.name} ({logs.length})
+          </summary>
           <pre className="mono">{logs.map((l) => l.text).join("\n")}</pre>
         </details>
       )}
@@ -279,7 +331,7 @@ function RunPanel({ state, agents }: { state: AgentsState; agents: AgentsService
         </div>
       )}
       {(state.phase === "finished" || state.phase === "review" || state.phase === "applying") && state.record && <StoppedNotice record={state.record} t={t} />}
-      {state.phase === "finished" && state.record && <Outcome record={state.record} t={t} />}
+      {state.phase === "finished" && state.record && <Outcome record={state.record} t={t} p={p} />}
     </section>
   );
 }
@@ -350,8 +402,15 @@ function Results({ state, agents, focus }: { state: AgentsState; agents: AgentsS
   );
 }
 
-function eventLines(events: readonly AgentEvent[], t: T["run"]) {
-  return events.filter((e) => e.type !== "log" && e.type !== "exit").map((event, i) => <EventLine key={i} event={event} t={t} />);
+function eventLines(events: readonly AgentEvent[], t: T["run"], p: ProviderStrings) {
+  return events.filter((e) => e.type !== "log" && e.type !== "exit").map((event, i) => <EventLine key={i} event={event} t={t} p={p} />);
+}
+
+/** The cost column: the CLI's cost estimate (Claude Code), or the tokens it reported (Codex). */
+function costCell(r: RunRecord, t: T["history"]): string {
+  if (r.outcome?.costUsd !== undefined) return t.costOf(r.outcome.costUsd);
+  if (r.outcome?.tokens) return t.tokensOf(r.outcome.tokens.input + r.outcome.tokens.output);
+  return t.noCost;
 }
 
 function outcomeLabel(r: RunRecord, t: T["history"]): string {
@@ -382,7 +441,7 @@ function HistoryDetail({ agents, detail }: { agents: AgentsService; detail: NonN
         <>
           <h4>{t.history.transcript}</h4>
           <div role="log" aria-label={t.history.transcript}>
-            <ol className="agents-log">{eventLines(details.events, t.run)}</ol>
+            <ol className="agents-log">{eventLines(details.events, t.run, providerOf(t, record.provider.id))}</ol>
           </div>
           <h4>{t.history.changes}</h4>
           {details.changes === null ? (
@@ -443,6 +502,7 @@ function History({ state, agents }: { state: AgentsState; agents: AgentsService 
             <tr>
               <th scope="col">{t.date}</th>
               <th scope="col">{t.task}</th>
+              <th scope="col">{t.agent}</th>
               <th scope="col">{t.model}</th>
               <th scope="col">{t.cost}</th>
               <th scope="col">{t.outcome}</th>
@@ -462,8 +522,11 @@ function History({ state, agents }: { state: AgentsState; agents: AgentsService 
                   <td className="agents-history-task" title={r.task.prompt}>
                     {r.task.prompt.split("\n")[0]!.slice(0, 120)}
                   </td>
+                  <td className="small" data-provider={r.provider.id}>
+                    {r.provider.name}
+                  </td>
                   <td className="mono small">{r.outcome?.model ?? r.task.model ?? t.defaultModel}</td>
-                  <td className="small">{r.outcome?.costUsd === undefined ? t.noCost : t.costOf(r.outcome.costUsd)}</td>
+                  <td className="small">{costCell(r, t)}</td>
                   <td>
                     <span className="badge badge-muted" data-state={r.state} data-stopped={r.outcome?.stoppedBy}>
                       {outcomeLabel(r, t)}
@@ -587,7 +650,7 @@ function Body({ agents }: { agents: AgentsService }) {
         <h1 className="page-title">{t.title}</h1>
         <p className="muted">{t.lede}</p>
         <p className="alert alert-warning agents-caution" role="note">
-          {t.caution}
+          {t.providers[state.provider].caution}
         </p>
         {state.recovered !== null && (
           <p role="status" className="alert alert-warning">
@@ -602,7 +665,8 @@ function Body({ agents }: { agents: AgentsService }) {
             {t.awaiting(waiting)}
           </p>
         )}
-        <Status status={state.status} checking={state.checking} onCheck={() => void agents.detect()} />
+        <ProviderPicker state={state} agents={agents} />
+        <Status provider={state.provider} status={state.status} checking={state.checking} onCheck={() => void agents.detect()} />
         {!showRun && <TaskForm state={state} agents={agents} />}
         {showRun && <RunPanel state={state} agents={agents} />}
         {(state.phase === "review" || state.phase === "applying") && state.changes && (
