@@ -11,6 +11,7 @@ import { registerAttachmentRoutes } from "./routes/attachments.ts";
 import { registerCoreRoutes } from "./routes/core.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
+import { registerShareRoutes } from "./routes/shares.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
 import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
 import type { CapabilityId } from "@thoth/workspace-protocol";
@@ -71,7 +72,11 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "events.sse", test: (m, p) => m === "GET" && /^\/workspaces\/[^/]+\/events$/.test(p) },
   { capability: "page-order", test: (m, p) => m === "POST" && /^\/workspaces\/[^/]+\/pages\/[^/]+\/move$/.test(p) },
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
+  { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
 ];
+
+/** A share token in a request path is a credential: it never reaches a log line (ADR-0023). */
+export const redactSharePath = (url: string): string => url.replace(/^\/s\/[^/]*/, "/s/[token]");
 
 export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstance {
   const { config } = deps;
@@ -82,7 +87,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
       redact: { paths: LOG_REDACT_PATHS, censor: "[redacted]" },
       // The default request serializer logs method, url, host and remote address; headers only via the redact paths above.
       serializers: {
-        req: (req: { method?: string; url?: string; id?: string }) => ({ method: req.method, url: (req.url ?? "").split("?")[0], id: req.id }),
+        req: (req: { method?: string; url?: string; id?: string }) => ({ method: req.method, url: redactSharePath((req.url ?? "").split("?")[0] ?? ""), id: req.id }),
       },
       ...(options.logStream ? { stream: options.logStream } : {}),
     },
@@ -189,6 +194,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerAttachmentRoutes(app, deps);
   registerEventRoutes(app, deps);
   registerTransferRoutes(app, deps);
+  registerShareRoutes(app, deps);
   registerMaintenanceRoutes(app, deps);
   registerSignInRoutes(app, deps);
   return app;

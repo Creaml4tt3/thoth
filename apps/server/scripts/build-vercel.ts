@@ -11,6 +11,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { build } from "rolldown";
+import { inlineShareAssetsModule } from "../src/share/assets.ts";
 
 const SERVER = join(import.meta.dirname, "..");
 const OUTPUT = join(SERVER, ".vercel", "output");
@@ -23,6 +24,9 @@ await build({
   platform: "node",
   // pg loads its optional native binding only when asked; it is not installed.
   external: ["pg-native"],
+  // The shared pages' stylesheet and fonts (ADR-0023) are read from apps/server/assets at run time; a function has
+  // no such tree, so the module that reads them is replaced by one with the bytes embedded.
+  plugins: [{ name: "inline-share-assets", load: (id: string) => (id.replaceAll("\\", "/").endsWith("/src/share/assets.ts") ? { code: inlineShareAssetsModule(), moduleType: "js" } : null) }],
   output: { file: join(FUNCTION, "index.cjs"), format: "cjs", exports: "default", minify: false, sourcemap: false },
   logLevel: "warn",
 });

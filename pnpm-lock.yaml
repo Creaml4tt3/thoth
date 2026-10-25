@@ -219,6 +219,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@thoth/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@thoth/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -232,6 +235,9 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
     devDependencies:
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1

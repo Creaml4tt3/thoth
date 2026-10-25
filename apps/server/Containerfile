@@ -29,6 +29,8 @@ COPY --from=deps /app/apps/server/package.json ./apps/server/package.json
 COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=deps /app/apps/server/src ./apps/server/src
 COPY --from=deps /app/apps/server/migrations ./apps/server/migrations
+# The shared pages' stylesheet and fonts (ADR-0023), served at /assets/share/.
+COPY --from=deps /app/apps/server/assets ./apps/server/assets
 COPY --from=deps /app/packages/domain ./packages/domain
 COPY --from=deps /app/packages/content ./packages/content
 COPY --from=deps /app/packages/workspace-protocol ./packages/workspace-protocol

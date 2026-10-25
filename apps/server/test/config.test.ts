@@ -61,7 +61,7 @@ describe("configuration", () => {
 
   it("EVENTS=off drops events.sse from the capabilities; the rest stay", () => {
     const c = loadConfig(env({ EVENTS: "off" }));
-    expect(c.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind"]);
+    expect(c.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share"]);
     expect(loadConfig(env({ EVENTS: "on" })).capabilities).toContain("events.sse");
   });
 

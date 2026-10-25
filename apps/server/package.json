@@ -11,12 +11,14 @@
     "build:vercel": "node scripts/build-vercel.ts"
   },
   "dependencies": {
+    "@thoth/content": "workspace:*",
     "@thoth/domain": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",
     "fastify": "5.12.7",
     "pg": "8.23.1"
   },
   "devDependencies": {
+    "@types/mdast": "4.0.4",
     "@types/pg": "8.23.1",
     "rolldown": "1.2.14"
   }

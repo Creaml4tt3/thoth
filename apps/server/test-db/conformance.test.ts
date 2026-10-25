@@ -27,9 +27,9 @@ describe("conformance suite against the reference server (real PostgreSQL)", () 
     expect(report.results.length).toBeGreaterThanOrEqual(35);
   });
 
-  it("lists exactly the six capabilities the server implements", () => {
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"]);
-    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind"]);
+  it("lists exactly the seven capabilities the server implements", () => {
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"]);
+    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"]);
   });
 
   it("also passes for an editor (not only an owner)", async () => {

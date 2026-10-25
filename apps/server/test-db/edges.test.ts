@@ -15,7 +15,7 @@ describe("protocol edges", () => {
 
   it("advertises its limits and capabilities", async () => {
     const caps = (await env.api(null, "GET", "/capabilities")).json;
-    expect(caps).toMatchObject({ protocolVersion: "1.0", capabilities: ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"], limits: { maxMarkdownBytes: 4096, maxPageSize: 200, idempotencyWindowSeconds: 86400 } });
+    expect(caps).toMatchObject({ protocolVersion: "1.0", capabilities: ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"], limits: { maxMarkdownBytes: 4096, maxPageSize: 200, idempotencyWindowSeconds: 86400 } });
   });
 
   it("405 carries Allow; unknown routes are 404 problems (authenticated)", async () => {

@@ -44,6 +44,19 @@ export interface ServerConfig {
   serverName: string;
   /** The sign-in broker (docs/protocol/sign-in.md); `undefined` when no provider is configured. */
   signIn: SignInConfig | undefined;
+  /** The server's public origin from PUBLIC_URL (no trailing slash), used for share-link addresses; `undefined` = the request's own origin. */
+  publicUrl: string | undefined;
+  /** Public share links (ADR-0023, capability `public-share`). `undefined` = no limit. */
+  share: ShareConfig;
+}
+
+export interface ShareConfig {
+  /** Active (not revoked, not expired) links per workspace; one more is 409 `quota_exceeded`. */
+  maxLinksPerWorkspace: number | undefined;
+  /** Views of one link (pages and attachments) per rate-limit window, counted per token, known or not. */
+  viewsPerLink: number | undefined;
+  /** Views of any shared page per client IP per rate-limit window. */
+  viewsPerIp: number | undefined;
 }
 
 export interface OidcProviderConfig {
@@ -84,7 +97,7 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"];
 
 const KIB = 1024;
 const MIB = 1_048_576;
@@ -111,6 +124,11 @@ export const TRIAL_PROFILE = {
   events: "off",
   // ADR-0014 rule 4: sign-up is limited per IP.
   signupLimitPerIp: 10,
+  // ADR-0023 rule 4: public share links stay on in the trial, with a cap per workspace and view rate limits.
+  // A page view with a few pictures is a handful of requests; per IP stays well below the API's 600.
+  maxShareLinksPerWorkspace: 20,
+  shareViewsPerLink: 300,
+  shareViewsPerIp: 120,
 } as const;
 
 export class ConfigError extends Error {
@@ -279,18 +297,27 @@ function signInFrom(env: NodeJS.ProcessEnv, trial: typeof TRIAL_PROFILE | undefi
   const accessTokenTtlSeconds = intFrom(env, "ACCESS_TOKEN_TTL_SECONDS", 900, 60, 3600);
   const refreshTokenTtlDays = intFrom(env, "REFRESH_TOKEN_TTL_DAYS", 30, 1, 365);
   const sessionMaxDays = intFrom(env, "SESSION_MAX_DAYS", 90, 1, 365);
-  const publicUrlRaw = present(env, "PUBLIC_URL");
   if (providers.length === 0) return undefined;
-  if (publicUrlRaw === undefined) throw new ConfigError("PUBLIC_URL is required when a sign-in provider is configured");
-  let publicUrl: string | null = null;
+  const publicUrl = publicUrlFrom(env, { strict: true });
+  if (publicUrl === undefined) throw new ConfigError("PUBLIC_URL is required when a sign-in provider is configured");
+  return { publicUrl, providers, webRedirectUris, signupLimitPerIp, accessTokenTtlSeconds, refreshTokenTtlDays, sessionMaxDays };
+}
+
+/**
+ * PUBLIC_URL as an origin without a trailing slash, or `undefined` when unset. Sign-in needs it (`strict`: an invalid
+ * value is an error); without sign-in an invalid value is ignored, as before, and share links use the request's origin.
+ */
+function publicUrlFrom(env: NodeJS.ProcessEnv, options: { strict: boolean }): string | undefined {
+  const raw = present(env, "PUBLIC_URL");
+  if (raw === undefined) return undefined;
   try {
-    const url = new URL(publicUrlRaw);
-    if ((url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname))) && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "") publicUrl = url.origin;
+    const url = new URL(raw);
+    if ((url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname))) && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "") return url.origin;
   } catch {
     /* rejected below */
   }
-  if (publicUrl === null) throw new ConfigError("PUBLIC_URL must be an https origin (scheme://host[:port], plain http only on a loopback host) without a path, query or fragment");
-  return { publicUrl, providers, webRedirectUris, signupLimitPerIp, accessTokenTtlSeconds, refreshTokenTtlDays, sessionMaxDays };
+  if (!options.strict) return undefined;
+  throw new ConfigError("PUBLIC_URL must be an https origin (scheme://host[:port], plain http only on a loopback host) without a path, query or fragment");
 }
 
 /**
@@ -321,6 +348,9 @@ function signInFrom(env: NodeJS.ProcessEnv, trial: typeof TRIAL_PROFILE | undefi
  *   WEB_REDIRECT_URIS   exact redirect URIs of the thoth-web client
  *   SIGNUP_LIMIT_PER_IP new accounts per IP per 24 h (trial 10)
  *   ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_DAYS, SESSION_MAX_DAYS   sign-in lifetimes
+ *   PUBLIC_SHARE  on (default) | off: public read-only share links (ADR-0023, capability public-share)
+ *   MAX_SHARE_LINKS_PER_WORKSPACE   active share links per workspace (trial 20; unset = no limit)
+ *   SHARE_VIEWS_PER_LINK, SHARE_VIEWS_PER_IP   share-page views per RATE_LIMIT_WINDOW_SECONDS (trial 300 and 120; unset = off)
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -338,6 +368,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     windowSeconds: intFrom(env, "RATE_LIMIT_WINDOW_SECONDS", 60, 1, 86_400),
   };
   const eventsEnabled = oneOf(env, "EVENTS", ["on", "off"], trial?.events ?? "on") === "on";
+  // ADR-0023: public share links are on by default on every server; an operator can switch them off.
+  const shareEnabled = oneOf(env, "PUBLIC_SHARE", ["on", "off"], "on") === "on";
+  const share: ShareConfig = {
+    maxLinksPerWorkspace: limitFrom(env, "MAX_SHARE_LINKS_PER_WORKSPACE", trial?.maxShareLinksPerWorkspace, 1_000_000),
+    viewsPerLink: limitFrom(env, "SHARE_VIEWS_PER_LINK", trial?.shareViewsPerLink, 1_000_000),
+    viewsPerIp: limitFrom(env, "SHARE_VIEWS_PER_IP", trial?.shareViewsPerIp, 1_000_000),
+  };
 
   return {
     databaseUrl,
@@ -363,8 +400,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     rateLimit,
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
-    capabilities: DEFAULT_CAPABILITIES.filter((c) => eventsEnabled || c !== "events.sse"),
+    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share")),
     serverName: serverNameFrom(env),
     signIn: signInFrom(env, trial),
+    publicUrl: publicUrlFrom(env, { strict: false }),
+    share,
   };
 }
