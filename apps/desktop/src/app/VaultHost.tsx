@@ -4,6 +4,7 @@ import type { Platform, VaultConnection } from "@thoth/platform";
 import { Intro } from "../features/onboarding/Intro.tsx";
 import { createImportService } from "../features/import/service.ts";
 import { createTransferService } from "../features/transfer/service.ts";
+import { createAgentsService } from "../features/agents/service.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
@@ -79,6 +80,14 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     };
   }, [servers, transfers]);
 
+  // Agent Hub: only where the host can run CLIs. Working directories an earlier session left are deleted and its
+  // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
+  const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump }) : null), [platform, vault, bump]);
+  useEffect(() => {
+    void agents?.recover();
+    return () => void agents?.dispose();
+  }, [agents]);
+
   const importService = useMemo(
     () => createImportService(vault, (kind, location) => options.openImportSource(platform, kind, location)),
     [vault, platform, options],
@@ -101,6 +110,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       tabs,
       servers,
       transfers,
+      agents,
+      openAgents: (selection) => {
+        if (agents && selection && selection.length > 0) agents.setDraft({ selection: [...selection].sort() });
+        tabs.open({ kind: "agents" });
+      },
       openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
       openFolder: (folder) =>
         void flushAll().then(async (ok) => {
@@ -116,7 +130,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, tabs],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, tabs],
   );
 
   return (

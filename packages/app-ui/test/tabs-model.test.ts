@@ -69,6 +69,16 @@ describe("opening", () => {
     expect(paths(blank)).toEqual(["settings"]);
   });
 
+  it("the Agent Hub is one tab like Settings, and survives a restart", () => {
+    let s = initialTabs([page("A.md")]);
+    s = open(s, { kind: "agents" });
+    s = open(activate(s, s.tabs[0]!.id), { kind: "agents" });
+    expect(paths(s)).toEqual(["A.md", "agents"]);
+    expect(activeIndex(s)).toBe(1);
+    expect(parseTabs(serializeTabs(s))!.tabs.map((t) => t.target)).toEqual([page("A.md"), { kind: "agents" }]);
+    expect(sameTarget({ kind: "agents" }, { kind: "settings" })).toBe(false);
+  });
+
   it("a new tab is empty, goes after the current tab and is shown", () => {
     const s = newTab(initialTabs([page("A.md"), page("B.md")], 0));
     expect(paths(s)).toEqual(["A.md", "blank", "B.md"]);

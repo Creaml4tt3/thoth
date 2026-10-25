@@ -238,6 +238,8 @@ export const en = {
       moveDown: "Move page down",
       theme: (name: string) => `Change theme: ${name}`,
       settings: "Open Settings",
+      /** Desktop only. */
+      agents: "Open the Agent Hub",
       newTab: "New tab",
       closeTab: "Close tab",
       nextTab: "Next tab",

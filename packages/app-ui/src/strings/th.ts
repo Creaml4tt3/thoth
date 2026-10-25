@@ -213,6 +213,7 @@ export const th: Strings = {
       moveDown: "ย้ายหน้าลง",
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
+      agents: "เปิด Agent Hub",
       newTab: "แท็บใหม่",
       closeTab: "ปิดแท็บ",
       nextTab: "แท็บถัดไป",

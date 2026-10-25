@@ -61,9 +61,10 @@ function PendingTransfers() {
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer }: Props) {
-  const { connection, reveal, openSettings, vault } = useSession();
+  const { connection, reveal, openSettings, vault, agents, openAgents } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useDesktopStrings().transfer;
+  const ta = useDesktopStrings().agents;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
@@ -137,6 +138,12 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
     setPicked(new Set(current ? [current] : []));
     setSelecting(true);
   };
+  const askAgent = () => {
+    const paths = [...picked].sort();
+    setSelecting(false);
+    setPicked(new Set());
+    openAgents(paths);
+  };
   const transfer = (mode: "copy" | "move") => {
     const paths = [...picked].sort();
     setSelecting(false);
@@ -177,6 +184,11 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
             <Button variant="ghost" small disabled={picked.size === 0} onClick={() => transfer("move")}>
               {tt.moveTo}
             </Button>
+            {agents && (
+              <Button variant="ghost" small disabled={picked.size === 0} onClick={askAgent}>
+                {ta.askAgent}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -192,7 +204,15 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <Button variant="ghost" small onClick={onNewFolder}>
           {t.newFolder}
         </Button>
-        {/* An icon keeps the row to one line in a narrow sidebar, in English and Thai; the name is still announced and shown on hover. */}
+        {/* Icons keep the row to one line in a narrow sidebar, in English and Thai; the names are still announced and shown on hover. */}
+        {agents && (
+          <Button variant="quiet" small className="side-icon" aria-label={ta.open} title={ta.open} onClick={() => openAgents()}>
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+            </svg>
+          </Button>
+        )}
         <Button variant="quiet" small className="side-icon" aria-label={t.settings} title={t.settings} onClick={() => openSettings()}>
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />

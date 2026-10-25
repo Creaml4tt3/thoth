@@ -9,6 +9,7 @@ import type { ImportService } from "../features/import/service.ts";
 import type { OpenImportSource } from "../features/import/open-source.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferService } from "../features/transfer/service.ts";
+import type { AgentsService } from "../features/agents/service.ts";
 import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 import type { OpenOptions } from "@thoth/app-ui/tabs/model.ts";
 import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
@@ -50,6 +51,10 @@ export interface Session {
   openWorkspacePage(ref: WorkspacePageRef, options?: OpenOptions): void;
   /** Copy and move between this Private Space and workspaces (ADR-0006). */
   transfers: TransferService;
+  /** The Agent Hub (ADR-0007); null where the host cannot run agent CLIs. */
+  agents: AgentsService | null;
+  /** Opens the Agent Hub tab; `selection` (vault paths) becomes the next task's context. */
+  openAgents(selection?: string[]): void;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
   openFolder(path: string): void;
   reveal: { path: string; nonce: number } | null;

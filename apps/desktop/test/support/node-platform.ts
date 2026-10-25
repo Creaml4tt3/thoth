@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { Platform, VaultChangedEvent, VaultConnection } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
+import { NodeAgentHost } from "@thoth/agent-core/node";
 import { FakeServers } from "../../../../tests/helpers/fake-servers.ts";
 
 type Listener = (event: Omit<VaultChangedEvent, "vault">) => void;
@@ -25,9 +26,11 @@ export interface NodePlatform extends Platform {
   connections: VaultConnection[];
   /** In-memory workspace servers (no server known by default). */
   servers: FakeServers;
+  /** Agent CLIs (the fake claude in tests); absent unless asked for, like a host without the Agent Hub. */
+  agents?: NodeAgentHost;
 }
 
-export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers } = {}): NodePlatform {
+export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers; agents?: { dataDir: string; searchDirs: string[] } } = {}): NodePlatform {
   const listeners = new Set<Listener>();
   const connections: VaultConnection[] = [];
   const platform: NodePlatform = {
@@ -37,6 +40,7 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     recent: [],
     connections,
     servers: options.servers ?? new FakeServers(),
+    ...(options.agents ? { agents: new NodeAgentHost({ ...options.agents, excludeRoots: () => connections.map((c) => c.root) }) } : {}),
     async pickVaultFolder() {
       return platform.pickedVault;
     },

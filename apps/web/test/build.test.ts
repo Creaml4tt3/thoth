@@ -12,7 +12,7 @@ function files(dir: string): string[] {
 }
 
 describe("web client production build", () => {
-  it("builds under /app/ for the configured server, with no filesystem, Tauri or process code (spec 14.11)", () => {
+  it("builds under /app/ for the configured server, with no filesystem, Tauri, process or agent code (spec 14.11)", () => {
     const vite = join(app, "node_modules/.bin/vite");
     const result = spawnSync(vite, ["build", "--logLevel", "warn"], { cwd: app, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0", VITE_DEFAULT_SERVER: SERVER, VITE_GA4_ID: "" } });
     expect(result.status, result.stdout + result.stderr).toBe(0);
@@ -22,7 +22,8 @@ describe("web client production build", () => {
     const code = built.filter((f) => /\.(js|css|html)$/.test(f)).map((f) => ({ f, text: readFileSync(f, "utf8") }));
     expect(code.length).toBeGreaterThan(2);
 
-    for (const forbidden of ["@tauri-apps", "plugin:fs", "child_process", "__TAURI_INTERNALS__", "@thoth/local-store", "openVault", "node:fs", "node:sqlite"]) {
+    // The Agent Hub's host commands and the Claude Code adapter are desktop only: a browser can never spawn a CLI.
+    for (const forbidden of ["@tauri-apps", "plugin:fs", "child_process", "__TAURI_INTERNALS__", "@thoth/local-store", "openVault", "node:fs", "node:sqlite", "agent.start", "agent.run.create", "agent_start", "stream-json", "--permission-mode"]) {
       expect(code.filter((c) => c.text.includes(forbidden)).map((c) => c.f), forbidden).toEqual([]);
     }
     // No fonts or scripts from anywhere but /app/ (self-hosted fonts; no Google Fonts).
