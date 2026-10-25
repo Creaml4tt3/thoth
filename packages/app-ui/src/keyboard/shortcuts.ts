@@ -43,6 +43,8 @@ export type ShortcutId =
   | "tab.previous"
   | "tab.jump"
   | "tab.openNew"
+  | "tab.move"
+  | "tab.menu"
   | "tree.move"
   | "tree.expand"
   | "tree.open"
@@ -68,10 +70,10 @@ export type ShortcutId =
 export type ShortcutGroup = "general" | "assistant" | "tabs" | "tree" | "editor";
 
 /**
- * Who acts on the key. "global": `useShortcuts` (the app passes the handlers). "tree", "editor" and "dialog": the
- * focused tree, editor or dialog handles it itself; the entry is here so the list shows it and the tests see it.
+ * Who acts on the key. "global": `useShortcuts` (the app passes the handlers). "tree", "tabs", "editor" and "dialog":
+ * the focused tree, tab, editor or dialog handles it itself; the entry is here so the list shows it and the tests see it.
  */
-export type ShortcutScope = "global" | "tree" | "editor" | "dialog";
+export type ShortcutScope = "global" | "tree" | "tabs" | "editor" | "dialog";
 
 export interface ShortcutDef {
   id: ShortcutId;
@@ -141,6 +143,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     display: { desktop: "Cmd/Ctrl+1–9", web: "Alt+1–9" },
   },
   { id: "tab.openNew", group: "tabs", scope: "tree", desktop: [{ key: "Enter", mod: true }], display: { desktop: "Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter" } },
+  // On the focused tab (ADR-0019): the keyboard way to reorder tabs, beside dragging them. Not global: in text,
+  // Option+Shift+Left/Right selects by word.
+  { id: "tab.move", group: "tabs", scope: "tabs", desktop: [{ key: "ArrowLeft", alt: true, shift: true }, { key: "ArrowRight", alt: true, shift: true }], display: { desktop: "Alt+Shift+← / →" } },
+  { id: "tab.menu", group: "tabs", scope: "tabs", desktop: [{ key: "ContextMenu" }, { key: "F10", shift: true }], display: { desktop: "Menu key / Shift+F10" } },
 
   // The page trees
   { id: "tree.move", group: "tree", scope: "tree", desktop: [{ key: "ArrowUp" }, { key: "ArrowDown" }, { key: "Home" }, { key: "End" }], display: { desktop: "↑ ↓ Home End" } },

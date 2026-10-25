@@ -52,7 +52,7 @@ describe("the shortcut table", () => {
     // The global handler works over everything; a tree, an editor and a dialog each have their own keys.
     const seen = new Map<string, string>();
     for (const { def, sig } of placed(client, platform)) {
-      const places = def.scope === "global" ? ["global", "tree", "editor", "dialog"] : [def.scope];
+      const places = def.scope === "global" ? ["global", "tree", "tabs", "editor", "dialog"] : [def.scope];
       for (const place of places) {
         const key = `${place}:${sig}`;
         const other = seen.get(key);
@@ -125,6 +125,19 @@ describe("the shortcut table", () => {
       { key: "ArrowUp", alt: true, shift: true },
       { key: "ArrowDown", alt: true, shift: true },
     ]);
+  });
+
+  it("moves a focused tab with Alt/Option+Shift+Left and Right, on both clients (ADR-0019)", () => {
+    const def = shortcutById("tab.move" as never)!;
+    expect(def.scope).toBe("tabs");
+    expect(def.web).toBeUndefined(); // a browser keeps neither key
+    expect(def.desktop).toEqual([
+      { key: "ArrowLeft", alt: true, shift: true },
+      { key: "ArrowRight", alt: true, shift: true },
+    ]);
+    expect(formatShortcut(def, "desktop", "mac")).toBe("Option+Shift+← / →");
+    expect(formatShortcut(def, "web", "other")).toBe("Alt+Shift+← / →");
+    expect(shortcutById("tab.menu" as never)!.scope).toBe("tabs");
   });
 
   it("reads Tiptap's notation", () => {

@@ -6,8 +6,11 @@ import {
   activeIndex,
   activeTab,
   close,
+  detach,
   initialTabs,
   jump,
+  move,
+  moveBy,
   newTab,
   open,
   parseTabs,
@@ -154,6 +157,83 @@ describe("switching", () => {
   it("retargets a tab in place", () => {
     const s = retarget(three, three.tabs[1]!.id, page("Z.md"));
     expect(paths(s)).toEqual(["A.md", "Z.md", "C.md"]);
+  });
+});
+
+describe("reordering (ADR-0019)", () => {
+  const four = () => initialTabs([page("A.md"), page("B.md"), page("C.md"), page("D.md")], 1);
+
+  it("moves a tab to a new place by pointer, and the same tab stays current", () => {
+    const s0 = four();
+    const s = move(s0, s0.tabs[0]!.id, 2);
+    expect(paths(s)).toEqual(["B.md", "C.md", "A.md", "D.md"]);
+    expect(activeTab(s).target).toEqual(page("B.md"));
+    expect(s.active).toBe(s0.active);
+    expect(new Set(s.tabs.map((t) => t.id))).toEqual(new Set(s0.tabs.map((t) => t.id)));
+    const back = move(s, s0.tabs[3]!.id, 0);
+    expect(paths(back)).toEqual(["D.md", "B.md", "C.md", "A.md"]);
+  });
+
+  it("keeps the place inside the list: past either end is the end", () => {
+    const s0 = four();
+    expect(paths(move(s0, s0.tabs[1]!.id, 99))).toEqual(["A.md", "C.md", "D.md", "B.md"]);
+    expect(paths(move(s0, s0.tabs[2]!.id, -5))).toEqual(["C.md", "A.md", "B.md", "D.md"]);
+  });
+
+  it("returns the same state for no move, an unknown id or one tab", () => {
+    const s0 = four();
+    expect(move(s0, s0.tabs[2]!.id, 2)).toBe(s0);
+    expect(move(s0, "nope", 0)).toBe(s0);
+    const one = initialTabs([page("A.md")]);
+    expect(move(one, one.active, 1)).toBe(one);
+  });
+
+  it("Alt/Option+Shift+Left and Right move the current tab one place, and stop at the ends", () => {
+    let s = four(); // B is current, second
+    s = moveBy(s, s.active, 1);
+    expect(paths(s)).toEqual(["A.md", "C.md", "B.md", "D.md"]);
+    s = moveBy(s, s.active, 1);
+    expect(paths(s)).toEqual(["A.md", "C.md", "D.md", "B.md"]);
+    const end = moveBy(s, s.active, 1);
+    expect(end).toBe(s); // no wrap: the last place is the last place
+    s = moveBy(moveBy(moveBy(s, s.active, -1), s.active, -1), s.active, -1);
+    expect(paths(s)).toEqual(["B.md", "A.md", "C.md", "D.md"]);
+    expect(moveBy(s, s.active, -1)).toBe(s);
+    expect(activeTab(s).target).toEqual(page("B.md"));
+  });
+
+  it("the new order is what is stored and what comes back on restart", () => {
+    const s0 = four();
+    const s = move(s0, s0.tabs[3]!.id, 0);
+    const back = parseTabs(serializeTabs(s))!;
+    expect(paths(back)).toEqual(["D.md", "A.md", "B.md", "C.md"]);
+    expect(activeTab(back).target).toEqual(page("B.md"));
+  });
+});
+
+describe("moving a tab to a new window (ADR-0019)", () => {
+  it("the window loses the tab and the new window gets it; both come back on restart", () => {
+    const s0 = initialTabs([page("A.md"), page("B.md"), { kind: "settings" }], 1);
+    const out = detach(s0, s0.tabs[1]!.id)!;
+    expect(paths(out.source)).toEqual(["A.md", "settings"]);
+    expect(activeTab(out.source).target).toEqual({ kind: "settings" }); // the current tab passed to its right
+    expect(paths(out.moved)).toEqual(["B.md"]);
+    expect(activeTab(out.moved).target).toEqual(page("B.md"));
+    expect(paths(parseTabs(serializeTabs(out.source))!)).toEqual(["A.md", "settings"]);
+    expect(paths(parseTabs(serializeTabs(out.moved))!)).toEqual(["B.md"]);
+  });
+
+  it("a background tab leaves without changing the current one", () => {
+    const s0 = initialTabs([page("A.md"), page("B.md"), page("C.md")], 2);
+    const out = detach(s0, s0.tabs[0]!.id)!;
+    expect(out.source.active).toBe(s0.active);
+    expect(paths(out.moved)).toEqual(["A.md"]);
+  });
+
+  it("the only tab of a window, or an unknown one, cannot leave", () => {
+    const one = initialTabs([page("A.md")]);
+    expect(detach(one, one.active)).toBeNull();
+    expect(detach(initialTabs([page("A.md"), page("B.md")]), "nope")).toBeNull();
   });
 });
 

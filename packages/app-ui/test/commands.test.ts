@@ -67,6 +67,27 @@ describe("Show notifications", () => {
   });
 });
 
+describe("moving tabs (ADR-0019)", () => {
+  it("offers Move tab left and right with their keys, only where the tab can go, and Move tab to new window where there is one", () => {
+    const { actions, log } = spies();
+    const tabs = { ...actions.tabs, moveLeft: vi.fn(() => void log.push("left")), moveRight: vi.fn(() => void log.push("right")), moveToWindow: vi.fn(() => void log.push("window")) };
+    const list = buildCommands({ ...actions, tabs }, en, "desktop", "mac");
+    expect(find(list, "tab.moveLeft")?.title).toBe("Move tab left");
+    expect(find(list, "tab.moveLeft")?.shortcut).toBe("Option+Shift+←");
+    expect(find(list, "tab.moveRight")?.shortcut).toBe("Option+Shift+→");
+    expect(find(list, "tab.moveToWindow")?.title).toBe("Move tab to new window");
+    for (const id of ["tab.moveLeft", "tab.moveRight", "tab.moveToWindow"]) find(list, id)!.run();
+    expect(log).toEqual(["left", "right", "window"]);
+    expect(filterCommands("> move tab", list).map((c) => c.id)).toEqual(["tab.moveLeft", "tab.moveRight", "tab.moveToWindow"]);
+    expect(find(buildCommands({ ...actions, tabs }, en, "web", "other"), "tab.moveLeft")?.shortcut).toBe("Alt+Shift+←");
+    expect(titles(buildCommands({ ...actions, tabs }, th, "desktop", "mac"))).toContain("ย้ายแท็บไปทางซ้าย");
+
+    // At the left end there is no "left"; the web client and a lone tab have no new window.
+    const none = buildCommands(actions, en, "desktop", "mac");
+    for (const id of ["tab.moveLeft", "tab.moveRight", "tab.moveToWindow"]) expect(find(none, id), id).toBeUndefined();
+  });
+});
+
 describe("the palette's commands", () => {
   it("offers what the app can do now, in the UI language", () => {
     const { actions } = spies();

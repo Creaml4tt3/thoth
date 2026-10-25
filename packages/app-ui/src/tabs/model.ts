@@ -129,6 +129,39 @@ export function jump(state: TabsState, n: number): TabsState {
 }
 
 /**
+ * Moves the tab `id` to index `to` of the list (ADR-0019: a pointer drag in the tab bar, the palette, the tab's
+ * menu). An index past either end is that end. The current tab stays the current tab; ids do not change.
+ */
+export function move(state: TabsState, id: string, to: number): TabsState {
+  const from = state.tabs.findIndex((t) => t.id === id);
+  if (from < 0) return state;
+  const at = Math.max(0, Math.min(Math.trunc(to), state.tabs.length - 1));
+  if (at === from) return state;
+  const tabs = state.tabs.filter((t) => t.id !== id);
+  tabs.splice(at, 0, state.tabs[from]!);
+  return { ...state, tabs };
+}
+
+/** Alt/Option+Shift+Left and Right: the tab `id` one place (or `delta` places) along. It stops at the ends, as a browser's does. */
+export function moveBy(state: TabsState, id: string, delta: number): TabsState {
+  const from = state.tabs.findIndex((t) => t.id === id);
+  if (from < 0) return state;
+  const to = from + delta;
+  return to < 0 || to >= state.tabs.length ? state : move(state, id, to);
+}
+
+/**
+ * The tab `id` leaves for a new window (ADR-0019): `source` is this window without it (the current tab passes on as
+ * when it closes), `moved` is the new window's tabs (that one, current). A window's only tab cannot leave: the
+ * window would be left with nothing but an empty tab. Null then, or for an unknown id.
+ */
+export function detach(state: TabsState, id: string): { source: TabsState; moved: TabsState } | null {
+  const tab = state.tabs.find((t) => t.id === id);
+  if (!tab || state.tabs.length < 2) return null;
+  return { source: close(state, id), moved: initialTabs([tab.target]) };
+}
+
+/**
  * Pages that moved: tabs showing `from` (a page) or a page under `from` (a folder that moved) follow to `to`, so
  * renaming or moving something keeps its tabs open on it instead of leaving them on a path that is gone.
  */

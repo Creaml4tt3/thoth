@@ -18,6 +18,7 @@ import { AgentRunView } from "../agents/AgentRunView.tsx";
 import { MascotLayer } from "../mascot/Mascot.tsx";
 import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import { tabMoves } from "@thoth/app-ui/tabs/useTabs.ts";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
@@ -178,6 +179,7 @@ export function Shell() {
       list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
+      ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -239,7 +241,7 @@ export function Shell() {
     <div className="shell" ref={shell} style={sidebar.style}>
       <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
       <main className="main">
-        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} />
+        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} />
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
             {t.watchError(watchError)}

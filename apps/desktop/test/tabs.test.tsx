@@ -299,6 +299,51 @@ describe("edits are never lost when tabs change", () => {
   });
 });
 
+describe("reordering tabs (ADR-0019)", () => {
+  async function three() {
+    const app = await start();
+    for (const name of ["Beta", "Gamma"]) {
+      await app.user.keyboard("{Control>}");
+      await app.user.click(await row(name));
+      await app.user.keyboard("{/Control}");
+    }
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Beta", "Gamma"]));
+    return app;
+  }
+
+  it("Alt+Shift+Left on the focused tab moves it, keeps the same page current, and the order is saved", async () => {
+    const app = await three();
+    tabs()[2]!.focus();
+    await app.user.keyboard("{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}");
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Gamma", "Beta"]));
+    expect(current()).toBe("Gamma");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Gamma" })));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root))!).tabs).toEqual([{ k: "page", path: "Alpha.md" }, { k: "page", path: "Gamma.md" }, { k: "page", path: "Beta.md" }]));
+    expect(await app.read("Alpha.md")).toBe(ALPHA); // moving a tab writes nothing
+  });
+
+  it("the palette's Move tab left and right move the current tab", async () => {
+    const app = await three();
+    await app.user.keyboard("{Control>}k{/Control}");
+    await app.user.keyboard("> move tab left");
+    await app.user.keyboard("{Enter}");
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Gamma", "Beta"]));
+    await app.user.keyboard("{Control>}k{/Control}");
+    await app.user.keyboard("> move tab");
+    const options = within(await screen.findByRole("dialog", { name: "Search" })).getAllByRole("option").map((o) => o.textContent ?? "");
+    expect(options.some((o) => o.startsWith("Move tab left"))).toBe(true);
+    expect(options.some((o) => o.startsWith("Move tab right"))).toBe(true);
+    expect(options.some((o) => o.startsWith("Move tab to new window"))).toBe(false); // no second window on this platform
+  });
+
+  it("comes back in the order it was left in", async () => {
+    localStorage.setItem(tabsKey(root), serializeTabs(initialTabs([{ kind: "page", path: "Gamma.md" }, { kind: "page", path: "Alpha.md" }, { kind: "page", path: "Beta.md" }], 1)));
+    await openApp(root);
+    await waitFor(() => expect(tabNames()).toEqual(["Gamma", "Alpha", "Beta"]));
+    expect(current()).toBe("Alpha");
+  });
+});
+
 describe("restoring tabs on restart", () => {
   it("brings the tabs back for this Private Space, with the one that was current", async () => {
     localStorage.setItem(

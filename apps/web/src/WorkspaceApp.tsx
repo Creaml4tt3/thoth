@@ -10,7 +10,7 @@ import { useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import type { OpenOptions, TabTarget } from "@thoth/app-ui/tabs/model.ts";
-import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
+import { tabMoves, useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
@@ -176,6 +176,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
       list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
+      ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -288,7 +289,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           </div>
         </aside>
         <main className="main">
-          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} />
+          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
               {t.web.sessionEnded}{" "}

@@ -115,6 +115,32 @@ describe("opening pages in tabs", () => {
   });
 });
 
+describe("reordering tabs (ADR-0019: reorder only on the web)", () => {
+  it("Alt+Shift+Right moves the focused tab, the order survives a reload, and there is no new window", async () => {
+    const browser = await signedIn();
+    await browser.user.click(await row("Alpha"));
+    await ctrlClick(browser, "Beta");
+    await ctrlClick(browser, "Gamma");
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Beta", "Gamma"]));
+    tabs()[0]!.focus();
+    await browser.user.keyboard("{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}");
+    await waitFor(() => expect(tabNames()).toEqual(["Beta", "Alpha", "Gamma"]));
+    expect(current()).toBe("Gamma");
+
+    fireEvent.contextMenu(screen.getByRole("tab", { name: "Alpha" }), { clientX: 10, clientY: 10 });
+    expect(screen.getByRole("menuitem", { name: /^Move tab left/ })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Move tab to new window" })).toBeNull();
+    await browser.user.keyboard("{Escape}");
+
+    cleanup();
+    // A reload: same storage, same server, the cookie signs the visitor in again.
+    const again = fakeBrowser(browser.server, { local: browser.local });
+    again.server.giveCookie();
+    open(again);
+    await waitFor(() => expect(tabNames()).toEqual(["Beta", "Alpha", "Gamma"]));
+  });
+});
+
 describe("restoring tabs in the same browser", () => {
   it("keeps ids only in localStorage: no page title, no text, no sign-in data", async () => {
     const browser = await signedIn();

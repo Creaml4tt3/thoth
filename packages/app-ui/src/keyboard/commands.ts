@@ -44,7 +44,20 @@ export interface CommandActions {
   openAssistantSettings?(): void;
   /** Opens the notification list (the bell in the sidebar). */
   openNotifications?(): void;
-  tabs: { newTab(): void; closeTab(): void; next(): void; previous(): void; list: readonly { id: string; label: string }[]; active: string; goTo(id: string): void };
+  tabs: {
+    newTab(): void;
+    closeTab(): void;
+    next(): void;
+    previous(): void;
+    list: readonly { id: string; label: string }[];
+    active: string;
+    goTo(id: string): void;
+    /** The current tab one place along (ADR-0019); absent at that end of the bar. */
+    moveLeft?(): void;
+    moveRight?(): void;
+    /** The current tab into a new window (the desktop only, and not a window's only tab). */
+    moveToWindow?(): void;
+  };
   toggleMode?(): void;
   showShortcuts(): void;
   /** Present when text is selected and may be styled. */
@@ -83,6 +96,11 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   add("tab.close", t.closeTab, a.tabs.closeTab, key("tab.close"));
   add("tab.next", t.nextTab, a.tabs.next, key("tab.next"));
   add("tab.previous", t.previousTab, a.tabs.previous, key("tab.previous"));
+  // The table writes both keys as "Alt+Shift+← / →"; each command shows its own.
+  const tabKeys = shortcutText("tab.move", client, platform);
+  if (a.tabs.moveLeft) add("tab.moveLeft", t.moveTabLeft, a.tabs.moveLeft, { shortcut: tabKeys.replace("← / →", "←"), keywords: "reorder order earlier" });
+  if (a.tabs.moveRight) add("tab.moveRight", t.moveTabRight, a.tabs.moveRight, { shortcut: tabKeys.replace("← / →", "→"), keywords: "reorder order later" });
+  if (a.tabs.moveToWindow) add("tab.moveToWindow", t.moveTabToWindow, a.tabs.moveToWindow, { keywords: "window detach tear off split" });
   a.tabs.list.forEach((tab, index) => {
     if (tab.id !== a.tabs.active) add(`tab.go.${tab.id}`, t.goToTab(tab.label), () => a.tabs.goTo(tab.id), { keywords: `switch tab ${index + 1}` });
   });

@@ -20,6 +20,16 @@ export interface TabsController {
   prune(gone: (target: TabTarget) => boolean): void;
   /** A page or folder moved or was renamed: every tab on it (or on a page under it) follows. */
   remapPaths(from: string, to: string): void;
+  /** Puts the tab `id` at index `to` (a drag in the tab bar). The current tab does not change. */
+  move(id: string, to: number): void;
+  /** Moves the tab `id` (the current one by default) one place left (-1) or right (1); nothing at the ends. */
+  moveBy(delta: -1 | 1, id?: string): void;
+  /**
+   * Moves the tab `id` to another window (ADR-0019). Its pending edits are written first when it is the current
+   * tab; then `send` gets the new window's tabs, and only when it reports success does the tab leave this window.
+   * False when the tab cannot leave (the only tab), the edit could not be written, or `send` failed.
+   */
+  detach(id: string, send: (moved: TabsState) => Promise<boolean>): Promise<boolean>;
 }
 
 interface Options {
@@ -73,7 +83,26 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
       jump: (n) => guarded((s) => model.jump(s, n)),
       prune,
       remapPaths,
+      // The current tab stays current, so nothing on screen changes and nothing needs saving first.
+      move: (id, to) => setState((s) => model.move(s, id, to)),
+      moveBy: (delta, id) => setState((s) => model.moveBy(s, id ?? s.active, delta)),
+      detach: async (id, send) => {
+        if (id === latest.current.active && !(await flushRef.current())) return false;
+        const out = model.detach(latest.current, id);
+        if (!out) return false;
+        const sent = await send(out.moved).catch(() => false);
+        if (sent) setState((s) => model.close(s, id));
+        return sent;
+      },
     }),
     [state, guarded, prune, remapPaths],
   );
+}
+
+/** The palette's Move tab left and right for the current tab at `index` of `count`: only the ones that can move it. */
+export function tabMoves(index: number, count: number, moveBy: (delta: -1 | 1) => void): { moveLeft?(): void; moveRight?(): void } {
+  return {
+    ...(index > 0 ? { moveLeft: () => moveBy(-1) } : {}),
+    ...(index >= 0 && index < count - 1 ? { moveRight: () => moveBy(1) } : {}),
+  };
 }

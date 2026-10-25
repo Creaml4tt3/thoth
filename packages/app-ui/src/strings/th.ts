@@ -222,6 +222,9 @@ export const th: Strings = {
       nextTab: "แท็บถัดไป",
       previousTab: "แท็บก่อนหน้า",
       goToTab: (label) => `ไปที่แท็บ: ${label}`,
+      moveTabLeft: "ย้ายแท็บไปทางซ้าย",
+      moveTabRight: "ย้ายแท็บไปทางขวา",
+      moveTabToWindow: "ย้ายแท็บไปหน้าต่างใหม่", // REVIEW
       toggleMode: "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
       shortcuts: "แสดงปุ่มลัด",
       format: (style) => `จัดรูปแบบ: ${style}`,
@@ -240,6 +243,8 @@ export const th: Strings = {
       "tab.previous": "แท็บก่อนหน้า",
       "tab.jump": "ไปยังแท็บที่ 1–9 (9 คือแท็บสุดท้าย)",
       "tab.openNew": "เปิดหน้าในแท็บใหม่",
+      "tab.move": "ย้ายแท็บไปทางซ้ายหรือขวา",
+      "tab.menu": "เปิดเมนูของแท็บ",
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",
@@ -311,6 +316,13 @@ export const th: Strings = {
     settings: "การตั้งค่า",
     untitled: "ไม่มีชื่อ",
     loading: "กำลังโหลด…",
+    menu: (label) => `แท็บ: ${label}`,
+    moveLeft: "ย้ายแท็บไปทางซ้าย",
+    moveRight: "ย้ายแท็บไปทางขวา",
+    moveToWindow: "ย้ายแท็บไปหน้าต่างใหม่", // REVIEW
+    movedTo: (label, position, total) => `ย้าย ${label} ไปลำดับที่ ${count(position)} จาก ${count(total)}`,
+    movedToWindow: (label) => `ย้าย ${label} ไปหน้าต่างใหม่แล้ว`, // REVIEW
+    releaseForWindow: "ปล่อยเพื่อเปิดในหน้าต่างใหม่", // REVIEW
   },
 
   web: {

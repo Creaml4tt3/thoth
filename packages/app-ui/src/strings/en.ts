@@ -248,6 +248,10 @@ export const en = {
       nextTab: "Next tab",
       previousTab: "Previous tab",
       goToTab: (label: string) => `Go to tab: ${label}`,
+      moveTabLeft: "Move tab left",
+      moveTabRight: "Move tab right",
+      /** Desktop only (ADR-0019). */
+      moveTabToWindow: "Move tab to new window",
       toggleMode: "Switch between Blocks and Plain mode",
       shortcuts: "Show keyboard shortcuts",
       format: (style: string) => `Format: ${style}`,
@@ -266,6 +270,8 @@ export const en = {
       "tab.previous": "Previous tab",
       "tab.jump": "Go to tab 1–9 (9 is the last tab)",
       "tab.openNew": "Open a page in a new tab",
+      "tab.move": "Move the tab left or right",
+      "tab.menu": "Open the tab's menu",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
@@ -343,6 +349,15 @@ export const en = {
     settings: "Settings",
     untitled: "Untitled",
     loading: "Loading…",
+    /** The tab's menu (right click, the Menu key or Shift+F10) and what it says after a move (ADR-0019). */
+    menu: (label: string) => `Tab: ${label}`,
+    moveLeft: "Move tab left",
+    moveRight: "Move tab right",
+    moveToWindow: "Move tab to new window",
+    movedTo: (label: string, position: number, total: number) => `${label} moved to position ${position} of ${total}`,
+    movedToWindow: (label: string) => `${label} moved to a new window`,
+    /** Shown on a tab dragged far enough out of the bar (desktop). */
+    releaseForWindow: "Release to open in a new window",
   },
 
   web: {
