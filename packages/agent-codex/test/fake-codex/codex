@@ -1,0 +1,183 @@
+#!/usr/bin/env node
+// A fake Codex CLI for tests: CI never calls a real model. It answers the probes the host runs (`--version`,
+// `exec --help`, `login status`, the `sandbox ... -- <codex> --version` probe) and, for `exec`, reads the prompt from
+// stdin, records what it was given, acts on directives in the prompt, and prints `--json` events shaped like Codex
+// CLI 0.164.0's (see ../fixtures/README.md).
+//
+// Environment:
+//   FAKE_CODEX_VERSION=<text>   what --version prints (default "codex-cli 0.164.0")
+//   FAKE_CODEX_HELP=old         exec --help without --strict-config and --ignore-rules
+//   FAKE_CODEX_LOGGED_OUT=1     login status says "Not logged in" (exit 1)
+//   FAKE_CODEX_NO_SANDBOX=1     the sandbox probe fails, as on a machine where Codex's sandbox cannot start
+//
+// Directives (one per prompt line; paths are relative to the working directory):
+//   @replace PATH :: OLD => NEW      @write PATH :: TEXT (\n for a newline)     @delete PATH
+//   @run COMMAND (a command that succeeds)   @fail-run COMMAND (exit code 1)    @say TEXT
+//   @unlock PATH (make a read-only file writable)   @symlink PATH -> TARGET    @mkdir PATH
+//   @sleep MS   @hang (start a grandchild, then wait to be killed)   @ignore-term (ignore SIGTERM)
+//   @not-logged-in (fail like a signed-out Codex: 401, turn.failed, exit 1)
+//   @bad-model (fail like an unknown -m: model_not_found, exit 1)   @exit CODE
+import { spawn } from "node:child_process";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+const argv = process.argv.slice(2);
+const out = (text) => process.stdout.write(text);
+const emit = (event) => out(`${JSON.stringify(event)}\n`);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const VERSION = process.env.FAKE_CODEX_VERSION ?? "codex-cli 0.164.0";
+
+if (argv[0] === "--version" || argv[0] === "-V") {
+  out(`${VERSION}\n`);
+  process.exit(0);
+}
+if (argv[0] === "exec" && (argv[1] === "--help" || argv[1] === "-h")) {
+  let help = readFileSync(new URL("../fixtures/help-exec-0.164.0.txt", import.meta.url), "utf8");
+  if (process.env.FAKE_CODEX_HELP === "old") help = help.replace(/--strict-config/g, "--strict-x").replace(/--ignore-rules/g, "--ignore-x");
+  out(help);
+  process.exit(0);
+}
+if (argv[0] === "login" && argv[1] === "status") {
+  // The real CLI says this on stderr.
+  if (process.env.FAKE_CODEX_LOGGED_OUT === "1") {
+    process.stderr.write("Not logged in\n");
+    process.exit(1);
+  }
+  process.stderr.write("Logged in using ChatGPT\n");
+  process.exit(0);
+}
+if (argv[0] === "sandbox") {
+  if (process.env.FAKE_CODEX_NO_SANDBOX === "1") {
+    process.stderr.write("Error: the sandbox could not be started (fake)\n");
+    process.exit(1);
+  }
+  const rest = argv.slice(argv.indexOf("--") + 1);
+  if (rest[1] === "--version") out(`${VERSION}\n`);
+  process.exit(0);
+}
+if (argv[0] !== "exec" || !argv.includes("--json")) {
+  process.stderr.write("fake codex: only `exec --json` is supported\n");
+  process.exit(2);
+}
+
+process.stderr.write("Reading prompt from stdin...\n");
+const chunks = [];
+for await (const chunk of process.stdin) chunks.push(chunk);
+const prompt = Buffer.concat(chunks).toString("utf8");
+const cwd = process.cwd();
+
+function listing(dir, prefix = "") {
+  const entries = [];
+  for (const name of readdirSync(dir).sort()) {
+    const path = prefix ? `${prefix}/${name}` : name;
+    const st = lstatSync(join(dir, name));
+    const kind = st.isSymbolicLink() ? "symlink" : st.isDirectory() ? "directory" : "file";
+    entries.push({ path, kind });
+    if (kind === "directory") entries.push(...listing(join(dir, name), path));
+  }
+  return entries;
+}
+
+const modes = {};
+for (const { path } of listing(cwd)) modes[path] = lstatSync(join(cwd, path)).mode & 0o777;
+const record = { pid: process.pid, argv, cwd, env: process.env, stdin: prompt, files: listing(cwd), modes, grandchild: null };
+const recordFile = join(cwd, "..", "fake-codex-record.json");
+const save = () => writeFileSync(recordFile, JSON.stringify(record, null, 2));
+save();
+
+let ignoreTerm = false;
+process.on("SIGTERM", () => {
+  if (ignoreTerm) return;
+  process.exit(143);
+});
+
+let item = 0;
+const nextId = () => `item_${item++}`;
+const message = (text) => emit({ type: "item.completed", item: { id: nextId(), type: "agent_message", text } });
+const fileChange = (path, kind, apply) => {
+  const id = nextId();
+  const changes = [{ path: join(cwd, path), kind }];
+  emit({ type: "item.started", item: { id, type: "file_change", changes, status: "in_progress" } });
+  let status = "completed";
+  try {
+    if (apply() === false) status = "failed";
+  } catch {
+    status = "failed";
+  }
+  emit({ type: "item.completed", item: { id, type: "file_change", changes, status } });
+};
+const command = (text, exitCode, output) => {
+  const id = nextId();
+  const shown = `/bin/zsh -lc ${JSON.stringify(text)}`;
+  emit({ type: "item.started", item: { id, type: "command_execution", command: shown, aggregated_output: "", exit_code: null, status: "in_progress" } });
+  emit({ type: "item.completed", item: { id, type: "command_execution", command: shown, aggregated_output: output, exit_code: exitCode, status: exitCode === 0 ? "completed" : "failed" } });
+};
+const fail = (text) => {
+  emit({ type: "error", message: text });
+  emit({ type: "turn.failed", error: { message: text } });
+  process.exit(1);
+};
+
+emit({ type: "thread.started", thread_id: "00000000-0000-7000-8000-0000000000aa" });
+emit({ type: "turn.started" });
+
+for (const raw of prompt.split("\n")) {
+  const line = raw.trim();
+  if (!line.startsWith("@")) continue;
+  const [directive, ...rest] = line.split(" ");
+  const arg = rest.join(" ");
+  if (directive === "@replace") {
+    const [path, change] = arg.split(" :: ");
+    const [from, to] = change.split(" => ");
+    const file = join(cwd, path);
+    fileChange(path, "update", () => {
+      const text = readFileSync(file, "utf8");
+      if (!text.includes(from)) return false;
+      writeFileSync(file, text.replace(from, to));
+    });
+  } else if (directive === "@write") {
+    const [path, text] = arg.split(" :: ");
+    const file = join(cwd, path);
+    fileChange(path, existsSync(file) ? "update" : "add", () => {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, text.replaceAll("\\n", "\n"));
+    });
+  } else if (directive === "@delete") {
+    fileChange(arg, "delete", () => rmSync(join(cwd, arg)));
+  } else if (directive === "@run") {
+    command(arg, 0, "");
+  } else if (directive === "@fail-run") {
+    command(arg, 1, `${arg.split(" ")[0]}: Operation not permitted\n`);
+  } else if (directive === "@unlock") {
+    chmodSync(join(cwd, arg), 0o644);
+  } else if (directive === "@symlink") {
+    const [path, target] = arg.split(" -> ");
+    symlinkSync(target, join(cwd, path));
+  } else if (directive === "@mkdir") {
+    mkdirSync(join(cwd, arg), { recursive: true });
+  } else if (directive === "@say") {
+    message(arg);
+  } else if (directive === "@sleep") {
+    await sleep(Number(arg));
+  } else if (directive === "@ignore-term") {
+    ignoreTerm = true;
+  } else if (directive === "@hang") {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    record.grandchild = child.pid;
+    save();
+    message("Working on it…");
+    await new Promise(() => setInterval(() => {}, 1000));
+  } else if (directive === "@not-logged-in") {
+    emit({ type: "error", message: "Reconnecting... 2/5 (unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: wss://api.openai.com/v1/responses)" });
+    fail("unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses");
+  } else if (directive === "@bad-model") {
+    const model = argv.includes("-m") ? argv[argv.indexOf("-m") + 1] : "unknown";
+    fail(JSON.stringify({ type: "error", status: 400, error: { type: "invalid_request_error", message: `The '${model}' model is not supported when using Codex with a ChatGPT account.`, code: "model_not_found" } }));
+  } else if (directive === "@exit") {
+    process.stderr.write("fake codex: exiting early\n");
+    process.exit(Number(arg));
+  }
+}
+
+message("Done.");
+emit({ type: "turn.completed", usage: { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 34, reasoning_output_tokens: 8 } });

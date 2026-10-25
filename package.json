@@ -28,6 +28,7 @@
     "@axe-core/playwright": "4.13.0",
     "@playwright/test": "^1.64.1",
     "@thoth/agent-claude": "workspace:*",
+    "@thoth/agent-codex": "workspace:*",
     "@thoth/agent-core": "workspace:*",
     "@thoth/content": "workspace:*",
     "@thoth/desktop": "workspace:*",

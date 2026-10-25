@@ -1,0 +1,14 @@
+{
+  "name": "@thoth/agent-codex",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The OpenAI Codex CLI adapter for the Agent Hub (ADR-0007): verified arguments, `codex exec --json` parsing, detection. No React, no Tauri.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@thoth/agent-core": "workspace:*"
+  }
+}

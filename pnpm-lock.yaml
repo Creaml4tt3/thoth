@@ -20,6 +20,9 @@ importers:
       '@thoth/agent-claude':
         specifier: workspace:*
         version: link:packages/agent-claude
+      '@thoth/agent-codex':
+        specifier: workspace:*
+        version: link:packages/agent-codex
       '@thoth/agent-core':
         specifier: workspace:*
         version: link:packages/agent-core
@@ -119,6 +122,9 @@ importers:
       '@thoth/agent-claude':
         specifier: workspace:*
         version: link:../../packages/agent-claude
+      '@thoth/agent-codex':
+        specifier: workspace:*
+        version: link:../../packages/agent-codex
       '@thoth/agent-core':
         specifier: workspace:*
         version: link:../../packages/agent-core
@@ -310,6 +316,12 @@ importers:
         version: 8.3.4(@types/node@24.19.2)(yaml@2.9.1)
 
   packages/agent-claude:
+    dependencies:
+      '@thoth/agent-core':
+        specifier: workspace:*
+        version: link:../agent-core
+
+  packages/agent-codex:
     dependencies:
       '@thoth/agent-core':
         specifier: workspace:*
