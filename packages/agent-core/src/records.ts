@@ -88,6 +88,8 @@ export const RunRecordSchema = z.object({
       code: z.number().nullable(),
       ok: z.boolean(),
       costUsd: z.number().optional(),
+      /** Token counts, for a CLI that reports those instead of a cost (Codex). */
+      tokens: z.object({ input: z.number(), cachedInput: z.number(), output: z.number(), reasoningOutput: z.number() }).optional(),
       turns: z.number().optional(),
       durationMs: z.number().optional(),
       error: z.object({ code: z.string(), message: z.string() }).optional(),

@@ -5,7 +5,8 @@
  * provider.
  */
 
-export type AgentCapability = "streaming-output" | "resume-session" | "structured-events" | "file-changes" | "approval-controls" | "cancellation";
+/** `spending-limit`: the CLI enforces `AgentTaskInput.maxBudgetUsd` itself (Claude Code does, Codex has no such limit). */
+export type AgentCapability = "streaming-output" | "resume-session" | "structured-events" | "file-changes" | "approval-controls" | "cancellation" | "spending-limit";
 
 /** Whether the CLI can be used, and if not, what the user can do about it. */
 export type AgentInstallationStatus =
@@ -17,6 +18,8 @@ export type AgentInstallationStatus =
   | { state: "unsupported"; path: string; version: string; missingFlags: string[] }
   /** The CLI itself says nobody is signed in. Thoth never looks at credentials. */
   | { state: "not_logged_in"; path: string; version: string }
+  /** The CLI runs commands only inside its own OS sandbox, and that sandbox does not start here: it is not run. */
+  | { state: "sandbox_unavailable"; path: string; version: string; message: string }
   | { state: "ready"; path: string; version: string }
   /** Found but could not be asked (it crashed or timed out). */
   | { state: "error"; path?: string; message: string };
@@ -24,6 +27,8 @@ export type AgentInstallationStatus =
 export interface AgentTaskInput {
   /** The host's run handle: a working directory already holding the selected context. */
   workspace: string;
+  /** Where that directory is (for showing the paths a CLI reports relative to it; nothing is addressed by it). */
+  dir?: string;
   prompt: string;
   /** A model alias or name the CLI accepts; the CLI's default when absent. */
   model?: string;
@@ -37,6 +42,14 @@ export interface AgentRun {
   id: string;
   providerId: string;
   startedAt: number;
+}
+
+/** Tokens a run used, as the CLI reported them. */
+export interface TokenUsage {
+  input: number;
+  cachedInput: number;
+  output: number;
+  reasoningOutput: number;
 }
 
 /** Why the CLI process ended. */
@@ -56,7 +69,8 @@ export type AgentEvent =
   | { type: "tool_error"; id: string; message: string }
   | { type: "denied"; tool: string; message: string }
   | { type: "retry"; attempt: number; error: string }
-  | { type: "result"; ok: boolean; text?: string; costUsd?: number; turns?: number; durationMs?: number }
+  /** `costUsd` when the CLI estimates a cost (Claude Code), `tokens` when it reports token counts instead (Codex). */
+  | { type: "result"; ok: boolean; text?: string; costUsd?: number; turns?: number; durationMs?: number; tokens?: TokenUsage }
   | { type: "error"; code: AgentErrorCode; message: string }
   /** A line on the CLI's stderr. */
   | { type: "log"; text: string }

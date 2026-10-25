@@ -16,7 +16,16 @@ export interface ProbeOutput {
 /** What the host found when it looked for a provider's CLI. Interpreting it is the adapter's job. */
 export type AgentProbe =
   | { found: false; searched: string[] }
-  | { found: true; path: string; searched: string[]; version: ProbeOutput; help: ProbeOutput; auth: ProbeOutput };
+  | {
+      found: true;
+      path: string;
+      searched: string[];
+      version: ProbeOutput;
+      help: ProbeOutput;
+      auth: ProbeOutput;
+      /** A CLI that runs commands in its own OS sandbox (Codex): a trivial command run inside that sandbox. */
+      sandbox?: ProbeOutput;
+    };
 
 /** Raw process output, numbered from 0. */
 export type HostAgentEvent =

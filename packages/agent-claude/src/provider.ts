@@ -30,7 +30,7 @@ export function createClaudeProvider(host: AgentHost, options: ClaudeProviderOpt
     },
 
     async getCapabilities(): Promise<AgentCapability[]> {
-      return ["streaming-output", "structured-events", "file-changes", "cancellation"];
+      return ["streaming-output", "structured-events", "file-changes", "cancellation", "spending-limit"];
     },
 
     async startTask(input: AgentTaskInput): Promise<AgentRun> {

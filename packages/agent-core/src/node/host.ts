@@ -1,11 +1,12 @@
 /**
  * `AgentHost` on Node, for tests and the desktop UI test platform. It follows the Rust host's rules (a private
  * working directory per run, the provider binary found in fixed folders, the environment without `THOTH_*` and
- * vault paths, a process group per run, pulled events, sweep) but does not enforce the argument policy: that
- * boundary is the Rust host's (`crates/thoth-host/src/agent/claude.rs`), tested there and in `tests/ports`.
+ * vault paths, a process group per run, pulled events, sweep, the same probes, Codex run by its real path) but does
+ * not enforce the argument policy: that boundary is the Rust host's (`crates/thoth-host/src/agent/claude.rs`,
+ * `codex.rs`), tested there and in `tests/ports`.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { chmod, lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -14,9 +15,37 @@ import { NodeVaultFs } from "@thoth/local-store/node";
 import { checkTimeLimitMs } from "../limits.ts";
 import type { AgentFiles, AgentHistoryStore, AgentHost, AgentProbe, HostAgentEvent, HostEventBatch, HostHistoryRun, ProbeOutput } from "../host.ts";
 
-const PROBES: Record<string, { binary: string; probes: [key: "version" | "help" | "auth", args: string[]][] }> = {
-  claude: { binary: "claude", probes: [["version", ["--version"]], ["help", ["--help"]], ["auth", ["auth", "status", "--json"]]] },
+type ProbeKey = "version" | "help" | "auth" | "sandbox";
+/** The Rust host's fixed probes (`crates/thoth-host/src/agent/mod.rs`, `codex.rs`); `bin` is the binary found. */
+const PROBES: Record<string, { binary: string; canonical: boolean; probes: (bin: string) => [key: ProbeKey, args: string[]][] }> = {
+  claude: { binary: "claude", canonical: false, probes: () => [["version", ["--version"]], ["help", ["--help"]], ["auth", ["auth", "status", "--json"]]] },
+  codex: {
+    binary: "codex",
+    // Codex runs by its real path: its sandbox lets the binary re-run itself only under the path it was started as.
+    canonical: true,
+    probes: (bin) => [
+      ["version", ["--version"]],
+      ["help", ["exec", "--help"]],
+      ["auth", ["login", "status"]],
+      ["sandbox", ["sandbox", ...CODEX_SANDBOX_PROFILE, "-P", "thoth", "--", bin, "--version"]],
+    ],
+  },
 };
+/** The permission profile of `packages/agent-codex/src/args.ts`, for the sandbox probe. */
+const CODEX_SANDBOX_PROFILE = [
+  "-c",
+  "default_permissions=thoth",
+  "-c",
+  "permissions.thoth.filesystem.:minimal=read",
+  "-c",
+  "permissions.thoth.filesystem.:workspace_roots=write",
+  "-c",
+  "permissions.thoth.filesystem.:slash_tmp=deny",
+  "-c",
+  "permissions.thoth.filesystem.:tmpdir=deny",
+  "-c",
+  "permissions.thoth.network.enabled=false",
+];
 const KILL_GRACE_MS = 3000;
 const RUN_NAME = /^run_[0-9a-f]{32}$/;
 const HISTORY_RUN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -35,6 +64,7 @@ export interface NodeAgentHostOptions {
 }
 
 interface Run {
+  provider: string;
   dir: string;
   work: string;
   files: NodeVaultFs;
@@ -64,7 +94,7 @@ export class NodeAgentHost implements AgentHost {
       const candidate = join(dir, spec.binary);
       try {
         const st = statSync(candidate);
-        if (st.isFile() && (st.mode & 0o111) !== 0) return candidate;
+        if (st.isFile() && (st.mode & 0o111) !== 0) return spec.canonical ? realpathSync(candidate) : candidate;
       } catch {
         // not here
       }
@@ -94,12 +124,12 @@ export class NodeAgentHost implements AgentHost {
     if (!bin) return { found: false, searched };
     const cwd = (await realpath(this.options.dataDir).catch(() => this.options.dataDir)) || process.cwd();
     const env = this.env(bin, cwd);
-    const out: Partial<Record<"version" | "help" | "auth", ProbeOutput>> = {};
-    for (const [key, args] of PROBES[provider]!.probes) {
+    const out: Partial<Record<ProbeKey, ProbeOutput>> = {};
+    for (const [key, args] of PROBES[provider]!.probes(bin)) {
       const r = spawnSync(bin, args, { cwd, env, encoding: "utf8", timeout: 15_000, maxBuffer: 256 * 1024 });
       out[key] = { code: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "", timedOut: r.error !== undefined && (r.error as { code?: string }).code === "ETIMEDOUT" };
     }
-    return { found: true, path: bin, searched, version: out.version!, help: out.help!, auth: out.auth! };
+    return { found: true, path: bin, searched, version: out.version!, help: out.help!, auth: out.auth!, ...(out.sandbox ? { sandbox: out.sandbox } : {}) };
   }
 
   async createRun(provider: string): Promise<{ run: string; dir: string }> {
@@ -112,7 +142,7 @@ export class NodeAgentHost implements AgentHost {
     await mkdir(join(dir, "work"), { recursive: true, mode: 0o700 });
     await chmod(dir, 0o700);
     const work = await realpath(join(dir, "work"));
-    this.runs.set(id, { dir, work, files: new NodeVaultFs(work), started: false, child: null, events: [], done: false, stop: null, waiters: new Set() });
+    this.runs.set(id, { provider, dir, work, files: new NodeVaultFs(work), started: false, child: null, events: [], done: false, stop: null, waiters: new Set() });
     return { run: id, dir: work };
   }
 
@@ -159,8 +189,8 @@ export class NodeAgentHost implements AgentHost {
   async start(id: string, argv: string[], stdin: Uint8Array, timeoutMs?: number): Promise<void> {
     const run = this.run(id);
     if (run.started) throw Object.assign(new Error("This agent run has already started"), { code: "NOT_ALLOWED" });
-    const bin = this.resolve("claude");
-    if (!bin) throw Object.assign(new Error("The claude CLI was not found"), { code: "AGENT_UNAVAILABLE" });
+    const bin = this.resolve(run.provider);
+    if (!bin) throw Object.assign(new Error(`The ${run.provider} CLI was not found`), { code: "AGENT_UNAVAILABLE" });
     // The Rust host refuses, rather than clamps, a time limit outside 1 second to 24 hours.
     if (timeoutMs !== undefined) {
       try {

@@ -18,7 +18,7 @@ import type { Vault } from "@thoth/local-store";
 import { applyChanges, saveAsCopy, type ApplyResult, type ReviewedFiles } from "./apply.ts";
 import { loadReview, loadRunDetails, rebuildChanges, reviewIsIntact, saveReview, storedFiles, TranscriptSaver, type RunDetails } from "./details.ts";
 import type { AgentHost } from "./host.ts";
-import { checkBudgetUsd, checkTimeLimitMs, DEFAULT_RETENTION_DAYS } from "./limits.ts";
+import { checkBudgetUsd, checkTimeLimitMs, DEFAULT_RETENTION_DAYS, LimitError } from "./limits.ts";
 import { listRuns, MAX_PROMPT_CHARS, pruneRuns, readRun, TERMINAL_STATES, writeRun, type ChangeRecord, type RunRecord } from "./records.ts";
 import { collectChanges, DEFAULT_REVIEW_LIMITS, type ProposedChange, type ReviewLimits } from "./review.ts";
 import { DEFAULT_STAGING_LIMITS, stageContext, workspaceFraming, type ContextEntry, type StagingLimits } from "./staging.ts";
@@ -176,7 +176,11 @@ export class AgentHub {
     const prompt = task.prompt.trim();
     if (prompt === "") throw new RunStateError("Write a task for the agent first");
     if (prompt.length > MAX_PROMPT_CHARS) throw new RunStateError(`The task is longer than ${MAX_PROMPT_CHARS} characters`);
-    if (task.maxBudgetUsd !== undefined) checkBudgetUsd(task.maxBudgetUsd);
+    if (task.maxBudgetUsd !== undefined) {
+      checkBudgetUsd(task.maxBudgetUsd);
+      // A limit that was asked for but cannot be enforced is refused, never silently dropped.
+      if (!(await provider.getCapabilities()).includes("spending-limit")) throw new LimitError("budget", `${provider.name} has no spending limit`);
+    }
     if (task.timeoutMs !== undefined) checkTimeLimitMs(task.timeoutMs);
     const status = await provider.detect();
     if (status.state !== "ready") throw new AgentUnavailableError(status);
@@ -189,7 +193,7 @@ export class AgentHub {
       documents = await this.workspaceReader.readMany(refs);
     }
 
-    const { run: workspace } = await this.host.createRun(provider.id);
+    const { run: workspace, dir } = await this.host.createRun(provider.id);
     let context: ContextEntry[];
     try {
       context = await stageContext(this.vault, this.host.files(workspace), task.selection, this.staging, { ...(task.wholeSpace ? { wholeSpace: true } : {}), workspace: documents });
@@ -223,7 +227,7 @@ export class AgentHub {
       // The reference folder is announced to the model, in front of the user's own words (the record keeps only those).
       const readOnly = context.find((c) => c.readOnly);
       const framed = readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt;
-      await provider.startTask({ workspace, prompt: framed, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
+      await provider.startTask({ workspace, dir, prompt: framed, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
     } catch (error) {
       record.state = "failed";
       record.outcome = { reason: "spawn_failed", code: null, ok: false, error: { code: "spawn", message: error instanceof Error ? error.message : String(error) } };
@@ -273,6 +277,7 @@ export class AgentHub {
       code: exit?.code ?? null,
       ok,
       ...(result?.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
+      ...(result?.tokens ? { tokens: { ...result.tokens } } : {}),
       ...(result?.turns !== undefined ? { turns: result.turns } : {}),
       ...(result?.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
       ...(error ? { error: { code: error.code, message: error.message.slice(0, 500) } } : reason !== "exited" ? { error: { code: reason, message: reason } } : {}),
