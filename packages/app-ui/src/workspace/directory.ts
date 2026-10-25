@@ -133,6 +133,11 @@ export class ServerDirectory {
     return this.state.capabilities[server]?.includes("page-order") ?? false;
   }
 
+  /** Does the server offer public read-only share links (`public-share`, ADR-0023)? */
+  canShare(server: string): boolean {
+    return this.state.capabilities[server]?.includes("public-share") ?? false;
+  }
+
   // -------------------------------------------------------------- lifecycle
 
   async start(): Promise<void> {

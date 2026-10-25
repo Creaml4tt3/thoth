@@ -17,6 +17,8 @@ import {
   MeSchema,
   PageResourceSchema,
   SearchResponseSchema,
+  ShareLinkCreatedSchema,
+  ShareLinkListSchema,
   TransferResourceSchema,
   TreeNodeSchema,
   TreePageSchema,
@@ -31,6 +33,9 @@ import {
   type PageWrite,
   type SearchRequest,
   type SearchResponse,
+  type ShareExpiry,
+  type ShareLink,
+  type ShareLinkCreated,
   type TransferCommitRequest,
   type TransferCreateRequest,
   type TransferResource,
@@ -238,5 +243,40 @@ export class WorkspaceClient {
   /** Discards staged items. Repeating it is harmless; a committed transfer answers 409 `invalid_transfer_state`. */
   async abortTransfer(operationId: string): Promise<TransferResource> {
     return (await this.request(TransferResourceSchema, { method: "POST", path: `/transfers/${seg(operationId)}/abort` })).data;
+  }
+
+  /**
+   * A public read-only link to a page and its sub-pages (capability `public-share`, ADR-0023). The token and the
+   * address are in this response only: the server keeps just a hash, so they cannot be read back later.
+   */
+  async createShareLink(workspaceId: string, pageId: string, expiresInDays: ShareExpiry): Promise<ShareLinkCreated> {
+    return (
+      await this.request(ShareLinkCreatedSchema, {
+        method: "POST",
+        path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/share-links`,
+        headers: JSON_HEADERS,
+        body: encoder.encode(JSON.stringify({ expiresInDays })),
+        ok: [201],
+      })
+    ).data;
+  }
+
+  /** The page's active share links, newest first (follows pagination). */
+  async listShareLinks(workspaceId: string, pageId: string): Promise<ShareLink[]> {
+    const out: ShareLink[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(ShareLinkListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/share-links`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    throw new ProtocolError("The server's list of share links never ended.", 200);
+  }
+
+  /** Stops a share link at once. Revoking one that is already revoked or expired succeeds. */
+  async revokeShareLink(workspaceId: string, linkId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/share-links/${seg(linkId)}`, ok: [204] });
   }
 }

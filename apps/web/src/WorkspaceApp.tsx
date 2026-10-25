@@ -4,6 +4,7 @@ import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
+import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { RenameDialog } from "@thoth/app-ui/order/RenameDialog.tsx";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -164,6 +165,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           rename: () => setDialog({ kind: "rename", page: current.page, workspace: current.workspace, title: remoteTitle(state, current) ?? "" }),
           moveTo: () => requestMoveTo({ kind: "workspace", ...current }),
           reorder: (delta: -1 | 1) => requestReorder({ kind: "workspace", ...current }, delta),
+          ...(hasCapability(capabilities, "public-share") ? { sharePage: () => requestShare(current) } : {}),
         }
       : {}),
     theme: { current: theme, set: setTheme },

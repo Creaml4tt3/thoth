@@ -225,3 +225,31 @@ describe("transfers and attachments", () => {
     expect([error.code, error.status]).toEqual(["export_restricted", 403]);
   });
 });
+
+describe("share links (capability public-share, ADR-0023)", () => {
+  const link = (id: string, expiresAt: string | null = "2026-11-22T10:00:00Z") => ({ id, workspaceId: "ws1", pageId: PAGE, createdAt: T, createdBy: "u1", expiresAt });
+
+  it("creates a link with the chosen expiry and returns its token and address", async () => {
+    const token = "A".repeat(32);
+    const { client, requests } = fake(() => ok({ ...link("shl_1"), token, url: `https://notes.example.org/s/${token}` }, 201));
+    const created = await client.createShareLink("ws1", PAGE, 7);
+    expect(created.url).toBe(`https://notes.example.org/s/${token}`);
+    expect(requests[0]).toMatchObject({ method: "POST", path: `/api/v1/workspaces/ws1/pages/${PAGE}/share-links`, headers: { "content-type": "application/json" } });
+    expect(bodyOf(requests[0]!)).toEqual({ expiresInDays: 7 });
+    await client.createShareLink("ws1", PAGE, null).catch(() => undefined);
+    expect(bodyOf(requests[1]!)).toEqual({ expiresInDays: null });
+  });
+
+  it("lists every active link across pages of the list, and revokes with 204", async () => {
+    const { client, requests } = fake((req, n) => (req.method === "DELETE" ? { status: 204, headers: {}, body: "" } : ok(n === 0 ? { items: [link("shl_2", null)], nextCursor: "l1" } : { items: [link("shl_1")], nextCursor: null })));
+    expect((await client.listShareLinks("ws1", PAGE)).map((l) => l.id)).toEqual(["shl_2", "shl_1"]);
+    expect(requests[1]!.query).toEqual({ cursor: "l1" });
+    await client.revokeShareLink("ws1", "shl_1");
+    expect(requests[2]).toMatchObject({ method: "DELETE", path: "/api/v1/workspaces/ws1/share-links/shl_1" });
+  });
+
+  it("turns a refusal into a ProblemError with its code", async () => {
+    const { client } = fake(() => ({ status: 409, headers: { "content-type": "application/problem+json" }, body: JSON.stringify({ ...problem("quota_exceeded", { detail: "this workspace may have 20 active share links" }), quota: "shareLinksPerWorkspace", limit: 20, current: 20 }) }));
+    await expect(client.createShareLink("ws1", PAGE, 30)).rejects.toMatchObject({ code: "quota_exceeded" });
+  });
+});

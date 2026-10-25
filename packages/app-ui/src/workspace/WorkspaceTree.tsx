@@ -16,6 +16,8 @@ import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
+import { ShareDialog } from "./ShareDialog.tsx";
+import { clearShare, usePendingShare } from "./share-request.ts";
 
 /** The drop target for "no parent": the workspace row itself. */
 const TOP = "\u0000top";
@@ -203,9 +205,12 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; at: { x: number; y: number } } | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
   const [said, setSaid] = useState("");
   const here = current?.server === server && current.workspace === workspace.id ? current.page : null;
   const canWrite = roleCan(workspace.role, "write");
+  // ADR-0023: owners and editors, on a server that lists `public-share`.
+  const canShare = canWrite && (state.capabilities[server]?.includes("public-share") ?? false);
   const nodes = tree?.nodes;
   /** The tree as it is now, also while a change is under way (the rendered `nodes` lag behind by a render). */
   const fresh = (): readonly TreeNode[] | undefined => directory.getState().trees[key]?.nodes;
@@ -381,6 +386,14 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     if (canWrite && nodes?.some((n) => n.id === request.page)) setMoving(request.page);
   }, [request, canWrite, nodes]);
 
+  // "Share…" asked for from code (the command palette).
+  const shareRequest = usePendingShare(server, workspace.id);
+  useEffect(() => {
+    if (!shareRequest) return;
+    clearShare();
+    if (canShare && nodes?.some((n) => n.id === shareRequest.page)) setSharing(shareRequest.page);
+  }, [shareRequest, canShare, nodes]);
+
   // "Move page up / down" asked for from code (the command palette): the same change as Alt+Shift+Up and Down.
   const reorderRequest = usePendingReorder(isThisWorkspaceReorder(server, workspace.id));
   useEffect(() => {
@@ -400,6 +413,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: !ordered || i <= 0, onSelect: () => reorder(id, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
+      ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
     ];
   };
 
@@ -491,6 +505,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           onClose={() => setMoving(null)}
         />
       )}
+      {sharing && canShare && <ShareDialog client={directory.client(server)} workspace={workspace.id} page={sharing} title={titleOf(sharing)} onClose={() => setSharing(null)} />}
     </li>
   );
 }

@@ -31,6 +31,7 @@ import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
+import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -196,6 +197,7 @@ export function Shell() {
           rename: () => setDialog({ kind: "rename", target: { kind: "workspace", server: here.server, workspace: here.workspace, page: here.page, title: remoteTitle(directory, here) ?? "" } }),
           moveTo: () => requestMoveTo({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }),
           reorder: (delta: -1 | 1) => requestReorder({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }, delta),
+          ...(servers.canShare(here.server) ? { sharePage: () => requestShare({ server: here.server, workspace: here.workspace, page: here.page }) } : {}),
         }
       : {}),
     theme: { current: themeNow, set: setTheme },

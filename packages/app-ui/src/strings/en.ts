@@ -168,6 +168,8 @@ export const en = {
     moveUp: "Move up",
     moveDown: "Move down",
     moveTo: "Move to…",
+    /** A public read-only link to the page (ADR-0023). */
+    share: "Share…",
     folder: "Folder",
     /** Shown as a tooltip on a folder row. */
     itemCount: (n: number) => (n === 0 ? "Empty" : plural(n, "item")),
@@ -205,6 +207,35 @@ export const en = {
       move: "Move",
       cancel: "Cancel",
     },
+  },
+
+  /** Public read-only share links of a workspace page (ADR-0023). */
+  share: {
+    title: (name: string) => `Share “${name}”`,
+    intro: "Anyone with a link can read this page and the pages inside it. They cannot edit or comment, and they do not need to sign in.",
+    expiry: "The link stops working after",
+    days: (n: number) => plural(n, "day"),
+    never: "Never",
+    create: "Create link",
+    creating: "Creating…",
+    newLink: "Public link",
+    copy: "Copy link",
+    copied: "Link copied",
+    copyFailed: "Could not copy. Select the link and copy it yourself.",
+    onlyOnce: "Copy it now: the link is shown only this once. You can make a new one at any time.",
+    active: "Active links",
+    none: "No active links.",
+    loading: "Loading links…",
+    created: (date: string) => `Created ${date}`,
+    expires: (date: string) => `stops working ${date}`,
+    neverExpires: "never stops working",
+    revoke: "Revoke",
+    revokeLabel: (date: string) => `Revoke the link created ${date}`,
+    revoked: "Link revoked. It no longer works.",
+    failed: (detail: string) => `Could not create the link: ${detail}`,
+    listFailed: (detail: string) => `Could not load the links: ${detail}`,
+    revokeFailed: (detail: string) => `Could not revoke the link: ${detail}`,
+    done: "Done",
   },
 
   limits: {
@@ -250,6 +281,7 @@ export const en = {
       moveTo: "Move to…",
       moveUp: "Move page up",
       moveDown: "Move page down",
+      share: "Share page…",
       theme: (name: string) => `Change theme: ${name}`,
       settings: "Open Settings",
       /** Desktop only: the mascot's prompt bubble, its size, and the assistant's settings. */

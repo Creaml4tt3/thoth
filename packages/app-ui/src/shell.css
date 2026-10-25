@@ -111,6 +111,29 @@
 .move-list option { padding: 4px 8px; }
 .move-actions { display: flex; gap: var(--thoth-space-3); justify-content: flex-end; align-items: center; }
 
+/* "Share…" (ADR-0023): the expiry choice, the new address with its copy button, the active links. */
+.share-intro { font: var(--thoth-text-ui); color: var(--thoth-ink-secondary); }
+.share-expiry { border: 0; margin: 0; padding: 0; min-width: 0; }
+.share-expiry legend { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); padding: 0; margin-bottom: 8px; }
+.share-choices { display: flex; flex-wrap: wrap; gap: var(--thoth-space-2); }
+.share-choice { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-pill); font: var(--thoth-text-ui); cursor: pointer; }
+.share-choice:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.share-choice:has(input:focus-visible) { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+.share-choice input { margin: 0; accent-color: var(--thoth-accent); }
+.share-new { display: grid; gap: 6px; padding: var(--thoth-space-3); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-sidebar); }
+.share-label { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.share-copy { display: flex; gap: var(--thoth-space-2); align-items: center; }
+.share-copy .input { flex: 1; min-width: 0; }
+.share-note { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.share-said { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); min-height: 16px; }
+.share-said:empty { min-height: 0; margin: 0; }
+.share-heading { font: 600 14px / 20px var(--thoth-font-sans); }
+.share-active { display: grid; gap: var(--thoth-space-2); }
+.share-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.share-link { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); padding: 6px 0; border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); }
+.share-link > span { min-width: 0; color: var(--thoth-ink-secondary); }
+@media (max-width: 520px) { .share-copy { flex-direction: column; align-items: stretch; } }
+
 /* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator. */
 .tabstrip { flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
 .tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }

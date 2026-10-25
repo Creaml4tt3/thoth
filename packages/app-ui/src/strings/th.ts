@@ -147,6 +147,7 @@ export const th: Strings = {
     moveUp: "เลื่อนขึ้น",
     moveDown: "เลื่อนลง",
     moveTo: "ย้ายไปที่…",
+    share: "แชร์…",
     folder: "โฟลเดอร์",
     itemCount: (n) => (n === 0 ? "ว่างเปล่า" : `${count(n)} รายการ`),
     movedTo: (title, position, total) => `ย้าย ${title} ไปลำดับที่ ${count(position)} จาก ${count(total)}`,
@@ -181,6 +182,35 @@ export const th: Strings = {
       move: "ย้าย",
       cancel: "ยกเลิก",
     },
+  },
+
+  // ลิงก์สาธารณะแบบอ่านอย่างเดียว (ADR-0023). Strings marked REVIEW are the least certain.
+  share: {
+    title: (name) => `แชร์ “${name}”`,
+    intro: "ทุกคนที่มีลิงก์จะอ่านหน้านี้และหน้าย่อยข้างในได้ แต่แก้ไขหรือแสดงความคิดเห็นไม่ได้ และไม่ต้องลงชื่อเข้าใช้",
+    expiry: "ลิงก์จะใช้ไม่ได้หลังจาก", // REVIEW
+    days: (n) => `${n} วัน`,
+    never: "ไม่มีกำหนด", // REVIEW
+    create: "สร้างลิงก์",
+    creating: "กำลังสร้าง…",
+    newLink: "ลิงก์สาธารณะ",
+    copy: "คัดลอกลิงก์",
+    copied: "คัดลอกลิงก์แล้ว",
+    copyFailed: "คัดลอกไม่ได้ เลือกลิงก์แล้วคัดลอกเอง",
+    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ", // REVIEW
+    active: "ลิงก์ที่ใช้งานอยู่",
+    none: "ไม่มีลิงก์ที่ใช้งานอยู่",
+    loading: "กำลังโหลดลิงก์…",
+    created: (date) => `สร้างเมื่อ ${date}`,
+    expires: (date) => `ใช้ได้ถึง ${date}`, // REVIEW
+    neverExpires: "ใช้ได้ตลอด", // REVIEW
+    revoke: "เพิกถอน", // REVIEW
+    revokeLabel: (date) => `เพิกถอนลิงก์ที่สร้างเมื่อ ${date}`, // REVIEW
+    revoked: "เพิกถอนลิงก์แล้ว ลิงก์นี้ใช้ไม่ได้อีก", // REVIEW
+    failed: (detail) => `สร้างลิงก์ไม่ได้: ${detail}`,
+    listFailed: (detail) => `โหลดลิงก์ไม่ได้: ${detail}`,
+    revokeFailed: (detail) => `เพิกถอนลิงก์ไม่ได้: ${detail}`, // REVIEW
+    done: "เสร็จ",
   },
 
   limits: {
@@ -223,6 +253,7 @@ export const th: Strings = {
       moveTo: "ย้ายไปที่…",
       moveUp: "ย้ายหน้าขึ้น",
       moveDown: "ย้ายหน้าลง",
+      share: "แชร์หน้า…",
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
       ask: "ถาม Thoth",

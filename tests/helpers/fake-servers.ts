@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { PageMoveSchema, pageKindOf, parseEtag, problem, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -34,6 +34,8 @@ export interface FakeWorkspace {
   exportRestricted: boolean;
   members: { userId: string; displayName: string; role: Role }[];
   attachments: Map<string, { id: string; bytes: Uint8Array; mimeType: string; hash: string; fileName?: string }>;
+  /** Public share links (capability `public-share`); the token is kept only so tests can read it. */
+  shares: { id: string; workspaceId: string; pageId: string; createdAt: string; createdBy: string; expiresAt: string | null; token: string; revoked: boolean }[];
 }
 
 export interface FakeTransfer {
@@ -125,6 +127,7 @@ export class FakeServers implements Servers {
       exportRestricted: init.exportRestricted ?? false,
       members: init.members ?? [{ userId: "usr_me", displayName: "Me", role: init.role ?? "editor" }],
       attachments: new Map(),
+      shares: [],
     };
     this.serverOf.set(ws, server);
     const list = this.workspaces.get(server) ?? [];
@@ -318,6 +321,17 @@ export class FakeServers implements Servers {
     }
     const mv = /^\/pages\/([^/]+)\/move$/.exec(rest);
     if (mv && method === "POST") return this.move(server, ws, decodeURIComponent(mv[1]!), headers, text);
+    const sl = /^\/pages\/([^/]+)\/share-links$/.exec(rest);
+    if (sl) return this.shareLinks(server, ws, method, decodeURIComponent(sl[1]!), text);
+    const sr = /^\/share-links\/([^/]+)$/.exec(rest);
+    if (sr && method === "DELETE") {
+      if (!this.capable(server, "public-share")) return fail("capability_not_supported");
+      if (ws.role === "viewer") return fail("forbidden");
+      const link = ws.shares.find((l) => l.id === decodeURIComponent(sr[1]!));
+      if (!link) return fail("not_found", "share link not found");
+      link.revoked = true;
+      return { status: 204, headers: {}, body: "" };
+    }
     const pm = /^\/pages\/([^/]+)$/.exec(rest);
     if (!pm) return fail("not_found");
     const id = decodeURIComponent(pm[1]!);
@@ -397,6 +411,34 @@ export class FakeServers implements Servers {
     if (position !== undefined) page.position = position;
     this.record(ws, "page.updated", page, "usr_me");
     return json(200, this.node(server, page), { etag: `"${page.revisions.at(-1)!.id}"` });
+  }
+
+  /** `createShareLink` and `listShareLinks` (capability `public-share`, ADR-0023): owners and editors only. */
+  private shareLinks(server: string, ws: FakeWorkspace, method: string, pageId: string, text: string): ApiCallResult {
+    if (!this.capable(server, "public-share")) return fail("capability_not_supported");
+    if (ws.role === "viewer") return fail("forbidden", "viewers cannot share pages");
+    const page = ws.pages.get(pageId);
+    if (!page || page.deleted) return fail("not_found");
+    const active = () => ws.shares.filter((l) => l.pageId === pageId && !l.revoked && (l.expiresAt === null || Date.parse(l.expiresAt) > this.now()));
+    if (method === "GET") return json(200, { items: active().reverse().map(({ token: _t, revoked: _r, ...link }) => link), nextCursor: null });
+    if (method !== "POST") return fail("method_not_allowed");
+    const parsed = ShareLinkCreateRequestSchema.safeParse(text === "" ? {} : JSON.parse(text));
+    if (!parsed.success) return fail("validation_failed", parsed.error.message);
+    const limit = this.mustKnow(server).config.limits?.["maxShareLinksPerWorkspace"];
+    const current = ws.shares.filter((l) => !l.revoked && (l.expiresAt === null || Date.parse(l.expiresAt) > this.now())).length;
+    if (limit !== undefined && current >= limit) return json(409, { ...problem("quota_exceeded", { detail: `this workspace may have ${limit} active share links (${current} in use); revoke one to make room` }), quota: "shareLinksPerWorkspace", limit, current });
+    const days = parsed.data.expiresInDays === undefined ? 30 : parsed.data.expiresInDays;
+    const created = this.now() + ws.shares.length * 1000;
+    const token = `tok${String(ws.shares.length + 1).padStart(29, "0")}`;
+    const link = { id: `shl_${ws.shares.length + 1}`, workspaceId: ws.id, pageId, createdAt: iso(created), createdBy: "usr_me", expiresAt: days === null ? null : iso(created + days * 86_400_000), token, revoked: false };
+    ws.shares.push(link);
+    const { token: _t, revoked: _r, ...resource } = link;
+    return json(201, { ...resource, token, url: `${this.mustKnow(server).config.url}/s/${token}` });
+  }
+
+  /** The fake servers' clock for share-link expiry: the fixed test epoch. */
+  private now(): number {
+    return T0;
   }
 
   private conflict(page: FakePage): ApiCallResult {

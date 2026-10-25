@@ -254,3 +254,17 @@ describe("finding a command", () => {
     expect(titles(filterCommands("> keyboard", list))).toEqual(["Show keyboard shortcuts"]);
   });
 });
+
+describe("Share page… (ADR-0023)", () => {
+  it("is offered only when the app gives the action, in English and Thai, and found by “public link”", () => {
+    const { actions, log } = spies();
+    expect(find(buildCommands(actions, en, "web", "mac"), "page.share")).toBeUndefined();
+    const sharePage = vi.fn(() => void log.push("share"));
+    const list = buildCommands({ ...actions, sharePage }, en, "web", "mac");
+    expect(find(list, "page.share")?.title).toBe("Share page…");
+    expect(find(buildCommands({ ...actions, sharePage }, th, "desktop", "mac"), "page.share")?.title).toBe("แชร์หน้า…");
+    expect(titles(filterCommands("public link", list))).toContain("Share page…");
+    find(list, "page.share")!.run();
+    expect(log).toEqual(["share"]);
+  });
+});
