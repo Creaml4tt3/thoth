@@ -2,6 +2,7 @@
 .agents .small { font: var(--thoth-text-small); }
 /* Secondary text here is read, not skimmed (status, transcript, hints): the AA-contrast ink rather than the tertiary one. */
 .agents .muted { color: var(--thoth-ink-secondary); }
+.agents .badge-muted { color: var(--thoth-ink-secondary); }
 .agents-caution { color: var(--thoth-ink-primary); }
 .agents-ready { color: var(--thoth-ink-primary); }
 .agents-ready::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: var(--thoth-radius-pill); background: var(--thoth-success); vertical-align: 1px; }
@@ -49,3 +50,6 @@
 .agents-workspaces .agents-context-list { margin-top: var(--thoth-space-1); }
 .agents-chosen { display: grid; gap: var(--thoth-space-1); }
 .agents-confirm { display: inline-flex; gap: var(--thoth-space-2); align-items: center; flex-wrap: wrap; }
+.agents-limits-grid { align-items: start; }
+.agents-limits-grid .field > label, .agents .set-section .field > label { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.agents-workspace, .agents-limits, .agents-total { margin-top: var(--thoth-space-3); }

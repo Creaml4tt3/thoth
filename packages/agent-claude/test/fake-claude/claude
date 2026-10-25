@@ -5,7 +5,7 @@
 // (see ../fixtures/README.md).
 //
 // Environment:
-//   FAKE_CLAUDE_RECORD=<dir>    write <dir>/run-<pid>.json: argv, cwd, env, stdin, the files in cwd, pids
+//   FAKE_CLAUDE_RECORD=<dir>    write <dir>/run-<pid>.json: argv, cwd, env, stdin, the files in cwd and their modes, pids
 //                               (default: fake-claude-record.json next to the working directory, outside it)
 //   FAKE_CLAUDE_VERSION=<text>  what --version prints (default "2.1.310 (Claude Code)")
 //   FAKE_CLAUDE_HELP=old        --help without --restricted and --permission-prompts
@@ -68,7 +68,9 @@ function listing(dir, prefix = "") {
   return entries;
 }
 
-const record = { pid: process.pid, argv, cwd, env: process.env, stdin: prompt, files: listing(cwd), grandchild: null };
+const modes = {};
+for (const { path } of listing(cwd)) modes[path] = lstatSync(join(cwd, path)).mode & 0o777;
+const record = { pid: process.pid, argv, cwd, env: process.env, stdin: prompt, files: listing(cwd), modes, grandchild: null };
 const recordFile = process.env.FAKE_CLAUDE_RECORD ? join(process.env.FAKE_CLAUDE_RECORD, `run-${process.pid}.json`) : join(cwd, "..", "fake-claude-record.json");
 const save = () => recordFile && writeFileSync(recordFile, JSON.stringify(record, null, 2));
 save();

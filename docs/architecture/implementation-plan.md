@@ -28,7 +28,7 @@ Toolchain verified on the dev machine:
 | Import wizard UI (P1, §7.1) | **Done (2026-10-21)** | All 10 steps of §7.1, plus resume of unfinished jobs. Runs on the portable importer (`openArchiveSource`/`openFolderSource` over a `SourceHost`) with the Rust source host. |
 | Workspace protocol / server / web (P2) | **Contract drafted (2026-10-21)**; auth decided (OIDC, ADR-0013); server 2a done (Podman + PostgreSQL) | `packages/workspace-protocol` route registry → `protocol/openapi.yaml` (drift-checked); `docs/protocol/README.md`; `protocol/conformance` runner and CLI, tested against good and deliberately broken fixture servers. ADR-0004, ADR-0005 and ADR-0009 are still Proposed. |
 | Transfer engine (P3) | **Done (2026-10-24)** | `packages/transfer` (ADR-0006, Accepted for its decisions; see the ADR's resolved questions), desktop copy/move UI, fault injection at every state boundary, e2e on the real server. Attachments go Private → Workspace only (see Phase 3). |
-| Agent Hub (P4) | **Claude Code adapter done (2026-10-25)** | `packages/agent-core`, `packages/agent-claude`, the host's `agent.*` commands and the desktop Agent Hub tab. ADR-0007 decisions taken 2026-10-25 (owner to confirm). Codex not started; no OS-level sandbox yet. |
+| Agent Hub (P4) | **Claude Code adapter done (2026-10-25); owner decisions implemented (2026-10-25)** | `packages/agent-core`, `packages/agent-claude`, the host's `agent.*` commands and the desktop Agent Hub tab. ADR-0007 decisions decided by the owner 2026-10-25: whole-Private-Space and read-only workspace context, time and budget limits, local-only run history with a retention setting. Codex not started; OS-level sandbox deferred (plan in ADR-0007). |
 | Licensing | **Decided (2026-10-22)** | Apache-2.0 (ADR-0011). `LICENSE` added; dependency audit clean. Contributions use the DCO (`CONTRIBUTING.md`). |
 
 ## 3. Phased plan with acceptance criteria
@@ -651,6 +651,42 @@ What was built:
   The dialog is the shared accessible `Modal`, with labelled controls, `role=status`/`alert` results
   and focus moved to the result.
 
+Owner decisions (2026-10-25), implemented on top of the above:
+- **Context scope.** Any Private Space page or folder, or the **whole Private Space** (no `.thoth/`), editable and
+  reviewed per file as before; the task form shows the file count and total size before starting, within the
+  existing limits. **Workspace pages are read-only context:** picked in the form (only from workspaces whose role can
+  read and that are not export restricted, ADR-0009), fetched with the workspace client, copied to
+  `workspace/<workspace name>/…` with read-only file mode, announced to the agent as reference only; after the run
+  any change under that folder is shown as "Read-only workspace page: change discarded" and never applied, copied or
+  sent to the server.
+- **OS sandbox: not now.** ADR-0007 keeps the "no OS sandbox" note and has a "Future: OS-level sandbox" section
+  (macOS first behind a setting, then Linux bubblewrap/Landlock, Windows later; Claude Code's own sandbox covers
+  shell commands only and is irrelevant while `--restricted` removes them). No code.
+- **History.** Metadata records stay in `.thoth/agent/runs/`. The transcript and the proposed files live only in the
+  app data folder (`agent-history/`, four `agent.history.*` host commands). A run waiting for review is **awaiting
+  review** after a restart, not interrupted, when its stored files are intact; applying still uses compare-and-swap
+  against the staged hashes, so a stale page is a conflict. The history list shows date, task, model, cost and
+  outcome and opens the transcript and diffs. Retention 30 days by default (7, 30, 90, for ever) and "Delete history
+  now" in the new Agent Hub settings; pruning at start and after each run; neither touches runs still going or
+  waiting for review.
+- **Limits.** Time limit 5, 15, 30 or 60 minutes (default 30) and budget US$0.25, 0.50, 1, 2, 5 or none (default
+  US$1, the CLI's `--max-budget-usd`), defaults in the Agent Hub settings (kept in `localStorage` with the other
+  preferences) and overridable per run. The Rust host validates instead of clamping: time 1 s to 24 h, budget above
+  0 and at most US$100 (20 times the top choice), and still checks every argument against its allowlist. A run
+  stopped by either limit says so in the run panel, the review and the history. The budget stop was verified on a
+  real run of Claude Code 2.1.310 (`--max-budget-usd 0.0001`, `--model haiku`, US$0.00014): result subtype
+  `error_max_budget_usd`, exit 1, no result text (`packages/agent-claude/README.md`).
+
+Tests for these: `crates/thoth-host/tests/agent.rs` (limit validation, read-only files, history store),
+`agent/limits.rs`, `agent/history.rs` and `agent/claude.rs` unit tests; `packages/agent-core/test/context.test.ts`
+(whole space, totals, workspace layout, review of reference copies, access, limits); `tests/agent/hub.test.ts` on
+the Rust and the Node host (whole space, workspace page included read-only and its edit refused, workspaces that
+forbid copying out, limits, time and budget stops, transcript and diffs outside the vault, restart while awaiting
+review then apply and conflict, pruning and "Delete history now", the host's history rules);
+`apps/desktop/test/agents.test.tsx` (picker, read-only review rows, limit selects and settings, stopped banners,
+history, awaiting review after a restart, Thai); `tests/e2e/agent-hub.e2e.ts` (whole space, a workspace page from the
+protocol test server whose edit is discarded, a real restart while awaiting review then apply, a budget stop).
+
 AC evidence:
 - **Copy, move, move back**, with verified hashes, attachments and link mapping:
   - `apps/server/test-db/transfer-engine.test.ts` › "copy, then move, then move back" (real server on
@@ -769,12 +805,14 @@ AC:
 - Browser contexts cannot spawn processes or read files without the local
   bridge (§14.11).
 
-Result (2026-10-25): Claude Code adapter ✅ (Codex not started). ADR-0007's open questions were decided with
-conservative defaults on 2026-10-25, owner to confirm (ADR-0007, "Decisions for Phase 4").
+Result (2026-10-25): Claude Code adapter ✅ (Codex not started). ADR-0007's open questions were first decided with
+conservative defaults; the owner then answered them the same day (ADR-0007, "Decisions for Phase 4", now "decided by
+the owner") and they are implemented, see "Owner decisions" below.
 
 What was built:
 - **`crates/thoth-host/src/agent`**: the `agent.*` host commands (`detect`, `run.create`, `fs.stat/read/list/mkdirp/
-  write`, `start`, `events`, `cancel`, `run.dispose`, `sweep`), in the Tauri shell (commands, permissions) and the
+  write`, `start`, `events`, `cancel`, `run.dispose`, `sweep`, and `history.write/read/list/delete` for the local-only run
+  details), in the Tauri shell (commands, permissions) and the
   stdio harness (`--agent-search-dir` for tests). The host finds the CLI itself, checks every argument against the
   Claude Code policy (`agent/claude.rs`), runs it in `<app data>/agent-runs/<run>/work` (0700) with the prompt on
   stdin, in its own process group, with the environment minus `THOTH_*` and anything naming an open vault. Output is
@@ -812,11 +850,13 @@ Checks (2026-10-25): `pnpm check` 1804 passed, 1 skipped (the real-CLI smoke tes
 site's Windows download and the two motion captures, as before), `agent-hub.e2e.ts` included.
 
 Not done / follow-ups (see §4 item 12):
-- Codex adapter; Workspace content as context; OS-level sandboxing; git worktrees.
-- Windows: cancel and timeout cannot signal a process group yet (the desktop app ships for macOS).
-- The run history shows metadata; transcripts are not kept (by design) and a finished run cannot be reopened for
-  review after the app restarts (its working directory is gone; the record says `interrupted`).
-- Not yet checked by a person in a real window: the look of the tab, Thai on screen, a real long-running task.
+- Codex adapter; OS-level sandboxing (planned in ADR-0007); git worktrees.
+- Workspace context is single pages, read-only: no subtree pick for a folder page, no workspace attachments, no
+  writing back to a workspace.
+- Windows: cancel and the time limit cannot signal a process group yet (the desktop app ships for macOS; another
+  change adds the Windows kill).
+- Not yet checked by a person in a real window: the look of the tab, Thai on screen, a real long-running task, a
+  real long budget/time stop. The Thai strings marked `REVIEW` in `apps/desktop/src/strings/th.ts` need a native reader.
 
 ### Phase 5 — MVP end-to-end (§14)
 
@@ -876,7 +916,8 @@ All twelve steps of spec §14 as one automated scenario.
     and the run ID is that directory's handle. The host side is a set of dedicated `agent.*` commands rather than a
     process API, and it re-checks the adapter's argument list against its own policy (ADR-0007 decision 3). Run
     records keep the task text in the vault's `.thoth/agent/runs/` (ADR-0007 decision 9); spec §3.3's "not a content
-    store" holds: no page text or agent output is kept.
+    store" holds: the vault's records keep no page text or agent output. Transcripts and proposed files are kept
+    outside the vault, in the app data folder, for a retention period (ADR-0007 decisions 9 and 12).
 
 ## 5. Independent review (2026-10-21) — status
 

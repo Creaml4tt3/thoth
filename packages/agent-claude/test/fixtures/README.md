@@ -8,4 +8,7 @@ Recorded Claude Code 2.1.310 output, 2026-10-25 (see ../../README.md):
 - `stream-not-logged-in.jsonl`: the same flags with an empty `CLAUDE_CONFIG_DIR` (no login), exit code 1. The
   assistant text block is reconstructed from the recorded `result`.
 - `stream-model-not-found.jsonl`: the same flags with an unknown `--model`, exit code 1, cost 0.
+- `stream-budget.jsonl`: the same flags with `--model haiku --max-budget-usd 0.0001` (2026-10-25, one real run, about
+  US$0.00014): the budget stop, `result` with subtype `error_max_budget_usd`, no result text, exit code 1. Session ID,
+  UUIDs and the temp path are replaced; the init event's plugin and capability lists are dropped.
 - `argv.json`: the argument lists the adapter builds; checked by the TS tests and the Rust host's policy tests.

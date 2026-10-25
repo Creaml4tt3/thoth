@@ -37,7 +37,7 @@ claude -p --output-format stream-json --verbose --input-format text
 | `--permission-prompts none` (≥ 2.1.259) | Nobody answers prompts; Claude is told not to retry. Denials arrive as `system/permission_denied`. | CLI reference, headless ("Turn off permission prompts") |
 | `--no-session-persistence` | Nothing is added to the user's session history. | CLI reference |
 | `--disable-slash-commands` | No skills or commands. | CLI reference |
-| `--model`, `--max-budget-usd` | Optional; the budget is the CLI's own client-side estimate and can be exceeded slightly. | CLI reference |
+| `--model`, `--max-budget-usd` | Optional; the budget is the CLI's own client-side estimate and can be exceeded slightly. The Agent Hub passes it by default (US$1, choices 0.25 to 5, or none for no flag); the host accepts more than 0 and at most US$100, two decimals. | CLI reference |
 
 Not used on purpose: `--bare` (no OAuth/keychain login), `--add-dir`, `--settings`, `--plugin-dir`, `--agents`,
 `--dangerously-skip-permissions`, `--resume`/`--continue`, `--worktree`, `--append-system-prompt`.
@@ -68,11 +68,19 @@ Unknown types and fields are ignored.
 | `{"type":"system","subtype":"api_retry"}` | `attempt`, `error` | `retry` |
 | `{"type":"assistant"}` | `message.content[]` blocks `text` (`text`) and `tool_use` (`id`, `name`, `input.file_path`/`path`/`pattern`); top-level `error` such as `authentication_failed`, `model_not_found`, `billing_error`, `rate_limit` | `text`, `tool`, `error` |
 | `{"type":"user"}` | `message.content[]` `tool_result` with `is_error: true` | `tool_error` |
-| `{"type":"result"}` | `is_error`, `subtype` (`success` or an error subtype), `result`, `total_cost_usd`, `num_turns`, `duration_ms` | `result` (+ `error`) |
+| `{"type":"result"}` | `is_error`, `subtype` (`success` or an error subtype), `result`, `errors`, `terminal_reason`, `total_cost_usd`, `num_turns`, `duration_ms` | `result` (+ `error`, code `budget` for a budget stop) |
 
 Ignored: `rate_limit_event`, `system/thinking_tokens`, `system/ui_invalidate`, `stream_event`, hook events.
 
-Recorded facts: a signed-out run prints an assistant message with `"error":"authentication_failed"` and a result
+Recorded facts, budget (2026-10-25, Claude Code 2.1.310, `--model haiku --max-budget-usd 0.0001`, one run, cost about
+US$0.00014, `test/fixtures/stream-budget.jsonl`): when the budget is used up the CLI prints a `result` line with
+`"subtype":"error_max_budget_usd"`, `"is_error":true`, `"errors":["Reached maximum budget ($0.0001)"]`,
+`"terminal_reason":"budget_exhausted"`, `total_cost_usd` slightly above the limit, **no `result` text and no assistant
+error**, and exits with code 1. The parser reports it as `result {ok:false}` plus `error {code:"budget"}` whose message
+is the first of `errors`; it also treats `terminal_reason: "budget_exhausted"` as a budget stop. Time-limit stops are
+not the CLI's: the host stops the process group and reports `exit` with reason `timeout`.
+
+Other recorded facts: a signed-out run prints an assistant message with `"error":"authentication_failed"` and a result
 with `"is_error":true,"result":"Not logged in · Please run /login"` and exits 1. An unknown model gives
 `"error":"model_not_found"`, `api_error_status: 404`, cost 0, exit 1. With `--restricted`, a `Read` outside the
 working directory is denied (`permission_denied`, then an `is_error` tool result) and listed in the result's
@@ -85,7 +93,8 @@ then SIGKILL after 3 s).
   same file.
 - `test/stream.test.ts`, `test/detect.test.ts`: the recorded output and help text.
 - `test/fake-claude/claude`: a Node script standing in for the CLI (probes, stream-json shaped like the recordings,
-  directives in the prompt that edit files, hang, or fail). It records argv, cwd, environment, stdin and the files it
+  directives in the prompt that edit files, hang, fail, make a read-only file writable (`@unlock`) or stop the way a
+  used-up budget does (`@budget`)). It records argv, cwd, environment, stdin and the files it
   saw next to its working directory. Used by `tests/agent`, `crates/thoth-host/tests/agent.rs`,
   `apps/desktop/test/agents.test.tsx` and `tests/e2e/agent-hub.e2e.ts`. CI never calls the real model.
 - `tests/agent/real-claude.test.ts`: a manual smoke test with the real CLI on the Rust host, skipped unless

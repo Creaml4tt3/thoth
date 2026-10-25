@@ -14,6 +14,8 @@ export interface FakeRecord {
   env: Record<string, string>;
   stdin: string;
   files: { path: string; kind: string }[];
+  /** Permission bits of each file at the start, by path. */
+  modes: Record<string, number>;
   grandchild: number | null;
 }
 

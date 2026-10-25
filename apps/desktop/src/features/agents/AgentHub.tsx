@@ -120,10 +120,10 @@ function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService
       </div>
       <fieldset className="agents-limits" disabled={busy}>
         <legend>{t.limits}</legend>
-        <div className="xfer-grid">
-          <label className="field">
-            <span>{t.timeLimit}</span>
-            <select className="input" value={String(draft.timeMinutes)} onChange={(e) => agents.setDraft({ timeMinutes: e.target.value === "default" ? "default" : Number(e.target.value) })}>
+        <div className="xfer-grid agents-limits-grid">
+          <div className="field">
+            <label htmlFor="agents-time">{t.timeLimit}</label>
+            <select id="agents-time" className="input" value={String(draft.timeMinutes)} onChange={(e) => agents.setDraft({ timeMinutes: e.target.value === "default" ? "default" : Number(e.target.value) })}>
               <option value="default">{t.useDefault(defaultTime)}</option>
               {TIME_LIMIT_MINUTES.map((m) => (
                 <option key={m} value={m}>
@@ -131,7 +131,7 @@ function TaskForm({ state, agents }: { state: AgentsState; agents: AgentsService
                 </option>
               ))}
             </select>
-          </label>
+          </div>
           <div className="field">
             <label htmlFor="agents-budget">{t.budget}</label>
             <select id="agents-budget" className="input" value={String(draft.budget)} onChange={(e) => agents.setDraft({ budget: e.target.value === "default" ? "default" : e.target.value === "none" ? "none" : Number(e.target.value) })} aria-describedby="agents-budget-hint">
