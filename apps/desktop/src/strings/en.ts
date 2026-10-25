@@ -42,6 +42,8 @@ export const en = {
     /** The name a new folder starts with; a number follows when it is taken ("Untitled folder 2"). */
     untitledFolder: "Untitled folder",
     folderCreated: (name: string) => `Created the folder ${name}`,
+    /** A tab could not be moved to a new window (ADR-0019); the tab stays. */
+    windowFailed: (reason: string) => `The tab could not be moved to a new window: ${reason}`,
     /** Said after a rename when the page changed meanwhile, so the title inside it was left alone. */
     titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
     unsavedChanges: "The open page has changes that could not be saved yet.",

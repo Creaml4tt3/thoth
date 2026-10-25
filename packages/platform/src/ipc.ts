@@ -26,6 +26,7 @@ export type WireRow = Record<string, WireValue>;
  */
 export type HostErrorCode =
   | "EEXIST"
+  | "CONFLICT"
   | "ENOENT"
   | "ENOTDIR"
   | "EISDIR"
@@ -66,10 +67,13 @@ type Bytes = Uint8Array;
 export interface Commands {
   "vault.pick": { args: Record<string, never>; result: string | null };
   "vault.recent": { args: Record<string, never>; result: string[] };
-  "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string } };
+  /** `shared`: another handle (another window) already has this folder open (ADR-0019); that window ran recovery. */
+  "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string; shared: boolean } };
   "vault.close": { args: { vault: string }; result: null };
   /** Shows the open vault's folder in the system file manager. By handle only: the webview cannot name a path. */
   "vault.reveal": { args: { vault: string }; result: null };
+  /** True while another handle (another window) has this vault's folder open (ADR-0019). */
+  "vault.shared": { args: { vault: string }; result: boolean };
 
   "fs.stat": { args: { vault: string; path: string }; result: FileStat | null };
   "fs.read": { args: { vault: string; path: string }; result: Bytes };
@@ -77,7 +81,8 @@ export interface Commands {
   "fs.mkdirp": { args: { vault: string; dir: string }; result: null };
   /** Request bytes: the file content. */
   "fs.write": { args: { vault: string; path: string; exclusive: boolean }; result: null };
-  "fs.rename": { args: { vault: string; from: string; to: string; noReplace: boolean }; result: null };
+  /** With `replaceHash`, `to` is replaced only while it still has that SHA-256 (else `CONFLICT`), checked and renamed as one step. */
+  "fs.rename": { args: { vault: string; from: string; to: string; noReplace: boolean; replaceHash?: string }; result: null };
   "fs.remove": { args: { vault: string; path: string }; result: null };
 
   "sql.exec": { args: { vault: string; sql: string }; result: null };

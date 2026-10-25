@@ -9,6 +9,7 @@ import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
 import { NO_SYSTEM_NOTIFIER } from "@thoth/app-ui/notifications/core.ts";
 import { VaultHost } from "./VaultHost.tsx";
 import type { AppOptions } from "./context.ts";
+import { MAIN_WINDOW, type Launch } from "./windows.ts";
 import "./app.css";
 
 export const DEFAULT_OPTIONS: AppOptions = {
@@ -55,15 +56,18 @@ function LanguageRoot({ children }: { children: ReactNode }) {
   );
 }
 
-export function App({ platform, options }: { platform: Platform; options?: Partial<AppOptions> }) {
+const MAIN_LAUNCH: Launch = { id: MAIN_WINDOW, root: null, tabs: null };
+
+/** `launch`: which window this is and what it opens at once (ADR-0019); the main window by default. */
+export function App({ platform, options, launch = MAIN_LAUNCH }: { platform: Platform; options?: Partial<AppOptions>; launch?: Launch }) {
   return (
     <LanguageRoot>
-      <AppBody platform={platform} options={options} />
+      <AppBody platform={platform} options={options} launch={launch} />
     </LanguageRoot>
   );
 }
 
-function AppBody({ platform, options }: { platform: Platform; options?: Partial<AppOptions> | undefined }) {
+function AppBody({ platform, options, launch }: { platform: Platform; options?: Partial<AppOptions> | undefined; launch: Launch }) {
   const [host, setHost] = useState<Host | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +81,8 @@ function AppBody({ platform, options }: { platform: Platform; options?: Partial<
       let connection: VaultConnection | undefined;
       try {
         connection = await platform.openVault(root);
-        const { vault } = await Vault.open({ fs: connection.fs, sql: connection.sql });
+        // Another window has this folder open (ADR-0019): it ran recovery, and what is in `.thoth/tmp` is its work in flight.
+        const { vault } = await Vault.open({ fs: connection.fs, sql: connection.sql, recover: connection.shared !== true });
         const empty = (await vault.listPages()).length === 0;
         const next = { connection, vault, empty };
         hostRef.current = next;
@@ -91,6 +96,15 @@ function AppBody({ platform, options }: { platform: Platform; options?: Partial<
     },
     [platform],
   );
+
+  // A window the app opened on a Private Space shows it at once, with the tabs it was given (only the first time).
+  const [launchTabs, setLaunchTabs] = useState(launch.tabs);
+  const launched = useRef(false);
+  useEffect(() => {
+    if (launched.current || launch.root === null) return;
+    launched.current = true;
+    void openRoot(launch.root);
+  }, [launch.root, openRoot]);
 
   const switchVault = useCallback(() => {
     const current = hostRef.current;
@@ -109,5 +123,18 @@ function AppBody({ platform, options }: { platform: Platform; options?: Partial<
   );
 
   if (!host) return <Onboarding platform={platform} busy={busy} error={error} onOpen={openRoot} />;
-  return <VaultHost key={host.connection.root} platform={platform} connection={host.connection} vault={host.vault} options={merged} intro={host.empty} switchVault={switchVault} />;
+  return (
+    <VaultHost
+      key={host.connection.root}
+      platform={platform}
+      connection={host.connection}
+      vault={host.vault}
+      options={merged}
+      intro={host.empty && launch.root === null}
+      switchVault={switchVault}
+      windowId={launch.id}
+      startTabs={host.connection.root === launch.root ? launchTabs : null}
+      onStarted={() => setLaunchTabs(null)}
+    />
+  );
 }

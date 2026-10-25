@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as nodePath from "node:path";
-import { normalizeVaultPath, UnsafePathError } from "@thoth/domain";
+import { normalizeVaultPath, sha256Hex, UnsafePathError } from "@thoth/domain";
 import type { DirEntry, EntryKind, FileStat, VaultFs } from "../ports.ts";
 
 function kindOf(s: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean }): EntryKind {
@@ -88,7 +88,24 @@ export class NodeVaultFs implements VaultFs {
     }
   }
 
-  async rename(from: string, to: string, options: { noReplace?: boolean } = {}): Promise<void> {
+  async rename(from: string, to: string, options: { noReplace?: boolean; replaceHash?: string } = {}): Promise<void> {
+    const expected = options.replaceHash;
+    if (expected === undefined) return this.renameNow(from, to, options);
+    // Compare and rename as one step for every NodeVaultFs on this root in this process (the Node host's windows).
+    return underRootLock(this.root, async () => {
+      await this.assertNoSymlinkAncestors(to);
+      let current: string | null = null;
+      try {
+        current = sha256Hex(await this.readFile(to));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (current !== expected) throw Object.assign(new Error(`CONFLICT: "${to}" changed before it could be replaced`), { code: "CONFLICT" });
+      await this.renameNow(from, to, {});
+    });
+  }
+
+  private async renameNow(from: string, to: string, options: { noReplace?: boolean }): Promise<void> {
     await this.assertNoSymlinkAncestors(from);
     await this.assertNoSymlinkAncestors(to);
     if (options.noReplace) {
@@ -118,4 +135,16 @@ export class NodeVaultFs implements VaultFs {
     await this.assertNoSymlinkAncestors(path);
     await fs.rm(this.abs(path), { force: true, recursive: true });
   }
+}
+
+/** One compare-and-rename at a time per vault root in this process. */
+const rootLocks = new Map<string, Promise<unknown>>();
+function underRootLock<T>(root: string, task: () => Promise<T>): Promise<T> {
+  const run = (rootLocks.get(root) ?? Promise.resolve()).then(task, task);
+  const settled = run.catch(() => undefined);
+  rootLocks.set(root, settled);
+  void settled.then(() => {
+    if (rootLocks.get(root) === settled) rootLocks.delete(root);
+  });
+  return run;
 }

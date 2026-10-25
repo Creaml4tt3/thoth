@@ -19,6 +19,10 @@ import { MascotLayer } from "../mascot/Mascot.tsx";
 import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { tabMoves } from "@thoth/app-ui/tabs/useTabs.ts";
+import { initialTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
+import { MAIN_WINDOW, newWindowId } from "../../app/windows.ts";
+import { rememberWindow } from "../../app/windows-store.ts";
+import { saveTabs } from "../../app/tabs-store.ts";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
@@ -62,7 +66,7 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant } = useSession();
+  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, windowId } = useSession();
   const t = useDesktopStrings().shell;
   const agentsTitle = useDesktopStrings().agents.runView.tab;
   const strings = useStrings();
@@ -131,6 +135,33 @@ export function Shell() {
   };
 
   const attempt = (job: () => Promise<void>) => void job().catch((error: unknown) => setProblem(error instanceof Error ? error.message : String(error)));
+
+  // More windows on this Private Space (ADR-0019, the desktop shell only).
+  const windows = host.windows;
+  const moveToWindow = (id: string, at: { x: number; y: number } | null) => {
+    if (!windows) return;
+    void tabs.detach(id, async (moved) => {
+      const next = newWindowId();
+      try {
+        await windows.open({ id: next, root: connection.root, tabs: serializeTabs(moved), ...(at ? { at } : {}) });
+      } catch (error) {
+        setProblem(t.windowFailed(error instanceof Error ? error.message : String(error)));
+        return false;
+      }
+      rememberWindow(next, connection.root);
+      return true;
+    });
+  };
+  /** Cmd/Ctrl+W: the current tab, and after the last one the window itself when another window stays open. */
+  const closeTab = () => {
+    if (!windows || tabs.state.tabs.length > 1) return tabs.close();
+    void flushAll().then(async (ok) => {
+      if (!ok) return;
+      // The main window always comes back on restart: closed this way, it comes back empty.
+      if (windowId === MAIN_WINDOW) saveTabs(connection.root, initialTabs());
+      if (!(await windows.closeThis().catch(() => false))) tabs.close();
+    });
+  };
   const makeActions = (): CommandActions => ({
     newPage: () => setDialog({ kind: "new" }),
     // The Private Space, like New page; with a workspace page open, "New folder in <workspace>" is offered as well.
@@ -173,13 +204,14 @@ export function Shell() {
       : {}),
     tabs: {
       newTab: tabs.newTab,
-      closeTab: () => tabs.close(),
+      closeTab,
       next: () => tabs.step(1),
       previous: () => tabs.step(-1),
       list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
       ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
+      ...(windows && tabs.state.tabs.length > 1 ? { moveToWindow: () => moveToWindow(tabs.active.id, null) } : {}),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -195,7 +227,7 @@ export function Shell() {
     "page.new": () => setDialog({ kind: "new" }),
     "folder.new": () => requestNewFolder(),
     "tab.new": () => tabs.newTab(),
-    "tab.close": () => tabs.close(),
+    "tab.close": closeTab,
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
@@ -241,7 +273,7 @@ export function Shell() {
     <div className="shell" ref={shell} style={sidebar.style}>
       <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
       <main className="main">
-        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} />
+        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} {...(windows ? { onDetach: moveToWindow } : {})} />
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
             {t.watchError(watchError)}

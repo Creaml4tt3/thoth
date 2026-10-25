@@ -5,7 +5,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Platform, VaultChangedEvent, VaultConnection } from "@thoth/platform";
+import type { Platform, VaultChangedEvent, VaultConnection, Windows } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
 import { NodeAgentHost } from "@thoth/agent-core/node";
@@ -24,23 +24,65 @@ export interface NodePlatform extends Platform {
   watchers(): number;
   /** Connections handed out so far. */
   connections: VaultConnection[];
+  /** Folders another (unrendered) window has open: connections to them are `shared`. */
+  sharedWith: string[];
   /** In-memory workspace servers (no server known by default). */
   servers: FakeServers;
   /** Agent CLIs (the fake claude in tests); absent unless asked for, like a host without the Agent Hub. */
   agents?: NodeAgentHost;
+  /** More windows (ADR-0019); absent unless asked for, like a host with one window. */
+  windows?: FakeWindows;
 }
 
-export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers; agents?: { dataDir: string; searchDirs: string[] } } = {}): NodePlatform {
+/** The desktop shell's windows, recorded: what was opened, and a way to say another window closed. */
+export interface FakeWindows extends Windows {
+  opened: { id: string; root: string; tabs: string; at?: { x: number; y: number } }[];
+  /** How many other windows `closeThis` sees (0: this is the last one, it stays). */
+  others: number;
+  closed: number;
+  /** The shell reports that the window `id` was closed. */
+  emitClosed(id: string): void;
+}
+
+export function createFakeWindows(): FakeWindows {
+  const listeners = new Set<(id: string) => void>();
+  const windows: FakeWindows = {
+    opened: [],
+    others: 0,
+    closed: 0,
+    async open(request) {
+      windows.opened.push(request);
+    },
+    async closeThis() {
+      if (windows.others === 0) return false;
+      windows.closed++;
+      return true;
+    },
+    async onClosed(listener) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    emitClosed(id) {
+      for (const listener of [...listeners]) listener(id);
+    },
+  };
+  return windows;
+}
+
+export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers; agents?: { dataDir: string; searchDirs: string[] }; windows?: FakeWindows; recent?: string[] } = {}): NodePlatform {
   const listeners = new Set<Listener>();
   const connections: VaultConnection[] = [];
+  const open: VaultConnection[] = [];
   const platform: NodePlatform = {
     kind: "node",
     pickedVault: options.vault ?? null,
     pickedSource: null,
-    recent: [],
+    recent: options.recent ?? [],
     connections,
+    sharedWith: [],
     servers: options.servers ?? new FakeServers(),
     ...(options.agents ? { agents: new NodeAgentHost({ ...options.agents, excludeRoots: () => connections.map((c) => c.root) }) } : {}),
+    ...(options.windows ? { windows: options.windows } : {}),
     async pickVaultFolder() {
       return platform.pickedVault;
     },
@@ -51,17 +93,28 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
       const fs = new NodeVaultFs(root);
       await fs.mkdirp(".thoth");
       const sql = new NodeSqlDriver(join(fs.root, ".thoth", "index.sqlite"));
+      // Another window of this "app" on the same folder (`sharedWith` stands in for windows a test does not render).
+      const others = () => open.filter((c) => c.root === fs.root && c !== connection).length + (platform.sharedWith.includes(fs.root) ? 1 : 0);
+      let closed = false;
       const connection: VaultConnection = {
         root: fs.root,
         label: fs.root.split("/").pop() ?? fs.root,
+        shared: false,
+        isShared: async () => !closed && others() > 0,
         fs,
         sql,
         async watch(listener) {
           listeners.add(listener);
           return async () => void listeners.delete(listener);
         },
-        close: () => sql.close(),
+        close: async () => {
+          closed = true;
+          open.splice(open.indexOf(connection), 1);
+          await sql.close();
+        },
       };
+      (connection as { shared: boolean }).shared = others() > 0;
+      open.push(connection);
       connections.push(connection);
       return connection;
     },

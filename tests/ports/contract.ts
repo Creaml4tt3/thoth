@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { lstat, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { sha256Hex } from "@thoth/domain";
 import type { PortRuntime, SourceFixture, SqlFixture, VaultFixture } from "./harness.ts";
 import { tempDir } from "./harness.ts";
 
@@ -96,6 +97,19 @@ export function vaultFsContract(runtime: PortRuntime): void {
       expect(await readFile(join(fx.root, "d/c.md"), "utf8")).toBe("C");
       expect(await fx.fs.stat("c.tmp")).toBeUndefined();
       await expect(fx.fs.rename("missing.md", "z.md")).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("renames over a file only while it still has the expected hash (replaceHash, ADR-0019)", async () => {
+      await fx.fs.writeFile("page.md", text("old"));
+      await fx.fs.writeFile("new.tmp", text("new"));
+      await expect(fx.fs.rename("new.tmp", "page.md", { replaceHash: sha256Hex("something else") })).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(decode(await fx.fs.readFile("page.md"))).toBe("old");
+      expect(await fx.fs.stat("new.tmp")).toBeDefined();
+      await fx.fs.rename("new.tmp", "page.md", { replaceHash: sha256Hex("old") });
+      expect(decode(await fx.fs.readFile("page.md"))).toBe("new");
+      expect(await fx.fs.stat("new.tmp")).toBeUndefined();
+      await fx.fs.writeFile("other.tmp", text("x"));
+      await expect(fx.fs.rename("other.tmp", "absent.md", { replaceHash: sha256Hex("x") })).rejects.toMatchObject({ code: "CONFLICT" });
     });
 
     it("stat reports kind, size and mtime, and undefined for ENOENT/ENOTDIR", async () => {

@@ -99,8 +99,8 @@ export class RemoteVaultFs implements VaultFs {
     await this.transport.call("fs.write", { vault: this.vault, path, exclusive: options.exclusive ?? false }, data);
   }
 
-  async rename(from: string, to: string, options: { noReplace?: boolean } = {}): Promise<void> {
-    await this.transport.call("fs.rename", { vault: this.vault, from, to, noReplace: options.noReplace ?? false });
+  async rename(from: string, to: string, options: { noReplace?: boolean; replaceHash?: string } = {}): Promise<void> {
+    await this.transport.call("fs.rename", { vault: this.vault, from, to, noReplace: options.noReplace ?? false, ...(options.replaceHash === undefined ? {} : { replaceHash: options.replaceHash }) });
   }
 
   async remove(path: string): Promise<void> {
@@ -236,6 +236,7 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
   return {
     root: opened.root,
     label: opened.label,
+    shared: opened.shared === true,
     fs: new RemoteVaultFs(transport, vault),
     sql: new RemoteSqlDriver(transport, vault),
     async watch(listener) {
@@ -256,6 +257,7 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
     async reveal() {
       await transport.call("vault.reveal", { vault });
     },
+    isShared: () => transport.call("vault.shared", { vault }),
     close() {
       closed ??= transport.call("vault.close", { vault }).then(() => undefined);
       return closed;

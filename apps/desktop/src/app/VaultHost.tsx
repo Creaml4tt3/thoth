@@ -12,6 +12,7 @@ import { createReconciler } from "./reconciler.ts";
 import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
+import { parseTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
 import { loadTabs, saveTabs } from "./tabs-store.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
@@ -19,6 +20,8 @@ import { createNotificationPrefsStore } from "../features/notifications/prefs.ts
 import { importEvent, transferEvent, watchAgentRuns } from "../features/notifications/sources.ts";
 import { waitingReviews } from "../features/mascot/hooks.ts";
 import { createWindowPresence } from "../platform/notifier.ts";
+import { MAIN_WINDOW } from "./windows.ts";
+import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 
 interface Props {
   platform: Platform;
@@ -27,10 +30,15 @@ interface Props {
   options: AppOptions;
   intro: boolean;
   switchVault(): void;
+  /** Which window this is (ADR-0019): "main", or the id of a window the app opened. */
+  windowId?: string;
+  /** The tabs this window was opened with (stored form), instead of its saved ones; once. */
+  startTabs?: string | null;
+  onStarted?(): void;
 }
 
 /** Owns the live Session of one open Private Space: revision counter, watcher, import service. */
-export function VaultHost({ platform, connection, vault, options, intro, switchVault }: Props) {
+export function VaultHost({ platform, connection, vault, options, intro, switchVault, windowId = MAIN_WINDOW, startTabs = null, onStarted }: Props) {
   const [revision, setRevision] = useState(0);
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
@@ -46,8 +54,41 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   const bump = useCallback(() => setRevision((r) => r + 1), []);
 
-  // Tabs: restored per Private Space, saved on every change. Leaving the page on screen writes its edits first.
-  const tabs = useTabs({ initial: () => loadTabs(connection.root), flush: flushAll, save: (state) => saveTabs(connection.root, state) });
+  // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
+  const tabs = useTabs({
+    initial: () => (startTabs !== null ? parseTabs(startTabs) : null) ?? loadTabs(connection.root, windowId),
+    flush: flushAll,
+    save: (state) => saveTabs(connection.root, state, windowId),
+  });
+  const started = useRef(onStarted);
+  useEffect(() => started.current?.(), []);
+
+  // Windows (ADR-0019). A window the app opened is remembered on this Private Space until it is closed; one closed
+  // elsewhere is forgotten here. The main window, alone on the Private Space, brings back the windows that were open.
+  const windows = platform.windows;
+  useEffect(() => {
+    if (!windows) return;
+    if (windowId !== MAIN_WINDOW) rememberWindow(windowId, connection.root);
+    let live = true;
+    let stop: (() => void) | undefined;
+    void windows
+      .onClosed((id) => forgetWindow(id))
+      .then((remove) => {
+        if (live) stop = remove;
+        else remove();
+      })
+      .catch(() => undefined);
+    if (windowId === MAIN_WINDOW && connection.shared !== true) {
+      for (const id of windowsOn(connection.root)) {
+        // An id already open (the main window came back to this Private Space) is refused by the shell: nothing to do.
+        void windows.open({ id, root: connection.root, tabs: serializeTabs(loadTabs(connection.root, id)) }).catch(() => undefined);
+      }
+    }
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [windows, windowId, connection]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,24 +150,26 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       }),
     [vault, servers, options.now, bump, notifications],
   );
+  // Recovery is for what a crash left: with another window on this folder, its operations are in flight, not left (ADR-0019).
+  const recovers = connection.shared !== true;
   useEffect(() => {
     let live = true;
     void servers.start().then(() => {
-      if (live) void transfers.recover();
+      if (live && recovers) void transfers.recover();
     });
     return () => {
       live = false;
       servers.dispose();
     };
-  }, [servers, transfers]);
+  }, [servers, transfers, recovers]);
 
   // Agent runs: only where the host can run CLIs. Working directories an earlier session left are deleted and its
   // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
   const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers }) : null), [platform, vault, bump, servers]);
   useEffect(() => {
-    void agents?.recover();
+    if (recovers) void agents?.recover();
     return () => void agents?.dispose();
-  }, [agents]);
+  }, [agents, recovers]);
   // The mascot: its preferences are the user's (not this Private Space's), read once per window.
   const assistant = useMemo(() => (agents ? createAssistantController() : null), [agents]);
   mascotShown.current = () => assistant?.prefs.get().show ?? false;
@@ -137,12 +180,15 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       createImportService(
         vault,
         (kind, location) => options.openImportSource(platform, kind, location),
-        ({ jobId, destinationRoot, report }) => {
-          const event = importEvent(jobId, destinationRoot, report);
-          if (event) notifications.push(event);
+        {
+          shared: () => connection.isShared?.() ?? Promise.resolve(false),
+          onFinished: ({ jobId, destinationRoot, report }) => {
+            const event = importEvent(jobId, destinationRoot, report);
+            if (event) notifications.push(event);
+          },
         },
       ),
-    [vault, platform, options, notifications],
+    [vault, platform, options, notifications, connection],
   );
 
   const openFolder = useCallback(
@@ -224,10 +270,17 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       reveal,
       registerFlush,
       flushAll,
-      switchVault: () => void flushAll().then((ok) => ok && switchVault()),
+      switchVault: () =>
+        void flushAll().then((ok) => {
+          if (!ok) return;
+          // A window the app opened leaves this Private Space: it is not brought back on it.
+          if (windowId !== MAIN_WINDOW) forgetWindow(windowId);
+          switchVault();
+        }),
       watchError,
+      windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, windowId],
   );
 
   return (

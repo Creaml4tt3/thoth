@@ -48,6 +48,11 @@ export interface VaultOptions {
   fs: VaultFs;
   sql: SqlDriver;
   now?: () => number;
+  /**
+   * Run journal recovery at open (the default). False when another window of the app has this folder open already
+   * (ADR-0019): its temp files and journal entries are work in flight, not what a crash left.
+   */
+  recover?: boolean;
 }
 
 export interface ReconcileReport {
@@ -134,7 +139,7 @@ export class Vault {
     const vault = new Vault(options);
     await vault.ensureLayout();
     await vault.ensureIndexSchema();
-    const { recovered, invalid } = await vault.recoverJournal();
+    const { recovered, invalid } = options.recover === false ? { recovered: 0, invalid: [] } : await vault.recoverJournal();
     const report = await vault.reconcile();
     report.recoveredJournalEntries = recovered;
     for (const path of invalid) report.warnings.push({ path, code: "invalid_journal_entry", message: "Journal file ignored: it is malformed or names a path outside Thoth's temp directory" });
@@ -285,7 +290,7 @@ export class Vault {
       }
     }
 
-    await this.sql.exec("BEGIN");
+    await this.sql.exec("BEGIN IMMEDIATE");
     try {
       for (const [path, row] of known) {
         await this.deletePageRows(row.id);
@@ -346,7 +351,7 @@ export class Vault {
   /** Drops the whole index and rebuilds it from files (index loss is never content loss). */
   async rebuildIndex(): Promise<ReconcileReport> {
     return this.exclusive(async () => {
-      await this.sql.exec("BEGIN");
+      await this.sql.exec("BEGIN IMMEDIATE");
       for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
         await this.sql.exec(`DELETE FROM ${table}`);
       await this.sql.exec("COMMIT");
@@ -605,12 +610,15 @@ export class Vault {
       // Re-check immediately before the rename to narrow the race with external editors.
       const latest = await this.currentHash(normalized);
       if (latest !== options.expectedHash) throw new ConflictError(normalized, options.expectedHash, latest);
-      await this.fs.rename(tempPath, normalized, { noReplace: options.expectedHash === null });
+      // The host compares and renames as one step, so another window's save that lands after the check above is a
+      // conflict here rather than a write lost under this one (ADR-0019).
+      await this.fs.rename(tempPath, normalized, options.expectedHash === null ? { noReplace: true } : { replaceHash: options.expectedHash });
     } catch (error) {
       await this.fs.remove(tempPath);
       await clearJournalEntry(this.fs, id);
-      if (options.expectedHash === null && (error as { code?: unknown }).code === "EEXIST") {
-        throw new ConflictError(normalized, null, await this.currentHash(normalized));
+      const code = (error as { code?: unknown }).code;
+      if ((options.expectedHash === null && code === "EEXIST") || code === "CONFLICT") {
+        throw new ConflictError(normalized, options.expectedHash, await this.currentHash(normalized));
       }
       throw error;
     }
@@ -916,7 +924,7 @@ export class Vault {
   /** Replaces every projection row of one workspace (`workspaceUrl`) with `rows`. */
   async projectSyncRecords(workspaceUrl: string, rows: { pageId: string; remoteId: string; remoteRevision: string | null; baseHash: string | null }[]): Promise<void> {
     await this.exclusive(async () => {
-      await this.sql.exec("BEGIN");
+      await this.sql.exec("BEGIN IMMEDIATE");
       try {
         await this.sql.run("DELETE FROM external_locations WHERE workspace_url = ?", [workspaceUrl]);
         await this.sql.run("DELETE FROM sync_state WHERE workspace_url = ?", [workspaceUrl]);

@@ -10,13 +10,15 @@
  * that `@tauri-apps/api/core#invoke` and `@tauri-apps/api/event#listen` (2.x)
  * call. The app may pass those functions instead via `createTauriPlatform(api)`.
  */
-import type { Platform } from "./index.ts";
+import type { Platform, Windows } from "./index.ts";
 import type { CommandName, Commands, Transport, VaultChangedEvent } from "./ipc.ts";
 import { HostCallError, createRemotePlatform, isHostErrorShape } from "./remote.ts";
 
 /** Header carrying the JSON arguments when the body is raw bytes. */
 export const ARGS_HEADER = "x-thoth-args";
 export const VAULT_CHANGED_EVENT = "vault:changed";
+/** Sent by the shell to the other windows when the user closes one (ADR-0019). */
+export const WINDOW_CLOSED_EVENT = "thoth:window-closed";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<unknown>;
 export type TauriListen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
@@ -93,6 +95,30 @@ export class TauriTransport implements Transport {
   }
 }
 
+/** Thoth's own windows (ADR-0019): the shell's `window_open` and `window_close`, and its window-closed event. */
+export function tauriWindows(api: TauriApi = internalsApi()): Windows {
+  return {
+    async open(request) {
+      try {
+        await api.invoke("window_open", { args: request });
+      } catch (error) {
+        throw toError(error);
+      }
+    },
+    async closeThis() {
+      try {
+        return (await api.invoke("window_close", { args: {} })) === true;
+      } catch (error) {
+        throw toError(error);
+      }
+    },
+    async onClosed(listener) {
+      const unlisten = await api.listen<string>(WINDOW_CLOSED_EVENT, (e) => listener(e.payload));
+      return () => void unlisten();
+    },
+  };
+}
+
 export function createTauriPlatform(api?: TauriApi): Platform {
-  return createRemotePlatform(new TauriTransport(api), "tauri");
+  return { ...createRemotePlatform(new TauriTransport(api), "tauri"), windows: tauriWindows(api) };
 }

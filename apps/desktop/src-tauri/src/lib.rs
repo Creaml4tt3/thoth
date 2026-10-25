@@ -13,14 +13,19 @@
 //! Agent Hub (ADR-0007): the host finds and runs the user's AI CLI with an argument list its policy accepts, in a
 //! private folder under the app data directory; the webview gets no shell or process permission.
 //!
+//! Windows (ADR-0019): besides the host's commands the shell has two of its own, `window_open` and `window_close`,
+//! for Thoth's own windows on a Private Space (labels `space-…`, always the app's own page). Each host call is made
+//! as the window that asked (`Host::call_as`), and a closed window's vaults and agent runs end with it (`Host::release`).
+//!
 //! Workspace servers: the host is the HTTP client. Refresh tokens and personal access tokens go to the OS
 //! keychain (`KeychainStore`), sign-in opens the system browser from the host (`SystemBrowser`), and the
 //! webview gets no http, opener or shell permission.
 use serde_json::Value;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
 
@@ -178,8 +183,122 @@ fn contract_name(tauri_command: &str) -> Option<&'static str> {
     thoth_host::COMMANDS.iter().copied().find(|c| c.replace('.', "_") == tauri_command)
 }
 
+/// The shell's own commands (not the host's): Thoth's windows on a Private Space (ADR-0019).
+pub const SHELL_COMMANDS: &[&str] = &["window_open", "window_close"];
+/// Sent to the other windows when the user closes one (never while the app quits): they forget it, so it does not come back.
+pub const WINDOW_CLOSED_EVENT: &str = "thoth:window-closed";
+/// The longest tab list a new window starts with (30 tabs of long paths fit many times over).
+const MAX_LAUNCH_TABS: usize = 64 * 1024;
+
+/// Is `label` one of the windows the app opens (`space-` and 1 to 32 lowercase letters or digits)? The capability
+/// grants Thoth's commands to `main` and `space-*`; nothing else can be made through `window_open`.
+fn is_window_label(label: &str) -> bool {
+    label.strip_prefix("space-").is_some_and(|id| (1..=32).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+}
+
+/// Percent-encodes everything but the unreserved characters, for a query value.
+fn query_escape(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for b in value.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// A window `window_open` may make: its label, the app page it loads (with what it shows in the query) and where.
+#[derive(Debug, PartialEq)]
+struct NewWindow {
+    label: String,
+    page: String,
+    at: Option<(f64, f64)>,
+}
+
+/// Checks a `window_open` request: a `space-` label, a Private Space the user opened (one of the host's recent
+/// folders, which the host would open anyway), a bounded tab list and, if given, a finite screen point. The page is
+/// always the app's own `index.html`; nothing in the request can name another address.
+fn new_window(args: &Value, recent: &[String]) -> HostResult<NewWindow> {
+    let text = |key: &str| args.get(key).and_then(Value::as_str).ok_or_else(|| HostError::bad_argument(format!("{key} must be a string")));
+    let label = text("id")?;
+    if !is_window_label(label) {
+        return Err(HostError::bad_argument("A window id is space- and lowercase letters or digits"));
+    }
+    let root = text("root")?;
+    if !recent.iter().any(|r| r == root) {
+        return Err(HostError::not_allowed("A new window opens only on a Private Space that was opened"));
+    }
+    let tabs = text("tabs")?;
+    if tabs.len() > MAX_LAUNCH_TABS {
+        return Err(HostError::bad_argument("Too many tabs for a new window"));
+    }
+    let at = match args.get("at") {
+        None | Some(Value::Null) => None,
+        Some(point) => {
+            let (x, y) = (point.get("x").and_then(Value::as_f64), point.get("y").and_then(Value::as_f64));
+            match (x, y) {
+                (Some(x), Some(y)) if x.is_finite() && y.is_finite() => Some((x, y)),
+                _ => return Err(HostError::bad_argument("at must be a point")),
+            }
+        }
+    };
+    let page = format!("index.html?window={label}&root={}&tabs={}", query_escape(root), query_escape(tabs));
+    Ok(NewWindow { label: label.to_owned(), page, at })
+}
+
+/// `window_open` and `window_close`, for the window that asked.
+fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
+    let webview = invoke.message.webview();
+    let app = webview.app_handle().clone();
+    let caller = webview.label().to_owned();
+    let command = invoke.message.command().to_owned();
+    let args = request_parts(invoke.message.payload(), None).map(|(args, _)| args);
+    invoke.resolver.respond_async_serialized(async move {
+        let args = args.map_err(InvokeError::from)?;
+        match command.as_str() {
+            "window_open" => {
+                let host = host.get().cloned().ok_or_else(|| InvokeError::from(HostError::internal("Host is not ready")))?;
+                let window = new_window(&args, &host.recent()).map_err(InvokeError::from)?;
+                if app.get_webview_window(&window.label).is_some() {
+                    return Err(InvokeError::from(HostError::bad_argument("That window is open already")));
+                }
+                let mut builder = WebviewWindowBuilder::new(&app, &window.label, WebviewUrl::App(window.page.into()))
+                    .title("Thoth")
+                    .inner_size(1200.0, 800.0)
+                    .min_inner_size(720.0, 480.0)
+                    .focused(true);
+                // The tab was let go here: the new window's tab bar starts under the pointer.
+                if let Some((x, y)) = window.at {
+                    builder = builder.position((x - 140.0).max(0.0), (y - 20.0).max(0.0));
+                }
+                builder.build().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                Ok(InvokeResponseBody::Json("null".to_owned()))
+            }
+            "window_close" => {
+                // The last window stays (Cmd/Ctrl+W leaves it an empty tab); closing it would quit the app.
+                let others = app.webview_windows().keys().any(|label| label != &caller);
+                if others {
+                    if let Some(window) = app.get_webview_window(&caller) {
+                        window.close().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be closed: {e}"))))?;
+                    }
+                }
+                Ok(InvokeResponseBody::Json(others.to_string()))
+            }
+            _ => Err(InvokeError::from(HostError::bad_argument("Unknown shell command"))),
+        }
+    });
+    true
+}
+
 fn handle(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
+    if SHELL_COMMANDS.contains(&invoke.message.command()) {
+        return handle_shell(host, invoke);
+    }
     let Some(command) = contract_name(invoke.message.command()) else { return false };
+    // Vaults a window opens and agent runs it starts are its own: they end when it closes.
+    let owner = invoke.message.webview().label().to_owned();
     let Some(host) = host.get().cloned() else {
         invoke.resolver.reject(HostError::internal("Host is not ready"));
         return true;
@@ -189,7 +308,7 @@ fn handle(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
     invoke.resolver.respond_async_serialized(async move {
         let (args, bytes) = parts.map_err(InvokeError::from)?;
         // Host calls block (disk, SQLite, native dialogs); keep them off the async runtime and main thread.
-        let reply = tauri::async_runtime::spawn_blocking(move || host.call(command, &args, bytes.as_deref()))
+        let reply = tauri::async_runtime::spawn_blocking(move || host.call_as(&owner, command, &args, bytes.as_deref()))
             .await
             .map_err(|_| InvokeError::from(HostError::internal("Host call panicked")))?;
         match reply {
@@ -255,6 +374,8 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static HOST: OnceLock<Arc<Host>> = OnceLock::new();
+    /// Set once the app is quitting: windows destroyed then are not "closed by the user" (they come back next time).
+    static EXITING: AtomicBool = AtomicBool::new(false);
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(app_menu);
@@ -283,10 +404,26 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| handle(&HOST, invoke))
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                let label = window.label().to_owned();
+                // Its vaults (watchers, index connections) close and its agent runs end, as all of them do at quit.
+                if let Some(host) = HOST.get() {
+                    host.release(&label);
+                }
+                if !EXITING.load(Ordering::SeqCst) {
+                    let _ = window.app_handle().emit(WINDOW_CLOSED_EVENT, label);
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("failed to build the Thoth app")
         .run(|_app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                EXITING.store(true, Ordering::SeqCst);
+            }
             if let tauri::RunEvent::Exit = event {
+                EXITING.store(true, Ordering::SeqCst);
                 // Stop watchers and delete import temp files before the process exits.
                 if let Some(host) = HOST.get() {
                     host.shutdown();
@@ -298,6 +435,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn every_contract_command_has_a_tauri_command_and_permission() {
@@ -310,6 +448,57 @@ mod tests {
             assert!(capability.contains(&format!("\"allow-{}\"", tauri.replace('_', "-"))), "{tauri} missing from capability");
         }
         assert_eq!(contract_name("plugin:fs|read"), None);
+    }
+
+    #[test]
+    fn the_shell_commands_have_a_permission_and_are_not_host_commands() {
+        let build = include_str!("../build.rs");
+        let capability = include_str!("../capabilities/main.json");
+        for command in SHELL_COMMANDS {
+            assert!(build.contains(&format!("\"{command}\"")), "{command} missing from build.rs");
+            assert!(capability.contains(&format!("\"allow-{}\"", command.replace('_', "-"))), "{command} missing from capability");
+            assert_eq!(contract_name(command), None, "{command} must not reach the host");
+        }
+    }
+
+    #[test]
+    fn the_capability_covers_the_main_window_and_thoths_own_windows_only() {
+        let capability: Value = serde_json::from_str(include_str!("../capabilities/main.json")).unwrap();
+        let windows: Vec<&str> = capability["windows"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
+        assert_eq!(windows, ["main", "space-*"]);
+        assert!(capability.get("webviews").is_none());
+        // Every label `window_open` can make is one the capability names, and nothing else is.
+        for label in ["space-a", "space-0123456789abcdef", &format!("space-{}", "z".repeat(32))] {
+            assert!(is_window_label(label), "{label}");
+        }
+        for label in ["main", "space-", "space-A", "space-a.b", "space-../main", "spaces-a", "space-a b", &format!("space-{}", "z".repeat(33)), ""] {
+            assert!(!is_window_label(label), "{label:?}");
+        }
+    }
+
+    #[test]
+    fn window_open_makes_only_thoths_own_windows_on_an_opened_private_space() {
+        let recent = vec!["/Users/a/Notes & more".to_owned()];
+        let ok = json!({ "id": "space-ab12", "root": "/Users/a/Notes & more", "tabs": "{\"v\":1,\"active\":0,\"tabs\":[{\"k\":\"page\",\"path\":\"A#b?c.md\"}]}", "at": { "x": 900.5, "y": 400.0 } });
+        let window = new_window(&ok, &recent).unwrap();
+        assert_eq!(window.label, "space-ab12");
+        assert_eq!(window.at, Some((900.5, 400.0)));
+        // Always the app's own page; what it shows travels escaped, so nothing in it adds to or ends the query.
+        assert!(window.page.starts_with("index.html?window=space-ab12&root=%2FUsers%2Fa%2FNotes%20%26%20more&tabs=%7B"));
+        assert_eq!(window.page.matches('?').count(), 1);
+        assert_eq!(window.page.matches('&').count(), 2);
+        assert!(!window.page.contains('#'));
+        assert_eq!(new_window(&json!({ "id": "space-ab12", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent).unwrap().at, None);
+
+        let refused = |args: Value| new_window(&args, &recent).unwrap_err().code;
+        assert_eq!(refused(json!({ "id": "main", "root": "/Users/a/Notes & more", "tabs": "x" })), "BAD_ARGUMENT");
+        assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Other", "tabs": "x" })), "NOT_ALLOWED");
+        assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more", "tabs": "x".repeat(MAX_LAUNCH_TABS + 1) })), "BAD_ARGUMENT");
+        assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more", "tabs": "x", "at": { "x": "1", "y": 2 } })), "BAD_ARGUMENT");
+        assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more" })), "BAD_ARGUMENT");
+        // An address in the request is not used: the page is the app's own whatever else is sent.
+        let elsewhere = new_window(&json!({ "id": "space-x", "url": "https://example.org/", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent).unwrap();
+        assert!(elsewhere.page.starts_with("index.html?window=space-x&") && !elsewhere.page.contains("example.org"));
     }
 
     #[test]

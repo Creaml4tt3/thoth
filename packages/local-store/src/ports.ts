@@ -26,8 +26,14 @@ export interface VaultFs {
   mkdirp(dir: string): Promise<void>;
   /** Writes and fsyncs. Fails if the file exists when `exclusive` is set. */
   writeFile(path: string, data: Uint8Array, options?: { exclusive?: boolean }): Promise<void>;
-  /** Atomic rename within the vault volume. Replaces `to` unless `noReplace`, in which case an existing target fails with an error whose `code` is "EEXIST". */
-  rename(from: string, to: string, options?: { noReplace?: boolean }): Promise<void>;
+  /**
+   * Atomic rename within the vault volume. Replaces `to` unless `noReplace`, in which case an existing target fails with
+   * an error whose `code` is "EEXIST". With `replaceHash` (a SHA-256 hex digest), `to` is replaced only while its bytes
+   * still have that hash; otherwise (changed, or gone) it fails with `code` "CONFLICT" and nothing moves. The check and
+   * the rename are one step for every writer that goes through the same host (two windows of the app, ADR-0019); an
+   * editor outside Thoth can still land in between, as ADR-0001 accepts.
+   */
+  rename(from: string, to: string, options?: { noReplace?: boolean; replaceHash?: string }): Promise<void>;
   remove(path: string): Promise<void>;
 }
 

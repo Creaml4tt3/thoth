@@ -54,7 +54,7 @@ use watch::Watcher;
 
 /// Every command name in the contract (`Commands` in ipc.ts).
 pub const COMMANDS: &[&str] = &[
-    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal",
+    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal", "vault.shared",
     "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
     "sql.exec", "sql.run", "sql.all", "sql.get",
     "watch.start", "watch.stop",
@@ -108,6 +108,8 @@ pub struct HostConfig {
 }
 
 struct VaultEntry {
+    /// Who opened it (a window of the desktop app, ADR-0019; "" in the harness): `Host::release` closes it with the window.
+    owner: String,
     root: PathBuf,
     fs: VaultFs,
     sql: Mutex<Sql>,
@@ -135,6 +137,9 @@ pub struct Host {
     state: Mutex<State>,
     remote: Remote,
     agents: Agents,
+    /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
+    /// same page cannot both pass the check (ADR-0019).
+    replace: Mutex<()>,
 }
 
 type Reply = (Value, Option<Vec<u8>>);
@@ -145,7 +150,7 @@ impl Host {
         let allow_roots = config.allow_roots.iter().filter_map(|r| canonicalize_path(r).ok()).collect();
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
         let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
-        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents }
+        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, replace: Mutex::new(()) }
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -154,6 +159,12 @@ impl Host {
 
     /// Dispatches one command. `bytes` is the out-of-band request body (`fs.write`, `source.temp.write`, `api.call`).
     pub fn call(&self, command: &str, args: &Value, bytes: Option<&[u8]>) -> HostResult<Reply> {
+        self.call_as("", command, args, bytes)
+    }
+
+    /// `call`, made by `owner` (the label of the desktop window that asked). Vaults it opens and agent runs it creates
+    /// are that owner's: `release(owner)` ends them when the window closes. Handles stay usable by any caller.
+    pub fn call_as(&self, owner: &str, command: &str, args: &Value, bytes: Option<&[u8]>) -> HostResult<Reply> {
         let json = |v: Value| Ok((v, None));
         let null = || Ok((Value::Null, None));
         if !args.is_object() {
@@ -166,10 +177,16 @@ impl Host {
         match command {
             "vault.pick" => json(self.pick_vault()),
             "vault.recent" => json(json!(self.recent())),
-            "vault.open" => json(self.open_vault(str_arg(args, "root")?)?),
+            "vault.open" => json(self.open_vault(owner, str_arg(args, "root")?)?),
             "vault.close" => {
                 self.close_vault(str_arg(args, "vault")?)?;
                 null()
+            }
+            // Is another handle (another window) open on this vault's folder right now? (ADR-0019)
+            "vault.shared" => {
+                let entry = self.vault(args)?;
+                let others = self.state().vaults.values().filter(|v| v.root == entry.root).count() > 1;
+                json(json!(others))
             }
             // Names a vault by its handle, never a path: only a folder the user opened can be shown.
             "vault.reveal" => {
@@ -190,7 +207,24 @@ impl Host {
                 null()
             }
             "fs.rename" => {
-                self.vault(args)?.fs.rename(str_arg(args, "from")?, str_arg(args, "to")?, bool_arg(args, "noReplace")?)?;
+                let vault = self.vault(args)?;
+                let (from, to) = (str_arg(args, "from")?, str_arg(args, "to")?);
+                match args.get("replaceHash") {
+                    None | Some(Value::Null) => vault.fs.rename(from, to, bool_arg(args, "noReplace")?)?,
+                    Some(Value::String(expected)) => {
+                        let _one_at_a_time = lock(&self.replace);
+                        let current = match vault.fs.read(to) {
+                            Ok(bytes) => Some(hex_digest(&bytes)),
+                            Err(e) if e.code == "ENOENT" => None,
+                            Err(e) => return Err(e),
+                        };
+                        if current.as_deref() != Some(expected.as_str()) {
+                            return Err(HostError::new("CONFLICT", format!("\"{to}\" changed before it could be replaced")));
+                        }
+                        vault.fs.rename(from, to, false)?;
+                    }
+                    Some(_) => return Err(HostError::bad_argument("replaceHash must be a string")),
+                }
                 null()
             }
             "fs.remove" => {
@@ -299,7 +333,7 @@ impl Host {
             "server.signOut" => json(self.remote.sign_out(str_arg(args, "server")?)?),
             "api.call" => json(self.remote.api_call(args, bytes)?),
             "agent.detect" => json(self.agents.detect(str_arg(args, "provider")?, &self.open_roots())?),
-            "agent.run.create" => json(self.agents.create(str_arg(args, "provider")?)?),
+            "agent.run.create" => json(self.agents.create_for(owner, str_arg(args, "provider")?)?),
             "agent.fs.stat" => json(self.agents.stat(str_arg(args, "run")?, str_arg(args, "path")?)?),
             "agent.fs.read" => Ok((Value::Null, Some(self.agents.read(str_arg(args, "run")?, str_arg(args, "path")?)?))),
             "agent.fs.list" => json(self.agents.list(str_arg(args, "run")?, str_arg(args, "dir")?)?),
@@ -363,7 +397,7 @@ impl Host {
         self.state().picked_vaults.contains(root) || self.allow_roots.iter().any(|r| root.starts_with(r)) || self.recent().iter().any(|r| Path::new(r) == root)
     }
 
-    fn open_vault(&self, raw: &str) -> HostResult<Value> {
+    fn open_vault(&self, owner: &str, raw: &str) -> HostResult<Value> {
         let root = canonical(raw)?;
         if !self.vault_allowed(&root) {
             return Err(HostError::not_allowed(format!("{raw} was not picked by the user")));
@@ -386,10 +420,16 @@ impl Host {
         let label = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let handle = handles::new_handle("vault")?;
         let shown = root.to_string_lossy().into_owned();
-        let entry = Arc::new(VaultEntry { root: root.clone(), fs, sql: Mutex::new(sql), watcher: Mutex::new(None) });
-        self.state().vaults.insert(handle.clone(), entry);
+        let entry = Arc::new(VaultEntry { owner: owner.to_owned(), root: root.clone(), fs, sql: Mutex::new(sql), watcher: Mutex::new(None) });
+        // Another window has this folder open: it ran recovery, and what is in `.thoth/tmp` may be its work in flight.
+        let shared = {
+            let mut state = self.state();
+            let shared = state.vaults.values().any(|v| v.root == root);
+            state.vaults.insert(handle.clone(), entry);
+            shared
+        };
         self.remember(&shown);
-        Ok(json!({ "vault": handle, "root": shown, "label": label }))
+        Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared }))
     }
 
     fn close_vault(&self, handle: &str) -> HostResult<()> {
@@ -539,6 +579,16 @@ impl Host {
 }
 
 impl Host {
+    /// A window closed (ADR-0019): closes the vaults it opened (and their watchers) and ends the agent runs it started,
+    /// deleting their working directories, as quitting does for all of them. Other windows' handles are untouched.
+    pub fn release(&self, owner: &str) {
+        let mine: Vec<String> = self.state().vaults.iter().filter(|(_, v)| v.owner == owner).map(|(h, _)| h.clone()).collect();
+        for handle in mine {
+            let _ = self.close_vault(&handle);
+        }
+        self.agents.release(owner);
+    }
+
     /// Closes every vault (stopping watchers) and source (deleting temp files), cancels server sign-ins, and stops
     /// every agent run (deleting its working directory).
     /// The host stays usable.
@@ -608,6 +658,12 @@ pub(crate) fn no_symlinks(flags: OFlags) -> OFlags {
     {
         flags | OFlags::NOFOLLOW
     }
+}
+
+/// The SHA-256 of `bytes` as lowercase hex, the form `@thoth/domain`'s `sha256Hex` writes.
+fn hex_digest(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {

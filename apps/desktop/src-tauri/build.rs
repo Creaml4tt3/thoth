@@ -1,9 +1,9 @@
 //! Generates `allow-<command>` permissions for the contract commands so the
 //! capability file can grant exactly these (and nothing else) to the webview.
 
-/// `thoth_host::COMMANDS` with `.` replaced by `_` (checked by a unit test in src/lib.rs).
+/// `thoth_host::COMMANDS` with `.` replaced by `_`, then the shell's own commands (both checked by unit tests in src/lib.rs).
 pub const TAURI_COMMANDS: &[&str] = &[
-    "vault_pick", "vault_recent", "vault_open", "vault_close", "vault_reveal",
+    "vault_pick", "vault_recent", "vault_open", "vault_close", "vault_reveal", "vault_shared",
     "fs_stat", "fs_read", "fs_list", "fs_mkdirp", "fs_write", "fs_rename", "fs_remove",
     "sql_exec", "sql_run", "sql_all", "sql_get",
     "watch_start", "watch_stop",
@@ -14,6 +14,8 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "agent_detect", "agent_run_create", "agent_fs_stat", "agent_fs_read", "agent_fs_list", "agent_fs_mkdirp", "agent_fs_write",
     "agent_start", "agent_events", "agent_cancel", "agent_run_dispose", "agent_sweep",
     "agent_history_write", "agent_history_read", "agent_history_list", "agent_history_delete",
+    // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
+    "window_open", "window_close",
 ];
 
 fn main() {

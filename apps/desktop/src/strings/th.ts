@@ -32,6 +32,7 @@ export const th: DesktopStrings = {
     newFolder: "โฟลเดอร์ใหม่",
     untitledFolder: "โฟลเดอร์ไม่มีชื่อ",
     folderCreated: (name) => `สร้างโฟลเดอร์ ${name} แล้ว`,
+    windowFailed: (reason) => `ย้ายแท็บไปหน้าต่างใหม่ไม่ได้: ${reason}`, // REVIEW
     titleNotUpdated: (name) => `เปลี่ยนชื่อเป็น ${name} แล้ว แต่ไม่ได้อัปเดตชื่อภายในหน้า เพราะหน้านี้มีการเปลี่ยนแปลง`,
     unsavedChanges: "หน้าที่เปิดอยู่มีการเปลี่ยนแปลงที่ยังบันทึกไม่ได้",
     settings: "การตั้งค่า",

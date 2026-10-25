@@ -82,6 +82,8 @@ export interface Session {
   switchVault(): void;
   /** Set when the filesystem watcher could not start; saving still works. */
   watchError: string | null;
+  /** Which window this is (ADR-0019): "main", or the id of a window the app opened (`platform.windows`). */
+  windowId: string;
 }
 
 export const SessionContext = createContext<Session | null>(null);

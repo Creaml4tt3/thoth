@@ -144,6 +144,8 @@ struct RunState {
 }
 
 struct Run {
+    /// Who created it (a window of the desktop app, ADR-0019): `Agents::release` ends the runs of a window that closed.
+    owner: String,
     provider: Provider,
     dir: PathBuf,
     work: PathBuf,
@@ -272,6 +274,11 @@ impl Agents {
 
     /// Creates an empty private working directory for one run.
     pub fn create(&self, provider: &str) -> HostResult<Value> {
+        self.create_for("", provider)
+    }
+
+    /// `create`, for `owner` (a window): the run ends when that window closes (`release`).
+    pub fn create_for(&self, owner: &str, provider: &str) -> HostResult<Value> {
         let provider = Provider::parse(provider)?;
         if self.runs().len() >= MAX_RUNS {
             return Err(HostError::not_allowed("Too many agent runs are open"));
@@ -286,6 +293,7 @@ impl Agents {
         let work = crate::paths::canonicalize_path(&work).map_err(|e| HostError::io(&e, "open", &work.to_string_lossy()))?;
         let fd = crate::open_root_dir(&work)?;
         let run = Arc::new(Run {
+            owner: owner.to_owned(),
             provider,
             dir,
             work: work.clone(),
@@ -459,6 +467,23 @@ impl Agents {
     /// Kills every run's process group and deletes every run folder (app exit).
     pub fn shutdown(&self) {
         let runs: Vec<Arc<Run>> = self.runs().drain().map(|(_, r)| r).collect();
+        Self::end_all(runs);
+    }
+
+    /// Ends the runs `owner` created, as `shutdown` ends all of them: a window that closes takes its runs with it, as
+    /// quitting the app always did (ADR-0019). Returns how many.
+    pub fn release(&self, owner: &str) -> usize {
+        let runs: Vec<Arc<Run>> = {
+            let mut all = self.runs();
+            let mine: Vec<String> = all.iter().filter(|(_, r)| r.owner == owner).map(|(h, _)| h.clone()).collect();
+            mine.iter().filter_map(|h| all.remove(h)).collect()
+        };
+        let count = runs.len();
+        Self::end_all(runs);
+        count
+    }
+
+    fn end_all(runs: Vec<Arc<Run>>) {
         for run in &runs {
             stop(run, "cancelled");
             kill_group(&run.lock(), Signal::Kill);

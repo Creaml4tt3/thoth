@@ -59,7 +59,12 @@ export type OpenSource = (kind: ImportSourceKind, location: string) => Promise<{
 /** An import run ended: with its report, or null when it threw. Not called for a scan or a discarded plan. */
 export type ImportFinished = (outcome: { jobId: string; destinationRoot: string; report: ImportReport | null }) => void;
 
-export function createImportService(vault: Vault, openSource: OpenSource, onFinished?: ImportFinished): ImportService {
+/**
+ * `shared` says whether another window has this Private Space open (ADR-0019). An unfinished job may then be running
+ * there, so none is offered for resume until this window is the only one. `onFinished` hears every import that ended.
+ */
+export function createImportService(vault: Vault, openSource: OpenSource, options: { shared?: () => Promise<boolean>; onFinished?: ImportFinished } = {}): ImportService {
+  const { onFinished } = options;
   const running = new Map<string, AbortController>();
 
   const plan = async (source: ImportSource, provider: ImportProvider, options: Partial<ImportOptions> | undefined): Promise<ScanResult> => {
@@ -123,6 +128,7 @@ export function createImportService(vault: Vault, openSource: OpenSource, onFini
     },
 
     async listJobs() {
+      if (await (options.shared?.() ?? false)) return [];
       return (await listManifests(vault.fs)).filter((m) => m.state !== "completed").sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
     },
   };
