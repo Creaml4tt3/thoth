@@ -282,13 +282,23 @@ pub fn rename(handle: &OwnedHandle, dst_dir: &OwnedHandle, name: &[u16], replace
     };
     let flags = if replace { FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS | RENAME_IGNORE_READONLY } else { 0 };
     fill(flags, true);
-    match set_info(handle, fs::FileRenameInfoEx, info.cast(), size) {
+    match set_info_nt(handle, ntfs::FileRenameInformationEx, info.cast(), size) {
         Err(error) if unsupported(error) => {
             fill(0, false);
-            set_info(handle, fs::FileRenameInfo, info.cast(), size)
+            set_info_nt(handle, ntfs::FileRenameInformation, info.cast(), size)
         }
         other => other,
     }
+}
+
+/// `NtSetInformationFile`. Renames use it rather than `SetFileInformationByHandle`, which treats
+/// `FILE_RENAME_INFO.FileName` as a Win32 path and makes it absolute against the current directory, defeating a
+/// name relative to `RootDirectory` (it fails with ERROR_INVALID_PARAMETER).
+fn set_info_nt(handle: &OwnedHandle, class: ntfs::FILE_INFORMATION_CLASS, data: *const std::ffi::c_void, size: usize) -> Result<(), OsError> {
+    let mut io = IO_STATUS_BLOCK::default();
+    // SAFETY: `data` points to `size` readable bytes laid out for `class` (FILE_RENAME_INFO is FILE_RENAME_INFORMATION).
+    let status = unsafe { ntfs::NtSetInformationFile(raw(handle), &mut io, data, size as u32, class) };
+    if status < 0 { Err(status_error(status)) } else { Ok(()) }
 }
 
 /// Deletes the open file or empty directory `handle` (opened with DELETE): the name goes when the handle closes.

@@ -103,7 +103,9 @@ fn code<T: std::fmt::Debug>(result: HostResult<T>) -> &'static str {
 
 /// A directory junction (no privilege needed), made with `mklink /J` as a user would.
 fn junction(link: &Path, target: &Path) {
-    let out = std::process::Command::new("cmd").arg("/C").arg("mklink").arg("/J").arg(link).arg(target).output().unwrap();
+    // cmd reads a `/` inside a path as a switch.
+    let backslashes = |p: &Path| p.to_string_lossy().replace('/', "\\");
+    let out = std::process::Command::new("cmd").arg("/C").arg("mklink").arg("/J").arg(backslashes(link)).arg(backslashes(target)).output().unwrap();
     assert!(out.status.success(), "mklink /J failed: {}", String::from_utf8_lossy(&out.stderr));
     let meta = std::fs::symlink_metadata(link).unwrap();
     use std::os::windows::fs::MetadataExt;
