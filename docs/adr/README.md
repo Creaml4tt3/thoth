@@ -27,6 +27,7 @@ trade-off.
 | [0015](0015-website-web-client-and-analytics.md) | Website, trial-only web client, and analytics (GA4) | Accepted 2026-10-24 |
 | [0016](0016-editor-ux-text-styles-order-tabs-and-themes.md) | Text styles, page order, folders, tabs and themes | Accepted 2026-10-24 |
 | [0017](0017-page-kind-in-the-workspace-protocol.md) | Page kind in the workspace protocol | Accepted 2026-10-25 |
+| [0018](0018-notifications.md) | Notifications: in-app list, mascot, system notifications | Accepted 2026-10-25 |
 
 Template: [0000-template.md](0000-template.md).
 
