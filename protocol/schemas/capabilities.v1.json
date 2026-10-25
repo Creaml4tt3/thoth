@@ -21,6 +21,7 @@
               "transfers",
               "page-order",
               "page-kind",
+              "public-share",
               "databases",
               "realtime-collab"
             ]

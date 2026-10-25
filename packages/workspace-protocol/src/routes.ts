@@ -9,6 +9,7 @@ import { SearchRequestSchema, SearchResponseSchema } from "./search.ts";
 import { AttachmentIdSchema, AttachmentResourceSchema, UploadAttachmentQuerySchema } from "./attachments.ts";
 import { ChangesQuerySchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferOperationIdSchema, TransferResourceSchema } from "./transfers.ts";
+import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema, ShareLinkListSchema } from "./shares.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -371,6 +372,46 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     responses: [json(200, "The transfer after abort.", TransferResourceSchema)],
     errors: ["forbidden", "not_found", "invalid_transfer_state", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "createShareLink",
+    method: "post",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/share-links",
+    tag: "Sharing",
+    summary: "Create a public read-only link to a page",
+    description:
+      "ADR-0023. Owners and editors only. The link shows the page and its sub-pages, read-only and without sign-in, at the returned `url` (`<origin>/s/<token>`). The token is returned this once: the server stores only its hash. `Idempotency-Key` is not honoured (a replay would have to store the token); a retry makes a second link. 403 `export_restricted` in a workspace that forbids exporting; 409 `quota_exceeded` (`quota: shareLinksPerWorkspace`) past the server's limit of active links.",
+    capability: "public-share",
+    pathParams: pageParams,
+    requestBody: { contentType: JSON_CT, schema: ShareLinkCreateRequestSchema, required: false, description: "The expiry: 7, 30 or 90 days, or null for never. Absent means 30 days." },
+    responses: [json(201, "The link, with its token and address (shown once).", ShareLinkCreatedSchema)],
+    errors: ["validation_failed", "forbidden", "export_restricted", "not_found", "quota_exceeded"],
+  }),
+  route({
+    operationId: "listShareLinks",
+    method: "get",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/share-links",
+    tag: "Sharing",
+    summary: "Active share links of a page",
+    description: "Owners and editors only. The links of the page that are neither revoked nor expired, newest first. Tokens are never returned here.",
+    capability: "public-share",
+    pathParams: pageParams,
+    query: PaginationQuerySchema,
+    responses: [json(200, "A page of share links.", ShareLinkListSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "cursor_invalid"],
+  }),
+  route({
+    operationId: "revokeShareLink",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/share-links/{linkId}",
+    tag: "Sharing",
+    summary: "Revoke a share link",
+    description: "Owners and editors only. The link stops working at once. Revoking a link that is already revoked or expired succeeds and changes nothing.",
+    capability: "public-share",
+    pathParams: { workspaceId: WorkspaceIdSchema, linkId: ShareLinkIdSchema },
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Revoked.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
   }),
 ];
 

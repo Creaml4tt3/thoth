@@ -57,6 +57,9 @@ describe("route registry", () => {
       commitTransfer: "transfers",
       abortTransfer: "transfers",
       movePage: "page-order",
+      createShareLink: "public-share",
+      listShareLinks: "public-share",
+      revokeShareLink: "public-share",
     });
   });
 

@@ -9,6 +9,7 @@ export * from "./search.ts";
 export * from "./attachments.ts";
 export * from "./changes.ts";
 export * from "./transfers.ts";
+export * from "./shares.ts";
 export * from "./routes.ts";
 export * from "./schemas.ts";
 export * from "./validate.ts";

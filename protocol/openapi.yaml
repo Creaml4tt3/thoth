@@ -26,6 +26,7 @@ tags:
   - name: Attachments
   - name: Changes
   - name: Transfers
+  - name: Sharing
 paths:
   /api/v1/capabilities:
     get:
@@ -1116,6 +1117,191 @@ paths:
         - internal_error
         - capability_not_supported
         - service_unavailable
+  /api/v1/workspaces/{workspaceId}/pages/{pageId}/share-links:
+    post:
+      operationId: createShareLink
+      tags:
+        - Sharing
+      summary: Create a public read-only link to a page
+      description: |-
+        ADR-0023. Owners and editors only. The link shows the page and its sub-pages, read-only and without sign-in, at the returned `url` (`<origin>/s/<token>`). The token is returned this once: the server stores only its hash. `Idempotency-Key` is not honoured (a replay would have to store the token); a retry makes a second link. 403 `export_restricted` in a workspace that forbids exporting; 409 `quota_exceeded` (`quota: shareLinksPerWorkspace`) past the server's limit of active links.
+
+        Requires capability `public-share`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+      requestBody:
+        required: false
+        description: "The expiry: 7, 30 or 90 days, or null for never. Absent means 30 days."
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareLinkCreateRequest"
+      responses:
+        "201":
+          description: The link, with its token and address (shown once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareLinkCreated"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`export_restricted`: The workspace forbids exporting content out of it (ADR-0009). `forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: public-share
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - export_restricted
+        - forbidden
+        - not_found
+        - quota_exceeded
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    get:
+      operationId: listShareLinks
+      tags:
+        - Sharing
+      summary: Active share links of a page
+      description: |-
+        Owners and editors only. The links of the page that are neither revoked nor expired, newest first. Tokens are never returned here.
+
+        Requires capability `public-share`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of share links.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareLinkList"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: public-share
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/share-links/{linkId}:
+    delete:
+      operationId: revokeShareLink
+      tags:
+        - Sharing
+      summary: Revoke a share link
+      description: |-
+        Owners and editors only. The link stops working at once. Revoking a link that is already revoked or expired succeeds and changes nothing.
+
+        Requires capability `public-share`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/LinkId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "204":
+          description: Revoked.
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: public-share
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
 components:
   schemas:
     AttachmentResource:
@@ -1177,6 +1363,7 @@ components:
                   - transfers
                   - page-order
                   - page-kind
+                  - public-share
                   - databases
                   - realtime-collab
               - type: string
@@ -1780,6 +1967,124 @@ components:
       required:
         - items
         - nextCursor
+    ShareLink:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        createdBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        expiresAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+            - type: "null"
+      required:
+        - id
+        - workspaceId
+        - pageId
+        - createdAt
+        - createdBy
+        - expiresAt
+    ShareLinkCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        workspaceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        createdBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        expiresAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+            - type: "null"
+        token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{22,}$
+        url:
+          type: string
+          format: uri
+      required:
+        - id
+        - workspaceId
+        - pageId
+        - createdAt
+        - createdBy
+        - expiresAt
+        - token
+        - url
+    ShareLinkCreateRequest:
+      type: object
+      properties:
+        expiresInDays:
+          anyOf:
+            - type: number
+              const: 7
+            - type: number
+              const: 30
+            - type: number
+              const: 90
+            - type: "null"
+    ShareLinkList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareLink"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+      required:
+        - items
+        - nextCursor
     TransferCommitRequest:
       type: object
       properties:
@@ -2212,6 +2517,15 @@ components:
       schema:
         type: string
         pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9_.~-]+$
   responses:
     Problem400:
       description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
@@ -2347,5 +2661,6 @@ x-thoth-capabilities:
   - transfers
   - page-order
   - page-kind
+  - public-share
   - databases
   - realtime-collab

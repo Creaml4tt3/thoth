@@ -2,7 +2,7 @@
  * Minimal in-memory workspace server used to test the conformance suite.
  *
  * `startTestServer()` implements the protocol subset the suite exercises (all core
- * routes plus attachments, search, SSE hints and transfers). `startBrokenServer()` is
+ * routes plus attachments, search, SSE hints, transfers, page order and kind, and public share links). `startBrokenServer()` is
  * the same server with deliberate violations, so tests can prove the suite notices them.
  * It is a test fixture, not the reference server.
  */
@@ -21,6 +21,7 @@ import {
   PageWriteSchema,
   SSE_EVENT_NAME,
   SearchRequestSchema,
+  ShareLinkCreateRequestSchema,
   TransferCommitRequestSchema,
   TransferCreateRequestSchema,
   formatEtag,
@@ -55,7 +56,7 @@ export interface Flaws {
 
 export interface TestServerOptions {
   flaws?: Flaws;
-  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind. */
+  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share. */
   capabilities?: CapabilityId[];
 }
 
@@ -165,7 +166,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -700,6 +701,58 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     }),
   );
 
+  // ----- public-share (ADR-0023): links by token hash; the page is plain escaped text, no script -----
+  const shareLinks = new Map<string, { id: string; workspaceId: string; pageId: string; tokenHash: string; createdAt: string; createdBy: string; expiresAt: string | null; revoked: boolean }>();
+  const shareResource = (l: { id: string; workspaceId: string; pageId: string; createdAt: string; createdBy: string; expiresAt: string | null }) => ({ id: l.id, workspaceId: l.workspaceId, pageId: l.pageId, createdAt: l.createdAt, createdBy: l.createdBy, expiresAt: l.expiresAt });
+  const livePage = (workspaceId: string, pageId: string) => {
+    const page = pages.get(pageKey(workspaceId, pageId));
+    if (!page || page.deleted) throw new ApiError("not_found", "page not found");
+    return page;
+  };
+  add("POST", "/workspaces/:workspaceId/pages/:pageId/share-links", "public-share", (ctx) => {
+    const ws = workspaceFor(ctx, "write");
+    const pageId = parsePageId(ctx.params.pageId);
+    livePage(ws.id, pageId);
+    const parsed = ShareLinkCreateRequestSchema.safeParse(ctx.body.length === 0 ? {} : parseJson(ctx));
+    if (!parsed.success) throw zodFail(parsed.error);
+    const days = parsed.data.expiresInDays === undefined ? 30 : parsed.data.expiresInDays;
+    const token = randomBytes(24).toString("base64url");
+    const now = Date.now();
+    const link = { id: `shl_${randomBytes(6).toString("hex")}`, workspaceId: ws.id, pageId, tokenHash: sha256(token), createdAt: new Date(now).toISOString(), createdBy: ctx.user.id, expiresAt: days === null ? null : new Date(now + days * 86_400_000).toISOString(), revoked: false };
+    shareLinks.set(link.id, link);
+    const host = ctx.headers.host ?? "127.0.0.1";
+    return jsonReply(201, { ...shareResource(link), token, url: `http://${host}/s/${token}` });
+  });
+  add("GET", "/workspaces/:workspaceId/pages/:pageId/share-links", "public-share", (ctx) => {
+    const ws = workspaceFor(ctx, "write");
+    const pageId = parsePageId(ctx.params.pageId);
+    livePage(ws.id, pageId);
+    const active = [...shareLinks.values()].filter((l) => l.workspaceId === ws.id && l.pageId === pageId && !l.revoked && (l.expiresAt === null || Date.parse(l.expiresAt) > Date.now()));
+    return jsonReply(200, { items: active.reverse().map(shareResource), nextCursor: null });
+  });
+  add("DELETE", "/workspaces/:workspaceId/share-links/:linkId", "public-share", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = workspaceFor(ctx, "write");
+      const link = shareLinks.get(ctx.params.linkId ?? "");
+      if (!link || link.workspaceId !== ws.id) throw new ApiError("not_found", "share link not found");
+      link.revoked = true;
+      return { status: 204, headers: {} };
+    }),
+  );
+  const SHARE_HEADERS = { "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'", "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff", "content-type": "text/html; charset=utf-8" };
+  const escapeText = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  function sharePage(pathname: string): Reply {
+    const missing: Reply = { status: 404, headers: SHARE_HEADERS, body: '<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>Not found</title></head><body><p>Not available.</p></body></html>' };
+    const m = /^\/s\/([A-Za-z0-9_-]+)$/.exec(pathname);
+    if (!caps.has("public-share") || !m) return missing;
+    const hash = sha256(m[1]!);
+    const link = [...shareLinks.values()].find((l) => l.tokenHash === hash && !l.revoked && (l.expiresAt === null || Date.parse(l.expiresAt) > Date.now()));
+    const page = link ? pages.get(pageKey(link.workspaceId, link.pageId)) : undefined;
+    if (!link || !page || page.deleted) return missing;
+    const rev = currentRevision(page);
+    return { status: 200, headers: SHARE_HEADERS, body: `<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>${escapeText(rev.title)}</title></head><body><main><h1>${escapeText(rev.title)}</h1><pre>${escapeText(rev.markdown)}</pre></main></body></html>` };
+  }
+
   // ---------- dispatch ----------
   function matchRoute(segments: string[]): { route: Route; params: Record<string, string> }[] {
     const found: { route: Route; params: Record<string, string> }[] = [];
@@ -736,6 +789,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       const url = new URL(req.url ?? "/", "http://localhost");
       const method = req.method ?? "GET";
       const body = await readBody(req);
+      if (method === "GET" && url.pathname.startsWith("/s/")) return send(res, sharePage(url.pathname));
       if (!url.pathname.startsWith(`${API_BASE_PATH}/`)) return send(res, errorReply(new ApiError("not_found", "no such route"), req));
       const segments = url.pathname.slice(API_BASE_PATH.length).split("/").filter(Boolean);
 

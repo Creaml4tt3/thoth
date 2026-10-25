@@ -35,6 +35,11 @@ export interface Client {
   unrouted(method: string, path: string, init?: CallInit): Promise<ApiResponse>;
   /** Opens a streaming GET for a route (SSE). The caller aborts the controller. */
   stream(operationId: string, init: CallInit, controller: AbortController): Promise<{ response: Response; issues: string[] }>;
+  /**
+   * A GET outside /api/v1 without any credential, for the public pages of a capability (`public-share`: `/s/<token>`).
+   * Not validated against the route registry; the check asserts what it needs.
+   */
+  publicGet(path: string, accept: string): Promise<{ status: number; headers: Headers; text: string }>;
   redact(text: string): string;
   violations: Violation[];
   /** Number of HTTP responses received and validated so far. */
@@ -118,6 +123,17 @@ export function createClient(options: { baseUrl: string; token: string; fetch?: 
       const issues = raw.status >= 400 ? validateUnroutedProblem(observed).map((i) => redact(i)) : [`expected an error response, got HTTP ${raw.status}`];
       if (issues.length) violations.push({ operation: `${method} ${path}`, status: raw.status, issues });
       return { status: raw.status, headers: raw.headers, contentType: raw.contentType, body: raw.body, bytes: raw.bytes, issues };
+    },
+    async publicGet(path, accept) {
+      if (!path.startsWith("/") || path.startsWith("//")) throw new Error("publicGet takes a path on the server's origin");
+      let res: Response;
+      try {
+        res = await doFetch(`${base}${path}`, { method: "GET", headers: { accept }, redirect: "manual" });
+      } catch (error) {
+        throw new Error(redact(`network error calling GET ${path}: ${error instanceof Error ? error.message : String(error)}`));
+      }
+      stats.responses++;
+      return { status: res.status, headers: res.headers, text: await res.text() };
     },
     async stream(operationId, init, controller) {
       const route = getRoute(operationId);

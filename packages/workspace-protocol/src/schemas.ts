@@ -8,6 +8,7 @@ import { SearchHitSchema, SearchRequestSchema, SearchResponseSchema } from "./se
 import { AttachmentResourceSchema } from "./attachments.ts";
 import { ChangeEntrySchema, ChangeHintEventSchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemSchema, TransferResourceSchema } from "./transfers.ts";
+import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 
 export interface ProtocolSchemaEntry {
   /** OpenAPI component name. */
@@ -50,4 +51,8 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "TransferCommitRequest", file: "transfer-commit-request.v1", schema: TransferCommitRequestSchema },
   { name: "TransferItem", file: "transfer-item.v1", schema: TransferItemSchema },
   { name: "TransferResource", file: "transfer-resource.v1", schema: TransferResourceSchema },
+  { name: "ShareLinkCreateRequest", file: "share-link-create-request.v1", schema: ShareLinkCreateRequestSchema },
+  { name: "ShareLink", file: "share-link.v1", schema: ShareLinkSchema },
+  { name: "ShareLinkCreated", file: "share-link-created.v1", schema: ShareLinkCreatedSchema },
+  { name: "ShareLinkList", file: "share-link-list.v1", schema: ShareLinkListSchema },
 ];
