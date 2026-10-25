@@ -124,7 +124,8 @@ describe("restoring tabs in the same browser", () => {
     const stored = browser.local.get(TABS_KEY)!;
     expect(Object.keys(JSON.parse(stored))).toEqual(["v", "active", "tabs"]);
     expect(stored).not.toMatch(/Alpha|Beta|Gamma|Notes|Body of/);
-    expect(stored).not.toMatch(/thoth_(at|rt|pat)_|token|email|Ada/i);
+    // Word boundaries: a random page id ("…a41adabc…") must not look like the name.
+    expect(stored).not.toMatch(/thoth_(at|rt|pat)_|token|email|\bAda\b/i);
     for (const tab of JSON.parse(stored).tabs as Record<string, string>[]) expect(Object.keys(tab).sort()).toEqual(["k", "page", "server", "workspace"]);
     expect(JSON.parse(stored).active).toBe(1);
     // Nothing else in storage changed because of the tabs, and the session storage holds none of it.
