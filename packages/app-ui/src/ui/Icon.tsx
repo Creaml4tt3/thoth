@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   "page-plus": (
@@ -60,6 +60,18 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     <>
       <path d="M12 3v12M7 10.5l5 4.5 5-4.5" />
       <path d="M4 20h16" />
+    </>
+  ),
+  shrink: (
+    <>
+      <path d="M4 14h6v6M20 10h-6V4" />
+      <path d="M10 14l-6 6M14 10l6-6" />
+    </>
+  ),
+  expand: (
+    <>
+      <path d="M14 4h6v6M10 20H4v-6" />
+      <path d="M20 4l-6 6M4 20l6-6" />
     </>
   ),
   "sign-out": (

@@ -4,8 +4,8 @@
  *
  * - Clicking a page opens it in the current tab; Cmd/Ctrl+click, middle-click and Cmd/Ctrl+Enter open a new tab
  *   (`open(state, target, { newTab: true })`). A new tab goes right after the current one, as in a browser.
- * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. The Agent Hub
- *   (desktop only) is one tab in the same way.
+ * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. The review of
+ *   the assistant's run (desktop only) is one tab in the same way.
  * - There is always at least one tab. Closing the last one leaves an empty tab.
  * - Only the current tab is mounted. Leaving a tab writes its pending edits first (`flushAll`, done by the app),
  *   so a switch never loses an edit.
@@ -16,8 +16,8 @@ export type TabTarget =
   | { kind: "page"; path: string }
   /** A page of a workspace on a server. */
   | { kind: "workspace"; server: string; workspace: string; page: string }
-  | { kind: "settings"; section?: "servers" }
-  /** The Agent Hub (desktop only; the web client drops it). */
+  | { kind: "settings"; section?: "servers" | "agents" }
+  /** The review of the assistant's current run (desktop only; the web client drops it). */
   | { kind: "agents" }
   /** A new, empty tab. */
   | { kind: "blank" };
@@ -189,7 +189,7 @@ function targetFromStored(value: unknown): TabTarget | null {
     case "ws":
       return text(v["server"]) && text(v["workspace"]) && text(v["page"]) ? { kind: "workspace", server: v["server"], workspace: v["workspace"], page: v["page"] } : null;
     case "settings":
-      return v["section"] === "servers" ? { kind: "settings", section: "servers" } : { kind: "settings" };
+      return v["section"] === "servers" || v["section"] === "agents" ? { kind: "settings", section: v["section"] } : { kind: "settings" };
     case "agents":
       return { kind: "agents" };
     case "blank":

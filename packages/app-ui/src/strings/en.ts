@@ -212,7 +212,7 @@ export const en = {
     title: "Keyboard shortcuts",
     intro: "Every command can be reached with the keyboard. Press Ctrl/Cmd+K and type > to find a command by name.",
     close: "Close",
-    groups: { general: "Everywhere", tabs: "Tabs", tree: "Page tree", editor: "Editor" } satisfies Record<ShortcutGroup, string>,
+    groups: { general: "Everywhere", assistant: "Thoth assistant", tabs: "Tabs", tree: "Page tree", editor: "Editor" } satisfies Record<ShortcutGroup, string>,
     /** Marks a shortcut that has other keys in the web version. */
     webDiffers: "Different on the desktop app",
     desktopDiffers: "Different in the web version",
@@ -238,8 +238,10 @@ export const en = {
       moveDown: "Move page down",
       theme: (name: string) => `Change theme: ${name}`,
       settings: "Open Settings",
-      /** Desktop only. */
-      agents: "Open the Agent Hub",
+      /** Desktop only: the mascot's prompt bubble, its size, and the assistant's settings. */
+      ask: "Ask Thoth",
+      assistantSize: "Shrink or expand the assistant",
+      assistantSettings: "Open the assistant settings",
       newTab: "New tab",
       closeTab: "Close tab",
       nextTab: "Next tab",
@@ -282,6 +284,8 @@ export const en = {
       "style.link": "Link",
       "style.toolbar": "Go to the formatting toolbar",
       "dialog.close": "Close a dialog or menu",
+      "assistant.ask": "Ask Thoth (open the assistant's bubble)",
+      "assistant.size": "Shrink or expand the assistant",
     } satisfies Record<ShortcutId, string>,
   },
 

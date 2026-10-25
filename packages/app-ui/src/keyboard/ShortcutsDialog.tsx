@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useStrings } from "../strings/index.ts";
 import { Modal } from "../ui/Modal.tsx";
-import { allShortcuts, currentPlatform, differsOnWeb, formatShortcut, type Client, type Platform, type ShortcutGroup } from "./shortcuts.ts";
+import { allShortcuts, currentPlatform, differsOnWeb, formatShortcut, offeredOn, type Client, type Platform, type ShortcutGroup } from "./shortcuts.ts";
 
-const GROUPS: readonly ShortcutGroup[] = ["general", "tabs", "tree", "editor"];
+const GROUPS: readonly ShortcutGroup[] = ["general", "assistant", "tabs", "tree", "editor"];
 
 /**
  * Cmd/Ctrl+/: every shortcut, written from the shortcut table, so the list is what the keys do. On the web it shows
@@ -13,7 +13,7 @@ const GROUPS: readonly ShortcutGroup[] = ["general", "tabs", "tree", "editor"];
 export function ShortcutsDialog({ client, platform = currentPlatform(), onClose }: { client: Client; platform?: Platform; onClose(): void }) {
   const t = useStrings().keyboard;
   const other: Client = client === "web" ? "desktop" : "web";
-  const defs = allShortcuts();
+  const defs = useMemo(() => allShortcuts().filter((d) => offeredOn(d, client)), [client]);
   const groups = useMemo(() => GROUPS.map((group) => ({ group, items: defs.filter((d) => d.group === group) })).filter((g) => g.items.length > 0), [defs]);
   return (
     <Modal title={t.title} onClose={onClose} wide>

@@ -190,7 +190,7 @@ export const th: Strings = {
     title: "ปุ่มลัด",
     intro: "ทุกคำสั่งใช้ได้ด้วยแป้นพิมพ์ กด Ctrl/Cmd+K แล้วพิมพ์ > เพื่อหาคำสั่งตามชื่อ",
     close: "ปิด",
-    groups: { general: "ทุกที่", tabs: "แท็บ", tree: "ต้นไม้หน้า", editor: "ตัวแก้ไข" },
+    groups: { general: "ทุกที่", assistant: "ผู้ช่วย Thoth", tabs: "แท็บ", tree: "ต้นไม้หน้า", editor: "ตัวแก้ไข" },
     webDiffers: "บนแอปเดสก์ท็อปใช้ปุ่มอื่น",
     desktopDiffers: "บนเว็บใช้ปุ่มอื่น",
     webNote: "เบราว์เซอร์เก็บบางปุ่มไว้ใช้เอง (แท็บใหม่ ปิดแท็บ สลับแท็บ) เวอร์ชันเว็บจึงใช้ปุ่มเหล่านี้แทน หากต่างกัน จะแสดงปุ่มของแอปเดสก์ท็อปไว้ด้วย",
@@ -213,7 +213,9 @@ export const th: Strings = {
       moveDown: "ย้ายหน้าลง",
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
-      agents: "เปิด Agent Hub",
+      ask: "ถาม Thoth",
+      assistantSize: "ย่อหรือขยายผู้ช่วย", // REVIEW
+      assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       newTab: "แท็บใหม่",
       closeTab: "ปิดแท็บ",
       nextTab: "แท็บถัดไป",
@@ -256,6 +258,8 @@ export const th: Strings = {
       "style.link": "ลิงก์",
       "style.toolbar": "ไปที่แถบเครื่องมือจัดรูปแบบ",
       "dialog.close": "ปิดกล่องโต้ตอบหรือเมนู",
+      "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)", // REVIEW
+      "assistant.size": "ย่อหรือขยายผู้ช่วย", // REVIEW
     },
   },
 

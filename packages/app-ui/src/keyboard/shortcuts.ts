@@ -61,9 +61,11 @@ export type ShortcutId =
   | "style.highlight"
   | "style.link"
   | "style.toolbar"
-  | "dialog.close";
+  | "dialog.close"
+  | "assistant.ask"
+  | "assistant.size";
 
-export type ShortcutGroup = "general" | "tabs" | "tree" | "editor";
+export type ShortcutGroup = "general" | "assistant" | "tabs" | "tree" | "editor";
 
 /**
  * Who acts on the key. "global": `useShortcuts` (the app passes the handlers). "tree", "editor" and "dialog": the
@@ -81,6 +83,8 @@ export interface ShortcutDef {
   web?: readonly Chord[];
   /** How the keys are written in the list when they are not a plain chord (for example "Cmd/Ctrl+click"). */
   display?: { desktop?: string; web?: string };
+  /** Only this client has the command (the Thoth assistant is desktop only): the other binds nothing and lists nothing. */
+  only?: Client;
 }
 
 const DIGITS = Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`);
@@ -118,6 +122,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "folder.new", group: "general", scope: "global", desktop: [{ key: "n", mod: true, shift: true }], web: [{ code: "KeyN", alt: true, shift: true }] },
   { id: "theme.cycle", group: "general", scope: "global", desktop: [{ key: "l", mod: true, shift: true }] },
   { id: "dialog.close", group: "general", scope: "dialog", desktop: [{ key: "Escape" }] },
+
+  // The Thoth assistant (the mascot; desktop only)
+  { id: "assistant.ask", group: "assistant", scope: "global", only: "desktop", desktop: [{ code: "KeyJ", mod: true }] },
+  { id: "assistant.size", group: "assistant", scope: "global", only: "desktop", desktop: [{ code: "KeyJ", mod: true, shift: true }] },
 
   // Tabs
   { id: "tab.new", group: "tabs", scope: "global", desktop: [{ key: "t", mod: true }], web: [{ code: "KeyT", alt: true }] },
@@ -176,8 +184,12 @@ export function allShortcuts(): readonly ShortcutDef[] {
 export const shortcutById = (id: ShortcutId): ShortcutDef | undefined => allShortcuts().find((s) => s.id === id);
 
 export function chordsFor(def: ShortcutDef, client: Client): readonly Chord[] {
+  if (def.only !== undefined && def.only !== client) return [];
   return client === "web" && def.web ? def.web : def.desktop;
 }
+
+/** True when `client` has the shortcut's command at all. */
+export const offeredOn = (def: ShortcutDef, client: Client): boolean => def.only === undefined || def.only === client;
 
 export function currentPlatform(userAgent: string = globalThis.navigator?.userAgent ?? ""): Platform {
   return /Mac OS X|Macintosh|iPhone|iPad/.test(userAgent) ? "mac" : "other";

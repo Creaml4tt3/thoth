@@ -38,8 +38,10 @@ export interface CommandActions {
   reorder?(delta: -1 | 1): void;
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
-  /** The Agent Hub (the desktop only). */
-  openAgents?(): void;
+  /** The Thoth assistant (the desktop only): its prompt bubble, its size, and its settings. */
+  askAssistant?(): void;
+  toggleAssistantSize?(): void;
+  openAssistantSettings?(): void;
   tabs: { newTab(): void; closeTab(): void; next(): void; previous(): void; list: readonly { id: string; label: string }[]; active: string; goTo(id: string): void };
   toggleMode?(): void;
   showShortcuts(): void;
@@ -71,7 +73,9 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   }
   for (const theme of THEMES) add(`theme.${theme}`, t.theme(strings.theme[theme]), () => a.theme.set(theme), { keywords: `appearance colour mode ${theme === "dark" ? "night" : ""}`.trim() });
   add("settings.open", t.settings, a.openSettings, { ...key("settings.open"), keywords: "preferences" });
-  if (a.openAgents) add("agents.open", t.agents, a.openAgents, { keywords: "agent ai claude assistant" });
+  if (a.askAssistant) add("assistant.ask", t.ask, a.askAssistant, { ...key("assistant.ask"), keywords: "agent ai claude codex assistant mascot ibis prompt" });
+  if (a.toggleAssistantSize) add("assistant.size", t.assistantSize, a.toggleAssistantSize, { ...key("assistant.size"), keywords: "mascot compact full small big" });
+  if (a.openAssistantSettings) add("assistant.settings", t.assistantSettings, a.openAssistantSettings, { keywords: "agent hub ai claude codex history usage permissions mascot preferences" });
   add("tab.new", t.newTab, a.tabs.newTab, key("tab.new"));
   add("tab.close", t.closeTab, a.tabs.closeTab, key("tab.close"));
   add("tab.next", t.nextTab, a.tabs.next, key("tab.next"));
