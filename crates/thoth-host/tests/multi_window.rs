@@ -39,6 +39,7 @@ fn host(allow: &Path, data: &Path) -> Host {
         browser: Arc::new(Nothing),
         file_manager: Arc::new(Nothing),
         agent_search_dirs: Some(Vec::new()),
+        link_preview_loopback: false,
     })
 }
 

@@ -78,6 +78,7 @@ impl Harness {
             browser: browser.clone(),
             file_manager: Arc::new(NoFileManager),
             agent_search_dirs: None,
+            link_preview_loopback: false,
         }));
         Self { host, secrets, browser, dir, seen: Mutex::default() }
     }

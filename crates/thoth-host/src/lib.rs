@@ -24,6 +24,7 @@ pub mod agent;
 mod at;
 pub mod error;
 mod handles;
+pub mod links;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
@@ -39,6 +40,7 @@ pub use error::{HostError, HostResult};
 pub use remote::{Browser, KEYCHAIN_SERVICE, MemorySecretStore, SecretStore};
 
 use agent::Agents;
+use links::{LinkOptions, LinkPreviews};
 use paths::{canonical, canonicalize_path, check_root_policy};
 use remote::Remote;
 #[cfg(unix)]
@@ -65,6 +67,7 @@ pub const COMMANDS: &[&str] = &[
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
     "agent.start", "agent.events", "agent.cancel", "agent.run.dispose", "agent.sweep",
     "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
+    "link.preview", "link.preview.clear", "link.open",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -105,6 +108,9 @@ pub struct HostConfig {
     /// Test hook (stdio harness only): search only these folders for agent CLIs instead of `PATH` and the usual
     /// install locations. The desktop shell always passes `None`.
     pub agent_search_dirs: Option<Vec<PathBuf>>,
+    /// Test hook (stdio harness only, `--link-preview-loopback`): link previews may fetch from loopback addresses (a
+    /// local test server). Every other address rule still applies. The desktop shell always passes `false`.
+    pub link_preview_loopback: bool,
 }
 
 struct VaultEntry {
@@ -137,6 +143,7 @@ pub struct Host {
     state: Mutex<State>,
     remote: Remote,
     agents: Agents,
+    links: LinkPreviews,
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
@@ -150,7 +157,8 @@ impl Host {
         let allow_roots = config.allow_roots.iter().filter_map(|r| canonicalize_path(r).ok()).collect();
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
         let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
-        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, replace: Mutex::new(()) }
+        let links = LinkPreviews::new(config.data_dir.clone(), LinkOptions { allow_loopback: config.link_preview_loopback, ..LinkOptions::default() });
+        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, links, replace: Mutex::new(()) }
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -377,6 +385,18 @@ impl Host {
             "agent.history.list" => json(self.agents.history_list()?),
             "agent.history.delete" => {
                 self.agents.history_delete(str_arg(args, "id")?)?;
+                null()
+            }
+            // Link previews (ADR-0020): the host fetches, under its own address and size rules; the webview gets text.
+            "link.preview" => json(self.links.preview(str_arg(args, "url")?)?),
+            "link.preview.clear" => {
+                self.links.clear()?;
+                null()
+            }
+            // Opens a web link in the system browser (the webview has no opener permission).
+            "link.open" => {
+                let url = links::openable(str_arg(args, "url")?)?;
+                self.config.browser.open(url.as_str())?;
                 null()
             }
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),

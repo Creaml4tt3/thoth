@@ -70,6 +70,7 @@ fn fixture(search: Option<Vec<PathBuf>>, data_dir: bool) -> Fixture {
         browser: Arc::new(NoBrowser),
         file_manager: Arc::new(NoFiles),
         agent_search_dirs: search,
+        link_preview_loopback: false,
     });
     Fixture { host, data, vault }
 }

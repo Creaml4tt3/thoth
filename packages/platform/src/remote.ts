@@ -6,7 +6,7 @@
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { Platform, Servers, VaultConnection } from "./index.ts";
+import type { Links, Platform, Servers, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -305,10 +305,19 @@ export function remoteAgents(transport: Transport): AgentHost {
   };
 }
 
+export function remoteLinks(transport: Transport): Links {
+  return {
+    preview: (url) => transport.call("link.preview", { url }),
+    clearPreviews: async () => void (await transport.call("link.preview.clear", {})),
+    open: async (url) => void (await transport.call("link.open", { url })),
+  };
+}
+
 export function createRemotePlatform(transport: Transport, kind: Platform["kind"]): Platform {
   return {
     servers: remoteServers(transport),
     agents: remoteAgents(transport),
+    links: remoteLinks(transport),
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),

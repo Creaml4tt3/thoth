@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Least privilege for the main window and Thoth's own windows on a Private Space (space-*, ADR-0019): Thoth's host commands, event listening, and showing a system notification (check and ask for the permission, notify; ADR-0018). No fs, shell, http, opener or window plugins; native dialogs, the system browser, every server request and the Agent Hub's CLI runs are opened by the host, not the webview.",
+  "description": "Least privilege for the main window and Thoth's own windows on a Private Space (space-*, ADR-0019): Thoth's host commands, event listening, and showing a system notification (check and ask for the permission, notify; ADR-0018). No fs, shell, http, opener or window plugins; native dialogs, the system browser, every server request, link previews (ADR-0020) and the Agent Hub's CLI runs are opened by the host, not the webview.",
   "windows": [
     "main",
     "space-*"
@@ -65,6 +65,9 @@
     "allow-agent-history-write",
     "allow-agent-history-read",
     "allow-agent-history-list",
-    "allow-agent-history-delete"
+    "allow-agent-history-delete",
+    "allow-link-preview",
+    "allow-link-preview-clear",
+    "allow-link-open"
   ]
 }

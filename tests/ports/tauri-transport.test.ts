@@ -51,6 +51,22 @@ describe("TauriTransport", () => {
     expect(seen).toEqual([{ vault: "v", paths: ["a.md"], rescan: false }]);
   });
 
+  it("sends link previews, clearing and opening to the host's link commands (ADR-0020)", async () => {
+    const preview = { url: "https://a.example/", finalUrl: "https://a.example/", title: "A" };
+    const { api, calls } = fakeApi((command) => (command === "link_preview" ? preview : null));
+    const links = createTauriPlatform(api).links!;
+    expect(await links.preview("https://a.example/")).toEqual(preview);
+    await links.clearPreviews();
+    await links.open("https://a.example/x");
+    expect(calls.map((c) => [c[0], c[1]])).toEqual([
+      ["link_preview", { args: { url: "https://a.example/" } }],
+      ["link_preview_clear", { args: {} }],
+      ["link_open", { args: { url: "https://a.example/x" } }],
+    ]);
+    const shell = readFileSync(join(import.meta.dirname, "../../crates/thoth-host/src/lib.rs"), "utf8");
+    expect(shell).toContain(`"link.preview", "link.preview.clear", "link.open",`);
+  });
+
   it("binds to window.__TAURI_INTERNALS__ like @tauri-apps/api", async () => {
     const invoked: unknown[][] = [];
     const api = internalsApi({

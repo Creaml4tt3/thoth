@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, ServerInfo, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, LinkPreview, ServerInfo, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -49,6 +49,16 @@ export interface Platform {
   readonly agents?: AgentHost;
   /** More windows of the app on a Private Space (ADR-0019). Only the desktop shell has them; absent: one window only. */
   readonly windows?: Windows;
+  /** Link previews and opening web links (ADR-0020). Only a native host has them; absent: links show as links. */
+  readonly links?: Links;
+}
+
+/** What the host does with web links (ADR-0020): it fetches their previews and opens them in the browser. */
+export interface Links {
+  preview(url: string): Promise<LinkPreview>;
+  /** Forgets every cached preview. */
+  clearPreviews(): Promise<void>;
+  open(url: string): Promise<void>;
 }
 
 /** What a window asks of the app shell about windows (ADR-0019). Window ids are `space-` and lowercase letters or digits. */

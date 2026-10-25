@@ -12,13 +12,15 @@
 //! (match them by `id`). Every other command runs in order on the main thread, as before. Secrets are kept
 //! in memory only and die with the process, unless `--secrets-file` names a file for them.
 //!
-//! `agent.events` (a long poll) and `agent.detect` (runs the CLI's probes) also run on their own thread.
+//! `agent.events` (a long poll) and `agent.detect` (runs the CLI's probes) also run on their own thread, and so do
+//! `link.*` (link previews fetch from the network).
 //!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
 //! --pick-source <path>, --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
 //! there, so tests run a fake `claude` and can make it missing), --secrets-file <path> (keep server secrets in
 //! that file instead of memory: it stands in for the system keychain, so a test can restart the host and still
-//! be signed in, as the desktop app is). Env: THOTH_TEST_DISABLE_HARDLINK=1 makes no-replace rename take the
+//! be signed in, as the desktop app is), --link-preview-loopback (link previews may fetch from loopback
+//! addresses, so tests run a local page server; ADR-0020). Env: THOTH_TEST_DISABLE_HARDLINK=1 makes no-replace rename take the
 //! exclusive-copy fallback.
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
@@ -114,7 +116,7 @@ impl SecretStore for FileSecretStore {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH]");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback]");
     std::process::exit(2);
 }
 
@@ -125,8 +127,13 @@ fn main() {
     let mut data_dir = None;
     let mut agent_dirs: Option<Vec<PathBuf>> = None;
     let mut secrets_file = None;
+    let mut link_preview_loopback = false;
     let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
+        if flag.to_str() == Some("--link-preview-loopback") {
+            link_preview_loopback = true;
+            continue;
+        }
         let mut value = || args.next().map(PathBuf::from).unwrap_or_else(|| usage("missing flag value"));
         match flag.to_str() {
             Some("--allow-root") => allow_roots.push(value()),
@@ -164,6 +171,7 @@ fn main() {
         browser: Arc::new(EventBrowser { emit: Arc::new(browser_emit) }),
         file_manager: Arc::new(EventFileManager { emit: Arc::new(reveal_emit) }),
         agent_search_dirs: agent_dirs,
+        link_preview_loopback,
     }));
     let mut workers = Vec::new();
 
@@ -206,7 +214,7 @@ fn runs_off_main(line: &str) -> bool {
     serde_json::from_str::<Value>(line)
         .ok()
         .and_then(|r| {
-            r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c.starts_with("sql.") || c.starts_with("fs.") || matches!(c, "api.call" | "agent.events" | "agent.detect"))
+            r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c.starts_with("sql.") || c.starts_with("fs.") || c.starts_with("link.") || matches!(c, "api.call" | "agent.events" | "agent.detect"))
         })
         .unwrap_or(false)
 }

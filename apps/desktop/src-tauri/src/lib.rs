@@ -482,6 +482,8 @@ pub fn run() {
                 file_manager: Arc::new(SystemFileManager),
                 // Agent CLIs are found on PATH and in the usual install folders, never in a folder the webview names.
                 agent_search_dirs: None,
+                // Link previews connect to public addresses only (ADR-0020); the loopback switch is for tests.
+                link_preview_loopback: false,
             });
             let _ = HOST.set(Arc::new(host));
             Ok(())
@@ -634,6 +636,19 @@ mod tests {
         let text = include_str!("../capabilities/main.json");
         for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
+        }
+    }
+
+    #[test]
+    fn capability_grants_exactly_the_host_and_shell_commands() {
+        // Nothing beyond the contract: link previews (ADR-0020) add `link.preview`, `link.preview.clear` and `link.open`
+        // and no plugin (no http, no opener).
+        let capability: Value = serde_json::from_str(include_str!("../capabilities/main.json")).unwrap();
+        let granted: BTreeSet<String> = capability["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).filter(|p| p.starts_with("allow-")).map(str::to_owned).collect();
+        let expected: BTreeSet<String> = thoth_host::COMMANDS.iter().map(|c| c.replace('.', "_")).chain(SHELL_COMMANDS.iter().map(|c| (*c).to_owned())).map(|c| format!("allow-{}", c.replace('_', "-"))).collect();
+        assert_eq!(granted, expected);
+        for link in ["allow-link-preview", "allow-link-preview-clear", "allow-link-open"] {
+            assert!(granted.contains(link), "{link}");
         }
     }
 

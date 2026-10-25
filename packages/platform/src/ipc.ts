@@ -47,6 +47,8 @@ export type HostErrorCode =
   | "SIGN_IN_FAILED"
   /** The agent CLI could not be found or started. */
   | "AGENT_UNAVAILABLE"
+  /** A link preview could not be fetched: the page did not answer, took too long, or is not HTML (ADR-0020). */
+  | "PREVIEW_UNAVAILABLE"
   | "INTERNAL";
 
 export interface HostError {
@@ -166,6 +168,35 @@ export interface Commands {
   "agent.history.list": { args: Record<string, never>; result: HostHistoryRun[] };
   /** Deletes one run's details. Repeating it is harmless. */
   "agent.history.delete": { args: { id: string }; result: null };
+
+  // ---- Link previews (ADR-0020). Desktop only: the host fetches, the webview has no network.
+  /**
+   * The Open Graph preview of an `http(s)` link, from the host's cache (app data folder) when fresh. The host connects
+   * to public addresses only (checked after DNS, for every hop), follows at most 5 redirects, gives up after 5 s and
+   * reads at most 512 KB of HTML. `NOT_ALLOWED`: a scheme, credentials or an address it refuses;
+   * `PREVIEW_UNAVAILABLE`: no answer, not HTML, too slow. Every text field is plain text, never HTML.
+   */
+  "link.preview": { args: { url: string }; result: LinkPreview };
+  /** Forgets every cached preview and failure. */
+  "link.preview.clear": { args: Record<string, never>; result: null };
+  /** Opens an `http(s)` link in the system browser (the webview has no opener). */
+  "link.open": { args: { url: string }; result: null };
+}
+
+/** What a page says about itself (ADR-0020). Text is decoded, stripped of control characters and cut. */
+export interface LinkPreview {
+  /** The link asked for (normalized, without its `#fragment`). */
+  url: string;
+  /** Where the last redirect ended. */
+  finalUrl: string;
+  /** `og:site_name`, at most 80 characters. */
+  siteName?: string;
+  /** `og:title`, `twitter:title` or `<title>`, at most 200 characters. */
+  title?: string;
+  /** `og:description` or `twitter:description`, at most 300 characters. */
+  description?: string;
+  /** `og:image` or `twitter:image` as a `data:` URL: PNG, JPEG, GIF or WebP (by its bytes), at most 2 MB. */
+  image?: string;
 }
 
 export interface ServerInfo {

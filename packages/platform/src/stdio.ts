@@ -23,6 +23,8 @@ export interface StdioTransportOptions {
    * system keychain, so a restarted host is still signed in as the desktop app is.
    */
   secretsFile?: string;
+  /** Test hook: link previews may fetch from loopback addresses, for a local page server (`--link-preview-loopback`). */
+  linkPreviewLoopback?: boolean;
   env?: Record<string, string>;
   /**
    * Harness-only host events other than `vault.changed` (for example `browser.open`, where the test harness
@@ -58,6 +60,7 @@ export class StdioTransport implements Transport {
     if (options.dataDir !== undefined) args.push("--data-dir", options.dataDir);
     for (const dir of options.agentSearchDirs ?? []) args.push("--agent-search-dir", dir);
     if (options.secretsFile !== undefined) args.push("--secrets-file", options.secretsFile);
+    if (options.linkPreviewLoopback) args.push("--link-preview-loopback");
     this.child = spawn(options.binary, args, { env: { ...process.env, ...options.env }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString("utf8")).slice(-4096);

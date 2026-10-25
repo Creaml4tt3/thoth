@@ -55,6 +55,7 @@ fn host(base: &Path, data: &Path, disable_hardlink: bool) -> Host {
         browser: Arc::new(NoBrowser),
         file_manager: Arc::new(NoFiles),
         agent_search_dirs: Some(Vec::new()),
+        link_preview_loopback: false,
     })
 }
 
