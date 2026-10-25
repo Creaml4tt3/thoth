@@ -43,10 +43,17 @@ async function body(req: IncomingMessage): Promise<string> {
 
 /** `port`: listen there (a restart on the same origin keeps the browser's storage); a free one by default. */
 export async function startBridge(options: { dist: string; bridgeDir: string; host: StdioTransportOptions; port?: number }): Promise<Bridge> {
-  // Harness events such as `browser.open` go to the test (options.host.onHostEvent), never to the page.
-  const transport = new StdioTransport(options.host);
-  const token = randomBytes(24).toString("hex");
+  // Harness events such as `browser.open` go to the test (options.host.onHostEvent), never to the page. Connected apps'
+  // events (ADR-0021) go to the pages too, as the desktop shell sends them to its windows.
   const streams = new Set<ServerResponse>();
+  const transport = new StdioTransport({
+    ...options.host,
+    onHostEvent: (event, payload) => {
+      if (event === "mcp.request" || event === "mcp.pending") for (const res of streams) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+      options.host.onHostEvent?.(event, payload);
+    },
+  });
+  const token = randomBytes(24).toString("hex");
   let hold: { command: CommandName; when: (args: Record<string, unknown>) => boolean; arrive(): void; gate: Promise<void> } | null = null;
   const unlisten = await transport.listen("vault.changed", (event: VaultChangedEvent) => {
     for (const res of streams) res.write(`data: ${JSON.stringify(event)}\n\n`);
