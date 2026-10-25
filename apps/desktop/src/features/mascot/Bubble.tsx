@@ -21,7 +21,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ContextPicker } from "../agents/ContextPicker.tsx";
 import { EventLine, Outcome, StoppedNotice, providerOf } from "../agents/parts.tsx";
-import { MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
+import { excerptAllowed, MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
 import { AGENT_PROVIDERS } from "../agents/settings.ts";
 import type { Insets, Size } from "./placement.ts";
 
@@ -66,7 +66,9 @@ function useDefaultContext(agents: AgentsService, excerpt: string | null) {
       const page = servers.getState().trees[`${target.server}\n${target.workspace}`]?.nodes.find((n) => n.id === target.page);
       if (ws && page) agents.addWorkspacePage({ server: target.server, workspace: target.workspace, page: target.page, title: page.title, workspaceName: ws.name });
     }
-    if (excerpt) agents.setDraft({ excerpt: { text: excerpt, from: target.kind === "page" ? target.path : null } });
+    // The selected text is page text: it is offered only where Permissions allow that kind of page.
+    const source = target.kind === "workspace" ? "workspace" : "private";
+    if (excerpt && excerptAllowed(source, settings)) agents.setDraft({ excerpt: { text: excerpt, from: target.kind === "page" ? target.path : null, source } });
     // Once per opening of the bubble.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

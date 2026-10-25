@@ -14,7 +14,7 @@ import { mkdir, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/p
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "@thoth/domain";
-import { AgentHub, createWorkspaceReader, LimitError, WorkspaceContextError, type AgentEvent, type AgentHost, type RunRecord, type StartTask } from "@thoth/agent-core";
+import { AgentHub, createWorkspaceReader, LimitError, MAX_EXCERPT_CHARS, WorkspaceContextError, type AgentEvent, type AgentHost, type RunRecord, type StartTask } from "@thoth/agent-core";
 import { NodeAgentHost } from "@thoth/agent-core/node";
 import { createClaudeProvider } from "@thoth/agent-claude";
 import { Vault } from "@thoth/local-store";
@@ -179,6 +179,21 @@ describe.each(runtimes)("Agent Hub on the $name", (runtime) => {
     } finally {
       await out.close();
     }
+  });
+
+  it("quotes selected text to the CLI after the task, and keeps only the task in the run record", async () => {
+    const quote = "We have a cat. ".repeat(300); // longer than the limit: cut to it
+    const { started, work } = await runTask("Rewrite this.\n@sleep 300", ["Notes/Plan.md"], { excerpt: { text: quote, from: "Notes/Plan.md" } });
+    const record = await fakeRecord(work); // before it ends: a run that proposed nothing deletes its folder
+    const finished = await started.finished;
+    expect(record.stdin.startsWith("Rewrite this.\n@sleep 300\n\nSelected text (from Notes/Plan.md):\n\"\"\"\n")).toBe(true);
+    expect(record.stdin).toContain(`"""\n${quote.slice(0, MAX_EXCERPT_CHARS)}\n"""`);
+    expect(record.stdin).not.toContain(quote.slice(0, MAX_EXCERPT_CHARS + 1));
+    // No page text in the vault's record (spec §3.3): the task is the user's own words.
+    expect(started.record.task.prompt).toBe("Rewrite this.\n@sleep 300");
+    expect(finished.task.prompt).toBe("Rewrite this.\n@sleep 300");
+    const saved = await readFile(join(root, ".thoth/agent/runs", `${finished.id}.json`), "utf8");
+    expect(saved).not.toContain("We have a cat. We have");
   });
 
   it("stages only the selected context, streams, and applies exactly the approved bytes", async () => {

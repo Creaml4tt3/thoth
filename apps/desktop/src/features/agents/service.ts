@@ -10,6 +10,7 @@ import {
   AgentUnavailableError,
   createWorkspaceReader,
   LimitError,
+  MAX_EXCERPT_CHARS,
   minutesToMs,
   previewContext,
   StagingError,
@@ -65,19 +66,18 @@ export interface Draft {
   timeMinutes: number | "default";
   /** US dollars for this run, "none" for no limit, or the default from the settings. */
   budget: number | "none" | "default";
-  /** Text selected in the editor when the bubble opened, quoted after the task; null: none. */
-  excerpt: { text: string; from: string | null } | null;
+  /**
+   * Text selected in the editor when the bubble opened, quoted to the CLI after the task (never kept in the run
+   * record); `source` is the kind of page it came from, so Permissions apply to it as to that page. null: none.
+   */
+  excerpt: { text: string; from: string | null; source: "private" | "workspace" } | null;
 }
 
 /** The longest excerpt of selected text quoted in a task. */
-export const MAX_EXCERPT = 4000;
+export const MAX_EXCERPT = MAX_EXCERPT_CHARS;
 
-/** The prompt the CLI gets: the task, then the selected text (if any) quoted as reference. */
-export function composePrompt(prompt: string, excerpt: Draft["excerpt"]): string {
-  if (!excerpt || excerpt.text.trim() === "") return prompt;
-  const text = excerpt.text.slice(0, MAX_EXCERPT);
-  return `${prompt.trimEnd()}\n\nSelected text${excerpt.from ? ` (from ${excerpt.from})` : ""}:\n"""\n${text}\n"""\n`;
-}
+/** Whether Permissions let an excerpt from that kind of page be given to an agent. */
+export const excerptAllowed = (source: "private" | "workspace", settings: AgentSettings): boolean => (source === "private" ? settings.allowPrivate : settings.allowWorkspace);
 
 export type DraftProblem = "needContext" | "needTask" | "badModel" | "privateOff" | "wholeSpaceOff" | "workspaceOff" | "contextTooMany" | "contextTooLarge" | "contextFileTooLarge" | "contextMissing";
 
@@ -302,6 +302,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         selection: settings.allowPrivate ? d.selection : [],
         wholeSpace: settings.allowWholeSpace && d.wholeSpace,
         workspace: settings.allowWorkspace ? d.workspace : [],
+        excerpt: d.excerpt && excerptAllowed(d.excerpt.source, settings) ? d.excerpt : null,
       };
       set({ settings, cleared: null, draft });
       if (draft.selection !== d.selection || draft.wholeSpace !== d.wholeSpace) void service.refreshPreview();
@@ -320,7 +321,8 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         const { record, finished } = await hub.start(
           {
             provider,
-            prompt: composePrompt(prompt, excerpt),
+            prompt,
+            ...(excerpt && excerptAllowed(excerpt.source, state.settings) ? { excerpt: { text: excerpt.text, ...(excerpt.from ? { from: excerpt.from } : {}) } } : {}),
             selection: wholeSpace ? [] : selection,
             ...(wholeSpace ? { wholeSpace: true } : {}),
             ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),

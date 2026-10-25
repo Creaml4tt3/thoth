@@ -39,6 +39,20 @@ export interface StartTask {
   maxBudgetUsd?: number;
   /** Milliseconds, from 1 second to 24 hours; the host's default (30 minutes) when absent. */
   timeoutMs?: number;
+  /**
+   * Text the user selected in a page, quoted to the CLI after the task (at most `MAX_EXCERPT_CHARS`). Like the workspace
+   * framing it is sent but not kept: the run record holds only the user's own words, never page text (spec §3.3).
+   */
+  excerpt?: { text: string; from?: string };
+}
+
+/** The longest selected-text excerpt quoted after a task. */
+export const MAX_EXCERPT_CHARS = 4000;
+
+/** The excerpt as the CLI reads it, after the task; "" when there is none. */
+export function quoteExcerpt(excerpt: StartTask["excerpt"]): string {
+  if (!excerpt || excerpt.text.trim() === "") return "";
+  return `\n\nSelected text${excerpt.from ? ` (from ${excerpt.from})` : ""}:\n"""\n${excerpt.text.slice(0, MAX_EXCERPT_CHARS)}\n"""\n`;
 }
 
 export class AgentUnavailableError extends Error {
@@ -226,7 +240,7 @@ export class AgentHub {
     try {
       // The reference folder is announced to the model, in front of the user's own words (the record keeps only those).
       const readOnly = context.find((c) => c.readOnly);
-      const framed = readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt;
+      const framed = (readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt) + quoteExcerpt(task.excerpt);
       await provider.startTask({ workspace, dir, prompt: framed, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
     } catch (error) {
       record.state = "failed";

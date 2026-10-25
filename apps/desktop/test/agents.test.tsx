@@ -429,18 +429,26 @@ describe("the assistant's runs: context", () => {
     const dialog = await screen.findByRole("dialog", { name: "Ask Thoth" });
     expect(within(dialog).getByRole("list", { name: "Context" }).textContent).toContain("Selected text (1 word)");
     await ready();
-    await writeAndStart(app, "Explain it.");
+    await writeAndStart(app, "Explain it.\n@sleep 300");
+    // The CLI gets the quote; the run record in the Private Space keeps only the task (no page text in records).
+    expect((await fakeRecord(await workDir())).stdin).toContain('Explain it.\n@sleep 300\n\nSelected text (from Diary.md):\n"""\nDiary\n"""');
     await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
-    const record = await fakeRecordFromRuns();
-    expect(record).toContain('Explain it.\n\nSelected text (from Diary.md):\n"""\nDiary\n"""');
+    expect((await savedRecords())[0]!["task"]["prompt"]).toBe("Explain it.\n@sleep 300");
+  });
+
+  it("does not offer selected text from a kind of page Permissions switch off", async () => {
+    localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify({ allowPrivate: false }));
+    const app = await openApp(root, {}, createNodePlatform({ vault: root, agents: { dataDir: data, searchDirs: [FAKE_CLAUDE_DIR] } }));
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    const range = document.createRange();
+    range.selectNodeContents((await editorBox()).querySelector("h1")!);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(range);
+    await app.user.keyboard("{Meta>}j{/Meta}");
+    const dialog = await screen.findByRole("dialog", { name: "Ask Thoth" });
+    expect(within(dialog).getByRole("list", { name: "Context" }).textContent).not.toContain("Selected text");
   });
 });
-
-/** The prompt of the only saved run. */
-async function fakeRecordFromRuns(): Promise<string> {
-  const [saved] = await savedRecords();
-  return saved!["task"]["prompt"] as string;
-}
 
 describe("the assistant's runs: limits and settings", () => {
   const select = (name: string, scope: HTMLElement = document.body) => within(scope).getByRole("combobox", { name }) as HTMLSelectElement;
