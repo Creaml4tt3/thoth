@@ -98,7 +98,7 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await page.keyboard.press("ControlOrMeta+Shift+N");
   const naming = page.getByRole("textbox", { name: "Rename Untitled folder" });
   await expect(naming).toBeFocused();
-  expect(await isDirectory("Docs/Untitled folder")).toBe(true);
+  await expect.poll(() => isDirectory("Docs/Untitled folder")).toBe(true);
   await page.keyboard.type("Drafts");
   await page.keyboard.press("Enter");
   await expect.poll(() => isDirectory("Docs/Drafts")).toBe(true);
@@ -111,19 +111,19 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await page.keyboard.press("Enter");
   await expect(page.getByRole("textbox", { name: "Rename Untitled folder" })).toBeFocused();
   await page.keyboard.press("Escape"); // keeps the default name
-  expect(await isDirectory("Docs/Drafts/Untitled folder")).toBe(true);
+  await expect.poll(() => isDirectory("Docs/Drafts/Untitled folder")).toBe(true);
 
   // With focus outside the tree it is created at the top level, and a second one is numbered.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("ControlOrMeta+Shift+N");
   await expect(page.getByRole("textbox", { name: "Rename Untitled folder" })).toBeFocused();
   await page.keyboard.press("Escape");
-  expect(await isDirectory("Untitled folder")).toBe(true);
+  await expect.poll(() => isDirectory("Untitled folder")).toBe(true);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("ControlOrMeta+Shift+N");
   await expect(page.getByRole("textbox", { name: "Rename Untitled folder 2" })).toBeFocused();
   await page.keyboard.press("Escape");
-  expect(await isDirectory("Untitled folder 2")).toBe(true);
+  await expect.poll(() => isDirectory("Untitled folder 2")).toBe(true);
 
   // F2 on a folder renames the directory; links to what is in it follow, and the page keeps its tab.
   await page.getByRole("treeitem", { name: "Notes", exact: true }).click();
@@ -136,7 +136,7 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await expect.poll(() => isDirectory("Papers")).toBe(true);
   expect(await isDirectory("Docs")).toBe(false);
   expect(await read("Papers/Notes.md")).toBe("# Notes\n\nSee [[Roadmap]] and [the plan](../Roadmap.md).\n");
-  expect(await isDirectory("Papers/Drafts")).toBe(true);
+  await expect.poll(() => isDirectory("Papers/Drafts")).toBe(true);
   await expect(current(page)).toHaveText("Notes");
   await expect(page.getByRole("treeitem", { name: "Notes", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(row(page, "Papers")).toBeFocused();

@@ -205,7 +205,7 @@ describe("Plain mode", () => {
     const app = await openApp(root);
     await app.user.click(await screen.findByRole("button", { name: /settings/i }));
     await app.user.click(await screen.findByRole("radio", { name: /plain/i }));
-    expect(localStorage.getItem("thoth.editor.defaultMode")).toBe("plain");
+    await waitFor(() => expect(localStorage.getItem("thoth.editor.defaultMode")).toBe("plain"));
     await app.user.click(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Beta" }));
     await waitFor(() => expect(modeButton("Plain").getAttribute("aria-pressed")).toBe("true"));
   });
