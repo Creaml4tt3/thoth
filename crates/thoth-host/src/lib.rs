@@ -25,6 +25,7 @@ mod at;
 pub mod error;
 mod handles;
 pub mod links;
+pub mod mcp;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
@@ -71,6 +72,7 @@ pub const COMMANDS: &[&str] = &[
     "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings",
+    "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -143,11 +145,13 @@ pub struct Host {
     config: HostConfig,
     home: Option<PathBuf>,
     allow_roots: Vec<PathBuf>,
-    state: Mutex<State>,
+    /// Shared with Connected apps (`mcp`), which asks which Private Spaces are open and in which window.
+    state: Arc<Mutex<State>>,
     remote: Remote,
     agents: Agents,
     links: LinkPreviews,
     updates: Updates,
+    mcp: mcp::Relay,
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
@@ -162,8 +166,14 @@ impl Host {
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
         let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
         let links = LinkPreviews::new(config.data_dir.clone(), LinkOptions { allow_loopback: config.link_preview_loopback, ..LinkOptions::default() });
+        let state = Arc::new(Mutex::new(State::default()));
+        let open: mcp::OpenSpaces = {
+            let state = state.clone();
+            Arc::new(move || lock(&state).vaults.values().map(|v| mcp::OpenSpace { root: v.root.clone(), owner: v.owner.clone() }).collect())
+        };
+        let mcp = mcp::Relay::new(config.data_dir.as_ref().map(|d| d.join(mcp::DIR)), config.events.clone(), open, mcp::McpOptions::default());
         let updates = Updates::new(config.data_dir.clone(), UpdateOptions::off());
-        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, links, updates, replace: Mutex::new(()) }
+        Self { config, home, allow_roots, state, remote, agents, links, updates, mcp, replace: Mutex::new(()) }
     }
 
     /// Turns the update notice on (ADR-0022): `options` name the running version and where `latest.json` is. A host
@@ -417,6 +427,27 @@ impl Host {
             // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict, never a page.
             "update.check" => json(self.updates.check(bool_arg(args, "force")?)),
             "update.settings" => json(self.updates.settings(args)?),
+            // Connected apps (ADR-0021): the switch, the shared Private Spaces and each app's Allow or Deny, set by the
+            // user in a window; `mcp.answer` is a window's answer to an app's request (`mcp.request` event).
+            "mcp.settings" => json(self.mcp.settings()),
+            "mcp.configure" => {
+                let mut opened = self.recent();
+                opened.extend(self.open_roots().iter().map(|r| r.to_string_lossy().into_owned()));
+                json(self.mcp.configure(args, &opened)?)
+            }
+            "mcp.decide" => {
+                let allow = match args.get("allow") {
+                    Some(Value::Bool(b)) => *b,
+                    _ => return Err(HostError::bad_argument("allow must be a boolean")),
+                };
+                json(self.mcp.decide(str_arg(args, "app")?, allow)?)
+            }
+            "mcp.forget" => json(self.mcp.forget(str_arg(args, "app")?)?),
+            "mcp.answer" => {
+                self.mcp.answer(owner, str_arg(args, "id")?, args)?;
+                null()
+            }
+            "mcp.log" => json(self.mcp.log()),
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }
@@ -642,9 +673,11 @@ impl Host {
     }
 
     /// Closes every vault (stopping watchers) and source (deleting temp files), cancels server sign-ins, and stops
-    /// every agent run (deleting its working directory).
+    /// every agent run (deleting its working directory), and stops listening for connected apps (ADR-0021; their
+    /// settings are kept for the next start).
     /// The host stays usable.
     pub fn shutdown(&self) {
+        self.mcp.stop();
         self.remote.shutdown();
         self.agents.shutdown();
         let (vaults, sources): (Vec<String>, Vec<String>) = {
