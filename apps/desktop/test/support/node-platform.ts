@@ -5,7 +5,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Links, Platform, Updates, VaultChangedEvent, VaultConnection, Windows } from "@thoth/platform";
+import type { ConnectedApps, Links, Platform, Updates, VaultChangedEvent, VaultConnection, Windows } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
 import { NodeAgentHost } from "@thoth/agent-core/node";
@@ -79,7 +79,7 @@ export function createFakeWindows(): FakeWindows {
   return windows;
 }
 
-export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers; agents?: { dataDir: string; searchDirs: string[] }; windows?: FakeWindows; recent?: string[]; links?: Links; updates?: Updates } = {}): NodePlatform {
+export function createNodePlatform(options: { vault?: string | null; servers?: FakeServers; agents?: { dataDir: string; searchDirs: string[] }; windows?: FakeWindows; recent?: string[]; links?: Links; updates?: Updates; connectedApps?: ConnectedApps } = {}): NodePlatform {
   const listeners = new Set<Listener>();
   const connections: VaultConnection[] = [];
   const open: VaultConnection[] = [];
@@ -95,6 +95,7 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     ...(options.windows ? { windows: options.windows } : {}),
     ...(options.links ? { links: options.links } : {}),
     ...(options.updates ? { updates: options.updates } : {}),
+    ...(options.connectedApps ? { connectedApps: options.connectedApps } : {}),
     async pickVaultFolder() {
       return platform.pickedVault;
     },

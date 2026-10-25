@@ -48,6 +48,10 @@ const DOWNLOADS_PAGE_URL: &str = match option_env!("THOTH_DOWNLOADS_PAGE_URL") {
 
 pub const ARGS_HEADER: &str = "x-thoth-args";
 pub const VAULT_CHANGED_EVENT: &str = "vault:changed";
+/// Connected apps (ADR-0021): an app's request for the window that holds its Private Space, and the apps waiting for
+/// Allow or Deny (the host's `mcp.request` and `mcp.pending`).
+pub const MCP_REQUEST_EVENT: &str = "thoth:mcp-request";
+pub const MCP_PENDING_EVENT: &str = "thoth:mcp-pending";
 
 /// Native dialogs, shown by the host so that only paths the user chose enter the allow-list.
 struct DialogPicker {
@@ -486,8 +490,16 @@ pub fn run() {
                 data_dir: app.path().app_data_dir().ok(),
                 allow_roots: Vec::new(),
                 picker: Arc::new(DialogPicker { app: handle }),
-                events: Arc::new(move |_event, payload| {
-                    let _ = emitter.emit(VAULT_CHANGED_EVENT, payload);
+                events: Arc::new(move |event, payload| {
+                    let _ = match event {
+                        // Each window also checks `owner` itself: a listener in any window hears every event.
+                        thoth_host::mcp::REQUEST_EVENT => match payload.get("owner").and_then(Value::as_str).map(str::to_owned) {
+                            Some(owner) => emitter.emit_to(owner.as_str(), MCP_REQUEST_EVENT, payload),
+                            None => Ok(()),
+                        },
+                        thoth_host::mcp::PENDING_EVENT => emitter.emit(MCP_PENDING_EVENT, payload),
+                        _ => emitter.emit(VAULT_CHANGED_EVENT, payload),
+                    };
                 }),
                 disable_hardlink: false,
                 secrets: Arc::new(KeychainStore),
@@ -673,6 +685,9 @@ mod tests {
         let text = include_str!("../capabilities/main.json");
         assert!(!text.contains("updater"), "no updater plugin");
         assert!(!include_str!("../Cargo.toml").contains("updater"));
+        // Connected apps (ADR-0021) add exactly their six commands and no plugin: the socket is the host's.
+        let mcp: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.starts_with("allow-mcp-")).collect();
+        assert_eq!(mcp, BTreeSet::from(["allow-mcp-settings", "allow-mcp-configure", "allow-mcp-decide", "allow-mcp-forget", "allow-mcp-answer", "allow-mcp-log"]));
     }
 
     #[test]

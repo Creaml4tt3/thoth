@@ -23,6 +23,7 @@ import { createUpdateService } from "../features/updates/service.ts";
 import { waitingReviews } from "../features/mascot/hooks.ts";
 import { createWindowPresence } from "../platform/notifier.ts";
 import { MAIN_WINDOW } from "./windows.ts";
+import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 
 interface Props {
@@ -344,6 +345,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     <SessionContext.Provider value={session}>
       <PageHostContext.Provider value={pageHost}>
         {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell />}
+        {/* Connected apps (ADR-0021): this window answers apps' requests for its Private Space, and asks Allow or Deny. */}
+        {platform.connectedApps && <ConnectedAppsHost connectedApps={platform.connectedApps} />}
       </PageHostContext.Provider>
     </SessionContext.Provider>
   );

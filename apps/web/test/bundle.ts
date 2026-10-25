@@ -37,6 +37,12 @@ export const DESKTOP_ONLY = [
   "sendNotification",
   "isPermissionGranted",
   "__THOTH_NOTIFICATION_PLUGIN__",
+  // Connected apps are the desktop host's (ADR-0021 rule 6): the web client has no setting, no prompt, no answers.
+  "mcp.settings",
+  "mcp.answer",
+  "thoth:mcp-request",
+  "thoth-mcp",
+  "connected-apps-settings",
 ];
 
 export function files(dir: string): string[] {

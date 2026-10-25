@@ -50,7 +50,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, te
 /** The focus to restore after a card is drawn again (its state changed while focus was in it). */
 let refocus: string | null = null;
 
-async function copyText(text: string): Promise<void> {
+/** Puts `text` on the clipboard (the async clipboard, else the older way). Also used by Settings → Connected apps. */
+export async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
     return;

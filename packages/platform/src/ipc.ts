@@ -49,6 +49,10 @@ export type HostErrorCode =
   | "AGENT_UNAVAILABLE"
   /** A link preview could not be fetched: the page did not answer, took too long, or is not HTML (ADR-0020). */
   | "PREVIEW_UNAVAILABLE"
+  /** Connected apps cannot listen here (Windows for now, or no app data folder, or a path too long for a socket). */
+  | "UNAVAILABLE"
+  /** Another copy of Thoth answers connected apps already. */
+  | "BUSY"
   | "INTERNAL";
 
 export interface HostError {
@@ -191,6 +195,21 @@ export interface Commands {
   "update.check": { args: { force?: boolean }; result: UpdateCheck };
   /** The person's choice for the notice, after applying `notify` (on or off) and `skip` (a version to skip; `null` forgets it). */
   "update.settings": { args: { notify?: boolean; skip?: string | null }; result: UpdateSettings };
+  // ---- Connected apps (ADR-0021). Desktop only: other apps read shared Private Spaces through `thoth-mcp`.
+  "mcp.settings": { args: Record<string, never>; result: ConnectedAppsSettings };
+  /**
+   * Switches Connected apps on or off (the host starts or stops listening), and/or replaces the shared Private Spaces
+   * (canonical roots; each must be one the user opened). `UNAVAILABLE` or `BUSY` when it cannot listen.
+   */
+  "mcp.configure": { args: { enabled?: boolean; spaces?: string[] }; result: ConnectedAppsSettings };
+  /** The user's Allow or Deny for an app that asked (or a change of mind later). */
+  "mcp.decide": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
+  /** Removes an app: it is asked about again the next time it connects. */
+  "mcp.forget": { args: { app: string }; result: ConnectedAppsSettings };
+  /** This window's answer to an `McpRequest` sent to it. `NOT_ALLOWED` when another window was asked. */
+  "mcp.answer": { args: { id: string } & McpAnswer; result: null };
+  /** The requests of the last 30 days, newest first (at most 500). */
+  "mcp.log": { args: Record<string, never>; result: ConnectedAppsLogEntry[] };
 }
 
 /** A newer version, as the notice shows it. */
@@ -229,6 +248,55 @@ export interface UpdateSettings {
   /** When the last request was made (Unix seconds), if one was. */
   lastChecked: number | null;
 }
+
+/** Connected apps (ADR-0021) as the host keeps them. */
+export interface ConnectedAppsSettings {
+  /** False where the host cannot listen at all (Windows for now). */
+  available: boolean;
+  enabled: boolean;
+  /** The socket is open. False with `enabled` when listening failed (`error` says why). */
+  listening: boolean;
+  error: string | null;
+  /** Canonical roots of the shared Private Spaces. */
+  spaces: string[];
+  /** Apps the user allowed or denied; `name` is what the app calls itself (MCP `clientInfo.name`), not verified. */
+  apps: { name: string; allowed: boolean; decidedAt: string }[];
+  /** Apps waiting for Allow or Deny, oldest first. */
+  pending: string[];
+  /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
+  setup: { command: string; args: string[] } | null;
+}
+
+/** One request of a connected app, as logged: never page text or search words. */
+export interface ConnectedAppsLogEntry {
+  /** UTC, `YYYY-MM-DDTHH:MM:SSZ`. */
+  time: string;
+  app: string;
+  tool: string;
+  spaces: string[];
+  paths: string[];
+  ok: boolean;
+  /** The error code when `ok` is false (`DENIED`, `NOT_FOUND`, `NO_SPACE`, …). */
+  error?: string;
+}
+
+/** The host asks a window to answer an app's tool call from its open Vault (event `mcp.request`). */
+export type McpRequest = {
+  id: string;
+  /** The window asked; only it may answer. */
+  owner: string;
+  /** The Private Space's canonical root (the window's `connection.root`). */
+  root: string;
+  space: string;
+} & (
+  | { tool: "search"; args: { query: string; limit: number } }
+  | { tool: "list_pages"; args: { folder: string; limit: number } }
+  | { tool: "read_page"; args: { path: string } | { id: string } }
+  | { tool: "backlinks"; args: ({ path: string } | { id: string }) & { limit: number } }
+);
+
+/** A window's answer to an `McpRequest`: what its Vault found, or why not. */
+export type McpAnswer = { result: unknown } | { error: { code: "NOT_FOUND" | "INTERNAL"; message: string } };
 
 /** What a page says about itself (ADR-0020). Text is decoded, stripped of control characters and cut. */
 export interface LinkPreview {

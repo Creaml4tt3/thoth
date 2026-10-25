@@ -6,7 +6,7 @@
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
+import type { ConnectedApps, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -319,6 +319,20 @@ export function remoteUpdates(transport: Transport): Updates {
     settings: () => transport.call("update.settings", {}),
     setNotify: (on) => transport.call("update.settings", { notify: on }),
     skip: (version) => transport.call("update.settings", { skip: version }),
+  };
+}
+
+/** Connected apps (ADR-0021) over the `mcp.*` commands; the events come from the platform's own event channel. */
+export function remoteConnectedApps(transport: Transport, events: Pick<ConnectedApps, "onRequest" | "onPending">): ConnectedApps {
+  return {
+    settings: () => transport.call("mcp.settings", {}),
+    configure: (change) => transport.call("mcp.configure", change),
+    decide: (app, allow) => transport.call("mcp.decide", { app, allow }),
+    forget: (app) => transport.call("mcp.forget", { app }),
+    log: () => transport.call("mcp.log", {}),
+    answer: async (id, answer) => void (await transport.call("mcp.answer", { id, ...answer })),
+    onRequest: (listener) => events.onRequest(listener),
+    onPending: (listener) => events.onPending(listener),
   };
 }
 

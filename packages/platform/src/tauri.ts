@@ -10,9 +10,9 @@
  * that `@tauri-apps/api/core#invoke` and `@tauri-apps/api/event#listen` (2.x)
  * call. The app may pass those functions instead via `createTauriPlatform(api)`.
  */
-import type { Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, isHostErrorShape } from "./remote.ts";
+import type { ConnectedApps, Platform, Windows } from "./index.ts";
+import type { CommandName, Commands, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps } from "./remote.ts";
 
 /** Header carrying the JSON arguments when the body is raw bytes. */
 export const ARGS_HEADER = "x-thoth-args";
@@ -21,6 +21,9 @@ export const VAULT_CHANGED_EVENT = "vault:changed";
 export const WINDOW_CLOSED_EVENT = "thoth:window-closed";
 /** Sent by the shell to a window whose close button (or Quit) was used: write the edits, then `window_close` (ADR-0019). */
 export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
+/** Connected apps (ADR-0021): a request for one window to answer, and the apps waiting for Allow or Deny. */
+export const MCP_REQUEST_EVENT = "thoth:mcp-request";
+export const MCP_PENDING_EVENT = "thoth:mcp-pending";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<unknown>;
 export type TauriListen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
@@ -125,6 +128,21 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
   };
 }
 
+/** Connected apps (ADR-0021): the `mcp.*` commands and the shell's two events for them. */
+export function tauriConnectedApps(transport: Transport, api: TauriApi = internalsApi()): ConnectedApps {
+  return remoteConnectedApps(transport, {
+    async onRequest(listener) {
+      const unlisten = await api.listen<McpRequest>(MCP_REQUEST_EVENT, (e) => listener(e.payload));
+      return () => void unlisten();
+    },
+    async onPending(listener) {
+      const unlisten = await api.listen<{ apps: string[] }>(MCP_PENDING_EVENT, (e) => listener(e.payload.apps));
+      return () => void unlisten();
+    },
+  });
+}
+
 export function createTauriPlatform(api?: TauriApi): Platform {
-  return { ...createRemotePlatform(new TauriTransport(api), "tauri"), windows: tauriWindows(api) };
+  const transport = new TauriTransport(api);
+  return { ...createRemotePlatform(transport, "tauri"), windows: tauriWindows(api), connectedApps: tauriConnectedApps(transport, api) };
 }

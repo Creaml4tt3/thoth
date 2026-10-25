@@ -18,6 +18,9 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "link_preview", "link_preview_clear", "link_open",
     // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict and no network.
     "update_check", "update_settings",
+    // Connected apps (ADR-0021): the settings, the Allow or Deny, a window's answer and the log; thoth-mcp's socket is
+    // the host's own.
+    "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
     // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
     "window_open", "window_close",
 ];

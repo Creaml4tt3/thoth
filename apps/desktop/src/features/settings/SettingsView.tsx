@@ -7,6 +7,7 @@ import { ImportWizard } from "../import/ImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { AgentSettings } from "../agents/AgentSettings.tsx";
 import { NotificationSettings } from "../notifications/NotificationSettings.tsx";
+import { ConnectedAppsSettings } from "../connected-apps/ConnectedAppsSettings.tsx";
 import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
@@ -91,6 +92,7 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
         <NotificationSettings />
 
         <UpdateSettings />
+        {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
 
         <section aria-labelledby="set-language" className="set-section">
           <h2 id="set-language">{t.language}</h2>

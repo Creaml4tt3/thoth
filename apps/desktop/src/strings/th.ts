@@ -148,6 +148,64 @@ export const th: DesktopStrings = {
     off: "เปิด “แจ้งฉันเมื่อมีเวอร์ชันใหม่” เพื่อตรวจสอบ", // REVIEW
   },
 
+  // Settings → Connected apps and the question when an app connects (ADR-0021). Strings marked REVIEW are the least
+  // certain. "Private Space" and "MCP" stay in English, as elsewhere.
+  connectedApps: {
+    title: "แอปที่เชื่อมต่อ",
+    intro: "แอปในเครื่องนี้ที่ใช้ MCP ได้ เช่น Claude Desktop หรือ Cursor จะค้นหาและอ่าน Private Space ที่คุณแชร์ไว้ที่นี่ได้ แต่แก้ไขอะไรไม่ได้", // REVIEW
+    unavailable: "เครื่องนี้ยังใช้แอปที่เชื่อมต่อไม่ได้",
+    enable: "ให้แอปอื่นอ่านโน้ตของฉัน",
+    enableHint: "ปิดอยู่โดยค่าเริ่มต้น แอปจะอ่าน Private Space ได้ก็ต่อเมื่อ Thoth เปิดอยู่และ Private Space นั้นเปิดอยู่ในหน้าต่างหนึ่ง", // REVIEW
+    notListening: (reason) => `Thoth เริ่มรอรับการเชื่อมต่อจากแอปไม่ได้: ${reason}`, // REVIEW
+    spaces: "Private Space ที่แอปอ่านได้",
+    spacesHint: "เฉพาะที่ติ๊กไว้เท่านั้น Private Space อื่นของคุณแอปจะมองไม่เห็น",
+    apps: "แอป",
+    selfReported: "แต่ละแอปบอกชื่อของตัวเองตอนเชื่อมต่อ Thoth ตรวจสอบชื่อนั้นไม่ได้ อนุญาตเฉพาะแอปที่คุณตั้งค่าเองเท่านั้น", // REVIEW
+    noApps: "ยังไม่มีแอปใดเชื่อมต่อ",
+    allowed: "อนุญาตแล้ว",
+    denied: "ไม่อนุญาต",
+    waiting: "รอคำตอบจากคุณ",
+    allow: "อนุญาต",
+    revoke: "เพิกถอน",
+    remove: "นำออก",
+    setup: "ตั้งค่าแอป",
+    setupHint: "วางข้อความนี้ในการตั้งค่า MCP ของแอป (Claude Desktop: claude_desktop_config.json, Cursor: mcp.json) ข้อความนี้จะเปิด thoth-mcp ที่มากับ Thoth", // REVIEW
+    copySetup: "คัดลอกการตั้งค่า",
+    copied: "คัดลอกแล้ว",
+    copyFailed: "คัดลอกไม่ได้ ให้เลือกข้อความแล้วคัดลอกเอง",
+    log: "คำขอ",
+    logHint: "คำขอทุกครั้งใน 30 วันล่าสุด: เมื่อไร แอปไหน ขออะไร และหน้าไหน เก็บไว้ในเครื่องนี้เท่านั้น และไม่เก็บเนื้อหาของหน้าหรือคำที่ค้นหา", // REVIEW
+    showLog: "แสดงคำขอ",
+    refreshLog: "รีเฟรช",
+    noRequests: "ยังไม่มีคำขอ",
+    logLabel: "คำขอจากแอปที่เชื่อมต่อ",
+    when: (date) => date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }),
+    columns: { time: "เวลา", app: "แอป", tool: "สิ่งที่ขอ", pages: "หน้า", result: "ผล" },
+    tools: { search: "ค้นหา", list_pages: "รายการหน้า", read_page: "อ่านหน้า", backlinks: "ลิงก์มายังหน้า", unknown: "สิ่งที่ไม่รู้จัก" }, // REVIEW
+    answered: "ตอบแล้ว",
+    refused: {
+      DENIED: "ปฏิเสธ: ไม่ได้รับอนุญาต",
+      NOT_ALLOWED: "ปฏิเสธ: รอคำตอบจากคุณ",
+      NOT_ENABLED: "ปฏิเสธ: ปิดแอปที่เชื่อมต่ออยู่", // REVIEW
+      NO_SPACE: "ไม่มี Private Space ที่แชร์เปิดอยู่",
+      NOT_FOUND: "ไม่พบ",
+      TOO_LARGE: "ใหญ่เกินไป",
+      TIMEOUT: "ใช้เวลานานเกินไป",
+      BAD_ARGUMENT: "คำขอไม่ถูกต้อง",
+      BUSY: "ไม่ว่าง",
+    },
+    failed: (code) => `ไม่สำเร็จ (${code})`,
+    prompt: {
+      title: (app) => `ให้ “${app}” อ่านโน้ตของคุณไหม`,
+      body: (spaces) => `แอปนี้จะค้นหาและอ่านหน้าใน ${spaces} ได้ แต่แก้ไขอะไรไม่ได้`, // REVIEW
+      nothingShared: "ยังไม่ได้แชร์ Private Space ใด ติ๊กเลือกได้ที่ การตั้งค่า → แอปที่เชื่อมต่อ",
+      caution: (app) => `แอปตั้งชื่อตัวเอง Thoth ตรวจสอบไม่ได้ว่าใช่ ${app} จริงหรือไม่ อนุญาตเฉพาะเมื่อคุณเพิ่งตั้งค่าแอปนี้เอง`, // REVIEW
+      later: "Thoth จะจำคำตอบของคุณไว้ เปลี่ยนได้ทุกเมื่อที่ การตั้งค่า → แอปที่เชื่อมต่อ",
+      allow: "อนุญาต",
+      deny: "ไม่อนุญาต",
+    },
+  },
+
   servers: {
     title: "เซิร์ฟเวอร์",
     intro: "เชื่อมต่อกับเซิร์ฟเวอร์ Thoth เพื่อทำงานในเวิร์กสเปซที่แชร์กัน Thoth เก็บการเข้าสู่ระบบไว้ในพวงกุญแจของระบบ หน้าต่างนี้ไม่เคยเห็นข้อมูลนั้น",

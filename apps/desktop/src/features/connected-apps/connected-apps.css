@@ -1,0 +1,32 @@
+/* Settings → Connected apps (ADR-0021). */
+.connected-apps h3 { font: var(--thoth-text-ui); font-weight: 600; margin-top: var(--thoth-space-3); }
+.connected-apps .small { font: var(--thoth-text-small); }
+/* Small hints need the stronger grey for contrast (as in Settings → Notifications). */
+.connected-apps .muted, .mcp-prompt .muted { color: var(--thoth-ink-secondary); }
+.mcp-spaces { border: 0; margin: var(--thoth-space-2) 0 0; padding: 0; display: grid; gap: var(--thoth-space-1); min-width: 0; }
+.mcp-spaces > legend { padding: 0; margin-bottom: var(--thoth-space-1); font: var(--thoth-text-ui); font-weight: 600; }
+.mcp-space { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: var(--thoth-space-2); align-items: baseline; padding: 4px 0; cursor: pointer; }
+.mcp-space > input { margin: 0; accent-color: var(--thoth-accent); align-self: center; }
+.mcp-space-name { font-weight: 550; }
+.mcp-space-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-apps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
+.mcp-app { display: flex; align-items: center; gap: var(--thoth-space-3); flex-wrap: wrap; padding: 8px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); }
+.mcp-app-name { font-weight: 550; overflow-wrap: anywhere; min-width: 0; }
+.mcp-app-actions { display: flex; gap: var(--thoth-space-2); margin-left: auto; }
+.mcp-app .badge { background: var(--thoth-bg-hover); color: var(--thoth-ink-secondary); }
+.mcp-app .badge-allowed { background: var(--thoth-accent-soft); color: var(--thoth-ink-primary); }
+.mcp-app .badge-denied { background: color-mix(in srgb, var(--thoth-danger) 12%, transparent); color: var(--thoth-ink-primary); }
+.mcp-setup { margin: 0; padding: 10px 12px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border: 1px solid var(--thoth-border); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.mcp-setup:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.mcp-log-wrap { overflow-x: auto; }
+.mcp-log { width: 100%; border-collapse: collapse; font: var(--thoth-text-small); }
+.mcp-log th, .mcp-log td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--thoth-border); }
+.mcp-log th { font-weight: 600; color: var(--thoth-ink-secondary); }
+.mcp-log tr[data-ok="false"] td:last-child { color: var(--thoth-danger); }
+.mcp-log-time { white-space: nowrap; }
+.mcp-log-paths { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+
+/* The question when an app connects for the first time. */
+.mcp-prompt { display: grid; gap: var(--thoth-space-2); margin-bottom: var(--thoth-space-4); }
+.mcp-prompt .small { font: var(--thoth-text-small); }
+.mcp-caution { padding: 8px 12px; border-radius: var(--thoth-radius-md); background: color-mix(in srgb, var(--thoth-danger) 8%, transparent); }

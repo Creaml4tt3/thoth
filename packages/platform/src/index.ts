@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, LinkPreview, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, LinkPreview, McpAnswer, McpRequest, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -53,6 +53,8 @@ export interface Platform {
   readonly links?: Links;
   /** The notice that a new desktop version is out (ADR-0022). Only the desktop host has it; absent: no notice (the web client is always current). */
   readonly updates?: Updates;
+  /** Other apps reading shared Private Spaces over MCP (ADR-0021). Only the desktop host has it; absent: no such setting. */
+  readonly connectedApps?: ConnectedApps;
 }
 
 /** What the host does for the update notice (ADR-0022): it asks `latest.json` and keeps the person's choice. */
@@ -64,6 +66,20 @@ export interface Updates {
   setNotify(on: boolean): Promise<UpdateSettings>;
   /** "Skip this version": no notice for it or any older one. */
   skip(version: string): Promise<UpdateSettings>;
+}
+
+/** Connected apps (ADR-0021): the user's settings, and the requests the host sends a window to answer. */
+export interface ConnectedApps {
+  settings(): Promise<ConnectedAppsSettings>;
+  configure(change: { enabled?: boolean; spaces?: string[] }): Promise<ConnectedAppsSettings>;
+  decide(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
+  forget(app: string): Promise<ConnectedAppsSettings>;
+  log(): Promise<ConnectedAppsLogEntry[]>;
+  answer(id: string, answer: McpAnswer): Promise<void>;
+  /** A request for some window (each window answers only those whose `owner` is its own id). Returns the remover. */
+  onRequest(listener: (request: McpRequest) => void): Promise<() => void>;
+  /** The apps waiting for Allow or Deny changed. Returns the remover. */
+  onPending(listener: (apps: string[]) => void): Promise<() => void>;
 }
 
 /** What the host does with web links (ADR-0020): it fetches their previews and opens them in the browser. */

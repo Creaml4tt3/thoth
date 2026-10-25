@@ -4,9 +4,9 @@
  * TEST INFRASTRUCTURE: the desktop app never uses it; it only exists so a real
  * browser can drive the real UI against the real Rust host.
  */
-import type { Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape } from "./remote.ts";
+import type { ConnectedApps, Platform, Windows } from "./index.ts";
+import type { CommandName, Commands, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps } from "./remote.ts";
 
 export class HttpTransport implements Transport {
   private readonly base: string;
@@ -71,6 +71,23 @@ function bridgeWindows(): Windows {
   };
 }
 
+/**
+ * Connected apps (ADR-0021) for the bridge: the `mcp.*` commands, and the host's `mcp.request` and `mcp.pending` events
+ * as named events on the bridge's event stream.
+ */
+function bridgeConnectedApps(transport: HttpTransport, base: string, token: string): ConnectedApps {
+  const on = async <T>(event: string, listener: (payload: T) => void): Promise<() => void> => {
+    const source = new EventSource(`${base}/events?token=${encodeURIComponent(token)}`);
+    source.addEventListener(event, (e) => listener(JSON.parse((e as MessageEvent<string>).data) as T));
+    return () => source.close();
+  };
+  return remoteConnectedApps(transport, {
+    onRequest: (listener) => on<McpRequest>("mcp.request", listener),
+    onPending: (listener) => on<{ apps: string[] }>("mcp.pending", (payload) => listener(payload.apps)),
+  });
+}
+
 export function createHttpPlatform(base: string, token: string): Platform {
-  return { ...createRemotePlatform(new HttpTransport(base, token), "bridge"), windows: bridgeWindows() };
+  const transport = new HttpTransport(base, token);
+  return { ...createRemotePlatform(transport, "bridge"), windows: bridgeWindows(), connectedApps: bridgeConnectedApps(transport, base, token) };
 }
