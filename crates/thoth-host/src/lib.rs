@@ -30,6 +30,7 @@ pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
 pub mod source;
 pub mod sql;
+pub mod updates;
 #[cfg_attr(windows, path = "vault_fs_windows.rs")]
 pub mod vault_fs;
 pub mod watch;
@@ -51,6 +52,7 @@ use sql::Sql;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
+use updates::{UpdateOptions, Updates};
 use vault_fs::VaultFs;
 use watch::Watcher;
 
@@ -68,6 +70,7 @@ pub const COMMANDS: &[&str] = &[
     "agent.start", "agent.events", "agent.cancel", "agent.run.dispose", "agent.sweep",
     "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
     "link.preview", "link.preview.clear", "link.open",
+    "update.check", "update.settings",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -144,6 +147,7 @@ pub struct Host {
     remote: Remote,
     agents: Agents,
     links: LinkPreviews,
+    updates: Updates,
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
@@ -158,7 +162,18 @@ impl Host {
         let remote = Remote::new(config.data_dir.clone(), config.secrets.clone(), config.browser.clone());
         let agents = Agents::new(config.data_dir.clone(), config.agent_search_dirs.clone());
         let links = LinkPreviews::new(config.data_dir.clone(), LinkOptions { allow_loopback: config.link_preview_loopback, ..LinkOptions::default() });
-        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, links, replace: Mutex::new(()) }
+        let updates = Updates::new(config.data_dir.clone(), UpdateOptions::off());
+        Self { config, home, allow_roots, state: Mutex::new(State::default()), remote, agents, links, updates, replace: Mutex::new(()) }
+    }
+
+    /// Turns the update notice on (ADR-0022): `options` name the running version and where `latest.json` is. A host
+    /// built with `Host::new` alone has no notice and never makes that request. The test switch of link previews
+    /// (`link_preview_loopback`) applies to it too, so a test can serve `latest.json` from a local server.
+    #[must_use]
+    pub fn with_updates(mut self, mut options: UpdateOptions) -> Self {
+        options.allow_loopback = self.config.link_preview_loopback;
+        self.updates = Updates::new(self.config.data_dir.clone(), options);
+        self
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -399,6 +414,9 @@ impl Host {
                 self.config.browser.open(url.as_str())?;
                 null()
             }
+            // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict, never a page.
+            "update.check" => json(self.updates.check(bool_arg(args, "force")?)),
+            "update.settings" => json(self.updates.settings(args)?),
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }

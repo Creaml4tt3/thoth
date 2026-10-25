@@ -15,7 +15,7 @@ use crate::error::{HostError, HostResult};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use cache::{Cache, CacheLimits, Cached};
-use fetch::{Fetcher, Lookup, MAX_HTML, MAX_IMAGE, SystemLookup, TIMEOUT, Want, charset, image_type, mime, unavailable};
+use fetch::{Fetcher, Lookup, MAX_HTML, MAX_IMAGE, SystemLookup, TIMEOUT, USER_AGENT, Want, charset, image_type, mime, unavailable};
 use serde_json::{Map, Value};
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
@@ -133,7 +133,7 @@ impl LinkPreviews {
 
     fn fetch(&self, url: &Url) -> HostResult<Value> {
         let deadline = Instant::now() + TIMEOUT;
-        let page = self.fetcher.get(url, deadline, &Want { accept: "text/html,application/xhtml+xml;q=0.9", max: MAX_HTML, stop_at_head: true, refuse_longer: false })?;
+        let page = self.fetcher.get(url, deadline, &Want { accept: "text/html,application/xhtml+xml;q=0.9", user_agent: USER_AGENT, https_only: false, max: MAX_HTML, stop_at_head: true, refuse_longer: false })?;
         if mime(page.content_type.as_deref()).as_deref() != Some("text/html") {
             return Err(unavailable(&page.url, "it is not a web page"));
         }
@@ -159,7 +159,7 @@ impl LinkPreviews {
     fn image(&self, url: &Url, deadline: Instant) -> Option<String> {
         let mut url = url.clone();
         url.set_fragment(None);
-        let fetched = self.fetcher.get(&url, deadline, &Want { accept: "image/png,image/jpeg,image/gif,image/webp", max: MAX_IMAGE, stop_at_head: false, refuse_longer: true }).ok()?;
+        let fetched = self.fetcher.get(&url, deadline, &Want { accept: "image/png,image/jpeg,image/gif,image/webp", user_agent: USER_AGENT, https_only: false, max: MAX_IMAGE, stop_at_head: false, refuse_longer: true }).ok()?;
         let kind = image_type(&fetched.body)?;
         Some(format!("data:{kind};base64,{}", B64.encode(&fetched.body)))
     }

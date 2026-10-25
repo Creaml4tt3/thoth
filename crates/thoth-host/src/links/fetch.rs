@@ -85,9 +85,14 @@ fn network(url: &Url, error: &ureq::Error) -> HostError {
 }
 
 /// What to read from a hop's answer.
-pub struct Want {
+pub struct Want<'a> {
     /// `Accept` header.
-    pub accept: &'static str,
+    pub accept: &'a str,
+    /// `User-Agent` header (fixed for each kind of request).
+    pub user_agent: &'a str,
+    /// Only `https` is followed, redirects included (the update notice, ADR-0022). The test switch lets an `http` link
+    /// to a loopback address through, for a local test server.
+    pub https_only: bool,
     /// Most bytes read.
     pub max: usize,
     /// Stop reading after `</head>` (HTML).
@@ -137,17 +142,20 @@ impl Fetcher {
 
     /// GETs `url`, following up to `MAX_REDIRECTS` redirects, each checked like the first. A 2xx answer's body is read
     /// as `want` says; any other status is `PREVIEW_UNAVAILABLE`.
-    pub fn get(&self, url: &Url, deadline: Instant, want: &Want) -> HostResult<Fetched> {
+    pub fn get(&self, url: &Url, deadline: Instant, want: &Want<'_>) -> HostResult<Fetched> {
         let mut current = url.clone();
         for hop in 0..=MAX_REDIRECTS {
             check_link(&current)?;
+            if want.https_only && current.scheme() != "https" && !(self.allow_loopback && matches!(current.host(), Some(Host::Ipv4(ip)) if ip.is_loopback())) {
+                return Err(HostError::not_allowed(format!("{} is not an https address", origin(&current))));
+            }
             let addrs = self.resolve(&current, deadline)?;
             let config = Agent::config_builder()
                 .max_redirects(0)
                 .http_status_as_error(false)
                 .proxy(None)
                 .timeout_global(Some(Self::remaining(&current, deadline)?))
-                .user_agent(USER_AGENT)
+                .user_agent(want.user_agent)
                 .build();
             let agent = Agent::with_parts(config, DefaultConnector::new(), Pinned(addrs));
             let request = Request::builder().method("GET").uri(current.as_str()).header("accept", want.accept).body(()).map_err(|_| unavailable(&current, "the link could not be requested"))?;
@@ -178,7 +186,7 @@ impl Fetcher {
 }
 
 /// Reads up to `want.max` bytes (one more for `refuse_longer`), stopping after `</head>` when asked.
-fn read_body(url: &Url, mut reader: impl Read, want: &Want) -> HostResult<Vec<u8>> {
+fn read_body(url: &Url, mut reader: impl Read, want: &Want<'_>) -> HostResult<Vec<u8>> {
     let mut body = Vec::new();
     let mut chunk = [0u8; 16 * 1024];
     let cap = if want.refuse_longer { want.max + 1 } else { want.max };

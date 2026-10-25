@@ -2,6 +2,9 @@
 //! rules refuse; tests that need to reach it turn on the test switch (`allow_loopback`, the stdio harness's
 //! `--link-preview-loopback`), which lets loopback through and nothing else. Names resolve through a fake resolver,
 //! so private, link-local and rebinding names are tested without a real DNS server.
+//!
+//! The update notice (ADR-0022) asks `latest.json` through the same fetcher, so its fetch rules are tested here too,
+//! against the same server and the same fake resolver (the last section).
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use serde_json::{Value, json};
@@ -15,6 +18,7 @@ use std::time::{Duration, Instant, SystemTime};
 use thoth_host::links::cache::CacheLimits;
 use thoth_host::links::fetch::{Lookup, USER_AGENT};
 use thoth_host::links::{LinkOptions, LinkPreviews};
+use thoth_host::updates::{UpdateOptions, Updates};
 use thoth_host::{Browser, FileManager, Host, HostConfig, HostResult, MemorySecretStore, Picker};
 
 // ---------------------------------------------------------------------------------------------- the page server
@@ -576,4 +580,334 @@ fn the_shipped_desktop_shell_never_turns_the_switch_on() {
     // Only the test harness parses the flag.
     let harness = include_str!("../src/bin/thoth-host-stdio.rs");
     assert!(harness.contains("\"--link-preview-loopback\""));
+}
+
+// ------------------------------------------------------------------------------------------- the update notice
+
+fn latest(version: &str) -> String {
+    format!(r#"{{"version":"{version}","date":"2026-11-02","base":"https://download.thoth.creaml4tt3.me/v{version}/","files":[],"extra":{{"ignored":true}}}}"#)
+}
+
+fn serve_latest(server: &Server, body: &str) {
+    server.route("/latest.json", Answer::Full(200, vec![("content-type", "application/json".into())], body.as_bytes().to_vec()));
+}
+
+/// A clock the test moves.
+#[derive(Clone)]
+struct Clock(Arc<Mutex<SystemTime>>);
+
+impl Clock {
+    fn new() -> Self {
+        Self(Arc::new(Mutex::new(SystemTime::UNIX_EPOCH + Duration::from_secs(1_900_000_000))))
+    }
+    fn tick(&self, secs: u64) {
+        *self.0.lock().unwrap() += Duration::from_secs(secs);
+    }
+    fn at(&self) -> thoth_host::links::Clock {
+        let now = self.0.clone();
+        Arc::new(move || *now.lock().unwrap())
+    }
+}
+
+/// An update notice for app version `current` that reads `url`, with the test switch on or off.
+fn updates(current: &str, url: &str, loopback: bool, clock: &Clock, data: Option<&std::path::Path>) -> Updates {
+    let mut options = UpdateOptions::new(current, url);
+    options.allow_loopback = loopback;
+    options.clock = clock.at();
+    Updates::new(data.map(std::path::Path::to_owned), options)
+}
+
+fn state(check: &Value) -> &str {
+    check["state"].as_str().unwrap()
+}
+
+#[test]
+fn tells_of_a_newer_version_with_where_to_get_it() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let notice = updates("0.1.3", &server.url("/latest.json"), true, &Clock::new(), None);
+    let answer = notice.check(false);
+    assert_eq!(state(&answer), "available", "{answer}");
+    let update = &answer["update"];
+    assert_eq!(update["version"], "0.2.0");
+    assert_eq!(update["date"], "2026-11-02");
+    assert_eq!(update["downloadUrl"], thoth_host::updates::DEFAULT_DOWNLOADS_PAGE);
+    assert_eq!(update["skipped"], false);
+    assert!(update.get("notesUrl").is_none(), "{update}");
+    assert_eq!(server.requests().len(), 1);
+}
+
+#[test]
+fn gives_the_release_notes_link_when_latest_json_has_one() {
+    let server = Server::start();
+    serve_latest(&server, r#"{"version":"0.2.0","notes":"https://thoth.creaml4tt3.me/changes#0.2.0"}"#);
+    let answer = updates("0.1.3", &server.url("/latest.json"), true, &Clock::new(), None).check(false);
+    assert_eq!(answer["update"]["notesUrl"], "https://thoth.creaml4tt3.me/changes#0.2.0");
+}
+
+#[test]
+fn says_nothing_for_the_same_an_older_or_a_prerelease_version() {
+    for (current, published) in [("0.1.3", "0.1.3"), ("0.1.3", "0.1.2"), ("0.1.3", "0.2.0-rc.1"), ("0.2.0", "0.2.0-rc.9")] {
+        let server = Server::start();
+        serve_latest(&server, &latest(published));
+        let answer = updates(current, &server.url("/latest.json"), true, &Clock::new(), None).check(false);
+        assert_eq!(state(&answer), "current", "{current} against {published}: {answer}");
+        assert!(answer.get("update").is_none());
+    }
+    // A person on a pre-release is offered the release, and a newer pre-release.
+    for published in ["0.2.0", "0.2.0-rc.2"] {
+        let server = Server::start();
+        serve_latest(&server, &latest(published));
+        assert_eq!(state(&updates("0.2.0-rc.1", &server.url("/latest.json"), true, &Clock::new(), None).check(false)), "available", "{published}");
+    }
+}
+
+#[test]
+fn a_request_carries_nothing_but_a_fixed_user_agent() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    updates("0.1.3", &server.url("/latest.json"), true, &Clock::new(), None).check(false);
+    let requests = server.requests();
+    assert_eq!(requests.len(), 1);
+    let lower = requests[0].to_ascii_lowercase();
+    assert!(lower.starts_with("get /latest.json http/1.1\r\n"), "{lower}");
+    assert!(lower.contains("\r\nuser-agent: thoth/0.1.3 (update check)\r\n"), "{lower}");
+    assert!(lower.contains("\r\naccept: application/json\r\n"), "{lower}");
+    for header in ["cookie:", "authorization:", "referer:", "proxy-authorization:", "origin:"] {
+        assert!(!lower.contains(&format!("\r\n{header}")), "{header} in {lower}");
+    }
+}
+
+#[test]
+fn asks_at_most_once_in_24_hours_and_the_wait_survives_a_restart() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
+    let url = server.url("/latest.json");
+    let notice = updates("0.1.3", &url, true, &clock, Some(data.path()));
+    assert_eq!(state(&notice.check(false)), "available");
+    assert_eq!(state(&notice.check(false)), "waiting");
+    clock.tick(23 * 3600 + 59 * 60);
+    assert_eq!(state(&notice.check(false)), "waiting");
+    assert_eq!(server.count(), 1);
+
+    // The app is closed and started again: the time of the last check is in the app data folder.
+    let restarted = updates("0.1.3", &url, true, &clock, Some(data.path()));
+    assert_eq!(state(&restarted.check(false)), "waiting");
+    assert_eq!(server.count(), 1);
+    let kept = std::fs::read_to_string(data.path().join("update.json")).unwrap();
+    assert!(kept.contains("lastCheck"), "{kept}");
+    assert!(!kept.contains(&server.port.to_string()), "the file keeps no address");
+
+    clock.tick(2 * 60);
+    assert_eq!(state(&restarted.check(false)), "available");
+    assert_eq!(server.count(), 2);
+    // "Check now" does not wait.
+    assert_eq!(state(&restarted.check(true)), "available");
+    assert_eq!(server.count(), 3);
+    assert_eq!(state(&restarted.check(false)), "waiting", "a manual check counts as the day's check");
+}
+
+#[test]
+fn a_clock_set_back_does_not_stop_the_checks_for_ever() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
+    let notice = updates("0.1.3", &server.url("/latest.json"), true, &clock, Some(data.path()));
+    clock.tick(10 * 24 * 3600);
+    assert_eq!(state(&notice.check(false)), "available");
+    // The computer's clock is now ten days behind the time that was kept.
+    let behind = Clock::new();
+    let again = updates("0.1.3", &server.url("/latest.json"), true, &behind, Some(data.path()));
+    assert_eq!(state(&again.check(false)), "available");
+    assert_eq!(server.count(), 2);
+}
+
+#[test]
+fn turned_off_means_no_request_at_all_even_for_check_now() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
+    let notice = updates("0.1.3", &server.url("/latest.json"), true, &clock, Some(data.path()));
+    assert_eq!(notice.settings(&json!({}), ).unwrap()["notify"], true, "On by default");
+    assert_eq!(notice.settings(&json!({ "notify": false })).unwrap()["notify"], false);
+    assert_eq!(state(&notice.check(false)), "off");
+    assert_eq!(state(&notice.check(true)), "off");
+    assert_eq!(server.count(), 0);
+    // The choice is kept; turning it on again lets the next check through.
+    let restarted = updates("0.1.3", &server.url("/latest.json"), true, &clock, Some(data.path()));
+    assert_eq!(restarted.settings(&json!({})).unwrap()["notify"], false);
+    assert_eq!(state(&restarted.check(false)), "off");
+    assert_eq!(restarted.settings(&json!({ "notify": true })).unwrap()["notify"], true);
+    assert_eq!(state(&restarted.check(false)), "available");
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
+fn a_skipped_version_is_remembered_until_a_newer_one_appears() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
+    let url = server.url("/latest.json");
+    let notice = updates("0.1.3", &url, true, &clock, Some(data.path()));
+    assert_eq!(notice.settings(&json!({ "skip": "0.2.0" })).unwrap()["skipped"], "0.2.0");
+    assert_eq!(notice.check(false)["update"]["skipped"], true);
+
+    clock.tick(25 * 3600);
+    let restarted = updates("0.1.3", &url, true, &clock, Some(data.path()));
+    assert_eq!(restarted.settings(&json!({})).unwrap()["skipped"], "0.2.0");
+    assert_eq!(restarted.check(false)["update"]["skipped"], true, "remembered across a restart");
+
+    clock.tick(25 * 3600);
+    serve_latest(&server, &latest("0.2.1"));
+    let newer = restarted.check(false);
+    assert_eq!(newer["update"]["version"], "0.2.1");
+    assert_eq!(newer["update"]["skipped"], false, "a newer version is offered again");
+
+    // Skipping is for a version; anything else is refused, and null forgets it.
+    for bad in [json!("v1"), json!(""), json!(2), json!("1.2")] {
+        assert_eq!(restarted.settings(&json!({ "skip": bad })).unwrap_err().code, "BAD_ARGUMENT");
+    }
+    assert_eq!(restarted.settings(&json!({ "skip": null })).unwrap()["skipped"], Value::Null);
+    assert_eq!(restarted.settings(&json!({ "notify": "yes" })).unwrap_err().code, "BAD_ARGUMENT");
+}
+
+#[test]
+fn a_build_without_an_address_never_asks() {
+    let notice = Updates::new(None, UpdateOptions::new("0.1.3", ""));
+    assert_eq!(state(&notice.check(true)), "unavailable");
+    let settings = notice.settings(&json!({})).unwrap();
+    assert_eq!(settings["available"], false);
+    assert_eq!(settings["current"], "0.1.3");
+    // A host that was not given an update notice behaves the same way.
+    assert_eq!(state(&Updates::new(None, UpdateOptions::off()).check(false)), "unavailable");
+}
+
+#[test]
+fn only_https_to_a_public_address_is_asked() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let clock = Clock::new();
+    // As shipped (the test switch off) the local server is refused, and so is every other address the rules refuse.
+    assert_eq!(state(&updates("0.1.3", &server.url("/latest.json"), false, &clock, None).check(false)), "failed");
+    assert_eq!(server.count(), 0);
+    // `http` to a name is refused even when the name resolves to an address the switch lets through.
+    let dns = FakeDns::with(&[("updates.test", &["127.0.0.1"]), ("inside.test", &["10.0.0.5"]), ("metadata.test", &["169.254.169.254"])]);
+    for name in ["updates.test", "inside.test", "metadata.test"] {
+        for scheme in ["http", "https"] {
+            let mut options = UpdateOptions::new("0.1.3", format!("{scheme}://{name}:{}/latest.json", server.port));
+            options.allow_loopback = scheme == "http";
+            options.lookup = dns.clone();
+            assert_eq!(state(&Updates::new(None, options).check(false)), "failed", "{scheme}://{name}");
+        }
+    }
+    assert_eq!(server.count(), 0, "nothing reached the server");
+    for bad in ["file:///etc/passwd", "ftp://updates.test/latest.json", "https://user:pw@updates.test/latest.json", "not a url"] {
+        assert_eq!(state(&updates("0.1.3", bad, true, &clock, None).check(false)), "failed", "{bad}");
+    }
+}
+
+#[test]
+fn a_redirect_is_followed_only_to_another_checked_https_address() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    server.redirect("/moved.json", "/latest.json");
+    let clock = Clock::new();
+    let ok = updates("0.1.3", &server.url("/moved.json"), true, &clock, None).check(false);
+    assert_eq!(state(&ok), "available", "a redirect to the same checked address is followed");
+    assert_eq!(server.count(), 2);
+
+    // To a name: `http` is not allowed (the switch exempts a loopback IP address only).
+    let dns = FakeDns::with(&[("elsewhere.test", &["127.0.0.1"])]);
+    server.redirect("/away.json", &format!("http://elsewhere.test:{}/latest.json", server.port));
+    let mut options = UpdateOptions::new("0.1.3", server.url("/away.json"));
+    options.allow_loopback = true;
+    options.lookup = dns;
+    assert_eq!(state(&Updates::new(None, options).check(false)), "failed");
+    assert_eq!(server.count(), 3, "only the first hop was made");
+    // To a private address.
+    server.redirect("/inside.json", "http://10.0.0.5/latest.json");
+    assert_eq!(state(&updates("0.1.3", &server.url("/inside.json"), true, &clock, None).check(false)), "failed");
+}
+
+#[test]
+fn only_a_small_json_answer_is_believed() {
+    let clock = Clock::new();
+    let server = Server::start();
+    let url = server.url("/latest.json");
+    let check = |server_answer: Answer| {
+        server.route("/latest.json", server_answer);
+        state(&updates("0.1.3", &url, true, &clock, None).check(false)).to_owned()
+    };
+    let json_type = || vec![("content-type", "application/json; charset=utf-8".to_owned())];
+    let body = latest("0.2.0").into_bytes();
+    assert_eq!(check(Answer::Full(200, json_type(), body.clone())), "available");
+    // Not JSON by its type, an error status, a bad file, a file that is too large.
+    assert_eq!(check(Answer::Full(200, vec![("content-type", "text/html".into())], body.clone())), "failed");
+    assert_eq!(check(Answer::Full(200, vec![], body.clone())), "failed");
+    assert_eq!(check(Answer::Full(404, json_type(), body.clone())), "failed");
+    assert_eq!(check(Answer::Full(500, json_type(), body.clone())), "failed");
+    assert_eq!(check(Answer::Full(200, json_type(), br#"{"version":"soon"}"#.to_vec())), "failed");
+    assert_eq!(check(Answer::Full(200, json_type(), b"<html>0.9.0</html>".to_vec())), "failed");
+    let mut big = format!(r#"{{"version":"0.2.0","padding":"{}"}}"#, "x".repeat(64 * 1024)).into_bytes();
+    assert_eq!(check(Answer::Full(200, json_type(), big.clone())), "failed", "a file over 64 KB");
+    // The same file without a length (a stream that goes on) is cut at the limit and then refused.
+    big.truncate(70_000);
+    assert_eq!(check(Answer::Hang(json_type(), big)), "failed");
+}
+
+#[test]
+fn an_answer_that_never_comes_gives_up_after_5_seconds() {
+    let server = Server::start();
+    server.route("/latest.json", Answer::Silent);
+    let start = Instant::now();
+    let answer = updates("0.1.3", &server.url("/latest.json"), true, &Clock::new(), None).check(false);
+    assert_eq!(state(&answer), "failed");
+    let took = start.elapsed();
+    assert!(took >= Duration::from_secs(4) && took < Duration::from_secs(8), "{took:?}");
+}
+
+#[test]
+fn a_failed_check_uses_up_the_day_and_tells_nothing_about_the_server() {
+    let server = Server::start();
+    let clock = Clock::new();
+    let notice = updates("0.1.3", &server.url("/latest.json"), true, &clock, None);
+    let answer = notice.check(false);
+    assert_eq!(state(&answer), "failed");
+    assert_eq!(answer.as_object().unwrap().keys().collect::<Vec<_>>(), ["state", "checkedAt"]);
+    assert_eq!(state(&notice.check(false)), "waiting");
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
+fn the_update_commands_through_the_host() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let data = tempfile::tempdir().unwrap();
+    let browser = Arc::new(Opened::default());
+    // Without `with_updates` there is no notice.
+    let plain = host(data.path(), true, browser.clone());
+    assert_eq!(plain.call("update.check", &json!({}), None).unwrap().0["state"], "unavailable");
+    assert_eq!(plain.call("update.settings", &json!({}), None).unwrap().0["available"], false);
+
+    let noticed = host(data.path(), true, browser).with_updates(UpdateOptions::new("0.1.3", server.url("/latest.json")));
+    assert_eq!(noticed.call("update.settings", &json!({}), None).unwrap().0["available"], true);
+    let (answer, bytes) = noticed.call("update.check", &json!({ "force": true }), None).unwrap();
+    assert!(bytes.is_none());
+    assert_eq!(answer["update"]["version"], "0.2.0");
+    assert_eq!(noticed.call("update.check", &json!({ "force": "yes" }), None).unwrap_err().code, "BAD_ARGUMENT");
+    assert_eq!(noticed.call("update.check", &json!({}), Some(b"x")).unwrap_err().code, "BAD_ARGUMENT");
+    assert_eq!(noticed.call("update.settings", &json!({ "notify": 1 }), None).unwrap_err().code, "BAD_ARGUMENT");
+    // The host's own loopback switch is what lets the test server through: as shipped, it is refused.
+    let shipped = host(tempfile::tempdir().unwrap().path(), false, Arc::new(Opened::default())).with_updates(UpdateOptions::new("0.1.3", server.url("/latest.json")));
+    assert_eq!(shipped.call("update.check", &json!({}), None).unwrap().0["state"], "failed");
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
+fn the_shipped_shell_has_no_way_to_change_where_the_notice_looks() {
+    let shell = include_str!("../../../apps/desktop/src-tauri/src/lib.rs");
+    assert!(!shell.contains("--update-url") && !shell.contains("--update-current") && !shell.contains("--update-now"));
+    let harness = include_str!("../src/bin/thoth-host-stdio.rs");
+    assert!(harness.contains("\"--update-url\""));
 }
