@@ -136,6 +136,10 @@ test("drop into a folder: the folder row is outlined, the page moves into it and
 });
 
 test("a drop on the row's text lands like a drop on the row, and so does a drop on its empty end", async ({ page }) => {
+  // The tree being visible is not the rows being listed: under heavy load the first drag once started before they were
+  // (a first-drop miss). Wait for the rows on screen, then for any motion to end, as before the second drag.
+  await expect.poll(() => rowNames(tree(page))).toEqual(["Docs", "Empty", "Alpha", "Beta", "Gamma"]);
+  await settled(page);
   const label = row(page, "Docs").locator(".tree-label");
   const drag = await startDrag(page, row(page, "Beta"));
   const text = (await label.boundingBox())!;
@@ -143,6 +147,14 @@ test("a drop on the row's text lands like a drop on the row, and so does a drop 
   await expectIndicator(page, ["Docs: inside"]);
   await drag.drop();
   await expect.poll(() => exists("Docs/Beta.md")).toBe(true);
+  // A file on disk is not the UI: Docs opens, Beta is re-keyed into it and the 140ms open slide moves the rows below only
+  // after that (about 100ms idle, more under load). Pressing Gamma before then grabs a row that is sliding (the press
+  // lands on the row above, or the drag starts as another page). Evidence: dnd flake investigation, 8 of 8 failing runs
+  // pressed within -32..+52ms of the re-key, passing runs outside it; the drag state, the rows and the timers were
+  // consistent in every run (no stale state, no remount mid-drag, no hover-open, no tooltip). So wait for what the UI
+  // shows (Docs open, Beta inside it), then for the motion to end.
+  await expect(row(page, "Docs")).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => rowNames(tree(page))).toEqual(["Docs", "Deep", "One", "Three", "Two", "Beta", "Empty", "Alpha", "Gamma"]);
   await settled(page);
 
   const far = await startDrag(page, row(page, "Gamma"));

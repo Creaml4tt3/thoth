@@ -272,6 +272,11 @@ test.describe("workspace tree drag and drop", () => {
   test("locator.dragTo reorders and moves too", async ({ page }) => {
     await row(page, "Gamma").dragTo(row(page, "Alpha"), { targetPosition: { x: 60, y: 3 } });
     await expect.poll(async () => (await serverTree()).under(null)).toEqual(["Gamma", "Alpha", "Beta", "Folder"]);
+    // The server showing the order is not the UI showing it: the second dragTo measures its rows at once, so wait for the
+    // list on screen first (as the Private Space twin of this test does). NOT REPRODUCED: this test did not fail in ~128
+    // runs of the investigation; the wait follows from the code (the UI redraws after movePage returns, a few ms after the
+    // server poll can already see it), not from a failing run.
+    await expect.poll(() => names(page)).toEqual(["Gamma", "Alpha", "Beta", "Folder"]);
     await row(page, "Beta").dragTo(row(page, "Gamma"));
     await expect.poll(async () => (await serverTree()).parentOf("Beta")).toBe("Gamma");
   });

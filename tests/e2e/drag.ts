@@ -5,9 +5,33 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * HTML5 drag (dragstart, dragenter, dragover, drop, dragend), so the app sees what a person's mouse produces.
  */
 
+/**
+ * The box of `target` once it has stopped moving: read `getBoundingClientRect()` in the page on each animation frame until
+ * two frames in a row agree (at most 60 frames, then the last read). A row that is still sliding (a folder opening above
+ * it) would otherwise be measured, and pressed, where it is no longer. Costs two frames when the row is at rest.
+ */
+async function stableBox(target: Locator): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  const box = await target.evaluate(async (el) => {
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    };
+    const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    let last = read();
+    for (let i = 0; i < 60; i++) {
+      await frame();
+      const now = read();
+      if (now.x === last.x && now.y === last.y && now.width === last.width && now.height === last.height) return now;
+      last = now;
+    }
+    return last;
+  });
+  return box.width > 0 && box.height > 0 ? box : null;
+}
+
 /** The pointer at `fraction` (0 top edge, 1 bottom edge) of the row, in page coordinates. */
 async function pointAt(target: Locator, fraction: number): Promise<{ x: number; y: number }> {
-  const box = await target.boundingBox();
+  const box = await stableBox(target);
   if (!box) throw new Error("row is not on screen");
   return { x: box.x + Math.min(box.width - 4, Math.max(24, box.width / 2)), y: box.y + Math.max(1, Math.min(box.height - 1, box.height * fraction)) };
 }

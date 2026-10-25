@@ -11,6 +11,8 @@ export const DIST = join(REPO, "apps", "desktop", "dist");
 export const BRIDGE_DIR = join(REPO, "tests", ".tmp", "e2e-bridge");
 
 export async function buildAll(): Promise<{ dist: string; bridgeDir: string; binary: string }> {
+  // Built once by `global-setup.ts`; rebuilding here would rewrite files other workers are serving.
+  if (process.env.THOTH_E2E_PREBUILT === "1") return { dist: DIST, bridgeDir: BRIDGE_DIR, binary: await buildHarness() };
   const desktop = join(REPO, "apps", "desktop");
   execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: desktop, stdio: "inherit" });
   // The bridge transport as a standalone ES module served at /__bridge__.js (test-only; never part of the app bundle).
