@@ -74,14 +74,32 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Windows (ADR-0019). A window the app opened is remembered on this Private Space until it is closed; one closed
   // elsewhere is forgotten here. The main window, alone on the Private Space, brings back the windows that were open.
+  // Recovery is for what a crash left: with another window on this folder, its operations are in flight, not left
+  // (ADR-0019). Once the other windows have closed, this one is alone and runs what it skipped, for what they left.
+  const [alone, setAlone] = useState(connection.shared !== true);
+  const aloneRef = useRef(alone);
   const windows = platform.windows;
   useEffect(() => {
     if (!windows) return;
     if (windowId !== MAIN_WINDOW) rememberWindow(windowId, connection.root);
     let live = true;
     let stop: (() => void) | undefined;
+    // One check at a time, each after the one before: two windows closing together are both seen.
+    let checks = Promise.resolve();
+    const checkAlone = async () => {
+      if (aloneRef.current || !live || !connection.isShared || (await connection.isShared())) return;
+      // The journal first (an interrupted delete puts its page back), then agent runs and transfers (effects below).
+      await vault.recover().catch(() => undefined);
+      if (!live) return;
+      bump();
+      aloneRef.current = true;
+      setAlone(true);
+    };
     void windows
-      .onClosed((id) => forgetWindow(id))
+      .onClosed((id) => {
+        forgetWindow(id);
+        checks = checks.then(checkAlone).catch(() => undefined);
+      })
       .then((remove) => {
         if (live) stop = remove;
         else remove();
@@ -97,7 +115,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       live = false;
       stop?.();
     };
-  }, [windows, windowId, connection]);
+  }, [windows, windowId, connection, vault, bump]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,26 +177,29 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       }),
     [vault, servers, options.now, bump, notifications],
   );
-  // Recovery is for what a crash left: with another window on this folder, its operations are in flight, not left (ADR-0019).
-  const recovers = connection.shared !== true;
+  const [serversReady, setServersReady] = useState(false);
   useEffect(() => {
     let live = true;
     void servers.start().then(() => {
-      if (live && recovers) void transfers.recover();
+      if (live) setServersReady(true);
     });
     return () => {
       live = false;
+      setServersReady(false);
       servers.dispose();
     };
-  }, [servers, transfers, recovers]);
+  }, [servers]);
+  useEffect(() => {
+    if (alone && serversReady) void transfers.recover();
+  }, [transfers, alone, serversReady]);
 
   // Agent runs: only where the host can run CLIs. Working directories an earlier session left are deleted and its
   // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
   const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers }) : null), [platform, vault, bump, servers]);
+  useEffect(() => () => void agents?.dispose(), [agents]);
   useEffect(() => {
-    if (recovers) void agents?.recover();
-    return () => void agents?.dispose();
-  }, [agents, recovers]);
+    if (alone) void agents?.recover();
+  }, [agents, alone]);
   // The mascot: its preferences are the user's (not this Private Space's), read once per window.
   const assistant = useMemo(() => (agents ? createAssistantController() : null), [agents]);
   mascotShown.current = () => assistant?.prefs.get().show ?? false;

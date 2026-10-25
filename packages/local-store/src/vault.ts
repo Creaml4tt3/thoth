@@ -146,6 +146,21 @@ export class Vault {
     return { vault, report };
   }
 
+  /**
+   * Journal recovery, as `open` runs it, for a window that opened with `recover: false` and is now the only one on the
+   * folder (ADR-0019): what is left in the journal and `.thoth/tmp` is what a closed window left, not work in flight.
+   * Reconciles afterwards (a delete it undid puts a page back).
+   */
+  async recover(): Promise<ReconcileReport> {
+    return this.exclusive(async () => {
+      const { recovered, invalid } = await this.recoverJournal();
+      const report = await this.reconcileNow();
+      report.recoveredJournalEntries = recovered;
+      for (const path of invalid) report.warnings.push({ path, code: "invalid_journal_entry", message: "Journal file ignored: it is malformed or names a path outside Thoth's temp directory" });
+      return report;
+    });
+  }
+
   /** Waits for in-flight writes and reconciles, then closes the index. Later mutations reject. */
   async close(): Promise<void> {
     if (this.closed) return;

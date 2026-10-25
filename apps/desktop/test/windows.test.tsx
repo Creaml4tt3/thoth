@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // Moving a tab to a new window, and windows on one Private Space (ADR-0019), against a recorded desktop shell.
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { planImport, saveManifest } from "@thoth/importer-core";
 import { ObsidianVaultImporter } from "@thoth/importer-obsidian/node";
+import { JOURNAL_DIR, TEMP_DIR } from "@thoth/local-store";
 import { openNodeVault } from "@thoth/local-store/node";
 import { createImportService } from "../src/features/import/service.ts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -153,6 +154,32 @@ describe("a window opened on a Private Space", () => {
     await editorBox();
     expect(platform.connections[0]!.shared).toBe(true);
     expect(await readdir(join(root, ".thoth", "tmp"))).toEqual(["01J00000000000000000000000.tmp"]);
+  });
+
+  it("runs the recovery it skipped once the other window has closed and it is the only one", async () => {
+    // The other window closed in the middle of a delete (ADR-0001): the page waits in Thoth's temp folder.
+    const id = "0190a5b0-0000-7000-8000-000000000001";
+    await mkdir(join(root, TEMP_DIR), { recursive: true });
+    await mkdir(join(root, JOURNAL_DIR), { recursive: true });
+    await writeFile(join(root, TEMP_DIR, `${id}.tmp`), "# Delta\n\nHalf deleted.\n");
+    await writeFile(join(root, JOURNAL_DIR, `${id}.json`), JSON.stringify({ id, kind: "delete-file", path: "Delta.md", tempPath: `${TEMP_DIR}/${id}.tmp`, expectedHash: "x", newHash: null, createdAt: 0 }));
+    const platform = createNodePlatform({ vault: root, windows, recent: [root] });
+    platform.sharedWith.push(root);
+    await launched("space-0000000000000006", [page("Alpha.md")], platform);
+    await editorBox();
+    expect(await readdir(join(root, TEMP_DIR))).toEqual([`${id}.tmp`]);
+
+    // Another Private Space's window closing changes nothing here.
+    windows.emitClosed("space-00000000000000ff");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await readdir(join(root, TEMP_DIR))).toEqual([`${id}.tmp`]);
+
+    platform.sharedWith.splice(0);
+    windows.emitClosed("space-0000000000000007");
+    await waitFor(async () => expect(await readdir(join(root, JOURNAL_DIR))).toEqual([]));
+    expect(await readdir(join(root, TEMP_DIR))).toEqual([]);
+    expect(await readFile(join(root, "Delta.md"), "utf8")).toBe("# Delta\n\nHalf deleted.\n");
+    expect(await row("Delta")).toBeTruthy();
   });
 
   it("is reopened with its own tabs when the main window opens the Private Space again", async () => {
