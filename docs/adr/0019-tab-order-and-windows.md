@@ -67,21 +67,35 @@ What the desktop runtime does today, checked in the code before deciding:
    its own handle to the same folder. That means its own index connection and its own watcher, in the one host
    process. The files stay the truth. Each window's watcher triggers its own reconcile, so an edit made in one window
    shows in the others.
-5. **Recovery runs for the first window only.** `vault.open` answers `shared: true` when another handle has the folder
-   open. A shared window skips:
+5. **Recovery runs for the only window.** `vault.open` answers `shared: true` when another window has the folder open:
+   a handle with another owner. Handles of the same window (a page that reloaded) do not count, and `vault.shared` asks
+   the same question later. A shared window skips:
    - journal recovery (`Vault.open({ recover: false })`);
    - agent-run recovery and the sweep of run folders;
    - transfer recovery.
 
    Recovery is for what a crash left. With another window open, what it would recover is that window's work in flight.
    In practice the first window opens at start, so ADR-0001 rule 7 ("on startup") holds as before.
+
+   When another window closes (`thoth:window-closed`, sent once the host has let go of that window's handles), a window
+   that skipped recovery asks `vault.shared` again. If it is now the only one, it runs what it skipped, for what the
+   closed window left: the journal (`Vault.recover`, which puts back a page a closed window was deleting), then agent
+   runs and transfers. There is no timer.
 6. **Index transactions take the write lock up front** (`BEGIN IMMEDIATE`). One window's transaction then waits for
    the other's, within the 5 s busy timeout, rather than failing on a stale snapshot. The index stays a cache that can
-   be rebuilt from the files.
+   be rebuilt from the files, so a busy index never fails what already happened to the files:
+   - A reconcile reads what the index knows inside its transaction, under the lock.
+   - A rebuild is one transaction: other windows read the old index until the new one is committed, and a rebuild
+     that fails leaves the old one.
+   - A save (or delete, or move) whose rename has landed returns as done even if the index update after it fails, for
+     example busy past the timeout. A reconcile is queued to catch up, and the watcher triggers more.
+   - `Vault.open` tries again while the index is busy (after 250 ms, then 1 s), then fails with `IndexBusyError`
+     ("busy in another window"), not a bare SQLite error.
 7. **Compare-and-swap is one step in the host.** `fs.rename` takes an optional `replaceHash`. The host replaces the
    target only while its bytes still have that hash, and checks and renames under one host-wide lock. Otherwise it
-   answers `CONFLICT` and nothing moves. `writeFileAtomic` uses it, and a conflict is a `ConflictError`, shown by the
-   existing conflict dialog. Two windows saving the same page therefore give one write and one conflict, never a lost
+   answers `CONFLICT` and nothing moves. The Node port does the same with one lock per folder in the process, keyed by
+   the folder's real path. `writeFileAtomic` uses it, and a conflict is a `ConflictError`, shown by the existing
+   conflict dialog. Two windows saving the same page therefore give one write and one conflict, never a lost
    write. Editors outside Thoth keep the narrow window that ADR-0001 accepts.
 8. **Each window owns what it starts.**
    - **Agent runs.** A run belongs to the window whose mascot started it, which streams it, reviews it and applies it.
@@ -95,16 +109,22 @@ What the desktop runtime does today, checked in the code before deciding:
    - **Other windows.** They see the results through the files and the index: pages, run records in the history, the
      tree. They do not see live progress.
 9. **A window takes its own with it.** The host records which window opened each vault handle and created each agent
-   run. When a window is destroyed, the shell calls `Host::release(window)`:
-   - that window's handles close, and so do their watchers;
-   - its agent runs are cancelled and their folders deleted, as quitting does for all of them.
+   run. When a window is destroyed, or its page starts loading again (a reload is a new page in the same window), the
+   shell releases it in two steps:
+   - `Host::detach(window)`, on the event loop, takes its handles out at once. They stop working and no longer count
+     for `shared`, and a handle the new page opens afterwards is not caught up in the release.
+   - `Detached::end`, on a blocking thread (`spawn_blocking`): the watchers stop, the index connections close, and
+     the agent runs are cancelled and their folders deleted, as quitting does for all of them. The app waits for these
+     before it exits.
 
-   Other windows' handles and runs are untouched.
+   Other windows' handles and runs are untouched. The stdio harness takes the window from each request (`owner`), so
+   tests and the e2e bridge give each window, or each browser page, its own owner, as the shell does.
 
 ### Window lifecycle
 
 10. **Thoth's own windows only.** The first window is `main`. Every other window is `space-` followed by 1 to 32
-    lowercase letters or digits.
+    lowercase letters or digits. There are at most 8 windows (each has its own index connection and watcher);
+    `window_open` past that fails with a clear error.
     - The shell's own command `window_open` makes such a window only on a Private Space in the host's recent list.
     - It always loads the app's own page, `index.html?window=…&root=…&tabs=…`, with the values escaped.
     - It places the window at the drop point when there is one.
@@ -127,7 +147,12 @@ What the desktop runtime does today, checked in the code before deciding:
 13. **Closing.**
     - Cmd/Ctrl+W closes the current tab. On a window's last tab it closes the window when another window is open, and
       leaves an empty tab in the last window, as before, since closing the last window quits the app.
-    - The window's close button always closes it.
+    - The window's close button always closes it, after its page has written its edits. The shell holds the close,
+      sends the page `thoth:close-requested`, and the page flushes (`flushAll`) and calls `window_close` with
+      `evenIfLast`. A page that does not answer within 4 s (hung) is closed anyway.
+    - Quit on macOS (Cmd+Q, the app menu) is the app's own menu item, not the predefined one, which ends the app at
+      once: every window is asked as with its close button, and the app exits when the last has gone. The windows are
+      not forgotten (rule 12).
     - When the main window is closed this way, it is saved with one empty tab.
     - A new window gets the focus.
 
@@ -141,16 +166,19 @@ What the desktop runtime does today, checked in the code before deciding:
   - The webview still gets no Tauri window permission: windows are made by the shell, under its own rules.
 - Negative:
   - Every window indexes and watches the folder itself, so a change is reconciled once per window.
-  - A big first reconcile in one window can make another window's write wait, and fail after the 5 s busy timeout.
+  - A big reconcile in one window (it holds the index's write lock while it reads changed files) makes another
+    window's index update wait. A save still lands; its index update catches up later (rule 6).
   - Closing a window that is running an agent ends that run, as quitting does.
-  - Unsaved typing in a window closed with its close button (at most the autosave delay, 1 s) is lost, as when
-    quitting today.
+  - Unsaved typing (at most the autosave delay, 1 s) is still lost when the app ends without Thoth's Quit: Quit from
+    the Dock, logging out, or a page that did not answer its close within 4 s.
   - Window sizes and positions are not restored.
   - A window does not see another window's live agent run, import or transfer progress.
-  - A webview that crashes on its own leaves its in-flight work until the Private Space is next opened alone.
+  - A webview that crashes on its own leaves its in-flight work until the Private Space is next opened alone, or until
+    the other windows on it close.
 - Follow-up:
-  - `Host::call_as` and `Host::release`, plus the shell commands `window_open` and `window_close`
-    (`apps/desktop/src-tauri/src/lib.rs`) and the host command `vault.shared`.
+  - `Host::call_as`, `Host::release` and `Host::detach`, plus the shell commands `window_open` and `window_close`
+    (`apps/desktop/src-tauri/src/lib.rs`), its `thoth:close-requested` event and the host command `vault.shared`.
+  - `Vault.recover` and `IndexBusyError` (`packages/local-store`); the harness's `owner` and `StdioTransport.as`.
   - `fs.rename` with `replaceHash` in both port implementations and the port contract.
   - `tests/ports/two-windows.test.ts` (Node and Rust hosts), `crates/thoth-host/tests/multi_window.rs` and the shell
     tests.
@@ -188,8 +216,19 @@ client), 14.11 (browser contexts spawn nothing).
    Cmd+N is New page and Cmd+W must stay the page's key. Not done.
 5. **Live state across windows.** Should one window show another window's running agent, import or transfer? Today
    each window shows its own.
-6. **Not yet checked in a real window:**
+6. **Agent run handles are not checked against their owner.** A run handle is unguessable and only the window that
+   created it learns it, but any window that named it could use it. Checking the owner on every `agent.*` call would
+   close that; it is left until a window can learn another's handles (it cannot today). Blocks: nothing.
+7. **The stdio harness runs `sql.*` and `fs.*` off its main loop.** One window's `BEGIN IMMEDIATE` waits in SQLite for
+   another's transaction, which must go on meanwhile, as in the desktop shell. So the harness may answer those calls
+   out of order, and calls sent one after another need not start in that order. Index calls on one handle still run
+   one at a time (the host's lock per connection) and `Vault` orders its own transactions, but a test that sends calls
+   without waiting for each answer must not rely on their order. Blocks: nothing.
+8. **Quitting other ways.** Quit from the Dock and logging out still end the app without the windows writing their
+   edits: tao 0.37 gives no hook before the app ends that way. Blocks: nothing.
+9. **Not yet checked in a real window:**
    - that WKWebView delivers the pointer release outside the window (the e2e suite drives Chromium);
    - the drop point on a second display;
    - the look and feel of the drag in light and dark;
-   - the Thai strings marked `REVIEW`.
+   - the Thai strings marked `REVIEW`;
+   - the close handshake (close button, Cmd+Q, a hung page) and a page reload releasing its window's handles.
