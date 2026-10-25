@@ -62,6 +62,10 @@ node apps/server/src/main.ts
 | `ACCESS_TOKEN_TTL_SECONDS` | 900 | Sign-in access token lifetime (60 to 3600). |
 | `REFRESH_TOKEN_TTL_DAYS` | 30 | Refresh token lifetime, sliding (1 to 365). |
 | `SESSION_MAX_DAYS` | 90 | Maximum age of a sign-in session; then the user signs in again (1 to 365). |
+| `PUBLIC_SHARE` | `on` | Public read-only share links (ADR-0023, capability `public-share`). `off`: not advertised, the share calls answer 501, every `/s/<token>` address is the not-found page. |
+| `MAX_SHARE_LINKS_PER_WORKSPACE` | none (trial 20) | Active (not revoked, not expired) share links per workspace; one more is 409 `quota_exceeded` (`shareLinksPerWorkspace`). |
+| `SHARE_VIEWS_PER_LINK` | off (trial 300) | Requests to one share link (pages and pictures) per `RATE_LIMIT_WINDOW_SECONDS`, counted per token as given, known or not. |
+| `SHARE_VIEWS_PER_IP` | off (trial 120) | Requests to any share link per client IP per window. |
 
 Every limit is its own optional variable: unset means no limit. Each accepts a positive integer, or the word
 `unlimited` to remove a value the trial profile would set. Invalid values stop the server at startup with a
@@ -102,6 +106,7 @@ SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
 | `MAX_ACCOUNTS` | 300 | keeps the database inside Neon's 1 GB; adjust after real usage |
 | `RATE_LIMIT_PER_ACCOUNT` / `RATE_LIMIT_PER_IP` | 300 / 600 per 60 s | ample for a person whose client polls the change feed, small for a script |
 | `SIGNUP_LIMIT_PER_IP` | 10 per 24 h | ADR-0014 rule 4: sign-up is limited per IP |
+| `MAX_SHARE_LINKS_PER_WORKSPACE` / `SHARE_VIEWS_PER_LINK` / `SHARE_VIEWS_PER_IP` | 20 / 300 / 120 per 60 s | ADR-0023 rule 4: share links stay on in the trial, capped and rate limited |
 
 Recommended companions (not part of the profile because they depend on the deployment):
 `MIGRATE_ON_START=false`, `DATABASE_POOL_MAX=1` to `3`, `TRUST_PROXY=true`, `CORS_ORIGINS`, `CRON_SECRET`.
@@ -131,6 +136,31 @@ not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
 - All checks run under the per-workspace row lock (or, for server-wide and per-account counts, a transaction-scoped
   advisory lock), so concurrent requests cannot overshoot: at limit - 1 exactly one of N concurrent creates wins.
 - A `quota_exceeded` reply is not stored under its `Idempotency-Key`: retrying after freeing room runs the request.
+
+### Public share links (ADR-0023)
+
+Owners and editors make a read-only link to a page (`createShareLink`), and anyone with the address reads the page
+and its sub-pages at `<PUBLIC_URL>/s/<token>` without signing in. The pictures those pages use are served at
+`/s/<token>/a/<id>`. On by default; for a self-hosted server:
+
+- **Off:** `PUBLIC_SHARE=off`. The apps hide "Share…", and links made earlier stop working (they come back if it is
+  switched on again, unless revoked or expired).
+- **Limits:** `MAX_SHARE_LINKS_PER_WORKSPACE`, `SHARE_VIEWS_PER_LINK` and `SHARE_VIEWS_PER_IP` (above). Behind a
+  proxy, set `TRUST_PROXY=true` so the per-IP limit sees the visitor's address.
+- **Addresses** are built from `PUBLIC_URL`. Without it, from the address the request came to.
+- **Migration** `010_share_links.sql` must be applied before a build that lists `public-share` serves traffic. With
+  `MIGRATE_ON_START=false` (Neon, any separate migration step), run `node src/cli.ts migrate` with the direct URL
+  first.
+- **What is stored:** the link (page, creator, expiry, revocation) and the SHA-256 of its token. The token itself is
+  shown once, in the create response, and never stored or logged. Request logs show `/s/[token]`.
+- **Every request re-checks** that the link is not revoked or expired, the page is not deleted (a page moved out of
+  the workspace is deleted there), the creator is still an owner or editor, the workspace is not export restricted,
+  and the capability is on. Anything else, and any page or picture outside the subtree, is the same 404.
+- **The page** is HTML the server renders from the Markdown, with no script and a strict CSP
+  (`default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none';
+  form-action 'none'`), `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer` and `nosniff`. Its
+  stylesheet and the brand fonts are served from `/assets/share/` (`apps/server/assets/share`; the Vercel bundle
+  embeds them). Raw HTML in a page is shown as text.
 
 ### Serverless notes (Vercel + Neon)
 
@@ -327,3 +357,10 @@ live on named volumes.
     it; ADR-0014 open question on email). An auth request row is written before the provider is visited, so without
     `RATE_LIMIT_PER_IP` a client can create many short-lived rows (maintenance removes them). Accounts cannot be linked
     across providers. There is no consent screen and no per-client scope: a token grants everything the account can do.
+12. **Share links (ADR-0023).** Revoked and expired rows of `share_links` are kept (an audit trail of what was
+    public); maintenance does not remove them yet. A link in a workspace that is (or later becomes) export restricted
+    is refused (403 `export_restricted`) and stops working: a public link takes content out of the workspace, which
+    ADR-0009's flag forbids. The owner has not decided this point; it is ADR-0023 open question 1. The shared subtree is
+    found through `parent_id`, depth-limited to 64; an attachment is served only when a subtree page's current
+    Markdown uses it (a mention in code does not count). `createShareLink` ignores `Idempotency-Key`, since a stored
+    replay would keep the token.

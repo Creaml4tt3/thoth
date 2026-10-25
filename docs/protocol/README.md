@@ -62,8 +62,9 @@ when either is stale.
 
 ## 3. Capabilities
 
-`GET /api/v1/capabilities` is the only route reachable without credentials, so clients can
-discover a server before signing in.
+`GET /api/v1/capabilities` is the only protocol route reachable without credentials, so clients
+can discover a server before signing in. (A server that lists `public-share` also serves read-only
+HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 10.)
 
 ```json
 {
@@ -91,6 +92,7 @@ discover a server before signing in.
 | `transfers` | `createTransfer`, `getTransfer`, `commitTransfer`, `abortTransfer` | a server that accepts `attachmentIds` in transfers also lists `attachments` |
 | `page-order` | `movePage` | the optional `position` member of pages, tree nodes and change entries; section 7 |
 | `page-kind` | none | the optional `kind` member of tree nodes and page metadata, and `pageKind` of change entries, derived from frontmatter `thoth_kind`; section 7, ADR-0017 |
+| `public-share` | `createShareLink`, `listShareLinks`, `revokeShareLink` | public read-only links to a page and its sub-pages, served as HTML at `/s/<token>`; section 10, ADR-0023 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -146,7 +148,9 @@ Rules for every credential:
   response MUST carry a `WWW-Authenticate` header (RFC 9110 section 11.6.1), for example
   `Bearer`.
 - Credentials travel only in the `Authorization` header, never in URLs or bodies.
-- `GET /capabilities` is public. Every other route requires a credential.
+- `GET /capabilities` is public. Every other `/api/v1` route requires a credential. The
+  share pages of `public-share` (`/s/<token>`) are not protocol routes: the token in the path is
+  the only thing that opens them (section 10).
 - Browser `EventSource` cannot set headers, which constrains `events.sse`; this is tied to the
   authentication decision (open questions).
 
@@ -163,6 +167,7 @@ Rules for every credential:
 | write or delete pages, upload attachments | no | yes | yes |
 | create `to_workspace` transfers, create `from_workspace` move transfers | no | yes | yes |
 | create `from_workspace` copy transfers | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted |
+| create, list and revoke share links (`public-share`) | no | yes, unless export restricted | yes, unless export restricted |
 | administer membership | no | no | yes (not part of this protocol draft) |
 
 - **Existence is not leaked.** A workspace, page, attachment or transfer the principal may
@@ -476,7 +481,7 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   correctness and SHOULD poll the feed on reconnect and at a low background interval.
 - A server MAY send comment lines (`:`) as keep-alives.
 
-## 10. Search and attachments
+## 10. Search, attachments and share links
 
 - `POST .../search` (capability `search`) takes `{ query, limit?, cursor?, withinPageId? }`
   and returns a paginated envelope of `{ pageId, title, revisionId, snippet?, score? }`. It
@@ -488,6 +493,41 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   `GET .../attachments/{attachmentId}` returns the bytes with the stored `Content-Type`.
   `GET` of attachments is an addition to the spec section 8 list, needed to read uploads back.
   Resumable or multipart upload is not defined (open questions).
+
+### Public share links (capability `public-share`, ADR-0023)
+
+- `POST .../pages/{pageId}/share-links` (owners and editors) takes
+  `{ expiresInDays?: 7 | 30 | 90 | null }` (absent: 30; `null`: never) and returns 201 with the
+  link (`id`, `workspaceId`, `pageId`, `createdAt`, `createdBy`, `expiresAt`) plus `token` and
+  `url`. **The token is returned this once.** A server MUST store only a hash of it, so it
+  cannot be listed again. The token is URL-safe with at least 128 bits from a CSPRNG.
+  `Idempotency-Key` is not honoured, because a stored replay would keep the token.
+- Refusals:
+  - 403 `forbidden` for a viewer;
+  - 403 `export_restricted` in an export-restricted workspace;
+  - 409 `quota_exceeded` with `quota: shareLinksPerWorkspace` past the server's limit of
+    active links.
+- `GET .../pages/{pageId}/share-links` lists the page's active (not revoked, not expired) links,
+  newest first, without tokens. `DELETE .../share-links/{linkId}` revokes a link at once (204).
+  Revoking a revoked or expired link also answers 204.
+- The link opens `GET <origin>/s/<token>`: the page as HTML, read-only, no sign-in. Its
+  sub-pages are at `/s/<token>/p/<pageId>`, and the attachments those pages use at
+  `/s/<token>/a/<attachmentId>`. Nothing else of the workspace is reachable.
+- The page is the current revision, not a snapshot. Every request re-checks:
+  - the link is active;
+  - the page is not deleted and is still in the subtree;
+  - the link's creator is still an owner or editor;
+  - the capability is on.
+- An unknown, expired, revoked, out-of-scope or malformed token gets one and the same 404:
+  HTML for a browser, problem+json otherwise. Rate limits count the token as given, so a 429
+  does not tell whether a token exists.
+- Share pages carry no script, a CSP with `default-src 'none'`, `frame-ancestors 'none'`,
+  `base-uri 'none'` and `form-action 'none'`, `X-Robots-Tag: noindex, nofollow`,
+  `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. They show no workspace
+  IDs, member names or emails, and no titles of pages outside the subtree. Raw HTML in the
+  Markdown is never passed through.
+- Attachments keep their stored `Content-Type`. Only raster images are inline; SVG and
+  everything else download.
 
 ## 11. Transfers
 
@@ -601,7 +641,7 @@ the fixture tests, and `Retry-After`.
    how clients obtain credentials; browser SSE authentication; the final shape of `GET /me`
    (ADR-0004).
 2. **Versioning policy:** what is breaking, deprecation windows, running v1 and v2 together.
-3. **Capability registry:** naming beyond the seven IDs; governance of `x-` IDs; semantics of
+3. **Capability registry:** naming beyond the nine IDs; governance of `x-` IDs; semantics of
    `databases` and `realtime-collab`.
 4. **Attachments:** resumable or multipart upload; chunking; how page Markdown refers to an
    attachment (URL form); deduplication; deletion and retention; size limits per MIME type.
@@ -615,7 +655,7 @@ the fixture tests, and `Retry-After`.
    checks that frontmatter `thoth_id` equals the path ID; newline and Unicode normalization of
    stored Markdown.
 8. **Roles and sharing:** a members listing route and who may see members; role changes and
-   last-owner protection; page-level permissions; guest and public links; the definition of
+   last-owner protection; page-level permissions; guest links (public read-only links are decided in ADR-0023); the definition of
    "export" (copy, move, download, agent context) for the restriction flag (ADR-0009).
 9. **Search:** query syntax, ranking, snippet format, tokenization (notably Thai), and a bound on
    index lag.

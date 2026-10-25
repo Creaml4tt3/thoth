@@ -55,6 +55,12 @@ Domains used below (change them when you buy your own domain):
    input; the URL is kept in memory only, redacted from output and not saved). It accepts only `migrate` and
    `backfill-kind` and refuses the pooled URL.
 
+   Migration `010_share_links.sql` (ADR-0023, public share links) adds one new
+   table and needs no backfill. **Apply it to Neon before you deploy the server
+   build that contains it.** That build lists the capability `public-share`, so
+   the apps offer "Share…" right away. Without the table, every share call and
+   every `/s/<token>` page fails with a database error.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
@@ -108,6 +114,20 @@ names do not work for sign-in cookies.
    | `PUBLIC_URL` | `https://api.thoth.creaml4tt3.me` (the sign-in redirect addresses are built from it) |
    | `SERVER_NAME` | `Thoth demo server` (the name the desktop app and web client show; the same as the starter server's name) |
    | `WEB_REDIRECT_URIS` | `https://thoth.creaml4tt3.me/app/callback` |
+
+   Public share links (ADR-0023) are on in the trial with no extra variable.
+   `THOTH_PROFILE=trial` sets these defaults, and each one can be overridden:
+
+   | Variable | Trial default | Meaning |
+   | --- | --- | --- |
+   | `PUBLIC_SHARE` | `on` | `off` hides "Share…" in the apps, answers the share calls `501`, and makes every `/s/<token>` address the not-found page |
+   | `MAX_SHARE_LINKS_PER_WORKSPACE` | `20` | Active (not revoked, not expired) links per workspace. One more is `409 quota_exceeded` (`quota: shareLinksPerWorkspace`) |
+   | `SHARE_VIEWS_PER_LINK` | `300` | Requests per link (pages and pictures) per `RATE_LIMIT_WINDOW_SECONDS` (60). Counted per token, known or not |
+   | `SHARE_VIEWS_PER_IP` | `120` | Requests to any shared page per client IP per window. Needs `TRUST_PROXY=true` behind Vercel |
+
+   Share addresses are built from `PUBLIC_URL`
+   (`https://api.thoth.creaml4tt3.me/s/<token>`). The pages are served by the
+   same function as the API.
 
 5. The daily cron job that calls `/internal/maintenance` is part of the build
    (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.
