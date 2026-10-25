@@ -10,6 +10,7 @@ import type { OpenImportSource } from "../features/import/open-source.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferService } from "../features/transfer/service.ts";
 import type { AgentsService } from "../features/agents/service.ts";
+import type { AssistantController } from "../features/mascot/controller.ts";
 import type { StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 import type { OpenOptions } from "@thoth/app-ui/tabs/model.ts";
 import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
@@ -42,7 +43,7 @@ export interface Session {
   /** Opens a page in the current tab, or in a new one (`newTab`: Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter). */
   openPage(path: string, options?: OpenOptions): void;
   /** Opens Settings as a tab (one only), optionally scrolled to a section. */
-  openSettings(section?: "servers"): void;
+  openSettings(section?: "servers" | "agents"): void;
   /** The window's tabs (ADR-0016 rule 5). */
   tabs: TabsController;
   /** Workspace servers: the host holds the credentials; this is the app's view of them. */
@@ -51,10 +52,14 @@ export interface Session {
   openWorkspacePage(ref: WorkspacePageRef, options?: OpenOptions): void;
   /** Copy and move between this Private Space and workspaces (ADR-0006). */
   transfers: TransferService;
-  /** The Agent Hub (ADR-0007); null where the host cannot run agent CLIs. */
+  /** The agent runs (ADR-0007); null where the host cannot run agent CLIs. */
   agents: AgentsService | null;
-  /** Opens the Agent Hub tab; `selection` (vault paths) becomes the next task's context. */
-  openAgents(selection?: string[]): void;
+  /** The mascot and its prompt bubble; null where there are no agents. */
+  assistant: AssistantController | null;
+  /** Opens the mascot's prompt bubble; `selection` (vault paths) becomes the next task's context. */
+  askAssistant(selection?: string[]): void;
+  /** Opens the review tab of the current run (its proposed changes, then the result of applying). */
+  openAgentReview(): void;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
   openFolder(path: string): void;
   reveal: { path: string; nonce: number } | null;

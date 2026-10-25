@@ -8,6 +8,7 @@ import type { System } from "../features/import/model.ts";
 type Phase = "staging" | "verifying" | "committing";
 type Step = "source" | "instructions" | "pick" | "preview" | "destination" | "options" | "run" | "report";
 type Os = "mac" | "windows" | "linux";
+type MascotStateName = "idle" | "listening" | "working" | "review" | "done" | "error" | "sleeping";
 
 const times = (n: number) => (n === 1 ? "once" : `${n} times`);
 
@@ -154,15 +155,14 @@ export const en = {
   },
 
   agents: {
-    title: "Agent Hub",
-    /** The sidebar button, the palette command and the tab. */
-    open: "Agent Hub",
-    /** In the sidebar's page selection: hands the picked pages to the Agent Hub. */
-    askAgent: "Ask an agent…",
-    lede: "Give an AI tool you already use a few pages to work on. It works on copies, and you review every change before anything in your Private Space is written.",
-    unavailable: "The Agent Hub needs the Thoth desktop app: a browser cannot run programs on your computer.",
+    /** The Settings section (the Agent Hub became settings; tasks start from the mascot). */
+    title: "Thoth assistant",
+    /** In the sidebar's page selection: hands the picked pages to the mascot's prompt bubble. */
+    askAgent: "Ask Thoth…",
+    lede: "Thoth hands a few pages to an AI tool you already use. It works on copies, and you review every change before anything in your Private Space is written. Start a task from the mascot in the corner of the window.",
+    unavailable: "The Thoth assistant needs the Thoth desktop app: a browser cannot run programs on your computer.",
     recovered: (n: number) => `${n === 1 ? "1 run was" : `${n} runs were`} stopped when Thoth last closed. Their copies were deleted and nothing was applied.`,
-    awaiting: (n: number) => `${n === 1 ? "1 run is" : `${n} runs are`} waiting for your review. Open it under Earlier runs.`,
+    awaiting: (n: number) => `${n === 1 ? "1 run is" : `${n} runs are`} waiting for your review. Open it under Earlier runs, or click the mascot.`,
     dismiss: "Dismiss",
     /** Why a workspace page was not given to the agent, or a review could not be opened. */
     notice: {
@@ -171,6 +171,7 @@ export const en = {
       not_found: (workspace: string | undefined) => `A workspace page is gone, or you are no longer a member${workspace ? ` of “${workspace}”` : ""}. Remove it and try again.`,
       unavailable: "The workspace could not be reached. Check the server (Settings → Servers) and try again.",
       reviewGone: "This review can no longer be opened: its saved copy was deleted or damaged. Nothing was applied.",
+      workspaceOff: "Workspace pages are switched off in Settings → Thoth assistant → Permissions.",
     } as Record<string, string | ((workspace: string | undefined) => string)>,
 
     /** Which CLI runs the task, with each one's detection state in a few words. */
@@ -191,6 +192,19 @@ export const en = {
     status: {
       searched: "Thoth looked in:",
       check: "Check again",
+    },
+
+    /** Short facts beside each agent's name in the settings. */
+    facts: {
+      label: "Details",
+      version: (version: string) => `Version ${version}`,
+      noVersion: "No version",
+      notInstalled: "Not installed",
+      signedIn: "Signed in",
+      signedOut: "Not signed in",
+      sandbox: "Sandbox works",
+      noSandbox: "No sandbox",
+      unknown: "Not known yet",
     },
 
     /** What differs between the agent CLIs. */
@@ -215,7 +229,7 @@ export const en = {
         badModel: "That is not a model name Claude Code accepts.",
         session: (model: string) => `Started with ${model}. Tools: reading and editing files in its folder only.`,
         retry: (attempt: number) => `Claude Code is retrying (attempt ${attempt})…`,
-        budgetHint: "Claude Code stops once its own cost estimate reaches this amount. The estimate can be a little off. You can change the defaults in the Agent Hub settings below.",
+        budgetHint: "Claude Code stops once its own cost estimate reaches this amount. The estimate can be a little off. The defaults are in Settings → Thoth assistant.",
         noBudget: "Not supported by Claude Code",
         errors: {
           not_logged_in: "Claude Code is not signed in. Run claude in a terminal and sign in, then try again.",
@@ -302,6 +316,9 @@ export const en = {
       contextTooLarge: "That is too much data for one run. Pick fewer pages or folders.",
       contextFileTooLarge: "One of the files is too large to give to an agent. Pick something else.",
       contextMissing: "Something you picked is gone. Pick again.",
+      privateOff: "Private Space pages are switched off in Settings → Thoth assistant → Permissions.",
+      wholeSpaceOff: "Giving the whole Private Space is switched off in Settings → Thoth assistant → Permissions.",
+      workspaceOff: "Workspace pages are switched off in Settings → Thoth assistant → Permissions.",
     },
 
     run: {
@@ -414,8 +431,49 @@ export const en = {
       localOnly: "Kept on this computer only, never in your Private Space.",
     },
 
+    /** The review tab: what a run proposed, the review with per-file diffs, and the result of applying. */
+    runView: {
+      tab: "Agent changes",
+      title: "Agent changes",
+      none: "No run is waiting for review. Start a task from the mascot in the corner of the window.",
+      transcript: "Transcript",
+    },
+
+    providersHeading: "Agents",
+    providersLede: "Thoth runs the command-line tools you installed and signed in to. It never sees your login.",
+
+    permissions: {
+      heading: "Permissions and limits",
+      lede: "What an agent may be given, and the defaults for every run. You can change the limits for a single run in the bubble's options.",
+      private: "Private Space pages and folders",
+      privateHint: "Copies of the pages and folders you pick. The agent may edit them; you review every change.",
+      wholeSpace: "The whole Private Space",
+      wholeSpaceHint: "Every page and attachment, except Thoth's own .thoth folder.",
+      workspace: "Read-only workspace pages",
+      workspaceHint: "Copies of pages you may copy out of a workspace. Nothing the agent does to them is saved or sent back.",
+      limits: "Default limits",
+      codexNote: "Codex has no spending limit of its own, so the spending limit applies to Claude Code only. The time limit applies to both.",
+    },
+
+    usage: {
+      heading: "Usage",
+      lede: "From the runs recorded on this computer: Claude Code reports an estimated cost, Codex reports tokens.",
+      period: "Show by",
+      periods: { day: "Day", week: "Week", month: "Month" },
+      chart: (runs: number, from: string, to: string) => `Runs per period, ${from} to ${to}: ${runs === 1 ? "1 run" : `${runs} runs`} in all. The numbers are in the table below.`,
+      table: "Show the numbers",
+      when: "Period",
+      claudeRuns: "Claude Code runs",
+      cost: "Cost",
+      codexRuns: "Codex runs",
+      tokens: "Tokens",
+      total: "Total",
+      none: "No runs in this time yet.",
+      weekOf: (date: string) => `Week of ${date}`,
+    },
+
     settings: {
-      heading: "Agent Hub settings",
+      heading: "Run history",
       lede: "Defaults for every run. You can change the limits for a single run in the task form. Codex has no spending limit; only the time limit applies to it.",
       time: "Time limit",
       budget: "Spending limit",
@@ -427,6 +485,68 @@ export const en = {
       clearYes: "Delete",
       clearNo: "Keep",
       cleared: (n: number) => (n === 0 ? "There was nothing to delete." : n === 1 ? "Deleted the saved details of 1 run." : `Deleted the saved details of ${n} runs.`),
+    },
+  },
+
+  /** The mascot: a button that floats in a corner, with the prompt bubble it opens, and its settings. */
+  mascot: {
+    name: "Thoth assistant",
+    /** Part of the button's name: "Thoth assistant, working". */
+    states: { idle: "ready", listening: "listening", working: "working", review: "changes ready for review", done: "done", error: "stopped with an error", sleeping: "resting" } as Record<MascotStateName, string>,
+    /** Said politely when the state changes (not "listening": the person just opened the bubble). */
+    announce: {
+      idle: "Thoth assistant is ready.",
+      listening: "Thoth assistant is listening.",
+      working: "Thoth assistant is working.",
+      review: "Thoth assistant: the changes are ready for your review.",
+      done: "Thoth assistant: done.",
+      error: "Thoth assistant: the run stopped with an error.",
+      sleeping: "Thoth assistant is resting.",
+    } as Record<MascotStateName, string>,
+    hint: "Click to ask. Drag it, or use the arrow keys, to move it.",
+    reviewHint: "Click to review the changes.",
+    shrink: "Shrink the assistant",
+    expand: "Expand the assistant",
+    bubble: {
+      title: "Ask Thoth",
+      close: "Close",
+      context: "Context",
+      contextNone: "Nothing yet. Add pages with +.",
+      remove: (name: string) => `Remove ${name}`,
+      selection: (words: number) => (words === 1 ? "Selected text (1 word)" : `Selected text (${words} words)`),
+      wholeSpace: "Whole Private Space",
+      workspacePage: (title: string) => `${title} (read-only)`,
+      add: "Add context",
+      addDone: "Done",
+      agent: "Agent",
+      agentOption: (name: string, state: string) => `${name} · ${state}`,
+      options: "Options",
+      task: "Task",
+      taskHint: "What should Thoth do with these pages?",
+      working: "Working on it…",
+      reviewReady: "The changes are ready for your review.",
+      openReview: "Review the changes",
+      openResult: "Open the result",
+      settings: "Assistant settings",
+      appliedSummary: (n: number) => (n === 0 ? "Nothing was applied." : n === 1 ? "1 change was applied." : `${n} changes were applied.`),
+    },
+    settings: {
+      heading: "Mascot",
+      lede: "The mascot floats in a corner of the window. Click it to ask, drag it to move it.",
+      show: "Show the mascot",
+      size: "Size",
+      sizes: { compact: "Compact", full: "Full", auto: "Auto" } as Record<"compact" | "full" | "auto", string>,
+      sizeHint: "Auto is full, and compact while you type in a page or when the window is narrow.",
+      scale: "Scale",
+      scaleValue: (percent: number) => `${percent}%`,
+      motion: "Motion",
+      motions: { full: "Full", calm: "Calm", off: "Off" } as Record<"full" | "calm" | "off", string>,
+      motionHint: "Calm moves less, and more slowly. Off shows a still picture of each state. When your computer asks for reduced motion, the mascot keeps still whatever is chosen here.",
+      snap: "Snap to the edges",
+      snapHint: "When you let go of it, it moves to the nearest edge or corner.",
+      reset: "Reset position",
+      resetDone: "Back in the bottom-right corner.",
+      preview: "Preview",
     },
   },
 

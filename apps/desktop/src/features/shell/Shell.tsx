@@ -14,7 +14,8 @@ import { TooltipLayer } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
-import { AgentHubView } from "../agents/AgentHub.tsx";
+import { AgentRunView } from "../agents/AgentRunView.tsx";
+import { MascotLayer } from "../mascot/Mascot.tsx";
 import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
@@ -60,9 +61,9 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, agents, openAgents } = useSession();
+  const { vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant } = useSession();
   const t = useDesktopStrings().shell;
-  const agentsTitle = useDesktopStrings().agents.title;
+  const agentsTitle = useDesktopStrings().agents.runView.tab;
   const strings = useStrings();
   const tt = strings.tabs;
   const [problem, setProblem] = useState<string | null>(null);
@@ -165,7 +166,9 @@ export function Shell() {
       : {}),
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
-    ...(agents ? { openAgents: () => openAgents() } : {}),
+    ...(assistant
+      ? { askAssistant: () => assistant.ask(), toggleAssistantSize: () => assistant.toggleSize(), openAssistantSettings: () => openSettings("agents") }
+      : {}),
     tabs: {
       newTab: tabs.newTab,
       closeTab: () => tabs.close(),
@@ -192,6 +195,7 @@ export function Shell() {
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
+    ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
 
   // Open the first page when nothing is open at start, so the shell is never blank. Once: closing every tab leaves it empty.
@@ -252,7 +256,7 @@ export function Shell() {
           {target.kind === "settings" ? (
             <SettingsView section={target.section ?? "top"} />
           ) : target.kind === "agents" ? (
-            <AgentHubView />
+            <AgentRunView />
           ) : target.kind === "workspace" ? (
             <WorkspacePageView key={`${tabs.active.id}\n${target.server}\n${target.workspace}\n${target.page}`} target={target} onTransfer={transfer} />
           ) : target.kind === "page" ? (
@@ -267,6 +271,7 @@ export function Shell() {
         </TabPanel>
       </main>
       <SidebarResizer sidebar={sidebar} shell={shell} />
+      <MascotLayer />
       <TooltipLayer />
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}

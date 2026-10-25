@@ -63,7 +63,7 @@ function PendingTransfers() {
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer }: Props) {
-  const { connection, reveal, openSettings, vault, agents, openAgents } = useSession();
+  const { connection, reveal, openSettings, vault, agents, askAssistant } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
@@ -144,7 +144,7 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
     const paths = [...picked].sort();
     setSelecting(false);
     setPicked(new Set());
-    openAgents(paths);
+    askAssistant(paths);
   };
   const transfer = (mode: "copy" | "move") => {
     const paths = [...picked].sort();
@@ -201,7 +201,6 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <IconButton icon="page-plus" label={t.newPage} shortcut="page.new" onClick={onNewPage} />
         <IconButton icon="folder-plus" label={t.newFolder} shortcut="folder.new" onClick={onNewFolder} />
         <span className="side-end">
-          {agents && <IconButton icon="sparkle" label={ta.open} onClick={() => openAgents()} />}
           <IconButton icon="gear" label={t.settings} shortcut="settings.open" onClick={() => openSettings()} />
         </span>
       </div>

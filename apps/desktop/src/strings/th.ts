@@ -141,16 +141,15 @@ export const th: DesktopStrings = {
     editsStay: "สิ่งที่คุณแก้ไขยังอยู่ในหน้านี้ หลังเข้าสู่ระบบแล้ว ให้กด ลองอีกครั้ง เพื่อบันทึก",
   },
 
-  // Thai for the Agent Hub was written by the implementer, not a native reviewer. "Agent Hub", "Claude Code" and "Codex"
+  // Thai for the assistant was written by the implementer, not a native reviewer. "Thoth", "Claude Code" and "Codex"
   // stay in English as names. Strings marked REVIEW are the least certain.
   agents: {
-    title: "Agent Hub",
-    open: "Agent Hub",
-    askAgent: "ให้เอเจนต์ช่วย…", // REVIEW
-    lede: "ส่งหน้าบางหน้าให้เครื่องมือ AI ที่คุณใช้อยู่แล้วช่วยทำงาน เครื่องมือจะทำงานกับสำเนา และคุณตรวจทุกการเปลี่ยนแปลงก่อนที่จะมีอะไรถูกเขียนลงใน Private Space",
-    unavailable: "Agent Hub ต้องใช้แอป Thoth บนเดสก์ท็อป เบราว์เซอร์รันโปรแกรมบนคอมพิวเตอร์ของคุณไม่ได้",
+    title: "ผู้ช่วย Thoth",
+    askAgent: "ถาม Thoth…", // REVIEW
+    lede: "Thoth ส่งหน้าบางหน้าให้เครื่องมือ AI ที่คุณใช้อยู่แล้วช่วยทำงาน เครื่องมือจะทำงานกับสำเนา และคุณตรวจทุกการเปลี่ยนแปลงก่อนที่จะมีอะไรถูกเขียนลงใน Private Space เริ่มงานได้จากมาสคอตที่มุมหน้าต่าง", // REVIEW
+    unavailable: "ผู้ช่วย Thoth ต้องใช้แอป Thoth บนเดสก์ท็อป เบราว์เซอร์รันโปรแกรมบนคอมพิวเตอร์ของคุณไม่ได้",
     recovered: (n) => `มี ${count(n)} งานที่หยุดไปตอนปิด Thoth ครั้งล่าสุด สำเนาของงานเหล่านั้นถูกลบแล้ว และไม่มีการเปลี่ยนแปลงใดถูกนำไปใช้`,
-    awaiting: (n) => `มี ${count(n)} งานที่รอให้คุณตรวจ เปิดได้ที่ งานก่อนหน้า`, // REVIEW
+    awaiting: (n) => `มี ${count(n)} งานที่รอให้คุณตรวจ เปิดได้ที่ งานก่อนหน้า หรือคลิกที่มาสคอต`, // REVIEW
     dismiss: "ปิด",
     notice: {
       export_restricted: (workspace) => `${workspace ? `“${workspace}”` : "เวิร์กสเปซนี้"} ไม่อนุญาตให้คัดลอกหน้าออกไป จึงส่งให้เอเจนต์ไม่ได้`, // REVIEW
@@ -158,6 +157,7 @@ export const th: DesktopStrings = {
       not_found: (workspace) => `หน้าในเวิร์กสเปซหายไป หรือคุณไม่ได้เป็นสมาชิก${workspace ? `ของ “${workspace}”` : ""}แล้ว เอาหน้านั้นออกแล้วลองอีกครั้ง`, // REVIEW
       unavailable: "ติดต่อเวิร์กสเปซไม่ได้ ตรวจสอบเซิร์ฟเวอร์ (การตั้งค่า → เซิร์ฟเวอร์) แล้วลองอีกครั้ง",
       reviewGone: "เปิดการตรวจนี้อีกไม่ได้ เพราะสำเนาที่บันทึกไว้ถูกลบหรือเสียหาย ไม่มีการเปลี่ยนแปลงใดถูกนำไปใช้", // REVIEW
+      workspaceOff: "ปิดการใช้หน้าจากเวิร์กสเปซไว้ที่ การตั้งค่า → ผู้ช่วย Thoth → สิทธิ์", // REVIEW
     },
 
     picker: {
@@ -177,6 +177,18 @@ export const th: DesktopStrings = {
     status: {
       searched: "Thoth หาในโฟลเดอร์เหล่านี้:",
       check: "ตรวจอีกครั้ง",
+    },
+
+    facts: {
+      label: "รายละเอียด",
+      version: (version) => `เวอร์ชัน ${version}`,
+      noVersion: "ไม่มีเวอร์ชัน",
+      notInstalled: "ยังไม่ได้ติดตั้ง",
+      signedIn: "เข้าสู่ระบบแล้ว",
+      signedOut: "ยังไม่ได้เข้าสู่ระบบ",
+      sandbox: "แซนด์บ็อกซ์ใช้ได้", // REVIEW
+      noSandbox: "ไม่มีแซนด์บ็อกซ์", // REVIEW
+      unknown: "ยังไม่ทราบ",
     },
 
     providers: {
@@ -200,7 +212,7 @@ export const th: DesktopStrings = {
         badModel: "ชื่อโมเดลนี้ Claude Code ไม่รับ",
         session: (model) => `เริ่มด้วย ${model} เครื่องมือ: อ่านและแก้ไขไฟล์ในโฟลเดอร์ของตัวเองเท่านั้น`,
         retry: (attempt) => `Claude Code กำลังลองใหม่ (ครั้งที่ ${count(attempt)})…`,
-        budgetHint: "Claude Code จะหยุดเมื่อค่าใช้จ่ายที่ประมาณเองถึงจำนวนนี้ ค่าประมาณอาจคลาดเคลื่อนเล็กน้อย เปลี่ยนค่าเริ่มต้นได้ที่การตั้งค่า Agent Hub ด้านล่าง", // REVIEW
+        budgetHint: "Claude Code จะหยุดเมื่อค่าใช้จ่ายที่ประมาณเองถึงจำนวนนี้ ค่าประมาณอาจคลาดเคลื่อนเล็กน้อย เปลี่ยนค่าเริ่มต้นได้ที่ การตั้งค่า → ผู้ช่วย Thoth", // REVIEW
         noBudget: "Claude Code ไม่รองรับ",
         errors: {
           not_logged_in: "Claude Code ยังไม่ได้เข้าสู่ระบบ รัน claude ในเทอร์มินัลแล้วเข้าสู่ระบบ จากนั้นลองอีกครั้ง",
@@ -287,6 +299,9 @@ export const th: DesktopStrings = {
       contextTooLarge: "ข้อมูลมากเกินไปสำหรับหนึ่งงาน เลือกหน้าหรือโฟลเดอร์ให้น้อยลง",
       contextFileTooLarge: "มีไฟล์หนึ่งใหญ่เกินกว่าจะส่งให้เอเจนต์ เลือกอย่างอื่น",
       contextMissing: "สิ่งที่คุณเลือกหายไปแล้ว เลือกใหม่อีกครั้ง",
+      privateOff: "ปิดการใช้หน้าใน Private Space ไว้ที่ การตั้งค่า → ผู้ช่วย Thoth → สิทธิ์", // REVIEW
+      wholeSpaceOff: "ปิดการส่งทั้ง Private Space ไว้ที่ การตั้งค่า → ผู้ช่วย Thoth → สิทธิ์", // REVIEW
+      workspaceOff: "ปิดการใช้หน้าจากเวิร์กสเปซไว้ที่ การตั้งค่า → ผู้ช่วย Thoth → สิทธิ์", // REVIEW
     },
 
     run: {
@@ -399,8 +414,48 @@ export const th: DesktopStrings = {
       localOnly: "เก็บไว้ในคอมพิวเตอร์เครื่องนี้เท่านั้น ไม่อยู่ใน Private Space",
     },
 
+    runView: {
+      tab: "การเปลี่ยนแปลงของเอเจนต์", // REVIEW
+      title: "การเปลี่ยนแปลงของเอเจนต์", // REVIEW
+      none: "ไม่มีงานที่รอการตรวจ เริ่มงานได้จากมาสคอตที่มุมหน้าต่าง", // REVIEW
+      transcript: "บันทึกการทำงาน",
+    },
+
+    providersHeading: "เอเจนต์",
+    providersLede: "Thoth เรียกใช้เครื่องมือบรรทัดคำสั่งที่คุณติดตั้งและเข้าสู่ระบบไว้แล้ว Thoth ไม่เคยเห็นข้อมูลเข้าสู่ระบบของคุณ", // REVIEW
+
+    permissions: {
+      heading: "สิทธิ์และขีดจำกัด", // REVIEW
+      lede: "สิ่งที่ส่งให้เอเจนต์ได้ และค่าเริ่มต้นของทุกงาน เปลี่ยนขีดจำกัดเฉพาะงานเดียวได้ในตัวเลือกของกล่องข้อความ", // REVIEW
+      private: "หน้าและโฟลเดอร์ใน Private Space",
+      privateHint: "สำเนาของหน้าและโฟลเดอร์ที่คุณเลือก เอเจนต์แก้ไขได้ และคุณตรวจทุกการเปลี่ยนแปลง",
+      wholeSpace: "ทั้ง Private Space",
+      wholeSpaceHint: "ทุกหน้าและไฟล์แนบ ยกเว้นโฟลเดอร์ .thoth ของ Thoth เอง",
+      workspace: "หน้าจากเวิร์กสเปซ (อ่านอย่างเดียว)",
+      workspaceHint: "สำเนาของหน้าที่คุณคัดลอกออกจากเวิร์กสเปซได้ สิ่งที่เอเจนต์ทำกับหน้าเหล่านี้จะไม่ถูกบันทึกหรือส่งกลับ", // REVIEW
+      limits: "ขีดจำกัดเริ่มต้น",
+      codexNote: "Codex ไม่มีวงเงินค่าใช้จ่ายของตัวเอง วงเงินจึงใช้กับ Claude Code เท่านั้น ส่วนเวลาสูงสุดใช้กับทั้งสองตัว", // REVIEW
+    },
+
+    usage: {
+      heading: "การใช้งาน",
+      lede: "จากงานที่บันทึกไว้ในคอมพิวเตอร์เครื่องนี้ Claude Code รายงานค่าใช้จ่ายโดยประมาณ ส่วน Codex รายงานจำนวนโทเคน", // REVIEW
+      period: "แสดงตาม",
+      periods: { day: "วัน", week: "สัปดาห์", month: "เดือน" },
+      chart: (runs, from, to) => `จำนวนงานต่อช่วงเวลา ตั้งแต่ ${from} ถึง ${to} รวม ${count(runs)} งาน ตัวเลขอยู่ในตารางด้านล่าง`, // REVIEW
+      table: "แสดงตัวเลข",
+      when: "ช่วงเวลา",
+      claudeRuns: "งานของ Claude Code",
+      cost: "ค่าใช้จ่าย",
+      codexRuns: "งานของ Codex",
+      tokens: "โทเคน",
+      total: "รวม",
+      none: "ยังไม่มีงานในช่วงนี้",
+      weekOf: (date) => `สัปดาห์ของ ${date}`, // REVIEW
+    },
+
     settings: {
-      heading: "การตั้งค่า Agent Hub",
+      heading: "ประวัติการทำงาน",
       lede: "ค่าเริ่มต้นของทุกงาน เปลี่ยนขีดจำกัดเฉพาะงานเดียวได้ในแบบฟอร์มงาน Codex ไม่มีวงเงินค่าใช้จ่าย ใช้เฉพาะเวลาสูงสุด", // REVIEW
       time: "เวลาสูงสุด",
       budget: "วงเงินค่าใช้จ่าย",
@@ -412,6 +467,65 @@ export const th: DesktopStrings = {
       clearYes: "ลบ",
       clearNo: "เก็บไว้",
       cleared: (n) => (n === 0 ? "ไม่มีอะไรให้ลบ" : `ลบรายละเอียดที่บันทึกไว้ของ ${count(n)} งานแล้ว`),
+    },
+  },
+
+  mascot: {
+    name: "ผู้ช่วย Thoth",
+    states: { idle: "พร้อม", listening: "กำลังฟัง", working: "กำลังทำงาน", review: "การเปลี่ยนแปลงพร้อมให้ตรวจ", done: "เสร็จแล้ว", error: "หยุดเพราะมีข้อผิดพลาด", sleeping: "กำลังพัก" }, // REVIEW
+    announce: {
+      idle: "ผู้ช่วย Thoth พร้อมแล้ว",
+      listening: "ผู้ช่วย Thoth กำลังฟัง",
+      working: "ผู้ช่วย Thoth กำลังทำงาน",
+      review: "ผู้ช่วย Thoth: การเปลี่ยนแปลงพร้อมให้คุณตรวจแล้ว", // REVIEW
+      done: "ผู้ช่วย Thoth: เสร็จแล้ว",
+      error: "ผู้ช่วย Thoth: งานหยุดเพราะมีข้อผิดพลาด", // REVIEW
+      sleeping: "ผู้ช่วย Thoth กำลังพัก", // REVIEW
+    },
+    hint: "คลิกเพื่อถาม ลากหรือใช้ปุ่มลูกศรเพื่อย้าย", // REVIEW
+    reviewHint: "คลิกเพื่อตรวจการเปลี่ยนแปลง",
+    shrink: "ย่อผู้ช่วย", // REVIEW
+    expand: "ขยายผู้ช่วย", // REVIEW
+    bubble: {
+      title: "ถาม Thoth",
+      close: "ปิด",
+      context: "บริบท", // REVIEW
+      contextNone: "ยังไม่มี เพิ่มหน้าได้ด้วยปุ่ม +",
+      remove: (name) => `เอา ${name} ออก`,
+      selection: (words) => `ข้อความที่เลือก (${count(words)} คำ)`, // REVIEW
+      wholeSpace: "ทั้ง Private Space",
+      workspacePage: (title) => `${title} (อ่านอย่างเดียว)`,
+      add: "เพิ่มบริบท", // REVIEW
+      addDone: "เสร็จ",
+      agent: "เอเจนต์",
+      agentOption: (name, state) => `${name} · ${state}`,
+      options: "ตัวเลือก",
+      task: "งาน",
+      taskHint: "ให้ Thoth ทำอะไรกับหน้าเหล่านี้",
+      working: "กำลังทำงาน…",
+      reviewReady: "การเปลี่ยนแปลงพร้อมให้คุณตรวจแล้ว", // REVIEW
+      openReview: "ตรวจการเปลี่ยนแปลง",
+      openResult: "เปิดผลลัพธ์",
+      settings: "การตั้งค่าผู้ช่วย",
+      appliedSummary: (n) => (n === 0 ? "ไม่ได้นำการเปลี่ยนแปลงใดไปใช้" : `นำการเปลี่ยนแปลง ${count(n)} รายการไปใช้แล้ว`), // REVIEW
+    },
+    settings: {
+      heading: "มาสคอต", // REVIEW
+      lede: "มาสคอตลอยอยู่ที่มุมหน้าต่าง คลิกเพื่อถาม ลากเพื่อย้าย", // REVIEW
+      show: "แสดงมาสคอต",
+      size: "ขนาด",
+      sizes: { compact: "เล็ก", full: "เต็มตัว", auto: "อัตโนมัติ" }, // REVIEW
+      sizeHint: "อัตโนมัติจะแสดงเต็มตัว และย่อเล็กลงขณะที่คุณพิมพ์ในหน้าหรือเมื่อหน้าต่างแคบ", // REVIEW
+      scale: "มาตราส่วน", // REVIEW
+      scaleValue: (percent) => `${count(percent)}%`,
+      motion: "การเคลื่อนไหว",
+      motions: { full: "เต็มที่", calm: "นุ่มนวล", off: "ปิด" }, // REVIEW
+      motionHint: "นุ่มนวลจะเคลื่อนไหวน้อยลงและช้าลง ปิดจะแสดงภาพนิ่งของแต่ละสถานะ เมื่อคอมพิวเตอร์ขอให้ลดการเคลื่อนไหว มาสคอตจะอยู่นิ่งไม่ว่าจะเลือกอะไรไว้ที่นี่", // REVIEW
+      snap: "ชิดขอบอัตโนมัติ", // REVIEW
+      snapHint: "เมื่อปล่อยมือ มาสคอตจะเลื่อนไปที่ขอบหรือมุมที่ใกล้ที่สุด", // REVIEW
+      reset: "รีเซ็ตตำแหน่ง",
+      resetDone: "กลับไปที่มุมขวาล่างแล้ว",
+      preview: "ตัวอย่าง",
     },
   },
 

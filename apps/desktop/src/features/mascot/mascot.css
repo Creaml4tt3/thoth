@@ -1,0 +1,289 @@
+/*
+ * The Thoth mascot (MascotArt.tsx). Only transform and opacity move, on SVG groups whose pivot is their own origin
+ * (`transform-box: view-box; transform-origin: 0 0`, so a CSS transform composes like the SVG attribute).
+ *
+ * Motion: the morph between the versions and every pose change are transitions (they can be re-triggered and
+ * retargeted mid-flight); the per-state loops are keyframes whose amplitude and tempo come from two variables:
+ * Full is 1 and 1, Calm halves the amplitude and slows the tempo, Off (and the OS's reduced-motion setting, through
+ * the tokens and the global override in ui.css) leaves a static pose for each state. Loops are slow and small: the
+ * mascot sits beside the writing, it must never pull the eye from it.
+ */
+
+/* Palette: the orange disc stays in both themes; the silhouette is ink on light and warm white on dark. */
+.mascot-art {
+  --m-moon: #E8590C;
+  --m-crater: #C94A07;
+  --m-ink: #0A0A0A;
+  --m-eye: #F7F5F0;
+  --m-pupil: #0A0A0A;
+  --m-glint: #F7F5F0;
+  --m-paper: #F7F5F0;
+  --m-line: rgb(10 10 10 / 0.42);
+  --m-accent: #E8590C;
+  --m-page-edge: rgb(10 10 10 / 0.26);
+  /* The cut-out edge that keeps a prop apart from the silhouette: the surface the mascot floats on. */
+  --m-cut: var(--thoth-bg, #FFFFFF);
+
+  --m-amp: 1;
+  --m-tempo: 1;
+  --m-morph: var(--thoth-dur-slow, 280ms);
+  --m-pose: var(--thoth-dur-slow, 280ms);
+  --m-fade: var(--thoth-dur-fast, 140ms);
+  --m-ease-morph: var(--thoth-ease-emphasized, cubic-bezier(0.32, 0.72, 0, 1));
+  --m-ease-pose: var(--thoth-ease-spring, cubic-bezier(0.32, 0.72, 0, 1));
+  --m-ease-loop: var(--thoth-ease-in-out, cubic-bezier(0.65, 0, 0.35, 1));
+
+  display: block;
+  overflow: visible;
+  color: var(--m-ink);
+}
+[data-theme="night"] .mascot-art {
+  --m-ink: #F7F5F0;
+  --m-eye: #0A0A0A;
+  --m-line: rgb(10 10 10 / 0.5);
+  --m-accent: #FF7A2F;
+  --m-page-edge: var(--m-cut);
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] .mascot-art {
+    --m-ink: #F7F5F0;
+    --m-eye: #0A0A0A;
+    --m-line: rgb(10 10 10 / 0.5);
+    --m-accent: #FF7A2F;
+    --m-page-edge: var(--m-cut);
+  }
+}
+.mascot-art[data-motion="calm"] { --m-amp: 0.5; --m-tempo: 1.6; }
+
+.mascot-art g, .mascot-art ellipse { transform-box: view-box; transform-origin: 0 0; }
+.mascot-art .m-ink { fill: var(--m-ink); }
+.mascot-art .m-moon { fill: var(--m-moon); }
+.mascot-art .m-crater { fill: var(--m-crater); }
+.mascot-art .m-accent-fill { fill: var(--m-accent); }
+.mascot-art .m-sclera { fill: var(--m-eye); }
+.mascot-art .m-pupil-dot { fill: var(--m-pupil); }
+.mascot-art .m-glint { fill: var(--m-glint); }
+.mascot-art .m-eye-line { fill: none; stroke: var(--m-eye); stroke-width: 1.6; stroke-linecap: round; }
+.mascot-art .m-legs path { fill: none; stroke: var(--m-ink); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.mascot-art .m-floor { fill: var(--m-ink); opacity: 0.1; }
+.mascot-art .m-paper { fill: var(--m-paper); stroke: var(--m-page-edge); stroke-width: 0.7; stroke-linejoin: round; }
+.mascot-art .m-fold { fill: none; stroke: var(--m-line); stroke-width: 0.8; stroke-linejoin: round; }
+.mascot-art .m-page-lines path, .mascot-art .m-page-review path { fill: none; stroke: var(--m-line); stroke-width: 1.1; stroke-linecap: round; }
+.mascot-art .m-orbit-ring { fill: none; stroke: var(--m-accent); stroke-width: 0.8; stroke-dasharray: 1.4 2.6; opacity: 0.55; }
+.mascot-art .m-ticks path { fill: none; stroke: var(--m-accent); stroke-width: 1.6; stroke-linecap: round; }
+
+/* ---------------------------------------------------------------- the stage: facing, corner, versions */
+
+.mascot-art .m-face { transition: transform var(--m-pose) var(--m-ease-morph); }
+.mascot-art[data-facing="left"] .m-face { transform: translate(88px, 0) scale(-1, 1); }
+.mascot-art .m-offset { transition: transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art[data-version="compact"][data-vertical="top"] .m-offset { transform: translate(0, -36px); }
+
+/* The disc: the full body (centre 34,58, radius 23) or the badge (centre 24,64, radius 20). */
+.mascot-art .m-disc-pos { transform: translate(34px, 58px) scale(23); transition: transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art[data-version="compact"] .m-disc-pos { transform: translate(24px, 64px) scale(20); }
+.mascot-art .m-head-pos { transform: translate(26px, 22px); transition: transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art[data-version="compact"] .m-head-pos { transform: translate(17px, 53px) scale(0.78); }
+.mascot-art .m-wing-pos { transform: translate(49px, 51px); }
+
+/* Parts of one version fade while the shared parts move; the incoming parts wait a little, so nothing doubles up. */
+.mascot-art [data-part], .mascot-art .m-craters { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out) calc(var(--m-morph) * 0.35); }
+.mascot-art[data-version="compact"] [data-part="full"],
+.mascot-art[data-version="full"] [data-part="compact"],
+.mascot-art[data-version="compact"] .m-craters { opacity: 0; transition-delay: 0s; transition-timing-function: var(--thoth-ease-in, ease-in); }
+/* While they fade, the full version's own parts travel with what they belong to: the neck with the head, the legs and
+   the wing with the body, so the morph reads as one bird settling into the badge. */
+.mascot-art .m-neck-full { transform-box: view-box; transform-origin: 0 0; }
+.mascot-art .m-legs, .mascot-art .m-neck-full, .mascot-art .m-wing-pos { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out) calc(var(--m-morph) * 0.35), transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art[data-version="compact"] .m-legs { transform: translate(-5.6px, 13.5px) scale(0.87); }
+.mascot-art[data-version="compact"] .m-neck-full { transform: translate(-3.3px, 35.8px) scale(0.78); }
+.mascot-art[data-version="compact"] .m-wing-pos { transform: translate(37px, 57.9px) scale(0.87); }
+.mascot-art[data-version="compact"] .m-legs, .mascot-art[data-version="compact"] .m-neck-full, .mascot-art[data-version="compact"] .m-wing-pos { transition: opacity var(--m-fade) var(--thoth-ease-in, ease-in), transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art[data-detail="low"] .m-craters, .mascot-art[data-detail="low"] .m-glint { display: none; }
+.mascot-art .m-beak-bold { display: none; }
+.mascot-art[data-detail="low"] .m-beak-bold { display: inline; }
+.mascot-art[data-detail="low"] .m-beak { display: none; }
+.mascot-art[data-detail="low"] .m-pupil-dot { r: 2.6px; cx: 0.4px; }
+
+/* ---------------------------------------------------------------- poses per state */
+
+.mascot-art .m-head, .mascot-art .m-wing, .mascot-art .m-pupil, .mascot-art .m-eye-pos { transition: transform var(--m-pose) var(--m-ease-pose); }
+.mascot-art .m-eye-pos { transform: translate(2.2px, -11px); }
+.mascot-art[data-state="listening"] .m-head { transform: rotate(-12deg); }
+.mascot-art[data-state="listening"] .m-pupil { transform: translate(0.5px, -0.9px); }
+.mascot-art[data-state="working"] .m-head { transform: rotate(-7deg); }
+.mascot-art[data-state="working"] .m-pupil { transform: translate(0.9px, -1px); }
+.mascot-art[data-state="review"] .m-pupil { transform: translate(0.4px, 0.6px); }
+.mascot-art[data-state="review"] .m-wing { transform: rotate(-58deg); }
+.mascot-art[data-state="done"] .m-head { transform: rotate(-6deg); }
+.mascot-art[data-state="done"] .m-wing { transform: rotate(-38deg); }
+.mascot-art[data-state="error"] .m-head { transform: rotate(5deg); }
+.mascot-art[data-state="error"] .m-pupil { transform: translate(-0.2px, 0.5px); }
+.mascot-art[data-state="error"] .m-wing { transform: rotate(-18deg); }
+.mascot-art[data-state="sleeping"] .m-head { transform: rotate(15deg); }
+
+/* The eye: open, happy (done) or closed (sleeping); the worried brow for error. */
+.mascot-art .m-eye-open, .mascot-art .m-eye-happy, .mascot-art .m-eye-closed, .mascot-art .m-brow { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out); }
+.mascot-art .m-eye-happy, .mascot-art .m-eye-closed, .mascot-art .m-brow { opacity: 0; }
+.mascot-art[data-state="done"] .m-eye-open, .mascot-art[data-state="sleeping"] .m-eye-open { opacity: 0; }
+.mascot-art[data-state="done"] .m-eye-happy, .mascot-art[data-state="sleeping"] .m-eye-closed, .mascot-art[data-state="error"] .m-brow { opacity: 1; }
+.mascot-art[data-state="listening"] .m-eye { transform: scale(1.08); }
+
+/* Props: each one is placed for its version and state, and shown only in the state that has it. */
+.mascot-art .m-pp { opacity: 0; transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out), transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art .m-pp-page { transform: translate(63px, 13px); }
+.mascot-art[data-state="review"] .m-pp-page { transform: translate(60px, 50px) rotate(-8deg) scale(1.3); }
+.mascot-art[data-version="compact"] .m-pp-page { transform: translate(45px, 40px) scale(0.7); }
+.mascot-art[data-version="compact"][data-state="review"] .m-pp-page { transform: translate(45px, 40px) scale(0.74) rotate(-6deg); }
+.mascot-art[data-state="working"] .m-pp-page, .mascot-art[data-state="review"] .m-pp-page { opacity: 1; }
+.mascot-art .m-page-review { opacity: 0; }
+.mascot-art .m-page-lines { opacity: 1; }
+.mascot-art[data-state="review"] .m-page-review { opacity: 1; }
+.mascot-art[data-state="review"] .m-page-lines { opacity: 0; }
+.mascot-art .m-pp-orbit { transform: translate(63px, 13px); }
+.mascot-art[data-version="compact"] .m-pp-orbit { transform: translate(45px, 40px) scale(0.7); }
+.mascot-art[data-version="compact"] .m-orbit-ring { opacity: 0; }
+.mascot-art[data-state="working"] .m-pp-orbit { opacity: 1; }
+.mascot-art .m-pp-ticks { transform: translate(44px, 5px); }
+.mascot-art[data-state="review"] .m-pp-ticks { transform: translate(73px, 36px) rotate(40deg); }
+.mascot-art[data-version="compact"] .m-pp-ticks { transform: translate(35px, 41px) scale(0.75); }
+.mascot-art[data-version="compact"][data-state="review"] .m-pp-ticks { transform: translate(51px, 34px) rotate(45deg) scale(0.65); }
+.mascot-art[data-state="listening"] .m-pp-ticks, .mascot-art[data-state="review"] .m-pp-ticks { opacity: 1; }
+.mascot-art .m-pp-sparkle { transform: translate(60px, 9px); }
+.mascot-art[data-version="compact"] .m-pp-sparkle { transform: translate(44px, 40px) scale(0.74); }
+.mascot-art[data-state="done"] .m-pp-sparkle { opacity: 1; }
+.mascot-art .m-pp-bang { transform: translate(60px, 11px); }
+.mascot-art[data-version="compact"] .m-pp-bang { transform: translate(45px, 42px) scale(0.76); }
+.mascot-art[data-state="error"] .m-pp-bang { opacity: 1; }
+.mascot-art .m-pp-moon { transform: translate(60px, 9px); }
+.mascot-art[data-version="compact"] .m-pp-moon { transform: translate(44px, 40px) scale(0.74); }
+.mascot-art[data-state="sleeping"] .m-pp-moon { opacity: 1; }
+
+/* ---------------------------------------------------------------- loops and one-shots, per state */
+
+/* idle: a slow bob and a blink now and then. */
+@keyframes m-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, calc(var(--m-amp) * -1.4px)); } }
+@keyframes m-blink { 0%, 90%, 96%, 100% { transform: scale(1, 1); } 93% { transform: scale(1, 0.1); } }
+@keyframes m-float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, calc(var(--m-amp) * -1.6px)); } }
+@keyframes m-orbit { to { transform: rotate(360deg); } }
+/* needs review: a soft nudge of the page every few seconds, then stillness. */
+@keyframes m-nudge { 0%, 14%, 100% { transform: translate(0, 0) rotate(0); } 4% { transform: translate(0, calc(var(--m-amp) * -2px)) rotate(calc(var(--m-amp) * -4deg)); } 9% { transform: translate(0, calc(var(--m-amp) * -1px)) rotate(calc(var(--m-amp) * 3deg)); } }
+/* done: one small hop with a soft landing; the sparkle pops and turns once. */
+@keyframes m-hop { 0% { transform: translate(0, 0); } 35% { transform: translate(0, calc(var(--m-amp) * var(--m-hop, -6px))); } 70% { transform: translate(0, 0); } 82% { transform: translate(0, calc(var(--m-amp) * 0.8px)); } 100% { transform: translate(0, 0); } }
+@keyframes m-shadow-hop { 0%, 70%, 100% { transform: scale(1, 1); } 35% { transform: scale(0.82, 1); } }
+@keyframes m-pop { from { transform: scale(0.6) rotate(-30deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+/* error: a short worried shake, once. */
+@keyframes m-shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(var(--m-amp) * -1px), 0); } 45% { transform: translate(calc(var(--m-amp) * 1px), 0); } 70% { transform: translate(calc(var(--m-amp) * -0.6px), 0); } }
+@keyframes m-in { from { transform: scale(0.82); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* sleeping: slow breathing. */
+@keyframes m-breathe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, calc(var(--m-amp) * 0.9px)); } }
+
+.mascot-art[data-version="compact"] { --m-hop: -3px; }
+.mascot-art .m-eye { transform-origin: 0 0; }
+.mascot-art[data-state="idle"] .m-rig { animation: m-bob calc(4.8s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="idle"] .m-eye,
+.mascot-art[data-state="listening"] .m-eye-open,
+.mascot-art[data-state="working"] .m-eye-open { animation: m-blink calc(5.6s * var(--m-tempo)) linear infinite; }
+.mascot-art[data-state="listening"] .m-rig { animation: m-bob calc(3.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="listening"] .m-ticks { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both; }
+.mascot-art[data-state="working"] .m-page { animation: m-float calc(3s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="working"] .m-orbit { animation: m-orbit calc(6s * var(--m-tempo)) linear infinite; }
+.mascot-art[data-state="review"] .m-page { animation: m-nudge calc(4.2s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="done"] .m-rig { animation: m-hop 640ms var(--m-ease-loop) 1 both; }
+.mascot-art[data-state="done"] .m-floor { animation: m-shadow-hop 640ms var(--m-ease-loop) 1 both; transform-origin: 34px 86.4px; }
+.mascot-art[data-state="done"] .m-sparkle { animation: m-pop 360ms var(--thoth-ease-out, ease-out) 120ms both; }
+.mascot-art[data-state="error"] .m-rig { animation: m-shake 420ms var(--m-ease-loop) 1 both; }
+.mascot-art[data-state="error"] .m-bang { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both; }
+.mascot-art[data-state="sleeping"] .m-rig { animation: m-breathe calc(6.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="sleeping"] .m-sleep-moon { animation: m-float calc(5.2s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+
+/* Off: a still pose per state (the OS's reduced-motion setting does the same through ui.css). Nothing moves, nothing fades. */
+.mascot-art[data-motion="off"] *, .mascot-art[data-motion="off"] { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .mascot-art, .mascot-art * { animation: none !important; transition: none !important; }
+}
+
+/* In compact, mirroring happens with the badge hanging off the other side of the button, so it flips at once. */
+.mascot-art[data-version="compact"] .m-face { transition: none; }
+
+/* ---------------------------------------------------------------- the floating mascot */
+
+/* Positioned by transform only (left/top stay 0), so dragging and the settle after a drop never touch layout. Below
+   menus, dialogs and tooltips (40–70), above the page. */
+.mascot-layer { position: fixed; left: 0; top: 0; z-index: 30; touch-action: none; }
+.mascot-layer[data-settling] { transition: transform var(--thoth-dur-slow) var(--thoth-ease-emphasized); }
+.mascot { all: unset; box-sizing: border-box; position: relative; display: block; width: 100%; height: 100%; border-radius: var(--thoth-radius-lg); cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.mascot-layer[data-dragging] .mascot { cursor: grabbing; }
+.mascot:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 3px; }
+.mascot-stage { position: absolute; display: block; pointer-events: none; }
+.mascot-stage .mascot-art { width: 100%; height: 100%; }
+/* A press gives way a little: the only feedback a drag needs. */
+.mascot-stage { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
+.mascot:active .mascot-stage { transform: scale(0.97); }
+.mascot-layer[data-dragging] .mascot-stage { transform: scale(1.03); }
+
+/* Shrink / expand: a small chip just outside the mascot, on the side toward the window's middle and at the edge it
+   is docked to, so it never covers the drawing or its props. Shown on hover and keyboard focus. */
+.mascot-size.icon-btn { position: absolute; bottom: 0; width: 22px; height: 22px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg); color: var(--thoth-ink-secondary); box-shadow: var(--thoth-shadow-pop); opacity: 0; transform: scale(0.9); transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), transform var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.mascot-layer[data-h="right"] .mascot-size { left: -28px; }
+.mascot-layer[data-h="left"] .mascot-size { right: -28px; }
+.mascot-layer[data-v="top"] .mascot-size { bottom: auto; top: 0; }
+.mascot-layer:hover .mascot-size, .mascot-layer:focus-within .mascot-size { opacity: 1; transform: none; }
+.mascot-layer[data-dragging] .mascot-size { opacity: 0; }
+.mascot-size.icon-btn:hover { background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+
+/* ---------------------------------------------------------------- the prompt bubble */
+
+.mascot-bubble { position: fixed; z-index: 35; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.mascot-bubble::after { content: ""; position: absolute; left: calc(var(--tail-x) - 7px); width: 12px; height: 12px; background: var(--thoth-bg); border: 1px solid var(--thoth-border-strong); transform: rotate(45deg); }
+.mascot-bubble[data-side="above"]::after { bottom: -7px; border-top: 0; border-left: 0; }
+.mascot-bubble[data-side="below"]::after { top: -7px; border-bottom: 0; border-right: 0; }
+.bubble-head { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-2); padding: 10px 10px 4px 16px; }
+.bubble-head h2 { margin: 0; font: 600 14px / 20px var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
+.bubble-body { overflow: auto; padding: 4px 16px 16px; min-height: 0; }
+.bubble-form, .bubble-run { display: grid; gap: var(--thoth-space-3); }
+.bubble-label { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.bubble-context { display: grid; gap: 6px; }
+.bubble-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bubble-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; height: 26px; padding: 0 2px 0 10px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); border: 1px solid var(--thoth-border); font: var(--thoth-text-small); }
+.bubble-chip[data-kind="excerpt"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); border-color: transparent; }
+.bubble-chip[data-kind="workspace"]::before { content: ""; width: 6px; height: 6px; margin-inline-end: 4px; border-radius: 50%; background: var(--thoth-workspace); }
+.bubble-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.bubble-chip-remove { all: unset; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--thoth-ink-secondary); cursor: pointer; }
+.bubble-chip-remove:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.bubble-chip-remove:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+.bubble-chip-none { padding: 0 2px; }
+.bubble-add.icon-btn { width: 26px; height: 26px; border: 1px dashed var(--thoth-border-strong); border-radius: var(--thoth-radius-pill); }
+.bubble-add[aria-expanded="true"] { background: var(--thoth-bg-active); border-style: solid; }
+.bubble-picker { display: grid; gap: var(--thoth-space-2); max-height: 260px; overflow: auto; padding: 10px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg-sidebar); }
+.bubble-picker .agents-context-list { max-height: 9rem; background: var(--thoth-bg); }
+.bubble-task { display: grid; gap: 6px; }
+.bubble-task textarea { resize: vertical; min-height: 4.5em; font: var(--thoth-text-ui); line-height: 1.5; }
+.bubble-row { display: grid; gap: var(--thoth-space-2); }
+.bubble-agent { display: grid; gap: 6px; }
+.bubble-options summary { cursor: pointer; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); width: fit-content; }
+.bubble-options summary:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: 2px; }
+.bubble-options-grid { display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-2); }
+.bubble-options-grid .field > span, .bubble-options-grid .field > label { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.bubble-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); }
+.bubble-caution { margin: 0; }
+.bubble-prompt { margin: 0; font-weight: 550; overflow-wrap: anywhere; }
+.bubble-log { max-height: 180px; overflow: auto; padding: 8px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); font: var(--thoth-text-small); }
+.bubble-log .agents-log { gap: 4px; }
+.bubble-run .alert { margin: 0; }
+
+/* ---------------------------------------------------------------- settings */
+
+.mascot-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--thoth-space-6); align-items: start; }
+.mascot-settings-controls { display: grid; gap: var(--thoth-space-4); min-width: 0; }
+.mascot-preview { margin: 0; display: grid; place-items: center; width: 140px; height: 140px; border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-sidebar); border: 1px solid var(--thoth-border); overflow: hidden; }
+.mascot-preview-stage { display: grid; place-items: center; }
+.mascot-scale { display: grid; gap: 6px; }
+.mascot-scale-row { display: flex; align-items: center; gap: var(--thoth-space-3); max-width: 320px; }
+.mascot-scale-row input[type="range"] { flex: 1; accent-color: var(--thoth-accent); }
+.mascot-scale-row output { min-width: 3.5em; text-align: end; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { .mascot-settings-grid { grid-template-columns: minmax(0, 1fr); } }
+/* Text in the bubble is read, not skimmed: the AA-contrast ink, as in the agent views. */
+.mascot-bubble .muted, .mascot-settings .muted { color: var(--thoth-ink-secondary); }
+/* Streamed lines arrive many times a second in a small panel: they appear, they do not rise in. */
+.bubble-log .agents-log > li { animation: none; }

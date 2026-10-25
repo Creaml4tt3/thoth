@@ -5,6 +5,7 @@ import { Intro } from "../features/onboarding/Intro.tsx";
 import { createImportService } from "../features/import/service.ts";
 import { createTransferService } from "../features/transfer/service.ts";
 import { createAgentsService } from "../features/agents/service.ts";
+import { createAssistantController } from "../features/mascot/controller.ts";
 import { Shell } from "../features/shell/Shell.tsx";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
@@ -87,6 +88,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     void agents?.recover();
     return () => void agents?.dispose();
   }, [agents]);
+  // The mascot: its preferences are the user's (not this Private Space's), read once per window.
+  const assistant = useMemo(() => (agents ? createAssistantController() : null), [agents]);
 
   const importService = useMemo(
     () => createImportService(vault, (kind, location) => options.openImportSource(platform, kind, location)),
@@ -111,10 +114,14 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       servers,
       transfers,
       agents,
-      openAgents: (selection) => {
-        if (agents && selection && selection.length > 0) agents.setDraft({ selection: [...selection].sort() });
-        tabs.open({ kind: "agents" });
+      assistant,
+      askAssistant: (selection) => {
+        if (!agents || !assistant) return;
+        const phase = agents.getState().phase;
+        if (selection && selection.length > 0 && (phase === "idle" || phase === "finished")) agents.setDraft({ selection: [...selection].sort(), wholeSpace: false });
+        assistant.openBubble();
       },
+      openAgentReview: () => tabs.open({ kind: "agents" }),
       openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
       openFolder: (folder) =>
         void flushAll().then(async (ok) => {
@@ -130,7 +137,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       switchVault: () => void flushAll().then((ok) => ok && switchVault()),
       watchError,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, tabs],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs],
   );
 
   return (

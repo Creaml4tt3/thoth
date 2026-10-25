@@ -1,7 +1,7 @@
 /**
- * The Agent Hub's state for one open Private Space (ADR-0007): detection, the task being written, the current run
- * (its streamed events, then its proposed changes and the apply results), the run history and the Agent Hub's
- * settings. It wraps `AgentHub` from `@thoth/agent-core` in a store the views read with `useSyncExternalStore`, so a
+ * The assistant's agent state for one open Private Space (ADR-0007): detection, the task being written (in the
+ * mascot's prompt bubble), the current run (its streamed events, then its proposed changes and the apply results),
+ * the run history and the agent settings. It wraps `AgentHub` from `@thoth/agent-core` in a store the views read with `useSyncExternalStore`, so a
  * run goes on while another tab is shown. Nothing here reaches the vault except through `AgentHub.apply`
  * (compare-and-swap) after the user chose.
  */
@@ -61,20 +61,34 @@ export interface Draft {
   workspace: WorkspaceChoice[];
   prompt: string;
   model: string;
-  /** Minutes for this run, or the Agent Hub's default. */
+  /** Minutes for this run, or the default from the settings. */
   timeMinutes: number | "default";
-  /** US dollars for this run, "none" for no limit, or the Agent Hub's default. */
+  /** US dollars for this run, "none" for no limit, or the default from the settings. */
   budget: number | "none" | "default";
+  /** Text selected in the editor when the bubble opened, quoted after the task; null: none. */
+  excerpt: { text: string; from: string | null } | null;
 }
 
-export type DraftProblem = "needContext" | "needTask" | "badModel" | "contextTooMany" | "contextTooLarge" | "contextFileTooLarge" | "contextMissing";
+/** The longest excerpt of selected text quoted in a task. */
+export const MAX_EXCERPT = 4000;
+
+/** The prompt the CLI gets: the task, then the selected text (if any) quoted as reference. */
+export function composePrompt(prompt: string, excerpt: Draft["excerpt"]): string {
+  if (!excerpt || excerpt.text.trim() === "") return prompt;
+  const text = excerpt.text.slice(0, MAX_EXCERPT);
+  return `${prompt.trimEnd()}\n\nSelected text${excerpt.from ? ` (from ${excerpt.from})` : ""}:\n"""\n${text}\n"""\n`;
+}
+
+export type DraftProblem = "needContext" | "needTask" | "badModel" | "privateOff" | "wholeSpaceOff" | "workspaceOff" | "contextTooMany" | "contextTooLarge" | "contextFileTooLarge" | "contextMissing";
 
 /** Something the user should be told that is not part of a run's outcome. */
 export type Notice =
   /** A workspace page was refused as context (or could not be read). */
   | { kind: "refused"; refusal: WorkspaceRefusal; workspace?: string }
   /** A review could not be opened again. */
-  | { kind: "reviewGone" };
+  | { kind: "reviewGone" }
+  /** Workspace pages are switched off in Permissions. */
+  | { kind: "workspaceOff" };
 
 export interface DetailState {
   record: RunRecord;
@@ -150,7 +164,7 @@ export interface AgentsService {
   dispose(): Promise<void>;
 }
 
-const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default" };
+const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default", excerpt: null };
 
 export function createAgentsService(vault: Vault, host: AgentHost, options: { now?: () => number; onApplied?: () => void; servers?: ServerDirectory; settings?: AgentSettings } = {}): AgentsService {
   const initialSettings = options.settings ?? loadAgentSettings();
@@ -228,6 +242,10 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     },
 
     addWorkspacePage(choice) {
+      if (!state.settings.allowWorkspace) {
+        set({ notice: { kind: "workspaceOff" } });
+        return false;
+      }
       const workspace = servers?.workspace(choice.server, choice.workspace);
       // The server decides what a person may read; the app also refuses what it would refuse for a copy out.
       const access = workspace ? workspaceContextAccess(workspace) : "forbidden";
@@ -258,7 +276,12 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     draftProblems() {
       const { selection, wholeSpace, workspace, prompt, model } = state.draft;
       const problems: DraftProblem[] = [];
+      const { allowPrivate, allowWholeSpace, allowWorkspace } = state.settings;
       if (selection.length === 0 && !wholeSpace && workspace.length === 0) problems.push("needContext");
+      // Permissions only narrow: what they switch off cannot be started with, whatever the draft holds.
+      if (selection.length > 0 && !allowPrivate) problems.push("privateOff");
+      if (wholeSpace && !allowWholeSpace) problems.push("wholeSpaceOff");
+      if (workspace.length > 0 && !allowWorkspace) problems.push("workspaceOff");
       if (prompt.trim() === "") problems.push("needTask");
       if (model.trim() !== "" && !PROVIDER_FEATURES[state.provider].isModelName(model.trim())) problems.push("badModel");
       const code = state.preview?.problem?.code;
@@ -272,13 +295,22 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     updateSettings(patch) {
       const settings = { ...state.settings, ...patch };
       saveAgentSettings(settings);
-      set({ settings, cleared: null });
+      // What Permissions switch off leaves the task being written, so it is never sent by accident.
+      const d = state.draft;
+      const draft = {
+        ...d,
+        selection: settings.allowPrivate ? d.selection : [],
+        wholeSpace: settings.allowWholeSpace && d.wholeSpace,
+        workspace: settings.allowWorkspace ? d.workspace : [],
+      };
+      set({ settings, cleared: null, draft });
+      if (draft.selection !== d.selection || draft.wholeSpace !== d.wholeSpace) void service.refreshPreview();
     },
 
     async start() {
       if (state.phase !== "idle" && state.phase !== "finished") return;
       if (service.draftProblems().length > 0) return;
-      const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget } = state.draft;
+      const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget, excerpt } = state.draft;
       const provider = state.provider;
       // Only a CLI that enforces a spending limit gets one; Codex has none, and none is pretended.
       const budgetUsd = !PROVIDER_FEATURES[provider].budget ? null : budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
@@ -288,7 +320,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         const { record, finished } = await hub.start(
           {
             provider,
-            prompt,
+            prompt: composePrompt(prompt, excerpt),
             selection: wholeSpace ? [] : selection,
             ...(wholeSpace ? { wholeSpace: true } : {}),
             ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),
@@ -413,7 +445,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     async newTask() {
       if (state.phase === "running" || state.phase === "cancelling" || state.phase === "starting" || state.phase === "applying") return;
       if (state.record && state.phase !== "review") await hub.close(state.record.id);
-      set({ phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "" } });
+      set({ phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "", excerpt: null } });
     },
 
     async recover() {

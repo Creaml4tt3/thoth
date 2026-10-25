@@ -61,3 +61,40 @@
 .agents-picker-option:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-bg-hover); }
 .agents-picker-option:has(input:focus-visible) { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .agents-picker:disabled .agents-picker-option { cursor: default; opacity: 0.7; }
+/* Settings → Thoth assistant: sub-sections under one h2. */
+.set-section.agents { gap: var(--thoth-space-6); }
+.agents-sub { display: grid; gap: var(--thoth-space-2); min-width: 0; }
+.agents-sub h3 { margin: 0; font: 600 15px / 1.4 var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
+.agents-sub-head { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-3); flex-wrap: wrap; }
+.agents-inline-field { display: inline-flex; align-items: center; gap: var(--thoth-space-2); font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.agents-inline-field .input { width: auto; }
+.agents-providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--thoth-space-3); }
+.agents-provider { display: grid; gap: var(--thoth-space-2); align-content: start; padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); min-width: 0; }
+.agents-provider-head { display: grid; gap: 6px; }
+.agents-provider h4 { margin: 0; font: 600 14px / 20px var(--thoth-font-sans); }
+.agents-provider p { margin: 0; }
+.agents-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.agents-facts li::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-inline-end: 6px; border-radius: 50%; background: var(--thoth-ink-faint); vertical-align: 1px; }
+.agents-facts li[data-ok="true"]::before { background: var(--thoth-success); }
+.agents-facts li[data-ok="false"]::before { background: var(--thoth-danger); }
+.agents-table-wrap { overflow-x: auto; }
+.agents-history-table .num { text-align: end; font-variant-numeric: tabular-nums; }
+.agents-history-table tbody th, .agents-history-table tfoot th { text-align: start; font-weight: 450; padding: var(--thoth-space-2) var(--thoth-space-3) var(--thoth-space-2) 0; border-bottom: 1px solid var(--thoth-border); }
+.agents-history-table tfoot th, .agents-history-table tfoot td { font-weight: 600; border-bottom: 0; }
+.agents-transcript summary { cursor: pointer; color: var(--thoth-ink-secondary); }
+.agents-transcript[open] summary { margin-bottom: var(--thoth-space-2); }
+/* Usage: one bar column per period; Claude Code in the accent, Codex in ink. Heights are set once (no motion). */
+.agents-legend { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--thoth-space-4); font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.agents-legend li::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-inline-end: 6px; border-radius: 2px; vertical-align: -1px; }
+.agents-legend [data-provider="claude"]::before, .agents-bar[data-provider="claude"] { background: var(--thoth-accent); }
+.agents-legend [data-provider="codex"]::before, .agents-bar[data-provider="codex"] { background: var(--thoth-ink-secondary); }
+.agents-chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; height: 132px; padding-top: 8px; border-bottom: 1px solid var(--thoth-border-strong); }
+.agents-chart-col { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; min-width: 0; }
+.agents-chart-bars { display: flex; flex-direction: column-reverse; justify-content: flex-start; min-height: 0; }
+.agents-bar { display: block; width: 100%; max-width: 28px; margin-inline: auto; border-radius: 2px 2px 0 0; }
+.agents-bar + .agents-bar { border-radius: 2px 2px 0 0; margin-bottom: 1px; }
+.agents-chart-label { font: 450 11px / 14px var(--thoth-font-sans); color: var(--thoth-ink-secondary); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 4px; }
+.agents-usage-table summary { cursor: pointer; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); width: fit-content; }
+.agents-usage-table[open] summary { margin-bottom: var(--thoth-space-2); }
+/* A stored transcript is shown at once (and inside a closed <details> an entrance would never finish). */
+.agents-transcript .agents-log > li { animation: none; }
