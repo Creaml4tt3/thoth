@@ -13,6 +13,7 @@ import { TreeGroup } from "@thoth/app-ui/order/TreeGroup.tsx";
 import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
@@ -340,7 +341,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         // While selecting, the row is a checkbox: Space toggles it, the tree keeps its keyboard order.
         return (
           <li role="none" key={`page:${node.path}`}>
-            <label className="tree-item" style={indent} title={node.path}>
+            <label className="tree-item" style={indent} title={node.path} {...tipIfClipped(node.title)}>
               <input type="checkbox" className="tree-select" checked={checked} onChange={() => selection.toggle(node.path)} aria-label={ts.selectPage(node.title)} />
               <span className="tree-label">{node.title}</span>
             </label>
@@ -375,6 +376,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             }}
             onContextMenu={onContextMenu}
             title={node.path}
+            {...tipIfClipped(node.title)}
             {...dnd.rowProps(node.path)}
           >
             <Disclosure open={false} hidden />
@@ -397,6 +399,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           data-dragging={dnd.dragging === node.path || undefined}
           style={indent}
           title={`${tt.folder} · ${tt.itemCount(node.children.length)}`}
+          {...tipIfClipped(node.name)}
           onClick={() => setFolder(node.path)}
           onKeyDown={keys}
           onContextMenu={onContextMenu}

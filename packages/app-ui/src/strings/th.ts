@@ -106,7 +106,7 @@ export const th: Strings = {
     },
   },
 
-  modal: { close: "ปิด", closeTitle: "ปิด (Esc)" },
+  modal: { close: "ปิด" },
 
   workspace: {
     badge: (name) => `เวิร์กสเปซ · ${name}`,
@@ -260,10 +260,14 @@ export const th: Strings = {
   },
 
   /** แท็บเหนือหน้า (ADR-0016 ข้อ 5) */
+  sidebar: {
+    resize: "ปรับความกว้างแถบด้านข้าง", // REVIEW
+    resizeHint: "ลากเพื่อปรับขนาด ดับเบิลคลิกหรือกด Enter เพื่อคืนค่าเดิม", // REVIEW
+  },
+
   tabs: {
     list: "หน้าที่เปิดอยู่",
     new: "แท็บใหม่",
-    newWith: (shortcut) => `แท็บใหม่ (${shortcut})`,
     close: "ปิดแท็บ",
     blank: "แท็บใหม่",
     settings: "การตั้งค่า",

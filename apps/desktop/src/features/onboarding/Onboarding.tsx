@@ -4,6 +4,7 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { displayPath } from "../settings/path.ts";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 interface Props {
   platform: Platform;
@@ -69,7 +70,7 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
             <ul>
               {recent.map((root) => (
                 <li key={root}>
-                  <button type="button" className="recent-item" disabled={busy} onClick={() => onOpen(root)} title={root}>
+                  <button type="button" className="recent-item" disabled={busy} onClick={() => onOpen(root)} title={root} {...tipIfClipped(root)}>
                     <b>{leaf(root)}</b>
                     <span className="muted mono">{displayPath(root, 64)}</span>
                   </button>

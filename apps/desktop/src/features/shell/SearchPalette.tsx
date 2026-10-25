@@ -6,6 +6,7 @@ import type { Command } from "@thoth/app-ui/keyboard/commands.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 /**
  * Cmd/Ctrl+K quick search over the index (`vault.search`). Starting with `>` it lists commands instead (ADR-0016 rule
@@ -93,7 +94,7 @@ export function SearchPalette({ commands, onRun, onClose }: { commands: readonly
               <li key={hit.id} id={`${listId}-${i}`} role="option" aria-selected={i === active} className="result" onMouseEnter={() => setActive(i)} onClick={() => choose(hit)}>
                 <b>{hit.title}</b>
                 <span className="muted mono">{hit.path}</span>
-                <span className="snippet">{hit.snippet}</span>
+                <span className="snippet" {...tipIfClipped(hit.snippet)}>{hit.snippet}</span>
               </li>
             ))}
           </ul>

@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
 import { workspaceKey, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
@@ -32,12 +33,8 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
   const actions =
     onTransfer && workspace && !signedOut ? (
       <span className="page-actions">
-        <Button variant="quiet" small onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })}>
-          {tt.copyHere}
-        </Button>
-        <Button variant="quiet" small onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "move" })}>
-          {tt.moveHere}
-        </Button>
+        <IconButton icon="copy" label={tt.copyHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })} />
+        <IconButton icon="move-in" label={tt.moveHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "move" })} />
       </span>
     ) : undefined;
 

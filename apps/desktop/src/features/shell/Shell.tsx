@@ -9,6 +9,9 @@ import { SearchPalette } from "./SearchPalette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { SidebarResizer, useSidebarWidth } from "@thoth/app-ui/ui/SidebarResizer.tsx";
+import { TooltipLayer } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
 import { AgentHubView } from "../agents/AgentHub.tsx";
@@ -16,7 +19,7 @@ import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
-import { currentPlatform, shortcutText } from "@thoth/app-ui/keyboard/shortcuts.ts";
+import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/keyboard/commands.ts";
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
@@ -27,6 +30,7 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { roleCan } from "@thoth/workspace-protocol";
 import { desktopTheme } from "../settings/theme.ts";
+import { loadSidebarWidth, saveSidebarWidth } from "../../app/sidebar-store.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
 
 type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
@@ -56,7 +60,7 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { vault, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, agents, openAgents } = useSession();
+  const { vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, agents, openAgents } = useSession();
   const t = useDesktopStrings().shell;
   const agentsTitle = useDesktopStrings().agents.title;
   const strings = useStrings();
@@ -86,6 +90,10 @@ export function Shell() {
   const toggleSearch = () => setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
   const toggleShortcuts = () => setDialog((d) => (d?.kind === "shortcuts" ? null : { kind: "shortcuts" }));
   const platform = useMemo(() => currentPlatform(), []);
+  const hints = useMemo(() => ({ client: "desktop" as const, platform }), [platform]);
+  // The sidebar's width: dragged by its edge, remembered per Private Space.
+  const shell = useRef<HTMLDivElement>(null);
+  const sidebar = useSidebarWidth({ initial: () => loadSidebarWidth(connection.root), save: (width) => saveSidebarWidth(connection.root, width) });
 
   const label = (tab: TabTarget): TabItem["label"] => {
     switch (tab.kind) {
@@ -221,10 +229,11 @@ export function Shell() {
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
 
   return (
-    <div className="shell">
+    <HintContext value={hints}>
+    <div className="shell" ref={shell} style={sidebar.style}>
       <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} />
       <main className="main">
-        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} newShortcut={shortcutText("tab.new", "desktop", platform)} />
+        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} />
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
             {t.watchError(watchError)}
@@ -257,11 +266,14 @@ export function Shell() {
           )}
         </TabPanel>
       </main>
+      <SidebarResizer sidebar={sidebar} shell={shell} />
+      <TooltipLayer />
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />}
     </div>
+    </HintContext>
   );
 }

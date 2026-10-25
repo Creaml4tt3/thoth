@@ -12,11 +12,15 @@ import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import type { OpenOptions, TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
-import { currentPlatform, shortcutText } from "@thoth/app-ui/keyboard/shortcuts.ts";
+import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { LegalLinks } from "./LegalLinks.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
+import { SidebarResizer, useSidebarWidth } from "@thoth/app-ui/ui/SidebarResizer.tsx";
+import { TooltipLayer, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
@@ -31,6 +35,7 @@ import { track } from "./analytics.ts";
 import type { WebEnv } from "./env.ts";
 import { SERVER_ID } from "./servers.ts";
 import { SettingsView } from "./SettingsView.tsx";
+import { loadSidebarWidth, saveSidebarWidth } from "./sidebar-store.ts";
 import { clearTabs, loadTabs, saveTabs } from "./tabs-store.ts";
 
 interface Props {
@@ -83,6 +88,10 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
 
   // The keyboard (ADR-0016 rule 7). Where a browser keeps a key, the web client uses another (see the shortcut table).
   const platform = useMemo(() => currentPlatform(), []);
+  const hints = useMemo(() => ({ client: "web" as const, platform }), [platform]);
+  // The sidebar's width: dragged by its edge, remembered in this browser (the width and nothing else).
+  const shell = useRef<HTMLDivElement>(null);
+  const sidebar = useSidebarWidth({ initial: () => loadSidebarWidth(env.localStorage), save: (width) => saveSidebarWidth(env.localStorage, width) });
   const themeStore = useContext(ThemeStoreContext)!;
   const { theme, setTheme, cycle } = useTheme(themeStore);
   const editor = useEditorActions();
@@ -201,8 +210,9 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   };
 
   return (
+    <HintContext value={hints}>
     <PageHostContext.Provider value={pageHost}>
-      <div className="shell web-shell">
+      <div className="shell web-shell" ref={shell} style={sidebar.style}>
         <aside className="sidebar" aria-label={t.web.sidebar}>
           <div className="ws">
             <Mark size={18} />
@@ -254,19 +264,17 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 </ul>
               </details>
             )}
-            {account && <p className="muted web-who">{t.web.signedInAs(account.displayName)}</p>}
+            {account && <p className="muted web-who" {...tipIfClipped(t.web.signedInAs(account.displayName))}>{t.web.signedInAs(account.displayName)}</p>}
             <div className="side-actions">
               <LanguageSwitch />
               <ThemeSwitch />
-              <Button variant="quiet" small disabled={signingOut} onClick={() => void doSignOut()}>
-                {signingOut ? t.web.signingOut : t.web.signOut}
-              </Button>
+              <IconButton icon="sign-out" label={signingOut ? t.web.signingOut : t.web.signOut} disabled={signingOut} onClick={() => void doSignOut()} />
             </div>
             <LegalLinks />
           </div>
         </aside>
         <main className="main">
-          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} newShortcut={shortcutText("tab.new", "web", platform)} />
+          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
               {t.web.sessionEnded}{" "}
@@ -308,6 +316,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             )}
           </TabPanel>
         </main>
+        <SidebarResizer sidebar={sidebar} shell={shell} />
+        <TooltipLayer />
         {dialog?.kind === "search" && (
           <SearchDialog
             directory={directory}
@@ -338,5 +348,6 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         )}
       </div>
     </PageHostContext.Provider>
+    </HintContext>
   );
 }

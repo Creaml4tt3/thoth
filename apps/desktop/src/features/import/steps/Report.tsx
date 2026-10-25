@@ -3,6 +3,7 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useDesktopStrings } from "../../../strings/index.ts";
 import { SEVERITY_ORDER } from "../warnings.ts";
 import { Stat, WarningList, type WarningGroup } from "./Preview.tsx";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 function groupsOf(report: ImportReport): WarningGroup[] {
   const groups = new Map<string, WarningGroup>();
@@ -71,7 +72,7 @@ export function Report({ report, destinationRoot, onOpenFolder, onResume, onDone
           {w.close}
         </Button>
         {total > 0 && (
-          <Button variant="primary" onClick={onOpenFolder} title={destinationRoot || undefined} aria-label={t.openLabel(destinationRoot || null)}>
+          <Button variant="primary" onClick={onOpenFolder} title={destinationRoot || undefined} {...(destinationRoot ? tipIfClipped(destinationRoot) : {})} aria-label={t.openLabel(destinationRoot || null)}>
             <span className="wz-open-label">{t.open(destinationRoot ? destinationRoot.slice(destinationRoot.lastIndexOf("/") + 1) : null)}</span>
           </Button>
         )}

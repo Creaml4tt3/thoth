@@ -88,6 +88,9 @@ export function createSuggestMenu<T>(owner: HTMLElement, o: SuggestMenuOptions<T
         option.id = optionId(i);
         option.className = `${o.prefix}-option`;
         option.setAttribute("role", "option");
+        // Long titles and notes are cut with an ellipsis; the tooltip (ui/Tooltip.tsx) shows them whole.
+        option.setAttribute("data-tip", row.meta ? `${row.title} · ${row.meta}` : row.title);
+        option.setAttribute("data-tip-fit", "");
         if (row.icon) {
           const icon = document.createElement("span");
           icon.className = `${o.prefix}-option-icon`;

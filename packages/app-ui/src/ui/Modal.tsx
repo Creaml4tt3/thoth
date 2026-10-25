@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useStrings } from "../strings/index.ts";
+import { IconButton } from "./IconButton.tsx";
 import { leaveAsGhost } from "./presence.ts";
 
 interface ModalProps {
@@ -79,11 +80,7 @@ export function Modal({ title, onClose, theme = "paper", wide, children }: Modal
             {title}
           </h2>
           {onClose && (
-            <button type="button" className="modal-close" aria-label={t.close} title={t.closeTitle} onClick={() => close.current?.()}>
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
+            <IconButton icon="close" label={t.close} shortcut="dialog.close" className="modal-close" onClick={() => close.current?.()} />
           )}
         </div>
         {children}

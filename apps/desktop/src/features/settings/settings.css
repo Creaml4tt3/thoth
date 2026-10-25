@@ -10,6 +10,8 @@
 .mode-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-card { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); }
 .server-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--thoth-space-3); }
+.server-id { min-width: 0; }
+.server-name, .server-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .server-name { font: 600 15px / 1.4 var(--thoth-font-sans); }
 .server-account { color: var(--thoth-ink-secondary); }
 .server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); }

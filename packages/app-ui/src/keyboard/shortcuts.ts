@@ -313,5 +313,34 @@ export function shortcutText(id: ShortcutId, client: Client, platform: Platform)
   return def ? formatShortcut(def, client, platform) : "";
 }
 
+const MAC_SYMBOLS: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Escape: "Esc", " ": "Space", Comma: ",", Slash: "/" };
+
+/** "⌘⇧N" on a Mac (the symbols a Mac menu uses), "Ctrl+Shift+N" elsewhere: one chord, short enough for a tooltip. */
+export function formatChordShort(chord: Chord, platform: Platform): string {
+  if (platform !== "mac") return formatChord(chord, platform);
+  const key = chord.code !== undefined ? (CODE_NAMES[chord.code] ?? chord.code.replace(/^(Key|Digit)/, "")) : (chord.key ?? "");
+  const name = MAC_SYMBOLS[key] ?? (key.length === 1 ? key.toUpperCase() : (KEY_NAMES[key] ?? key));
+  return `${chord.ctrl ? "⌃" : ""}${chord.alt ? "⌥" : ""}${chord.shift ? "⇧" : ""}${chord.mod ? "⌘" : ""}${name}`;
+}
+
+/** The `aria-keyshortcuts` value of a chord: "Meta+Shift+N" on a Mac, "Control+Shift+N" elsewhere. */
+export function ariaKeyShortcut(chord: Chord, platform: Platform): string {
+  const parts: string[] = [];
+  if (chord.ctrl || (chord.mod && platform !== "mac")) parts.push("Control");
+  if (chord.mod && platform === "mac") parts.push("Meta");
+  if (chord.alt) parts.push("Alt");
+  if (chord.shift) parts.push("Shift");
+  const key = chord.code !== undefined ? (CODE_NAMES[chord.code] ?? chord.code.replace(/^(Key|Digit)/, "")) : (chord.key ?? "");
+  parts.push(key.length === 1 ? key.toUpperCase() : key);
+  return parts.join("+");
+}
+
+/** What an icon button shows beside its name and announces: the first key combination of `id`, or nothing when it has none. */
+export function shortcutHint(id: ShortcutId, client: Client, platform: Platform): { keys: string; aria: string } | null {
+  const def = shortcutById(id);
+  const chord = def ? chordsFor(def, client)[0] : undefined;
+  return chord ? { keys: formatChordShort(chord, platform), aria: ariaKeyShortcut(chord, platform) } : null;
+}
+
 /** True when the web client binds other keys than the desktop for this shortcut (the list says so). */
 export const differsOnWeb = (def: ShortcutDef): boolean => def.web !== undefined;

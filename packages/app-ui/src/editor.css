@@ -73,17 +73,21 @@
 .inline-raw { background: var(--thoth-bg-hover); border: 1px dashed var(--thoth-border-strong); }
 
 /* Page chrome */
-.page-view { display: grid; grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
+/* minmax(0, 1fr): the column may be narrower than its content, so a long breadcrumb is cut instead of widening the page. */
+.page-view { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
 .page-title { font: var(--thoth-text-h1); letter-spacing: var(--thoth-tracking-heading); margin: var(--thoth-space-4) 0 var(--thoth-space-1); overflow-wrap: anywhere; }
 .page-props { display: flex; gap: 14px; flex-wrap: wrap; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-4); }
 .page-props b { font-weight: 450; color: var(--thoth-ink-secondary); }
 .crumbs { display: flex; align-items: center; gap: var(--thoth-space-3); justify-content: space-between; padding: var(--thoth-space-3) var(--thoth-space-6); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); border-bottom: 1px solid var(--thoth-border); min-height: 44px; }
-.crumb-trail { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
-.crumb-trail li { list-style: none; display: inline-flex; gap: 4px; }
+/* One line: a part that does not fit is cut with an ellipsis and shows in full in a tooltip (ui/Tooltip.tsx). */
+.crumb-trail { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; min-width: 0; }
+.crumb-trail li { list-style: none; display: flex; gap: 4px; min-width: 0; }
+.crumb-trail li:first-child { flex: none; }
+.crumb-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crumb-trail ol { display: contents; margin: 0; padding: 0; }
-.crumb-trail li + li::before { content: "/"; color: var(--thoth-ink-faint); }
+.crumb-trail li + li::before { content: "/"; color: var(--thoth-ink-faint); flex: none; }
 .crumb-current { color: var(--thoth-ink-secondary); }
 .save-status { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .save-status[data-state="error"] { color: var(--thoth-danger); }

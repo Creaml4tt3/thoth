@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { PageSummary } from "@thoth/domain";
 import { emptyOrder, readOrder, type OrderRecord } from "@thoth/local-store";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ancestorFolders, buildTree } from "./tree.ts";
@@ -162,14 +164,12 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <kbd>⌘K</kbd>
       </button>
       <div className="sec">
-        <span className="sec-name" title={connection.root}>
+        <span className="sec-name" title={connection.root} {...tipIfClipped(connection.label)}>
           {connection.label}
         </span>
         <span className="sec-actions">
           {pages.length > 0 && (
-            <button type="button" className="sec-link" aria-pressed={selecting} onClick={() => (selecting ? setSelecting(false) : startSelecting())}>
-              {selecting ? tt.selectDone : tt.select}
-            </button>
+            <IconButton icon={selecting ? "done" : "select"} label={selecting ? tt.selectDone : tt.select} aria-pressed={selecting} onClick={() => (selecting ? setSelecting(false) : startSelecting())} />
           )}
           <span className="badge badge-private">{t.local}</span>
         </span>
@@ -198,27 +198,12 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
       </nav>
       <PendingTransfers />
       <div className="side-actions">
-        <Button variant="ghost" small onClick={onNewPage}>
-          {t.newPage}
-        </Button>
-        <Button variant="ghost" small onClick={onNewFolder}>
-          {t.newFolder}
-        </Button>
-        {/* Icons keep the row to one line in a narrow sidebar, in English and Thai; the names are still announced and shown on hover. */}
-        {agents && (
-          <Button variant="quiet" small className="side-icon" aria-label={ta.open} title={ta.open} onClick={() => openAgents()}>
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
-              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
-            </svg>
-          </Button>
-        )}
-        <Button variant="quiet" small className="side-icon" aria-label={t.settings} title={t.settings} onClick={() => openSettings()}>
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-          </svg>
-        </Button>
+        <IconButton icon="page-plus" label={t.newPage} shortcut="page.new" onClick={onNewPage} />
+        <IconButton icon="folder-plus" label={t.newFolder} shortcut="folder.new" onClick={onNewFolder} />
+        <span className="side-end">
+          {agents && <IconButton icon="sparkle" label={ta.open} onClick={() => openAgents()} />}
+          <IconButton icon="gear" label={t.settings} shortcut="settings.open" onClick={() => openSettings()} />
+        </span>
       </div>
     </aside>
   );

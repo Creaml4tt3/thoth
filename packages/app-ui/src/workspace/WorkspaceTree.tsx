@@ -10,6 +10,8 @@ import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
 import { useStrings } from "../strings/index.ts";
+import { IconButton } from "../ui/IconButton.tsx";
+import { tipIfClipped } from "../ui/Tooltip.tsx";
 import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
@@ -109,6 +111,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
         data-dragging={ctx.dnd.dragging === item.id || undefined}
         style={indent}
         title={item.folder ? `${t.folder} · ${t.itemCount(item.children.length)}` : undefined}
+        {...tipIfClipped(item.title)}
         onKeyDown={(event) => {
           if (!item.folder && event.target === event.currentTarget && isOpenInNewTabKey(event)) {
             event.preventDefault();
@@ -419,6 +422,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           onClick={() => (expanded ? directory.collapse(server, workspace.id) : directory.expand(server, workspace.id))}
           onKeyDown={rowKeys}
           title={t.onServer(workspace.name, serverLabel)}
+          {...tipIfClipped(workspace.name)}
           {...topDrop}
         >
           <Disclosure open={expanded} />
@@ -427,16 +431,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
         </button>
         {canWrite && (
           <>
-            <button type="button" className="tree-add" aria-label={tt.newFolderIn(workspace.name)} title={tt.newFolder} disabled={creating} onClick={() => void create("folder", null)}>
-              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M2 4.2a1 1 0 0 1 1-1h3l1.4 1.6H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z M8 7.2v3.6 M6.2 9h3.6" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button type="button" className="tree-add" aria-label={t.newPageIn(workspace.name)} title={creating ? t.creating : t.newPage} disabled={creating} onClick={() => void create("page", null)}>
-              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
+            <IconButton icon="folder-plus" className="tree-add" label={tt.newFolderIn(workspace.name)} disabled={creating} onClick={() => void create("folder", null)} />
+            <IconButton icon="page-plus" className="tree-add" label={t.newPageIn(workspace.name)} disabled={creating} onClick={() => void create("page", null)} />
           </>
         )}
       </div>

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/Button.tsx";
+import { Icon } from "../ui/Icon.tsx";
+import { tip, tipIfClipped } from "../ui/Tooltip.tsx";
+import { useShortcutHint } from "../keyboard/hints.ts";
 import { useStrings } from "../strings/index.ts";
 import { ConflictDialog } from "./ConflictDialog.tsx";
 import { PageEditor, type PageEditorHandle } from "./PageEditor.tsx";
@@ -15,11 +18,22 @@ import { PlainEditor } from "./plain/PlainEditor.tsx";
 
 function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: boolean; onChange(mode: EditorMode): void }) {
   const t = useStrings().editor;
+  const hint = useShortcutHint("editor.mode");
   return (
-    <div className="mode-switch" role="group" aria-label={t.modeGroup} title={t.modeSwitchTitle}>
+    <div className="mode-switch" role="group" aria-label={t.modeGroup}>
       {EDITOR_MODES.map((m) => (
-        <button key={m.id} type="button" className="mode-option" aria-pressed={mode === m.id} title={t.modes[m.id].hint} disabled={disabled} onClick={() => onChange(m.id)}>
-          {t.modes[m.id].label}
+        <button
+          key={m.id}
+          type="button"
+          className="icon-btn mode-option"
+          aria-label={t.modes[m.id].label}
+          aria-pressed={mode === m.id}
+          {...(hint ? { "aria-keyshortcuts": hint.aria } : {})}
+          {...tip(t.modes[m.id].label, hint?.keys, t.modes[m.id].hint)}
+          disabled={disabled}
+          onClick={() => onChange(m.id)}
+        >
+          <Icon name={m.id === "blocks" ? "blocks" : "text"} />
         </button>
       ))}
     </div>
@@ -35,7 +49,9 @@ function Breadcrumbs({ badge, parts, status, children }: { badge: ReactNode; par
           <li>{badge}</li>
           {parts.map((part, i) => (
             <li key={i} {...(i === parts.length - 1 ? { "aria-current": "page" as const, className: "crumb-current" } : {})}>
-              {part}
+              <span className="crumb-text" {...tipIfClipped(part)}>
+                {part}
+              </span>
             </li>
           ))}
         </ol>

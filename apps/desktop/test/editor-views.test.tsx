@@ -99,7 +99,7 @@ describe("node views", () => {
     await app.user.click(box.querySelector<HTMLElement>("a.wikilink")!);
     const crumbs = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByText("Folder")).toBeTruthy();
-    expect(within(crumbs).getByText("Target Page.md").getAttribute("aria-current")).toBe("page");
+    expect(within(crumbs).getByText("Target Page.md").closest("li")!.getAttribute("aria-current")).toBe("page");
   });
 
   it("opening a page full of preserved blocks and saving makes no write", async () => {

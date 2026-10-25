@@ -8,6 +8,7 @@ import { STARTER_SERVER, isStarter, type StarterServer } from "@thoth/app-ui/wor
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings, type DesktopStrings } from "../../strings/index.ts";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -88,11 +89,13 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
   return (
     <article className="server-card" aria-labelledby={titleId}>
       <div className="server-head">
-        <div>
-          <h3 id={titleId} className="server-name">
+        <div className="server-id">
+          <h3 id={titleId} className="server-name" {...tipIfClipped(info.label)}>
             {info.label}
           </h3>
-          <p className="mono muted">{info.url}</p>
+          <p className="mono muted server-url" {...tipIfClipped(info.url)}>
+            {info.url}
+          </p>
         </div>
         <span className={`badge ${signedIn ? "badge-workspace" : "badge-muted"}`}>{signedIn ? t.signedIn : t.signedOut}</span>
       </div>

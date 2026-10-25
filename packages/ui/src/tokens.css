@@ -126,6 +126,7 @@
   --thoth-border: rgb(255 255 255 / 0.08);
   --thoth-border-strong: rgb(255 255 255 / 0.14);
   --thoth-moon: #FF7A2F;
+  --thoth-private: var(--thoth-stone-400); /* the light theme's stone is 2.3:1 on the dark badge */
   --thoth-moon-soft: rgb(255 122 47 / 0.14);
   --thoth-moon-ink: #FFB386;
   --thoth-link: #5AA9FF;
@@ -156,6 +157,7 @@
     --thoth-border: rgb(255 255 255 / 0.08);
     --thoth-border-strong: rgb(255 255 255 / 0.14);
     --thoth-moon: #FF7A2F;
+    --thoth-private: var(--thoth-stone-400);
     --thoth-moon-soft: rgb(255 122 47 / 0.14);
     --thoth-moon-ink: #FFB386;
     --thoth-link: #5AA9FF;

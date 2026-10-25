@@ -45,6 +45,7 @@
 /* Narrow screens: the sidebar sits above the page. */
 @media (max-width: 760px) {
   .web-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .web-shell .sidebar-resizer { display: none; }
   .web-shell .sidebar { border-right: 0; border-bottom: 1px solid var(--thoth-border); max-height: 45vh; }
   .page-scroll { padding: var(--thoth-space-4); }
 }

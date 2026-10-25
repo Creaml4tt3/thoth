@@ -18,6 +18,7 @@ import { DiffView, Review } from "./Review.tsx";
 import { PROVIDER_FEATURES, type AgentsService, type AgentsState } from "./service.ts";
 import { AGENT_PROVIDERS, isAgentProvider, type AgentProviderId } from "./settings.ts";
 import "./agents.css";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 type T = DesktopStrings["agents"];
 type ProviderStrings = T["providers"][AgentProviderId];
@@ -519,7 +520,7 @@ function History({ state, agents }: { state: AgentsState; agents: AgentsService 
                   <td>
                     <time dateTime={new Date(r.createdAt).toISOString()}>{new Date(r.createdAt).toLocaleString()}</time>
                   </td>
-                  <td className="agents-history-task" title={r.task.prompt}>
+                  <td className="agents-history-task" {...tipIfClipped(r.task.prompt)}>
                     {r.task.prompt.split("\n")[0]!.slice(0, 120)}
                   </td>
                   <td className="small" data-provider={r.provider.id}>

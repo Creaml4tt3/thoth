@@ -166,7 +166,7 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
         event.dataTransfer.setData("text/plain", id);
         const picture = dragImage(event.currentTarget);
         if (picture) {
-          event.dataTransfer.setDragImage(picture.node, picture.x, picture.y);
+          event.dataTransfer.setDragImage?.(picture.node, picture.x, picture.y);
           setTimeout(() => picture.node.remove(), 0); // the browser has taken its picture by then
         }
         // Changing what the page looks like inside `dragstart` can end the drag at once in some browsers: do it a tick later.

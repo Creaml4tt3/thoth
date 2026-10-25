@@ -1,11 +1,19 @@
-/* Shell (Paper). Sidebar is 260px (DESIGN.md section 5). */
-.shell { display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+/* Shell (Paper). The sidebar is 260px unless the person dragged its edge (--thoth-sidebar-width, ui/SidebarResizer.tsx). */
+.shell { position: relative; display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .sidebar { background: var(--thoth-bg-sidebar); border-right: 1px solid var(--thoth-border); padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+/* The drag handle: an 8px strip over the sidebar's edge, with a line that shows on hover, focus and while dragging. */
+.sidebar-resizer { position: absolute; z-index: 5; top: 0; bottom: 0; inset-inline-start: calc(var(--thoth-sidebar-width) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }
+.sidebar-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; inset-inline-start: 3px; width: 2px; background: transparent; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after, .shell[data-resizing] .sidebar-resizer::after { background: var(--thoth-accent); }
+.sidebar-resizer:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+/* While it drags: no text selection, the resize cursor everywhere, and nothing that could stutter the frame. */
+.shell[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+.shell[data-resizing] .sidebar, .shell[data-resizing] .main, .shell[data-resizing] .sidebar-resizer::after { transition: none; }
 .ws { display: flex; gap: 8px; align-items: center; padding: 6px 8px; font-weight: 600; letter-spacing: -0.03em; }
-.search-trigger { display: flex; justify-content: space-between; align-items: center; margin: 8px 4px 8px; padding: 6px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border: 0; color: var(--thoth-ink-tertiary); cursor: pointer; text-align: left; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.search-trigger { display: flex; justify-content: space-between; align-items: center; margin: 8px 4px 8px; padding: 6px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border: 0; color: var(--thoth-ink-secondary); cursor: pointer; text-align: left; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .search-trigger:hover { background: var(--thoth-bg-active); }
-.search-trigger kbd { font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
-.sec { padding: 10px 8px 4px; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.search-trigger kbd { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.sec { padding: 10px 8px 4px; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .sec-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-wrap { flex: 1; min-height: 0; overflow: auto; }
 .tree-wrap ul { list-style: none; margin: 0; padding: 0; }
@@ -36,7 +44,7 @@
 .tree-collapse[data-state="closed"] { grid-template-rows: 0fr; opacity: 0; transition-timing-function: var(--thoth-ease-in), var(--thoth-ease-in); }
 .tree-collapse > ul { min-height: 0; overflow: hidden; }
 .side-actions { display: flex; align-items: center; gap: 4px; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
-.side-actions > .side-icon { margin-left: auto; padding-inline: 6px; }
+.side-end { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
 .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .banner { margin: 8px 16px; }
 .empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--thoth-ink-secondary); text-align: center; }
@@ -55,10 +63,8 @@
 /* A workspace row: the folder item plus New page, shown on hover or focus (always on touch screens). */
 .tree-row { display: flex; align-items: center; gap: 2px; }
 .tree-row > .tree-item { flex: 1; min-width: 0; }
-.tree-add { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; opacity: 0; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tree-add { opacity: 0; }
 .tree-row:hover .tree-add, .tree-add:focus-visible, .tree-add:disabled { opacity: 1; }
-.tree-add:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
-.tree-add:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .tree-add:disabled { cursor: progress; }
 @media (hover: none) { .tree-add { opacity: 1; } }
 .tree-error { color: var(--thoth-danger); }
@@ -108,7 +114,9 @@
 /* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator. */
 .tabstrip { flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
 .tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.tab { position: relative; display: flex; align-items: center; flex: 0 1 180px; min-width: 96px; max-width: 220px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+/* A tab is 270px wide when there is room (1.5 times the old 180px ideal; `width` too, because a flex-basis alone does not size the strip around
+   it and a short title would shrink the tab), and shrinks toward 96px as more are open; then the strip scrolls. */
+.tab { position: relative; display: flex; align-items: center; flex: 0 1 270px; width: 270px; min-width: 96px; max-width: 330px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 /* A tab the user opened enters by widening and fading in; one that closes narrows and fades out (TabBar.tsx keeps it for
    that long, inert). The strip is a few elements wide, so width is the one layout property animated here. Tabs that
    were there at start do not animate. The current tab's line fades in and out, since the tab itself changes colour. */
@@ -121,14 +129,12 @@
 .tab-label { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 7px 4px 7px 12px; cursor: pointer; font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
 .tab-text { overflow: hidden; text-overflow: ellipsis; }
-.tab-close, .tab-new { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tab-close { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 3px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; opacity: 0; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-close svg { pointer-events: none; }
-.tab-close { margin-right: 4px; opacity: 0; }
 .tab:hover .tab-close, .tab[data-selected] .tab-close { opacity: 1; }
 @media (hover: none) { .tab-close { opacity: 1; } }
-.tab-close:hover, .tab-new:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
-.tab-new:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
-.tab-new { margin: 0 0 4px 4px; }
+.tab-close:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.tab-new { margin: 0 0 3px 4px; }
 .tab-panel { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
 .tab-panel > * { min-height: 0; }
 

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useShortcutHint } from "../keyboard/hints.ts";
 import { useStrings } from "../strings/index.ts";
+import { IconButton } from "../ui/IconButton.tsx";
+import { Icon } from "../ui/Icon.tsx";
 import { motionOff } from "../ui/presence.ts";
+import { tip, tipIfClipped } from "../ui/Tooltip.tsx";
 
 /** What the bar shows for one tab. The app names it (page titles are looked up live, never stored). */
 export interface TabItem {
@@ -19,8 +23,6 @@ interface BarProps {
   onActivate(id: string): void;
   onClose(id: string): void;
   onNew(): void;
-  /** The new-tab shortcut as text, for the button's tooltip. */
-  newShortcut?: string;
 }
 
 /** A tab that was closed and is still narrowing away: where it sat (after which tab), what it looked like. */
@@ -44,8 +46,9 @@ const LEAVE_MS = 400;
  * Motion (shell.css): a tab opened after the bar first showed widens and fades in; a closed tab is kept for a moment as an
  * inert, hidden-from-AT copy that narrows and fades out. Tabs present at the start, and everything under reduced motion, skip it.
  */
-export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }: BarProps) {
+export function TabBar({ tabs, active, onActivate, onClose, onNew }: BarProps) {
   const t = useStrings().tabs;
+  const closeHint = useShortcutHint("tab.close");
   /** The tab that is in the Tab order: the one last focused, else the current one. */
   const [stop, setStop] = useState(active);
   const refs = useRef(new Map<string, HTMLButtonElement>());
@@ -154,7 +157,8 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }
                 aria-keyshortcuts="Delete"
                 tabIndex={tab.id === stop ? 0 : -1}
                 className="tab-label"
-                title={tab.title ?? tab.label}
+                {...(tab.title ? { title: tab.title } : {})}
+                {...tipIfClipped(tab.label)}
                 onClick={() => onActivate(tab.id)}
                 onKeyDown={(event) => onKeyDown(event, tab.id)}
                 onMouseDown={(event: MouseEvent) => {
@@ -169,20 +173,14 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, newShortcut }
                 <span className="tab-text">{tab.label}</span>
               </button>
               {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. */}
-              <span className="tab-close" aria-hidden="true" title={t.close} onClick={() => onClose(tab.id)}>
-                <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+              <span className="tab-close" aria-hidden="true" {...tip(t.close, closeHint?.keys)} onClick={() => onClose(tab.id)}>
+                <Icon name="close" size={12} />
               </span>
             </div>
           );
         })}
       </div>
-      <button type="button" className="tab-new" aria-label={t.new} title={newShortcut ? t.newWith(newShortcut) : t.new} onClick={onNew}>
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </button>
+      <IconButton icon="plus" label={t.new} shortcut="tab.new" className="tab-new" onClick={onNew} />
     </div>
   );
 }

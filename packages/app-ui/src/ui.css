@@ -34,6 +34,14 @@ h1, h2, h3, p { margin: 0; }
 .btn-danger { background: transparent; color: var(--thoth-danger); box-shadow: inset 0 0 0 1px var(--thoth-border-strong); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 
+/* Icon buttons (ui/IconButton.tsx): 28px square, named by aria-label, with a tooltip (ui/Tooltip.tsx). */
+.icon-btn { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--thoth-radius-md); color: var(--thoth-ink-secondary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
+.icon-btn:hover:not(:disabled) { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.icon-btn[aria-pressed="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.icon-btn:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+.icon-btn:disabled { opacity: 0.45; cursor: default; }
+.icon-btn .icon { pointer-events: none; }
+
 /* Badges */
 .badge { font: 500 10px/1 var(--thoth-font-sans); padding: 3px 7px; border-radius: var(--thoth-radius-pill); letter-spacing: 0.02em; }
 .badge-private { background: var(--thoth-bg-active); color: var(--thoth-private); }
@@ -60,9 +68,17 @@ h1, h2, h3, p { margin: 0; }
 .modal-wide { width: min(880px, 100%); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); }
 .modal-title { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); }
-.modal-close { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px -4px 0; border: 0; border-radius: var(--thoth-radius-md); background: transparent; color: var(--thoth-ink-tertiary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
-.modal-close:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.modal-close { margin: -4px -6px -4px 0; }
 .modal-actions { display: flex; gap: var(--thoth-space-2); justify-content: flex-end; flex-wrap: wrap; }
+
+/* Tooltip (ui/Tooltip.tsx): dark on light and light on dark, from the ink and background tokens. It takes no pointer, so it
+   never gets in the way of a click or a drop; it arrives from the side that faces its element, like the other popovers. */
+.tooltip { position: fixed; z-index: 70; max-width: min(320px, calc(100vw - 16px)); display: flex; align-items: baseline; gap: var(--thoth-space-2); padding: 5px 9px; border-radius: var(--thoth-radius-sm); background: rgb(var(--thoth-ink)); color: var(--thoth-bg); font: var(--thoth-text-small); box-shadow: var(--thoth-shadow-pop); pointer-events: none; --pop-y: calc(var(--thoth-shift) * -1); transform-origin: top center; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tooltip[data-side="top"] { --pop-y: var(--thoth-shift); transform-origin: bottom center; }
+.tooltip-body { display: grid; gap: 2px; min-width: 0; }
+.tooltip-text { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 40vh; overflow: hidden; }
+.tooltip-detail { opacity: 0.75; overflow-wrap: anywhere; }
+.tooltip-keys { flex: none; font: inherit; opacity: 0.75; padding-inline-start: var(--thoth-space-2); border-inline-start: 1px solid currentColor; border-inline-start-color: color-mix(in srgb, currentColor 40%, transparent); }
 
 .alert { padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); color: var(--thoth-ink-secondary); font: var(--thoth-text-ui); }
 /* An error, warning or status that appears because something happened (not the ones that are part of a page's layout). */

@@ -124,7 +124,7 @@ export const en = {
     } satisfies Record<Where, Record<ConflictChoice, Choice>>,
   },
 
-  modal: { close: "Close", closeTitle: "Close (Esc)" },
+  modal: { close: "Close" },
 
   workspace: {
     badge: (name: string) => `Workspace · ${name}`,
@@ -286,10 +286,15 @@ export const en = {
   },
 
   /** Tabs above the page (ADR-0016 rule 5). */
+  /** The drag handle on the sidebar's edge. */
+  sidebar: {
+    resize: "Resize sidebar",
+    resizeHint: "Drag to resize. Double-click or press Enter to reset.",
+  },
+
   tabs: {
     list: "Open pages",
     new: "New tab",
-    newWith: (shortcut: string) => `New tab (${shortcut})`,
     /** The button in a tab. It does not repeat the page name: the name is its description, so a search for the page finds one thing. */
     close: "Close tab",
     blank: "New tab",

@@ -6,6 +6,7 @@ import { CommandOptions, useCommandMode } from "@thoth/app-ui/keyboard/CommandOp
 import type { Command } from "@thoth/app-ui/keyboard/commands.ts";
 import type { ServerDirectory, WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { SERVER_ID } from "./servers.ts";
+import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 
 interface Hit {
   workspace: Workspace;
@@ -126,7 +127,7 @@ export function SearchDialog({ directory, workspaces, canSearch, commands, onRun
                 <li key={`${hit.workspace.id}/${hit.pageId}`} role="option" aria-selected={i === active} className="result" onMouseDown={(e) => e.preventDefault()} onClick={() => open(hit)}>
                   <b>{hit.title}</b>
                   {workspaces.length > 1 && <span className="muted">{hit.workspace.name}</span>}
-                  {hit.snippet && <span className="snippet">{hit.snippet}</span>}
+                  {hit.snippet && <span className="snippet" {...tipIfClipped(hit.snippet)}>{hit.snippet}</span>}
                 </li>
               ))}
             </ul>

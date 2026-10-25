@@ -318,7 +318,7 @@ describe("workspace pages", () => {
     const box = await openPlan(app);
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByText("Workspace · Design")).toBeTruthy();
-    expect(within(crumbs).getByText("Plan").getAttribute("aria-current")).toBe("page");
+    expect(within(crumbs).getByText("Plan").closest("li")!.getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("group", { name: "Editor mode" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: /backlinks/i })).toBeNull();
 
