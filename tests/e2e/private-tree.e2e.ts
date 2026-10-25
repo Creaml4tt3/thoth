@@ -53,6 +53,11 @@ async function openVault(page: Page) {
 }
 
 const row = (page: Page, name: string) => page.getByRole("treeitem", { name, exact: true });
+/**
+ * A row by its path. While a rename saves, its field row (named after the new text) and the renamed row can both be on
+ * screen for a moment, so a row asked for by name may match twice (Playwright then fails at once instead of retrying).
+ */
+const rowAt = (page: Page, path: string) => page.locator(`[data-tree-id="${path}"]`);
 const current = (page: Page) => page.getByRole("tab", { selected: true });
 
 test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a folder that starts in rename", async ({ page }) => {
@@ -83,7 +88,7 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   expect(await readdir(vault)).not.toContain("Plan.md");
   expect(await read("Docs/Notes.md")).toBe("# Notes\n\nSee [[Roadmap]] and [the plan](../Roadmap.md).\n"); // links follow
   await expect(current(page)).toHaveText("Roadmap"); // the tab follows
-  await expect(row(page, "Roadmap")).toBeFocused();
+  await expect(rowAt(page, "Roadmap.md")).toBeFocused();
   expect(await readdir(join(vault, ".thoth"))).not.toContain("order.json");
 
   // Escape cancels.
@@ -103,9 +108,12 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await page.keyboard.press("Enter");
   await expect.poll(() => isDirectory("Docs/Drafts")).toBe(true);
   expect(await isDirectory("Docs/Untitled folder")).toBe(false);
-  await expect(row(page, "Drafts")).toBeVisible();
+  await expect(rowAt(page, "Docs/Drafts")).toBeVisible();
 
-  // The palette's > New folder goes where the tree had focus (the Drafts row), as the shortcut does.
+  // The palette's > New folder goes where the tree had focus (the Drafts row), as the shortcut does. After a rename,
+  // focus is nowhere until the tree has read the folder again and shows the renamed row; wait for it to be back, or
+  // "where the tree has focus" is nowhere and the folder is made at the top level.
+  await expect(rowAt(page, "Docs/Drafts")).toBeFocused();
   await page.keyboard.press("ControlOrMeta+k");
   await page.keyboard.type("> new folder");
   await page.keyboard.press("Enter");
@@ -113,12 +121,15 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await page.keyboard.press("Escape"); // keeps the default name
   await expect.poll(() => isDirectory("Docs/Drafts/Untitled folder")).toBe(true);
 
-  // With focus outside the tree it is created at the top level, and a second one is numbered.
+  // With focus outside the tree it is created at the top level, and a second one is numbered. Focus goes back to the
+  // row when the rename ends; wait for that, so that the blur below is the last word on where focus is.
+  await expect(rowAt(page, "Docs/Drafts/Untitled folder")).toBeFocused();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("ControlOrMeta+Shift+N");
   await expect(page.getByRole("textbox", { name: "Rename Untitled folder" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect.poll(() => isDirectory("Untitled folder")).toBe(true);
+  await expect(rowAt(page, "Untitled folder")).toBeFocused();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("ControlOrMeta+Shift+N");
   await expect(page.getByRole("textbox", { name: "Rename Untitled folder 2" })).toBeFocused();
@@ -139,5 +150,5 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await expect.poll(() => isDirectory("Papers/Drafts")).toBe(true);
   await expect(current(page)).toHaveText("Notes");
   await expect(page.getByRole("treeitem", { name: "Notes", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(row(page, "Papers")).toBeFocused();
+  await expect(rowAt(page, "Papers")).toBeFocused();
 });
