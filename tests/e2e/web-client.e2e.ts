@@ -16,6 +16,9 @@ import { createServer as netServer } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
 import type { TestProject } from "vitest/node";
 import { REPO } from "../ports/harness.ts";
+import { newStableId } from "@thoth/domain";
+import { startDrag } from "./drag.ts";
+import { settled } from "./settled.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { loadConfig } from "../../apps/server/src/config.ts";
 import { createDatabase, type Database } from "../../apps/server/src/db.ts";
@@ -132,6 +135,53 @@ test.describe("web client", () => {
     await issuer?.close().catch(() => undefined);
     await new Promise<void>((resolve) => (site ? site.close(() => resolve()) : resolve()));
     await stopPostgres?.();
+  });
+
+  test("tabs are dragged to a new place with a real pointer and come back in that order after a reload (ADR-0019: reorder only)", async ({ page, context }) => {
+    await context.route((url) => url.hostname !== "127.0.0.1", (route) => route.abort());
+    // An account of its own; the other test's account comes back afterwards.
+    const before = { ...issuer.profile };
+    issuer.reset({ sub: `sub-web-tabs-${Date.now()}`, name: "Tab Tester", email: "tabs@example.org" });
+    try {
+      await page.setViewportSize({ width: 1200, height: 800 });
+      await page.goto(`${siteUrl}/app/`);
+      await page.getByRole("button", { name: "Sign in with Google" }).click();
+      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible({ timeout: 20_000 });
+
+      // Three pages in the account's own workspace, written through the API with a token of its own.
+      const userId = (await db.query<{ id: string }>("SELECT u.id FROM users u JOIN identities i ON i.user_id = u.id WHERE i.provider = 'google' AND i.subject = $1", [issuer.profile.sub])).rows[0]!.id;
+      const workspace = (await db.query<{ id: string }>("SELECT workspace_id AS id FROM memberships WHERE user_id = $1 AND role = 'owner'", [userId])).rows[0]!.id;
+      const token = generateToken();
+      await db.query("INSERT INTO access_tokens (id, user_id, token_hash) VALUES ($1, $2, $3)", [opaqueId("tok"), userId, hashToken(token)]);
+      for (const title of ["Alpha", "Beta", "Gamma"]) {
+        const made = await asOther(token, "PUT", `/workspaces/${workspace}/pages/${newStableId(Date.now())}`, { headers: { "if-none-match": "*", "idempotency-key": crypto.randomUUID() }, json: { title, markdown: `# ${title}\n` } });
+        expect(made.status, JSON.stringify(made.json)).toBe(201);
+      }
+      await page.reload();
+      const pages = page.getByRole("tree", { name: "Workspaces" }).getByRole("group", { name: "Pages in Tab Tester's workspace" });
+      await pages.getByRole("treeitem", { name: "Alpha" }).click();
+      for (const name of ["Beta", "Gamma"]) await pages.getByRole("treeitem", { name }).click({ modifiers: ["ControlOrMeta"] });
+      const tabNames = () => page.getByRole("tab").allTextContents();
+      await expect.poll(tabNames).toEqual(["Alpha", "Beta", "Gamma"]);
+      await settled(page);
+
+      // Alpha past Gamma, with the pointer: the line, then the new order. Below the bar there is no new window here.
+      const drag = await startDrag(page, page.getByRole("tab", { name: "Alpha" }).locator("xpath=.."));
+      const gamma = (await page.getByRole("tab", { name: "Gamma" }).boundingBox())!;
+      await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + gamma.height / 2);
+      await expect(page.locator(".tab[data-drop]")).toHaveAttribute("data-drop", "after");
+      await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + 300);
+      await expect(page.getByText("Release to open in a new window")).toHaveCount(0);
+      await drag.drop();
+      await expect.poll(tabNames).toEqual(["Beta", "Gamma", "Alpha"]);
+      await expect(page.getByRole("tab", { selected: true })).toHaveText("Gamma");
+
+      await page.reload();
+      await expect.poll(tabNames, { timeout: 15_000 }).toEqual(["Beta", "Gamma", "Alpha"]);
+      await expect(page.getByRole("tab", { selected: true })).toHaveText("Gamma");
+    } finally {
+      issuer.reset(before);
+    }
   });
 
   test("a new account signs in, writes in its own workspace, survives a reload and a 412, and signs out", async ({ page, context }) => {

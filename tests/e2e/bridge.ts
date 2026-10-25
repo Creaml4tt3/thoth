@@ -41,7 +41,8 @@ async function body(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function startBridge(options: { dist: string; bridgeDir: string; host: StdioTransportOptions }): Promise<Bridge> {
+/** `port`: listen there (a restart on the same origin keeps the browser's storage); a free one by default. */
+export async function startBridge(options: { dist: string; bridgeDir: string; host: StdioTransportOptions; port?: number }): Promise<Bridge> {
   // Harness events such as `browser.open` go to the test (options.host.onHostEvent), never to the page.
   const transport = new StdioTransport(options.host);
   const token = randomBytes(24).toString("hex");
@@ -91,7 +92,7 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
       res.writeHead(200, { "content-type": TYPES[extname(safe)] ?? "application/octet-stream" }).end(data);
     })().catch((error: unknown) => res.writeHead(500).end(String(error)));
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => server.listen(options.port ?? 0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Bridge failed to listen");
   const url = `http://127.0.0.1:${address.port}`;
