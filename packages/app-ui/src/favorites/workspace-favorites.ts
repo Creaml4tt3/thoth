@@ -25,7 +25,7 @@ export interface WorkspaceFavoritesList extends WorkspaceScope {
   pages: string[];
 }
 
-type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type StorageLike = Pick<Storage, "getItem" | "setItem"> & Partial<Pick<Storage, "removeItem">>;
 
 const text = (v: unknown, max = 512): v is string => typeof v === "string" && v.length > 0 && v.length <= max && !/[\u0000-\u001f]/.test(v);
 const same = (a: WorkspaceScope, b: WorkspaceScope) => a.server === b.server && a.account === b.account && a.workspace === b.workspace;
@@ -78,7 +78,10 @@ export function createWorkspaceFavorites(storage: () => StorageLike | null): Wor
     fallback = lists;
     try {
       const s = storage();
-      if (s && lists.length === 0) s.removeItem(WORKSPACE_FAVORITES_KEY);
+      if (s && lists.length === 0) {
+        if (s.removeItem) s.removeItem(WORKSPACE_FAVORITES_KEY);
+        else s.setItem(WORKSPACE_FAVORITES_KEY, ""); // reads as none
+      }
       else s?.setItem(WORKSPACE_FAVORITES_KEY, JSON.stringify({ v: VERSION, lists }));
     } catch {
       // quota or privacy mode: they last for the session

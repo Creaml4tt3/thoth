@@ -26,10 +26,20 @@ export function workspaceRefOf(key: string): WorkspacePageRef | null {
   return server && workspace && page ? { server, workspace, page } : null;
 }
 
-/** The scope a workspace favorite is kept under: null while the server is signed out (no account known). */
-export function scopeOf(state: DirectoryState, server: string, workspace: string): WorkspaceScope | null {
+/** Who is signed in to a server: the host's word (`ServerInfo.account`), unless the app knows better. */
+type AccountOf = (server: string) => string | undefined;
+
+/** The account signed in to the entry, or undefined while it is signed out or not known. */
+function accountIn(state: DirectoryState, server: string, accountOf?: AccountOf): string | undefined {
   const entry = state.servers.find((s) => s.info.id === server);
-  const account = entry?.info.auth !== "signed-out" ? entry?.info.account?.id : undefined;
+  if (!entry || entry.info.auth === "signed-out") return undefined;
+  return accountOf?.(server) ?? entry.info.account?.id;
+}
+
+/** The scope a workspace favorite is kept under: null while the server is signed out (no account known). */
+export function scopeOf(state: DirectoryState, server: string, workspace: string, accountOf?: AccountOf): WorkspaceScope | null {
+  const entry = state.servers.find((s) => s.info.id === server);
+  const account = accountIn(state, server, accountOf);
   return entry && account ? { server: entry.info.url, account, workspace } : null;
 }
 
@@ -43,7 +53,11 @@ export interface WorkspaceFavoritesView {
   move(ref: WorkspacePageRef, to: number): void;
 }
 
-export function useWorkspaceFavorites(directory: ServerDirectory, store: WorkspaceFavorites, current: WorkspacePageRef | null): WorkspaceFavoritesView {
+/**
+ * `accountOf` names the signed-in account where the host's server list does not (the web client learns it from
+ * `GET /me` after the list was made).
+ */
+export function useWorkspaceFavorites(directory: ServerDirectory, store: WorkspaceFavorites, current: WorkspacePageRef | null, accountOf?: AccountOf): WorkspaceFavoritesView {
   const t = useStrings();
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const version = useSyncExternalStore(store.subscribe, store.version);
@@ -51,10 +65,10 @@ export function useWorkspaceFavorites(directory: ServerDirectory, store: Workspa
   const lists = useMemo(() => {
     void version;
     return state.servers.flatMap((entry) => {
-      const account = entry.info.auth !== "signed-out" ? entry.info.account?.id : undefined;
+      const account = accountIn(state, entry.info.id, accountOf);
       return account ? store.lists(entry.info.url, account).map((list) => ({ server: entry.info.id, list })) : [];
     });
-  }, [state.servers, store, version]);
+  }, [state, store, version, accountOf]);
 
   const wanted = [...new Set(lists.map((l) => `${l.server}\n${l.list.workspace}`))].join("\u0000");
   useEffect(() => {
@@ -102,29 +116,29 @@ export function useWorkspaceFavorites(directory: ServerDirectory, store: Workspa
   const has = useCallback(
     (ref: WorkspacePageRef) => {
       void version;
-      const scope = scopeOf(state, ref.server, ref.workspace);
+      const scope = scopeOf(state, ref.server, ref.workspace, accountOf);
       return scope !== null && store.get(scope).includes(ref.page);
     },
-    [state, store, version],
+    [state, store, version, accountOf],
   );
-  const can = useCallback((ref: WorkspacePageRef) => scopeOf(state, ref.server, ref.workspace) !== null, [state]);
+  const can = useCallback((ref: WorkspacePageRef) => scopeOf(state, ref.server, ref.workspace, accountOf) !== null, [state, accountOf]);
   const toggle = useCallback(
     (ref: WorkspacePageRef) => {
-      const scope = scopeOf(state, ref.server, ref.workspace);
+      const scope = scopeOf(state, ref.server, ref.workspace, accountOf);
       if (!scope) return false;
       const list = store.get(scope);
       const on = list.includes(ref.page);
       store.set(scope, on ? list.filter((p) => p !== ref.page) : [...list, ref.page]);
       return !on;
     },
-    [state, store],
+    [state, store, accountOf],
   );
   const move = useCallback(
     (ref: WorkspacePageRef, to: number) => {
-      const scope = scopeOf(state, ref.server, ref.workspace);
+      const scope = scopeOf(state, ref.server, ref.workspace, accountOf);
       if (scope) store.set(scope, moveInGroup(store.get(scope), ref.page, to));
     },
-    [state, store],
+    [state, store, accountOf],
   );
   return { items, has, can, toggle, move };
 }

@@ -43,12 +43,19 @@ import { SERVER_ID } from "./servers.ts";
 import { SettingsView } from "./SettingsView.tsx";
 import { loadSidebarWidth, saveSidebarWidth } from "./sidebar-store.ts";
 import { clearTabs, loadTabs, saveTabs } from "./tabs-store.ts";
+import { FavoritesContext, type FavoriteRef, type FavoritesApi } from "@thoth/app-ui/favorites/context.ts";
+import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
+import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
+import { useWorkspaceFavorites, workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
+import { createWorkspaceFavorites } from "@thoth/app-ui/favorites/workspace-favorites.ts";
+import { isPinned } from "@thoth/app-ui/tabs/model.ts";
+import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 
 interface Props {
   env: WebEnv;
   directory: ServerDirectory;
   capabilities: Capabilities;
-  account: { displayName: string } | null;
+  account: { id: string; displayName: string } | null;
   signOut(): Promise<void>;
   signInAgain(): void;
 }
@@ -83,6 +90,39 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
   const openPage = useCallback((ref: WorkspacePageRef, options?: OpenOptions) => tabs.open({ kind: "workspace", ...ref }, options), [tabs]);
   const openSettings = useCallback(() => tabs.open({ kind: "settings" }), [tabs]);
+
+  // Favorites (ADR-0027): workspace pages, kept in this browser per server, account and workspace, never sent.
+  const favoriteStore = useMemo(() => createWorkspaceFavorites(() => env.localStorage ?? null), [env]);
+  const accountId = account?.id;
+  const accountOf = useCallback(() => accountId, [accountId]);
+  const favorites = useWorkspaceFavorites(directory, favoriteStore, current, accountOf);
+  const [favoriteSaid, setFavoriteSaid] = useState("");
+  const favoritesApi = useMemo<FavoritesApi>(
+    () => ({
+      has: (ref) => ref.kind === "workspace" && favorites.has(ref),
+      can: (ref) => ref.kind === "workspace" && favorites.can(ref),
+      toggle: (ref) => {
+        if (ref.kind !== "workspace" || !favorites.can(ref)) return;
+        const title = remoteTitle(directory.getState(), ref) || t.tabs.untitled;
+        setFavoriteSaid(favorites.toggle(ref) ? t.favorites.added(title) : t.favorites.removed(title));
+      },
+    }),
+    [favorites, directory, t],
+  );
+  const currentFavorite: FavoriteRef | null = current ? { kind: "workspace", ...current } : null;
+  const toggleFavorite = () => {
+    if (currentFavorite && favoritesApi.can(currentFavorite)) favoritesApi.toggle(currentFavorite);
+  };
+  /** Said in the tab bar (Alt+W on a pinned tab); a new `seq` says it again. */
+  const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
+  const closeTab = () => {
+    // A pinned tab stays (ADR-0027): nothing closes, and the bar says how to close it.
+    if (isPinned(tabs.state, tabs.active.id)) return setTabNotice((n) => ({ text: t.tabs.pinnedNoClose, seq: (n?.seq ?? 0) + 1 }));
+    tabs.close();
+  };
+  const togglePin = () => {
+    if (tabs.active.target.kind !== "blank") tabs.setPinned(!tabs.active.pinned);
+  };
 
   // Notifications (ADR-0018): the list under the bell only, in memory for this tab. Its one event is a save conflict;
   // nothing is shown outside the browser tab (there is no system notifier on the web).
@@ -182,17 +222,20 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           deleteWorkspace: { workspace: here.name, run: () => requestWorkspaceAdmin({ kind: "delete", server: current.server, workspace: current.workspace }) },
         }
       : {}),
+    ...(currentFavorite && favoritesApi.can(currentFavorite) ? { favorite: { on: favoritesApi.has(currentFavorite), run: toggleFavorite } } : {}),
     theme: { current: theme, set: setTheme },
     openSettings,
     tabs: {
       newTab: tabs.newTab,
-      closeTab: () => tabs.close(),
+      closeTab,
       next: () => tabs.step(1),
       previous: () => tabs.step(-1),
       list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
       ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
+      ...(tabs.active.target.kind !== "blank" ? { pin: { pinned: tabs.active.pinned === true, run: togglePin } } : {}),
+      ...(tabs.state.tabs.some((tab) => tab.id !== tabs.active.id && !tab.pinned) ? { closeOthers: () => tabs.closeOthers() } : {}),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -207,7 +250,9 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     "settings.open": openSettings,
     ...(home ? { "page.new": newPage, "folder.new": newFolder } : {}),
     "tab.new": tabs.newTab,
-    "tab.close": () => tabs.close(),
+    "tab.close": closeTab,
+    "tab.pin": togglePin,
+    "page.favorite": toggleFavorite,
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
@@ -226,7 +271,13 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     for (const id of wanted ? wanted.split("\u0000") : []) if (workspaces.some((w) => w.id === id)) directory.expand(SERVER_ID, id);
   }, [directory, wanted, workspaces, signedOut]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) }));
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.pinned ? { pinned: true } : {}) }));
+  const tabMenuExtras = (id: string): MenuItem[] => {
+    const tab = tabs.state.tabs.find((x) => x.id === id);
+    if (tab?.target.kind !== "workspace") return [];
+    const ref: FavoriteRef = { kind: "workspace", server: tab.target.server, workspace: tab.target.workspace, page: tab.target.page };
+    return favoritesApi.can(ref) ? [{ id: "favorite", label: favoritesApi.has(ref) ? t.favorites.remove : t.favorites.add, onSelect: () => favoritesApi.toggle(ref) }] : [];
+  };
 
   const doSignOut = async () => {
     if (!(await flushAll())) return;
@@ -241,6 +292,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
 
   return (
     <HintContext value={hints}>
+    <FavoritesContext value={favoritesApi}>
     <PageHostContext.Provider value={pageHost}>
       <div className="shell web-shell" ref={shell} style={sidebar.style}>
         <aside className="sidebar" aria-label={t.web.sidebar}>
@@ -255,6 +307,30 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             </button>
           )}
           <nav aria-label={t.web.pages} className="tree-wrap">
+            {favorites.items.length > 0 && (
+              // The Favorites first, and only when there is one (ADR-0027).
+              <section aria-label={t.favorites.section} className="web-favorites">
+                <div className="sec">
+                  <span className="sec-name">{t.favorites.section}</span>
+                </div>
+                <FavoritesList
+                  items={favorites.items}
+                  onOpen={(key, options) => {
+                    const ref = workspaceRefOf(key);
+                    if (ref) openPage(ref, options.newTab ? { newTab: true } : undefined);
+                  }}
+                  onMove={(key, to) => {
+                    const ref = workspaceRefOf(key);
+                    if (ref) favorites.move(ref, to);
+                  }}
+                  onRemove={(key) => {
+                    const ref = workspaceRefOf(key);
+                    if (ref) favoritesApi.toggle({ kind: "workspace", ...ref });
+                  }}
+                  scroller={() => shell.current?.querySelector<HTMLElement>(".tree-wrap") ?? null}
+                />
+              </section>
+            )}
             <div className="sec">
               <span className="sec-name">{t.web.workspaces}</span>
               {entry && (
@@ -311,7 +387,18 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           </div>
         </aside>
         <main className="main">
-          <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} />
+          <TabBar
+            tabs={items}
+            active={tabs.active.id}
+            onActivate={tabs.activate}
+            onClose={tabs.close}
+            onNew={tabs.newTab}
+            onMove={tabs.move}
+            onPin={(id, pinned) => tabs.setPinned(pinned, id)}
+            onCloseOthers={(id) => tabs.closeOthers(id)}
+            menuExtras={tabMenuExtras}
+            notice={tabNotice}
+          />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
               {t.web.sessionEnded}{" "}
@@ -339,6 +426,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 modeSpace={env.server}
                 openPage={openPage}
                 goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
+                actions={<FavoriteButton target={{ kind: "workspace", ...current }} />}
                 signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
                 onOpened={() => track({ name: "page_open" }, target)}
                 onSaved={() => track({ name: "page_save" }, target)}
@@ -359,6 +447,9 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         </main>
         <SidebarResizer sidebar={sidebar} shell={shell} />
         <TooltipLayer />
+        <div className="sr-only" aria-live="polite" aria-atomic="true" data-favorites-note="">
+          {favoriteSaid}
+        </div>
         {dialog?.kind === "search" && (
           <SearchDialog
             directory={directory}
@@ -389,6 +480,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         )}
       </div>
     </PageHostContext.Provider>
+    </FavoritesContext>
     </HintContext>
   );
 }
