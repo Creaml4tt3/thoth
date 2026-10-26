@@ -4,7 +4,7 @@ All notable changes to the Thoth desktop app, the web app and the server are lis
 follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The website's changelog page (https://thoth.creaml4tt3.me/changelog/) and each GitHub release's notes are made from
+The website’s changelog page (https://thoth.creaml4tt3.me/changelog/) and each GitHub release’s notes are made from
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
@@ -12,9 +12,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Added
 
-- Codex as a second assistant next to Claude Code. It runs inside Codex's own sandbox and has no spending limit.
+- Codex as a second assistant next to Claude Code. It runs inside Codex’s own sandbox and has no spending limit.
 - The Thoth mascot and its prompt bubble (Cmd/Ctrl+J) start assistant runs, with the pages you picked as context.
-- A run's answer appears in the bubble and in the run's own tab, with Copy answer; the sidebar lists recent runs.
+- A run’s answer appears in the bubble and in the run’s own tab, with Copy answer; the sidebar lists recent runs.
 - Notifications: a bell with a list in the app, and system notifications while Thoth is in the background.
 - Drag a tab to reorder it, or out of the tab bar to open it in a new window on the same Private Space.
 - Pasting a web address makes a link, and links can show a preview card fetched by the app.
@@ -51,7 +51,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 - The Agent Hub runs the Claude Code CLI you installed on the pages you pick, in a private folder that holds only those pages.
 - Every change Claude Code proposes is shown as a diff, and nothing is written until you choose Apply.
-- A page edited while the run was going becomes a conflict, with the option to keep the agent's version as a copy.
+- A page edited while the run was going becomes a conflict, with the option to keep the agent’s version as a copy.
 - Pick single pages, a folder, the whole Private Space, or workspace pages as read-only reference.
 - A spending limit and a time limit for each run, and a history of runs kept on your computer only.
 
@@ -76,8 +76,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Fixed
 
-- Signing in to the web app returns you to the app instead of a "not found" page.
-- The sidebar's buttons fit on one line, with Settings as a labelled icon.
+- Signing in to the web app returns you to the app instead of a “not found” page.
+- The sidebar’s buttons fit on one line, with Settings as a labelled icon.
 
 ## [0.1.0] - 2026-10-24
 
