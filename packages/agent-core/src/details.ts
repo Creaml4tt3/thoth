@@ -20,6 +20,7 @@ import { collisionKey, isMarkdownPath, isReservedPath, normalizeVaultPath, sha25
 import type { Vault } from "@thoth/local-store";
 import { z } from "zod";
 import type { ReviewedFiles } from "./apply.ts";
+import { runAnswer } from "./answer.ts";
 import type { AgentHistoryStore, HostHistoryRun } from "./host.ts";
 import { ContextEntrySchema } from "./records.ts";
 import { readOnlyRoots, refreshAgainstVault, type ProposedChange } from "./review.ts";
@@ -266,6 +267,8 @@ export interface DetailChange {
 
 export interface RunDetails {
   events: AgentEvent[];
+  /** What the agent said at the end (`runAnswer`), from the transcript; null when it said nothing or none was kept. */
+  answer: string | null;
   /** Null when the review of this run was not kept. */
   changes: DetailChange[] | null;
 }
@@ -295,5 +298,5 @@ export async function loadRunDetails(history: AgentHistoryStore, runId: string):
       changes.push({ path: c.path, change: c.change, page: c.page, ...(c.problem ? { problem: c.problem } : {}), original: original.text, after: after.text, ...(after.omitted || original.omitted ? { omitted: true } : {}) });
     }
   }
-  return { events: events ?? [], changes };
+  return { events: events ?? [], answer: events ? runAnswer(events) : null, changes };
 }

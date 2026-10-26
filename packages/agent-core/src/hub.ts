@@ -15,8 +15,9 @@
  */
 import { newStableId } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
+import { AnswerTracker, runAnswer } from "./answer.ts";
 import { applyChanges, saveAsCopy, type ApplyResult, type ReviewedFiles } from "./apply.ts";
-import { loadReview, loadRunDetails, rebuildChanges, reviewIsIntact, saveReview, storedFiles, TranscriptSaver, type RunDetails } from "./details.ts";
+import { loadReview, loadRunDetails, loadTranscript, rebuildChanges, reviewIsIntact, saveReview, storedFiles, TranscriptSaver, type RunDetails } from "./details.ts";
 import type { AgentHost } from "./host.ts";
 import { checkBudgetUsd, checkTimeLimitMs, DEFAULT_RETENTION_DAYS, LimitError } from "./limits.ts";
 import { listRuns, MAX_PROMPT_CHARS, pruneRuns, readRun, TERMINAL_STATES, writeRun, type ChangeRecord, type RunRecord } from "./records.ts";
@@ -83,6 +84,8 @@ interface Live {
   open: boolean;
   /** Set for a reopened review: the agent's bytes come from the stored files. */
   stored?: ReviewedFiles;
+  /** What the agent said at the end (`runAnswer`), once the run ended. Agent output: never in the record. */
+  answer: string | null;
 }
 
 export interface AgentHubOptions {
@@ -233,7 +236,7 @@ export class AgentHub {
       updatedAt: now,
       changes: [],
     };
-    const live: Live = { record, workspace, provider, context, changes: null, open: true };
+    const live: Live = { record, workspace, provider, context, changes: null, open: true, answer: null };
     this.live.set(record.id, live);
     await pruneRuns(this.vault).catch(() => undefined);
     await this.save(record);
@@ -267,6 +270,7 @@ export class AgentHub {
     let exit: Extract<AgentEvent, { type: "exit" }> | null = null;
     let model: string | undefined;
     const transcript = new TranscriptSaver(this.host.history, record.id, this.transcriptFlushMs);
+    const answer = new AnswerTracker();
     try {
       for await (const event of live.provider!.streamEvents(live.workspace!)) {
         if (event.type === "result") result = event;
@@ -274,6 +278,7 @@ export class AgentHub {
         else if (event.type === "exit") exit = event;
         else if (event.type === "session") model ??= event.model;
         transcript.push(event);
+        answer.push(event);
         try {
           onEvent(event);
         } catch {
@@ -284,6 +289,7 @@ export class AgentHub {
       error ??= { type: "error", code: "cli", message: e instanceof Error ? e.message : String(e) };
     }
     await transcript.close();
+    live.answer = answer.answer();
     const reason = exit?.reason ?? "exited";
     const ok = reason === "exited" && exit?.code === 0 && result?.ok === true && error === null;
     record.outcome = {
@@ -348,9 +354,15 @@ export class AgentHub {
         else delete recorded.stale;
       }
     }
-    this.live.set(id, { record, workspace: null, provider: null, context: review.context, changes, open: true, stored: storedFiles(this.host.history, review) });
+    const events = await loadTranscript(this.host.history, id).catch(() => null);
+    this.live.set(id, { record, workspace: null, provider: null, context: review.context, changes, open: true, stored: storedFiles(this.host.history, review), answer: events ? runAnswer(events) : null });
     await this.save(record);
     return { record: structuredClone(record), changes };
+  }
+
+  /** What the agent said at the end of a run this session knows (null while it runs, or when it said nothing). */
+  answer(id: string): string | null {
+    return this.live.get(id)?.answer ?? null;
   }
 
   /** The transcript and diffs kept for a run (null when none are). */

@@ -15,6 +15,7 @@
 //   @replace PATH :: OLD => NEW      @write PATH :: TEXT (\n for a newline)     @delete PATH
 //   @symlink PATH -> TARGET          @mkdir PATH                                @say TEXT
 //   @unlock PATH (make a read-only file writable, as an agent that works around a file mode would)
+//   @answer TEXT (the final message and the result's text, instead of "Done."; \n for a newline)
 //   @sleep MS                        @hang (start a grandchild, then wait to be killed)
 //   @ignore-term (ignore SIGTERM)    @not-logged-in                             @exit CODE
 //   @budget (stop the way Claude Code does when --max-budget-usd is used up: a result with subtype
@@ -90,6 +91,7 @@ const assistant = (content, extra = {}) => emit({ type: "assistant", message: { 
 const toolResult = (toolUseId, content, isError = false) => emit({ type: "user", message: { role: "user", content: [{ tool_use_id: toolUseId, type: "tool_result", content, ...(isError ? { is_error: true } : {}) }] }, parent_tool_use_id: null, session_id: SESSION, uuid: id() });
 let turns = 0;
 let tool = 0;
+let answer = "Done.";
 const useTool = (name, input) => {
   const toolId = `toolu_fake_${++tool}`;
   assistant([{ type: "tool_use", id: toolId, name, input, caller: { type: "direct" } }]);
@@ -140,6 +142,8 @@ for (const raw of prompt.split("\n")) {
     mkdirSync(join(cwd, arg), { recursive: true });
   } else if (directive === "@say") {
     assistant([{ type: "text", text: arg }]);
+  } else if (directive === "@answer") {
+    answer = arg.replaceAll("\\n", "\n");
   } else if (directive === "@sleep") {
     await sleep(Number(arg));
   } else if (directive === "@ignore-term") {
@@ -165,5 +169,5 @@ for (const raw of prompt.split("\n")) {
   }
 }
 
-assistant([{ type: "text", text: "Done." }]);
-emit({ type: "result", subtype: "success", is_error: false, duration_ms: 1234, num_turns: turns + 1, result: "Done.", session_id: SESSION, total_cost_usd: 0.0012, permission_denials: [], terminal_reason: "completed", uuid: id() });
+assistant([{ type: "text", text: answer }]);
+emit({ type: "result", subtype: "success", is_error: false, duration_ms: 1234, num_turns: turns + 1, result: answer, session_id: SESSION, total_cost_usd: 0.0012, permission_denials: [], terminal_reason: "completed", uuid: id() });

@@ -596,6 +596,27 @@ describe.each(runtimes)("Agent Hub on the $name", (runtime) => {
     expect((await hub.history())[0]!.outcome).toMatchObject({ model: "claude-fake-1", costUsd: 0.0012 });
   });
 
+  it("keeps a run's answer for the session and in its local transcript, never in the vault's record", async () => {
+    const answer = "This page is a plan.\nIt mentions a cat.";
+    const finished = await (await runTask("What is on this page?\n@say Reading it now\n@answer This page is a plan.\\nIt mentions a cat.\n")).started.finished;
+    expect(finished.state).toBe("done");
+    // The run just finished: in memory. An earlier one: from its transcript.
+    expect(hub.answer(finished.id)).toBe(answer);
+    expect((await hub.details(finished.id))!.answer).toBe(answer);
+    const later = makeHub(await env.restart());
+    expect((await later.details(finished.id))!.answer).toBe(answer);
+    await later.dispose();
+    // Agent output never goes into the vault: the record has the task (here it holds the fake's directives, so the
+    // words appear there once) and the outcome, not what the agent said.
+    const file = join(root, ".thoth/agent/runs", `${finished.id}.json`);
+    const saved = await readFile(file, "utf8");
+    const prompt = JSON.stringify(finished.task.prompt);
+    expect(saved).toContain(prompt);
+    expect(saved.replace(prompt, "")).not.toContain("This page is a plan");
+    expect(saved.replace(prompt, "")).not.toContain("Reading it now");
+    expect(await filesContaining("It mentions a cat")).toEqual([file]);
+  });
+
   it("a run that proposed nothing keeps only its transcript", async () => {
     const finished = await (await runTask("@say nothing to do\n", ["Diary.md"])).started.finished;
     expect(finished.state).toBe("done");
