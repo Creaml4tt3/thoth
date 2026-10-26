@@ -35,6 +35,7 @@ import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
+import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
 import { requestNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -203,6 +204,7 @@ export function Shell() {
           ...(servers.canShare(here.server) ? { sharePage: () => requestShare({ server: here.server, workspace: here.workspace, page: here.page }) } : {}),
         }
       : {}),
+    ...(here && hereWorkspace && servers.canManageMembers(here.server) ? { members: { workspace: hereWorkspace.name, run: () => requestMembers({ server: here.server, workspace: here.workspace }) } } : {}),
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
     ...(assistant

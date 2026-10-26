@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** Six dots: something that can be dragged to a new place (a sidebar section's handle). */
@@ -16,6 +16,14 @@ const DRAWINGS: Record<IconName, ReactNode> = {
       <circle cx="15" cy="12" r="0.6" />
       <circle cx="9" cy="18" r="0.6" />
       <circle cx="15" cy="18" r="0.6" />
+    </>
+  ),
+  people: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0" />
+      <path d="M15.5 5.2a3.2 3.2 0 0 1 0 6" />
+      <path d="M17.5 14.2a5.5 5.5 0 0 1 3 5.3" />
     </>
   ),
   bell: (

@@ -37,6 +37,8 @@ export interface CommandActions {
   moveTo?(): void;
   /** A public read-only link to the open workspace page (ADR-0023): owners and editors on a server with `public-share`. */
   sharePage?(): void;
+  /** The members of the open page's workspace (ADR-0024), on a server with `members`, named for the menu. */
+  members?: { workspace: string; run(): void };
   reorder?(delta: -1 | 1): void;
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
@@ -82,6 +84,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.rename) add("page.rename", t.rename, a.rename, { ...key("tree.rename"), keywords: "name title" });
   if (a.moveTo) add("page.moveTo", t.moveTo, a.moveTo, { keywords: "folder nest" });
   if (a.sharePage) add("page.share", t.share, a.sharePage, { keywords: "public link publish url read-only" });
+  if (a.members) add("workspace.members", t.members(a.members.workspace), a.members.run, { keywords: "people invite invitation share team role owner editor viewer leave remove" });
   if (a.reorder) {
     const reorder = a.reorder;
     // The table writes both keys as "Alt+Shift+↑ / ↓"; each command shows its own.

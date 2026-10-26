@@ -166,6 +166,22 @@
 .share-link > span { min-width: 0; color: var(--thoth-ink-secondary); }
 @media (max-width: 520px) { .share-copy { flex-direction: column; align-items: stretch; } }
 
+/* "Members…" (ADR-0024): the member list with roles, the inline confirmation, and the invite-link part. */
+.members-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.member { display: flex; align-items: center; gap: var(--thoth-space-3); min-height: 44px; padding: 6px 0; border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); }
+.member-name { flex: 1; min-width: 0; display: grid; overflow-wrap: anywhere; }
+.member-hint { margin: 0; }
+.member-role { width: auto; min-width: 8.5rem; }
+.member-badge { flex: none; }
+.members-leave { display: flex; justify-content: flex-start; padding-top: var(--thoth-space-2); }
+.members-confirm { display: grid; gap: 6px; padding: var(--thoth-space-3); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-sidebar); }
+.members-confirm-title { font: 600 14px / 20px var(--thoth-font-sans); }
+.members-invite { display: grid; gap: var(--thoth-space-3); padding-top: var(--thoth-space-3); border-top: 1px solid var(--thoth-border); }
+.share-choice[data-disabled] { opacity: 0.5; cursor: not-allowed; }
+.join-invite { display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-4); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
+.join-sign-in { display: grid; gap: var(--thoth-space-2); }
+@media (max-width: 520px) { .member { flex-wrap: wrap; } .member-role { min-width: 0; flex: 1; } }
+
 /* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator.
    A tab is --thoth-tab-width wide when there is room (202px, three quarters of the 270px before it; `width` too, because
    a flex-basis alone does not size the strip around it and a short title would shrink the tab), and shrinks toward

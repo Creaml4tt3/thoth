@@ -19,6 +19,11 @@ import {
   SearchResponseSchema,
   ShareLinkCreatedSchema,
   ShareLinkListSchema,
+  InviteAcceptedSchema,
+  InviteLinkCreatedSchema,
+  InviteLinkListSchema,
+  MemberListSchema,
+  MemberSchema,
   TransferResourceSchema,
   TreeNodeSchema,
   TreePageSchema,
@@ -34,6 +39,12 @@ import {
   type SearchRequest,
   type SearchResponse,
   type ShareExpiry,
+  type InviteAccepted,
+  type InviteLink,
+  type InviteLinkCreateRequest,
+  type InviteLinkCreated,
+  type Member,
+  type Role,
   type ShareLink,
   type ShareLinkCreated,
   type TransferCommitRequest,
@@ -278,5 +289,58 @@ export class WorkspaceClient {
   /** Stops a share link at once. Revoking one that is already revoked or expired succeeds. */
   async revokeShareLink(workspaceId: string, linkId: string): Promise<void> {
     await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/share-links/${seg(linkId)}`, ok: [204] });
+  }
+
+  /** The workspace's members (capability `members`, ADR-0024): names and roles, every page of the list. */
+  async listMembers(workspaceId: string): Promise<Member[]> {
+    const out: Member[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(MemberListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/members`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    throw new ProtocolError("The server's list of members never ended.", 200);
+  }
+
+  /** Owners only. Demoting the last owner is a `ProblemError` with code `last_owner`. */
+  async setMemberRole(workspaceId: string, userId: string, role: Role): Promise<Member> {
+    return (await this.request(MemberSchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/members/${seg(userId)}`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ role })) })).data;
+  }
+
+  /** Owners remove anyone; anyone removes themself (leaves). The last owner cannot leave (`last_owner`). */
+  async removeMember(workspaceId: string, userId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/members/${seg(userId)}`, ok: [204] });
+  }
+
+  /** An invite link (capability `invite-links`). The token and the address are in this response only. */
+  async createInviteLink(workspaceId: string, input: InviteLinkCreateRequest): Promise<InviteLinkCreated> {
+    return (await this.request(InviteLinkCreatedSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/invite-links`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify(input)), ok: [201] })).data;
+  }
+
+  /** The workspace's active invite links, newest first (follows pagination). Owners only. */
+  async listInviteLinks(workspaceId: string): Promise<InviteLink[]> {
+    const out: InviteLink[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(InviteLinkListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/invite-links`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    throw new ProtocolError("The server's list of invite links never ended.", 200);
+  }
+
+  /** Stops an invite link at once. Revoking one that is already revoked, expired or used up succeeds. */
+  async revokeInviteLink(workspaceId: string, inviteId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/invite-links/${seg(inviteId)}`, ok: [204] });
+  }
+
+  /** Joins the workspace of an invite token. Already a member: `joined` is false and the role is unchanged. */
+  async acceptInvite(token: string): Promise<InviteAccepted> {
+    return (await this.request(InviteAcceptedSchema, { method: "POST", path: "/invites/accept", headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ token })) })).data;
   }
 }

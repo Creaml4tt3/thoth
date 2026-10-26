@@ -136,6 +136,8 @@ export const th: Strings = {
     newPage: "หน้าใหม่",
     newPageTitle: "ไม่มีชื่อ",
     creating: "กำลังสร้าง…",
+    noAccessTitle: "คุณไม่มีสิทธิ์เข้าถึงเวิร์กสเปซนี้แล้ว",
+    noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ หรือเจ้าของนำคุณออก ขอลิงก์เชิญใหม่จากเจ้าของเพื่อกลับเข้ามา", // REVIEW
   },
 
   tree: {
@@ -222,6 +224,78 @@ export const th: Strings = {
     done: "เสร็จ",
   },
 
+  members: {
+    menuItem: "สมาชิก…",
+    button: (workspace) => `สมาชิกของ ${workspace}`,
+    workspaceMenu: (workspace) => `การทำงานของ ${workspace}`, // REVIEW
+    title: (workspace) => `สมาชิกของ “${workspace}”`,
+    intro: "ทุกคนในเวิร์กสเปซเห็นว่ามีใครอยู่บ้างและแต่ละคนมีบทบาทอะไร ไม่แสดงอีเมล", // REVIEW
+    list: "สมาชิก",
+    loading: "กำลังโหลดสมาชิก…",
+    you: "คุณ",
+    roles: { owner: "เจ้าของ", editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
+    roleHints: { owner: "จัดการสมาชิกและลิงก์เชิญ", editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" }, // REVIEW
+    roleOf: (name) => `บทบาทของ ${name}`,
+    remove: "นำออก",
+    removeLabel: (name) => `นำ ${name} ออกจากเวิร์กสเปซ`,
+    confirmRemove: (name) => `นำ ${name} ออกไหม`,
+    confirmRemoveBody: "เขาจะเข้าถึงไม่ได้ทันที และลิงก์สาธารณะที่เขาสร้างจะใช้ไม่ได้", // REVIEW
+    removeConfirm: "นำสมาชิกออก",
+    leave: "ออกจากเวิร์กสเปซ",
+    confirmLeave: (workspace) => `ออกจาก ${workspace} ไหม`,
+    confirmLeaveBody: "คุณจะเข้าถึงไม่ได้ทันที หากต้องการกลับมา เจ้าของต้องเชิญคุณใหม่", // REVIEW
+    leaveConfirm: "ออก",
+    cancel: "ยกเลิก",
+    roleChanged: (name, role) => `ตอนนี้ ${name} เป็น${role}`,
+    removed: (name) => `นำ ${name} ออกจากเวิร์กสเปซแล้ว`,
+    lastOwner: "เวิร์กสเปซต้องมีเจ้าของอย่างน้อยหนึ่งคน ให้คนอื่นเป็นเจ้าของก่อน", // REVIEW
+    failed: (detail) => `เปลี่ยนสมาชิกไม่ได้: ${detail}`,
+    loadFailed: (detail) => `โหลดสมาชิกไม่ได้: ${detail}`,
+    readOnlyNote: "เฉพาะเจ้าของเท่านั้นที่เปลี่ยนบทบาทและเชิญคนได้",
+    invite: "เชิญคน",
+    inviteIntro: "ทุกคนที่มีลิงก์จะลงชื่อเข้าใช้และเข้าร่วมด้วยบทบาทที่คุณเลือกได้ จนกว่าลิงก์จะใช้ไม่ได้", // REVIEW
+    inviteRole: "เข้าร่วมในฐานะ",
+    inviteExpiry: "ลิงก์จะใช้ไม่ได้หลังจาก", // REVIEW
+    inviteUses: "จำนวนคนที่เข้าร่วมด้วยลิงก์นี้ได้", // REVIEW
+    days: (n) => `${count(n)} วัน`,
+    people: (n) => `${count(n)} คน`,
+    noRoom: "เวิร์กสเปซนี้ไม่มีที่ว่างสำหรับสมาชิกเพิ่มแล้ว",
+    create: "สร้างลิงก์เชิญ",
+    creating: "กำลังสร้าง…",
+    newLink: "ลิงก์เชิญ",
+    copy: "คัดลอกลิงก์",
+    copied: "คัดลอกลิงก์แล้ว",
+    copyFailed: "คัดลอกไม่ได้ เลือกลิงก์แล้วคัดลอกเอง",
+    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ", // REVIEW
+    active: "ลิงก์เชิญที่ใช้งานอยู่",
+    none: "ไม่มีลิงก์เชิญที่ใช้งานอยู่",
+    loadingLinks: "กำลังโหลดลิงก์…",
+    linkLine: (role, left, date, by) => `${role} · เหลือ ${count(left)} ที่ · ใช้ได้ถึง ${date} · โดย ${by}`, // REVIEW
+    revoke: "เพิกถอน", // REVIEW
+    revokeLabel: (role, date) => `เพิกถอนลิงก์เชิญ${role}ที่ใช้ได้ถึง ${date}`, // REVIEW
+    revoked: "เพิกถอนลิงก์เชิญแล้ว ลิงก์นี้ใช้ไม่ได้อีก", // REVIEW
+    inviteFailed: (detail) => `สร้างลิงก์เชิญไม่ได้: ${detail}`,
+    linksFailed: (detail) => `โหลดลิงก์เชิญไม่ได้: ${detail}`,
+    revokeFailed: (detail) => `เพิกถอนลิงก์เชิญไม่ได้: ${detail}`, // REVIEW
+    done: "เสร็จ",
+  },
+
+  join: {
+    title: "เข้าร่วมด้วยลิงก์เชิญ",
+    intro: "วางลิงก์เชิญที่มีคนส่งให้ Thoth จะเพิ่มเซิร์ฟเวอร์ให้ถ้ายังไม่มี ขอให้คุณลงชื่อเข้าใช้ แล้วเข้าร่วมเวิร์กสเปซ", // REVIEW
+    label: "ลิงก์เชิญ",
+    join: "เข้าร่วม",
+    joining: "กำลังเข้าร่วม…",
+    notInvite: "นี่ไม่ใช่ลิงก์เชิญ ลิงก์เชิญจะมีหน้าตาแบบ https://server/i/…",
+    signIn: (server) => `ลงชื่อเข้าใช้ ${server} เพื่อเข้าร่วม Thoth จะเข้าร่วมให้ทันทีหลังลงชื่อเข้าใช้`, // REVIEW
+    joined: (workspace, role) => `คุณเข้าร่วม ${workspace} ในฐานะ${role}แล้ว เวิร์กสเปซอยู่ในแถบด้านข้าง`,
+    already: (workspace, role) => `คุณเป็นสมาชิกของ ${workspace} อยู่แล้ว (${role}) ไม่มีอะไรเปลี่ยน`,
+    gone: "ลิงก์เชิญนี้ใช้ไม่ได้ อาจพิมพ์ผิด หมดอายุ ใช้ครบแล้ว หรือถูกเพิกถอน", // REVIEW
+    full: (detail) => `เวิร์กสเปซนี้เต็มแล้ว: ${detail}`,
+    unsupported: "เซิร์ฟเวอร์นั้นไม่มีลิงก์เชิญ",
+    failed: (detail) => `เข้าร่วมไม่ได้: ${detail}`,
+  },
+
   limits: {
     pages: (n) => `${count(n)} หน้าต่อเวิร์กสเปซ`,
     members: (n) => `สมาชิก ${count(n)} คนต่อเวิร์กสเปซ`,
@@ -263,6 +337,7 @@ export const th: Strings = {
       moveUp: "ย้ายหน้าขึ้น",
       moveDown: "ย้ายหน้าลง",
       share: "แชร์หน้า…",
+      members: (workspace) => `สมาชิกของ ${workspace}…`,
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
       ask: "ถาม Thoth",

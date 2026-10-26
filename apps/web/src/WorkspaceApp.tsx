@@ -5,6 +5,7 @@ import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
+import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { RenameDialog } from "@thoth/app-ui/order/RenameDialog.tsx";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -168,6 +169,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           ...(hasCapability(capabilities, "public-share") ? { sharePage: () => requestShare(current) } : {}),
         }
       : {}),
+    ...(current && here && hasCapability(capabilities, "members") ? { members: { workspace: here.name, run: () => requestMembers({ server: current.server, workspace: current.workspace }) } } : {}),
     theme: { current: theme, set: setTheme },
     openSettings,
     tabs: {

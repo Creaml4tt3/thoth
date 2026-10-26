@@ -19,6 +19,8 @@ import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./dir
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
+import { MembersDialog } from "./MembersDialog.tsx";
+import { clearMembers, usePendingMembers } from "./members-request.ts";
 
 /** The drop target for "no parent": the workspace row itself. */
 const TOP = "\u0000top";
@@ -199,6 +201,7 @@ function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: s
 export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false }: WorkspaceSectionProps) {
   const t = useStrings().workspace;
   const tt = useStrings().tree;
+  const tm = useStrings().members;
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const key = workspaceKey(server, workspace.id);
   const expanded = state.expanded.includes(key);
@@ -212,11 +215,18 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [menu, setMenu] = useState<{ id: string; at: { x: number; y: number } } | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [rowMenu, setRowMenu] = useState<{ x: number; y: number } | null>(null);
+  const rowButton = useRef<HTMLButtonElement>(null);
   const [said, setSaid] = useState("");
   const here = current?.server === server && current.workspace === workspace.id ? current.page : null;
   const canWrite = roleCan(workspace.role, "write");
   // ADR-0023: owners and editors, on a server that lists `public-share`.
   const canShare = canWrite && (state.capabilities[server]?.includes("public-share") ?? false);
+  // ADR-0024: every member sees the members; owners also manage them and, with `invite-links`, invite people.
+  const canMembers = state.capabilities[server]?.includes("members") ?? false;
+  const canInvite = state.capabilities[server]?.includes("invite-links") ?? false;
+  const account = state.servers.find((s) => s.info.id === server)?.info;
   const nodes = tree?.nodes;
   /** The tree as it is now, also while a change is under way (the rendered `nodes` lag behind by a render). */
   const fresh = (): readonly TreeNode[] | undefined => directory.getState().trees[key]?.nodes;
@@ -423,6 +433,14 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     if (canShare && nodes?.some((n) => n.id === shareRequest.page)) setSharing(shareRequest.page);
   }, [shareRequest, canShare, nodes]);
 
+  // "Members…" asked for from code (the command palette).
+  const membersRequest = usePendingMembers(server, workspace.id);
+  useEffect(() => {
+    if (!membersRequest) return;
+    clearMembers();
+    if (canMembers) setMembersOpen(true);
+  }, [membersRequest, canMembers]);
+
   // "Move page up / down" asked for from code (the command palette): the same change as Alt+Shift+Up and Down.
   const reorderRequest = usePendingReorder(isThisWorkspaceReorder(server, workspace.id));
   useEffect(() => {
@@ -449,13 +467,30 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   // The workspace row takes drops ("to the top level") but is not itself draggable.
   const { draggable: _draggable, onDragStart: _onDragStart, ...topDrop } = dnd.rowProps(TOP);
   const movingNode = moving ? nodes?.find((n) => n.id === moving) : undefined;
+  /** The workspace row's own menu: Members… and, for writers, New page and New folder. */
+  const rowItems: MenuItem[] = [
+    ...(canMembers ? [{ id: "members", label: tm.menuItem, onSelect: () => setMembersOpen(true) }] : []),
+    ...(canWrite
+      ? [
+          { id: "new-page", label: t.newPage, onSelect: () => void create("page", null) },
+          { id: "new-folder", label: tt.newFolder, onSelect: () => void create("folder", null) },
+        ]
+      : []),
+  ];
   const rowKeys = (event: KeyboardEvent<HTMLElement>) =>
-    treeKeyDown(event, { expandable: true, expanded, expand: () => directory.expand(server, workspace.id), collapse: () => directory.collapse(server, workspace.id) });
+    treeKeyDown(event, {
+      expandable: true,
+      expanded,
+      expand: () => directory.expand(server, workspace.id),
+      collapse: () => directory.collapse(server, workspace.id),
+      ...(rowItems.length > 0 ? { menu: () => setRowMenu(anchorOf(event.currentTarget)) } : {}),
+    });
 
   return (
     <li role="none">
       <div className="tree-row">
         <button
+          ref={rowButton}
           type="button"
           role="treeitem"
           aria-expanded={expanded}
@@ -464,6 +499,11 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           className="tree-item tree-folder"
           onClick={() => (expanded ? directory.collapse(server, workspace.id) : directory.expand(server, workspace.id))}
           onKeyDown={rowKeys}
+          onContextMenu={(event: MouseEvent<HTMLElement>) => {
+            if (rowItems.length === 0) return;
+            event.preventDefault();
+            setRowMenu({ x: event.clientX, y: event.clientY });
+          }}
           title={t.onServer(workspace.name, serverLabel)}
           {...tipIfClipped(workspace.name)}
           {...topDrop}
@@ -472,6 +512,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           <span className="tree-label">{workspace.name}</span>
           <span className="badge badge-workspace tree-badge">{t.badgeShort}</span>
         </button>
+        {canMembers && <IconButton icon="people" className="tree-add" label={tm.button(workspace.name)} onClick={() => setMembersOpen(true)} />}
         {canWrite && (
           <>
             <IconButton icon="folder-plus" className="tree-add" label={tt.newFolderIn(workspace.name)} disabled={creating} onClick={() => void create("folder", null)} />
@@ -532,6 +573,32 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             return ok ? null : lastError.current;
           }}
           onClose={() => setMoving(null)}
+        />
+      )}
+      {rowMenu && (
+        <ContextMenu
+          label={tm.workspaceMenu(workspace.name)}
+          at={rowMenu}
+          items={rowItems}
+          onClose={(restoreFocus) => {
+            setRowMenu(null);
+            if (restoreFocus) rowButton.current?.focus();
+          }}
+        />
+      )}
+      {membersOpen && canMembers && (
+        <MembersDialog
+          client={directory.client(server)}
+          workspace={workspace}
+          {...(account?.account?.id ? { me: account.account.id } : {})}
+          canInvite={canInvite}
+          {...(account?.limits?.["maxMembersPerWorkspace"] !== undefined ? { maxMembers: account.limits["maxMembersPerWorkspace"] } : {})}
+          onChanged={() => void directory.loadWorkspaces(server)}
+          onLeft={() => {
+            setMembersOpen(false);
+            void directory.forgetWorkspace(server, workspace.id);
+          }}
+          onClose={() => setMembersOpen(false)}
         />
       )}
       {sharing && canShare && <ShareDialog client={directory.client(server)} workspace={workspace.id} page={sharing} title={titleOf(sharing)} onClose={() => setSharing(null)} />}

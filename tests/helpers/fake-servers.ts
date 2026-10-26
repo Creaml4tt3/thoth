@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -36,6 +36,10 @@ export interface FakeWorkspace {
   attachments: Map<string, { id: string; bytes: Uint8Array; mimeType: string; hash: string; fileName?: string }>;
   /** Public share links (capability `public-share`); the token is kept only so tests can read it. */
   shares: { id: string; workspaceId: string; pageId: string; createdAt: string; createdBy: string; expiresAt: string | null; token: string; revoked: boolean }[];
+  /** Invite links (capability `invite-links`, ADR-0024); the token is kept only so tests can read it. */
+  invites: { id: string; role: "editor" | "viewer"; maxUses: number; uses: number; createdAt: string; createdBy: string; expiresAt: string; token: string; revoked: boolean }[];
+  /** False for a workspace "me" is not in yet (it can be joined with one of its invite links). */
+  joined: boolean;
 }
 
 export interface FakeTransfer {
@@ -117,7 +121,7 @@ export class FakeServers implements Servers {
     return info.id;
   }
 
-  addWorkspace(server: string, init: { id?: string; name: string; role?: Role; exportRestricted?: boolean; members?: FakeWorkspace["members"] }): FakeWorkspace {
+  addWorkspace(server: string, init: { id?: string; name: string; role?: Role; exportRestricted?: boolean; members?: FakeWorkspace["members"]; joined?: boolean }): FakeWorkspace {
     const ws: FakeWorkspace = {
       id: init.id ?? `ws_${this.workspaces.size + 1}${server}`,
       name: init.name,
@@ -128,12 +132,21 @@ export class FakeServers implements Servers {
       members: init.members ?? [{ userId: "usr_me", displayName: "Me", role: init.role ?? "editor" }],
       attachments: new Map(),
       shares: [],
+      invites: [],
+      joined: init.joined ?? true,
     };
     this.serverOf.set(ws, server);
     const list = this.workspaces.get(server) ?? [];
     list.push(ws);
     this.workspaces.set(server, list);
     return ws;
+  }
+
+  /** An invite link to `ws` made by someone else (an owner), as the test's "received" link. Returns its token. */
+  inviteAsOther(ws: FakeWorkspace, init: { role?: "editor" | "viewer"; maxUses?: number } = {}): string {
+    const token = `inv${String(ws.invites.length + 1).padStart(29, "0")}`;
+    ws.invites.push({ id: `inv_${ws.invites.length + 1}`, role: init.role ?? "editor", maxUses: init.maxUses ?? 1, uses: 0, createdAt: iso(T0), createdBy: "usr_other", expiresAt: iso(T0 + 7 * 86_400_000), token, revoked: false });
+    return token;
   }
 
   /** Creates or changes a page as another user would (a new revision and a change-feed entry). */
@@ -283,16 +296,19 @@ export class FakeServers implements Servers {
     if (path === "/me" && method === "GET") return json(200, this.mustKnow(server).config.account ?? { id: "usr_me", displayName: "Me" });
     if (path === "/workspaces" && method === "GET") {
       return json(200, {
-        items: (this.workspaces.get(server) ?? []).map((w) => ({ id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: w.exportRestricted, memberCount: w.members.length, members: w.members, createdAt: iso(T0) })),
+        items: (this.workspaces.get(server) ?? []).filter((w) => w.joined).map((w) => ({ id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: w.exportRestricted, memberCount: w.members.length, members: w.members, createdAt: iso(T0) })),
         nextCursor: null,
       });
     }
     const tm = /^\/transfers\/([^/]+)(\/commit|\/abort)?$/.exec(path);
     if (tm) return this.transferRoute(server, method, decodeURIComponent(tm[1]!), tm[2] ?? "", text);
     const m = /^\/workspaces\/([^/]+)(\/.*)$/.exec(path);
-    const ws = m ? (this.workspaces.get(server) ?? []).find((w) => w.id === decodeURIComponent(m[1]!)) : undefined;
+    if (path === "/invites/accept" && method === "POST") return this.acceptInvite(server, text);
+    const ws = m ? (this.workspaces.get(server) ?? []).find((w) => w.joined && w.id === decodeURIComponent(m[1]!)) : undefined;
     if (!m || !ws) return fail("not_found");
     const rest = m[2]!;
+    if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
+    if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
       const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));
       return json(200, { workspaceId: ws.id, items, nextCursor: null, changeCursor: this.cursor(ws.changes.length) });
@@ -411,6 +427,99 @@ export class FakeServers implements Servers {
     if (position !== undefined) page.position = position;
     this.record(ws, "page.updated", page, "usr_me");
     return json(200, this.node(server, page), { etag: `"${page.revisions.at(-1)!.id}"` });
+  }
+
+  private me(server: string): { id: string; displayName: string } {
+    const account = this.mustKnow(server).config.account;
+    return { id: account?.id ?? "usr_me", displayName: account?.displayName ?? "Me" };
+  }
+
+  /** `listMembers`, `setMemberRole`, `removeMember` (capability `members`, ADR-0024), with the one-owner rule. */
+  private members(server: string, ws: FakeWorkspace, method: string, rest: string, text: string): ApiCallResult {
+    if (!this.capable(server, "members")) return fail("capability_not_supported");
+    if (rest === "/members") return method === "GET" ? json(200, { items: ws.members, nextCursor: null }) : fail("method_not_allowed");
+    const userId = decodeURIComponent(rest.slice("/members/".length));
+    const me = this.me(server).id;
+    const owners = ws.members.filter((m) => m.role === "owner").length;
+    if (method === "PUT") {
+      if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+      const parsed = MemberRoleChangeSchema.safeParse(JSON.parse(text));
+      if (!parsed.success) return fail("validation_failed", parsed.error.message);
+      const member = ws.members.find((m) => m.userId === userId);
+      if (!member) return fail("not_found", "no such member");
+      if (member.role === "owner" && parsed.data.role !== "owner" && owners <= 1) return fail("last_owner", "a workspace keeps at least one owner: make another member an owner first");
+      member.role = parsed.data.role;
+      if (userId === me) ws.role = parsed.data.role;
+      return json(200, member);
+    }
+    if (method === "DELETE") {
+      if (userId !== me && ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+      const member = ws.members.find((m) => m.userId === userId);
+      if (!member) return fail("not_found", "no such member");
+      if (member.role === "owner" && owners <= 1) return fail("last_owner", "a workspace keeps at least one owner: make another member an owner first");
+      ws.members = ws.members.filter((m) => m.userId !== userId);
+      if (userId === me) ws.joined = false;
+      return { status: 204, headers: {}, body: "" };
+    }
+    return fail("method_not_allowed");
+  }
+
+  private activeInvites(ws: FakeWorkspace) {
+    return ws.invites.filter((l) => !l.revoked && l.uses < l.maxUses && Date.parse(l.expiresAt) > this.now());
+  }
+
+  private inviteResource(ws: FakeWorkspace, l: FakeWorkspace["invites"][number]) {
+    return { id: l.id, workspaceId: ws.id, role: l.role, maxUses: l.maxUses, usesLeft: l.maxUses - l.uses, createdAt: l.createdAt, createdBy: l.createdBy, createdByName: l.createdBy === "usr_other" ? "Someone else" : this.me(this.serverOf.get(ws)!).displayName, expiresAt: l.expiresAt };
+  }
+
+  /** `createInviteLink`, `listInviteLinks`, `revokeInviteLink` (capability `invite-links`): owners only. */
+  private inviteLinks(server: string, ws: FakeWorkspace, method: string, rest: string, text: string): ApiCallResult {
+    if (!this.capable(server, "invite-links")) return fail("capability_not_supported");
+    if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+    if (rest === "/invite-links" && method === "GET") return json(200, { items: this.activeInvites(ws).reverse().map((l) => this.inviteResource(ws, l)), nextCursor: null });
+    if (rest === "/invite-links" && method === "POST") {
+      const parsed = InviteLinkCreateRequestSchema.safeParse(JSON.parse(text));
+      if (!parsed.success) return fail("validation_failed", parsed.error.message);
+      const limits = this.mustKnow(server).config.limits ?? {};
+      const linkLimit = limits["maxInviteLinksPerWorkspace"];
+      const active = this.activeInvites(ws).length;
+      if (linkLimit !== undefined && active >= linkLimit) return json(409, { ...problem("quota_exceeded", { detail: `this workspace may have ${linkLimit} active invite links (${active} in use); revoke one to make room` }), quota: "inviteLinksPerWorkspace", limit: linkLimit, current: active });
+      const memberLimit = limits["maxMembersPerWorkspace"];
+      const maxUses = parsed.data.maxUses ?? 1;
+      if (memberLimit !== undefined && maxUses > memberLimit - ws.members.length) return json(409, { ...problem("quota_exceeded", { detail: `this workspace is limited to ${memberLimit} members (${ws.members.length} in use), so a link can let in at most ${Math.max(0, memberLimit - ws.members.length)} more` }), quota: "membersPerWorkspace", limit: memberLimit, current: ws.members.length });
+      const created = this.now() + ws.invites.length * 1000;
+      const token = `inv${String(ws.invites.length + 1).padStart(29, "0")}`;
+      const link = { id: `inv_${ws.invites.length + 1}`, role: parsed.data.role, maxUses, uses: 0, createdAt: iso(created), createdBy: this.me(server).id, expiresAt: iso(created + (parsed.data.expiresInDays ?? 7) * 86_400_000), token, revoked: false };
+      ws.invites.push(link);
+      return json(201, { ...this.inviteResource(ws, link), token, url: `${this.mustKnow(server).config.url}/i/${token}` });
+    }
+    const im = /^\/invite-links\/([^/]+)$/.exec(rest);
+    if (im && method === "DELETE") {
+      const link = ws.invites.find((l) => l.id === decodeURIComponent(im[1]!));
+      if (!link) return fail("not_found", "invite link not found");
+      link.revoked = true;
+      return { status: 204, headers: {}, body: "" };
+    }
+    return fail("method_not_allowed");
+  }
+
+  /** `acceptInvite`: the same 404 for every dead token; someone already a member keeps their role. */
+  private acceptInvite(server: string, text: string): ApiCallResult {
+    if (!this.capable(server, "invite-links")) return fail("capability_not_supported");
+    const parsed = InviteAcceptRequestSchema.safeParse(JSON.parse(text));
+    if (!parsed.success) return fail("validation_failed", parsed.error.message);
+    for (const ws of this.workspaces.get(server) ?? []) {
+      const link = this.activeInvites(ws).find((l) => l.token === parsed.data.token);
+      if (!link) continue;
+      if (ws.joined) return json(200, { workspaceId: ws.id, name: ws.name, role: ws.role, joined: false });
+      const me = this.me(server);
+      ws.joined = true;
+      ws.role = link.role;
+      ws.members = [...ws.members.filter((m) => m.userId !== me.id), { userId: me.id, displayName: me.displayName, role: link.role }];
+      link.uses++;
+      return json(200, { workspaceId: ws.id, name: ws.name, role: link.role, joined: true });
+    }
+    return fail("not_found", "no such invite");
   }
 
   /** `createShareLink` and `listShareLinks` (capability `public-share`, ADR-0023): owners and editors only. */

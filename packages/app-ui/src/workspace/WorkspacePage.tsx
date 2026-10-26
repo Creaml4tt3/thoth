@@ -67,6 +67,8 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
 
   if (!entry) return <>{goneNotice}</>;
   if (signedOut && !store) return <>{signedOutNotice}</>;
+  // ADR-0024: signed in, the list loaded, and this workspace is not in it: the user left or was removed.
+  if (!signedOut && entry.workspaces !== null && !workspace) return <Notice title={t.noAccessTitle} detail={t.noAccessDetail} />;
   if (!store || !known.current) {
     return entry.error ? <Notice title={t.couldNotLoad} detail={entry.error} /> : <Notice title={t.loading} detail="" />;
   }

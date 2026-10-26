@@ -4,6 +4,7 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
+import { JoinInvite } from "@thoth/app-ui/workspace/JoinInvite.tsx";
 import { STARTER_SERVER, isStarter, type StarterServer } from "@thoth/app-ui/workspace/starter.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
@@ -216,7 +217,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
   );
 }
 
-/** Settings → Servers: add a server, sign in (browser or token), sign out, remove. */
+/** Settings → Servers: add a server, sign in (browser or token), sign out, remove, and join a workspace with an invite link. */
 export function ServersSettings({ focus }: { focus: boolean }) {
   const { servers, options } = useSession();
   const t = useDesktopStrings().servers;
@@ -317,6 +318,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
           {error}
         </p>
       )}
+      <JoinInvite directory={servers} signIn={(info) => <ServerCard info={info} error={null} directory={servers} signInOnly />} />
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isStableId, newStableId } from "@thoth/domain";
-import { problem } from "@thoth/workspace-protocol";
+import { parseInviteUrl, problem } from "@thoth/workspace-protocol";
 import { ProblemError, ProtocolError, QuotaExceeded, RevisionConflict, WorkspaceClient, type SendRequest, type SendResponse } from "../src/index.ts";
 
 const T = "2026-10-23T10:00:00Z";
@@ -251,5 +251,60 @@ describe("share links (capability public-share, ADR-0023)", () => {
   it("turns a refusal into a ProblemError with its code", async () => {
     const { client } = fake(() => ({ status: 409, headers: { "content-type": "application/problem+json" }, body: JSON.stringify({ ...problem("quota_exceeded", { detail: "this workspace may have 20 active share links" }), quota: "shareLinksPerWorkspace", limit: 20, current: 20 }) }));
     await expect(client.createShareLink("ws1", PAGE, 30)).rejects.toMatchObject({ code: "quota_exceeded" });
+  });
+});
+
+describe("members and invite links (capabilities members and invite-links, ADR-0024)", () => {
+  const member = (userId: string, role: "owner" | "editor" | "viewer") => ({ userId, displayName: userId.toUpperCase(), role });
+  const invite = (id: string) => ({ id, workspaceId: "ws1", role: "viewer", maxUses: 5, usesLeft: 5, createdAt: "2026-10-26T10:00:00Z", createdBy: "usr_a", createdByName: "Ada", expiresAt: "2026-11-02T10:00:00Z" });
+
+  it("lists every member across pages, changes a role with PUT and removes with DELETE", async () => {
+    const { client, requests } = fake((req, n) =>
+      req.method === "DELETE" ? { status: 204, headers: {}, body: "" } : req.method === "PUT" ? ok(member("usr_b", "editor")) : ok(n === 0 ? { items: [member("usr_a", "owner")], nextCursor: "m1" } : { items: [member("usr_b", "viewer")], nextCursor: null }),
+    );
+    expect((await client.listMembers("ws1")).map((m) => m.userId)).toEqual(["usr_a", "usr_b"]);
+    expect(requests[0]).toMatchObject({ method: "GET", path: "/api/v1/workspaces/ws1/members" });
+    expect(requests[1]!.query).toEqual({ cursor: "m1" });
+    expect(await client.setMemberRole("ws1", "usr_b", "editor")).toEqual(member("usr_b", "editor"));
+    expect(requests[2]).toMatchObject({ method: "PUT", path: "/api/v1/workspaces/ws1/members/usr_b", headers: { "content-type": "application/json" } });
+    expect(bodyOf(requests[2]!)).toEqual({ role: "editor" });
+    await client.removeMember("ws1", "usr_b");
+    expect(requests[3]).toMatchObject({ method: "DELETE", path: "/api/v1/workspaces/ws1/members/usr_b" });
+  });
+
+  it("creates, lists and revokes invite links, and accepts a token", async () => {
+    const token = "B".repeat(32);
+    const { client, requests } = fake((req) => {
+      if (req.method === "DELETE") return { status: 204, headers: {}, body: "" };
+      if (req.path.endsWith("/accept")) return ok({ workspaceId: "ws1", name: "Team", role: "viewer", joined: true });
+      if (req.method === "POST") return ok({ ...invite("inv_1"), token, url: `https://notes.example.org/i/${token}` }, 201);
+      return ok({ items: [invite("inv_1")], nextCursor: null });
+    });
+    const created = await client.createInviteLink("ws1", { role: "viewer", expiresInDays: 30, maxUses: 5 });
+    expect(created.url).toBe(`https://notes.example.org/i/${token}`);
+    expect(requests[0]).toMatchObject({ method: "POST", path: "/api/v1/workspaces/ws1/invite-links" });
+    expect(bodyOf(requests[0]!)).toEqual({ role: "viewer", expiresInDays: 30, maxUses: 5 });
+    expect((await client.listInviteLinks("ws1")).map((l) => l.id)).toEqual(["inv_1"]);
+    await client.revokeInviteLink("ws1", "inv_1");
+    expect(requests[2]).toMatchObject({ method: "DELETE", path: "/api/v1/workspaces/ws1/invite-links/inv_1" });
+    expect(await client.acceptInvite(token)).toEqual({ workspaceId: "ws1", name: "Team", role: "viewer", joined: true });
+    expect(requests[3]).toMatchObject({ method: "POST", path: "/api/v1/invites/accept" });
+    expect(bodyOf(requests[3]!)).toEqual({ token });
+  });
+
+  it("turns the last-owner refusal into a ProblemError with its code", async () => {
+    const { client } = fake(() => ({ status: 409, headers: { "content-type": "application/problem+json" }, body: JSON.stringify(problem("last_owner", { detail: "a workspace keeps at least one owner" })) }));
+    await expect(client.removeMember("ws1", "usr_a")).rejects.toMatchObject({ code: "last_owner" });
+  });
+});
+
+describe("invite addresses", () => {
+  it("parses https://<server>/i/<token> and nothing else", () => {
+    const token = "C".repeat(32);
+    expect(parseInviteUrl(`  https://notes.example.org/i/${token}  `)).toEqual({ origin: "https://notes.example.org", token });
+    expect(parseInviteUrl(`http://127.0.0.1:8080/i/${token}/`)).toEqual({ origin: "http://127.0.0.1:8080", token });
+    for (const bad of ["", "notes.example.org/i/x", `https://notes.example.org/s/${token}`, `https://notes.example.org/i/${token}?x=1`, `https://notes.example.org/i/${token}#y`, `https://u:p@notes.example.org/i/${token}`, `ftp://notes.example.org/i/${token}`, "https://notes.example.org/i/short"]) {
+      expect(parseInviteUrl(bad), bad).toBeNull();
+    }
   });
 });

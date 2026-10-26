@@ -268,3 +268,17 @@ describe("Share page… (ADR-0023)", () => {
     expect(log).toEqual(["share"]);
   });
 });
+
+describe("Members of … (ADR-0024)", () => {
+  it("is offered only when the app gives the action, names the workspace in English and Thai, and is found by “invite”", () => {
+    const { actions, log } = spies();
+    expect(find(buildCommands(actions, en, "web", "mac"), "workspace.members")).toBeUndefined();
+    const members = { workspace: "Design", run: vi.fn(() => void log.push("members")) };
+    const list = buildCommands({ ...actions, members }, en, "web", "mac");
+    expect(find(list, "workspace.members")?.title).toBe("Members of Design…");
+    expect(find(buildCommands({ ...actions, members }, th, "desktop", "mac"), "workspace.members")?.title).toBe("สมาชิกของ Design…");
+    expect(titles(filterCommands("invite", list))).toContain("Members of Design…");
+    find(list, "workspace.members")!.run();
+    expect(log).toEqual(["members"]);
+  });
+});

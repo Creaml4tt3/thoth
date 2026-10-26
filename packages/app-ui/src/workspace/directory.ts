@@ -12,7 +12,7 @@
 import { newStableId } from "@thoth/domain";
 import type { ServerInfo, Servers } from "@thoth/platform";
 import { ProblemError, RevisionConflict, WorkspaceClient, type Send } from "@thoth/workspace-client";
-import { PAGE_TITLE_MAX, type ChangeEntry, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
+import { PAGE_TITLE_MAX, type ChangeEntry, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { placeAt } from "../order/fractional.ts";
 import { folderMarkdown, isFolderMarkdown } from "./folders.ts";
 import { childrenOf, isWithin } from "./tree.ts";
@@ -136,6 +136,47 @@ export class ServerDirectory {
   /** Does the server offer public read-only share links (`public-share`, ADR-0023)? */
   canShare(server: string): boolean {
     return this.state.capabilities[server]?.includes("public-share") ?? false;
+  }
+
+  /** Does the server list and manage members (`members`, ADR-0024)? */
+  canManageMembers(server: string): boolean {
+    return this.state.capabilities[server]?.includes("members") ?? false;
+  }
+
+  /** Does the server offer invite links (`invite-links`, ADR-0024)? */
+  canInvite(server: string): boolean {
+    return this.state.capabilities[server]?.includes("invite-links") ?? false;
+  }
+
+  /** The known server at this origin (`ServerInfo.url` is the normalized origin). */
+  serverAt(origin: string): ServerEntry | undefined {
+    return this.state.servers.find((s) => s.info.url === origin);
+  }
+
+  /** What the server lists, loaded if not known yet (null when the server does not answer). */
+  async capabilitiesOf(server: string): Promise<string[] | null> {
+    await this.loadCapabilities(server);
+    return this.state.capabilities[server] ?? null;
+  }
+
+  /**
+   * A workspace the user is no longer in (they left, or an owner removed them, ADR-0024): it leaves the sidebar at
+   * once, its tree stops polling, and the server's list is read again.
+   */
+  async forgetWorkspace(server: string, workspace: string): Promise<void> {
+    const key = workspaceKey(server, workspace);
+    const { [key]: _gone, ...trees } = this.state.trees;
+    this.set({ trees, expanded: this.state.expanded.filter((k) => k !== key) });
+    const entry = this.server(server);
+    if (entry?.workspaces) this.patchServer(server, { workspaces: entry.workspaces.filter((w) => w.id !== workspace) });
+    await this.loadWorkspaces(server);
+  }
+
+  /** Joins a workspace with an invite token, then reads the server's workspaces again so it shows in the sidebar. */
+  async acceptInvite(server: string, token: string): Promise<InviteAccepted> {
+    const accepted = await this.client(server).acceptInvite(token);
+    await this.loadWorkspaces(server);
+    return accepted;
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -502,6 +543,8 @@ export class ServerDirectory {
       }
     } catch (error) {
       if (error instanceof ProblemError && error.code === "cursor_expired") await this.loadTree(server, workspace);
+      // Not found: the user is no longer a member (ADR-0024). The list read again drops the workspace.
+      else if (error instanceof ProblemError && error.status === 404) await this.loadWorkspaces(server);
       return; // a failed poll is retried at the next tick
     }
     const tree = this.state.trees[key];
