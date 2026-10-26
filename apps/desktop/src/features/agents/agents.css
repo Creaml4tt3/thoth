@@ -103,7 +103,7 @@
 .agents-answer-head { display: flex; align-items: center; gap: var(--thoth-space-2); min-width: 0; }
 .agents-answer-title { margin: 0 auto 0 0; font: 600 14px / 20px var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
 .agents-answer[data-level="2"] .agents-answer-title { font: 600 15px / 1.4 var(--thoth-font-sans); }
-.agents-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; max-height: 24rem; overflow: auto; overscroll-behavior: contain; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+.agents-answer-text { white-space: pre-wrap; min-width: 0; word-break: break-word; overflow-wrap: anywhere; user-select: text; cursor: text; max-height: 24rem; overflow: hidden auto; overscroll-behavior: contain; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .agents-answer-text:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .agents-no-changes { margin: 0; color: var(--thoth-ink-secondary); }
 /* A session tab: the task, a line of facts, then what the run did. */

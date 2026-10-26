@@ -636,3 +636,30 @@ test("a follow-up in the session tab: the CLI is given the first question and an
     await again.locator(".agents-composer").screenshot({ path: join(CHAT_SHOTS, `composer-${dark ? "dark" : "light"}.png`) });
   }
 });
+
+test("a long answer with long links never pushes the bubble sideways, and links into the run's copy read as page paths", async ({ page }) => {
+  test.setTimeout(120_000);
+  const b = await openBubble(page);
+  await pickOnly(page, ["Plan"]);
+  const work = "file:///Users/a/Library/Application%20Support/io.github.creaml4tt3.thoth/agent-runs/run_5b11accfe44550c4eeeb9c2bcfbce1c1/work";
+  const long = `https://example.org/${"a".repeat(260)}`;
+  await writeAndStart(page, `Can you make an image to put together with this content, and place it right under the heading of the page please?\n@answer I made an original SVG illustration and embedded it beneath the heading in [Plan.md](${work}/Notes/Plan.md).\\n\\nThe file: [bird-uric-acid.svg](${work}/Notes/bird-uric-acid.svg)\\n\\nSource: ${long}\n`);
+  const text = b.getByTestId("agent-answer");
+  await expect(text).toContainText("beneath the heading in Notes/Plan.md.", { timeout: 15_000 });
+  await expect(text).toContainText("The file: Notes/bird-uric-acid.svg");
+  await expect(text).not.toContainText("agent-runs");
+  await expect(b.getByRole("button", { name: "New task" })).toBeFocused();
+
+  // Nothing in the bubble is wider than it, so nothing scrolls it sideways and every line starts at its left edge.
+  const layout = await b.evaluate((el) => {
+    const body = el.querySelector(".bubble-body")!;
+    const box = el.getBoundingClientRect();
+    const starts = [...el.querySelectorAll(".bubble-prompt, .agents-answer, .bubble-actions")].map((n) => Math.round(n.getBoundingClientRect().left - box.left));
+    const rights = [...el.querySelectorAll(".bubble-body *")].map((n) => Math.round(n.getBoundingClientRect().right - box.right));
+    return { overflow: body.scrollWidth - body.clientWidth, scrolled: body.scrollLeft, starts, sticksOut: Math.max(...rights) };
+  });
+  expect(layout.overflow).toBeLessThanOrEqual(0);
+  expect(layout.scrolled).toBe(0);
+  for (const start of layout.starts) expect(start).toBeGreaterThanOrEqual(16);
+  expect(layout.sticksOut).toBeLessThanOrEqual(0);
+});

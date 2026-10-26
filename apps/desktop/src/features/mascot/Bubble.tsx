@@ -135,7 +135,7 @@ function Form({ state, agents, focusNonce }: { state: AgentsState; agents: Agent
   const { draft, settings } = state;
   const budgetOn = PROVIDER_FEATURES[state.provider].budget;
   useEffect(() => {
-    task.current?.focus();
+    task.current?.focus({ preventScroll: true });
   }, [focusNonce]);
   const start = () => {
     setTried(true);
@@ -318,7 +318,7 @@ function Running({ state, agents, focusNonce }: { state: AgentsState; agents: Ag
   const t = useDesktopStrings().mascot.bubble;
   const p = providerOf(all, state.record?.provider.id ?? state.provider);
   const cancel = useRef<HTMLButtonElement>(null);
-  useEffect(() => cancel.current?.focus(), [focusNonce]);
+  useEffect(() => cancel.current?.focus({ preventScroll: true }), [focusNonce]);
   return (
     <div className="bubble-run" aria-busy="true">
       {state.record && <p className="bubble-prompt">{state.record.task.prompt.split("\n")[0]}</p>}
@@ -342,7 +342,7 @@ function ReviewReady({ state, focusNonce, onOpen }: { state: AgentsState; focusN
   const record = state.record!;
   const p = providerOf(all, record.provider.id);
   const open = useRef<HTMLButtonElement>(null);
-  useEffect(() => open.current?.focus(), [focusNonce]);
+  useEffect(() => open.current?.focus({ preventScroll: true }), [focusNonce]);
   return (
     <div className="bubble-run">
       <p className="bubble-prompt">{record.task.prompt.split("\n")[0]}</p>
@@ -366,7 +366,7 @@ function Finished({ state, agents, focusNonce, onFollowUp }: { state: AgentsStat
   const record = state.record!;
   const p = providerOf(all, record.provider.id);
   const next = useRef<HTMLButtonElement>(null);
-  useEffect(() => next.current?.focus(), [focusNonce]);
+  useEffect(() => next.current?.focus({ preventScroll: true }), [focusNonce]);
   const applied = state.results?.filter((r) => r.result === "applied").length ?? 0;
   return (
     <div className="bubble-run">
