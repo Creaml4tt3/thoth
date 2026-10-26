@@ -47,7 +47,7 @@ describe("notification center: entries", () => {
     const text = Object.fromEntries(entries.map((e) => [e.event.kind, describeNotification(e.event, en.notifications)]));
     expect(text).toEqual({
       agentReview: { title: "Changes ready for review", body: "Claude Code · Plan and 1 more page" },
-      agentFinished: { title: "The agent finished without changing anything", body: "Claude Code · Plan" },
+      agentFinished: { title: "The answer is ready", body: "Claude Code · Plan" },
       agentFailed: { title: "The run failed: Codex is not signed in", body: "Codex · Plan" },
       agentLimit: { title: "The run stopped at its spending limit", body: "Claude Code · Plan · its work so far can be reviewed" },
       transferDone: { title: "Copied to Studio", body: "Plan and 1 more page" },

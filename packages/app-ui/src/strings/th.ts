@@ -474,7 +474,7 @@ export const th: Strings = {
     unread: "ยังไม่ได้อ่าน",
     pages: (first, more) => (more === 0 ? first : `${first} และอีก ${count(more)} หน้า`),
     agentReview: "การแก้ไขพร้อมให้ตรวจแล้ว", // REVIEW
-    agentFinished: "เอเจนต์ทำงานเสร็จโดยไม่ได้แก้ไขอะไร", // REVIEW
+    agentFinished: "คำตอบพร้อมแล้ว", // REVIEW
     agentFailed: (reason) => `งานล้มเหลว: ${reason}`, // REVIEW
     failures: {
       notSignedIn: (agent) => `${agent} ยังไม่ได้ลงชื่อเข้าใช้`,

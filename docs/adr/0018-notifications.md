@@ -21,7 +21,7 @@ privilege (ADR-0008); the web client has no agents, imports or transfers.
 ## Decision
 
 1. **Events.** Nine kinds:
-   - an agent run ready for review (`agentReview`), finished without changes (`agentFinished`), failed
+   - an agent run ready for review (`agentReview`), finished without changes, which for a question means its answer is ready (`agentFinished`, "The answer is ready"), failed
      (`agentFailed`), or stopped at its time or spending limit (`agentLimit`, whether or not it left work to review);
    - a copy or move between the Private Space and a workspace done (`transferDone`, including "done, originals kept")
      or not finished (`transferFailed`: failed or interrupted);

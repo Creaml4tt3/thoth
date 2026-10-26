@@ -141,14 +141,14 @@ describe("agent runs", () => {
   it("a run that finished without changes, and one that failed", async () => {
     const app = await openAgents();
     await start(app, "@sleep 200\n");
-    await waitFor(() => expect(shown.map((n) => n.title)).toEqual(["The agent finished without changing anything"]), { timeout: 15_000 });
+    await waitFor(() => expect(shown.map((n) => n.title)).toEqual(["The answer is ready"]), { timeout: 15_000 });
     setForeground();
     await app.user.click(screen.getByRole("button", { name: MASCOT }));
     await app.user.click(await within(bubble()).findByRole("button", { name: "New task" }));
     await start(app, "@not-logged-in\n");
-    await waitFor(() => expect(shown.map((n) => n.title)).toEqual(["The agent finished without changing anything", "The run failed: Claude Code is not signed in"]), { timeout: 15_000 });
+    await waitFor(() => expect(shown.map((n) => n.title)).toEqual(["The answer is ready", "The run failed: Claude Code is not signed in"]), { timeout: 15_000 });
     expect(mascotState()).toBe("error");
-    expect(await entryTitles(app)).toEqual(["The run failed: Claude Code is not signed in", "The agent finished without changing anything"]);
+    expect(await entryTitles(app)).toEqual(["The run failed: Claude Code is not signed in", "The answer is ready"]);
   });
 
   it("a run stopped at its spending limit", async () => {

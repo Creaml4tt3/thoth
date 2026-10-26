@@ -514,7 +514,7 @@ export const en = {
     /** "Plan", "Plan and 1 more page", "Plan and 4 more pages". */
     pages: (first: string, more: number) => (more === 0 ? first : `${first} and ${plural(more, "more page", "more pages")}`),
     agentReview: "Changes ready for review",
-    agentFinished: "The agent finished without changing anything",
+    agentFinished: "The answer is ready",
     agentFailed: (reason: string) => `The run failed: ${reason}`,
     failures: {
       notSignedIn: (agent: string) => `${agent} is not signed in`,
