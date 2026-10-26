@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
 import { PAGE_TITLE_MAX, roleCan, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
-import { useTreeDnd, type DropZone, type TreeDnd } from "../order/dnd.ts";
+import { useTreeDnd, type AcrossTarget, type DropZone, type TreeDnd } from "../order/dnd.ts";
+import { crossDirection, refusalText, spaceDropRefusal, workspaceAccess, type SpaceDrag } from "../order/space-drag.ts";
 import { Disclosure, FolderIcon, PageIcon } from "../order/icons.tsx";
 import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
@@ -163,6 +164,11 @@ export interface WorkspaceSectionProps {
   onPageCreated?(): void;
   /** Writes the open page's pending edits before the tree changes a page; false keeps everything as it is. */
   flush?(): Promise<boolean>;
+  /**
+   * Pages can be dragged between this workspace and the Private Space (the desktop app; `space-drag.ts`). A drop
+   * only asks for the transfer dialog; dragging within the workspace is unchanged.
+   */
+  spaceDrops?: boolean;
 }
 
 const isThisWorkspace = (server: string, workspace: string) => (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "workspace" }> =>
@@ -190,7 +196,7 @@ function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: s
  * editors and owners, offers New page and New folder, rename (F2, context menu), and drag and drop, Alt+Shift+Up/Down
  * and "Move to…" to reorder and nest pages. Shared by the desktop sidebar and the web client.
  */
-export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush }: WorkspaceSectionProps) {
+export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false }: WorkspaceSectionProps) {
   const t = useStrings().workspace;
   const tt = useStrings().tree;
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
@@ -292,6 +298,26 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
 
   const titleOf = (id: string) => fresh()?.find((n) => n.id === id)?.title || "Untitled";
 
+  // Across spaces (`spaceDrops`): what a dragged page takes to the Private Space, and what a page from there may do here.
+  const space = { kind: "workspace", server, workspace: workspace.id } as const;
+  /** The page, and for a folder everything inside it, parents first. */
+  const carry = (id: string): SpaceDrag | null => {
+    const all = fresh();
+    if (id === TOP || !all?.some((n) => n.id === id)) return null;
+    const ids = [id];
+    if (directory.getState().trees[key]?.kinds[id]?.folder) for (let i = 0; i < ids.length; i++) for (const n of all) if (n.parentId === ids[i]) ids.push(n.id);
+    return { from: space, row: id, ids, title: titleOf(id) };
+  };
+  /** A drop lands at the top level (the workspace row) or inside the page under the pointer. */
+  const across = (drag: SpaceDrag, id: string, move: boolean): AcrossTarget | null => {
+    if (crossDirection(drag.from, space) !== "to_workspace") return null;
+    const access = workspaceAccess(directory, server, workspace.id);
+    const refusal = spaceDropRefusal("to_workspace", access);
+    if (refusal) return { highlight: null, to: null, text: refusalText(refusal, access, tt.across) };
+    const parentId = id !== TOP && fresh()?.some((n) => n.id === id) ? id : null;
+    return { highlight: parentId ?? TOP, to: { ...space, parentId }, text: (move ? tt.across.moveTo : tt.across.copyTo)(workspace.name) };
+  };
+
   /** Moves `id` under `parent` at `index`; `say` is announced when it worked. */
   const moveTo = (id: string, parent: string | null, index: number, say: () => string) =>
     enqueue(async () => {
@@ -351,7 +377,10 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       return zone === "inside" || ordered;
     },
     onDrop: drop,
-    onHoverOpen: (id) => id !== TOP && toggle(id, true),
+    // The workspace row itself opens only for a drag from the Private Space (a drag within needs it open already).
+    onHoverOpen: (id) => (id === TOP ? !expanded && directory.expand(server, workspace.id) : toggle(id, true)),
+    // A viewer's rows stay undraggable, as before; they copy out with the page's "Copy to Private Space…".
+    ...(spaceDrops ? { across, ...(canWrite ? { carry } : {}) } : {}),
   });
 
   const ctx: Ctx = {

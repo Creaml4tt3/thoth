@@ -3,6 +3,7 @@ import { basename, dirname, stripExtension } from "@thoth/domain";
 import type { OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
+import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
 import { Disclosure, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
@@ -20,6 +21,10 @@ import { useDesktopStrings } from "../../strings/index.ts";
 import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
 import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
+import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
+
+/** Every page below a folder, at any depth. */
+const pagesIn = (node: TreeNode): string[] => (node.kind === "page" ? [node.path] : node.children.flatMap(pagesIn));
 
 export interface Selection {
   active: boolean;
@@ -50,7 +55,7 @@ interface Props {
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
 export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder }: Props) {
-  const { vault, openPage, flushAll, refresh, tabs } = useSession();
+  const { vault, openPage, flushAll, refresh, tabs, servers } = useSession();
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
@@ -242,6 +247,23 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       void arrange(drag, folder, index);
     },
     onHoverOpen: (id) => id !== TOP && setFolder(id, true),
+    // Across spaces (ADR-0006, amendment of 2026-10-26): a page (or the selection it is in) or a folder's pages go
+    // to a workspace; a workspace page lands in the folder under the pointer, or the folder of the page under it.
+    carry: (path): SpaceDrag | null => {
+      const node = find(path);
+      if (!node) return null;
+      if (node.kind === "page") {
+        const ids = selection.active && selection.paths.has(path) ? [...selection.paths].sort() : [path];
+        return { from: PRIVATE_SPACE, row: path, ids, title: node.title };
+      }
+      const ids = pagesIn(node);
+      return ids.length === 0 ? null : { from: PRIVATE_SPACE, row: path, ids, title: node.name, base: dirname(path) };
+    },
+    across: (drag, id, move) => {
+      const node = id === TOP ? undefined : find(id);
+      const folder = node === undefined ? "" : node.kind === "folder" ? node.path : dirname(node.path);
+      return privateAcross(servers, drag, folder, folder === "" ? null : folder, move, tt.across);
+    },
   });
 
   // "Move to…" asked for from code (the command palette).
@@ -341,7 +363,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         // While selecting, the row is a checkbox: Space toggles it, the tree keeps its keyboard order.
         return (
           <li role="none" key={`page:${node.path}`}>
-            <label className="tree-item" style={indent} title={node.path} {...tipIfClipped(node.title)}>
+            <label className="tree-item" style={indent} title={node.path} {...tipIfClipped(node.title)} data-dragging={dnd.dragging === node.path || undefined} {...dnd.rowProps(node.path)}>
               <input type="checkbox" className="tree-select" checked={checked} onChange={() => selection.toggle(node.path)} aria-label={ts.selectPage(node.title)} />
               <span className="tree-label">{node.title}</span>
             </label>

@@ -39,7 +39,7 @@ export function ServersSidebar({ current }: Props) {
             ) : (
               <TreeList label={t.workspacesOn(entry.info.label)}>
                 {entry.workspaces.map((workspace) => (
-                  <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} />
+                  <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} spaceDrops />
                 ))}
               </TreeList>
             ))}

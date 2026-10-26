@@ -21,9 +21,34 @@ import { useDesktopStrings, type DesktopStrings } from "../../strings/index.ts";
 
 type T = DesktopStrings["transfer"];
 
+/**
+ * What the dialog is opened for. The optional fields prefill it (a drop across spaces, ADR-0006 amendment of
+ * 2026-10-26); the person can still change them before the preview is confirmed.
+ */
 export type TransferTarget =
-  | { direction: "to_workspace"; paths: string[]; mode: "copy" | "move" }
-  | { direction: "from_workspace"; server: string; workspace: string; pageId: string; title: string; mode: "copy" | "move" };
+  | {
+      direction: "to_workspace";
+      paths: string[];
+      mode: "copy" | "move";
+      /** The destination workspace, chosen if it is one the person can write to. */
+      server?: string;
+      workspace?: string;
+      parentId?: string | null;
+      /** The folder the pages are taken relative to (a dragged folder's parent, so the folder travels too). */
+      base?: string;
+    }
+  | {
+      direction: "from_workspace";
+      server: string;
+      workspace: string;
+      /** The page the dialog is named after. */
+      pageId: string;
+      title: string;
+      mode: "copy" | "move";
+      /** Everything that travels (a dragged folder and its pages, parents first); default `[pageId]`. */
+      pageIds?: string[];
+      folder?: string;
+    };
 
 const STEPS: readonly EngineState[] = ["validate", "stage", "transfer", "verify", "commit_destination", "finalize_source"];
 
@@ -86,9 +111,17 @@ export function TransferDialog({ target, onClose }: { target: TransferTarget; on
   const all = useWorkspaces();
   const writable = all.filter((w) => w.workspace.role !== "viewer");
   const [mode, setMode] = useState(target.mode);
-  const [dest, setDest] = useState<Destination | null>(() => (target.direction === "to_workspace" && writable[0] ? { server: writable[0].server, workspace: writable[0].workspace.id } : null));
-  const [parentId, setParentId] = useState<string | null>(null);
-  const [folder, setFolder] = useState("");
+  const [dest, setDest] = useState<Destination | null>(() => {
+    if (target.direction !== "to_workspace") return null;
+    const asked = writable.find((w) => w.server === target.server && w.workspace.id === target.workspace);
+    const first = asked ?? writable[0];
+    return first ? { server: first.server, workspace: first.workspace.id } : null;
+  });
+  const [parentId, setParentId] = useState<string | null>(() => {
+    if (target.direction !== "to_workspace" || !dest || dest.server !== target.server || dest.workspace !== target.workspace) return null;
+    return target.parentId ?? null;
+  });
+  const [folder, setFolder] = useState(target.direction === "from_workspace" ? (target.folder ?? "") : "");
   const [attachments, setAttachments] = useState(true);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [checking, setChecking] = useState(false);
@@ -107,8 +140,9 @@ export function TransferDialog({ target, onClose }: { target: TransferTarget; on
 
   // Re-check whenever a choice changes. Reads only.
   const request = useMemo(() => {
-    if (target.direction === "to_workspace") return dest ? { kind: "to" as const, req: { server: dest.server, workspace: dest.workspace, parentId, mode, paths: target.paths, attachments } } : null;
-    return { kind: "from" as const, req: { server: target.server, workspace: target.workspace, mode, pageIds: [target.pageId], folder } };
+    if (target.direction === "to_workspace")
+      return dest ? { kind: "to" as const, req: { server: dest.server, workspace: dest.workspace, parentId, mode, paths: target.paths, attachments, ...(target.base !== undefined ? { base: target.base } : {}) } } : null;
+    return { kind: "from" as const, req: { server: target.server, workspace: target.workspace, mode, pageIds: target.pageIds ?? [target.pageId], folder } };
   }, [target, dest, parentId, mode, attachments, folder]);
   useEffect(() => {
     if (!request || run.id) return;

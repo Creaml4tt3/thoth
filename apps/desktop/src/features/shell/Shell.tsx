@@ -11,6 +11,9 @@ import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { SidebarResizer, useSidebarWidth } from "@thoth/app-ui/ui/SidebarResizer.tsx";
 import { TooltipLayer } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { SpaceDragBadge } from "@thoth/app-ui/order/SpaceDragBadge.tsx";
+import { onSpaceDrop } from "@thoth/app-ui/order/space-drag.ts";
+import { transferTargetFor } from "./space-drop.ts";
 import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -270,6 +273,17 @@ export function Shell() {
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
+  // A drop across spaces opens the same dialog, prefilled (ADR-0006, amendment of 2026-10-26).
+  const transferRef = useRef(transfer);
+  transferRef.current = transfer;
+  useEffect(
+    () =>
+      onSpaceDrop((drop) => {
+        const next = transferTargetFor(drop);
+        if (next) transferRef.current(next);
+      }),
+    [],
+  );
 
   return (
     <HintContext value={hints}>
@@ -313,6 +327,7 @@ export function Shell() {
       <MascotLayer />
       <UpdateNotice />
       <TooltipLayer />
+      <SpaceDragBadge />
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}

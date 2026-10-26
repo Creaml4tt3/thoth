@@ -6,7 +6,11 @@ import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.t
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { useAcrossDropZone } from "@thoth/app-ui/order/dnd.ts";
+import { onSpaceDrop, useSpaceHoverAt } from "@thoth/app-ui/order/space-drag.ts";
+import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
+import { privateAcross } from "./space-drop.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ancestorFolders, buildTree } from "./tree.ts";
 import { PrivateTree, type Selection } from "./PrivateTree.tsx";
@@ -67,8 +71,9 @@ function PendingTransfers() {
 
 /** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
-  const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification } = useSession();
+  const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
+  const ttree = useStrings().tree;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
@@ -156,6 +161,20 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
     setPicked(new Set());
     onTransfer({ direction: "to_workspace", paths, mode });
   };
+  // Pages dragged out of the Private Space end the selection, as the Copy and Move buttons do.
+  useEffect(
+    () =>
+      onSpaceDrop((drop) => {
+        if (drop.drag.from.kind !== "private") return;
+        setSelecting(false);
+        setPicked(new Set());
+      }),
+    [],
+  );
+
+  // The header is where a workspace page goes to the Private Space's top level (ADR-0006, amendment of 2026-10-26).
+  const rootDrop = useAcrossDropZone((drag, move) => privateAcross(servers, drag, "", null, move, ttree.across));
+  const rootLit = useSpaceHoverAt((to) => to.kind === "private" && to.folder === "");
 
   return (
     <aside className="sidebar" aria-label={t.sidebar}>
@@ -167,7 +186,7 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <span>{t.search}</span>
         <kbd>⌘K</kbd>
       </button>
-      <div className="sec">
+      <div className="sec sec-drop" data-drop={rootLit ? "inside" : undefined} {...rootDrop}>
         <span className="sec-name" title={connection.root} {...tipIfClipped(connection.label)}>
           {connection.label}
         </span>
