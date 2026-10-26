@@ -81,7 +81,8 @@ const workspaces = (page: Page) => page.getByRole("tree", { name: /^Workspaces o
 const workspaceRow = (page: Page, name: string) => workspaces(page).getByRole("treeitem", { name: new RegExp(`^${name}`) });
 const pagesIn = (page: Page, name: string) => page.getByRole("group", { name: `Pages in ${name}` });
 const badge = (page: Page) => page.locator(".space-drag-badge");
-const header = (page: Page) => page.locator(".sidebar > .sec-drop");
+/** The Private Space header, a drop target (it heads a reorderable sidebar section, ADR-0019 amendment). */
+const header = (page: Page) => page.locator('.side-section[data-section="private"] > .sec-drop');
 
 async function shot(page: Page, name: string) {
   await mkdir(SHOTS, { recursive: true });
