@@ -90,6 +90,7 @@ export function NewWorkspaceDialog({ directory, server, serverLabel, onCreated, 
           <span>{t.name}</span>
           <input
             data-autofocus
+            name="workspace-name"
             className="input"
             value={name}
             maxLength={WORKSPACE_NAME_MAX}
@@ -100,7 +101,7 @@ export function NewWorkspaceDialog({ directory, server, serverLabel, onCreated, 
           />
         </label>
         <label className="ws-check">
-          <input type="checkbox" checked={restricted} disabled={busy} aria-describedby={ids.hint} onChange={(event) => setRestricted(event.target.checked)} />
+          <input type="checkbox" name="export-restricted" checked={restricted} disabled={busy} aria-describedby={ids.hint} onChange={(event) => setRestricted(event.target.checked)} />
           <span>{t.restrict}</span>
         </label>
         <p id={ids.hint} className="share-note ws-check-hint">

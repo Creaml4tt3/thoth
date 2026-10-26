@@ -64,6 +64,7 @@ export function ConfirmByNameForm({ body, name, confirmLabel, busyLabel, onConfi
         <input
           ref={field}
           data-autofocus
+          name="confirm-name"
           className="input"
           value={typed}
           disabled={busy}
