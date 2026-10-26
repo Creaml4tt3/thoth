@@ -152,7 +152,7 @@ export const en = {
     openFailed: "Could not open your browser.",
     general: "General",
     notify: "Tell me when a new version is out",
-    notifyHint: "Once a day Thoth asks download.thoth.creaml4tt3.me which version is newest, with nothing but its own version number. Nothing is downloaded or installed for you. Off means no request at all.",
+    notifyHint: "When it opens, and once a day while it stays open, Thoth asks download.thoth.creaml4tt3.me which version is newest, with nothing but its own version number. Nothing is downloaded or installed for you. Off means no request at all.",
     current: (version: string) => `You have Thoth ${version}.`,
     checkNow: "Check now",
     checking: "Checking…",

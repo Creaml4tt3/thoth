@@ -603,6 +603,9 @@ impl Clock {
     fn tick(&self, secs: u64) {
         *self.0.lock().unwrap() += Duration::from_secs(secs);
     }
+    fn back(&self, secs: u64) {
+        *self.0.lock().unwrap() -= Duration::from_secs(secs);
+    }
     fn at(&self) -> thoth_host::links::Clock {
         let now = self.0.clone();
         Arc::new(move || *now.lock().unwrap())
@@ -679,32 +682,38 @@ fn a_request_carries_nothing_but_a_fixed_user_agent() {
 }
 
 #[test]
-fn asks_at_most_once_in_24_hours_and_the_wait_survives_a_restart() {
+fn asks_at_each_start_then_at_most_once_in_24_hours_while_open() {
     let server = Server::start();
     serve_latest(&server, &latest("0.2.0"));
     let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
     let url = server.url("/latest.json");
     let notice = updates("0.1.3", &url, true, &clock, Some(data.path()));
     assert_eq!(state(&notice.check(false)), "available");
+    // Another window of the same run, or the same window's next timer: no second request that day.
     assert_eq!(state(&notice.check(false)), "waiting");
     clock.tick(23 * 3600 + 59 * 60);
     assert_eq!(state(&notice.check(false)), "waiting");
     assert_eq!(server.count(), 1);
+    clock.tick(2 * 60);
+    assert_eq!(state(&notice.check(false)), "available", "24 hours later, still open: it asks again");
+    assert_eq!(server.count(), 2);
 
-    // The app is closed and started again: the time of the last check is in the app data folder.
+    // The app is closed and started again an hour later: a new start always asks.
+    clock.tick(3600);
     let restarted = updates("0.1.3", &url, true, &clock, Some(data.path()));
+    assert_eq!(state(&restarted.check(false)), "available");
+    assert_eq!(server.count(), 3);
     assert_eq!(state(&restarted.check(false)), "waiting");
-    assert_eq!(server.count(), 1);
+    assert_eq!(server.count(), 3);
+    // The time of the last request is still kept for Settings, without the address.
     let kept = std::fs::read_to_string(data.path().join("update.json")).unwrap();
     assert!(kept.contains("lastCheck"), "{kept}");
     assert!(!kept.contains(&server.port.to_string()), "the file keeps no address");
+    assert!(!kept.contains("asked"), "the run's own wait is never written: {kept}");
 
-    clock.tick(2 * 60);
-    assert_eq!(state(&restarted.check(false)), "available");
-    assert_eq!(server.count(), 2);
     // "Check now" does not wait.
     assert_eq!(state(&restarted.check(true)), "available");
-    assert_eq!(server.count(), 3);
+    assert_eq!(server.count(), 4);
     assert_eq!(state(&restarted.check(false)), "waiting", "a manual check counts as the day's check");
 }
 
@@ -716,10 +725,9 @@ fn a_clock_set_back_does_not_stop_the_checks_for_ever() {
     let notice = updates("0.1.3", &server.url("/latest.json"), true, &clock, Some(data.path()));
     clock.tick(10 * 24 * 3600);
     assert_eq!(state(&notice.check(false)), "available");
-    // The computer's clock is now ten days behind the time that was kept.
-    let behind = Clock::new();
-    let again = updates("0.1.3", &server.url("/latest.json"), true, &behind, Some(data.path()));
-    assert_eq!(state(&again.check(false)), "available");
+    // While the app is open, the computer's clock goes ten days back, behind the time of that check.
+    clock.back(10 * 24 * 3600);
+    assert_eq!(state(&notice.check(false)), "available");
     assert_eq!(server.count(), 2);
 }
 

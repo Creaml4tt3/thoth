@@ -4,8 +4,8 @@
 //!
 //! The request follows the rules of link previews (ADR-0020), through the same fetcher: https only, a public address
 //! after DNS that is the address connected to, no cookies or credentials, no proxy, a fixed `User-Agent`, 5 s in
-//! total, at most 64 KB, JSON only. A check happens at most once in 24 hours, counted across restarts (the time of
-//! the last one is kept in the app data folder), and never when the person turned the notice off.
+//! total, at most 64 KB, JSON only. Each start of the app checks once; while it stays open, a check happens at most
+//! once in 24 hours, counted across its windows. Never when the person turned the notice off.
 use crate::error::{HostError, HostResult};
 use crate::links::Clock;
 use crate::links::fetch::{Fetcher, Lookup, SystemLookup, TIMEOUT, Want, mime};
@@ -23,7 +23,7 @@ pub const DEFAULT_URL: &str = "https://download.thoth.creaml4tt3.me/latest.json"
 pub const DEFAULT_DOWNLOADS_PAGE: &str = "https://thoth.creaml4tt3.me/#download";
 /// Most of `latest.json` read; a longer answer is refused.
 pub const MAX_BYTES: usize = 64 * 1024;
-/// The least time between two requests, across restarts.
+/// The least time between two requests while the app stays open. A restart is not held to it: each start checks once.
 pub const INTERVAL_SECS: u64 = 24 * 60 * 60;
 /// The file in the app data folder that keeps the person's choice, the skipped version and the time of the last check.
 pub const STATE_FILE: &str = "update.json";
@@ -219,17 +219,20 @@ impl UpdateOptions {
 }
 
 /// What is kept in the app data folder (`update.json`): the person's choice, the version they skipped and when the
-/// last request was made. Never in a vault.
+/// last request was made (shown in Settings). Never in a vault.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct State {
     notify: bool,
     last_check: Option<u64>,
     skipped: Option<Version>,
+    /// When this run of the app last asked. Only this holds back the next check; it is never written, so a new start
+    /// of the app always checks.
+    asked_this_run: Option<u64>,
 }
 
 impl Default for State {
     fn default() -> Self {
-        Self { notify: true, last_check: None, skipped: None }
+        Self { notify: true, last_check: None, skipped: None, asked_this_run: None }
     }
 }
 
@@ -240,6 +243,7 @@ impl State {
             notify: o.get("notify").and_then(Value::as_bool).unwrap_or(true),
             last_check: o.get("lastCheck").and_then(Value::as_u64),
             skipped: o.get("skipped").and_then(Value::as_str).and_then(Version::parse),
+            asked_this_run: None,
         }
     }
 
@@ -328,8 +332,10 @@ impl Updates {
     /// The answer's `state` is one of:
     /// - `unavailable`: this build has no update notice; nothing was requested.
     /// - `off`: the person turned the notice off (a forced check too); nothing was requested.
-    /// - `waiting`: the last request was less than 24 hours ago; nothing was requested (`force` skips this wait).
-    /// - `failed`: the request or the file was not good. It counts as a check: the next one is 24 hours away.
+    /// - `waiting`: this run of the app asked less than 24 hours ago (from any window); nothing was requested
+    ///   (`force` skips this wait). The first check after the app starts is never `waiting`.
+    /// - `failed`: the request or the file was not good. It counts as a check: the next one in this run is 24 hours
+    ///   away.
     /// - `current`: nothing newer is offered.
     /// - `available`: `update` has `version`, `downloadUrl`, `skipped` (the person skipped this version or a newer
     ///   one) and, when the file has them, `date` and `notesUrl`.
@@ -344,10 +350,11 @@ impl Updates {
             if !state.notify {
                 return json!({ "state": "off" });
             }
-            if !force && let Some(last) = state.last_check.filter(|last| *last <= now + 60 && now.saturating_sub(*last) < INTERVAL_SECS) {
+            if !force && let Some(last) = state.asked_this_run.filter(|last| *last <= now + 60 && now.saturating_sub(*last) < INTERVAL_SECS) {
                 return json!({ "state": "waiting", "checkedAt": last });
             }
             // Recorded before the request: a request that hangs or fails still uses up the day.
+            state.asked_this_run = Some(now);
             state.last_check = Some(now);
             self.save(&state);
             state.skipped.clone()

@@ -21,8 +21,9 @@ export const DEFAULT_OPTIONS: AppOptions = {
   starterServer: STARTER_SERVER,
   notifier: NO_SYSTEM_NOTIFIER,
   messageMs: 6000,
-  // The update notice (ADR-0022): 10 s after the start, then every 24 h while the window is open.
-  updateDelayMs: 10_000,
+  // The update notice (ADR-0022): right after the app opens (2 s, once the window has settled), then every 24 h while
+  // it stays open.
+  updateDelayMs: 2_000,
   updateIntervalMs: 24 * 60 * 60 * 1000,
 };
 

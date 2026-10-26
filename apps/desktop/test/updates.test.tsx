@@ -124,8 +124,8 @@ describe("the popup", () => {
     }
   });
 
-  it("waits 10 seconds after the start, then asks every 24 hours while the app is open", async () => {
-    expect(DEFAULT_OPTIONS.updateDelayMs).toBe(10_000);
+  it("asks right after the app opens, then every 24 hours while it is open", async () => {
+    expect(DEFAULT_OPTIONS.updateDelayMs).toBe(2_000);
     expect(DEFAULT_OPTIONS.updateIntervalMs).toBe(24 * 60 * 60 * 1000);
     await start({ intervalMs: 40 });
     await waitFor(() => expect(updates.checks.length).toBeGreaterThanOrEqual(3));

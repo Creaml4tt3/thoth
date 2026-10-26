@@ -1,6 +1,6 @@
 # ADR-0022: Update notice
 
-- **Status:** Proposed
+- **Status:** Accepted (owner, 2026-10-26)
 - **Date:** 2026-10-26
 - **Deciders:** project owner (the request); rules 1 to 5 were decided by the orchestrator for the owner. The details
   marked "(this ADR)" were decided while implementing them.
@@ -47,11 +47,14 @@ Constraints:
    - **Comparison** is semver 2.0.0 (implemented in the host, no new dependency). A pre-release is never offered to a
      stable build; a build that is itself a pre-release is offered newer pre-releases and the release.
 3. **When.**
-   - 10 s after the window starts, then every 24 h while it is open (the window schedules; the host decides).
-   - The host makes at most one request in 24 h, counted across restarts and windows: the time of the last request is
-     kept in the app data folder (`update.json`, mode 0600, never in a vault). A request that fails or times out also
-     counts (this ADR), so an offline start is not repeated on every restart. A last-check time in the future (a clock
-     set back) does not block checks.
+   - Right after the window opens (2 s, so the first paint and the vault open go first), then every 24 h while it is
+     open (the window schedules; the host decides). Changed by the owner on 2026-10-26: the first version waited 10 s
+     and held to "at most once in 24 h" across restarts, so opening the app the next morning often checked nothing.
+   - **Each start of the app checks once.** While the app stays open, the host makes at most one request in 24 h,
+     counted across its windows: a second window, or a window reloaded, finds that day's check done. That wait is kept
+     in memory only, so a restart always checks. A request that fails or times out also counts for the running app.
+     The time of the last request is kept in the app data folder (`update.json`, mode 0600, never in a vault) for
+     Settings only. A last-check time in the future (a clock set back while the app is open) does not block checks.
    - "Check now" in Settings skips the 24-hour wait, and shows a version the person skipped (they asked). It makes a
      request and so counts as the day's check.
    - Settings → General → "Tell me when a new version is out" is on by default. **Off means no request at all**,
@@ -77,10 +80,10 @@ Constraints:
 
 - Positive: people learn a release exists without an updater, signing keys or any code being installed for them.
 - Positive: the only new network path reuses the audited fetcher; the person can turn it off completely.
-- Negative: every 24 h an installation tells `download.thoth.creaml4tt3.me` its IP address and version number (the
-  `User-Agent`). Settings says so.
-- Negative: a person who closes the popup with "Later" and restarts the app within 24 h sees nothing until the next
-  allowed check. Accepted, to keep "at most once in 24 h".
+- Negative: at every start, and every 24 h while open, an installation tells `download.thoth.creaml4tt3.me` its IP
+  address and version number (the `User-Agent`). Settings says so. Someone who restarts often sends more requests
+  than once a day; each is one small GET.
+- Positive: "Later" lasts until the next start or the next day's check, whichever comes first.
 - Negative: the Thai strings marked `REVIEW` need a native reader.
 - Follow-up: `scripts/publish-downloads.ts` could write `notes`; a person checks the popup in a real Tauri window on
   macOS and Windows; Windows and Linux builds of the new tests run in CI as before.

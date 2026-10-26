@@ -117,11 +117,9 @@ async function openSettings(page: Page) {
   return toggle;
 }
 
-test("a popup after 10 seconds for a newer version; Skip is remembered across a restart, and Check now still shows it", async ({ browser }) => {
+test("a popup right after the app opens for a newer version; Skip is remembered across a restart, and Check now still shows it", async ({ browser }) => {
   const first = await launch(browser, T0);
   const page = first.page;
-  // Nothing is asked before the 10 seconds are over.
-  expect(asked).toEqual([]);
   await expect(popup(page)).toBeVisible({ timeout: 25_000 });
   expect(asked).toEqual(["GET /latest.json Thoth/0.1.3 (update check)"]);
 
@@ -172,11 +170,11 @@ test("a popup after 10 seconds for a newer version; Skip is remembered across a 
   expect(kept).toMatchObject({ notify: true, lastCheck: T0, skipped: "9.9.9" });
   expect(asked).toHaveLength(1);
 
-  // Restart 25 hours later: the 24-hour wait is over, so the host asks again, but the version was skipped.
+  // Restart an hour later: every start of the app asks again, but the version was skipped.
   const port = Number(new URL(bridge!.url).port);
   await first.close();
   await bridge!.close();
-  const second = await launch(browser, T0 + 25 * 3600, port);
+  const second = await launch(browser, T0 + 3600, port);
   await expect.poll(() => asked.length, { timeout: 25_000 }).toBe(2);
   await second.page.waitForTimeout(500);
   await expect(popup(second.page)).toBeHidden();
@@ -211,8 +209,8 @@ test("turned off in Settings: no request at all, not even Check now", async ({ b
   await expect(toggle).not.toBeChecked();
   await expect(app.page.getByRole("button", { name: "Check now" })).toBeDisabled();
   expect(JSON.parse(await readFile(join(scratch, "data", "update.json"), "utf8"))).toMatchObject({ notify: false });
-  // Well past the 10 seconds.
-  await app.page.waitForTimeout(13_000);
+  // Well past the first check's 2 seconds.
+  await app.page.waitForTimeout(5_000);
   await expect(popup(app.page)).toBeHidden();
   expect(asked).toEqual([]);
 
@@ -221,7 +219,7 @@ test("turned off in Settings: no request at all, not even Check now", async ({ b
   await app.close();
   await bridge!.close();
   const again = await launch(browser, T0 + 25 * 3600, port);
-  await again.page.waitForTimeout(13_000);
+  await again.page.waitForTimeout(5_000);
   await expect(popup(again.page)).toBeHidden();
   expect(asked).toEqual([]);
   await expect(await openSettings(again.page)).not.toBeChecked();

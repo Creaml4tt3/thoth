@@ -189,8 +189,8 @@ export interface Commands {
   // ---- The update notice (ADR-0022). Desktop only: the host asks `latest.json`, the webview gets a verdict.
   /**
    * Asks whether a newer version is out. The host makes the request itself (https only, a public address, 5 s, at most
-   * 64 KB) and at most once in 24 hours, counted across restarts; `force` ("Check now") skips that wait. Nothing is
-   * requested when the notice is off. The answer is a verdict, never the file.
+   * 64 KB): once per start of the app, then at most once in 24 hours across its windows; `force` ("Check now") skips
+   * that wait. Nothing is requested when the notice is off. The answer is a verdict, never the file.
    */
   "update.check": { args: { force?: boolean }; result: UpdateCheck };
   /** The person's choice for the notice, after applying `notify` (on or off) and `skip` (a version to skip; `null` forgets it). */
@@ -228,7 +228,7 @@ export interface UpdateInfo {
 
 /**
  * What `update.check` found. `unavailable`: this build has no update notice. `off`: the person turned it off. `waiting`:
- * asked less than 24 hours ago, so nothing was requested. `failed`: the request or the file was no good (it counts as a
+ * this run of the app asked less than 24 hours ago, so nothing was requested. `failed`: the request or the file was no good (it counts as a
  * check). `current`: nothing newer is offered (a pre-release is never offered to a stable build). `checkedAt`: Unix seconds.
  */
 export type UpdateCheck =

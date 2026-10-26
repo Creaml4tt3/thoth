@@ -59,7 +59,7 @@ export interface Platform {
 
 /** What the host does for the update notice (ADR-0022): it asks `latest.json` and keeps the person's choice. */
 export interface Updates {
-  /** Asks whether a newer version is out (at most once in 24 hours; `force` skips the wait; nothing when the notice is off). */
+  /** Asks whether a newer version is out (once per start, then at most once in 24 hours; `force` skips the wait; nothing when the notice is off). */
   check(options?: { force?: boolean }): Promise<UpdateCheck>;
   settings(): Promise<UpdateSettings>;
   /** Turns the notice on or off. Off means no request at all. */

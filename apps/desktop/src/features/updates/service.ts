@@ -1,9 +1,9 @@
 /**
- * The update notice of one window (ADR-0022). It asks the host whether a newer desktop version is out, 10 seconds after
- * the start and then every 24 hours while the window is open, and keeps the answer the popup shows. The host does the
- * asking (the webview has no network), makes a request at most once in 24 hours across restarts, and makes none when
- * the person turned the notice off; this only schedules, remembers "Later" for the session, and passes "Skip this
- * version" to the host, which keeps it.
+ * The update notice of one window (ADR-0022). It asks the host whether a newer desktop version is out right after the
+ * window opens (2 seconds) and then every 24 hours while it is open, and keeps the answer the popup shows. The host
+ * does the asking (the webview has no network): it asks once per start of the app, then at most once in 24 hours
+ * across its windows, and never when the person turned the notice off. This only schedules, remembers "Later" for the
+ * session, and passes "Skip this version" to the host, which keeps it.
  */
 import type { Updates, Links, UpdateCheck } from "@thoth/platform";
 
