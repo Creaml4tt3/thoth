@@ -206,7 +206,8 @@ export const imageView =
       input.id = id;
       input.setAttribute("aria-label", t.altLabel);
       input.setAttribute("aria-describedby", `${id}-hint`);
-      input.placeholder = t.altLabel;
+      input.name = "alt";
+      input.autocomplete = "off";
       const hint = el("span", "page-image-alt-hint", t.altHint);
       hint.id = `${id}-hint`;
       const save = el("button", "page-image-alt-button is-primary", t.save);

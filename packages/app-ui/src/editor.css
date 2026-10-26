@@ -46,9 +46,11 @@
 .page-image.ProseMirror-selectednode { outline-offset: 4px; }
 .page-image-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; padding: 8px; max-width: 520px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-small); }
 .page-image.is-inline .page-image-alt { position: absolute; z-index: 5; }
-.page-image-alt-input { flex: 1 1 220px; min-width: 0; min-height: 32px; padding: 4px 8px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; }
-.page-image-alt-button { min-height: 32px; min-width: 44px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; cursor: pointer; }
+.page-image-alt-input { flex: 1 1 220px; min-width: 0; min-height: 36px; padding: 4px 8px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; }
+.page-image-alt-button { min-height: 36px; min-width: 44px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; cursor: pointer; }
 .page-image-alt-button.is-primary { background: var(--thoth-accent); border-color: var(--thoth-accent); color: var(--thoth-on-accent); }
+.page-image-alt-button:hover { background: var(--thoth-bg-hover); }
+.page-image-alt-button.is-primary:hover { background: color-mix(in srgb, var(--thoth-accent) 88%, black); }
 .page-image-alt-hint { flex-basis: 100%; color: var(--thoth-ink-secondary); }
 .image-insert-status.is-error { margin-top: var(--thoth-space-2); padding: 6px 12px; border-radius: var(--thoth-radius-md); background: color-mix(in srgb, var(--thoth-danger) 10%, transparent); color: var(--thoth-danger); font: var(--thoth-text-small); }
 .ProseMirror-selectednode { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: var(--thoth-radius-sm); }

@@ -193,8 +193,9 @@ Result (2026-10-23) ✅:
   - fold writing to the file (2 failures);
   - move dropping neighbours' source bytes (1 failure);
   - the handle staying on a read-only page (1 failure, my own run).
-- Not done: inserting an image from `/`. A local path needs the host to read
-  the file, so it waits for an attachments design.
+- Inserting an image from `/` (and by paste or drop) is done since 2026-10-26
+  (ADR-0028): images show from the space through blob URLs, and added files are
+  copied next to the page or uploaded as workspace attachments.
 
 ### Phase 2 — Workspace protocol + reference server + web (ADR-0013)
 
