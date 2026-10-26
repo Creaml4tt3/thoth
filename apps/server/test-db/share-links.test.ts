@@ -333,6 +333,15 @@ const x = "<script>";
     expect((await view(env, `/s/${link.token}/p/${root}`)).status).toBe(200);
   });
 
+  it("answers an unknown or malformed token, page or attachment with its 404 and logs no error", async () => {
+    const before = logLines.length;
+    for (const path of [`/s/${"A".repeat(32)}`, "/s/notarealtoken", `/s/${"B".repeat(32)}/p/${uuid()}`, `/s/${"C".repeat(32)}/a/att_x`]) {
+      for (const headers of [HTML, { accept: "application/json" }]) expect((await view(env, path, headers)).status, path).toBe(404);
+    }
+    const errors = logLines.slice(before).filter((line) => (JSON.parse(line) as { level: number }).level >= 50);
+    expect(errors).toEqual([]);
+  });
+
   it("does not reach pages outside the subtree: the parent and a sibling are the same 404 as an unknown token", async () => {
     const unknown = fingerprint(await view(env, `/s/${"A".repeat(32)}`));
     expect(unknown.status).toBe(404);

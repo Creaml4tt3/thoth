@@ -140,11 +140,13 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
   }
 
   /**
-   * The link behind a token, or a reply already sent (404 or 429). Rate limits come first and count the token as
-   * given (its hash), known or not, so a refusal says nothing about whether the token exists.
+   * The link behind a token, or null once the 404 or 429 has been sent. Rate limits come first and count the token as
+   * given (its hash), known or not, so a refusal says nothing about whether the token exists. (Null, not the reply: a
+   * Fastify reply is a thenable, so an async function returning one resolves to undefined.)
    */
-  async function linkFor(request: FastifyRequest, reply: FastifyReply, token: string): Promise<ActiveShareLink | FastifyReply> {
-    if (!enabled) return notFound(request, reply);
+  async function linkFor(request: FastifyRequest, reply: FastifyReply, token: string): Promise<ActiveShareLink | null> {
+    const refuse = (sent: unknown): null => (void sent, null);
+    if (!enabled) return refuse(notFound(request, reply));
     const tokenHash = hashShareToken(token);
     const limits: [string, number | undefined][] = [
       [`share-ip:${clientIp(request.headers, request.socket.remoteAddress, config.trustProxy)}`, config.share.viewsPerIp],
@@ -153,19 +155,19 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
     for (const [key, limit] of limits) {
       if (limit === undefined) continue;
       const decision = await hit(db, key, limit, window);
-      if (!decision.allowed) return answer(request, reply, 429, TOO_MANY_HTML, problem("rate_limited", { detail: "too many requests; retry after the time in the Retry-After header" }), { "retry-after": String(decision.retryAfterSeconds) });
+      if (!decision.allowed) return refuse(answer(request, reply, 429, TOO_MANY_HTML, problem("rate_limited", { detail: "too many requests; retry after the time in the Retry-After header" }), { "retry-after": String(decision.retryAfterSeconds) }));
     }
     const link = SHARE_TOKEN_PATTERN.test(token) ? await resolveShareLink(db, tokenHash) : null;
     // Constant-time comparison whether or not a row came back.
     const matches = shareTokenMatches(token, link?.tokenHash ?? null);
-    return link && matches ? link : notFound(request, reply);
+    return link && matches ? link : refuse(notFound(request, reply));
   }
 
   const hrefOf = (token: string, link: ActiveShareLink, id: string) => (id === link.pageId ? `/s/${token}` : `/s/${token}/p/${id}`);
 
   async function servePage(request: FastifyRequest, reply: FastifyReply, token: string, pageId: string | null): Promise<FastifyReply> {
     const link = await linkFor(request, reply, token);
-    if (!isLink(link)) return link;
+    if (!link) return reply;
     const target = pageId ?? link.pageId;
     if (!PageIdSchema.safeParse(target).success) return notFound(request, reply);
     const tree = await sharedSubtree(db, link);
@@ -214,7 +216,7 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
 
   app.get<{ Params: { token: string; attachmentId: string } }>("/s/:token/a/:attachmentId", async (request, reply) => {
     const link = await linkFor(request, reply, request.params.token);
-    if (!isLink(link)) return link;
+    if (!link) return reply;
     const id = request.params.attachmentId;
     if (!AttachmentIdSchema.safeParse(id).success) return notFound(request, reply);
     // Served only when a page of the shared subtree uses it now (not merely mentions it, as in code).
@@ -242,8 +244,6 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
     return reply.code(200).header("content-type", asset.type).header("cache-control", "public, max-age=86400").header("x-content-type-options", "nosniff").header("cross-origin-resource-policy", "same-origin").send(asset.bytes);
   });
 }
-
-const isLink = (value: ActiveShareLink | FastifyReply): value is ActiveShareLink => typeof (value as ActiveShareLink).tokenHash === "string";
 
 /** Sub-pages in their sibling order (capability `page-order`), then by title. */
 function byOrder(a: SharedNode, b: SharedNode): number {
