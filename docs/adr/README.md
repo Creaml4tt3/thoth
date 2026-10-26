@@ -36,6 +36,7 @@ trade-off.
 | [0024](0024-workspace-members-and-invite-links.md) | Workspace members and invite links | Accepted 2026-10-26 |
 | [0025](0025-several-workspaces-per-account.md) | Several workspaces per account: create, rename, delete, restore | Accepted 2026-10-26 |
 | [0026](0026-blog-and-changelog-on-the-website.md) | A blog and a changelog on the website | Proposed 2026-10-26 |
+| [0027](0027-favorites-and-pinned-tabs.md) | Favorites and pinned tabs | Proposed 2026-10-26 |
 
 Template: [0000-template.md](0000-template.md).
 

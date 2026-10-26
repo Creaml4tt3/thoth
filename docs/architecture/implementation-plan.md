@@ -1186,6 +1186,19 @@ The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial
 - Not done (owner): Search Console and Bing Webmaster Tools, the `SAME_AS` profiles, the `INDEXNOW_KEY` variable on
   Vercel, off-site posts; `docs/legal/terms*.md` still say 1 workspace per account (a legal text change).
 
+### Favorites and pinned tabs (ADR-0027, 2026-10-26), built, waiting for review
+
+- Favorites: a star in the page header, the tree and tab menus, the palette and Cmd/Ctrl+D (Alt+Shift+D on the web);
+  a Favorites sidebar section, first by default and hidden while empty, reordered by drag and Alt/Option+Shift+Up/Down
+  within each space. Private Space favorites in `.thoth/favorites.json` (stable ids, compare-and-swap); workspace
+  favorites in localStorage per server, account and workspace, never sent. The web client has the same list.
+- Pinned tabs: compact at the start of the bar, no close button, Cmd/Ctrl+W says how to close, drags stop at the
+  boundary, kept on restart and in a new window; Close other tabs; Alt/Option+Shift+P.
+- Evidence: `packages/app-ui/test/tabs-pinned.test.ts`, `tab-pinned.test.tsx`, `favorites.test.ts`, `commands.test.ts`,
+  `shortcuts.test.ts`; `packages/local-store/test/favorites.test.ts`; `apps/desktop/test/favorites.test.tsx`,
+  `sidebar.test.tsx`; `apps/web/test/favorites.test.tsx`; `tests/e2e/favorites.e2e.ts` (axe light and dark).
+- Not done: a native reader for the Thai marked `REVIEW`.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

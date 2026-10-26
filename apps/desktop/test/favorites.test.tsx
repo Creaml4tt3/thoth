@@ -114,7 +114,7 @@ describe("Favorites of the Private Space", () => {
     await waitFor(() => expect(favoriteNames()).toEqual(["Alpha"]));
     fireEvent.contextMenu(favoriteRow("Alpha"));
     const menu = await screen.findByRole("menu", { name: "Favorite: Alpha" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tab⌘↵", "Move up⌥⇧↑", "Move down⌥⇧↓", "Remove from Favorites"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Move up⌥⇧↑", "Move down⌥⇧↓", "Remove from Favorites"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "Remove from Favorites" }));
     await waitFor(() => expect(favoritesRegion()).toBeNull());
     expect(await storedIds()).toEqual([]);

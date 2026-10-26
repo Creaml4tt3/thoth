@@ -10,7 +10,9 @@
  * - A favorite that cannot be checked right now (its server signed out, its workspace not loaded) stays, muted, with
  *   "Not available right now" as its hint; opening it shows why.
  */
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useContext, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { HintContext } from "../keyboard/hints.ts";
+import { currentPlatform, formatChordShort } from "../keyboard/shortcuts.ts";
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
 import { PageIcon } from "../order/icons.tsx";
 import { useListDrag } from "../order/list-drag.ts";
@@ -49,6 +51,8 @@ const KEYS = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown Control+Enter Meta+Enter Shi
 
 export function FavoritesList({ items, onOpen, onMove, onRemove, scroller }: Props) {
   const t = useStrings().favorites;
+  const platform = useContext(HintContext)?.platform ?? currentPlatform();
+  const newTabKeys = formatChordShort({ key: "Enter", mod: true }, platform);
   const host = useRef<HTMLUListElement>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
   const flip = useRef<Map<string, number> | null>(null);
@@ -109,7 +113,7 @@ export function FavoritesList({ items, onOpen, onMove, onRemove, scroller }: Pro
     const at = order.indexOf(key);
     const [first, last] = bounds(key);
     return [
-      { id: "open-tab", label: t.openNewTab, hint: "⌘↵", onSelect: () => onOpen(key, { newTab: true }) },
+      { id: "open-tab", label: t.openNewTab, hint: newTabKeys, onSelect: () => onOpen(key, { newTab: true }) },
       { id: "up", label: t.moveUp, hint: "⌥⇧↑", disabled: at <= first, onSelect: () => (move(key, at - 1), focusSoon(key)) },
       { id: "down", label: t.moveDown, hint: "⌥⇧↓", disabled: at >= last, onSelect: () => (move(key, at + 1), focusSoon(key)) },
       { id: "remove", label: t.remove, onSelect: () => onRemove(key) },
