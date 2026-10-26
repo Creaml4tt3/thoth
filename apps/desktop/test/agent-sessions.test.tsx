@@ -202,11 +202,14 @@ describe("the Assistant section in the sidebar", () => {
     expect(session().textContent).toContain("Question 6\nwith more lines");
   });
 
-  it("is not there without runs or without agents, and a new run joins it, marked while it runs", async () => {
-    let app = await open(createNodePlatform({ vault: root }));
+  it("is not there without agents", async () => {
+    await earlierRun("A question", Date.now() - 1000);
+    await open(createNodePlatform({ vault: root }));
     expect(within(sidebar()).queryByRole("region", { name: "Assistant" })).toBeNull();
-    cleanup();
-    app = await open();
+  });
+
+  it("is not there before the first run, and a new run joins it, marked while it runs", async () => {
+    const app = await open();
     expect(within(sidebar()).queryByRole("region", { name: "Assistant" })).toBeNull();
     await ask(app, "Fresh question\n@sleep 500\n");
     const row = await within(await section()).findByRole("button", { name: /Fresh question/ });
@@ -217,9 +220,12 @@ describe("the Assistant section in the sidebar", () => {
 
   it("speaks Thai", async () => {
     setLangPreference("th");
+    for (let i = 0; i < 5; i++) await earlierRun(`ข้อ ${i}`, Date.now() - 10_000 + i);
     await earlierRun("คำถาม", Date.now() - 1000);
     await openApp(root, {}, platform());
+    await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
     const region = await screen.findByRole("region", { name: "ผู้ช่วย" });
-    expect(within(region).getByRole("button", { name: /คำถาม/ }).textContent).toContain("ไม่มีการเปลี่ยนแปลง");
+    expect(within(region).getByRole("button", { name: /คำถาม/ }).textContent).toBe("คำถาม");
+    expect(within(region).getByRole("button", { name: "แสดงเพิ่มอีก 1 รายการ" }).getAttribute("aria-expanded")).toBe("false");
   });
 });

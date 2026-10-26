@@ -24,6 +24,7 @@ import { FAKE_CLAUDE_DIR, FAKE_CODEX_DIR, alive, fakeRecord, waitDead } from "..
 import { EDITOR_TOKEN, LOCKED_WORKSPACE, MAIN_WORKSPACE, startTestServer, type TestServer } from "../protocol/test-server.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { REPO } from "../ports/harness.ts";
 import { axe, bubble, mascot, openAssistantSettings, openBubble, openReview, picker, pickOnly, writeAndStart } from "./assistant.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
@@ -441,4 +442,100 @@ test("a run that used up its spending limit says so, and its work so far can be 
   await openAssistantSettings(page);
   await expect(page.getByRole("region", { name: "Earlier runs" })).toContainText("Stopped at the spending limit");
   expect(await readFile(join(vault, "Notes/Plan.md"), "utf8")).toBe(PLAN);
+});
+
+/** Light or dark (the theme attribute the tokens key off). */
+const theme = (page: Page, dark: boolean) => page.evaluate((night) => document.documentElement.setAttribute("data-theme", night ? "night" : "light"), dark);
+const SHOTS = join(REPO, "tests", ".tmp", "agent-sessions");
+
+/** An earlier run, as a past session left it: its record in the vault and its transcript in the app data folder. */
+async function earlierRun(prompt: string, at: number): Promise<void> {
+  const id = newStableId(at);
+  await mkdir(join(vault, ".thoth/agent/runs"), { recursive: true });
+  const record = { version: 1, id, provider: { id: "claude", name: "Claude Code", version: "2.1.310" }, task: { prompt }, context: [], state: "done", createdAt: at, updatedAt: at, outcome: { reason: "exited", code: 0, ok: true, costUsd: 0.002 }, changes: [] };
+  await writeFile(join(vault, ".thoth/agent/runs", `${id}.json`), JSON.stringify(record, null, 2));
+  await mkdir(join(data, "agent-history", id), { recursive: true });
+  await writeFile(join(data, "agent-history", id, "transcript.jsonl"), [{ type: "text", text: `About ${prompt}` }, { type: "result", ok: true, text: `About ${prompt}` }].map((e) => JSON.stringify(e)).join("\n") + "\n");
+}
+
+test("a question gets its answer in the bubble, opens in a tab, is listed in the sidebar, and comes back after a restart", async ({ page, context }) => {
+  test.setTimeout(240_000);
+  await mkdir(SHOTS, { recursive: true });
+  const b = await openBubble(page);
+  await pickOnly(page, ["Plan"]);
+  await writeAndStart(page, "What content is on this page?\n@say Reading Notes/Plan.md\n@answer The page is a plan with one line: “We have a cat.”\\nNothing else is on it.\n");
+
+  // The answer, as text with its line break; the "no changes" fact is a small line under it.
+  const answer = b.getByRole("region", { name: "Answer" });
+  await expect(answer.getByTestId("agent-answer")).toHaveText("The page is a plan with one line: “We have a cat.”\nNothing else is on it.", { timeout: 15_000 });
+  expect(await answer.getByTestId("agent-answer").evaluate((el) => getComputedStyle(el).whiteSpace)).toBe("pre-wrap");
+  await expect(b.getByText("No pages were changed.")).toBeVisible();
+  await expect(b.getByText("The agent finished without changing anything.")).toHaveCount(0);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await answer.getByRole("button", { name: "Copy answer" }).click();
+  await expect(answer.getByRole("status")).toHaveText("Copied.");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("The page is a plan with one line: “We have a cat.”\nNothing else is on it.");
+  for (const dark of [false, true]) {
+    await theme(page, dark);
+    await axe(page, "#mascot-bubble");
+    await page.screenshot({ path: join(SHOTS, `bubble-answer-${dark ? "dark" : "light"}.png`) });
+  }
+  await theme(page, false);
+  // Agent output stays out of the vault.
+  const [name] = await readdir(join(vault, ".thoth/agent/runs"));
+  const saved = await readFile(join(vault, ".thoth/agent/runs", name!), "utf8");
+  expect(saved.replace(JSON.stringify(JSON.parse(saved).task.prompt), "")).not.toContain("Nothing else is on it");
+
+  // The icon opens the run's session tab, with the keyboard.
+  await b.getByRole("button", { name: "Open in a tab" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(bubble(page)).toBeHidden();
+  await expect(page.getByRole("tab", { selected: true })).toHaveText("What content is on this page?");
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByRole("heading", { level: 1 })).toHaveText("What content is on this page?");
+  await expect(panel.getByRole("region", { name: "Answer" }).getByTestId("agent-answer")).toContainText("Nothing else is on it.");
+
+  // The sidebar lists it, marked as the current tab's run.
+  const section = page.getByRole("region", { name: "Assistant" });
+  const row = section.getByRole("button", { name: /What content is on this page\?/ });
+  await expect(row).toHaveAttribute("aria-current", "page");
+  for (const dark of [false, true]) {
+    await theme(page, dark);
+    await axe(page, [".agents-session", ".agents-section"]);
+    await page.screenshot({ path: join(SHOTS, `session-tab-${dark ? "dark" : "light"}.png`) });
+  }
+  await theme(page, false);
+
+  // Earlier runs from another day, so the section has more than five.
+  for (let i = 1; i <= 6; i++) await earlierRun(`Earlier question ${i}`, Date.now() - (10 - i) * 3_600_000);
+
+  // The app closes and starts again on the same origin: the tab comes back, its answer read from the transcript.
+  const port = Number(new URL(bridge.url).port);
+  await page.close();
+  await bridge.close();
+  bridge = await startBridge({ ...bridgeOptions(), port });
+  const again = await context.newPage();
+  await again.addInitScript(bridge.initScript);
+  await again.goto(bridge.url);
+  await again.getByRole("button", { name: /choose or create a private space/i }).click();
+  await expect(again.getByRole("tab", { selected: true })).toHaveText("What content is on this page?", { timeout: 15_000 });
+  await expect(again.getByRole("tabpanel").getByRole("region", { name: "Answer" }).getByTestId("agent-answer")).toHaveText("The page is a plan with one line: “We have a cat.”\nNothing else is on it.");
+
+  // Five shown, the rest behind "Show 2 more".
+  const rows = again.getByRole("region", { name: "Assistant" }).locator(".agents-row");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.first()).toContainText("What content is on this page?");
+  const more = again.getByRole("button", { name: "Show 2 more" });
+  await more.click();
+  await expect(rows).toHaveCount(7);
+  await expect(again.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+  for (const dark of [false, true]) {
+    await theme(again, dark);
+    await axe(again, ".agents-section");
+    await again.locator(".sidebar").screenshot({ path: join(SHOTS, `sidebar-section-${dark ? "dark" : "light"}.png`) });
+  }
+  await theme(again, false);
+  await rows.nth(6).click();
+  await expect(again.getByRole("tab", { selected: true })).toHaveText("Earlier question 1");
+  await expect(again.getByRole("tabpanel").getByTestId("agent-answer")).toHaveText("About Earlier question 1");
 });
