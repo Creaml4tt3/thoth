@@ -303,6 +303,7 @@ export const th: Strings = {
       "tree.rename": "เปลี่ยนชื่อ",
       "tree.reorder": "ย้ายหน้าขึ้นหรือลง",
       "tree.menu": "เปิดเมนูของหน้า",
+      "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง", // REVIEW
       "editor.save": "บันทึกทันที",
       "editor.mode": "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
       "editor.blockMenu": "เมนูบล็อก",

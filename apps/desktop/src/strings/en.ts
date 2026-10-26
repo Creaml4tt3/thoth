@@ -36,6 +36,17 @@ export const en = {
     local: "Local",
     pages: "Pages",
     pagesInSpace: "Pages in this Private Space",
+    /**
+     * The sidebar's sections (ADR-0019 amendment): each is a region named by what it holds, with a grip that is dragged
+     * to move it and opens its menu when clicked. Names are the Private Space's folder name or the server's name.
+     */
+    privateSection: (label: string) => `Private Space ${label}`,
+    sectionOptions: (name: string) => `Section options: ${name}`,
+    sectionGripTip: "Drag to move, or click for options",
+    sectionMenu: (name: string) => `Section: ${name}`,
+    moveSectionUp: "Move section up",
+    moveSectionDown: "Move section down",
+    sectionMoved: (name: string, position: number, total: number) => `${name} moved to position ${position} of ${total}`,
     noPages: "No pages yet.",
     newPage: "New page",
     newFolder: "New folder",

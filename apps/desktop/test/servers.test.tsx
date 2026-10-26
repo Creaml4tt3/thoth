@@ -285,10 +285,12 @@ describe("sidebar", () => {
     const items = within(list).getAllByRole("treeitem");
     expect(items.map((i) => i.textContent)).toEqual(["DesignWorkspace", "ResearchWorkspace"]);
     expect(within(items[0]!).getByText("Workspace").className).toContain("badge-workspace");
-    // The Private Space keeps its Local badge and comes first.
+    // The Private Space keeps its Local badge and comes first (until the person moves a section, sidebar-sections.test.tsx).
     const nav = screen.getByRole("navigation", { name: "Pages" });
-    expect(nav.querySelector(".badge-private")).toBeNull();
-    expect(document.querySelector(".sidebar .badge-private")?.textContent).toBe("Local");
+    const sections = within(nav).getAllByRole("region").filter((r) => r.classList.contains("side-section"));
+    expect(sections.map((r) => r.getAttribute("aria-label"))).toEqual([expect.stringMatching(/^Private Space /), "Server Team server"]);
+    expect(sections[0]!.querySelector(".badge-private")?.textContent).toBe("Local");
+    expect(section.querySelector(".badge-private")).toBeNull();
   });
 
   it("a signed-out server shows Sign in, which opens Settings → Servers", async () => {

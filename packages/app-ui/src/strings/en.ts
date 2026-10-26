@@ -334,6 +334,7 @@ export const en = {
       "tree.rename": "Rename",
       "tree.reorder": "Move the page up or down",
       "tree.menu": "Open the page's menu",
+      "section.move": "Move the sidebar section up or down",
       "editor.save": "Save now",
       "editor.mode": "Switch between Blocks and Plain",
       "editor.blockMenu": "Block menu",

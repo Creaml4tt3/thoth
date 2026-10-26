@@ -5,7 +5,6 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
-import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useAcrossDropZone } from "@thoth/app-ui/order/dnd.ts";
 import { onSpaceDrop, useSpaceHoverAt } from "@thoth/app-ui/order/space-drag.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -14,7 +13,9 @@ import { privateAcross } from "./space-drop.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ancestorFolders, buildTree } from "./tree.ts";
 import { PrivateTree, type Selection } from "./PrivateTree.tsx";
-import { ServersSidebar } from "../servers/ServersSidebar.tsx";
+import { useServerSections } from "../servers/ServersSidebar.tsx";
+import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
+import { PRIVATE_SECTION } from "./sections.ts";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -69,7 +70,11 @@ function PendingTransfers() {
   );
 }
 
-/** 260px page tree grouped by folder, with the Local space badge, search and new-page actions; workspace servers below it. */
+/**
+ * The sidebar: the brand row and search at the top and the actions at the bottom, which stay put, and between them the
+ * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
+ * one section per workspace server.
+ */
 export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
@@ -176,6 +181,47 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
   const rootDrop = useAcrossDropZone((drag, move) => privateAcross(servers, drag, "", null, move, ttree.across));
   const rootLit = useSpaceHoverAt((to) => to.kind === "private" && to.folder === "");
 
+  const privateSection: SidebarSection = {
+    id: PRIVATE_SECTION,
+    name: connection.label,
+    label: t.privateSection(connection.label),
+    title: connection.root,
+    drop: rootDrop,
+    dropLit: rootLit,
+    actions: (
+      <>
+        {pages.length > 0 && (
+          <IconButton icon={selecting ? "done" : "select"} label={selecting ? tt.selectDone : tt.select} aria-pressed={selecting} onClick={() => (selecting ? setSelecting(false) : startSelecting())} />
+        )}
+        <span className="badge badge-private">{t.local}</span>
+      </>
+    ),
+    children: (
+      <>
+        {selecting && (
+          <div className="select-bar" role="region" aria-label={tt.select}>
+            <span aria-live="polite">{tt.selected(picked.size)}</span>
+            <div className="set-actions">
+              <Button variant="primary" small disabled={picked.size === 0} onClick={() => transfer("copy")}>
+                {tt.copyTo}
+              </Button>
+              <Button variant="ghost" small disabled={picked.size === 0} onClick={() => transfer("move")}>
+                {tt.moveTo}
+              </Button>
+              {agents && (
+                <Button variant="ghost" small disabled={picked.size === 0} onClick={askAgent}>
+                  {ta.askAgent}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
+      </>
+    ),
+  };
+  const serverSections = useServerSections(currentRemote);
+
   return (
     <aside className="sidebar" aria-label={t.sidebar}>
       <div className="ws">
@@ -186,38 +232,8 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
         <span>{t.search}</span>
         <kbd>⌘K</kbd>
       </button>
-      <div className="sec sec-drop" data-drop={rootLit ? "inside" : undefined} {...rootDrop}>
-        <span className="sec-name" title={connection.root} {...tipIfClipped(connection.label)}>
-          {connection.label}
-        </span>
-        <span className="sec-actions">
-          {pages.length > 0 && (
-            <IconButton icon={selecting ? "done" : "select"} label={selecting ? tt.selectDone : tt.select} aria-pressed={selecting} onClick={() => (selecting ? setSelecting(false) : startSelecting())} />
-          )}
-          <span className="badge badge-private">{t.local}</span>
-        </span>
-      </div>
-      {selecting && (
-        <div className="select-bar" role="region" aria-label={tt.select}>
-          <span aria-live="polite">{tt.selected(picked.size)}</span>
-          <div className="set-actions">
-            <Button variant="primary" small disabled={picked.size === 0} onClick={() => transfer("copy")}>
-              {tt.copyTo}
-            </Button>
-            <Button variant="ghost" small disabled={picked.size === 0} onClick={() => transfer("move")}>
-              {tt.moveTo}
-            </Button>
-            {agents && (
-              <Button variant="ghost" small disabled={picked.size === 0} onClick={askAgent}>
-                {ta.askAgent}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
       <nav aria-label={t.pages} className="tree-wrap">
-        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
-        <ServersSidebar current={currentRemote} />
+        <SidebarSections root={connection.root} sections={[privateSection, ...serverSections]} />
       </nav>
       <PendingTransfers />
       <div className="side-actions">

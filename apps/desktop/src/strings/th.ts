@@ -27,6 +27,13 @@ export const th: DesktopStrings = {
     local: "ในเครื่อง",
     pages: "หน้า",
     pagesInSpace: "หน้าใน Private Space นี้",
+    privateSection: (label) => `Private Space ${label}`,
+    sectionOptions: (name) => `ตัวเลือกของส่วน ${name}`, // REVIEW
+    sectionGripTip: "ลากเพื่อย้าย หรือคลิกเพื่อดูตัวเลือก", // REVIEW
+    sectionMenu: (name) => `ส่วน: ${name}`, // REVIEW
+    moveSectionUp: "ย้ายส่วนขึ้น", // REVIEW
+    moveSectionDown: "ย้ายส่วนลง", // REVIEW
+    sectionMoved: (name, position, total) => `ย้าย ${name} ไปลำดับที่ ${count(position)} จาก ${count(total)}`,
     noPages: "ยังไม่มีหน้า",
     newPage: "หน้าใหม่",
     newFolder: "โฟลเดอร์ใหม่",

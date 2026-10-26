@@ -52,7 +52,7 @@ describe("the shortcut table", () => {
     // The global handler works over everything; a tree, an editor and a dialog each have their own keys.
     const seen = new Map<string, string>();
     for (const { def, sig } of placed(client, platform)) {
-      const places = def.scope === "global" ? ["global", "tree", "tabs", "editor", "dialog"] : [def.scope];
+      const places = def.scope === "global" ? ["global", "tree", "tabs", "sidebar", "editor", "dialog"] : [def.scope];
       for (const place of places) {
         const key = `${place}:${sig}`;
         const other = seen.get(key);

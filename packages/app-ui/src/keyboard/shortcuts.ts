@@ -51,6 +51,7 @@ export type ShortcutId =
   | "tree.rename"
   | "tree.reorder"
   | "tree.menu"
+  | "section.move"
   | "editor.save"
   | "editor.mode"
   | "editor.blockMenu"
@@ -70,10 +71,11 @@ export type ShortcutId =
 export type ShortcutGroup = "general" | "assistant" | "tabs" | "tree" | "editor";
 
 /**
- * Who acts on the key. "global": `useShortcuts` (the app passes the handlers). "tree", "tabs", "editor" and "dialog":
- * the focused tree, tab, editor or dialog handles it itself; the entry is here so the list shows it and the tests see it.
+ * Who acts on the key. "global": `useShortcuts` (the app passes the handlers). "tree", "tabs", "sidebar", "editor" and
+ * "dialog": the focused tree, tab, sidebar section header, editor or dialog handles it itself; the entry is here so the
+ * list shows it and the tests see it.
  */
-export type ShortcutScope = "global" | "tree" | "tabs" | "editor" | "dialog";
+export type ShortcutScope = "global" | "tree" | "tabs" | "sidebar" | "editor" | "dialog";
 
 export interface ShortcutDef {
   id: ShortcutId;
@@ -155,6 +157,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "tree.rename", group: "tree", scope: "tree", desktop: [{ key: "F2" }] },
   { id: "tree.reorder", group: "tree", scope: "tree", desktop: [{ key: "ArrowUp", alt: true, shift: true }, { key: "ArrowDown", alt: true, shift: true }], display: { desktop: "Alt+Shift+↑ / ↓" } },
   { id: "tree.menu", group: "tree", scope: "tree", desktop: [{ key: "ContextMenu" }, { key: "F10", shift: true }], display: { desktop: "Menu key / Shift+F10" } },
+  // On a sidebar section's header (ADR-0019 amendment; the desktop has sections, the web client's sidebar has one list).
+  { id: "section.move", group: "tree", scope: "sidebar", only: "desktop", desktop: [{ key: "ArrowUp", alt: true, shift: true }, { key: "ArrowDown", alt: true, shift: true }], display: { desktop: "Alt+Shift+↑ / ↓" } },
 
   // The editor
   { id: "editor.save", group: "editor", scope: "editor", desktop: [{ key: "s", mod: true }] },

@@ -4,9 +4,20 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
+  /** Six dots: something that can be dragged to a new place (a sidebar section's handle). */
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="0.6" />
+      <circle cx="15" cy="6" r="0.6" />
+      <circle cx="9" cy="12" r="0.6" />
+      <circle cx="15" cy="12" r="0.6" />
+      <circle cx="9" cy="18" r="0.6" />
+      <circle cx="15" cy="18" r="0.6" />
+    </>
+  ),
   bell: (
     <>
       <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
