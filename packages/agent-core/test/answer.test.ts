@@ -31,3 +31,26 @@ describe("runAnswer", () => {
     expect(runAnswer([session, text("Not logged in · Please run /login"), { type: "result", ok: false, text: "Not logged in · Please run /login" }, exit])).toBeNull();
   });
 });
+
+describe("the answer names pages as you know them, not by the run's private work folder", () => {
+  const work = "/Users/a/Library/Application Support/io.github.creaml4tt3.thoth/agent-runs/run_5b11accfe44550c4eeeb9c2bcfbce1c1/work";
+  const url = `file://${work.replace(/ /g, "%20")}`;
+  const answer = (t: string) => runAnswer([text(t), { type: "result", ok: true, text: t }, exit]);
+
+  it("turns a Markdown link into the work folder into the page's path", () => {
+    expect(answer(`I wrote it beneath the heading in [Test 2.md](${url}/Test%202.md).`)).toBe("I wrote it beneath the heading in Test 2.md.");
+    // A label that is not the path keeps the path next to it.
+    expect(answer(`See [the drawing](${url}/Notes/bird-uric-acid.svg).`)).toBe("See the drawing (Notes/bird-uric-acid.svg).");
+  });
+
+  it("turns bare file URLs and absolute paths into the work folder into vault paths, /private too", () => {
+    expect(answer(`Saved ${url}/Notes/A%20b.md and ${work}/Plan.md and /private${work}/x.md.`)).toBe("Saved Notes/A b.md and Plan.md and x.md.");
+    expect(answer(`<${url}/Test%202.md>`)).toBe("<Test 2.md>");
+    expect(answer(`Look in C:\\Users\\a\\AppData\\Roaming\\io.github.creaml4tt3.thoth\\agent-runs\\run_5b11accfe44550c4eeeb9c2bcfbce1c1\\work\\Notes\\Plan.md now`)).toBe("Look in Notes/Plan.md now");
+  });
+
+  it("leaves every other path and link alone", () => {
+    const other = "Read /etc/hosts, https://example.org/a%20b and [x](file:///Users/a/Notes/x.md); agent-runs/run_x/work/y stays.";
+    expect(answer(other)).toBe(other);
+  });
+});
