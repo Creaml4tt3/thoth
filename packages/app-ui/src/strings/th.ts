@@ -79,6 +79,29 @@ export const th: Strings = {
       copy: "คัดลอกลิงก์",
     },
 
+    image: {
+      slash: { title: "รูปภาพ", description: "เพิ่มรูปจากไฟล์" },
+      unnamed: (name) => `รูปภาพ: ${name}`,
+      loading: (name) => `กำลังโหลดรูป: ${name}`,
+      missing: (name) => `ไม่พบรูป: ${name}`,
+      refused: (name) => `ไม่แสดงรูปที่อยู่นอกพื้นที่นี้: ${name}`, // REVIEW
+      notImage: (name) => `ไม่ใช่ไฟล์รูป: ${name}`,
+      tooLarge: (name) => `รูปใหญ่เกิน 20 MB จึงไม่แสดง: ${name}`,
+      unreadable: (name) => `อ่านไฟล์รูปไม่ได้: ${name}`,
+      remote: "รูปจากเว็บ ไม่ได้โหลด:", // REVIEW
+      remoteTitle: "แอปไม่โหลดรูปจากเว็บ เปิดที่อยู่นี้ในเบราว์เซอร์ได้", // REVIEW
+      editAlt: "แก้ข้อความแทนรูป", // REVIEW
+      altLabel: "ข้อความแทนรูป", // REVIEW
+      altHint: "อธิบายรูปสำหรับคนที่มองไม่เห็นรูป กด Enter เพื่อบันทึก กด Escape เพื่อยกเลิก", // REVIEW
+      save: "บันทึก",
+      cancel: "ยกเลิก",
+      adding: "กำลังเพิ่มรูป…",
+      added: (name) => `เพิ่มรูปแล้ว: ${name}`,
+      addFailed: (detail) => `เพิ่มรูปไม่สำเร็จ: ${detail}`,
+      notAnImageFile: "ไฟล์นี้ไม่ใช่รูปที่หน้าแสดงได้", // REVIEW
+      fileTooLarge: "รูปใหญ่เกิน 20 MB",
+    },
+
     blocks: {
       text: { title: "ข้อความ", description: "ย่อหน้าธรรมดา" },
       h1: { title: "หัวข้อ 1", description: "หัวข้อใหญ่ของส่วน" },

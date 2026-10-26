@@ -98,6 +98,33 @@ export const en = {
       copy: "Copy link",
     },
 
+    /** Images in pages (ADR-0028). `name` is the file name, or the address as written. */
+    image: {
+      /** The `/` menu item. */
+      slash: { title: "Image", description: "Add a picture from a file" },
+      /** The accessible name of an image whose alt text is empty. */
+      unnamed: (name: string) => `Image: ${name}`,
+      loading: (name: string) => `Loading image: ${name}`,
+      missing: (name: string) => `Image not found: ${name}`,
+      refused: (name: string) => `Image not shown (outside this space): ${name}`,
+      notImage: (name: string) => `Not an image: ${name}`,
+      tooLarge: (name: string) => `Image too large to show (over 20 MB): ${name}`,
+      unreadable: (name: string) => `Could not read image: ${name}`,
+      /** A web image is not loaded; its address is a link. */
+      remote: "Web image, not loaded:",
+      remoteTitle: "Images from the web are not loaded. Open the address in your browser.",
+      editAlt: "Edit alt text",
+      altLabel: "Alt text",
+      altHint: "Describe the image for people who cannot see it. Enter saves, Escape cancels.",
+      save: "Save",
+      cancel: "Cancel",
+      adding: "Adding image…",
+      added: (name: string) => `Image added: ${name}`,
+      addFailed: (detail: string) => `Could not add the image: ${detail}`,
+      notAnImageFile: "This file is not an image a page can show.",
+      fileTooLarge: "The image is larger than 20 MB.",
+    },
+
     blocks: {
       text: { title: "Text", description: "Plain paragraph" },
       h1: { title: "Heading 1", description: "Big section heading" },

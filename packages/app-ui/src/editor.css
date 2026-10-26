@@ -23,7 +23,34 @@
 .prose table { border-collapse: collapse; margin: 0.8em 0; }
 .prose td, .prose th { border: 1px solid var(--thoth-border-strong); padding: 6px 10px; min-width: 60px; text-align: left; }
 .prose th { background: var(--thoth-bg-hover); font-weight: 600; }
-.prose img { max-width: 100%; border-radius: var(--thoth-radius-md); }
+.prose img { max-width: 100%; height: auto; border-radius: var(--thoth-radius-md); }
+
+/* Images in pages (ADR-0028): shown from blob URLs; placeholders name the file. */
+.page-image { display: block; margin: 0.8em 0; max-width: 100%; }
+.page-image.is-inline { display: inline-block; margin: 0; vertical-align: bottom; }
+.page-image-frame { display: block; max-width: 100%; }
+.page-image.is-inline .page-image-frame { display: inline-block; }
+.page-image-img { display: block; max-width: 100%; height: auto; }
+.page-image.is-inline .page-image-img { display: inline-block; max-height: 1.6em; vertical-align: text-bottom; border-radius: var(--thoth-radius-xs); }
+.page-image-placeholder { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 6px 12px; border: 1px dashed var(--thoth-border-strong); border-radius: var(--thoth-radius-md); background: var(--thoth-bg-sidebar); color: var(--thoth-ink-secondary); font: var(--thoth-text-small); overflow-wrap: anywhere; }
+.page-image[data-image-state="loading"] .page-image-placeholder { border-style: solid; border-color: var(--thoth-border); color: var(--thoth-ink-tertiary); }
+.page-image[data-image-state="loading"] .page-image-frame { display: flex; align-items: center; }
+.page-image.is-inline .page-image-placeholder { padding: 0 6px; gap: 4px; vertical-align: baseline; }
+.page-image-icon { flex: none; color: var(--thoth-ink-tertiary); }
+.page-image-icon:empty { display: none; }
+.page-image-remote { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; max-width: 100%; padding: 6px 12px; min-height: 24px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg-sidebar); color: var(--thoth-ink-primary); text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+.page-image-remote:hover { background: var(--thoth-bg-hover); }
+.page-image-remote:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.page-image-remote .page-image-url { color: var(--thoth-link); font: var(--thoth-text-small); text-decoration: underline; text-underline-offset: 3px; }
+.page-image.is-inline .page-image-remote { padding: 0 6px; }
+.page-image.ProseMirror-selectednode { outline-offset: 4px; }
+.page-image-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; padding: 8px; max-width: 520px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-small); }
+.page-image.is-inline .page-image-alt { position: absolute; z-index: 5; }
+.page-image-alt-input { flex: 1 1 220px; min-width: 0; min-height: 32px; padding: 4px 8px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; }
+.page-image-alt-button { min-height: 32px; min-width: 44px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; cursor: pointer; }
+.page-image-alt-button.is-primary { background: var(--thoth-accent); border-color: var(--thoth-accent); color: var(--thoth-on-accent); }
+.page-image-alt-hint { flex-basis: 100%; color: var(--thoth-ink-tertiary); }
+.image-insert-status { position: absolute; }
 .ProseMirror-selectednode { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: var(--thoth-radius-sm); }
 
 /* Wikilink chips: content uses Notion radii, not pills */

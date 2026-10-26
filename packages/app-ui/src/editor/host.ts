@@ -4,6 +4,7 @@
  */
 import { createContext, useContext } from "react";
 import type { LinkPreviewService } from "./link-previews.ts";
+import type { ImageFile } from "./media.ts";
 
 export interface PageHost {
   /** Which app this is, for the keys the editor binds (the web client avoids keys a browser keeps). Default: the desktop app. */
@@ -15,6 +16,8 @@ export interface PageHost {
   registerFlush(flush: () => Promise<boolean>): () => void;
   /** Link previews (ADR-0020): only the desktop app has them. Absent: links show as links, nothing is fetched. */
   links?: LinkPreviewService;
+  /** Asks for an image file to add to a page (ADR-0028): the host's picker on the desktop, `<input type=file>` on the web. Null: cancelled. */
+  pickImage?(): Promise<ImageFile | null>;
 }
 
 export const PageHostContext = createContext<PageHost | null>(null);

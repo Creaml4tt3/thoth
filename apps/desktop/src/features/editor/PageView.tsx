@@ -6,6 +6,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { Backlinks } from "./Backlinks.tsx";
 import { loadLinkLookup, vaultPageStore } from "./vault-store.ts";
+import { vaultPageMedia } from "./vault-media.ts";
 
 /** A page of the Private Space: a Markdown file in the vault. */
 export function PageView({ path }: { path: string }) {
@@ -13,6 +14,7 @@ export function PageView({ path }: { path: string }) {
   const strings = useDesktopStrings();
   const t = strings.page;
   const store = useMemo(() => vaultPageStore(vault, path), [vault, path]);
+  const media = useMemo(() => vaultPageMedia(vault, path), [vault, path]);
   const loadLinks = useCallback(() => loadLinkLookup(vault, path), [vault, path]);
   const onWritten = useCallback(() => void refresh().catch(() => undefined), [refresh]);
   // A save conflict is a notification (ADR-0018): the page's name and where it is, nothing of its text.
@@ -26,6 +28,7 @@ export function PageView({ path }: { path: string }) {
     <PageFrame
       label={path}
       store={store}
+      media={media}
       modeKey={{ space: connection.root, page: path }}
       crumbs={{ badge: <span className="badge badge-private">{strings.shell.local}</span>, parts: path.split("/") }}
       checkTick={revision}

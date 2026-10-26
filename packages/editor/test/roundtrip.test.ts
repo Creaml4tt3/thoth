@@ -42,6 +42,10 @@ describe("untouched round-trip is byte-identical", () => {
     "html comment": "<!-- c -->\n\ntext\n",
     "tight glue": "para\n# Heading\ntext\n> quote\n",
     "wikilinks": "[[T]] [[T|a]] [[T#H]] [[T#^b]] ![[img.png]]\n",
+    // ADR-0028: the spellings images are written in, by people, agents and importers.
+    images:
+      "# Birds\n\n![Uric acid crystals](bird-uric-acid.svg)\n\n![](my%20photo.png \"Title\")\n\n![Notion](../attachments/0f3a2b/Screen%20Shot.png)\n\n" +
+      "![spaces](<my photo (1).png>)\n\ntext ![inline](a.png) text\n\n![web](https://example.com/a.png)\n\n![ws](thoth:attachment/01920000-0000-7000-8000-000000000001)\n",
     "table with excess cells": "| a |\n|---|\n| x | y |\n",
     "thematic break first": "***\n\ntext\n",
     "nul and controls": "a\u0000b\u0007c\n",

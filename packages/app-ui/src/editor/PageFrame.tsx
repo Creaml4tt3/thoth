@@ -8,6 +8,7 @@ import { ConflictDialog } from "./ConflictDialog.tsx";
 import { PageEditor, type PageEditorHandle } from "./PageEditor.tsx";
 import { createEditorContext } from "./context.ts";
 import { EMPTY_LOOKUP, type LinkLookup } from "./links.ts";
+import type { PageMedia } from "./media.ts";
 import { EMPTY_SUGGESTER, type LinkSuggester } from "./link-suggest.ts";
 import { registerEditorActions } from "../keyboard/editor-actions.ts";
 import { usePageSession } from "./usePageSession.ts";
@@ -76,6 +77,8 @@ export interface PageFrameProps {
   /** Changes whenever the stored page may have changed (index revision, change feed). */
   checkTick: number;
   onWritten(): void;
+  /** Where the page's images come from and where added ones go (ADR-0028). Absent: images show their placeholder. */
+  media?: PageMedia;
   /** Wikilink resolution; null leaves every link unresolved. */
   loadLinks: (() => Promise<{ lookup: LinkLookup; suggester: LinkSuggester }>) | null;
   linkTick: number;
@@ -116,9 +119,22 @@ export function PageFrame(props: PageFrameProps) {
   const space = store.kind === "file" ? "private" : "workspace";
   const linkService = pageHost.links;
   const links = useMemo(() => linkService?.forPage({ space, key: `${modeKey.space}\n${modeKey.page}` }), [linkService, space, modeKey.space, modeKey.page]);
+  const media = useRef(props.media ?? null);
+  media.current = props.media ?? null;
+  const pickImage = pageHost.pickImage;
   const ctx = useMemo(
-    () => createEditorContext({ lookup: () => lookup.current, suggester: () => suggester.current, openPage: (p) => open.current(p), strings: t, client, ...(links ? { links } : {}) }),
-    [t, client, links],
+    () =>
+      createEditorContext({
+        lookup: () => lookup.current,
+        suggester: () => suggester.current,
+        openPage: (p) => open.current(p),
+        strings: t,
+        client,
+        media: () => media.current,
+        ...(links ? { links, openExternal: (url: string) => links.open(url) } : {}),
+        ...(pickImage ? { pickImage } : {}),
+      }),
+    [t, client, links, pickImage],
   );
   const { session, state } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten });
 

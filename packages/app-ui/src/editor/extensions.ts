@@ -9,6 +9,7 @@ import { history, redo, undo } from "@tiptap/pm/history";
 import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
 import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
+import { imageView } from "./image-views.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
@@ -72,6 +73,8 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     wikilink: wikilinkView(ctx),
     embed: embedView(ctx),
     taskItem: taskItemView(ctx),
+    image: imageView(ctx, false),
+    inlineImage: imageView(ctx, true),
   };
   const base = thothExtensions().map((ext) => {
     const view = views[ext.name];
