@@ -66,6 +66,8 @@ export interface SendRequest {
   query?: Record<string, string>;
   headers?: Record<string, string>;
   body?: Uint8Array;
+  /** The response is binary (an attachment): a successful body comes as `bytes`. */
+  binary?: boolean;
 }
 
 export interface SendResponse {
@@ -73,6 +75,8 @@ export interface SendResponse {
   /** Lower-case header names. */
   headers: Record<string, string>;
   body: string;
+  /** With `binary`, a successful response's body. */
+  bytes?: Uint8Array;
 }
 
 export type Send = (request: SendRequest) => Promise<SendResponse>;
@@ -228,6 +232,17 @@ export class WorkspaceClient {
     if (options.idempotencyKey !== undefined) headers["idempotency-key"] = options.idempotencyKey;
     const query: Record<string, string> = options.fileName === undefined ? {} : { fileName: options.fileName };
     return (await this.request(AttachmentResourceSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/attachments`, query, headers, body: bytes, ok: [201] })).data;
+  }
+
+  /**
+   * An attachment's bytes and stored MIME type (capability `attachments`), through the authorised download. Images in
+   * workspace pages are shown from these (ADR-0028).
+   */
+  async getAttachment(workspaceId: string, attachmentId: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    const response = await this.send({ method: "GET", path: `${API_BASE_PATH}/workspaces/${seg(workspaceId)}/attachments/${seg(attachmentId)}`, binary: true });
+    if (response.status !== 200) throw problemFromResponse(response.status, response.body);
+    if (!response.bytes) throw new ProtocolError("The server sent no attachment bytes.", response.status);
+    return { bytes: response.bytes, mimeType: (response.headers["content-type"] ?? "application/octet-stream").split(";")[0]!.trim().toLowerCase() };
   }
 
   /**

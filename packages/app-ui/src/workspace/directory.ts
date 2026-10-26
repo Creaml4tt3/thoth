@@ -76,6 +76,14 @@ function kindsOf(nodes: readonly TreeNode[]): TreeState["kinds"] {
 /** How many pages are read at once to find out which are folders (servers without `page-kind`). */
 const KIND_WORKERS = 4;
 
+/** The bytes of a base64 body (an attachment, ADR-0028). */
+function fromBase64(text: string): Uint8Array {
+  const binary = atob(text);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
+}
+
 export class ServerDirectory {
   private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {}, limits: {}, deleted: {} };
   private readonly kindWork = new Set<string>();
@@ -281,11 +289,19 @@ export class ServerDirectory {
     if (!client) {
       const send: Send = async (req) => {
         const response = await this.servers.call(
-          { server, method: req.method, path: req.path, ...(req.query ? { query: req.query } : {}), ...(req.headers ? { headers: req.headers } : {}) },
+          {
+            server,
+            method: req.method,
+            path: req.path,
+            ...(req.query ? { query: req.query } : {}),
+            ...(req.headers ? { headers: req.headers } : {}),
+            ...(req.binary ? { responseBytes: true } : {}),
+          },
           req.body,
         );
         if (response.status === 401) this.markSignedOut(server);
-        return response;
+        const { bodyBase64, ...rest } = response;
+        return bodyBase64 === undefined ? rest : { ...rest, bytes: fromBase64(bodyBase64) };
       };
       client = new WorkspaceClient(send);
       this.clients.set(server, client);

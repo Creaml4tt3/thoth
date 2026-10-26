@@ -5,6 +5,7 @@ import { useStrings } from "../strings/index.ts";
 import { Notice } from "../ui/Notice.tsx";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { workspacePageStore } from "./workspace-store.ts";
+import { workspacePageMedia } from "./workspace-media.ts";
 
 export interface WorkspacePageProps {
   directory: ServerDirectory;
@@ -55,6 +56,8 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
     () => (role ? workspacePageStore({ client: directory.client(target.server), workspace: target.workspace, page: target.page, role, onSaved: (page) => directory.notePageSaved(target.server, page) }) : null),
     [directory, target.server, target.workspace, target.page, role],
   );
+  // Images (ADR-0028): attachments through the authorised download; editors upload new ones.
+  const media = useMemo(() => workspacePageMedia(directory.client(target.server), target.workspace, { canWrite: role !== undefined && role !== "viewer" }), [directory, target.server, target.workspace, role]);
   const onWritten = useCallback(() => undefined, []);
   const openCopy = useCallback((page: string) => openPage({ ...target, page }), [openPage, target]);
 
@@ -79,6 +82,7 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
       key={`${key}\n${target.page}`}
       label={title}
       store={store}
+      media={media}
       modeKey={{ space: `${modeSpace}\n${target.workspace}`, page: target.page }}
       crumbs={{ badge: <span className="badge badge-workspace">{t.badge(name)}</span>, parts: [title] }}
       checkTick={tree?.ticks[target.page] ?? 0}

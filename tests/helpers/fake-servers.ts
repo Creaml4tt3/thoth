@@ -344,6 +344,14 @@ export class FakeServers implements Servers {
       ws.attachments.set(id, { id, bytes: data, mimeType, hash, ...(query["fileName"] ? { fileName: query["fileName"] } : {}) });
       return json(201, { id, workspaceId: ws.id, hash, size: data.length, mimeType, ...(query["fileName"] ? { fileName: query["fileName"] } : {}), createdAt: iso(T0), createdBy: "usr_me" });
     }
+    const at = /^\/attachments\/([^/]+)$/.exec(rest);
+    if (at && method === "GET") {
+      if (!this.capable(server, "attachments")) return fail("capability_not_supported");
+      const found = ws.attachments.get(decodeURIComponent(at[1]!));
+      if (!found) return fail("not_found");
+      // `responseBytes` (ADR-0028): the bytes as base64, as the host sends them.
+      return { status: 200, headers: { "content-type": found.mimeType }, body: "", bodyBase64: Buffer.from(found.bytes).toString("base64") };
+    }
     const mv = /^\/pages\/([^/]+)\/move$/.exec(rest);
     if (mv && method === "POST") return this.move(server, ws, decodeURIComponent(mv[1]!), headers, text);
     const sl = /^\/pages\/([^/]+)\/share-links$/.exec(rest);

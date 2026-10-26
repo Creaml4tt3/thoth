@@ -18,6 +18,7 @@ import { tabMoves, useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
+import { pickImageWithInput } from "@thoth/app-ui/editor/media.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
@@ -82,7 +83,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     return () => void flushers.current.delete(flush);
   }, []);
   const flushAll = useCallback(async () => (await Promise.all([...flushers.current].map((f) => f().catch(() => false)))).every(Boolean), []);
-  const pageHost = useMemo<PageHost>(() => ({ client: "web", autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush }), [env, registerFlush]);
+  // Images (ADR-0028): the browser's own file picker.
+  const pageHost = useMemo<PageHost>(() => ({ client: "web", autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush, pickImage: () => pickImageWithInput() }), [env, registerFlush]);
 
   // Tabs: restored per browser (ids only, no titles), saved on every change. Leaving the page on screen writes its edits first.
   const tabs = useTabs({ initial: () => loadTabs(env.localStorage), flush: flushAll, save: (state) => saveTabs(env.localStorage, state) });

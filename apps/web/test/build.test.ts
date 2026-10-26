@@ -34,6 +34,8 @@ describe("web client production build", () => {
     expect(directives["default-src"]).toEqual(["'self'"]);
     expect(directives["connect-src"]).toEqual(["'self'", SERVER, "https://*.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"]);
     expect(directives["script-src"]).toEqual(["'self'", "https://www.googletagmanager.com"]);
+    // Images in pages are shown from blob: URLs the page makes from authorised downloads (ADR-0028); never the server's own address.
+    expect(directives["img-src"]).toEqual(["'self'", "data:", "blob:", "https://*.google-analytics.com", "https://www.googletagmanager.com"]);
     expect(directives["frame-ancestors"]).toEqual(["'none'"]);
     expect(directives["base-uri"]).toEqual(["'none'"]);
     expect(directives["form-action"]).toEqual(["'self'", SERVER]);

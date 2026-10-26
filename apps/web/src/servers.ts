@@ -90,6 +90,13 @@ export class WebServers implements Servers {
       const value = res.headers.get(name);
       if (value !== null) headers[name] = value;
     }
+    // An attachment's bytes (ADR-0028): as base64, the way the desktop host sends them.
+    if (args.responseBytes && res.ok) {
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return { status: res.status, headers, body: "", bodyBase64: btoa(binary) };
+    }
     return { status: res.status, headers, body: await res.text() };
   }
 
