@@ -69,18 +69,19 @@
 .side-section { position: relative; border-radius: var(--thoth-radius-md); }
 .side-section + .side-section { margin-top: 6px; }
 .side-section > .sec { justify-content: flex-start; gap: 2px; padding: 6px 4px 4px 0; -webkit-user-select: none; user-select: none; }
-.sec-grip { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: grab; touch-action: none; opacity: 0; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.sec-grip { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: grab; touch-action: manipulation; opacity: 0; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .sec:hover .sec-grip, .sec:focus-within .sec-grip, .side-section[data-dragging] .sec-grip { opacity: 1; }
 .sec-grip:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .sec-grip:focus-visible { opacity: 1; outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 @media (hover: none) { .sec-grip { opacity: 1; } }
 .sec-toggle { all: unset; box-sizing: border-box; flex: 1; min-width: 0; min-height: 24px; display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); font: var(--thoth-text-small); cursor: pointer; transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .sec-toggle:hover { color: var(--thoth-ink-primary); }
+.sec-toggle .sec-name { min-width: 0; }
 .sec-toggle:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .sec-actions { flex: none; display: flex; align-items: center; gap: 4px; }
 .side-section[data-dragging] { z-index: 2; background: var(--thoth-bg-sidebar); box-shadow: var(--thoth-shadow-pop); }
 [data-section-dragging] .side-section:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
-[data-section-dragging], [data-section-dragging] * { cursor: grabbing; }
+[data-section-dragging], [data-section-dragging] * { cursor: grabbing; -webkit-user-select: none; user-select: none; }
 .sec-link { all: unset; cursor: pointer; color: var(--thoth-accent); font: var(--thoth-text-small); border-radius: var(--thoth-radius-xs); transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .sec-link:hover { text-decoration: underline; }
 .sec-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
