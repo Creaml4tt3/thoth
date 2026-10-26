@@ -283,3 +283,33 @@ for (const scheme of ["light", "dark"] as const) {
     await page.mouse.move(700, 600);
   });
 }
+
+test("the window never scrolls as a whole, even on the long Settings page: only the page area scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 600 });
+  await page.getByRole("button", { name: "Settings" }).click();
+  const scroller = page.locator(".page-scroll").first();
+  await expect(scroller).toBeVisible();
+  // The settings page is longer than the window, and its own area scrolls to its end.
+  expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  // A wheel over the sidebar and a scroll asked of the document (what a focus or scrollIntoView does) move nothing.
+  await page.mouse.move(100, 400);
+  await page.mouse.wheel(0, 2000);
+  await page.evaluate(() => {
+    window.scrollTo(0, 10_000);
+    document.scrollingElement?.scrollTo(0, 10_000);
+    document.querySelector(".shell")?.scrollTo(0, 10_000);
+  });
+  await settled(page);
+  const where = await page.evaluate(() => ({
+    scrolled: window.scrollY,
+    tall: (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight,
+    shellTop: document.querySelector(".shell")!.getBoundingClientRect().top,
+    shellScrolled: document.querySelector(".shell")!.scrollTop,
+    mainScrolled: document.querySelector(".main")!.scrollTop,
+    sidebarBottom: document.querySelector(".sidebar")!.getBoundingClientRect().bottom,
+  }));
+  expect(where).toEqual({ scrolled: 0, tall: 0, shellTop: 0, shellScrolled: 0, mainScrolled: 0, sidebarBottom: 600 });
+  // The tab bar is still at the top.
+  expect(await page.locator(".tabstrip").evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+});

@@ -1,5 +1,9 @@
-/* Shell (Paper). The sidebar is 260px unless the person dragged its edge (--thoth-sidebar-width, ui/SidebarResizer.tsx). */
-.shell { position: relative; display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+/* Shell (Paper). The sidebar is 260px unless the person dragged its edge (--thoth-sidebar-width, ui/SidebarResizer.tsx).
+   It clips what overflows it and cannot be scrolled, not even by a script: absolutely placed elements deep in a long
+   page (the `.sr-only` labels) have the shell as their containing block, and would otherwise make the whole window
+   scrollable, so a wheel or a scrollIntoView could move the sidebar and tab bar off screen. `hidden` first for WebKit
+   versions without `clip`. */
+.shell { position: relative; display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; overflow: hidden; overflow: clip; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .sidebar { background: var(--thoth-bg-sidebar); border-right: 1px solid var(--thoth-border); padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
 /* The drag handle: an 8px strip over the sidebar's edge, with a line that shows on hover, focus and while dragging. */
 .sidebar-resizer { position: absolute; z-index: 5; top: 0; bottom: 0; inset-inline-start: calc(var(--thoth-sidebar-width) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }
