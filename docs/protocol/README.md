@@ -96,6 +96,7 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `public-share` | `createShareLink`, `listShareLinks`, `revokeShareLink` | public read-only links to a page and its sub-pages, served as HTML at `/s/<token>`; section 10, ADR-0023 |
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
+| `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -121,7 +122,7 @@ is 409 `quota_exceeded` (section 5), never 413 (that is the size of one request)
 | `maxPagesPerWorkspace` | Live pages per workspace. Deleted pages do not count; updates never count. |
 | `maxWorkspaceAttachmentBytes` | Sum of the sizes of a workspace's attachments. Every upload counts, including an upload of bytes the server already stores for another attachment (the quota measures what the workspace holds, not how the server deduplicates). |
 | `maxMembersPerWorkspace` | Members of one workspace. |
-| `maxWorkspacesPerAccount` | Workspaces one account owns. |
+| `maxWorkspacesPerAccount` | Workspaces one account owns. A deleted workspace counts until it is purged (ADR-0025). |
 | `revisionRetentionDays` | Revisions that are not current are removed after this many days; see section 7. |
 
 A server may have further quotas that it does not advertise (for example a server-wide storage
@@ -487,7 +488,7 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   correctness and SHOULD poll the feed on reconnect and at a low background interval.
 - A server MAY send comment lines (`:`) as keep-alives.
 
-## 10. Search, attachments, share links, members and invite links
+## 10. Search, attachments, share links, members, invite links and workspaces
 
 - `POST .../search` (capability `search`) takes `{ query, limit?, cursor?, withinPageId? }`
   and returns a paginated envelope of `{ pageId, title, revisionId, snippet?, score? }`. It
@@ -580,6 +581,25 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   HttpOnly `SameSite=Lax` cookie, and returns to `/i/accept`. There a form `POST /i/accept` joins; it
   needs the ticket, a value derived from it in the form, and a same-origin request (`Origin`, or Fetch
   Metadata when `Origin` is `null`). A GET never joins.
+
+### Workspaces (capability `workspace-management`, ADR-0025)
+
+- `POST /workspaces` (any signed-in account) takes `{ name, exportRestricted? }` and returns 201 with
+  the `Workspace`, the caller its only member and owner. The name is trimmed and must then be 1 to 200
+  characters. `Idempotency-Key` is honoured. Refusals: 409 `quota_exceeded` with `quota:
+  workspacesPerAccount` (owned workspaces, deleted ones included until purged) or `quota:
+  workspaceCreationsPerDay` (with `Retry-After`).
+- `PUT /workspaces/{id}/name` (owners) takes `{ name }` and returns the `Workspace`.
+- `DELETE /workspaces/{id}` (owners, 204). From then on every route of the workspace is 404 for every
+  member and it is not listed; its share and invite links stop, for good. Its members are kept.
+- `GET /deleted-workspaces` lists the caller's deleted workspaces (where they are an owner) that can
+  still be restored, newest first: `{ id, name, exportRestricted, memberCount, deletedAt, deletedBy,
+  restorableUntil }`.
+- `POST /deleted-workspaces/{id}/restore` (owners of it) returns the `Workspace` with its pages and
+  members; its old share and invite links stay revoked. `DELETE /deleted-workspaces/{id}` (owners of it,
+  204) purges it now. Both: 403 for its other members, 404 for anyone else, a live workspace, and one
+  past its 30 days (`DELETED_WORKSPACE_RESTORE_DAYS`).
+- After 30 days the server purges a deleted workspace with its pages, revisions and attachments.
 
 ## 11. Transfers
 

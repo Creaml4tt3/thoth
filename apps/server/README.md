@@ -99,7 +99,8 @@ SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
 
 | Setting | Trial default | Why |
 | --- | --- | --- |
-| `MAX_WORKSPACES_PER_ACCOUNT` / `MAX_MEMBERS_PER_WORKSPACE` / `MAX_PAGES_PER_WORKSPACE` | 1 / 10 / 200 | owner decision |
+| `MAX_WORKSPACES_PER_ACCOUNT` / `MAX_MEMBERS_PER_WORKSPACE` / `MAX_PAGES_PER_WORKSPACE` | 3 / 10 / 200 | owner decision (workspaces: 3 since ADR-0025, was 1) |
+| `MAX_WORKSPACE_CREATIONS_PER_DAY` | 10 | ADR-0025: a guard against creating and purging over and over |
 | `MAX_WORKSPACE_ATTACHMENT_BYTES` | 20 MiB | owner decision |
 | `MAX_ATTACHMENT_BYTES` | **4 MiB** | Vercel Functions reject request bodies above 4.5 MB at the platform, before our code runs. Staying below it means a user sees our clear 413 `payload_too_large` instead of a platform error page. |
 | `MAX_MARKDOWN_BYTES`, `MAX_TRANSFER_BYTES` | 256 KiB, 4 MiB | the same 4.5 MB ceiling applies to `createTransfer` |
@@ -161,6 +162,25 @@ default; for a self-hosted server:
   `invite.revoked`, each with the acting account.
 - **Migration** `011_invites.sql` must be applied before a build that lists `members` and `invite-links` serves
   traffic (with `MIGRATE_ON_START=false`, `node src/cli.ts migrate` with the direct URL). It is additive.
+
+### Several workspaces per account (ADR-0025)
+
+Any signed-in account creates workspaces it owns (`POST /api/v1/workspaces`); owners rename (`PUT .../name`) and
+delete them. On by default; `WORKSPACE_MANAGEMENT=off` switches it off.
+
+- **Delete** sets `workspaces.deleted_at`: `workspaceAccess`, `listWorkspaces`, the share-link and invite-link lookups
+  and the CLI's `add-member` leave the workspace out, so it is 404 everywhere at once; its active share and invite
+  links are revoked in the same transaction, so a restore does not bring them back. Members are kept.
+- **Restore** within 30 days (`POST /deleted-workspaces/{id}/restore`, owners). **Purge** at once
+  (`DELETE /deleted-workspaces/{id}`, owners) or by `maintenance` after 30 days: pages, revisions, attachments,
+  changes, transfers, links and memberships go; the audit trail stays. Blobs no other attachment names are removed
+  after the purge commits, under the `blob-gc` advisory lock that uploads hold shared.
+- **Quota.** `MAX_WORKSPACES_PER_ACCOUNT` counts owned workspaces including deleted ones that can still be restored.
+  `MAX_WORKSPACE_CREATIONS_PER_DAY` caps API creations per account per UTC day (not sign-up, not the CLI).
+- **Audit:** `workspace.created` (with the actor when made through the API), `workspace.renamed`, `workspace.deleted`,
+  `workspace.restored`, `workspace.purged` (actor null when maintenance purged it).
+- **Migration** `012_workspace_deletion.sql` must be applied before a build that lists `workspace-management` serves
+  traffic. It is additive.
 
 ### Public share links (ADR-0023)
 
@@ -276,7 +296,7 @@ The client IP is the socket address unless `TRUST_PROXY` is set, then `x-real-ip
 ## Maintenance
 
 ```sh
-node apps/server/src/cli.ts maintenance      # prints {"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..}
+node apps/server/src/cli.ts maintenance      # prints {"workspacesPurged":..,"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..,"signInRowsDeleted":..}
 curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
 ```
 
@@ -284,6 +304,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
   (deleted pages keep their last revision) and are not pinned by a `from_workspace` transfer that is not terminal
   (`done`, `failed`, `aborted`). A surviving revision is never modified: if its parent was pruned its `parentId` keeps
   naming it and that revision now answers 404; `listPageRevisions` simply omits what is gone.
+- Purges workspaces deleted more than 30 days ago (ADR-0025), one transaction each, then removes their unused blobs.
 - Deletes idempotency records past the 24 h window and expired rate-limit rows.
 - Revisions stay immutable. Migration 006 replaces the trigger so that `UPDATE` is always rejected and `DELETE` is
   allowed only inside a transaction that set `thoth.pruning = on` (transaction-local, so it cannot leak through a

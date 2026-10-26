@@ -69,6 +69,15 @@ Domains used below (change them when you buy your own domain):
    the apps offer "Members…" and invite links right away; without the tables
    every invite call and `/i/<token>` page fails with a database error.
 
+   Migration `012_workspace_deletion.sql` (ADR-0025, several workspaces per
+   account) adds two nullable columns (`workspaces.deleted_at`,
+   `workspaces.deleted_by`) and a partial index, and needs no backfill. It is
+   additive and safe while the old build runs. **Apply it to Neon before you
+   deploy the server build that contains it.** That build lists
+   `workspace-management`, so the apps offer "New workspace…", Rename… and
+   Delete… right away; without the columns every workspace route fails with a
+   database error.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
@@ -154,6 +163,17 @@ names do not work for sign-in cookies.
    callback addresses (`/auth/callback/google`, `/auth/callback/github`) do not
    change. After joining, "Open in Thoth" goes to the web client, derived from
    `WEB_REDIRECT_URIS` (`https://thoth.creaml4tt3.me/app/`).
+
+   Several workspaces per account (ADR-0025) are on in the trial. The trial
+   profile now lets an account own **3** workspaces (it was 1). Deleted
+   workspaces count until they are purged (after 30 days by the daily cron
+   job, or at once with "Delete permanently"):
+
+   | Variable | Trial default | Meaning |
+   | --- | --- | --- |
+   | `MAX_WORKSPACES_PER_ACCOUNT` | `3` | Owned workspaces per account. **If the Vercel project sets this variable (for example to `1` from the first launch), it overrides the profile: change it to `3`, or delete it.** One more is `409 quota_exceeded` (`quota: workspacesPerAccount`) |
+   | `MAX_WORKSPACE_CREATIONS_PER_DAY` | `10` | Workspaces one account may create per UTC day through the API. One more is `409 quota_exceeded` (`quota: workspaceCreationsPerDay`) |
+   | `WORKSPACE_MANAGEMENT` | `on` | `off` hides New workspace, Rename… and Delete… in the apps and answers those calls `501` |
 
 5. The daily cron job that calls `/internal/maintenance` is part of the build
    (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.

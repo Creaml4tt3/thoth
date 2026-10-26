@@ -1131,6 +1131,23 @@ web client, on by default and on the trial server.
   conformance suite against the reference server.
 - **Before the deploy:** apply `apps/server/migrations/011_invites.sql` to Neon (docs/deploy/trial.md).
 
+### Several workspaces per account (ADR-0025, 2026-10-26), built, waiting for review
+
+The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial, with delete.
+
+- **Protocol.** Capability `workspace-management` (createWorkspace, renameWorkspace, deleteWorkspace,
+  listDeletedWorkspaces, restoreWorkspace, purgeWorkspace), quota name `workspaceCreationsPerDay`, OpenAPI and JSON
+  Schemas, six conformance checks that create and clean up a workspace of their own.
+- **Server.** Migration `012_workspace_deletion.sql` (additive). A deleted workspace is 404 everywhere and its links
+  are revoked; restore within 30 days; purge by the owner or the daily maintenance, blobs included. Deleted workspaces
+  count toward the owned limit until purged; trial limit 3, at most 10 creations a day.
+- **Apps.** "New workspace on …" in the server's sidebar header and the palette, with the count of the limit;
+  Rename… (F2) and Delete… (type the name) next to Members…; "Recently deleted" with Restore and Delete permanently.
+- **Evidence.** `apps/server/test-db/workspaces.test.ts`, `apps/desktop/test/workspaces.test.tsx`,
+  `apps/web/test/workspaces.test.tsx`, `tests/e2e/workspaces.e2e.ts`, the conformance suite.
+- **Before the deploy:** apply `apps/server/migrations/012_workspace_deletion.sql` to Neon, and check the Vercel
+  variable `MAX_WORKSPACES_PER_ACCOUNT` (docs/deploy/trial.md).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

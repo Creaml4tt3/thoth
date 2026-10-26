@@ -98,7 +98,7 @@ documentation. Re-check them before launch, because free plans change.
 
    | Limit | Value |
    | --- | --- |
-   | Workspaces per account | 1 |
+   | Workspaces per account | 3 (was 1; ADR-0025 amendment below) |
    | Members per workspace | 10 |
    | Pages per workspace (deleted pages do not count) | 200 |
    | Attachments per workspace | 20 MiB |
@@ -155,6 +155,12 @@ documentation. Re-check them before launch, because free plans change.
 6. **The privacy notice, terms and abuse contact are drafted** in `docs/legal/`.
    They must show the owner's contact address and be published on the website
    before the trial accepts sign-ups.
+
+### Amendment (2026-10-26, ADR-0025): several workspaces per account
+
+The owner asked for several workspaces per account on the trial ("3–5") and chose **3**. Deleted workspaces count
+until they are purged (30 days, or "Delete permanently"), and an account may create at most 10 a day through the API
+(`MAX_WORKSPACE_CREATIONS_PER_DAY`). See ADR-0025.
 
 ## Consequences
 
