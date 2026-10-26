@@ -4,6 +4,7 @@ import { attachmentChecks, eventChecks, pageKindChecks, pageOrderChecks, searchC
 import { coreChecks } from "./checks-core.ts";
 import { shareChecks } from "./checks-share.ts";
 import { inviteChecks, memberChecks } from "./checks-members.ts";
+import { workspaceChecks } from "./checks-workspaces.ts";
 import { createClient } from "./http.ts";
 import { CheckFailure, CheckSkip, type Check, type Context } from "./support.ts";
 import type { CheckGroup, CheckResult, ConformanceGroup, ConformanceOptions, ConformanceReport } from "./types.ts";
@@ -51,7 +52,7 @@ const cleanupCheck: Check = {
   },
 };
 
-export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, ...pageOrderChecks, ...pageKindChecks, ...shareChecks, ...memberChecks, ...inviteChecks, cleanupCheck, responseContractCheck];
+export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, ...pageOrderChecks, ...pageKindChecks, ...shareChecks, ...memberChecks, ...inviteChecks, ...workspaceChecks, cleanupCheck, responseContractCheck];
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

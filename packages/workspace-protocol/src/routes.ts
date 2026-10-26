@@ -2,7 +2,7 @@ import { z } from "zod";
 import { API_BASE_PATH, OpaqueIdSchema, PaginationQuerySchema, WorkspaceIdSchema } from "./common.ts";
 import { CapabilitiesSchema, type CapabilityId } from "./capabilities.ts";
 import { ERROR_CODES, ProblemDetailsSchema, type ErrorCode } from "./errors.ts";
-import { MemberSchema, MeSchema, WorkspaceListSchema } from "./identity.ts";
+import { MemberSchema, MeSchema, WorkspaceListSchema, WorkspaceSchema } from "./identity.ts";
 import { GetPageQuerySchema, PageIdSchema, PageMoveSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema } from "./pages.ts";
 import { TreeNodeSchema, TreePageSchema } from "./tree.ts";
 import { SearchRequestSchema, SearchResponseSchema } from "./search.ts";
@@ -11,6 +11,7 @@ import { ChangesQuerySchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferOperationIdSchema, TransferResourceSchema } from "./transfers.ts";
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema, ShareLinkListSchema } from "./shares.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
+import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -509,6 +510,88 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestBody: { contentType: JSON_CT, schema: InviteAcceptRequestSchema, required: true, description: "The token from the link." },
     responses: [json(200, "The workspace joined (or already a member of).", InviteAcceptedSchema)],
     errors: ["validation_failed", "not_found", "quota_exceeded"],
+  }),
+  route({
+    operationId: "createWorkspace",
+    method: "post",
+    path: "/workspaces",
+    tag: "Workspaces",
+    summary: "Create a workspace",
+    description:
+      "ADR-0025. Any signed-in account; the caller becomes its only member, as owner. The name is trimmed and must then be 1 to 200 characters. 409 `quota_exceeded` when the caller already owns `maxWorkspacesPerAccount` workspaces (`quota: workspacesPerAccount`; deleted workspaces count until they are purged) or created too many today (`quota: workspaceCreationsPerDay`, with `Retry-After`). A retry with the same `Idempotency-Key` returns the workspace created the first time.",
+    capability: "workspace-management",
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: WorkspaceCreateRequestSchema, required: true, description: "The name, and whether exporting out of the workspace is refused (default false)." },
+    responses: [json(201, "The new workspace, as the caller sees it in listWorkspaces.", WorkspaceSchema)],
+    errors: ["validation_failed", "quota_exceeded", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "renameWorkspace",
+    method: "put",
+    path: "/workspaces/{workspaceId}/name",
+    tag: "Workspaces",
+    summary: "Rename a workspace",
+    description: "ADR-0025. Owners only (403 for other members, 404 for non-members and deleted workspaces). The name is trimmed and must then be 1 to 200 characters. Setting the name it already has succeeds and changes nothing.",
+    capability: "workspace-management",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: WorkspaceRenameSchema, required: true, description: "The new name." },
+    responses: [json(200, "The workspace with its new name.", WorkspaceSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "deleteWorkspace",
+    method: "delete",
+    path: "/workspaces/{workspaceId}",
+    tag: "Workspaces",
+    summary: "Delete a workspace (restorable for 30 days)",
+    description:
+      "ADR-0025. Owners only. From then on every route of the workspace is 404 for every member, it is no longer listed, and its share links and invite links stop working for good (a restore does not bring them back). Its owners see it in listDeletedWorkspaces and can restore it for 30 days; then the server purges it with its pages, revisions and attachments. It keeps counting toward its owners' `maxWorkspacesPerAccount` until it is purged.",
+    capability: "workspace-management",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Deleted.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "listDeletedWorkspaces",
+    method: "get",
+    path: "/deleted-workspaces",
+    tag: "Workspaces",
+    summary: "Recently deleted workspaces the caller can restore",
+    description: "ADR-0025. The deleted workspaces where the caller is an owner and that can still be restored, newest first.",
+    capability: "workspace-management",
+    query: PaginationQuerySchema,
+    responses: [json(200, "A page of deleted workspaces.", DeletedWorkspaceListSchema)],
+    errors: ["validation_failed", "cursor_invalid"],
+  }),
+  route({
+    operationId: "restoreWorkspace",
+    method: "post",
+    path: "/deleted-workspaces/{workspaceId}/restore",
+    tag: "Workspaces",
+    summary: "Restore a deleted workspace",
+    description:
+      "ADR-0025. Owners of the deleted workspace only (403 for its other members; 404 for anyone else, for a workspace that is not deleted and for one past its 30 days). Its pages, members and roles come back as they were; its share links and invite links do not.",
+    capability: "workspace-management",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [json(200, "The restored workspace.", WorkspaceSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "purgeWorkspace",
+    method: "delete",
+    path: "/deleted-workspaces/{workspaceId}",
+    tag: "Workspaces",
+    summary: "Delete a deleted workspace permanently, now",
+    description:
+      "ADR-0025. Owners of the deleted workspace only, with the same answers as restoreWorkspace. Removes it with its pages, revisions and attachments at once, so it stops counting toward its owners' `maxWorkspacesPerAccount`. This cannot be undone.",
+    capability: "workspace-management",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Purged.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
   }),
 ];
 

@@ -11,6 +11,7 @@ export * from "./changes.ts";
 export * from "./transfers.ts";
 export * from "./shares.ts";
 export * from "./members.ts";
+export * from "./workspaces.ts";
 export * from "./routes.ts";
 export * from "./schemas.ts";
 export * from "./validate.ts";

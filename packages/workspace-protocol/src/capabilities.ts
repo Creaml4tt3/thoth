@@ -16,10 +16,12 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `members`          routes: listMembers, setMemberRole, removeMember (ADR-0024)
  * - `invite-links`     routes: createInviteLink, listInviteLinks, revokeInviteLink, acceptInvite; plus the
  *                      unauthenticated invite pages under `/i/<token>` on the server origin (ADR-0024)
+ * - `workspace-management` routes: createWorkspace, renameWorkspace, deleteWorkspace, listDeletedWorkspaces,
+ *                      restoreWorkspace, purgeWorkspace (ADR-0025)
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
@@ -40,7 +42,7 @@ export const LimitsSchema = z.object({
   maxWorkspaceAttachmentBytes: z.number().int().positive().optional(),
   /** Members a workspace may have. */
   maxMembersPerWorkspace: z.number().int().positive().optional(),
-  /** Workspaces one account may own. */
+  /** Workspaces one account may own. Deleted workspaces count until they are purged (ADR-0025). */
   maxWorkspacesPerAccount: z.number().int().positive().optional(),
   /** Non-current revisions older than this many days are removed; `GET ?revision=` of a removed revision is 404. */
   revisionRetentionDays: z.number().int().positive().optional(),

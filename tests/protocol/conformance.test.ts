@@ -36,6 +36,10 @@ const REQUIRED_CHECKS = [
   "invite-links.page.html",
   "invite-links.accept.member-keeps-role",
   "invite-links.revoke.stops-link",
+  "workspace-management.create.owner",
+  "workspace-management.delete.unreachable",
+  "workspace-management.restore",
+  "workspace-management.purge",
 ];
 
 describe("conformance suite against a correct server", () => {
@@ -61,8 +65,8 @@ describe("conformance suite against a correct server", () => {
 
   it("returns structured results grouped by capability", () => {
     expect(report.protocolVersion).toBe("1.0");
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
-    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"]);
+    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"]);
     for (const group of report.groups) {
       expect(group.results.length).toBeGreaterThan(0);
       for (const r of group.results) {
@@ -258,6 +262,12 @@ describe("conformance suite against deliberately broken servers", () => {
     const report = await runAgainst({ inviteRevokeIgnored: true });
     expect(failedIds(report)).toEqual(["invite-links.revoke.stops-link"]);
     expect(report.results.find((r) => r.id === "invite-links.revoke.stops-link")!.detail).toMatch(/revoked link answers HTTP 200/);
+  });
+
+  it("notices a deleted workspace that still answers (ADR-0025)", async () => {
+    const report = await runAgainst({ deletedStillReachable: true });
+    expect(failedIds(report)).toEqual(["workspace-management.delete.unreachable"]);
+    expect(report.results.find((r) => r.id === "workspace-management.delete.unreachable")!.detail).toMatch(/getWorkspaceTree of a deleted workspace: expected HTTP 404, got 200/);
   });
 
   it("fails each of them at once on the fully broken server, but still returns a complete report", async () => {

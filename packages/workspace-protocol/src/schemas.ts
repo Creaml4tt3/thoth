@@ -9,6 +9,7 @@ import { AttachmentResourceSchema } from "./attachments.ts";
 import { ChangeEntrySchema, ChangeHintEventSchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemSchema, TransferResourceSchema } from "./transfers.ts";
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
+import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -64,4 +65,8 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "InviteLinkList", file: "invite-link-list.v1", schema: InviteLinkListSchema },
   { name: "InviteAcceptRequest", file: "invite-accept-request.v1", schema: InviteAcceptRequestSchema },
   { name: "InviteAccepted", file: "invite-accepted.v1", schema: InviteAcceptedSchema },
+  { name: "WorkspaceCreateRequest", file: "workspace-create-request.v1", schema: WorkspaceCreateRequestSchema },
+  { name: "WorkspaceRename", file: "workspace-rename.v1", schema: WorkspaceRenameSchema },
+  { name: "DeletedWorkspace", file: "deleted-workspace.v1", schema: DeletedWorkspaceSchema },
+  { name: "DeletedWorkspaceList", file: "deleted-workspace-list.v1", schema: DeletedWorkspaceListSchema },
 ];

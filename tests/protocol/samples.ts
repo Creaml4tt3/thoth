@@ -22,6 +22,7 @@ const META = {
   updatedBy: "user_1",
 };
 const WORKSPACE = { id: "ws_1", kind: "workspace", name: "Main", role: "editor", exportRestricted: false, memberCount: 1, members: [{ userId: "user_1", displayName: "Ann", role: "editor" }], createdAt: "2026-01-01T00:00:00Z" };
+const DELETED_WORKSPACE = { id: "ws_2", name: "Old notes", exportRestricted: false, memberCount: 2, deletedAt: "2026-10-26T10:00:00Z", deletedBy: "user_1", restorableUntil: "2026-11-25T10:00:00Z" };
 const TRANSFER = {
   operationId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019",
   workspaceId: "ws_1",
@@ -80,4 +81,8 @@ export const SAMPLES: Record<string, unknown> = {
   InviteLinkList: { items: [INVITE_LINK], nextCursor: null },
   InviteAcceptRequest: { token: "aW52aXRlLXRva2VuLWV4YW1wbGUtMTIzNDU2Nzg" },
   InviteAccepted: { workspaceId: "ws_1", name: "Team", role: "viewer", joined: true },
+  WorkspaceCreateRequest: { name: "Design", exportRestricted: false },
+  WorkspaceRename: { name: "Design team" },
+  DeletedWorkspace: DELETED_WORKSPACE,
+  DeletedWorkspaceList: { items: [DELETED_WORKSPACE], nextCursor: null },
 };

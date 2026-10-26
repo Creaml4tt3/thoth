@@ -2,7 +2,8 @@
  * Minimal in-memory workspace server used to test the conformance suite.
  *
  * `startTestServer()` implements the protocol subset the suite exercises (all core
- * routes plus attachments, search, SSE hints, transfers, page order and kind, public share links, members and invite links). `startBrokenServer()` is
+ * routes plus attachments, search, SSE hints, transfers, page order and kind, public share links, members and invite links,
+ * and creating, renaming, deleting, restoring and purging workspaces). `startBrokenServer()` is
  * the same server with deliberate violations, so tests can prove the suite notices them.
  * It is a test fixture, not the reference server.
  */
@@ -13,9 +14,12 @@ import {
   API_BASE_PATH,
   ERROR_CODES,
   IdempotencyKeySchema,
+  DELETED_WORKSPACE_RESTORE_DAYS,
   InviteAcceptRequestSchema,
   InviteLinkCreateRequestSchema,
   MemberRoleChangeSchema,
+  WorkspaceCreateRequestSchema,
+  WorkspaceRenameSchema,
   PAGE_SIZE_DEFAULT,
   PAGE_SIZE_MAX,
   PROBLEM_CONTENT_TYPE,
@@ -57,11 +61,13 @@ export interface Flaws {
   staleKind?: boolean;
   /** Revoking an invite link records it but the link keeps working (ADR-0024). */
   inviteRevokeIgnored?: boolean;
+  /** A deleted workspace is listed as deleted but its routes keep answering (ADR-0025). */
+  deletedStillReachable?: boolean;
 }
 
 export interface TestServerOptions {
   flaws?: Flaws;
-  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share, members, invite-links. */
+  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share, members, invite-links, workspace-management. */
   capabilities?: CapabilityId[];
 }
 
@@ -171,17 +177,28 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
     [EDITOR_TOKEN]: { id: "user_editor", displayName: "Conformance Editor" },
     [VIEWER_TOKEN]: { id: "user_viewer", displayName: "Conformance Viewer" },
   };
-  const workspaces = [
-    { id: MAIN_WORKSPACE, name: "Main", exportRestricted: false, members: { user_editor: "owner", user_viewer: "viewer" } as Record<string, Role> },
-    { id: LOCKED_WORKSPACE, name: "Locked", exportRestricted: true, members: { user_editor: "owner", user_viewer: "viewer" } as Record<string, Role> },
+  interface FixtureWorkspace {
+    id: string;
+    name: string;
+    exportRestricted: boolean;
+    members: Record<string, Role>;
+    createdAt: string;
+    /** ADR-0025: set while the workspace is deleted (restorable for 30 days). */
+    deletedAt: string | null;
+    deletedBy: string | null;
+  }
+  const workspaces: FixtureWorkspace[] = [
+    { id: MAIN_WORKSPACE, name: "Main", exportRestricted: false, members: { user_editor: "owner", user_viewer: "viewer" }, createdAt: "2026-01-01T00:00:00Z", deletedAt: null, deletedBy: null },
+    { id: LOCKED_WORKSPACE, name: "Locked", exportRestricted: true, members: { user_editor: "owner", user_viewer: "viewer" }, createdAt: "2026-01-01T00:00:00Z", deletedAt: null, deletedBy: null },
   ];
+  const live = (w: FixtureWorkspace) => w.deletedAt === null || flaws.deletedStillReachable === true;
 
   const pages = new Map<string, PageRecord>();
   const changes = new Map<string, ChangeEntry[]>();
@@ -308,8 +325,8 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
   }
 
   // ---------- access ----------
-  function workspaceFor(ctx: Ctx, need: "read" | "write"): (typeof workspaces)[number] & { role: Role } {
-    const ws = workspaces.find((w) => w.id === ctx.params.workspaceId);
+  function workspaceFor(ctx: Ctx, need: "read" | "write"): FixtureWorkspace & { role: Role } {
+    const ws = workspaces.find((w) => w.id === ctx.params.workspaceId && live(w));
     const role = ws?.members[ctx.user.id];
     if (!ws || !role) throw new ApiError("not_found", "workspace not found");
     if (!roleCan(role, need)) throw new ApiError("forbidden", `role ${role} may not ${need}`);
@@ -364,23 +381,25 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
   const routes: Route[] = [];
   const add = (method: string, path: string, capability: CapabilityId | null, handler: Route["handler"]) => routes.push({ method, segments: path.split("/").filter(Boolean), capability, handler });
 
+  const workspaceResource = (w: FixtureWorkspace, userId: string) => ({
+    id: w.id,
+    kind: "workspace",
+    name: w.name,
+    role: w.members[userId]!,
+    exportRestricted: w.exportRestricted,
+    memberCount: Object.keys(w.members).length,
+    members: Object.entries(w.members).map(([id, role]) => ({ userId: id, displayName: id, role })),
+    createdAt: w.createdAt,
+  });
+
   add("GET", "/me", null, (ctx) => jsonReply(200, { id: ctx.user.id, displayName: ctx.user.displayName }));
 
   add("GET", "/workspaces", null, (ctx) => {
-    const mine = workspaces.filter((w) => w.members[ctx.user.id]);
+    const mine = workspaces.filter((w) => w.members[ctx.user.id] && w.deletedAt === null);
     const limit = limitFrom(ctx.query);
     const offset = decodeNumberCursor("w", ctx.query.get("cursor"));
     const slice = mine.slice(offset, offset + limit);
-    const items = slice.map((w) => ({
-      id: w.id,
-      kind: "workspace",
-      name: w.name,
-      role: w.members[ctx.user.id]!,
-      exportRestricted: w.exportRestricted,
-      memberCount: Object.keys(w.members).length,
-      members: Object.entries(w.members).map(([userId, role]) => ({ userId, displayName: userId, role })),
-      createdAt: "2026-01-01T00:00:00Z",
-    }));
+    const items = slice.map((w) => workspaceResource(w, ctx.user.id));
     return jsonReply(200, { items, nextCursor: offset + limit < mine.length ? encodeCursor("w", String(offset + limit)) : null });
   });
 
@@ -757,6 +776,72 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     const rev = currentRevision(page);
     return { status: 200, headers: SHARE_HEADERS, body: `<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>${escapeText(rev.title)}</title></head><body><main><h1>${escapeText(rev.title)}</h1><pre>${escapeText(rev.markdown)}</pre></main></body></html>` };
   }
+
+  // ----- workspace-management (ADR-0025): any account creates; owners rename, delete, restore and purge -----
+  const RESTORE_MS = DELETED_WORKSPACE_RESTORE_DAYS * 86_400_000;
+  const nameFrom = (raw: string) => {
+    const name = raw.trim();
+    if (name.length < 1 || name.length > 200) throw new ApiError("validation_failed", "the name must be 1 to 200 characters");
+    return name;
+  };
+  const restorable = (w: FixtureWorkspace) => w.deletedAt !== null && Date.parse(w.deletedAt) + RESTORE_MS > Date.now();
+  function deletedOwned(ctx: Ctx): FixtureWorkspace {
+    const ws = workspaces.find((w) => w.id === ctx.params.workspaceId && restorable(w) && w.members[ctx.user.id]);
+    if (!ws) throw new ApiError("not_found", "no such deleted workspace");
+    if (ws.members[ctx.user.id] !== "owner") throw new ApiError("forbidden", "only owners may do this");
+    return ws;
+  }
+  add("POST", "/workspaces", "workspace-management", (ctx) =>
+    withIdempotency(ctx, () => {
+      const parsed = WorkspaceCreateRequestSchema.safeParse(parseJson(ctx));
+      if (!parsed.success) throw zodFail(parsed.error);
+      const ws: FixtureWorkspace = { id: `ws_${randomBytes(6).toString("hex")}`, name: nameFrom(parsed.data.name), exportRestricted: parsed.data.exportRestricted ?? false, members: { [ctx.user.id]: "owner" }, createdAt: new Date().toISOString(), deletedAt: null, deletedBy: null };
+      workspaces.push(ws);
+      return jsonReply(201, workspaceResource(ws, ctx.user.id));
+    }),
+  );
+  add("PUT", "/workspaces/:workspaceId/name", "workspace-management", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = ownerOf(ctx);
+      const parsed = WorkspaceRenameSchema.safeParse(parseJson(ctx));
+      if (!parsed.success) throw zodFail(parsed.error);
+      realWorkspace(ws.id).name = nameFrom(parsed.data.name);
+      return jsonReply(200, workspaceResource(realWorkspace(ws.id), ctx.user.id));
+    }),
+  );
+  add("DELETE", "/workspaces/:workspaceId", "workspace-management", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = realWorkspace(ownerOf(ctx).id);
+      if (ws.deletedAt !== null) throw new ApiError("not_found", "workspace not found");
+      ws.deletedAt = new Date().toISOString();
+      ws.deletedBy = ctx.user.id;
+      return { status: 204, headers: {} };
+    }),
+  );
+  add("GET", "/deleted-workspaces", "workspace-management", (ctx) => {
+    const items = workspaces
+      .filter((w) => restorable(w) && w.members[ctx.user.id] === "owner")
+      .reverse()
+      .map((w) => ({ id: w.id, name: w.name, exportRestricted: w.exportRestricted, memberCount: Object.keys(w.members).length, deletedAt: w.deletedAt!, deletedBy: w.deletedBy, restorableUntil: new Date(Date.parse(w.deletedAt!) + RESTORE_MS).toISOString() }));
+    return jsonReply(200, { items, nextCursor: null });
+  });
+  add("POST", "/deleted-workspaces/:workspaceId/restore", "workspace-management", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = deletedOwned(ctx);
+      ws.deletedAt = null;
+      ws.deletedBy = null;
+      return jsonReply(200, workspaceResource(ws, ctx.user.id));
+    }),
+  );
+  add("DELETE", "/deleted-workspaces/:workspaceId", "workspace-management", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = deletedOwned(ctx);
+      workspaces.splice(workspaces.indexOf(ws), 1);
+      for (const key of [...pages.keys()]) if (key.startsWith(`${ws.id}/`)) pages.delete(key);
+      changes.delete(ws.id);
+      return { status: 204, headers: {} };
+    }),
+  );
 
   // ----- members and invite-links (ADR-0024): owners administer; one owner is always kept -----
   const displayNameOf = (userId: string) => Object.values(users).find((u) => u.id === userId)?.displayName ?? userId;

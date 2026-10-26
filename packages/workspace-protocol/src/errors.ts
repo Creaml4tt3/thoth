@@ -71,7 +71,7 @@ export const ProblemDetailsSchema = z.looseObject({
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>;
 
 /** Names the quota a `quota_exceeded` problem refers to. Open set: clients ignore values they do not know. */
-export const QUOTA_NAMES = ["pagesPerWorkspace", "attachmentBytesPerWorkspace", "membersPerWorkspace", "workspacesPerAccount", "serverAttachmentBytes", "accounts", "shareLinksPerWorkspace", "inviteLinksPerWorkspace"] as const;
+export const QUOTA_NAMES = ["pagesPerWorkspace", "attachmentBytesPerWorkspace", "membersPerWorkspace", "workspacesPerAccount", "serverAttachmentBytes", "accounts", "shareLinksPerWorkspace", "inviteLinksPerWorkspace", "workspaceCreationsPerDay"] as const;
 
 /**
  * Problem body for HTTP 409 `quota_exceeded`. `limit` and `current` are omitted for server-wide quotas

@@ -67,7 +67,31 @@ describe("route registry", () => {
       listInviteLinks: "invite-links",
       revokeInviteLink: "invite-links",
       acceptInvite: "invite-links",
+      createWorkspace: "workspace-management",
+      renameWorkspace: "workspace-management",
+      deleteWorkspace: "workspace-management",
+      listDeletedWorkspaces: "workspace-management",
+      restoreWorkspace: "workspace-management",
+      purgeWorkspace: "workspace-management",
     });
+  });
+
+  it("puts the workspace-management calls where ADR-0025 says: create with Idempotency-Key, owners-only changes, restore and purge of deleted ones", () => {
+    const at = (id: string) => `${getRoute(id).method.toUpperCase()} ${getRoute(id).path}`;
+    expect(at("createWorkspace")).toBe("POST /workspaces");
+    expect(at("renameWorkspace")).toBe("PUT /workspaces/{workspaceId}/name");
+    expect(at("deleteWorkspace")).toBe("DELETE /workspaces/{workspaceId}");
+    expect(at("listDeletedWorkspaces")).toBe("GET /deleted-workspaces");
+    expect(at("restoreWorkspace")).toBe("POST /deleted-workspaces/{workspaceId}/restore");
+    expect(at("purgeWorkspace")).toBe("DELETE /deleted-workspaces/{workspaceId}");
+    expect(getRoute("createWorkspace").responses.map((r) => r.status)).toEqual([201]);
+    expect(getRoute("createWorkspace").errors).toEqual(expect.arrayContaining(["validation_failed", "quota_exceeded", "idempotency_key_reused"]));
+    for (const id of ["createWorkspace", "renameWorkspace", "deleteWorkspace", "restoreWorkspace", "purgeWorkspace"]) {
+      expect(getRoute(id).requestHeaders.find((h) => h.name === "Idempotency-Key")?.requirement, id).toBe("optional");
+    }
+    for (const id of ["renameWorkspace", "deleteWorkspace", "restoreWorkspace", "purgeWorkspace"]) expect(getRoute(id).errors, id).toEqual(expect.arrayContaining(["forbidden", "not_found"]));
+    expect(getRoute("deleteWorkspace").responses.map((r) => r.status)).toEqual([204]);
+    expect(getRoute("purgeWorkspace").responses.map((r) => r.status)).toEqual([204]);
   });
 
   it("puts the members and invite-link calls where ADR-0024 says, with last_owner on the calls that can empty the owners", () => {
