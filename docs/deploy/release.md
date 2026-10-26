@@ -48,7 +48,24 @@ A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empt
 3. Copy the published `latest.json` into the website's download manifest
    (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website, with the new post, the
    changelog entry and the feeds.
-4. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
+4. **Tell search engines (IndexNow), after Vercel has deployed.** One-time setup: make a key (8 to 128 letters,
+   digits or dashes, for example `uuidgen | tr -d '\n'`), and add it to the Vercel project as the environment
+   variable `INDEXNOW_KEY` (Production). The build then publishes `/<key>.txt`, which is how the engines check the
+   site is yours ([IndexNow protocol](https://www.indexnow.org/documentation), "Option 1"). Never commit the key.
+   Each release, once the deploy is live:
+
+   ```sh
+   INDEXNOW_KEY='<the key>' node apps/site/scripts/indexnow.ts --dry-run   # checks the key file, counts the URLs
+   INDEXNOW_KEY='<the key>' node apps/site/scripts/indexnow.ts             # one POST to api.indexnow.org
+   ```
+
+   It sends every URL of the live `sitemap.xml`; 200 or 202 is success. IndexNow engines (Bing, Yandex and others)
+   share submissions with each other; Google does not use IndexNow, so it relies on the sitemap in Search Console.
+   Do not run it more than once per deploy (429 means too often).
+5. **New post pictures:** after adding `apps/site/public/blog/images/<slug>.png`, run
+   `pnpm --filter @thoth/site webp` (needs `cwebp`) and commit the `.webp` next to it; the pages serve the WebP
+   and keep the PNG for Open Graph. If a post was edited after its date, set `updated:` in both languages.
+6. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
    edit v0.1.3 --notes-file notes.md`.
 
 ## Windows
