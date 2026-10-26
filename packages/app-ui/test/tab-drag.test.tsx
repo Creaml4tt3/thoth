@@ -14,15 +14,38 @@ function box(left: number, top: number, width: number, height: number): DOMRect 
   return { x: left, y: top, left, top, width, height, right: left + width, bottom: top + height, toJSON: () => ({}) } as DOMRect;
 }
 
-/** Lays the bar out: tabs in DOM order, 100px each, the strip and the list as wide as the window. */
+/** How far a tab is moved by its inline `transform: translateX(…)` (what a browser's box includes); 0 for none. */
+const shiftOf = (el: HTMLElement): number => Number(/translateX\((-?[\d.]+)px\)/.exec(el.style.transform)?.[1] ?? 0);
+
+/** Right to left (the tabs run from the right edge), and how far the list has scrolled (it moves every tab). */
+const view = { rtl: false, scroll: 0 };
+
+/**
+ * Lays the bar out: tabs in DOM order, 100px each, from the left (or the right, right to left), the strip and the
+ * list as wide as the window. A tab's box includes its transform and the list's scroll, as in a browser.
+ */
 function layout(): void {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     if (this.classList.contains("tab")) {
-      const all = [...document.querySelectorAll(".tablist > .tab")];
-      return box(all.indexOf(this) * WIDTH, 0, WIDTH, HEIGHT);
+      const i = [...document.querySelectorAll(".tablist > .tab")].indexOf(this);
+      const left = view.rtl ? 1000 - (i + 1) * WIDTH : i * WIDTH;
+      return box(left - view.scroll + shiftOf(this), 0, WIDTH, HEIGHT);
     }
     if (this.classList.contains("tablist") || this.classList.contains("tabstrip")) return box(0, 0, 1000, HEIGHT);
     return box(0, 0, 0, 0);
+  });
+  // jsdom has no scrolling: the list reports `view.scroll`, and a right-to-left list says so in its computed style.
+  Object.defineProperty(HTMLElement.prototype, "scrollLeft", { configurable: true, get: () => view.scroll, set: () => undefined });
+  const real = window.getComputedStyle.bind(window);
+  vi.spyOn(window, "getComputedStyle").mockImplementation((el: Element, pseudo?: string | null) => {
+    const style = real(el, pseudo);
+    return new Proxy(style, {
+      get(target, key) {
+        if (key === "direction") return view.rtl ? "rtl" : "ltr";
+        const value = Reflect.get(target, key, target) as unknown;
+        return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+      },
+    });
   });
 }
 
@@ -30,6 +53,8 @@ let reduced = false;
 const animate = vi.fn();
 beforeEach(() => {
   reduced = false;
+  view.rtl = false;
+  view.scroll = 0;
   layout();
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: reduced && query.includes("reduce"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
   animate.mockReset();
@@ -42,6 +67,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
+  delete (HTMLElement.prototype as unknown as { scrollLeft?: unknown }).scrollLeft;
 });
 
 const items = (...names: string[]): TabItem[] => names.map((n) => ({ id: n, label: n }));
@@ -101,11 +127,13 @@ function setup(names = ["A", "B", "C", "D"], detach = true) {
 const tabNames = () => screen.getAllByRole("tab").map((t) => t.textContent);
 const tabEl = (name: string) => screen.getByRole("tab", { name }).closest(".tab") as HTMLElement;
 const drops = () => [...document.querySelectorAll<HTMLElement>(".tab[data-drop]")].map((el) => `${el.textContent}: ${el.dataset["drop"]}`);
+/** How far each tab is shifted right now, by name, in bar order. */
+const shifts = () => Object.fromEntries([...document.querySelectorAll<HTMLElement>(".tablist > .tab")].map((el) => [el.textContent, shiftOf(el)]));
 
 /** Presses on `name` and moves the pointer, as a hand does: down, a few pixels, then to each point. */
 function press(name: string) {
   const el = tabEl(name);
-  const at = [...document.querySelectorAll(".tablist > .tab")].indexOf(el) * WIDTH + 50;
+  const at = el.getBoundingClientRect().left + 50;
   fireEvent.pointerDown(el, { clientX: at, clientY: 16, screenX: at + 300, screenY: 116, button: 0, buttons: 1, pointerId: 1, pointerType: "mouse" });
   const move = (x: number, y = 16) => fireEvent.pointerMove(window, { clientX: x, clientY: y, screenX: x + 300, screenY: y + 100, buttons: 1, pointerId: 1, pointerType: "mouse" });
   return {
@@ -116,39 +144,76 @@ function press(name: string) {
 }
 
 describe("dragging a tab along the bar", () => {
-  it("shows a line where the tab will land, and puts it there on release", () => {
+  it("lifts the tab, which follows the pointer, while the others slide aside to show where it will land", () => {
     const spies = setup();
     const drag = press("A");
     drag.move(drag.from + 8);
     expect(tabEl("A").dataset["dragging"]).toBe("");
-    expect(drops()).toEqual([]); // still where it was: no line
-    drag.move(260); // past B's and C's middles
-    expect(drops()).toEqual(["D: before"]);
+    expect(shifts()).toEqual({ A: 8, B: 0, C: 0, D: 0 }); // still in its place: nobody moves aside
+    drag.move(260); // its middle past B's and C's middles: B and C slide back to open the gap after them
+    expect(shifts()).toEqual({ A: 210, B: -100, C: -100, D: 0 });
     drag.move(160); // past B's middle only
-    expect(drops()).toEqual(["C: before"]);
+    expect(shifts()).toEqual({ A: 110, B: -100, C: 0, D: 0 });
+    expect(drops()).toEqual([]); // the gap shows the place: no line
+    expect(screen.queryByText("A", { selector: ".tab-drag-label" })).toBeNull(); // nor a picture under the pointer
     drag.up(160);
     expect(spies.onMove).toHaveBeenCalledWith("A", 1);
     expect(tabNames()).toEqual(["B", "A", "C", "D"]);
-    expect(drops()).toEqual([]);
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0, D: 0 });
     expect(tabEl("A").dataset["dragging"]).toBeUndefined();
     expect(spies.onActivate).not.toHaveBeenCalled(); // a drag is not a click
   });
 
-  it("drags to the very start and the very end", () => {
+  it("drags to the very start and the very end, and the tab stays within the bar", () => {
     const spies = setup();
     let drag = press("C");
     drag.move(drag.from - 10);
     drag.move(5);
-    expect(drops()).toEqual(["A: before"]);
+    expect(shifts()).toEqual({ A: 100, B: 100, C: -200, D: 0 }); // C's left edge stops at the bar's start
     drag.up(5);
     expect(tabNames()).toEqual(["C", "A", "B", "D"]);
     drag = press("C");
     drag.move(drag.from + 10);
     drag.move(990);
-    expect(drops()).toEqual(["D: after"]);
+    expect(shifts()).toEqual({ C: 300, A: -100, B: -100, D: -100 }); // and its right edge at the last tab's end
     drag.up(990);
     expect(spies.onMove).toHaveBeenLastCalledWith("C", 3);
     expect(tabNames()).toEqual(["A", "B", "D", "C"]);
+  });
+
+  it("in a right-to-left bar, the others slide the other way", () => {
+    view.rtl = true; // A is rightmost: 900–1000, then B 800, C 700, D 600
+    const spies = setup();
+    const drag = press("A");
+    drag.move(drag.from - 10);
+    drag.move(740); // past B's (850) and C's (750) middles, reading from the right
+    expect(shifts()).toEqual({ A: -210, B: 100, C: 100, D: 0 });
+    drag.up(740);
+    expect(spies.onMove).toHaveBeenCalledWith("A", 2);
+  });
+
+  it("measures from where the tabs were when the drag began, plus how far the bar has scrolled since", () => {
+    setup();
+    const drag = press("A");
+    drag.move(drag.from + 10);
+    drag.move(160);
+    expect(shifts()).toEqual({ A: 110, B: -100, C: 0, D: 0 });
+    view.scroll = 100; // the bar scrolls by 100px (at an edge): every tab is 100px further left on screen
+    drag.move(161);
+    // A stays under the pointer (its own place moved with the scroll), and now its middle is past C's too.
+    expect(shifts()).toEqual({ A: 211, B: -100, C: -100, D: 0 });
+  });
+
+  it("only the dropped tab settles into the gap; the others are already where they land", () => {
+    setup();
+    const drag = press("A");
+    drag.move(drag.from + 10);
+    drag.move(260);
+    drag.up(260);
+    expect(tabNames()).toEqual(["B", "C", "A", "D"]);
+    expect(animate).toHaveBeenCalledTimes(1);
+    const [frames] = animate.mock.calls[0] as [Keyframe[]];
+    expect(frames).toEqual([{ transform: "translateX(10px)" }, { transform: "translateX(0)" }]); // from under the pointer (260) to its place (200)
   });
 
   it("a press that hardly moves is a click", () => {
@@ -161,17 +226,35 @@ describe("dragging a tab along the bar", () => {
     expect(spies.onActivate).toHaveBeenCalledWith("B");
   });
 
-  it("Escape puts the tab back where it was", () => {
+  it("Escape puts the tab back where it was, and everything slides back", () => {
     const spies = setup();
     const drag = press("A");
     drag.move(drag.from + 10);
     drag.move(260);
-    expect(drops()).toEqual(["D: before"]);
+    expect(shifts()).toEqual({ A: 210, B: -100, C: -100, D: 0 });
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(drops()).toEqual([]);
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    // Each tab that was moved slides from where it was shown back to its place.
+    expect(animate.mock.calls.map(([frames]) => (frames as Keyframe[])[0])).toEqual([{ transform: "translateX(210px)" }, { transform: "translateX(-100px)" }, { transform: "translateX(-100px)" }]);
     drag.up(260);
     expect(spies.onMove).not.toHaveBeenCalled();
     expect(tabNames()).toEqual(["A", "B", "C", "D"]);
+  });
+
+  it("a cancelled pointer or the window losing focus puts everything back too", () => {
+    const spies = setup();
+    let drag = press("B");
+    drag.move(drag.from + 10);
+    drag.move(360);
+    fireEvent.pointerCancel(window, { pointerId: 1 });
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    drag = press("B");
+    drag.move(drag.from + 10);
+    drag.move(360);
+    fireEvent.blur(window);
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    drag.up(360);
+    expect(spies.onMove).not.toHaveBeenCalled();
   });
 
   it("says where the tab went, for a screen reader", () => {
@@ -185,13 +268,20 @@ describe("dragging a tab along the bar", () => {
 });
 
 describe("dragging a tab out of the bar (desktop)", () => {
-  it("well below the bar, it offers a new window, and opens one where it is let go", () => {
+  it("well below the bar, it offers a new window: the others go back to their places, and come aside again back in the bar", () => {
     const spies = setup();
     const drag = press("B");
     drag.move(drag.from + 10);
+    drag.move(360);
+    expect(shifts()).toEqual({ A: 0, B: 200, C: -100, D: -100 });
     drag.move(200, 140);
-    expect(drops()).toEqual([]);
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0, D: 0 }); // the dragged tab waits in its place, the picture follows the pointer
+    expect(tabEl("B").dataset["detach"]).toBe("");
     expect(screen.getByText("Release to open in a new window")).toBeTruthy();
+    drag.move(360);
+    expect(shifts()).toEqual({ A: 0, B: 200, C: -100, D: -100 });
+    expect(screen.queryByText("Release to open in a new window")).toBeNull();
+    drag.move(200, 140);
     drag.up(220, 150);
     expect(spies.onDetach).toHaveBeenCalledWith("B", { x: 520, y: 250 });
     expect(spies.onMove).not.toHaveBeenCalled();
@@ -212,7 +302,7 @@ describe("dragging a tab out of the bar (desktop)", () => {
     const drag = press("A");
     drag.move(drag.from + 10);
     drag.move(260, HEIGHT + 20);
-    expect(drops()).toEqual(["D: before"]);
+    expect(shifts()).toEqual({ A: 210, B: -100, C: -100, D: 0 }); // the tab stays in the bar: it moves along it only
     drag.up(260, HEIGHT + 20);
     expect(spies.onMove).toHaveBeenCalledWith("A", 2);
     expect(spies.onDetach).not.toHaveBeenCalled();

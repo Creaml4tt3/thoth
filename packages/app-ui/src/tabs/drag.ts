@@ -1,17 +1,24 @@
 /**
- * Dragging tabs (ADR-0019), with the pointer: along the bar to reorder, and on the desktop out of it to open the tab in
- * a new window. Pointer events rather than HTML5 drag and drop (which the page trees use, `order/dnd.ts`): the bar
- * scrolls when the pointer nears an edge, the tab bar draws its own picture of the tab at the pointer, and a release
+ * Dragging tabs (ADR-0019, amended 2026-10-26), with the pointer: along the bar to reorder, and on the desktop out of it
+ * to open the tab in a new window. Pointer events rather than HTML5 drag and drop (which the page trees use,
+ * `order/dnd.ts`): the bar scrolls when the pointer nears an edge, the tab itself follows the pointer, and a release
  * outside the window still reports where it happened, so the new window can open there.
  *
  * - A press becomes a drag after it moves `DRAG_PX`; less is a click. Touch never drags (it scrolls the bar).
- * - While dragging, `drop` names the place the tab would land: a line before or after another tab (`data-drop`).
- * - Released `DETACH_PX` below the bar or outside the window, with `canDetach`, it is a move to a new window.
+ * - While dragging, the tab follows the pointer along the bar (kept within it) and the others slide aside to open the
+ *   gap where it would land: `drag.shifts` says how far each tab is moved (TabBar.tsx applies them as transforms).
+ *   Everything is measured from the tabs' boxes cached when the drag began, plus how far the bar has scrolled since,
+ *   so the gap does not chase the pointer (`order/live-reorder.ts`).
+ * - Released `DETACH_PX` below the bar or outside the window, with `canDetach`, it is a move to a new window. Out
+ *   there, every tab is back in its place.
  * - Escape, a cancelled pointer or losing the window's focus puts the tab back.
+ * - `onEnd` is called just before a drag that had started ends, while the tabs are still shown where the drag put
+ *   them, so they can slide from there to where they end up.
  *
  * The keyboard has Alt/Option+Shift+Left/Right and the tab's menu (TabBar.tsx).
  */
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { gapBetween, previewShifts, slotIndex, type Span } from "../order/live-reorder.ts";
 
 export const DRAG_PX = 5;
 /** How far below the bar a release means "a new window", in CSS pixels. Closer than this is still a reorder. */
@@ -20,14 +27,12 @@ export const DETACH_PX = 48;
 const EDGE_PX = 32;
 const EDGE_SPEED = 14;
 
-export type TabDrop = { id: string; side: "before" | "after" };
-
 /**
- * Where a tab dragged to `x` lands among the other tabs: the number of them whose middle it has passed (in reading
- * order, so right to left in a right-to-left bar). That is its new index.
+ * Where a tab whose middle is at `x` lands among the other tabs: the number of them whose middle it has passed (in
+ * reading order, so right to left in a right-to-left bar). That is its new index.
  */
 export function dropIndex(others: readonly { left: number; width: number }[], x: number, rtl = false): number {
-  return others.filter((r) => (rtl ? r.left + r.width / 2 > x : r.left + r.width / 2 < x)).length;
+  return slotIndex(others.map((r) => ({ start: r.left, size: r.width })), x, rtl);
 }
 
 export interface DragState {
@@ -39,6 +44,8 @@ export interface DragState {
   /** The pointer, for the "new window" label. */
   x: number;
   y: number;
+  /** How far each tab is shown moved along the bar (px; the dragged one follows the pointer, the others make room). */
+  shifts: Readonly<Record<string, number>>;
 }
 
 export interface TabDragOptions {
@@ -50,6 +57,8 @@ export interface TabDragOptions {
   canDetach: boolean;
   onMove(id: string, to: number): void;
   onDetach(id: string, at: { x: number; y: number }): void;
+  /** A drag that had started is about to end (drop or cancel); the tabs are still where it showed them. */
+  onEnd?(): void;
 }
 
 interface Pending {
@@ -60,6 +69,18 @@ interface Pending {
   started: boolean;
 }
 
+/** The bar as it was when the drag began: the tabs in order with their boxes, and the list's scroll. */
+interface Cache {
+  order: readonly string[];
+  spans: Span[];
+  scroll: number;
+  rtl: boolean;
+  gap: number;
+  /** Where the first tab starts and the last one ends (the tabs can be narrower than the bar). */
+  min: number;
+  max: number;
+}
+
 const inWindow = (x: number, y: number): boolean => x >= 0 && y >= 0 && x <= globalThis.innerWidth && y <= globalThis.innerHeight;
 
 export function useTabDrag(options: TabDragOptions) {
@@ -67,23 +88,60 @@ export function useTabDrag(options: TabDragOptions) {
   opts.current = options;
   const [drag, setDrag] = useState<DragState | null>(null);
   const pending = useRef<Pending | null>(null);
+  const cache = useRef<Cache | null>(null);
   const last = useRef<{ x: number; y: number; sx: number; sy: number } | null>(null);
   const frame = useRef<number | null>(null);
   /** Set when a drag ended over a tab, so the click that follows does not also open it. */
   const swallowClick = useRef(false);
   const detachListeners = useRef<(() => void) | null>(null);
 
-  /** Where the tab would go with the pointer at (x, y). */
+  /** Reads the bar once, as the drag begins: every later measure works from this. */
+  const remember = useCallback((list: HTMLElement): Cache => {
+    const o = opts.current;
+    const spans = o.order.map((id) => {
+      const r = o.tab(id)?.getBoundingClientRect();
+      return { start: r?.left ?? 0, size: r?.width ?? 0 };
+    });
+    const rtl = getComputedStyle(list).direction === "rtl";
+    return {
+      order: [...o.order],
+      spans,
+      scroll: list.scrollLeft,
+      rtl,
+      gap: gapBetween(spans, rtl),
+      min: Math.min(...spans.map((s) => s.start)),
+      max: Math.max(...spans.map((s) => s.start + s.size)),
+    };
+  }, []);
+
+  /** Where the tab would go with the pointer at (x, y), and where every tab is shown meanwhile. */
   const measure = useCallback((x: number, y: number): DragState | null => {
     const p = pending.current;
+    const c = cache.current;
     const list = opts.current.list();
-    if (!p || !list) return null;
-    const o = opts.current;
+    if (!p || !c || !list) return null;
+    const from = c.order.indexOf(p.id);
+    const self = c.spans[from];
+    if (!self) return null;
     const bar = list.getBoundingClientRect();
-    const detach = o.canDetach && (!inWindow(x, y) || y > bar.bottom + DETACH_PX);
-    const rtl = getComputedStyle(list).direction === "rtl";
-    const others = o.order.filter((id) => id !== p.id).map((id) => o.tab(id)?.getBoundingClientRect() ?? { left: 0, width: 0 });
-    return { id: p.id, to: detach ? null : dropIndex(others, x, rtl), detach, x, y };
+    const detach = opts.current.canDetach && (!inWindow(x, y) || y > bar.bottom + DETACH_PX);
+    const scrolled = list.scrollLeft - c.scroll;
+    const dx = x - p.x;
+    // Its middle where the pointer has taken it (not held back at the ends, so the far end is always reachable).
+    const center = self.start + self.size / 2 + dx;
+    const to = detach ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
+    const moved = previewShifts(c.order.length, from, to, self.size, c.gap, c.rtl);
+    if (!detach) {
+      // The tab follows the pointer along the bar, kept between the first tab's start and the last tab's end, and
+      // within what the bar shows. Its own place has moved with the scroll, so it is shifted by that too.
+      const lo = Math.max(bar.left, c.min - scrolled);
+      const hi = Math.min(bar.right, c.max - scrolled) - self.size;
+      const want = self.start + dx;
+      const left = hi < lo ? want : Math.min(hi, Math.max(lo, want));
+      moved[from] = left - (self.start - scrolled);
+    }
+    const shifts = Object.fromEntries(c.order.map((id, i) => [id, Math.round((moved[i] ?? 0) * 100) / 100 || 0]));
+    return { id: p.id, to, detach, x, y, shifts };
   }, []);
 
   const stopFrame = () => {
@@ -95,12 +153,21 @@ export function useTabDrag(options: TabDragOptions) {
     stopFrame();
     detachListeners.current?.();
     detachListeners.current = null;
+    if (pending.current?.started) opts.current.onEnd?.();
     pending.current = null;
+    cache.current = null;
     last.current = null;
     setDrag(null);
   }, []);
 
   useEffect(() => end, [end]);
+
+  // Tabs opened or closed during a drag (a shortcut, another window): the places it measured are gone, so it stops.
+  const orderKey = options.order.join("\u0000");
+  useEffect(() => {
+    const c = cache.current;
+    if (c && c.order.join("\u0000") !== orderKey) end();
+  }, [orderKey, end]);
 
   /** Scrolls an overflowing bar while the pointer stays near one of its ends, then measures again. */
   const edgeScroll = useCallback(() => {
@@ -124,13 +191,16 @@ export function useTabDrag(options: TabDragOptions) {
       last.current = { x: event.clientX, y: event.clientY, sx: event.screenX, sy: event.screenY };
       if (!p.started) {
         if (Math.hypot(event.clientX - p.x, event.clientY - p.y) < DRAG_PX) return;
+        const list = opts.current.list();
+        if (!list) return;
+        cache.current = remember(list);
         p.started = true;
       }
       event.preventDefault();
       setDrag(measure(event.clientX, event.clientY));
       if (frame.current === null) frame.current = requestAnimationFrame(edgeScroll);
     },
-    [measure, edgeScroll],
+    [measure, edgeScroll, remember],
   );
 
   const onWindowUp = useCallback(
@@ -184,14 +254,5 @@ export function useTabDrag(options: TabDragOptions) {
     };
   };
 
-  /** The line: before the tab now at `to`, or after the last one. Nothing where the tab already is. */
-  let drop: TabDrop | null = null;
-  if (drag && drag.to !== null) {
-    const order = options.order;
-    const from = order.indexOf(drag.id);
-    const others = order.filter((id) => id !== drag.id);
-    if (drag.to !== from && others.length > 0) drop = drag.to < others.length ? { id: others[drag.to]!, side: "before" } : { id: others[others.length - 1]!, side: "after" };
-  }
-
-  return { drag, drop, onPointerDown, swallowClick };
+  return { drag, onPointerDown, swallowClick };
 }

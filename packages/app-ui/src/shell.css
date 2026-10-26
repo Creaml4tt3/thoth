@@ -145,17 +145,19 @@
 .share-link > span { min-width: 0; color: var(--thoth-ink-secondary); }
 @media (max-width: 520px) { .share-copy { flex-direction: column; align-items: stretch; } }
 
-/* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator. */
-.tabstrip { flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
-.tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-/* A tab is 270px wide when there is room (1.5 times the old 180px ideal; `width` too, because a flex-basis alone does not size the strip around
-   it and a short title would shrink the tab), and shrinks toward 96px as more are open; then the strip scrolls. */
-.tab { position: relative; display: flex; align-items: center; flex: 0 1 270px; width: 270px; min-width: 96px; max-width: 330px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+/* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator.
+   A tab is --thoth-tab-width wide when there is room (202px, three quarters of the 270px before it; `width` too, because
+   a flex-basis alone does not size the strip around it and a short title would shrink the tab), and shrinks toward
+   --thoth-tab-min-width as more are open; then the strip scrolls. The enter and leave animations use the same tokens.
+   The top padding is on the list, not the strip, so a lifted tab's shadow (while dragged) is not clipped by it. */
+.tabstrip { --thoth-tab-width: 202px; --thoth-tab-min-width: 96px; --thoth-tab-max-width: 248px; flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 0 8px; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
+.tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding-top: 6px; overflow-x: auto; scrollbar-width: thin; }
+.tab { position: relative; display: flex; align-items: center; flex: 0 1 var(--thoth-tab-width); width: var(--thoth-tab-width); min-width: var(--thoth-tab-min-width); max-width: var(--thoth-tab-max-width); margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 /* A tab the user opened enters by widening and fading in; one that closes narrows and fades out (TabBar.tsx keeps it for
    that long, inert). The strip is a few elements wide, so width is the one layout property animated here. Tabs that
    were there at start do not animate. The current tab's line fades in and out, since the tab itself changes colour. */
-@keyframes thoth-tab-in { from { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; } }
-@keyframes thoth-tab-out { to { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; margin-right: -2px; } }
+@keyframes thoth-tab-in { from { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; } to { opacity: 1; flex-basis: var(--thoth-tab-width); min-width: var(--thoth-tab-min-width); max-width: var(--thoth-tab-max-width); } }
+@keyframes thoth-tab-out { from { opacity: 1; flex-basis: var(--thoth-tab-width); min-width: var(--thoth-tab-min-width); max-width: var(--thoth-tab-max-width); } to { opacity: 0; flex-basis: 0; min-width: 0; max-width: 0; margin-right: -2px; } }
 .tab[data-enter] { animation: thoth-tab-in var(--thoth-dur-fast) var(--thoth-ease-out); overflow: hidden; }
 .tab[data-leaving] { overflow: hidden; pointer-events: none; animation: thoth-tab-out var(--thoth-dur-fast) var(--thoth-ease-in) both; }
 .tab:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
@@ -169,16 +171,18 @@
 @media (hover: none) { .tab-close { opacity: 1; } }
 .tab-close:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .tab-new { margin: 0 0 3px 4px; }
-/* Dragging a tab (ADR-0019, tabs/drag.ts): as in the page trees, the dragged tab stays in place, faded, and a picture of it
-   follows the pointer (below it, so the place it would land, an accent line like the tree's drop indicator, stays in sight).
-   Well out of the bar the picture says a new window opens there. The tabs slide into place on drop (WAAPI, transform only). */
+/* Dragging a tab (ADR-0019 amended, tabs/drag.ts): a live preview. The dragged tab lifts (raised, a shadow) and follows the
+   pointer along the bar; the others slide aside to open the gap where it would land (TabBar.tsx sets each one's
+   translateX; only the others transition, so the dragged tab stays under the pointer). Well out of the bar the dragged
+   tab waits in its place, faded, the others go back, and a picture at the pointer says a new window opens there. When the
+   drag ends the tabs slide from where they were shown to their places (WAAPI, transform only). Under reduced motion the
+   durations are 0: the tabs jump to their places. */
 .tab { -webkit-user-select: none; user-select: none; }
-.tab[data-dragging] { opacity: 0.45; }
+[data-tab-dragging] .tab:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.tab[data-dragging] { z-index: 2; background: var(--thoth-bg); color: var(--thoth-ink-primary); border-color: var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); }
+.tab[data-dragging][data-selected] { background: var(--thoth-tab-active-bg); color: var(--thoth-tab-active-ink); border-top-color: var(--thoth-tab-active-line); }
+.tab[data-dragging][data-detach] { z-index: auto; opacity: 0.45; box-shadow: none; transition: transform var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 [data-tab-dragging], [data-tab-dragging] .tab-label { cursor: grabbing; }
-.tab[data-drop]::before { content: ""; position: absolute; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--thoth-drop-indicator); pointer-events: none; }
-.tab[data-drop="before"]::before { inset-inline-start: 0; }
-/* Inside the tab's edge: the list scrolls, so anything past its first or last tab is clipped. */
-.tab[data-drop="after"]::before { inset-inline-end: 0; }
 [data-tab-dragging] .tab-close { pointer-events: none; }
 .tab-drag-image { position: fixed; z-index: 50; display: grid; gap: 2px; max-width: 240px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-drag-label { overflow: hidden; text-overflow: ellipsis; }

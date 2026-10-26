@@ -105,11 +105,16 @@ test.describe("web client", () => {
       await expect.poll(tabNames).toEqual(["Alpha", "Beta", "Gamma"]);
       await settled(page);
 
-      // Alpha past Gamma, with the pointer: the line, then the new order. Below the bar there is no new window here.
-      const drag = await startDrag(page, page.getByRole("tab", { name: "Alpha" }).locator("xpath=.."));
+      // Alpha past Gamma, with the pointer: the same live preview as on the desktop (Beta and Gamma slide back to open
+      // the gap at the end), then the new order. Below the bar there is no new window here.
+      const boxOf = (name: string) => page.getByRole("tab", { name }).locator("xpath=..");
+      const left = async (name: string) => Math.round((await boxOf(name).boundingBox())!.x);
+      const betaWas = await left("Beta");
+      const drag = await startDrag(page, boxOf("Alpha"));
       const gamma = (await page.getByRole("tab", { name: "Gamma" }).boundingBox())!;
       await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + gamma.height / 2);
-      await expect(page.locator(".tab[data-drop]")).toHaveAttribute("data-drop", "after");
+      await expect.poll(async () => Math.abs((await left("Gamma")) - betaWas) <= 2).toBe(true);
+      await expect(page.locator(".tab[data-drop]")).toHaveCount(0);
       await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + 300);
       await expect(page.getByText("Release to open in a new window")).toHaveCount(0);
       await drag.drop();

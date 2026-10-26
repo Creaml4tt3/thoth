@@ -86,12 +86,18 @@ describe("the tab bar and dialogs", () => {
     expect(close.getAttribute("data-tip-keys")).toBe("Ctrl+W");
   });
 
-  it("opens each tab at 270px, 1.5 times the old 180px, and lets many tabs shrink to 96px", () => {
+  it("opens each tab at 202px (three quarters of the 270px before), at most 248px, and lets many tabs shrink to 96px, all from tokens", () => {
+    const strip = rule(css("shell.css"), ".tabstrip");
+    expect(strip).toMatch(/--thoth-tab-width: 202px/);
+    expect(strip).toMatch(/--thoth-tab-min-width: 96px/);
+    expect(strip).toMatch(/--thoth-tab-max-width: 248px/);
     const tab = rule(css("shell.css"), ".tab");
-    expect(tab).toMatch(/flex: 0 1 270px/);
-    expect(tab).toMatch(/width: 270px/);
-    expect(tab).toMatch(/min-width: 96px/);
-    expect(tab).toMatch(/max-width: 330px/);
+    expect(tab).toMatch(/flex: 0 1 var\(--thoth-tab-width\)/);
+    expect(tab).toMatch(/[^-]width: var\(--thoth-tab-width\)/);
+    expect(tab).toMatch(/min-width: var\(--thoth-tab-min-width\)/);
+    expect(tab).toMatch(/max-width: var\(--thoth-tab-max-width\)/);
+    // The enter and leave animations open to, and close from, the same width.
+    for (const name of ["thoth-tab-in", "thoth-tab-out"]) expect(css("shell.css")).toMatch(new RegExp(`@keyframes ${name} \\{[^\\n]*flex-basis: var\\(--thoth-tab-width\\)`));
     expect(rule(css("shell.css"), ".tab-close")).toMatch(/width: 28px/);
   });
 

@@ -1,6 +1,6 @@
 /**
  * The sidebar and the tab bar on the real desktop UI (Chromium, real Rust host, the e2e bridge): the drag handle on the
- * sidebar's edge, the tooltip for text that is cut off, icon buttons with names, tooltips and shortcuts, the wider tabs,
+ * sidebar's edge, the tooltip for text that is cut off, icon buttons with names, tooltips and shortcuts, the tab width,
  * an accessibility check in both themes, and pictures of the sidebar and tab bar in light and dark.
  *
  * SHOTS=<dir> changes where the pictures go (default tests/.tmp/screens, which git ignores).
@@ -231,13 +231,13 @@ test("a tooltip never gets in the way of a drag", async ({ page }) => {
   await page.mouse.up();
 });
 
-test("tabs open 1.5 times wider than before, shrink when there are many, and still close", async ({ page }) => {
+test("tabs open at 202px (three quarters of the old 270px), shrink when there are many, and still close", async ({ page }) => {
   await page.getByRole("treeitem", { name: "Alpha", exact: true }).click();
   const tab = page.getByRole("tab", { name: "Alpha" });
   await settled(page);
   const width = async (name: string | RegExp) => Math.round((await page.getByRole("tab", { name }).locator("xpath=..").boundingBox())!.width);
-  expect(await width("Alpha")).toBe(270);
-  expect(await tab.evaluate((el) => getComputedStyle(el.parentElement!).maxWidth)).toBe("330px");
+  expect(await width("Alpha")).toBe(202);
+  expect(await tab.evaluate((el) => getComputedStyle(el.parentElement!).maxWidth)).toBe("248px");
 
   // Many tabs: they give way down to the minimum, then the strip scrolls.
   for (const name of ["Beta", "Gamma", LONG]) await page.getByRole("treeitem", { name, exact: true }).click({ modifiers: ["ControlOrMeta"] });
@@ -246,7 +246,7 @@ test("tabs open 1.5 times wider than before, shrink when there are many, and sti
   await page.getByRole("treeitem", { name: "Two", exact: true }).click({ modifiers: ["ControlOrMeta"] });
   await settled(page);
   const many = await width("Beta");
-  expect(many).toBeLessThan(270);
+  expect(many).toBeLessThan(202);
   expect(many).toBeGreaterThanOrEqual(96);
 
   // The close button is there on hover and closes the tab.

@@ -62,16 +62,17 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * and End jump to the ends, with one tab in the Tab order (roving); Enter or Space opens the tab that has focus,
  * Delete closes it. Middle-click and the × on the tab close it with a pointer. The current tab uses the accent tokens `--thoth-tab-active-*`.
  *
- * Order (ADR-0019): a tab is dragged along the bar to reorder it, with an accent line where it would land; on the
- * desktop, dragged well below the bar or out of the window, it opens in a new window. While it is dragged it stays in
- * place, faded, and a picture of it follows the pointer (as in the page trees). Alt/Option+Shift+Left/Right moves
- * the focused tab, and its menu (right click, the Menu key, Shift+F10) has Move left, Move right, Move to new window and
- * Close. Each move is announced.
+ * Order (ADR-0019, amended 2026-10-26): a tab is dragged along the bar to reorder it. It lifts and follows the
+ * pointer, and the other tabs slide aside to open the gap where it would land (a live preview, as in a browser). On
+ * the desktop, dragged well below the bar or out of the window, the others go back to their places and a picture of it
+ * says it opens in a new window. Alt/Option+Shift+Left/Right moves the focused tab, and its menu (right click, the
+ * Menu key, Shift+F10) has Move left, Move right, Move to new window and Close. Each move is announced.
  *
  * Motion (shell.css): a tab opened after the bar first showed widens and fades in; a closed tab is kept for a moment as an
- * inert, hidden-from-AT copy that narrows and fades out. After a drop, the tabs that changed place slide there (transform
- * only, `--thoth-dur-fast`). Tabs present at the start, moves made with the keyboard, and everything under reduced
- * motion, skip it.
+ * inert, hidden-from-AT copy that narrows and fades out. While dragging, the others slide (transform only,
+ * `--thoth-dur-fast`); when the drag ends, every tab slides from where it was shown to its place (FLIP, once: the
+ * others are already there after a drop, so only the dropped tab settles). Tabs present at the start, moves made with
+ * the keyboard, and everything under reduced motion (the tabs jump to their places), skip it.
  */
 export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach }: BarProps) {
   const t = useStrings().tabs;
@@ -86,7 +87,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   const listRef = useRef<HTMLDivElement>(null);
   const [said, setSaid] = useState("");
   const [menu, setMenu] = useState<{ id: string; at: { x: number; y: number } } | null>(null);
-  /** Where each tab was just before a pointer drop, so they can slide from there to where they land (FLIP). */
+  /** Where each tab was shown just before a pointer drag ended, so they can slide from there to their places (FLIP). */
   const flip = useRef<Map<string, number> | null>(null);
   /** A tab sent to a new window from the keyboard or the menu: focus goes to the current tab once it has left. */
   const refocus = useRef<string | null>(null);
@@ -124,7 +125,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
     refs.current.get(active)?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [active, tabs.length]);
 
-  // FLIP: each tab that changed place starts where it was and slides to where it is now.
+  // FLIP: each tab shown somewhere else (moved, or shifted by the drag) starts where it was and slides to where it is now.
   useLayoutEffect(() => {
     const first = flip.current;
     flip.current = null;
@@ -139,7 +140,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       if (Math.abs(dx) < 0.5) continue;
       el.animate?.([{ transform: `translateX(${dx}px)` }, { transform: "translateX(0)" }], { duration: timing.duration, easing: timing.easing });
     }
-  }, [tabs]);
+  });
 
   // A tab sent away from the keyboard: once it has left, the keyboard is on the current tab, not on nothing.
   useEffect(() => {
@@ -154,16 +155,19 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   const canDetach = onDetach !== undefined && tabs.length > 1;
   const labelOf = (id: string) => tabs.find((tab) => tab.id === id)?.label ?? "";
 
-  /** Moves a tab and says so. `slide` (a pointer drop) animates the tabs that changed place. */
-  const moveTab = (id: string, to: number, slide: boolean) => {
+  /** Where every tab is shown now (with the drag's shifts), for the slide once the drag has ended. */
+  const rememberPlaces = () => {
+    if (motionOff()) return;
+    const places = new Map<string, number>();
+    for (const [key, el] of boxes.current) places.set(key, el.getBoundingClientRect().left);
+    flip.current = places;
+  };
+
+  /** Moves a tab and says so. A pointer drop has already remembered where the tabs were shown (`rememberPlaces`). */
+  const moveTab = (id: string, to: number) => {
     if (!onMove) return;
     const at = Math.max(0, Math.min(to, tabs.length - 1));
     if (at === order.indexOf(id)) return;
-    if (slide && !motionOff()) {
-      const places = new Map<string, number>();
-      for (const [key, el] of boxes.current) places.set(key, el.getBoundingClientRect().left);
-      flip.current = places;
-    }
     onMove(id, at);
     setSaid(t.movedTo(labelOf(id), at + 1, tabs.length));
   };
@@ -175,13 +179,14 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
     onDetach(id, at);
   };
 
-  const { drag, drop, onPointerDown, swallowClick } = useTabDrag({
+  const { drag, onPointerDown, swallowClick } = useTabDrag({
     order,
     list: () => listRef.current,
     tab: (id) => boxes.current.get(id) ?? null,
     canDetach,
-    onMove: (id, to) => moveTab(id, to, true),
+    onMove: (id, to) => moveTab(id, to),
     onDetach: (id, at) => detachTab(id, at),
+    onEnd: rememberPlaces,
   });
 
   /** Open tabs in order, each closed one still narrowing away where it sat. */
@@ -217,7 +222,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       handled();
       const delta = (event.key === "ArrowRight") !== rtl ? 1 : -1;
       if (at + delta < 0 || at + delta >= tabs.length) return;
-      moveTab(id, at + delta, false);
+      moveTab(id, at + delta);
       focusSoon(id);
       return;
     }
@@ -258,8 +263,8 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
     if (onMove) {
       const left = hint(0);
       const right = hint(1);
-      items.push({ id: "left", label: t.moveLeft, ...(left ? { hint: left } : {}), disabled: at <= 0, onSelect: () => (moveTab(id, at - 1, false), focusSoon(id)) });
-      items.push({ id: "right", label: t.moveRight, ...(right ? { hint: right } : {}), disabled: at >= tabs.length - 1, onSelect: () => (moveTab(id, at + 1, false), focusSoon(id)) });
+      items.push({ id: "left", label: t.moveLeft, ...(left ? { hint: left } : {}), disabled: at <= 0, onSelect: () => (moveTab(id, at - 1), focusSoon(id)) });
+      items.push({ id: "right", label: t.moveRight, ...(right ? { hint: right } : {}), disabled: at >= tabs.length - 1, onSelect: () => (moveTab(id, at + 1), focusSoon(id)) });
     }
     if (onDetach) items.push({ id: "window", label: t.moveToWindow, disabled: tabs.length < 2, onSelect: () => detachTab(id, null) });
     items.push({ id: "close", label: t.close, onSelect: () => onClose(id) });
@@ -283,6 +288,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
           const tab = row.item;
           const selected = tab.id === active;
           const dragged = drag?.id === tab.id ? drag : null;
+          const shift = drag?.shifts[tab.id];
           return (
             <div
               key={tab.id}
@@ -296,7 +302,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
               data-enter={fresh.includes(tab.id) || undefined}
               data-dragging={dragged ? "" : undefined}
               data-detach={dragged?.detach ? "" : undefined}
-              data-drop={drop?.id === tab.id ? drop.side : undefined}
+              style={shift === undefined ? undefined : { transform: `translateX(${shift}px)` }}
               {...(onMove ? { onPointerDown: (event: PointerEvent<HTMLDivElement>) => onPointerDown(event, tab.id) } : {})}
             >
               <button
@@ -343,12 +349,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
         })}
       </div>
       <IconButton icon="plus" label={t.new} shortcut="tab.new" className="tab-new" onClick={onNew} />
-      {drag && (
-        // A picture of the tab follows the pointer, below it so the line stays in sight; out of the bar it says what
-        // letting go will do. The list clips anything outside it, so this is fixed to the window.
+      {drag?.detach && (
+        // Out of the bar, a picture of the tab follows the pointer and says what letting go will do. The list clips
+        // anything outside it, so this is fixed to the window.
         <div className="tab-drag-image" aria-hidden="true" style={{ left: drag.x + 12, top: drag.y + 16 }}>
           <span className="tab-drag-label">{labelOf(drag.id)}</span>
-          {drag.detach && <span className="tab-drag-hint">{t.releaseForWindow}</span>}
+          <span className="tab-drag-hint">{t.releaseForWindow}</span>
         </div>
       )}
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tabs-said="">

@@ -76,17 +76,32 @@ async function at(tab: Locator, fraction = 0.5): Promise<{ x: number; y: number 
   return { x: box.x + box.width * fraction, y: box.y + box.height / 2 };
 }
 
-const drops = (page: Page) => page.locator(".tab[data-drop]").evaluateAll((els) => els.map((el) => `${el.querySelector(".tab-text")?.textContent}: ${el.getAttribute("data-drop")}`));
+/** Where each tab is shown now (its box includes the drag's transform), left edge rounded, by name. */
+const places = (page: Page) =>
+  page.locator(".tablist > .tab").evaluateAll((els) => Object.fromEntries(els.map((el) => [el.querySelector(".tab-text")?.textContent ?? "", Math.round(el.getBoundingClientRect().left)])));
+/** Within 2px, each: the tabs slide there over a short transition. */
+async function expectPlaces(page: Page, expected: Record<string, number>) {
+  await expect
+    .poll(async () => {
+      const now = await places(page);
+      return Object.keys(expected).every((name) => Math.abs((now[name] ?? Number.NaN) - expected[name]!) <= 2) ? expected : now;
+    })
+    .toEqual(expected);
+}
 
 test("tabs are dragged to a new place with a real pointer, and come back in that order after a restart", async ({ page }) => {
   await threeTabs(page);
+  const start0 = await places(page);
 
-  // Alpha past Gamma: the line shows after Gamma (the end), and the tab follows the pointer.
+  // Alpha past Gamma: Alpha lifts and follows the pointer, Beta and Gamma slide back to open the gap at the end.
   let drag = await startDrag(page, tabBox(page, "Alpha"));
   const end = await at(tabBox(page, "Gamma"), 0.9);
   await drag.moveTo(end.x, end.y);
-  await expect.poll(() => drops(page)).toEqual(["Gamma: after"]);
   await expect(tabBox(page, "Alpha")).toHaveAttribute("data-dragging", "");
+  await expectPlaces(page, { Beta: start0["Alpha"]!, Gamma: start0["Beta"]! });
+  expect((await places(page))["Alpha"]).toBeGreaterThan(start0["Beta"]!); // under the pointer, over where Gamma was
+  await expect(page.locator(".tab[data-drop]")).toHaveCount(0); // no line: the gap is the preview
+  await expect(page.locator(".tab-drag-image")).toHaveCount(0);
   for (const dark of [false, true]) {
     await theme(page, dark);
     await settled(page); // the colours change with a short transition
@@ -96,22 +111,26 @@ test("tabs are dragged to a new place with a real pointer, and come back in that
   await drag.drop();
   await expect.poll(() => tabNames(page)).toEqual(["Beta", "Gamma", "Alpha"]);
   await expect(current(page)).toHaveText("Gamma"); // the same tab stays current
-  await expect(page.locator(".tab[data-drop]")).toHaveCount(0);
+  // It lands in the gap it was shown: where Gamma was, and the others stay where they had slid to.
+  await expectPlaces(page, { Beta: start0["Alpha"]!, Gamma: start0["Beta"]!, Alpha: start0["Gamma"]! });
   await settled(page);
+  expect(await tabBox(page, "Beta").evaluate((el) => getComputedStyle(el).transform)).toBe("none");
 
-  // Gamma to the start; Escape on a second drag puts Beta back.
+  // Gamma to the start; Escape on a second drag puts everything back.
   drag = await startDrag(page, tabBox(page, "Gamma"));
-  const start = await at(tabBox(page, "Beta"), 0.1);
-  await drag.moveTo(start.x, start.y);
-  await expect.poll(() => drops(page)).toEqual(["Beta: before"]);
+  const begin = await at(tabBox(page, "Beta"), 0.1);
+  await drag.moveTo(begin.x, begin.y);
+  await expectPlaces(page, { Beta: start0["Beta"]! });
   await drag.drop();
   await expect.poll(() => tabNames(page)).toEqual(["Gamma", "Beta", "Alpha"]);
   await settled(page);
   drag = await startDrag(page, tabBox(page, "Beta"));
   const far = await at(tabBox(page, "Alpha"), 0.9);
   await drag.moveTo(far.x, far.y);
+  await expectPlaces(page, { Gamma: start0["Alpha"]!, Alpha: start0["Beta"]! });
   await drag.cancel();
   await expect.poll(() => tabNames(page)).toEqual(["Gamma", "Beta", "Alpha"]);
+  await expectPlaces(page, { Gamma: start0["Alpha"]!, Beta: start0["Beta"]!, Alpha: start0["Gamma"]! });
 
   // The keyboard way: Option/Alt+Shift+Right on the focused tab.
   await page.getByRole("tab", { name: "Gamma" }).focus();
@@ -129,8 +148,20 @@ test("tabs are dragged to a new place with a real pointer, and come back in that
 test("a tab dragged out opens in a second window on the same Private Space; edits show in both; both come back", async ({ page, context, browser }) => {
   await threeTabs(page);
 
-  // Out of the bar, well below it: the label says what letting go will do.
+  // Along the bar first: the gap opens. Out of the bar, well below it, every tab goes back to its place and the label
+  // says what letting go will do; back in the bar the gap comes back.
+  const home = await places(page);
   const drag = await startDrag(page, tabBox(page, "Beta"));
+  const gamma = await at(tabBox(page, "Gamma"), 0.9);
+  await drag.moveTo(gamma.x, gamma.y);
+  await expectPlaces(page, { Alpha: home["Alpha"]!, Gamma: home["Beta"]! });
+  await drag.moveTo(500, 420);
+  await expect(page.getByText("Release to open in a new window")).toBeVisible();
+  await expectPlaces(page, home);
+  await expect(tabBox(page, "Beta")).toHaveAttribute("data-detach", "");
+  await drag.moveTo(gamma.x, gamma.y);
+  await expectPlaces(page, { Gamma: home["Beta"]! });
+  await expect(page.getByText("Release to open in a new window")).toHaveCount(0);
   await drag.moveTo(500, 420);
   await expect(page.getByText("Release to open in a new window")).toBeVisible();
   for (const dark of [false, true]) {
