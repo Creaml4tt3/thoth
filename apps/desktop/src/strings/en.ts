@@ -585,6 +585,44 @@ export const en = {
       reviewAgain: "Review the changes",
       askAgain: "Ask again",
       changes: "What the agent proposed",
+      /** A conversation (ADR-0007, "Conversations"): its turns, then the composer for the next question. */
+      turns: "Questions and answers",
+      question: (n: number) => `Question ${n}`,
+      context: (sent: number, earlier: number, deleted: number, notAllowed: number) => {
+        const parts = [
+          sent === 0
+            ? "No earlier turns were sent with this question."
+            : sent === earlier
+              ? earlier === 1
+                ? "The earlier question and its answer were sent with this one."
+                : `All ${earlier} earlier questions and answers were sent with this one.`
+              : `Sent the last ${sent} of ${earlier} earlier turns as context.`,
+        ];
+        if (deleted > 0) parts.push(deleted === 1 ? "1 was left out because its details were deleted." : `${deleted} were left out because their details were deleted.`);
+        if (notAllowed > 0) parts.push(notAllowed === 1 ? "1 was left out because it used pages this question was not given." : `${notAllowed} were left out because they used pages this question was not given.`);
+        const long = earlier - sent - deleted - notAllowed;
+        if (long > 0) parts.push(long === 1 ? "1 older turn was left out to stay within the length limit." : `${long} older turns were left out to stay within the length limit.`);
+        return parts.join(" ");
+      },
+      composer: "Ask a follow-up",
+      composerHint: (mac: boolean): string => (mac ? "⌘ Return to send." : "Ctrl+Enter to send."),
+      send: "Send",
+      sending: "Sending…",
+      sendFailed: "The question could not be sent. Click the mascot for details.",
+      sameContext: (what: string) => `Same pages and settings as the last question: ${what}.`,
+      pages: (n: number) => (n === 1 ? "1 page" : `${n} pages`),
+      wholeSpace: "the whole Private Space",
+      workspacePages: (n: number) => (n === 1 ? "1 workspace page" : `${n} workspace pages`),
+      workspaceDropped: "Workspace pages are not kept after Thoth restarts: add them again under Change pages or settings.",
+      change: "Change pages or settings…",
+      blocked: {
+        running: "Wait for the answer before you ask more.",
+        review: "Review the proposed changes first. Then you can ask more.",
+        busy: "The assistant is working on another task in this window. Ask when it is done.",
+        notAllowed: "Permissions no longer allow what the last question was given. Change the pages or settings.",
+        unknown: "This conversation is no longer in the list of runs.",
+      },
+      ownedElsewhere: "This conversation belongs to another window. Continue it there.",
     },
 
     /** The Assistant section of the sidebar: the newest runs, each opening its session tab. */
@@ -592,6 +630,8 @@ export const en = {
       heading: "Assistant",
       more: (n: number) => `Show ${n} more`,
       less: "Show less",
+      /** How many questions a conversation has (shown from two on). */
+      turns: (n: number) => `${n} questions`,
     },
 
     providersHeading: "Agents",
@@ -684,6 +724,9 @@ export const en = {
       openResult: "Open the result",
       openInTab: "Open in a tab",
       askAgain: "Ask again",
+      followUp: "Ask a follow-up",
+      followUpTo: (title: string) => `Follow-up to “${title}”`,
+      notFollowUp: "Ask as a new task",
       settings: "Assistant settings",
       appliedSummary: (n: number) => (n === 0 ? "Nothing was applied." : n === 1 ? "1 change was applied." : `${n} changes were applied.`),
     },

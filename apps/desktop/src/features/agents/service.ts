@@ -8,6 +8,9 @@
 import {
   AgentHub,
   AgentUnavailableError,
+  conversationKey,
+  conversationTurns,
+  type Conversation,
   createWorkspaceReader,
   LimitError,
   MAX_EXCERPT_CHARS,
@@ -30,7 +33,7 @@ import { createClaudeProvider, isModelName as isClaudeModel } from "@thoth/agent
 import { createCodexProvider, isModelName as isCodexModel } from "@thoth/agent-codex";
 import type { Vault } from "@thoth/local-store";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
-import { AGENT_PROVIDERS, loadAgentSettings, saveAgentSettings, type AgentProviderId, type AgentSettings } from "./settings.ts";
+import { AGENT_PROVIDERS, isAgentProvider, loadAgentSettings, saveAgentSettings, type AgentProviderId, type AgentSettings } from "./settings.ts";
 
 /** What the form needs to know about each agent CLI. Codex has no spending limit (its adapter refuses one). */
 export const PROVIDER_FEATURES: Record<AgentProviderId, { budget: boolean; isModelName(name: string): boolean; models: readonly string[] }> = {
@@ -71,7 +74,40 @@ export interface Draft {
    * record); `source` is the kind of page it came from, so Permissions apply to it as to that page. null: none.
    */
   excerpt: Excerpt | null;
+  /** The conversation this task continues (a follow-up whose pages or settings were changed in the bubble); null: a new one. */
+  followUp: string | null;
 }
+
+/**
+ * What a follow-up is sent with (ADR-0007, "Conversations"): the agent, context and limits of the conversation's last
+ * turn as this window started it, or, for a conversation from an earlier session, as its record says.
+ */
+export interface FollowUpPlan {
+  provider: AgentProviderId;
+  selection: string[];
+  wholeSpace: boolean;
+  workspace: WorkspaceChoice[];
+  model: string;
+  timeMinutes: number | "default";
+  budget: number | "none" | "default";
+  /** The last turn had workspace pages, which cannot be given again here (their server is not in the record). */
+  workspaceDropped: boolean;
+}
+
+/** Why a follow-up cannot be sent now. */
+export type FollowUpBlock =
+  /** Not in the history. */
+  | "unknown"
+  /** Another window owns the conversation (ADR-0019 rule 8). */
+  | "elsewhere"
+  /** A turn of it is still running. */
+  | "running"
+  /** A turn of it waits for review. */
+  | "review"
+  /** This window is busy with another run. */
+  | "busy"
+  /** Permissions no longer allow the context it would be sent with. */
+  | "notAllowed";
 
 /** Selected text and the page it came from: a Private Space page (`from` its path) or a workspace page. */
 export type Excerpt = { text: string; from: string | null } & ({ source: "private" } | { source: "workspace"; server: string; workspace: string });
@@ -141,6 +177,10 @@ export interface AgentsState {
   recovered: number | null;
   /** How many runs "Delete history now" removed, until the next change. */
   cleared: number | null;
+  /** Conversations this window started (or continued while alone): it owns them (ADR-0019 rule 8). */
+  owned: readonly string[];
+  /** A request to focus a conversation's composer ("Ask a follow-up" in the bubble); the nonce changes each time. */
+  compose: { conversation: string; nonce: number } | null;
 }
 
 export interface AgentsService {
@@ -176,8 +216,8 @@ export interface AgentsService {
   /** Back to the form (after a run ended); keeps the selection. */
   newTask(): Promise<void>;
   /**
-   * Back to the form with the task of run `id` (the current run when absent) to send again: a follow-up is a new
-   * run (runs are one-shot, ADR-0007). The current run keeps the draft's context; an earlier one gives the Private
+   * Back to the form with the task of run `id` (the current run when absent) to send again as a new task (a follow-up
+   * in the same conversation is `sendFollowUp`). The current run keeps the draft's context; an earlier one gives the Private
    * Space pages and files it was given (workspace pages are picked again). False when a run is still going.
    */
   askAgain(id?: string): Promise<boolean>;
@@ -185,14 +225,53 @@ export interface AgentsService {
   refresh(): Promise<void>;
   /** The local details of a run (transcript, answer, diffs), or null when there are none. */
   runDetails(id: string): Promise<RunDetails | null>;
+  /** The conversation run `id` belongs to (its id, the first turn's run id); `id` itself when it is not known. */
+  conversationOf(id: string): string;
+  /** The turns of the conversation of run `id`, oldest first, with this window's current run as it is now. */
+  conversation(id: string): RunRecord[];
+  /** Every conversation, the one with the newest turn first (the sidebar's rows). */
+  conversations(): Conversation[];
+  /** What a follow-up in the conversation of `id` would be sent with; null when it is not known. */
+  followUpPlan(id: string): FollowUpPlan | null;
+  /** Why a follow-up in the conversation of `id` cannot be sent now, or null when it can. */
+  followUpBlock(id: string): FollowUpBlock | null;
+  /** Sends `question` as the next turn of the conversation of `id`, with `followUpPlan`. False when it did not start. */
+  sendFollowUp(id: string, question: string): Promise<boolean>;
+  /** Puts the follow-up in the bubble's form with its context and settings, to change them there before Start. */
+  editFollowUp(id: string, question: string): boolean;
+  /** Asks the conversation's composer to take focus (the session tab follows `compose`). */
+  composeFollowUp(id: string): void;
   recover(): Promise<void>;
   dismissRecovered(): void;
   dispose(): Promise<void>;
 }
 
-const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default", excerpt: null };
+const EMPTY_DRAFT: Draft = { selection: [], wholeSpace: false, workspace: [], prompt: "", model: "", timeMinutes: "default", budget: "default", excerpt: null, followUp: null };
 
-export function createAgentsService(vault: Vault, host: AgentHost, options: { now?: () => number; onApplied?: () => void; servers?: ServerDirectory; settings?: AgentSettings } = {}): AgentsService {
+/** A run to start: the form's draft, or a follow-up's plan with its question. */
+type Launch = Omit<Draft, "followUp"> & { provider: AgentProviderId; followUp: string | null };
+
+const GOING: ReadonlySet<RunPhase> = new Set(["starting", "running", "cancelling"]);
+const isIdle = (phase: RunPhase) => phase === "idle" || phase === "finished";
+
+/** Problems with what a run would be given, by the Permissions (they only narrow). */
+function contextProblems(d: Pick<Draft, "selection" | "wholeSpace" | "workspace">, settings: AgentSettings): DraftProblem[] {
+  const problems: DraftProblem[] = [];
+  if (d.selection.length === 0 && !d.wholeSpace && d.workspace.length === 0) problems.push("needContext");
+  if (d.selection.length > 0 && !settings.allowPrivate) problems.push("privateOff");
+  if (d.wholeSpace && !settings.allowWholeSpace) problems.push("wholeSpaceOff");
+  if (d.workspace.length > 0 && !settings.allowWorkspace) problems.push("workspaceOff");
+  return problems;
+}
+
+/** What an earlier run was given from the Private Space, to give again (folders come back as the files they gave). */
+const privateSelection = (record: RunRecord): string[] => [...new Set(record.context.filter((c) => !c.readOnly && (c.via === "selected" || c.via === "folder")).map((c) => c.path))].sort();
+
+export function createAgentsService(
+  vault: Vault,
+  host: AgentHost,
+  options: { now?: () => number; onApplied?: () => void; servers?: ServerDirectory; settings?: AgentSettings; alone?: () => boolean } = {},
+): AgentsService {
   const initialSettings = options.settings ?? loadAgentSettings();
   let state: AgentsState = {
     provider: initialSettings.provider,
@@ -216,8 +295,14 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     detail: null,
     recovered: null,
     cleared: null,
+    owned: [],
+    compose: null,
   };
   const servers = options.servers;
+  const alone = options.alone ?? (() => true);
+  /** How each conversation's last turn in this window was started (its workspace pages need their server). */
+  const plans = new Map<string, Omit<FollowUpPlan, "workspaceDropped">>();
+  let composeNonce = 0;
   const hub = new AgentHub({
     vault,
     host,
@@ -240,6 +325,60 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     const [history, available] = await Promise.all([hub.history().catch(() => state.history), hub.detailsAvailable().catch(() => new Map<string, { transcript: boolean; review: boolean }>())]);
     set({ history, available: Object.fromEntries(available) });
   };
+
+  /** Starts a run (a new task, or the next turn of a conversation) and follows it to its end. True when it started. */
+  async function launch(input: Launch, onStarted: () => void = () => undefined): Promise<boolean> {
+    const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget, excerpt, provider, followUp } = input;
+    // Only a CLI that enforces a spending limit gets one; Codex has none, and none is pretended.
+    const budgetUsd = !PROVIDER_FEATURES[provider].budget ? null : budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
+    const minutes = timeMinutes === "default" ? state.settings.timeMinutes : timeMinutes;
+    set({ phase: "starting", error: null, notice: null, events: [], answer: null, changes: null, approved: [], results: null, record: null, detail: null });
+    let started = false;
+    try {
+      const { record, finished } = await hub.start(
+        {
+          provider,
+          prompt,
+          // Checked again at Start: a workspace's rules can change while the bubble is open.
+          ...(excerpt && excerptAllowed(excerpt, state.settings, servers) ? { excerpt: { text: excerpt.text, ...(excerpt.from ? { from: excerpt.from } : {}) } } : {}),
+          selection: wholeSpace ? [] : selection,
+          ...(wholeSpace ? { wholeSpace: true } : {}),
+          ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),
+          ...(model.trim() ? { model: model.trim() } : {}),
+          ...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd } : {}),
+          timeoutMs: minutesToMs(minutes),
+          ...(followUp ? { followUp } : {}),
+        },
+        (event) => {
+          const events = state.events.length >= MAX_EVENTS ? [...state.events.slice(1), event] : [...state.events, event];
+          set({ events });
+        },
+      );
+      started = true;
+      // This window started the turn, so it owns the conversation; the next turn goes with the same context and limits.
+      const key = conversationKey(record);
+      plans.set(key, { provider, selection: wholeSpace ? [] : [...selection], wholeSpace, workspace: [...workspace], model, timeMinutes, budget });
+      set({ phase: service.getState().phase === "cancelling" ? "cancelling" : "running", record, owned: state.owned.includes(key) ? state.owned : [...state.owned, key] });
+      if (state.draft.followUp === key) set({ draft: { ...state.draft, prompt: "", followUp: null } });
+      onStarted();
+      void refreshHistory();
+      const done = await finished;
+      const changes = hub.changes(done.id);
+      set({
+        record: done,
+        answer: hub.answer(done.id),
+        changes: done.state === "review" ? changes : null,
+        approved: done.state === "review" ? (changes ?? []).filter((c) => c.problem === undefined).map((c) => c.path) : [],
+        phase: done.state === "review" ? "review" : "finished",
+      });
+    } catch (error) {
+      if (error instanceof AgentUnavailableError) set({ status: provider === state.provider ? error.status : state.status, statuses: { ...state.statuses, [provider]: error.status }, phase: "idle", error: null });
+      else if (error instanceof WorkspaceContextError) set({ phase: "idle", error: null, notice: { kind: "refused", refusal: error.refusal, ...(error.workspace ? { workspace: error.workspace } : {}) } });
+      else set({ phase: "idle", error: error instanceof StagingError || error instanceof LimitError ? error.message : message(error) });
+    }
+    await refreshHistory();
+    return started;
+  }
 
   const service: AgentsService = {
     subscribe(listener) {
@@ -307,14 +446,9 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     },
 
     draftProblems() {
-      const { selection, wholeSpace, workspace, prompt, model } = state.draft;
-      const problems: DraftProblem[] = [];
-      const { allowPrivate, allowWholeSpace, allowWorkspace } = state.settings;
-      if (selection.length === 0 && !wholeSpace && workspace.length === 0) problems.push("needContext");
+      const { prompt, model } = state.draft;
       // Permissions only narrow: what they switch off cannot be started with, whatever the draft holds.
-      if (selection.length > 0 && !allowPrivate) problems.push("privateOff");
-      if (wholeSpace && !allowWholeSpace) problems.push("wholeSpaceOff");
-      if (workspace.length > 0 && !allowWorkspace) problems.push("workspaceOff");
+      const problems = contextProblems(state.draft, state.settings);
       if (prompt.trim() === "") problems.push("needTask");
       if (model.trim() !== "" && !PROVIDER_FEATURES[state.provider].isModelName(model.trim())) problems.push("badModel");
       const code = state.preview?.problem?.code;
@@ -342,50 +476,87 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     },
 
     async start() {
-      if (state.phase !== "idle" && state.phase !== "finished") return;
+      if (!isIdle(state.phase)) return;
       if (service.draftProblems().length > 0) return;
-      const { selection, wholeSpace, workspace, prompt, model, timeMinutes, budget, excerpt } = state.draft;
-      const provider = state.provider;
-      // Only a CLI that enforces a spending limit gets one; Codex has none, and none is pretended.
-      const budgetUsd = !PROVIDER_FEATURES[provider].budget ? null : budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
-      const minutes = timeMinutes === "default" ? state.settings.timeMinutes : timeMinutes;
-      set({ phase: "starting", error: null, notice: null, events: [], answer: null, changes: null, approved: [], results: null, record: null, detail: null });
-      try {
-        const { record, finished } = await hub.start(
-          {
-            provider,
-            prompt,
-            // Checked again at Start: a workspace's rules can change while the bubble is open.
-            ...(excerpt && excerptAllowed(excerpt, state.settings, servers) ? { excerpt: { text: excerpt.text, ...(excerpt.from ? { from: excerpt.from } : {}) } } : {}),
-            selection: wholeSpace ? [] : selection,
-            ...(wholeSpace ? { wholeSpace: true } : {}),
-            ...(workspace.length > 0 ? { workspacePages: workspace.map(({ server, workspace: ws, page }) => ({ server, workspace: ws, page })) } : {}),
-            ...(model.trim() ? { model: model.trim() } : {}),
-            ...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd } : {}),
-            timeoutMs: minutesToMs(minutes),
-          },
-          (event) => {
-            const events = state.events.length >= MAX_EVENTS ? [...state.events.slice(1), event] : [...state.events, event];
-            set({ events });
-          },
-        );
-        set({ phase: service.getState().phase === "cancelling" ? "cancelling" : "running", record });
-        void refreshHistory();
-        const done = await finished;
-        const changes = hub.changes(done.id);
-        set({
-          record: done,
-          answer: hub.answer(done.id),
-          changes: done.state === "review" ? changes : null,
-          approved: done.state === "review" ? (changes ?? []).filter((c) => c.problem === undefined).map((c) => c.path) : [],
-          phase: done.state === "review" ? "review" : "finished",
+      await launch({ ...state.draft, provider: state.provider });
+    },
+
+    conversationOf(id) {
+      const record = state.record?.id === id ? state.record : state.history.find((r) => r.id === id);
+      return record ? conversationKey(record) : id;
+    },
+
+    conversation(id) {
+      const key = service.conversationOf(id);
+      // The current run as the service has it now (the history is read again only after each step).
+      const records = state.history.filter((r) => r.id !== state.record?.id && conversationKey(r) === key);
+      if (state.record && conversationKey(state.record) === key) records.push(state.record);
+      return conversationTurns(records)[0]?.turns ?? [];
+    },
+
+    conversations() {
+      const current = state.record;
+      return conversationTurns(current ? [current, ...state.history.filter((r) => r.id !== current.id)] : state.history);
+    },
+
+    followUpPlan(id) {
+      const key = service.conversationOf(id);
+      const kept = plans.get(key);
+      if (kept) return { ...kept, workspaceDropped: false };
+      const last = service.conversation(id).at(-1);
+      if (!last) return null;
+      // From the record: the same agent, Private Space context, model and limits (workspace pages are picked again).
+      const provider = isAgentProvider(last.provider.id) ? last.provider.id : state.provider;
+      const wholeSpace = last.task.wholeSpace === true;
+      return {
+        provider,
+        selection: wholeSpace ? [] : privateSelection(last),
+        wholeSpace,
+        workspace: [],
+        model: last.task.model ?? "",
+        timeMinutes: last.task.timeoutMs === undefined ? "default" : Math.round(last.task.timeoutMs / 60_000),
+        budget: !PROVIDER_FEATURES[provider].budget ? "default" : last.task.maxBudgetUsd ?? "none",
+        workspaceDropped: last.context.some((c) => c.readOnly),
+      };
+    },
+
+    followUpBlock(id) {
+      const key = service.conversationOf(id);
+      const turns = service.conversation(id);
+      if (turns.length === 0) return "unknown";
+      if (!state.owned.includes(key) && !alone()) return "elsewhere";
+      const current = state.record !== null && conversationKey(state.record) === key;
+      if ((current && GOING.has(state.phase)) || turns.some((t) => t.state === "running" || t.state === "staging")) return "running";
+      if ((current && (state.phase === "review" || state.phase === "applying")) || turns.some((t) => t.state === "review")) return "review";
+      if (!isIdle(state.phase)) return "busy";
+      const plan = service.followUpPlan(id);
+      if (!plan || contextProblems(plan, state.settings).length > 0) return "notAllowed";
+      return null;
+    },
+
+    async sendFollowUp(id, question) {
+      if (question.trim() === "" || service.followUpBlock(id) !== null) return false;
+      const { workspaceDropped: _dropped, ...plan } = service.followUpPlan(id)!;
+      // Resolves once the turn runs (or failed to start); the turn itself goes on in the service's state.
+      return new Promise<boolean>((resolve) => {
+        void launch({ ...plan, prompt: question, excerpt: null, followUp: service.conversationOf(id) }, () => resolve(true)).then((ok) => {
+          if (!ok) resolve(false);
         });
-      } catch (error) {
-        if (error instanceof AgentUnavailableError) set({ status: error.status, statuses: { ...state.statuses, [state.provider]: error.status }, phase: "idle", error: null });
-        else if (error instanceof WorkspaceContextError) set({ phase: "idle", error: null, notice: { kind: "refused", refusal: error.refusal, ...(error.workspace ? { workspace: error.workspace } : {}) } });
-        else set({ phase: "idle", error: error instanceof StagingError || error instanceof LimitError ? error.message : message(error) });
-      }
-      await refreshHistory();
+      });
+    },
+
+    editFollowUp(id, question) {
+      const plan = service.followUpPlan(id);
+      if (!plan || !isIdle(state.phase) || (!state.owned.includes(service.conversationOf(id)) && !alone())) return false;
+      const { provider, workspaceDropped: _dropped, ...draft } = plan;
+      if (provider !== state.provider) service.selectProvider(provider);
+      set({ draft: { ...draft, prompt: question, excerpt: null, followUp: service.conversationOf(id) }, error: null, notice: null });
+      void service.refreshPreview();
+      return true;
+    },
+
+    composeFollowUp(id) {
+      set({ compose: { conversation: service.conversationOf(id), nonce: ++composeNonce } });
     },
 
     async cancel() {
@@ -483,7 +654,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     async newTask() {
       if (state.phase === "running" || state.phase === "cancelling" || state.phase === "starting" || state.phase === "applying") return;
       if (state.record && state.phase !== "review") await hub.close(state.record.id);
-      set({ phase: "idle", record: null, events: [], answer: null, changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "", excerpt: null } });
+      set({ phase: "idle", record: null, events: [], answer: null, changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "", excerpt: null, followUp: null } });
     },
 
     async askAgain(id) {

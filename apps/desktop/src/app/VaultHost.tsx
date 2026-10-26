@@ -220,7 +220,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Agent runs: only where the host can run CLIs. Working directories an earlier session left are deleted and its
   // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
-  const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers }) : null), [platform, vault, bump, servers]);
+  const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers, alone: () => aloneRef.current }) : null), [platform, vault, bump, servers]);
   useEffect(() => () => void agents?.dispose(), [agents]);
   // A window that is not alone does not recover (the runs may be another window's) but still lists them.
   useEffect(() => {
@@ -265,7 +265,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     (runId: string) => {
       if (!agents || !assistant) return;
       const s = agents.getState();
-      const session = { kind: "agent-run" as const, run: runId };
+      // One tab per conversation (ADR-0007, "Conversations"): a turn opens its conversation's tab.
+      const session = { kind: "agent-run" as const, run: agents.conversationOf(runId) };
       if (s.record?.id === runId) {
         if (s.phase === "review" || s.phase === "applying" || (s.phase === "finished" && s.results !== null)) return tabs.open(session);
         if (s.phase !== "idle") return assistant.openBubble();
@@ -323,9 +324,9 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       },
       openAgentReview: () => {
         const run = agents?.getState().record?.id;
-        if (run) tabs.open({ kind: "agent-run", run });
+        if (run) tabs.open({ kind: "agent-run", run: agents!.conversationOf(run) });
       },
-      openAgentRun: (run) => tabs.open({ kind: "agent-run", run }),
+      openAgentRun: (run) => tabs.open({ kind: "agent-run", run: agents?.conversationOf(run) ?? run }),
       alone,
       openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
       openFolder,

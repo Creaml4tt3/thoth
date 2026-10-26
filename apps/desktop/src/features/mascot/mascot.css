@@ -262,6 +262,8 @@
 .bubble-run .agents-answer-text { max-height: 220px; }
 .bubble-caution { margin: 0; }
 .bubble-prompt { margin: 0; font-weight: 550; overflow-wrap: anywhere; }
+/* A follow-up whose pages or settings are being changed says which conversation it continues. */
+.bubble-followup { margin: 0; color: var(--thoth-ink-secondary); overflow-wrap: anywhere; }
 .bubble-log { max-height: 180px; overflow: auto; padding: 8px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); font: var(--thoth-text-small); }
 .bubble-log .agents-log { gap: 4px; }
 .bubble-run .alert { margin: 0; }

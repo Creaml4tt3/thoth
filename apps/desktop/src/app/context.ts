@@ -70,7 +70,7 @@ export interface Session {
   askAssistant(selection?: string[]): void;
   /** Opens the session tab of the current run (its transcript, answer, review and result); nothing without a run. */
   openAgentReview(): void;
-  /** Opens the session tab of run `id` (one tab per run: an open one is brought forward). */
+  /** Opens the session tab of run `id`: its conversation's tab (one tab per conversation: an open one is brought forward). */
   openAgentRun(id: string): void;
   /**
    * True while this window is the only one on its Private Space (ADR-0019 rule 5). A run waiting for review that this

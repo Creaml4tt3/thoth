@@ -127,3 +127,19 @@
 .agents-row-state[data-open]::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-inline-end: 5px; border-radius: 50%; background: var(--thoth-accent); vertical-align: 1px; }
 .sec-link.agents-more { display: inline-block; margin: 4px 8px 0; }
 @media (pointer: coarse) { .agents-row { min-height: 44px; } .sec-link.agents-more { padding: 8px 0; } }
+/* A conversation: its turns top to bottom (question, then what the run did), a rule between them, then the composer. */
+.agents-turns { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-6); }
+.agents-turn > section { display: grid; gap: var(--thoth-space-3); min-width: 0; }
+.agents-turn + .agents-turn { border-top: 1px solid var(--thoth-border); padding-top: var(--thoth-space-6); }
+.agents-turn-heading { margin: 0; font: 600 12px / 16px var(--thoth-font-sans); letter-spacing: 0.02em; text-transform: uppercase; color: var(--thoth-ink-secondary); }
+.agents-turn-question { margin: 0; color: var(--thoth-ink-primary); }
+.agents-turn-context { margin: 0; }
+.agents-composer { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); background: var(--thoth-bg); }
+.agents-composer-label { font-weight: 600; }
+.agents-composer textarea { resize: vertical; min-height: 4.5em; font: var(--thoth-text-body); }
+.agents-composer p { margin: 0; }
+.agents-composer-blocked { color: var(--thoth-ink-primary); }
+.agents-composer-blocked::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-inline-end: 6px; border-radius: 50%; background: var(--thoth-accent); vertical-align: 1px; }
+.agents-composer .set-actions { justify-content: flex-end; }
+.agents-row-turns { flex: none; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); white-space: nowrap; }
+.agents-row[aria-current="page"] .agents-row-turns { color: inherit; }

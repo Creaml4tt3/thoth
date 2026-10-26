@@ -123,7 +123,8 @@ export function Shell() {
       case "settings":
         return tt.settings;
       case "agent-run": {
-        const record = runs?.record?.id === tab.run ? runs.record : runs?.history.find((r) => r.id === tab.run);
+        // A tab is a conversation: named by its first question.
+        const record = runs ? agents?.conversation(tab.run)[0] : undefined;
         return record ? taskTitle(record.task.prompt) || sessionTitle : sessionTitle;
       }
       case "blank":

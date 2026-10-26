@@ -18,7 +18,7 @@ export type TabTarget =
   /** A page of a workspace on a server. */
   | { kind: "workspace"; server: string; workspace: string; page: string }
   | { kind: "settings"; section?: "servers" | "agents" }
-  /** A session of the assistant: one run, by its record's UUIDv7 (desktop only; the web client drops it). */
+  /** A session of the assistant: one conversation, by its first run's UUIDv7 (desktop only; the web client drops it). */
   | { kind: "agent-run"; run: string }
   /** A new, empty tab. */
   | { kind: "blank" };

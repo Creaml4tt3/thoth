@@ -5,7 +5,9 @@
  * pages, folders, the whole Private Space or read-only workspace pages, with the existing context picker), the task,
  * the agent (Claude Code or Codex with its detection state), options (model, time limit, spending limit: off for Codex,
  * as before) and Start. While it runs: a compact streamed transcript and Cancel. After: what the agent answered
- * (plain text, with Copy answer), the outcome, the result of applying, Ask again and New task. When the run waits for
+ * (plain text, with Copy answer), the outcome, the result of applying, Ask a follow-up (in the run's session tab, its
+ * composer focused), Ask again and New task. A follow-up whose pages or settings are changed comes back to the form,
+ * which says what it follows. When the run waits for
  * review, it says so and opens the review in the run's session tab (as a click on the mascot does then). While there is
  * a run, an "Open in a tab" icon in the head opens its session tab.
  *
@@ -22,7 +24,7 @@ import { tip, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ContextPicker } from "../agents/ContextPicker.tsx";
-import { Answer, EventLine, Outcome, StoppedNotice, providerOf } from "../agents/parts.tsx";
+import { Answer, EventLine, Outcome, StoppedNotice, providerOf, taskTitle } from "../agents/parts.tsx";
 import { MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
 import { AGENT_PROVIDERS } from "../agents/settings.ts";
 import type { Insets, Size } from "./placement.ts";
@@ -156,6 +158,14 @@ function Form({ state, agents, focusNonce }: { state: AgentsState; agents: Agent
         start();
       }}
     >
+      {draft.followUp && (
+        <p className="bubble-followup small" data-testid="bubble-followup">
+          <span>{t.followUpTo(taskTitle(agents.conversation(draft.followUp)[0]?.task.prompt ?? ""))}</span>{" "}
+          <button type="button" className="sec-link" onClick={() => agents.setDraft({ followUp: null })}>
+            {t.notFollowUp}
+          </button>
+        </p>
+      )}
       <Chips state={state} agents={agents} adding={adding} onAdd={() => setAdding((a) => !a)} />
       {adding && (
         <div id="bubble-picker" className="bubble-picker agents">
@@ -349,7 +359,7 @@ function ReviewReady({ state, focusNonce, onOpen }: { state: AgentsState; focusN
   );
 }
 
-function Finished({ state, agents, focusNonce }: { state: AgentsState; agents: AgentsService; focusNonce: number }) {
+function Finished({ state, agents, focusNonce, onFollowUp }: { state: AgentsState; agents: AgentsService; focusNonce: number; onFollowUp(): void }) {
   const all = useDesktopStrings().agents;
   const t = useDesktopStrings().mascot.bubble;
   const { openAgentReview } = useSession();
@@ -374,6 +384,10 @@ function Finished({ state, agents, focusNonce }: { state: AgentsState; agents: A
           <span />
         )}
         <span className="bubble-actions-end">
+          {/* The next question of this conversation goes in its session tab, under the turns it follows. */}
+          <Button variant="ghost" onClick={onFollowUp}>
+            {t.followUp}
+          </Button>
           <Button variant="ghost" onClick={() => void agents.askAgain()}>
             {t.askAgain}
           </Button>
@@ -461,7 +475,7 @@ export function Bubble({
     onClose(true);
   };
 
-  const { openAgentReview } = useSession();
+  const { openAgentReview, openAgentRun } = useSession();
   const running = state.phase === "starting" || state.phase === "running" || state.phase === "cancelling";
   const reviewing = (state.phase === "review" || state.phase === "applying") && state.record !== null;
   const finished = state.phase === "finished" && state.record !== null;
@@ -506,7 +520,21 @@ export function Bubble({
               openAgentReview();
             }}
           />
-        ) : finished ? <Finished state={state} agents={agents} focusNonce={focusNonce} /> : <Form state={state} agents={agents} focusNonce={focusNonce} />}
+        ) : finished ? (
+          <Finished
+            state={state}
+            agents={agents}
+            focusNonce={focusNonce}
+            onFollowUp={() => {
+              const run = state.record!.id;
+              onClose(false);
+              agents.composeFollowUp(run);
+              openAgentRun(run);
+            }}
+          />
+        ) : (
+          <Form state={state} agents={agents} focusNonce={focusNonce} />
+        )}
       </div>
     </div>
   );

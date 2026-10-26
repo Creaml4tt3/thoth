@@ -557,12 +557,50 @@ export const th: DesktopStrings = {
       reviewAgain: "ตรวจการเปลี่ยนแปลง",
       askAgain: "ถามอีกครั้ง",
       changes: "สิ่งที่เอเจนต์เสนอ", // REVIEW
+      turns: "คำถามและคำตอบ", // REVIEW
+      question: (n) => `คำถามที่ ${count(n)}`, // REVIEW
+      context: (sent, earlier, deleted, notAllowed) => {
+        const parts = [
+          sent === 0
+            ? "ไม่ได้ส่งคำถามก่อนหน้าไปพร้อมคำถามนี้" // REVIEW
+            : sent === earlier
+              ? earlier === 1
+                ? "ส่งคำถามก่อนหน้าและคำตอบไปพร้อมคำถามนี้แล้ว" // REVIEW
+                : `ส่งคำถามและคำตอบก่อนหน้าทั้ง ${count(earlier)} รายการไปพร้อมคำถามนี้แล้ว` // REVIEW
+              : `ส่ง ${count(sent)} รายการล่าสุดจาก ${count(earlier)} รายการก่อนหน้าไปเป็นบริบท`, // REVIEW
+        ];
+        if (deleted > 0) parts.push(`ไม่ได้ส่ง ${count(deleted)} รายการเพราะรายละเอียดถูกลบแล้ว`); // REVIEW
+        if (notAllowed > 0) parts.push(`ไม่ได้ส่ง ${count(notAllowed)} รายการเพราะใช้หน้าที่คำถามนี้ไม่ได้รับ`); // REVIEW
+        const long = earlier - sent - deleted - notAllowed;
+        if (long > 0) parts.push(`ไม่ได้ส่ง ${count(long)} รายการที่เก่ากว่าเพื่อไม่ให้เกินความยาวที่กำหนด`); // REVIEW
+        return parts.join(" ");
+      },
+      composer: "ถามต่อ", // REVIEW
+      composerHint: (mac) => (mac ? "กด ⌘ Return เพื่อส่ง" : "กด Ctrl+Enter เพื่อส่ง"), // REVIEW
+      send: "ส่ง",
+      sending: "กำลังส่ง…",
+      sendFailed: "ส่งคำถามไม่ได้ คลิกที่มาสคอตเพื่อดูรายละเอียด", // REVIEW
+      sameContext: (what) => `ใช้หน้าและการตั้งค่าเดียวกับคำถามล่าสุด: ${what}`, // REVIEW
+      pages: (n) => `${count(n)} หน้า`,
+      wholeSpace: "ทั้ง Private Space",
+      workspacePages: (n) => `หน้าจากเวิร์กสเปซ ${count(n)} หน้า`, // REVIEW
+      workspaceDropped: "หน้าจากเวิร์กสเปซจะไม่ถูกเก็บไว้หลัง Thoth เริ่มใหม่ เพิ่มอีกครั้งได้ที่ เปลี่ยนหน้าหรือการตั้งค่า", // REVIEW
+      change: "เปลี่ยนหน้าหรือการตั้งค่า…", // REVIEW
+      blocked: {
+        running: "รอคำตอบก่อนแล้วจึงถามต่อ", // REVIEW
+        review: "ตรวจการเปลี่ยนแปลงที่เสนอก่อน แล้วจึงถามต่อได้", // REVIEW
+        busy: "ผู้ช่วยกำลังทำงานอื่นอยู่ในหน้าต่างนี้ ถามได้เมื่องานนั้นเสร็จ", // REVIEW
+        notAllowed: "สิทธิ์ไม่อนุญาตให้ใช้สิ่งที่คำถามล่าสุดได้รับแล้ว เปลี่ยนหน้าหรือการตั้งค่า", // REVIEW
+        unknown: "บทสนทนานี้ไม่อยู่ในรายการงานแล้ว", // REVIEW
+      },
+      ownedElsewhere: "บทสนทนานี้เป็นของหน้าต่างอื่น ถามต่อได้ที่หน้าต่างนั้น", // REVIEW
     },
 
     sidebar: {
       heading: "ผู้ช่วย",
       more: (n) => `แสดงเพิ่มอีก ${count(n)} รายการ`, // REVIEW
       less: "แสดงน้อยลง",
+      turns: (n) => `${count(n)} คำถาม`, // REVIEW
     },
 
     providersHeading: "เอเจนต์",
@@ -652,6 +690,9 @@ export const th: DesktopStrings = {
       openResult: "เปิดผลลัพธ์",
       openInTab: "เปิดในแท็บ",
       askAgain: "ถามอีกครั้ง",
+      followUp: "ถามต่อ", // REVIEW
+      followUpTo: (title) => `ถามต่อจาก “${title}”`, // REVIEW
+      notFollowUp: "ถามเป็นงานใหม่", // REVIEW
       settings: "การตั้งค่าผู้ช่วย",
       appliedSummary: (n) => (n === 0 ? "ไม่ได้นำการเปลี่ยนแปลงใดไปใช้" : `นำการเปลี่ยนแปลง ${count(n)} รายการไปใช้แล้ว`), // REVIEW
     },

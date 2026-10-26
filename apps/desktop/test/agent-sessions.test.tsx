@@ -64,7 +64,7 @@ async function ask(app: Harness, prompt: string) {
 }
 
 /** A finished run as an earlier session left it: its record in the vault and, unless `transcript` is null, its local transcript. */
-async function earlierRun(prompt: string, at: number, options: { state?: RunRecord["state"]; transcript?: AgentEvent[] | null } = {}): Promise<string> {
+async function earlierRun(prompt: string, at: number, options: { state?: RunRecord["state"]; transcript?: AgentEvent[] | null; conversation?: RunRecord["conversation"] } = {}): Promise<string> {
   const id = newStableId(at);
   const record: RunRecord = {
     version: 1,
@@ -77,6 +77,7 @@ async function earlierRun(prompt: string, at: number, options: { state?: RunReco
     updatedAt: at,
     outcome: { reason: "exited", code: 0, ok: true, costUsd: 0.01, model: "claude-sonnet-x" },
     changes: [],
+    ...(options.conversation ? { conversation: options.conversation } : {}),
   };
   await mkdir(join(root, ".thoth/agent/runs"), { recursive: true });
   await writeFile(join(root, ".thoth/agent/runs", `${id}.json`), JSON.stringify(record, null, 2));
@@ -132,7 +133,7 @@ describe("the session tab", () => {
     // Then the answer, in the tab.
     const answer = await within(session()).findByRole("region", { name: "Answer" }, { timeout: 15_000 });
     expect(within(answer).getByTestId("agent-answer").textContent).toBe("A diary.");
-    expect(within(session()).getByText("Claude Code", { exact: false })).toBeTruthy();
+    expect(session().querySelector(".agents-session-facts")!.textContent).toContain("Claude Code");
     expect(session().textContent).toContain("No changes");
 
     // Opening it again goes to the same tab.
@@ -233,5 +234,131 @@ describe("the Assistant section in the sidebar", () => {
     const region = await screen.findByRole("region", { name: "ผู้ช่วย" });
     expect(within(region).getByRole("button", { name: /คำถาม/ }).textContent).toBe("คำถาม");
     expect(within(region).getByRole("button", { name: "แสดงเพิ่มอีก 1 รายการ" }).getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("conversations", () => {
+  const composer = () => within(session()).getByRole("textbox", { name: "Ask a follow-up" });
+  const send = () => within(session()).getByRole("button", { name: "Send" });
+  const records = async (): Promise<RunRecord[]> => {
+    const { readdir } = await import("node:fs/promises");
+    const names = await readdir(join(root, ".thoth/agent/runs"));
+    return Promise.all(names.map(async (n) => JSON.parse(await readFile(join(root, ".thoth/agent/runs", n), "utf8")) as RunRecord));
+  };
+
+  it("asks a follow-up from the bubble's finished view in the session tab: both turns show, and the CLI was given the first question and answer", async () => {
+    const app = await open();
+    await ask(app, "What is on this page?\n@answer A diary.\n");
+    await within(bubble()).findByRole("region", { name: "Answer" }, { timeout: 15_000 });
+    await app.user.click(within(bubble()).getByRole("button", { name: "Ask a follow-up" }));
+    await waitFor(() => expect(currentTab()).toBe("What is on this page?"));
+    await waitFor(() => expect(document.activeElement).toBe(composer()));
+    expect(within(session()).getByText(/Same pages and settings as the last question/).textContent).toContain("1 page");
+
+    await app.user.paste("And who wrote it?\n@sleep 400\n@echo-context");
+    await app.user.keyboard("{Control>}{Enter}{/Control}");
+    // While the turn runs, the next question waits.
+    await within(session()).findByRole("heading", { name: "Question 2" });
+    await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(true));
+    expect(within(session()).getByTestId("composer-blocked").textContent).toBe("Wait for the answer before you ask more.");
+    expect((composer() as HTMLTextAreaElement).value).toBe("");
+
+    await waitFor(() => expect(within(session()).getAllByRole("region", { name: "Answer" })).toHaveLength(2), { timeout: 15_000 });
+    const [first, second] = within(session()).getAllByTestId("agent-answer");
+    expect(first!.textContent).toBe("A diary.");
+    expect(second!.textContent).toBe("Earlier turns in my input: 1. The first question was: What is on this page?");
+    expect(within(session()).getByRole("heading", { name: "Question 1" })).toBeTruthy();
+    expect(within(session()).getByText("The earlier question and its answer were sent with this one.")).toBeTruthy();
+    await waitFor(() => expect(within(session()).queryByTestId("composer-blocked")).toBeNull());
+    expect(tabNames()).toEqual(["Diary", "What is on this page?"]);
+
+    // The record of turn 2 has its own question, the conversation and the turn; never the earlier answer.
+    const saved = await records();
+    const turn2 = saved.find((r) => r.conversation?.turn === 2)!;
+    const turn1 = saved.find((r) => r.conversation?.turn === 1)!;
+    expect(turn2.conversation).toEqual({ id: turn1.id, turn: 2, context: { earlier: 1, sent: 1, deleted: 0, notAllowed: 0 } });
+    expect(turn2.task.prompt).toBe("And who wrote it?\n@sleep 400\n@echo-context");
+    expect(JSON.stringify(turn2)).not.toContain("A diary.");
+    expect(turn2.context.map((c) => c.path)).toEqual(["Diary.md"]);
+
+    // The sidebar lists the conversation once, with its turn count.
+    const rows = within(await section()).getAllByRole("button", { name: /What is on this page\?/ });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain("2 questions");
+    expect(rows[0]!.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("waits for the review of the last turn before the next question can be sent", async () => {
+    const app = await open();
+    await ask(app, "@replace Diary.md :: Diary => Journal\n");
+    await within(bubble()).findByRole("button", { name: "Review the changes" }, { timeout: 15_000 });
+    await app.user.click(within(bubble()).getByRole("button", { name: "Review the changes" }));
+    await waitFor(() => expect(within(session()).getByRole("textbox", { name: "Ask a follow-up" })).toBeTruthy());
+    expect((send() as HTMLButtonElement).disabled).toBe(true);
+    expect(within(session()).getByTestId("composer-blocked").textContent).toBe("Review the proposed changes first. Then you can ask more.");
+    await app.user.click(within(session()).getByRole("button", { name: "Discard all" }));
+    await app.user.type(composer(), "Thanks.");
+    await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(false));
+    expect(within(session()).queryByTestId("composer-blocked")).toBeNull();
+  });
+
+  it("comes back after a restart: the turns from the records, the answers from the transcripts, one sidebar row", async () => {
+    const first = await earlierRun("What is this?", Date.now() - 60_000);
+    await earlierRun("Tell me more", Date.now() - 30_000, { conversation: { id: first, turn: 2, context: { earlier: 1, sent: 1, deleted: 0, notAllowed: 0 } } });
+    await earlierRun("Unrelated", Date.now() - 90_000);
+    const app = await open();
+    const list = await within(await section()).findByRole("list");
+    expect(within(list).getAllByRole("button").map((b) => b.querySelector(".agents-row-task")!.textContent)).toEqual(["What is this?", "Unrelated"]);
+    await app.user.click(within(list).getByRole("button", { name: /What is this\?/ }));
+    await waitFor(() => expect(currentTab()).toBe("What is this?"));
+    await waitFor(() => expect(within(session()).getAllByTestId("agent-answer").map((a) => a.textContent)).toEqual(["Answer to What is this?", "Answer to Tell me more"]));
+    expect((send() as HTMLButtonElement).disabled).toBe(true); // nothing typed yet
+    await app.user.type(composer(), "x");
+    expect((send() as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("'Change pages or settings…' puts the follow-up in the bubble with its context; Start sends it as the next turn", async () => {
+    const first = await earlierRun("What is this?", Date.now() - 60_000);
+    const app = await open();
+    await app.user.click(await within(await section()).findByRole("button", { name: /What is this\?/ }));
+    await app.user.type(await within(session()).findByRole("textbox", { name: "Ask a follow-up" }), "And then?");
+    await app.user.click(within(session()).getByRole("button", { name: "Change pages or settings…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Ask Thoth" });
+    expect(within(dialog).getByTestId("bubble-followup").textContent).toContain("Follow-up to “What is this?”");
+    expect((within(dialog).getByRole("textbox", { name: "Task" }) as HTMLTextAreaElement).value).toBe("And then?");
+    expect(within(dialog).getByRole("list", { name: "Context" }).textContent).toContain("Diary");
+    await waitFor(() => expect(dialog.querySelector<HTMLOptionElement>('option[value="claude"]')!.dataset["state"]).toBe("ready"));
+    await app.user.click(within(dialog).getByRole("button", { name: "Start" }));
+    await within(bubble()).findByRole("region", { name: "Answer" }, { timeout: 15_000 });
+    const turn2 = (await records()).find((r) => r.id !== first)!;
+    expect(turn2.conversation).toMatchObject({ id: first, turn: 2, context: { sent: 1 } });
+  });
+
+  it("says when an earlier turn's details were deleted", async () => {
+    const first = await earlierRun("Pruned question", Date.now() - 60_000, { transcript: null });
+    await earlierRun("Kept question", Date.now() - 30_000, { conversation: { id: first, turn: 2, context: { earlier: 1, sent: 0, deleted: 1, notAllowed: 0 } } });
+    const app = await open();
+    await app.user.click(await within(await section()).findByRole("button", { name: /Pruned question/ }));
+    expect((await within(session()).findAllByTestId("agent-details-gone")).length).toBe(1);
+    expect(within(session()).getByText("No earlier turns were sent with this question. 1 was left out because its details were deleted.")).toBeTruthy();
+  });
+
+  it("is read-only in a window that does not own the conversation", async () => {
+    const first = await earlierRun("Theirs", Date.now() - 60_000);
+    void first;
+    const app = await open(platform((p) => p.sharedWith.push(root)));
+    await app.user.click(await within(await section()).findByRole("button", { name: /Theirs/ }));
+    expect((await within(session()).findByTestId("composer-elsewhere")).textContent).toBe("This conversation belongs to another window. Continue it there.");
+    expect(within(session()).queryByRole("textbox", { name: "Ask a follow-up" })).toBeNull();
+  });
+
+  it("speaks Thai", async () => {
+    setLangPreference("th");
+    await earlierRun("คำถาม", Date.now() - 1000);
+    const app = await openApp(root, {}, platform());
+    await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
+    await app.user.click(await within(await screen.findByRole("region", { name: "ผู้ช่วย" })).findByRole("button", { name: /คำถาม/ }));
+    expect(await within(session()).findByRole("textbox", { name: "ถามต่อ" })).toBeTruthy();
+    expect(within(session()).getByRole("button", { name: "ส่ง" })).toBeTruthy();
   });
 });

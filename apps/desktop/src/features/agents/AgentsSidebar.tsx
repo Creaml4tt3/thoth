@@ -1,13 +1,14 @@
 /**
- * The sidebar's Assistant section (ADR-0007 amendment of 2026-10-26): the runs of this Private Space, newest first,
- * from the run records (the history). The five newest are shown; "Show N more" lists the rest (up to the history's
- * limit) and "Show less" folds them again. Each row is the task's first line and its state in words (a run going or
- * waiting for review also gets a dot, never colour alone); it opens the run's session tab, and the run of the current
- * tab is marked. Not shown where agents cannot run, nor before the first run.
+ * The sidebar's Assistant section (ADR-0007 amendments of 2026-10-26): the conversations of this Private Space, the
+ * one with the newest turn first, from the run records (the history). The five newest are shown; "Show N more" lists
+ * the rest (up to the history's limit) and "Show less" folds them again. Each row is the first question's first line,
+ * how many questions it has (from two on), and the newest turn's state in words when it is going or waiting for review
+ * (with a dot, never colour alone); it opens the conversation's session tab, and the current tab's is marked. Not shown
+ * where agents cannot run, nor before the first run.
  *
  * It is one of the sidebar's reorderable sections (id `agents`, ADR-0019 amendment), placed by `SidebarSections`.
  */
-import { useId, useState, useSyncExternalStore } from "react";
+import { useId, useMemo, useState, useSyncExternalStore } from "react";
 import type { RunRecord } from "@thoth/agent-core";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
@@ -33,24 +34,28 @@ function Runs({ agents, current }: { agents: AgentsService; current: string | nu
   const state = useSyncExternalStore(agents.subscribe, agents.getState);
   const [expanded, setExpanded] = useState(false);
   const list = `${useId()}-list`;
-  const runs = state.history;
-  const shown = expanded ? runs : runs.slice(0, SHOWN_RUNS);
-  const more = runs.length - SHOWN_RUNS;
+  // One row per conversation (ADR-0007, "Conversations"): its first question, how many there are, its newest state.
+  const conversations = useMemo(() => agents.conversations(), [agents, state.history, state.record]);
+  const shown = expanded ? conversations : conversations.slice(0, SHOWN_RUNS);
+  const more = conversations.length - SHOWN_RUNS;
   return (
     <div className="agents-section">
       <ul className="agents-rows" id={list}>
-        {shown.map((r) => {
+        {shown.map(({ id, turns }) => {
+          const first = turns[0]!;
+          const r = turns.at(-1)!;
           const live = state.record?.id === r.id && GOING.has(state.phase);
           const st = live ? "running" : r.state;
           const label = live ? all.history.states["running"]! : outcomeLabel(r, all.history);
           const open = st === "running" || st === "staging" || st === "review";
-          const title = taskTitle(r.task.prompt) || all.session.tab;
+          const title = taskTitle(first.task.prompt) || all.session.tab;
           return (
-            <li key={r.id}>
-              <button type="button" className="agents-row" data-state={st} aria-current={r.id === current ? "page" : undefined} onClick={() => openAgentRun(r.id)}>
+            <li key={id}>
+              <button type="button" className="agents-row" data-state={st} data-turns={turns.length} aria-current={id === current ? "page" : undefined} onClick={() => openAgentRun(id)}>
                 <span className="agents-row-task" {...tipIfClipped(title)}>
                   {title}
                 </span>
+                {turns.length > 1 && <span className="agents-row-turns">{t.turns(turns.length)}</span>}
                 {/* Only what still needs the person: a run going, or waiting for review. The tab says the rest. */}
                 {open && (
                   <span className="agents-row-state" data-open="">
