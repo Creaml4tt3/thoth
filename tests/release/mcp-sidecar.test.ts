@@ -29,6 +29,13 @@ describe("thoth-mcp in the desktop bundle", () => {
     expect(universal.built).toEqual(["/t/aarch64-apple-darwin/release/thoth-mcp", "/t/x86_64-apple-darwin/release/thoth-mcp"]);
     expect(universal.output).toBe(join(BINARIES, "thoth-mcp-universal-apple-darwin"));
     expect(universal.lipo).toBe(true);
+    // A universal build compiles each architecture on its own, and Tauri's build script checks for that
+    // architecture's sidecar then (the v0.2.0 release first failed without them).
+    expect(universal.copies).toEqual([
+      ["/t/aarch64-apple-darwin/release/thoth-mcp", join(BINARIES, "thoth-mcp-aarch64-apple-darwin")],
+      ["/t/x86_64-apple-darwin/release/thoth-mcp", join(BINARIES, "thoth-mcp-x86_64-apple-darwin")],
+    ]);
+    expect(sidecarPlan("x86_64-unknown-linux-gnu", "/t").copies).toEqual([["/t/x86_64-unknown-linux-gnu/release/thoth-mcp", join(BINARIES, "thoth-mcp-x86_64-unknown-linux-gnu")]]);
     const windows = sidecarPlan("x86_64-pc-windows-msvc", "/t");
     expect(windows.output).toBe(join(BINARIES, "thoth-mcp-x86_64-pc-windows-msvc.exe"));
     expect(windows.built).toEqual(["/t/x86_64-pc-windows-msvc/release/thoth-mcp.exe"]);

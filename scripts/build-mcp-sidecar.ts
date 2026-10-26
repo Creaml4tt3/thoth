@@ -5,7 +5,7 @@
  *
  *   node scripts/build-mcp-sidecar.ts <target triple | universal-apple-darwin>
  *
- * The universal macOS build is the two Apple builds joined with `lipo`. The release workflow runs this before
+ * The universal macOS build is the two Apple builds joined with `lipo`, and each is kept under its own name too. The release workflow runs this before
  * `tauri build --config src-tauri/tauri.sidecar.conf.json`.
  */
 import { execFileSync } from "node:child_process";
@@ -23,6 +23,11 @@ export interface SidecarPlan {
   built: string[];
   /** The file Tauri bundles. */
   output: string;
+  /**
+   * Each built program under its own target's name: a universal build compiles each architecture on its own, and
+   * Tauri's build script looks for that architecture's sidecar then.
+   */
+  copies: [string, string][];
   /** Join the built programs with `lipo` (universal macOS) instead of copying the one. */
   lipo: boolean;
 }
@@ -35,6 +40,7 @@ export function sidecarPlan(target: string, targetDir = process.env.CARGO_TARGET
     builds: targets.map((t) => ["build", "--release", "--locked", "-p", "thoth-mcp", "--target", t]),
     built: targets.map((t) => join(targetDir, t, "release", `thoth-mcp${exe}`)),
     output: join(BINARIES, `thoth-mcp-${target}${exe}`),
+    copies: targets.map((t) => [join(targetDir, t, "release", `thoth-mcp${exe}`), join(BINARIES, `thoth-mcp-${t}${exe}`)]),
     lipo: targets.length > 1,
   };
 }
@@ -48,7 +54,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const plan = sidecarPlan(target);
   for (const args of plan.builds) execFileSync("cargo", args, { cwd: REPO, stdio: "inherit" });
   mkdirSync(BINARIES, { recursive: true });
+  for (const [from, to] of plan.copies) copyFileSync(from, to);
   if (plan.lipo) execFileSync("lipo", ["-create", "-output", plan.output, ...plan.built], { stdio: "inherit" });
-  else copyFileSync(plan.built[0]!, plan.output);
   console.log(`thoth-mcp → ${plan.output}`);
 }
