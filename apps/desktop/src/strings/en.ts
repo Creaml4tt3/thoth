@@ -612,6 +612,7 @@ export const en = {
       sameContext: (what: string) => `Same pages and settings as the last question: ${what}.`,
       pages: (n: number) => (n === 1 ? "1 page" : `${n} pages`),
       wholeSpace: "the whole Private Space",
+      anyModel: "the default model",
       workspacePages: (n: number) => (n === 1 ? "1 workspace page" : `${n} workspace pages`),
       workspaceDropped: "Workspace pages are not kept after Thoth restarts: add them again under Change pages or settings.",
       change: "Change pages or settings…",

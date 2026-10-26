@@ -217,7 +217,7 @@ function planSummary(plan: FollowUpPlan, all: ReturnType<typeof useDesktopString
   if (plan.wholeSpace) what.push(t.wholeSpace);
   else if (plan.selection.length > 0) what.push(t.pages(plan.selection.length));
   if (plan.workspace.length > 0) what.push(t.workspacePages(plan.workspace.length));
-  what.push(plan.model.trim() || t.defaultModel);
+  what.push(plan.model.trim() || t.anyModel);
   return t.sameContext(what.join(", "));
 }
 

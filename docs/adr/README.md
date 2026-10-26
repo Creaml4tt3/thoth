@@ -16,7 +16,7 @@ trade-off.
 | [0004](0004-workspace-protocol-and-capability-negotiation.md) | Workspace protocol and capability negotiation | Proposed (finalize in phase P2) |
 | [0005](0005-revision-based-synchronization-and-conflict-resolution.md) | Revision-based synchronization and conflict resolution | Proposed |
 | [0006](0006-transfer-lifecycle-idempotency-and-recovery.md) | Transfer lifecycle, idempotency, and recovery | Proposed (implementation phase P3) |
-| [0007](0007-agent-adapter-contract-and-execution-security.md) | Agent adapter contract and execution security | Accepted for the Claude Code adapter, decisions of 2026-10-25 (owner to confirm); Proposed for Codex, OS-level sandboxing, and answers and sessions (2026-10-26) |
+| [0007](0007-agent-adapter-contract-and-execution-security.md) | Agent adapter contract and execution security | Accepted for the Claude Code adapter, decisions of 2026-10-25 (owner to confirm); Proposed for Codex, OS-level sandboxing, answers and sessions, and conversations (2026-10-26) |
 | [0008](0008-desktop-runtime-web-client-and-local-bridge.md) | Desktop runtime, web client, and local bridge | Accepted for Tauri 2 + Rust, shared React/TS/Vite UI, and Rust-hosted ports (2026-10-21); Proposed for the local bridge |
 | [0009](0009-workspace-authorization-and-sharing-semantics.md) | Workspace authorization and sharing semantics | Proposed (phase P2) |
 | [0010](0010-notion-obsidian-import-format-and-compatibility-policy.md) | Notion/Obsidian import format and compatibility policy | Accepted |

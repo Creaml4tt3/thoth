@@ -539,3 +539,100 @@ test("a question gets its answer in the bubble, opens in a tab, is listed in the
   await expect(again.getByRole("tab", { selected: true })).toHaveText("Earlier question 1");
   await expect(again.getByRole("tabpanel").getByTestId("agent-answer")).toHaveText("About Earlier question 1");
 });
+
+const CHAT_SHOTS = join(REPO, "tests", ".tmp", "agent-chat");
+
+test("a follow-up in the session tab: the CLI is given the first question and answer, both turns show, and the conversation comes back after a restart", async ({ page, context }) => {
+  test.setTimeout(240_000);
+  await mkdir(CHAT_SHOTS, { recursive: true });
+  const b = await openBubble(page);
+  await pickOnly(page, ["Plan"]);
+  await writeAndStart(page, "What content is on this page?\n@answer A plan with one line: “We have a cat.”\n");
+  await expect(b.getByRole("region", { name: "Answer" }).getByTestId("agent-answer")).toHaveText("A plan with one line: “We have a cat.”", { timeout: 15_000 });
+  const argvFirst = await (async () => {
+    const [name] = await readdir(join(vault, ".thoth/agent/runs"));
+    return JSON.parse(await readFile(join(vault, ".thoth/agent/runs", name!), "utf8")) as { id: string; conversation?: { id: string; turn: number } };
+  })();
+  expect(argvFirst.conversation).toEqual({ id: argvFirst.id, turn: 1 });
+  for (const dark of [false, true]) {
+    await theme(page, dark);
+    await page.locator("#mascot-bubble").screenshot({ path: join(CHAT_SHOTS, `bubble-follow-up-${dark ? "dark" : "light"}.png`) });
+  }
+  await theme(page, false);
+
+  // "Ask a follow-up" opens the session tab with the composer focused (keyboard all the way).
+  await b.getByRole("button", { name: "Ask a follow-up" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(bubble(page)).toBeHidden();
+  const panel = page.getByRole("tabpanel");
+  const composer = panel.getByRole("textbox", { name: "Ask a follow-up" });
+  await expect(composer).toBeFocused();
+  await expect(panel).toContainText("Same pages and settings as the last question: Claude Code, 1 page, the default model.");
+  await page.keyboard.type("Who has the cat?");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("@sleep 1500");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("@echo-context");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+
+  // While it runs, the next question waits.
+  await expect(panel.getByRole("heading", { name: "Question 2" })).toBeVisible();
+  await expect(panel.getByTestId("composer-blocked")).toHaveText("Wait for the answer before you ask more.");
+  await expect(panel.getByRole("button", { name: "Send" })).toBeDisabled();
+  // The fake CLI saw the first question and its answer before the new one, with the same arguments as the first turn.
+  const work = await workDir();
+  const seen = await fakeRecord(work);
+  expect(seen.stdin.indexOf("What content is on this page?")).toBeGreaterThan(-1);
+  expect(seen.stdin.indexOf("What content is on this page?")).toBeLessThan(seen.stdin.indexOf("A plan with one line"));
+  expect(seen.stdin.indexOf("A plan with one line")).toBeLessThan(seen.stdin.indexOf("Who has the cat?"));
+  expect(seen.argv).toEqual([...JSON.parse(await readFile(join(FAKE_CLAUDE_DIR, "../fixtures/argv.json"), "utf8")).cases[0].argv, "--max-budget-usd", "1"]);
+
+  const answers = panel.getByTestId("agent-answer");
+  await expect(answers).toHaveCount(2, { timeout: 15_000 });
+  await expect(answers.nth(0)).toHaveText("A plan with one line: “We have a cat.”");
+  await expect(answers.nth(1)).toHaveText("Earlier turns in my input: 1. The first question was: What content is on this page?");
+  await expect(panel.getByTestId("turn-context")).toHaveText("The earlier question and its answer were sent with this one.");
+  await expect(panel.getByTestId("composer-blocked")).toHaveCount(0);
+
+  // The record of turn 2: its own question, the conversation and the turn; no earlier text.
+  const names = await readdir(join(vault, ".thoth/agent/runs"));
+  const saved = await Promise.all(names.map(async (n) => readFile(join(vault, ".thoth/agent/runs", n), "utf8")));
+  const second = saved.map((s) => JSON.parse(s) as { task: { prompt: string }; conversation: { id: string; turn: number } }).find((r) => r.conversation.turn === 2)!;
+  expect(second.conversation.id).toBe(argvFirst.id);
+  expect(second.task.prompt).toBe("Who has the cat?\n@sleep 1500\n@echo-context");
+  expect(saved.find((s) => (JSON.parse(s) as { conversation: { turn: number } }).conversation.turn === 2)).not.toContain("A plan with one line");
+
+  // One sidebar row for the conversation, with its question count.
+  const rows = page.getByRole("region", { name: "Assistant" }).locator(".agents-row");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("2 questions");
+  for (const dark of [false, true]) {
+    await theme(page, dark);
+    await axe(page, [".agents-session", ".agents-section"]);
+    await page.screenshot({ path: join(CHAT_SHOTS, `conversation-${dark ? "dark" : "light"}.png`) });
+  }
+  await theme(page, false);
+
+  // Restart: the conversation comes back from the records and the local transcripts, and can go on.
+  const port = Number(new URL(bridge.url).port);
+  await page.close();
+  await bridge.close();
+  bridge = await startBridge({ ...bridgeOptions(), port });
+  const again = await context.newPage();
+  await again.addInitScript(bridge.initScript);
+  await again.goto(bridge.url);
+  await again.getByRole("button", { name: /choose or create a private space/i }).click();
+  await expect(again.getByRole("tab", { selected: true })).toHaveText("What content is on this page?", { timeout: 15_000 });
+  const restored = again.getByRole("tabpanel");
+  await expect(restored.getByTestId("agent-answer")).toHaveCount(2);
+  await expect(restored.getByTestId("agent-answer").nth(1)).toContainText("Earlier turns in my input: 1.");
+  await restored.getByRole("textbox", { name: "Ask a follow-up" }).fill("@echo-context");
+  await restored.getByRole("button", { name: "Send" }).click();
+  await expect(restored.getByTestId("agent-answer")).toHaveCount(3, { timeout: 15_000 });
+  await expect(restored.getByTestId("agent-answer").nth(2)).toHaveText("Earlier turns in my input: 2. The first question was: What content is on this page?");
+  for (const dark of [false, true]) {
+    await theme(again, dark);
+    await axe(again, ".agents-session");
+    await again.locator(".agents-composer").screenshot({ path: join(CHAT_SHOTS, `composer-${dark ? "dark" : "light"}.png`) });
+  }
+});

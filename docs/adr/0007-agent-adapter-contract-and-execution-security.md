@@ -3,9 +3,10 @@
 - **Status:** Accepted for the Claude Code CLI adapter (Phase 4), with the decisions below decided on 2026-10-25 by the
   owner. The Codex CLI adapter follows decision 13 (2026-10-25), implemented within the owner's decisions and
   proposed for the owner's review. A Thoth OS-level sandbox is deferred (see "Future: OS-level sandbox"); Codex runs
-  inside its own. The amendment "Answers and sessions" (decisions 14–20, 2026-10-26) is Proposed.
+  inside its own. The amendments "Answers and sessions" (decisions 14–20, 2026-10-26) and "Conversations" (decisions
+  21–27, 2026-10-26, which replace decision 20) are Proposed.
 - **Date:** 2026-10-20 (decisions added 2026-10-25; context scope, limits and history answered by the owner the same day;
-  answers and sessions 2026-10-26)
+  answers and sessions, and conversations, 2026-10-26)
 
 ## Context
 
@@ -205,9 +206,62 @@ anything." The CLI had answered, but the answer was never shown. Decided for the
     cancel a run it does not run, and while other windows are open it does not reopen a run waiting for review (it may
     be theirs): the tab says to use the window that owns it. Alone on the Private Space, it may reopen such a run as
     before. A window that is not alone now also reads the history at start (it skipped recovery and so the list).
-20. **Follow-up questions** stay out of scope (`--no-session-persistence` stays). "Ask again" returns to the bubble
+20. *(Replaced by the amendment "Conversations", decisions 21–27.)* **Follow-up questions** stayed out of scope (`--no-session-persistence` stays). "Ask again" returns to the bubble
     with the same task and context (an earlier run gives back its Private Space pages and files; workspace pages are
     picked again, since the record does not keep their server).
+
+## Amendment: conversations (2026-10-26, Proposed)
+
+The owner asked for sessions that can go on: after an answer, ask a follow-up in the same session. Decided for the owner
+(to accept); this replaces decision 20.
+
+21. **Thoth-side conversations, not CLI sessions.** A follow-up is a new one-shot run that belongs to the same
+    conversation. The CLI flags and the host's allowlists do not change: no `--resume`, `--continue` or `--session-id`,
+    `--no-session-persistence` and Codex's `--ephemeral` stay, nothing is added to `~/.claude` or Codex's history. A
+    test checks that turn 2's argument list equals turn 1's and the shared fixture (`tests/agent/hub.test.ts`, on the
+    Rust and the Node host). It works the same for both providers.
+22. **The context of a follow-up.** The earlier turns of the conversation (each question and answer, oldest first) are
+    quoted to the CLI in front of the new question (`fitConversation`, `packages/agent-core/src/conversation.ts`),
+    ending with the line `--- End of earlier turns ---`; like the workspace framing and the selected-text excerpt they
+    are sent, never kept. Earlier answers come from memory or the local transcripts (decision 15); a turn whose
+    transcript was deleted is left out. The 20 000-character prompt limit holds for the quoted turns plus the new
+    question: the newest turns that fit are sent, stopping at the first that does not (no gaps).
+    - *Leave out what this turn is not given.* An answer can quote the pages its turn was given. So an earlier turn
+      goes along only when this turn is given the same kind of material: Private Space pages if it had any, and pages
+      of the same workspaces if it had workspace pages (checked against what was staged now, after the fresh
+      `GET /workspaces` of decision 1). Otherwise it is left out and counted. This keeps a workspace page's text from
+      reaching a turn that no longer has (or may no longer have) that workspace, or another provider.
+23. **The run record** keeps only the person's own new question as its task, plus `conversation`: the conversation's
+    id (the first turn's run id, a UUID), the turn number, and for a follow-up the counts `earlier`, `sent`, `deleted`
+    and `notAllowed`. Counts only, never earlier text (a test reads the record on disk on both hosts). An older record
+    without `conversation` is a one-turn conversation whose id is its own run id, so it can be continued too.
+24. **Same context and settings as the turn before.** A follow-up uses the last turn's provider, model, Private Space
+    pages or whole Private Space, workspace pages, time limit and budget: as this window started it, or from the record
+    for a conversation from an earlier session (workspace pages then need picking again, since the record does not keep
+    their server; the composer says so). Permissions are checked again at each send, and the hub stages each turn
+    fresh, re-reading workspace pages with the person's access. "Change pages or settings…" puts the follow-up into the
+    bubble's form ("Follow-up to “…”", with "Ask as a new task" to drop that), where the usual form applies. A turn
+    that proposes changes is reviewed and applied like any run (decisions 5 and 8); while a turn runs or waits for
+    review, the hub refuses the next question of that conversation, and so does the composer.
+25. **UI.** The session tab is the conversation (tab target unchanged, its `run` is the conversation's id; any turn
+    opens it): the first question as title, the facts, the turns top to bottom (heading "Question N", the question,
+    for a follow-up how many earlier turns went with it, then the live progress or the answer, the review and the
+    result), and a composer ("Ask a follow-up", Cmd/Ctrl+Enter sends). The composer's text stays editable; Send is
+    disabled, with the reason in words, while a turn runs or waits for review or this window runs another task. The
+    bubble's finished view gets "Ask a follow-up", which opens the session tab with the composer focused: the turns it
+    follows are there, and one composer is easier to keep right than two (a compact composer in a 380-pixel bubble
+    would also hide the earlier answers). The sidebar lists one row per conversation (first question, "N questions"
+    from two on, the newest turn's state when it is going or waiting for review); the five-newest rule and "Show N
+    more" stay. Notifications stay one per run, with their fixed text, and open the conversation's tab.
+26. **Restore and history.** Conversations come back after a restart from the records (`conversation` id and turn) and
+    the local transcripts. Retention and "Delete history now" remove answers as before; such a turn shows its question
+    and that its details were deleted, and a later follow-up leaves it out.
+27. **Several windows** (ADR-0019 rule 8). A conversation belongs to the window that started it (or continued it while
+    alone on the Private Space). Another window shows it read-only and says to continue it in the window that owns it;
+    a window alone on the Private Space (after a restart, or once the others closed) may continue any.
+
+Not changed: review before apply, compare-and-swap, the host's argument allowlists, Permissions, the records' rule of
+no page text and no agent output, local-only history.
 
 ## Decision for the Codex adapter (2026-10-25, proposed for the owner's review)
 
@@ -266,6 +320,10 @@ anything." The CLI had answered, but the answer was never shown. Decided for the
   a workspace is never among them (changes to reference copies are not kept), but the transcript can quote it.
 - Negative: a workspace page given to an agent leaves the workspace's access control as soon as it is copied; the
   restriction check is the client's, on top of what the server enforces.
+- Negative: a follow-up feeds earlier answers (agent output, untrusted) back to the CLI as input. They can steer the
+  next turn like any prompt text; that turn is still restricted, staged and reviewed like any run. A selected-text
+  excerpt is not recorded, so an earlier turn whose excerpt came from a workspace page (and whose answer may quote it)
+  is judged only by the pages its record lists; the excerpt itself is never sent again.
 - Negative: Codex's sandbox is Codex's own code and its permission profiles are marked beta; a change to them can
   break runs (`--strict-config` makes a renamed setting fail instead of being ignored) and the probe only shows that
   the sandbox starts, not every rule it enforces.

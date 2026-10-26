@@ -923,6 +923,18 @@ task and context. Tests: `apps/desktop/test/agent-sessions.test.tsx`, `packages/
 Not yet checked by a person in a real window: the answer box with a long real answer, the sidebar section beside the
 reorderable sections, Thai on screen.
 
+**Conversations (2026-10-26)** (ADR-0007 amendment, decisions 21–27, Proposed): follow-up questions in a session. A
+follow-up is a new one-shot run of the same conversation (no CLI session flags; the argument lists are unchanged); the
+earlier questions and answers are quoted to the CLI before the new question, the newest that fit 20 000 characters,
+leaving out turns whose details were deleted or whose material the new turn is not given. The record keeps the new
+question and `conversation` (id, turn, counts), never earlier text. The session tab lists the turns with a composer
+(Cmd/Ctrl+Enter; waits while a turn runs or waits for review; read-only in a window that does not own it); the bubble's
+finished view has "Ask a follow-up"; the sidebar has one row per conversation. Tests:
+`packages/agent-core/test/conversation.test.ts`, `tests/agent/hub.test.ts` › "conversations" and the workspace
+follow-up, `apps/desktop/test/agent-sessions.test.tsx` › "conversations", `tests/e2e/agent-hub.e2e.ts` › "a follow-up in
+the session tab…". Not yet checked by a person in a real window: a real CLI's follow-up answer, the composer with a long
+conversation, two real windows, Thai on screen.
+
 Not done / follow-ups (see §4 item 12):
 - A Thoth OS-level sandbox (planned in ADR-0007); git worktrees.
 - Codex on Windows and Linux was not tried on a real machine; the sandbox probe decides there. Codex's permission
