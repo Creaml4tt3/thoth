@@ -1172,6 +1172,20 @@ The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial
 - Not done: the post pictures (made separately; the Open Graph card stands in), the GitHub releases' bodies (the
   orchestrator updates them), a native reader for the Thai marked `REVIEW`.
 
+### SEO audit and GEO review fixes (ADR-0026 amendment, 2026-10-26), built, waiting for review
+
+- llms-full.txt drops the changelog preambles and `[Unreleased]`; the changelog page lists "Coming in the next
+  version" after the released versions with `data-nosnippet`. The home page, FAQ and llms.txt match the released app
+  (Agent Hub as a feature, 3 workspaces per account on the trial, no dated GitHub promise, driven by `GITHUB_PUBLIC`).
+- A bilingual `404.html` (noindex), WebP blog pictures through `<picture>` with a 30-day cache, `favicon.ico`, real
+  sitemap `lastmod` and release dates, descriptive titles, a post byline, Person and Organization descriptions with
+  an empty `SAME_AS`, `alternateName`, "Thoth" in the home h1, a Thoth / Notion / Obsidian table, an IndexNow key
+  file from `INDEXNOW_KEY` and `apps/site/scripts/indexnow.ts` (docs/deploy/release.md step 4).
+- Evidence: `apps/site/test/seo-fixes.test.ts`, the updated `blog.test.ts`, `build.test.ts`, `download.test.ts`, and
+  `tests/e2e/site.e2e.ts` (404 page, comparison on a phone; screenshots with `SEO_SCREENSHOTS=1`).
+- Not done (owner): Search Console and Bing Webmaster Tools, the `SAME_AS` profiles, the `INDEXNOW_KEY` variable on
+  Vercel, off-site posts; `docs/legal/terms*.md` still say 1 workspace per account (a legal text change).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and
