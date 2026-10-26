@@ -65,6 +65,35 @@ when `latest.json` has `notes` (ADR-0022), but nothing wrote one.
 - **A Thai page that shows the English changelog.** Simpler, but not written for Thai readers, which ADR-0015 rule 2
   and the brief ask for.
 
+## Amendment (2026-10-26): fixes from the SEO audit and the GEO review
+
+Proposed. The audit (84/100) and the review (64/100) found the site sound but its words out of step with the released
+app, and some maintainer text in public files.
+
+1. **Unreleased work is labelled and kept apart.** On `/changelog/` the `[Unreleased]` section (still `#unreleased`)
+   is headed "Coming in the next version", names no branch, carries `data-nosnippet` and comes **after** the released
+   versions: readers and answer engines meet what they can download first, and a passage quoted from the top of the
+   page cannot be work that has not shipped. `llms-full.txt` leaves it out, and leaves out everything before each
+   changelog's first `## ` heading (the maintainer preamble). This changes rule 5's order, not its routes.
+2. **The site says only what is released.** Home and FAQ claims are checked against `CHANGELOG.md`'s released
+   versions (the Agent Hub, 0.1.2, is a feature) and, for the demo server, against the live trial profile (a test
+   reads `TRIAL_PROFILE`). Where the code is, is one sentence chosen by `GITHUB_PUBLIC`, with no date.
+3. **404.** One bilingual `404.html` at the output root, `noindex`; Vercel serves it for any missing path
+   (https://vercel.com/guides/custom-404-page). One file because the host has one 404 page per deployment.
+4. **Pictures.** Each blog PNG has a committed WebP (`pnpm --filter @thoth/site webp`, under 120 KB, tested), served
+   through `<picture>`; the PNG stays the Open Graph image. `/blog/images/*` is cached 30 days.
+5. **Dates and entity.** Sitemap `lastmod` is the real date of change (home: newest of launch, release and post);
+   `SoftwareApplication` has `datePublished` (first release) and `dateModified` (newest). Person and Organization
+   have descriptions; `SAME_AS` (routes.ts) is empty until the owner adds public profiles, and no `sameAs` is written
+   while it is. `alternateName: "Thoth Notes"` and "local-first Markdown notes app" tell this Thoth apart.
+6. **Comparison.** A Thoth / Notion / Obsidian table on the home page and in `llms-full.txt`; every Notion and
+   Obsidian cell is backed by that product's documentation, listed next to the English copy, with a visible
+   "checked on" date. Neutral words (tested).
+7. **IndexNow.** The build writes `/<INDEXNOW_KEY>.txt` only when the variable is set; the key is never committed.
+   `apps/site/scripts/indexnow.ts` posts the live sitemap's URLs after a deploy (https://www.indexnow.org/documentation).
+
+Consequence: the comparison needs re-checking when Notion or Obsidian change; its note says when it was checked.
+
 ## Spec references
 
 ADR-0015 (website), ADR-0022 (update notice, `notes`), docs/deploy/release.md.
