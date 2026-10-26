@@ -31,11 +31,14 @@ export type TauriListen = <T>(event: string, handler: (event: { payload: T }) =>
 export interface TauriApi {
   invoke: TauriInvoke;
   listen: TauriListen;
+  /** This window's label. A listener hears events sent to any window, so events meant for one window name it. */
+  label?(): string | undefined;
 }
 
 interface TauriInternals {
   invoke: TauriInvoke;
   transformCallback(callback: (event: { payload: unknown }) => void, once?: boolean): number;
+  metadata?: { currentWindow?: { label?: string } };
 }
 
 interface TauriGlobals {
@@ -59,7 +62,7 @@ export function internalsApi(globals: TauriGlobals = globalThis as TauriGlobals)
       await invoke("plugin:event|unlisten", { event, eventId });
     };
   };
-  return { invoke, listen };
+  return { invoke, listen, label: () => globals.__TAURI_INTERNALS__?.metadata?.currentWindow?.label };
 }
 
 export function tauriCommandName(command: CommandName): string {
@@ -122,7 +125,12 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
       return () => void unlisten();
     },
     async onCloseRequested(listener) {
-      const unlisten = await api.listen<null>(CLOSE_REQUESTED_EVENT, () => listener());
+      // Every window hears the request; only the one it names answers (the shell also refuses any other answer).
+      const unlisten = await api.listen<string | null>(CLOSE_REQUESTED_EVENT, (e) => {
+        const mine = api.label?.();
+        if (typeof e.payload === "string" && mine !== undefined && e.payload !== mine) return;
+        listener();
+      });
       return () => void unlisten();
     },
   };

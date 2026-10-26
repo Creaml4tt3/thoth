@@ -6,9 +6,15 @@
 import type { Platform } from "@thoth/platform";
 
 export async function loadTauriPlatform(): Promise<Platform> {
-  const [{ createTauriPlatform }, { invoke }, { listen }] = await Promise.all([import("@thoth/platform/tauri"), import("@tauri-apps/api/core"), import("@tauri-apps/api/event")]);
+  const [{ createTauriPlatform }, { invoke }, { listen }, { getCurrentWindow }] = await Promise.all([
+    import("@thoth/platform/tauri"),
+    import("@tauri-apps/api/core"),
+    import("@tauri-apps/api/event"),
+    import("@tauri-apps/api/window"),
+  ]);
   return createTauriPlatform({
     invoke: (command, args, options) => invoke(command, args, options),
     listen: (event, handler) => listen(event, handler),
+    label: () => getCurrentWindow().label,
   });
 }

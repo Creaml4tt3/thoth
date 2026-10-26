@@ -316,7 +316,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     Some(Value::Bool(b)) => *b,
                     Some(_) => return Err(InvokeError::from(HostError::bad_argument("evenIfLast must be a boolean"))),
                 };
-                let closes = even_if_last || app.webview_windows().keys().any(|label| label != &caller);
+                let asked = locked(&CLOSING).contains(&caller);
+                let closes = closes_window(even_if_last, asked, app.webview_windows().keys().any(|label| label != &caller));
                 if closes && let Some(window) = app.get_webview_window(&caller) {
                     window.destroy().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be closed: {e}"))))?;
                 }
@@ -438,13 +439,21 @@ fn release_in_background(label: &str, then: impl FnOnce() + Send + 'static) {
     locked(&RELEASING).push(task);
 }
 
+/// Whether `window_close` closes its caller. Cmd/Ctrl+W (`even_if_last` false) closes it unless it is the last window.
+/// `even_if_last` is the answer to a close request, and counts only from a window that was asked (`asked`, it is in
+/// `CLOSING`): every window's page hears the close-request event, so another window answering it must not close too.
+fn closes_window(even_if_last: bool, asked: bool, others_open: bool) -> bool {
+    if even_if_last { asked } else { others_open }
+}
+
 /// Asks the window `label` to write its edits and close itself (`CLOSE_REQUESTED_EVENT`, answered by `window_close`
-/// with `evenIfLast`). A page that does not answer within `CLOSE_ANSWER_TIMEOUT` (hung) is closed anyway.
+/// with `evenIfLast`). A page that does not answer within `CLOSE_ANSWER_TIMEOUT` (hung) is closed anyway. The event
+/// names the window, because a page's listener hears events sent to every window.
 fn ask_to_close<R: tauri::Runtime>(app: &AppHandle<R>, label: &str) {
     if !locked(&CLOSING).insert(label.to_owned()) {
         return; // asked already: its answer, or its timeout, is on the way
     }
-    let _ = app.emit_to(label, CLOSE_REQUESTED_EVENT, ());
+    let _ = app.emit_to(label, CLOSE_REQUESTED_EVENT, label);
     let (app, label) = (app.clone(), label.to_owned());
     std::thread::spawn(move || {
         std::thread::sleep(CLOSE_ANSWER_TIMEOUT);
@@ -591,6 +600,20 @@ mod tests {
             assert!(capability.contains(&format!("\"allow-{}\"", command.replace('_', "-"))), "{command} missing from capability");
             assert_eq!(contract_name(command), None, "{command} must not reach the host");
         }
+    }
+
+    #[test]
+    fn only_the_window_asked_to_close_closes_when_it_answers() {
+        // The close button or Quit asked this window: it closes, even the last one.
+        assert!(closes_window(true, true, false));
+        assert!(closes_window(true, true, true));
+        // Another window heard the same request and answered it: it stays, whatever else is open.
+        assert!(!closes_window(true, false, true));
+        assert!(!closes_window(true, false, false));
+        // Cmd/Ctrl+W: closes unless it is the last window.
+        assert!(closes_window(false, false, true));
+        assert!(!closes_window(false, false, false));
+        assert!(closes_window(false, true, true));
     }
 
     #[test]

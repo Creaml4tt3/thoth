@@ -165,4 +165,30 @@ describe("Thoth's windows over Tauri (ADR-0019)", () => {
     expect(await windows.closeThis({ evenIfLast: true })).toBe(true);
     expect(calls[1]).toEqual(["window_close", { args: { evenIfLast: true } }]);
   });
+
+  it("answers only a close request that names this window: closing one window leaves the others open", async () => {
+    let requested: ((event: { payload: unknown }) => void) | undefined;
+    const api: TauriApi = {
+      invoke: async () => true,
+      listen: async (_event, handler) => {
+        requested = handler as (event: { payload: unknown }) => void;
+        return () => undefined;
+      },
+      label: () => "space-ab12",
+    };
+    let asked = 0;
+    await tauriWindows(api).onCloseRequested(() => asked++);
+    requested!({ payload: "main" });
+    expect(asked, "a request for another window").toBe(0);
+    requested!({ payload: "space-ab12" });
+    expect(asked).toBe(1);
+    // The label comes from Tauri's own window metadata when the app passes none.
+    expect(internalsApi({ __TAURI_INTERNALS__: { invoke: async () => 1, transformCallback: () => 1, metadata: { currentWindow: { label: "space-x" } } } }).label!()).toBe("space-x");
+  });
+
+  it("the shell sends the close request with the window's label, and refuses an answer from a window it did not ask", () => {
+    const shell = readFileSync(join(import.meta.dirname, "../../apps/desktop/src-tauri/src/lib.rs"), "utf8");
+    expect(shell).toContain("app.emit_to(label, CLOSE_REQUESTED_EVENT, label)");
+    expect(shell).toContain("closes_window(even_if_last, asked,");
+  });
 });
