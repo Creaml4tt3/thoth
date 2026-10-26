@@ -22,8 +22,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Connected apps: a read-only MCP server that AI tools can use to search and read your pages, off until you switch it on.
 - Public read-only share links for workspace pages, which you can revoke at any time.
 - Workspace members and invite links: change roles, remove members, leave, and join with a link.
+- Several workspaces per account: create, rename and delete them, and restore a deleted one for 30 days. The trial allows 3 per account.
 - Drag pages between the Private Space and a workspace to open the copy and move dialog.
-- The sidebar can be resized, and its sections can be reordered and folded.
+- The sidebar can be resized, and its sections can be reordered and folded. A section’s drag handle shows only while you hover over its header.
 
 ### Changed
 
@@ -35,6 +36,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Pages in the sidebar can be dragged again, and a drop lands where the line is drawn.
 - A moved page keeps its open tabs.
 - The window no longer scrolls as a whole; only the page area scrolls.
+- Closing one window no longer closes the others.
+- An unknown share link no longer logs a server error behind its “not found” page.
 
 ## [0.1.3] - 2026-10-25
 
