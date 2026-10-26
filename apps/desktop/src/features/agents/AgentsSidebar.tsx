@@ -1,47 +1,43 @@
 /**
  * The sidebar's Assistant section (ADR-0007 amendment of 2026-10-26): the runs of this Private Space, newest first,
  * from the run records (the history). The five newest are shown; "Show N more" lists the rest (up to the history's
- * limit) and "Show less" folds them again. Each row is the task's first line; a run going or waiting for review also
- * says so in words, with a dot (never colour alone); it opens the run's session tab, and the run of the current
+ * limit) and "Show less" folds them again. Each row is the task's first line and its state in words (a run going or
+ * waiting for review also gets a dot, never colour alone); it opens the run's session tab, and the run of the current
  * tab is marked. Not shown where agents cannot run, nor before the first run.
  *
- * It is its own `<section>` with a `.sec` header and the stable id `agents`, so it can join the sidebar's section
- * order like the Private Space and the workspaces.
+ * It is one of the sidebar's reorderable sections (id `agents`, ADR-0019 amendment), placed by `SidebarSections`.
  */
 import { useId, useState, useSyncExternalStore } from "react";
+import type { RunRecord } from "@thoth/agent-core";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
+import { AGENTS_SECTION } from "../shell/sections.ts";
+import type { SidebarSection } from "../shell/SidebarSections.tsx";
 import { outcomeLabel, taskTitle } from "./parts.tsx";
 import type { AgentsService } from "./service.ts";
 
 /** How many runs the section shows before "Show N more". */
 export const SHOWN_RUNS = 5;
 /** The section's id in the sidebar's order. */
-export const AGENTS_SECTION_ID = "agents";
+export const AGENTS_SECTION_ID = AGENTS_SECTION;
 
 const GOING = new Set(["starting", "running", "cancelling"]);
+const NO_RUNS: readonly RunRecord[] = [];
+const NO_SUBSCRIPTION = () => () => undefined;
 
-function Section({ agents, current }: { agents: AgentsService; current: string | null }) {
+function Runs({ agents, current }: { agents: AgentsService; current: string | null }) {
   const all = useDesktopStrings().agents;
   const t = all.sidebar;
   const { openAgentRun } = useSession();
   const state = useSyncExternalStore(agents.subscribe, agents.getState);
   const [expanded, setExpanded] = useState(false);
-  const ids = useId();
-  const heading = `${ids}-heading`;
-  const list = `${ids}-list`;
+  const list = `${useId()}-list`;
   const runs = state.history;
-  if (runs.length === 0) return null;
   const shown = expanded ? runs : runs.slice(0, SHOWN_RUNS);
   const more = runs.length - SHOWN_RUNS;
   return (
-    <section className="agents-section" data-section={AGENTS_SECTION_ID} aria-labelledby={heading}>
-      <div className="sec">
-        <span className="sec-name" id={heading}>
-          {t.heading}
-        </span>
-      </div>
+    <div className="agents-section">
       <ul className="agents-rows" id={list}>
         {shown.map((r) => {
           const live = state.record?.id === r.id && GOING.has(state.phase);
@@ -71,13 +67,15 @@ function Section({ agents, current }: { agents: AgentsService; current: string |
           {expanded ? t.less : t.more(more)}
         </button>
       )}
-    </section>
+    </div>
   );
 }
 
-/** `current`: the run of the current tab, if it is a session tab. */
-export function AgentsSidebar({ current }: { current: string | null }) {
+/** The Assistant section, or null where agents cannot run or no run exists yet. `current`: the run of the current tab. */
+export function useAgentsSection(current: string | null): SidebarSection | null {
   const { agents } = useSession();
-  if (!agents) return null;
-  return <Section agents={agents} current={current} />;
+  const t = useDesktopStrings().agents.sidebar;
+  const history = useSyncExternalStore(agents?.subscribe ?? NO_SUBSCRIPTION, () => agents?.getState().history ?? NO_RUNS);
+  if (!agents || history.length === 0) return null;
+  return { id: AGENTS_SECTION, name: t.heading, label: t.heading, children: <Runs agents={agents} current={current} /> };
 }

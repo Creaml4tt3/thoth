@@ -16,7 +16,7 @@ import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { useServerSections } from "../servers/ServersSidebar.tsx";
 import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
 import { PRIVATE_SECTION } from "./sections.ts";
-import { AgentsSidebar } from "../agents/AgentsSidebar.tsx";
+import { useAgentsSection } from "../agents/AgentsSidebar.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -224,6 +224,7 @@ export function Sidebar({ pages, current, currentRemote = null, currentRun = nul
     ),
   };
   const serverSections = useServerSections(currentRemote);
+  const agentsSection = useAgentsSection(currentRun);
 
   return (
     <aside className="sidebar" aria-label={t.sidebar}>
@@ -236,8 +237,7 @@ export function Sidebar({ pages, current, currentRemote = null, currentRun = nul
         <kbd>⌘K</kbd>
       </button>
       <nav aria-label={t.pages} className="tree-wrap">
-        <SidebarSections root={connection.root} sections={[privateSection, ...serverSections]} />
-        <AgentsSidebar current={currentRun} />
+        <SidebarSections root={connection.root} sections={[privateSection, ...serverSections, ...(agentsSection ? [agentsSection] : [])]} />
       </nav>
       <PendingTransfers />
       <div className="side-actions">
