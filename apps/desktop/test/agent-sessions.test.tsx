@@ -187,7 +187,7 @@ describe("the Assistant section in the sidebar", () => {
     expect(rows()).toEqual(["Question 7", "Question 6", "Question 5", "Question 4", "Question 3"]);
     // It is one of the sidebar's reorderable sections, after the Private Space (ADR-0019 amendment).
     expect((await section()).getAttribute("data-section")).toBe("agents");
-    expect(within(await section()).getByRole("button", { name: "Options for the section Assistant" })).toBeTruthy();
+    expect(within(await section()).getByRole("button", { name: "Section options: Assistant" })).toBeTruthy();
     const order = [...sidebar().querySelectorAll(".side-section")].map((el) => el.getAttribute("data-section"));
     expect(order[0]).toBe("private");
     expect(order[order.length - 1]).toBe("agents");
