@@ -2,7 +2,9 @@
  * Drag and drop in a workspace tree with a real pointer, on the real desktop UI in Chromium, the real Rust host and the
  * real reference server (PostgreSQL in Podman): reorder before and after, move into a folder page, move to the top level
  * (the workspace row), open a closed folder by hovering it, refuse a drop into a descendant, and `locator.dragTo`. The
- * server's tree is read back to check where each page landed (`parentId`, `position`).
+ * server's tree is read back to check where each page landed (`parentId`, `position`). With a server there are two
+ * sidebar sections, so the sections' own drag (ADR-0019 amendment) is checked here too, with pictures of it in
+ * tests/.tmp/sidebar-sections/.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
@@ -20,6 +22,7 @@ import { opaqueId } from "../../apps/server/src/ids.ts";
 import { startServer, type RunningServer } from "../../apps/server/src/server.ts";
 import startPostgres from "../../apps/server/test-db/global-setup.ts";
 import { startFakeIssuer, type FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { expectIndicator, indicators, rowByName, rowNames, startDrag } from "./drag.ts";
 import { settled } from "./settled.ts";
@@ -267,6 +270,64 @@ test.describe("workspace tree drag and drop", () => {
     await page.waitForTimeout(300);
     expect((await serverTree()).parentOf("Folder")).toBeNull();
     await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("sidebar sections: a page drag moves no section; the server's section is dragged above the Private Space with a live preview, moved by keyboard, and kept after a restart", async ({ page }) => {
+    const SHOTS = join(REPO, "tests", ".tmp", "sidebar-sections");
+    await mkdir(SHOTS, { recursive: true });
+    const sections = () => page.locator(".side-section").evaluateAll((els) => els.map((el) => (el.getAttribute("aria-label") ?? "").split(" ")[0]));
+    const privateSection = page.getByRole("region", { name: /^Private Space / });
+    const serverSection = page.getByRole("region", { name: /^Server / });
+    await expect.poll(sections).toEqual(["Private", "Server"]);
+
+    // A page dragged in the workspace tree reorders pages; no section starts to move.
+    const pageDrag = await startDrag(page, row(page, "Gamma"));
+    await pageDrag.over(row(page, "Alpha"), 0.2);
+    await expectIndicator(page, ["Alpha: before"]);
+    await expect(page.locator("[data-section-dragging]")).toHaveCount(0);
+    await pageDrag.drop();
+    await expect.poll(() => names(page)).toEqual(["Gamma", "Alpha", "Beta", "Folder"]);
+    expect(await sections()).toEqual(["Private", "Server"]);
+    await settled(page);
+
+    // The server's section by its header, up past the Private Space: it lifts and follows, the Private Space slides down.
+    const privateWas = (await privateSection.boundingBox())!;
+    const serverWas = (await serverSection.boundingBox())!;
+    const header = (await serverSection.locator(".sec").boundingBox())!;
+    await page.mouse.move(header.x + 120, header.y + header.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(header.x + 120, header.y + header.height / 2 - 8, { steps: 3 });
+    await page.mouse.move(header.x + 120, 10, { steps: 16 });
+    await expect(serverSection).toHaveAttribute("data-dragging", "");
+    const gap = serverWas.y - (privateWas.y + privateWas.height);
+    await expect.poll(async () => Math.round((await privateSection.boundingBox())!.y - (privateWas.y + serverWas.height + gap))).toBe(0);
+    for (const dark of [false, true]) {
+      await page.evaluate((night) => document.documentElement.setAttribute("data-theme", night ? "night" : "light"), dark);
+      await settled(page);
+      await page.screenshot({ path: join(SHOTS, `section-drag-${dark ? "dark" : "light"}.png`), clip: { x: 0, y: 0, width: 300, height: 600 } });
+    }
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+    await page.mouse.up();
+    await expect.poll(sections).toEqual(["Server", "Private"]);
+    expect(await names(page)).toEqual(["Gamma", "Alpha", "Beta", "Folder"]); // the pages did not move
+    await settled(page);
+
+    // The keyboard: Alt+Shift+Up on the Private Space's grip, then Down again; focus stays on the grip.
+    const grip = privateSection.getByRole("button", { name: /^Section options: / });
+    await grip.focus();
+    await page.keyboard.press("Alt+Shift+ArrowUp");
+    await expect.poll(sections).toEqual(["Private", "Server"]);
+    await expect(grip).toBeFocused();
+    await page.keyboard.press("Alt+Shift+ArrowDown");
+    await expect.poll(sections).toEqual(["Server", "Private"]);
+    await expect(page.locator("[data-sections-said]")).toHaveText(/moved to position 2 of 2$/);
+
+    // Restart: the order comes back.
+    await page.reload();
+    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await page.getByRole("button", { name: /start writing/i }).click(); // the vault holds no page, so it is "Ready" again
+    await expect(page.getByRole("region", { name: /^Server / })).toBeVisible({ timeout: 15_000 });
+    await expect.poll(sections).toEqual(["Server", "Private"]);
   });
 
   test("locator.dragTo reorders and moves too", async ({ page }) => {

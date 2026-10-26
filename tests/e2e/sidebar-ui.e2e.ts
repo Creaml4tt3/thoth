@@ -118,7 +118,7 @@ test("the drag handle resizes the sidebar by pointer and keyboard, is remembered
   expect(await sidebarWidth(page)).toBe(232);
   const stored = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith("thoth.desktop.sidebar.")));
   expect(stored).toHaveLength(1);
-  expect(stored[0]![1]).toBe("232");
+  expect(JSON.parse(stored[0]![1])).toEqual({ v: 2, width: 232 }); // the sidebar's layout (ADR-0019 amendment), versioned
 
   // A double-click brings the default back and forgets the choice.
   const now = (await handle(page).boundingBox())!;
