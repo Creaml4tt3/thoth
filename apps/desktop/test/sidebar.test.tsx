@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
-import { sidebarKey, loadSidebarWidth, saveSidebarWidth } from "../src/app/sidebar-store.ts";
+import { sidebarKey, loadSidebarLayout, loadSidebarWidth, saveSectionCollapsed, saveSectionOrder, saveSidebarWidth } from "../src/app/sidebar-store.ts";
+import { arrangeSections, moveSection } from "../src/features/shell/sections.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -56,7 +57,7 @@ describe("sidebar width", () => {
     handle().focus();
     await app.user.keyboard("{ArrowRight}{Shift>}{ArrowRight}{/Shift}");
     await waitFor(() => expect(handle().getAttribute("aria-valuenow")).toBe("340"));
-    expect(localStorage.getItem(sidebarKey(root))).toBe("340");
+    expect(JSON.parse(localStorage.getItem(sidebarKey(root))!)).toEqual({ v: 2, width: 340 });
     expect(document.querySelector<HTMLElement>(".shell")!.style.getPropertyValue("--thoth-sidebar-width")).toBe("340px");
   });
 
@@ -80,5 +81,54 @@ describe("sidebar width", () => {
     expect(loadSidebarWidth("/d")).toBeNull();
     localStorage.setItem(sidebarKey("/e"), "9999");
     expect(loadSidebarWidth("/e")).toBeNull();
+  });
+});
+
+describe("the sidebar's stored layout (width, section order, folded sections)", () => {
+  it("reads the old width-only value, and keeps that width when the order is first saved", () => {
+    localStorage.setItem(sidebarKey("/old"), "300");
+    expect(loadSidebarLayout("/old")).toEqual({ width: 300, order: [], collapsed: [] });
+    saveSectionOrder("/old", ["server:demo", "private"]);
+    expect(JSON.parse(localStorage.getItem(sidebarKey("/old"))!)).toEqual({ v: 2, width: 300, order: ["server:demo", "private"] });
+    expect(loadSidebarWidth("/old")).toBe(300);
+  });
+
+  it("changing the width keeps the order and the folded sections, and nothing is stored when all is the default", () => {
+    saveSectionOrder("/a", ["agents", "private"]);
+    saveSectionCollapsed("/a", ["agents"]);
+    saveSidebarWidth("/a", 320);
+    expect(loadSidebarLayout("/a")).toEqual({ width: 320, order: ["agents", "private"], collapsed: ["agents"] });
+    saveSidebarWidth("/a", null);
+    saveSectionOrder("/a", []);
+    saveSectionCollapsed("/a", []);
+    expect(localStorage.getItem(sidebarKey("/a"))).toBeNull();
+  });
+
+  it("ignores what is not a layout: another version, bad ids, repeats, a bad width", () => {
+    for (const bad of ["{", "[]", '{"v":3,"order":["private"]}', "null", '"private"']) {
+      localStorage.setItem(sidebarKey("/x"), bad);
+      expect(loadSidebarLayout("/x")).toEqual({ width: null, order: [], collapsed: [] });
+    }
+    localStorage.setItem(sidebarKey("/x"), JSON.stringify({ v: 2, width: 12, order: ["private", 7, "", "private", "x".repeat(300), "server:a"], collapsed: "agents" }));
+    expect(loadSidebarLayout("/x")).toEqual({ width: null, order: ["private", "server:a"], collapsed: [] });
+  });
+});
+
+describe("the order of the sidebar's sections", () => {
+  it("is the natural order until someone moves one", () => {
+    expect(arrangeSections([], ["private", "server:demo", "agents"])).toEqual(["private", "server:demo", "agents"]);
+  });
+
+  it("follows the stored order, ignores ids that are not there, and adds a new section at the end", () => {
+    // `server:gone` was removed; `agents` is new (another branch adds it): it goes last, whatever the stored order says.
+    expect(arrangeSections(["server:demo", "server:gone", "private"], ["private", "server:demo", "agents"])).toEqual(["server:demo", "private", "agents"]);
+  });
+
+  it("moving a section keeps the places of stored ids that are not shown now", () => {
+    const stored = ["server:demo", "server:gone", "private"];
+    const present = ["private", "server:demo"];
+    expect(moveSection(stored, present, "private", 0)).toEqual(["private", "server:gone", "server:demo"]);
+    expect(moveSection([], ["private", "server:demo", "agents"], "agents", 0)).toEqual(["agents", "private", "server:demo"]);
+    expect(moveSection([], ["private", "server:demo"], "private", 5)).toEqual(["server:demo", "private"]); // past the end: last
   });
 });
