@@ -135,14 +135,18 @@ export function useTabDrag(options: TabDragOptions) {
     // Its middle where the pointer has taken it (not held back at the ends, so the far end is always reachable).
     const center = self.start + self.size / 2 + dx;
     const slot = detach ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
-    const [lo, hi] = opts.current.bounds?.(p.id) ?? [0, c.order.length - 1];
-    const to = slot === null ? null : Math.max(lo, Math.min(slot, hi));
+    const [first, last] = opts.current.bounds?.(p.id) ?? [0, c.order.length - 1];
+    const to = slot === null ? null : Math.max(first, Math.min(slot, last));
     const moved = previewShifts(c.order.length, from, to, self.size, c.gap, c.rtl);
     if (!detach) {
       // The tab follows the pointer along the bar, kept between the first tab's start and the last tab's end, and
       // within what the bar shows. Its own place has moved with the scroll, so it is shifted by that too.
-      const lo = Math.max(bar.left, c.min - scrolled);
-      const hi = Math.min(bar.right, c.max - scrolled) - self.size;
+      // Kept over its own group too (ADR-0027): an unpinned tab never covers the pinned ones.
+      const group = c.spans.slice(first, last + 1);
+      const gMin = group.length > 0 ? Math.min(...group.map((g) => g.start)) : c.min;
+      const gMax = group.length > 0 ? Math.max(...group.map((g) => g.start + g.size)) : c.max;
+      const lo = Math.max(bar.left, gMin - scrolled);
+      const hi = Math.min(bar.right, gMax - scrolled) - self.size;
       const want = self.start + dx;
       const left = hi < lo ? want : Math.min(hi, Math.max(lo, want));
       moved[from] = left - (self.start - scrolled);

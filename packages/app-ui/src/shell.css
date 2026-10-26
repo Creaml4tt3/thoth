@@ -39,7 +39,7 @@
 [data-fav-dragging], [data-fav-dragging] .fav-item { cursor: grabbing; }
 .fav-row { -webkit-user-select: none; user-select: none; }
 /* The star in a page's header: an outline, filled once the page is a favorite. */
-.fav-star-on { color: var(--thoth-accent); }
+.icon-btn.fav-star-on, .icon-btn.fav-star-on[aria-pressed="true"] { color: var(--thoth-accent-ink); }
 .fav-star-on .icon-star { fill: currentColor; }
 .tree-caret { width: 12px; height: 12px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); flex: none; border-radius: var(--thoth-radius-xs); }
 .tree-caret svg { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
