@@ -722,6 +722,15 @@ AC evidence:
   - the UI explains it: `transfer.test.tsx` › "an export-restricted workspace refuses, and the dialog
     explains why".
 
+Status note (2026-10-26): **drag and drop between the Private Space and a workspace** (ADR-0006 amendment,
+Proposed).
+- A drop across the two trees opens this dialog prefilled; nothing transfers without confirming it.
+- Copy is the default, and Alt/Option chooses Move. A drop can land in a workspace page or a vault folder.
+- Viewers, servers without `transfers` and export-restricted sources are refused with a reason.
+- Tests: `space-drag.test.ts`, `space-dnd.test.tsx`, `cross-space-dnd.test.tsx`, `cross-space-dnd.e2e.ts`.
+- `transfer.e2e.ts` now also covers a conflict copy, a taken name and the export-restricted refusal through the
+  menus.
+
 Checks: `pnpm check` 1253/1253, `pnpm test:server` 217/217, `pnpm e2e` 25 passed and 1 skipped (the
 site's Windows download, which has no Windows file in this release; `transfer.e2e.ts` included).
 `cargo test` was not needed: no Rust was changed.

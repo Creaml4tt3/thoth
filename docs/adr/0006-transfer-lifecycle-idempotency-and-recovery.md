@@ -116,3 +116,61 @@ Each answer below is pinned by tests in `packages/transfer/test` and `apps/serve
     `contentHash`, and each written file is re-read and compared before the server is told
     `verified`.
 
+
+## Amendment (2026-10-26): starting a transfer by drag and drop — Proposed
+
+The owner asked that drag and drop between the Private Space and a workspace work correctly. It did not exist:
+each sidebar tree had its own drag state, so a row from the other tree was never accepted. Decided for the owner,
+to be confirmed:
+
+1. **A drop across spaces opens the transfer dialog and never transfers by itself.** Dropping a Private Space page,
+   a folder, or the selection the dragged page is part of on a workspace row or a workspace page opens the
+   `to_workspace` dialog. Dropping a workspace page on the Private Space header, a Private Space folder, or a page
+   in one opens the `from_workspace` dialog. The dialog is prefilled with the pages, the workspace or folder, and
+   the mode, and it still shows the preview (members, link classes, problems, warnings) and waits for the person to
+   confirm. Copy is chosen unless Alt/Option is held at the drop; then Move is chosen, and the dialog's mode radio
+   shows it. Within one tree, drag and drop is unchanged. A workspace page dragged onto another workspace is not
+   accepted: there is no transfer between workspaces.
+2. **Where it lands.** The engine and protocol already take a destination parent page (`ToWorkspaceRequest.parentId`)
+   and a vault folder (`FromWorkspaceRequest.folder`), so nothing in the protocol or the server changed.
+   - On a workspace page, the pages go inside it. That page row is lit, and the dialog's "Put the pages" shows it.
+   - On the workspace row, they go to the top level.
+   - On a Private Space folder, the page goes into that folder. That folder row is lit.
+   - On a page in a folder, it goes into the page's folder. The folder row is lit, not the page.
+   - On a top-level page or on the header, it goes to the top level. The header is lit.
+   - A dragged Private Space folder travels as a folder page holding its pages: `base` is the folder's parent,
+     ADR-0016 rule 3. Empty sub-folders do not travel, as with "Select pages".
+   - A dragged workspace folder takes its whole subtree, and a dragged page takes only itself, as the page's own
+     buttons do.
+3. **Refused targets show no indicator and the "no drop" cursor, and the pointer says why.** The pointer badge
+   names the reason. These are refused:
+   - a viewer workspace as the destination ("You are a viewer in X.");
+   - a server without `transfers` ("X does not accept transfers."). When capabilities are not known yet, the
+     preview decides;
+   - a signed-out server. Its workspaces are not listed, so this is a safeguard;
+   - an export-restricted workspace as the source ("X does not allow copying or moving its pages out.").
+
+   A page dropped on itself, or into itself, is the tree's own refusal, as before. A viewer's workspace pages
+   stay undraggable, as within the tree; they copy out with the page's "Copy to Private Space…". The server
+   remains the authority (ADR-0009). This only spares people a dialog that could not start.
+4. **Look.** The drop uses the trees' accent indicator (`data-drop="inside"`, a tint on the row or header), with
+   `effectAllowed = copyMove` and `dropEffect` set to `copy`, or `move` with Alt/Option. The browser fixes the drag
+   picture at dragstart, so a badge drawn under it says "Copy to Studio…", "Move to Private Space…" or the reason.
+   A polite live region repeats the badge's text. The keyboard way is unchanged: Select pages, then Copy/Move to
+   workspace…, and the page header's Copy/Move to Private Space….
+5. **Implementation.** `packages/app-ui/src/order/space-drag.ts` holds:
+   - the payload (`application/x-thoth-page`, `{ from, row, ids, title, base? }`);
+   - a small shared store, so the tree under the pointer knows what is dragged during `dragover`;
+   - the pure drop rules.
+
+   `useTreeDnd` gained `carry` (source) and `across` (target), and `useAcrossDropZone` covers the header. The
+   desktop shell turns a drop into a prefilled `TransferTarget`. The web client does not opt in (`spaceDrops`).
+
+Gaps: a drag from one app window to another is not recognised (the shared state is per window). Dropping on a
+workspace page cannot choose a position among its children; the server puts the pages where a transfer always
+puts them.
+
+Pinned by `packages/app-ui/test/space-drag.test.ts`, `packages/app-ui/test/space-dnd.test.tsx`,
+`apps/desktop/test/cross-space-dnd.test.tsx` and `tests/e2e/cross-space-dnd.e2e.ts`. The menu transfers were
+checked again end to end in `tests/e2e/transfer.e2e.ts`: copy, move, move back, a conflict copy, a taken name, and
+the export-restricted refusal. No bugs were found.
