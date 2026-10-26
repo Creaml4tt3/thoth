@@ -1,4 +1,5 @@
 export * from "./errors.ts";
+export * from "./favorites.ts";
 export * from "./journal.ts";
 export * from "./mime.ts";
 export * from "./names.ts";

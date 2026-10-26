@@ -90,12 +90,13 @@ export async function readPendingJournal(fs: VaultFs): Promise<PendingJournal> {
 
 /**
  * A durable Thoth record path (ADR-0001 §2): `.thoth/<area>/.../<name>.json`, outside the index files and
- * outside the temp, journal and import staging areas, or the one top-level record `.thoth/order.json` (the tree
- * order, ADR-0016 rule 4). Throws for anything else.
+ * outside the temp, journal and import staging areas, or one of the two top-level records `.thoth/order.json` (the tree
+ * order, ADR-0016 rule 4) and `.thoth/favorites.json` (the starred pages, ADR-0027). Throws for anything else.
  */
 export function recordPath(path: string): string {
   const normalized = normalizeVaultPath(path);
-  if (normalized.toLowerCase() === ".thoth/order.json") return normalized;
+  const lower = normalized.toLowerCase();
+  if (lower === ".thoth/order.json" || lower === ".thoth/favorites.json") return normalized;
   const [first, ...rest] = normalized.split("/");
   const area = rest.join("/").toLowerCase();
   const ok =
@@ -117,7 +118,7 @@ export function recordPath(path: string): string {
  * Thoth's own `.thoth/tmp/<id>.tmp` (fsynced) and are renamed over the target; a crash leaves at most
  * that temp file, which `Vault.open` sweeps. `id` is a fresh UUIDv7 per write.
  */
-export async function writeRecordAtomic(fs: VaultFs, path: string, data: Uint8Array, id: string): Promise<void> {
+export async function writeRecordAtomic(fs: VaultFs, path: string, data: Uint8Array, id: string, rename: { noReplace?: boolean; replaceHash?: string } = {}): Promise<void> {
   const target = recordPath(path);
   if (!JOURNAL_ID.test(id)) throw new Error("A record write needs a UUIDv7 temp id");
   const temp = journalTempPath(id);
@@ -125,7 +126,7 @@ export async function writeRecordAtomic(fs: VaultFs, path: string, data: Uint8Ar
   await fs.writeFile(temp, data, { exclusive: true });
   try {
     await fs.mkdirp(dirname(target));
-    await fs.rename(temp, target);
+    await fs.rename(temp, target, rename);
   } catch (error) {
     await fs.remove(temp).catch(() => undefined);
     throw error;

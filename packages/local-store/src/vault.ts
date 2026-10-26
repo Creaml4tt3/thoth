@@ -964,6 +964,40 @@ export class Vault {
     return JSON.parse(decodeText(await this.fs.readFile(normalized)).text) as unknown;
   }
 
+  /**
+   * A record's bytes as text with their SHA-256, for a compare-and-swap write (`writeRecordIfUnchanged`); undefined
+   * when it does not exist. Unlike `readRecord`, nothing is parsed, so a broken record can still be replaced.
+   */
+  async readRecordText(path: string): Promise<{ text: string; hash: string } | undefined> {
+    const normalized = recordPath(path);
+    const stat = await this.fs.stat(normalized);
+    if (!stat) return undefined;
+    if (stat.kind !== "file") throw new Error(`${normalized} is not a file`);
+    const bytes = await this.fs.readFile(normalized);
+    return { text: decodeText(bytes).text, hash: sha256Hex(bytes) };
+  }
+
+  /**
+   * Writes a record only while it still has `expectedHash` (null: only while it does not exist), as one step with the
+   * check for every writer through the same host (two windows, ADR-0019). Otherwise throws `ConflictError` and writes
+   * nothing. Returns the new hash.
+   */
+  async writeRecordIfUnchanged(path: string, value: unknown, expectedHash: string | null): Promise<string> {
+    const normalized = recordPath(path);
+    const data = encodeText(JSON.stringify(value, null, 2) + "\n");
+    try {
+      await writeRecordAtomic(this.fs, normalized, data, newStableId(this.now()), expectedHash === null ? { noReplace: true } : { replaceHash: expectedHash });
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      if (code === "EEXIST" || code === "CONFLICT") {
+        const now = await this.fs.stat(normalized).then((st) => (st?.kind === "file" ? this.fs.readFile(normalized).then(sha256Hex) : null));
+        throw new ConflictError(normalized, expectedHash, now);
+      }
+      throw error;
+    }
+    return sha256Hex(data);
+  }
+
   /** Record file names (`*.json`) directly inside a `.thoth/` directory; empty when it does not exist. */
   async listRecords(dir: string): Promise<string[]> {
     const normalized = normalizeVaultPath(dir);
