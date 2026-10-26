@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { DELETED_WORKSPACE_RESTORE_DAYS, InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -40,6 +40,8 @@ export interface FakeWorkspace {
   invites: { id: string; role: "editor" | "viewer"; maxUses: number; uses: number; createdAt: string; createdBy: string; expiresAt: string; token: string; revoked: boolean }[];
   /** False for a workspace "me" is not in yet (it can be joined with one of its invite links). */
   joined: boolean;
+  /** ADR-0025: when it was deleted (restorable for 30 days), or null. */
+  deletedAt: string | null;
 }
 
 export interface FakeTransfer {
@@ -101,6 +103,7 @@ export class FakeServers implements Servers {
   signInMode: "auto" | "manual" = "auto";
   private readonly pending = new Map<string, PendingSignIn>();
   private nextServer = 1;
+  private made = 0;
   private seq = 0;
   private clock = 0;
 
@@ -134,6 +137,7 @@ export class FakeServers implements Servers {
       shares: [],
       invites: [],
       joined: init.joined ?? true,
+      deletedAt: null,
     };
     this.serverOf.set(ws, server);
     const list = this.workspaces.get(server) ?? [];
@@ -296,17 +300,22 @@ export class FakeServers implements Servers {
     if (path === "/me" && method === "GET") return json(200, this.mustKnow(server).config.account ?? { id: "usr_me", displayName: "Me" });
     if (path === "/workspaces" && method === "GET") {
       return json(200, {
-        items: (this.workspaces.get(server) ?? []).filter((w) => w.joined).map((w) => ({ id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: w.exportRestricted, memberCount: w.members.length, members: w.members, createdAt: iso(T0) })),
+        items: (this.workspaces.get(server) ?? []).filter((w) => w.joined && w.deletedAt === null).map((w) => this.workspaceResource(w)),
         nextCursor: null,
       });
     }
+    if (path === "/workspaces" && method === "POST") return this.createWorkspace(server, text);
+    if (path === "/deleted-workspaces" || path.startsWith("/deleted-workspaces/")) return this.deletedWorkspaces(server, method, path, text);
+    const whole = /^\/workspaces\/([^/]+)$/.exec(path);
+    if (whole && method === "DELETE") return this.deleteWorkspace(server, decodeURIComponent(whole[1]!));
     const tm = /^\/transfers\/([^/]+)(\/commit|\/abort)?$/.exec(path);
     if (tm) return this.transferRoute(server, method, decodeURIComponent(tm[1]!), tm[2] ?? "", text);
     const m = /^\/workspaces\/([^/]+)(\/.*)$/.exec(path);
     if (path === "/invites/accept" && method === "POST") return this.acceptInvite(server, text);
-    const ws = m ? (this.workspaces.get(server) ?? []).find((w) => w.joined && w.id === decodeURIComponent(m[1]!)) : undefined;
+    const ws = m ? (this.workspaces.get(server) ?? []).find((w) => w.joined && w.deletedAt === null && w.id === decodeURIComponent(m[1]!)) : undefined;
     if (!m || !ws) return fail("not_found");
     const rest = m[2]!;
+    if (rest === "/name" && method === "PUT") return this.renameWorkspace(server, ws, text);
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
@@ -432,6 +441,77 @@ export class FakeServers implements Servers {
   private me(server: string): { id: string; displayName: string } {
     const account = this.mustKnow(server).config.account;
     return { id: account?.id ?? "usr_me", displayName: account?.displayName ?? "Me" };
+  }
+
+  private workspaceResource(w: FakeWorkspace) {
+    return { id: w.id, kind: "workspace", name: w.name, role: w.role, exportRestricted: w.exportRestricted, memberCount: w.members.length, members: w.members, createdAt: iso(T0) };
+  }
+
+  /** Deleted workspaces "me" owns that can still be restored (ADR-0025). */
+  private restorable(server: string): FakeWorkspace[] {
+    return (this.workspaces.get(server) ?? []).filter((w) => w.joined && w.deletedAt !== null && Date.parse(w.deletedAt) + DELETED_WORKSPACE_RESTORE_DAYS * 86_400_000 > this.now());
+  }
+
+  /** `createWorkspace` (capability `workspace-management`): the owned-workspace limit counts deleted ones too. */
+  private createWorkspace(server: string, text: string): ApiCallResult {
+    if (!this.capable(server, "workspace-management")) return fail("capability_not_supported");
+    const parsed = WorkspaceCreateRequestSchema.safeParse(JSON.parse(text));
+    if (!parsed.success) return fail("validation_failed", parsed.error.message);
+    const name = parsed.data.name.trim();
+    if (name === "") return fail("validation_failed", "the name must be 1 to 200 characters");
+    const limit = this.mustKnow(server).config.limits?.["maxWorkspacesPerAccount"];
+    const owned = (this.workspaces.get(server) ?? []).filter((w) => w.joined && w.role === "owner" && (w.deletedAt === null || this.restorable(server).includes(w))).length;
+    if (limit !== undefined && owned >= limit) return json(409, { ...problem("quota_exceeded", { detail: `an account may own at most ${limit} workspaces (${owned} owned)` }), quota: "workspacesPerAccount", limit, current: owned });
+    const me = this.me(server);
+    const ws = this.addWorkspace(server, { id: `ws_made_${++this.made}`, name, role: "owner", exportRestricted: parsed.data.exportRestricted ?? false, members: [{ userId: me.id, displayName: me.displayName, role: "owner" }] });
+    return json(201, this.workspaceResource(ws));
+  }
+
+  private renameWorkspace(server: string, ws: FakeWorkspace, text: string): ApiCallResult {
+    if (!this.capable(server, "workspace-management")) return fail("capability_not_supported");
+    if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+    const parsed = WorkspaceRenameSchema.safeParse(JSON.parse(text));
+    if (!parsed.success || parsed.data.name.trim() === "") return fail("validation_failed", "the name must be 1 to 200 characters");
+    ws.name = parsed.data.name.trim();
+    return json(200, this.workspaceResource(ws));
+  }
+
+  private deleteWorkspace(server: string, id: string): ApiCallResult {
+    if (!this.capable(server, "workspace-management")) return fail("capability_not_supported");
+    const ws = (this.workspaces.get(server) ?? []).find((w) => w.joined && w.deletedAt === null && w.id === id);
+    if (!ws) return fail("not_found");
+    if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+    ws.deletedAt = iso(this.now());
+    for (const link of ws.shares) link.revoked = true;
+    for (const link of ws.invites) link.revoked = true;
+    return { status: 204, headers: {}, body: "" };
+  }
+
+  /** `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace`. */
+  private deletedWorkspaces(server: string, method: string, path: string, _text: string): ApiCallResult {
+    if (!this.capable(server, "workspace-management")) return fail("capability_not_supported");
+    const restorable = this.restorable(server);
+    if (path === "/deleted-workspaces" && method === "GET") {
+      const items = restorable
+        .filter((w) => w.role === "owner")
+        .sort((a, b) => Date.parse(b.deletedAt!) - Date.parse(a.deletedAt!))
+        .map((w) => ({ id: w.id, name: w.name, exportRestricted: w.exportRestricted, memberCount: w.members.length, deletedAt: w.deletedAt!, deletedBy: this.me(server).id, restorableUntil: iso(Date.parse(w.deletedAt!) + DELETED_WORKSPACE_RESTORE_DAYS * 86_400_000) }));
+      return json(200, { items, nextCursor: null });
+    }
+    const m = /^\/deleted-workspaces\/([^/]+)(\/restore)?$/.exec(path);
+    const ws = m ? restorable.find((w) => w.id === decodeURIComponent(m[1]!)) : undefined;
+    if (!m || !ws) return fail("not_found", "no such deleted workspace");
+    if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+    if (m[2] && method === "POST") {
+      ws.deletedAt = null;
+      return json(200, this.workspaceResource(ws));
+    }
+    if (!m[2] && method === "DELETE") {
+      const list = this.workspaces.get(server)!;
+      list.splice(list.indexOf(ws), 1);
+      return { status: 204, headers: {}, body: "" };
+    }
+    return fail("method_not_allowed");
   }
 
   /** `listMembers`, `setMemberRole`, `removeMember` (capability `members`, ADR-0024), with the one-owner rule. */

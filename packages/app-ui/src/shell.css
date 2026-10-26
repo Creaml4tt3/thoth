@@ -185,6 +185,17 @@
 .join-invite { display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-4); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
 .join-sign-in { display: grid; gap: var(--thoth-space-2); }
 @media (max-width: 520px) { .member { flex-wrap: wrap; } .member-role { min-width: 0; flex: 1; } }
+/* Several workspaces (ADR-0025): New workspace, Recently deleted, and the count under a server's workspaces. */
+.ws-check { display: flex; align-items: flex-start; gap: 8px; min-height: 24px; font: var(--thoth-text-ui); cursor: pointer; }
+.ws-check input { margin: 3px 0 0; width: 16px; height: 16px; flex: none; accent-color: var(--thoth-accent); }
+.ws-check input:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.ws-check-hint { margin: -4px 0 0 24px; }
+.ws-usage { display: grid; gap: 2px; }
+.ws-usage[data-full] p:first-child { color: var(--thoth-ink-primary); }
+.ws-confirm-body { margin: 0; }
+.ws-deleted .btn { flex: none; }
+.ws-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 8px 4px 28px; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.ws-footer .sec-link { min-height: 24px; display: inline-flex; align-items: center; }
 
 /* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator.
    A tab is --thoth-tab-width wide when there is room (202px, three quarters of the 270px before it; `width` too, because

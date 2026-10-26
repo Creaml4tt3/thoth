@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
-import { PAGE_TITLE_MAX, roleCan, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
+import { PAGE_TITLE_MAX, WORKSPACE_NAME_MAX, roleCan, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
 import { useTreeDnd, type AcrossTarget, type DropZone, type TreeDnd } from "../order/dnd.ts";
 import { crossDirection, refusalText, spaceDropRefusal, workspaceAccess, type SpaceDrag } from "../order/space-drag.ts";
@@ -7,6 +7,7 @@ import { Disclosure, FolderIcon, PageIcon } from "../order/icons.tsx";
 import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
+import { RenameDialog } from "../order/RenameDialog.tsx";
 import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
@@ -21,6 +22,8 @@ import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
 import { MembersDialog } from "./MembersDialog.tsx";
 import { clearMembers, usePendingMembers } from "./members-request.ts";
+import { ConfirmByNameDialog } from "./ConfirmByNameDialog.tsx";
+import { announceWorkspaces, clearWorkspaceAdmin, usePendingWorkspaceAdmin } from "./workspace-admin-request.ts";
 
 /** The drop target for "no parent": the workspace row itself. */
 const TOP = "\u0000top";
@@ -202,6 +205,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const t = useStrings().workspace;
   const tt = useStrings().tree;
   const tm = useStrings().members;
+  const tw = useStrings().workspaces;
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const key = workspaceKey(server, workspace.id);
   const expanded = state.expanded.includes(key);
@@ -216,6 +220,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [moving, setMoving] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
+  /** ADR-0025: the owner's Rename… and Delete… of this workspace. */
+  const [admin, setAdmin] = useState<"rename" | "delete" | null>(null);
   const [rowMenu, setRowMenu] = useState<{ x: number; y: number } | null>(null);
   const rowButton = useRef<HTMLButtonElement>(null);
   const [said, setSaid] = useState("");
@@ -226,6 +232,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   // ADR-0024: every member sees the members; owners also manage them and, with `invite-links`, invite people.
   const canMembers = state.capabilities[server]?.includes("members") ?? false;
   const canInvite = state.capabilities[server]?.includes("invite-links") ?? false;
+  // ADR-0025: owners rename and delete the workspace, on a server that lists `workspace-management`.
+  const canAdminister = workspace.role === "owner" && (state.capabilities[server]?.includes("workspace-management") ?? false);
   const account = state.servers.find((s) => s.info.id === server)?.info;
   const nodes = tree?.nodes;
   /** The tree as it is now, also while a change is under way (the rendered `nodes` lag behind by a render). */
@@ -441,6 +449,14 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     if (canMembers) setMembersOpen(true);
   }, [membersRequest, canMembers]);
 
+  // "Rename workspace…" and "Delete workspace…" asked for from code (the command palette).
+  const adminRequest = usePendingWorkspaceAdmin(server, workspace.id);
+  useEffect(() => {
+    if (!adminRequest) return;
+    clearWorkspaceAdmin();
+    if (canAdminister) setAdmin(adminRequest.kind);
+  }, [adminRequest, canAdminister]);
+
   // "Move page up / down" asked for from code (the command palette): the same change as Alt+Shift+Up and Down.
   const reorderRequest = usePendingReorder(isThisWorkspaceReorder(server, workspace.id));
   useEffect(() => {
@@ -467,9 +483,15 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   // The workspace row takes drops ("to the top level") but is not itself draggable.
   const { draggable: _draggable, onDragStart: _onDragStart, ...topDrop } = dnd.rowProps(TOP);
   const movingNode = moving ? nodes?.find((n) => n.id === moving) : undefined;
-  /** The workspace row's own menu: Members… and, for writers, New page and New folder. */
+  /** The workspace row's own menu: Members…, for owners Rename… and Delete…, and for writers New page and New folder. */
   const rowItems: MenuItem[] = [
     ...(canMembers ? [{ id: "members", label: tm.menuItem, onSelect: () => setMembersOpen(true) }] : []),
+    ...(canAdminister
+      ? [
+          { id: "rename-workspace", label: tw.rename, hint: "F2", onSelect: () => setAdmin("rename") },
+          { id: "delete-workspace", label: tw.delete, onSelect: () => setAdmin("delete") },
+        ]
+      : []),
     ...(canWrite
       ? [
           { id: "new-page", label: t.newPage, onSelect: () => void create("page", null) },
@@ -483,6 +505,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       expanded,
       expand: () => directory.expand(server, workspace.id),
       collapse: () => directory.collapse(server, workspace.id),
+      ...(canAdminister ? { rename: () => setAdmin("rename") } : {}),
       ...(rowItems.length > 0 ? { menu: () => setRowMenu(anchorOf(event.currentTarget)) } : {}),
     });
 
@@ -599,6 +622,43 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             void directory.forgetWorkspace(server, workspace.id);
           }}
           onClose={() => setMembersOpen(false)}
+        />
+      )}
+      {admin === "rename" && canAdminister && (
+        <RenameDialog
+          name={workspace.name}
+          maxLength={WORKSPACE_NAME_MAX}
+          onRename={async (next) => {
+            try {
+              const renamed = await directory.renameWorkspace(server, workspace.id, next);
+              setSaid(tw.renamed(renamed.name));
+              focusTreeItemSoon(`${key}\n`);
+              return null;
+            } catch (error) {
+              return tw.renameFailed(error instanceof Error ? error.message : String(error));
+            }
+          }}
+          onClose={() => setAdmin(null)}
+        />
+      )}
+      {admin === "delete" && canAdminister && (
+        <ConfirmByNameDialog
+          title={tw.deleteTitle(workspace.name)}
+          body={tw.deleteBody(workspace.memberCount)}
+          name={workspace.name}
+          confirmLabel={tw.deleteConfirm}
+          busyLabel={tw.deleting}
+          onConfirm={async () => {
+            try {
+              const name = workspace.name;
+              await directory.deleteWorkspace(server, workspace.id);
+              announceWorkspaces(server, tw.deleted(name));
+              return null;
+            } catch (error) {
+              return tw.deleteFailed(error instanceof Error ? error.message : String(error));
+            }
+          }}
+          onClose={() => setAdmin(null)}
         />
       )}
       {sharing && canShare && <ShareDialog client={directory.client(server)} workspace={workspace.id} page={sharing} title={titleOf(sharing)} onClose={() => setSharing(null)} />}

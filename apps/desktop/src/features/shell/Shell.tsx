@@ -37,6 +37,7 @@ import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
+import { requestWorkspaceAdmin } from "@thoth/app-ui/workspace/workspace-admin-request.ts";
 import { requestNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -133,6 +134,8 @@ export function Shell() {
   const here = target.kind === "workspace" ? target : null;
   const hereWorkspace = here ? directory.servers.find((s) => s.info.id === here.server)?.workspaces?.find((w) => w.id === here.workspace) : undefined;
   const canWriteHere = hereWorkspace !== undefined && roleCan(hereWorkspace.role, "write");
+  // ADR-0025: New workspace goes to the open page's server, else to the first signed-in server that offers it.
+  const workspaceServer = [here?.server, ...directory.servers.map((s) => s.info.id)].find((id) => id !== undefined && servers.canManageWorkspaces(id) && servers.server(id)?.workspaces != null);
 
   /** A command runs once the palette (or whatever dialog it came from) has closed and given focus back. */
   const afterClose = useRef<(() => void) | null>(null);
@@ -212,6 +215,15 @@ export function Shell() {
         }
       : {}),
     ...(here && hereWorkspace && servers.canManageMembers(here.server) ? { members: { workspace: hereWorkspace.name, run: () => requestMembers({ server: here.server, workspace: here.workspace }) } } : {}),
+    ...(workspaceServer
+      ? { newWorkspace: () => requestWorkspaceAdmin({ kind: "new", server: workspaceServer }), deletedWorkspaces: () => requestWorkspaceAdmin({ kind: "deleted", server: workspaceServer }) }
+      : {}),
+    ...(here && hereWorkspace?.role === "owner" && servers.canManageWorkspaces(here.server)
+      ? {
+          renameWorkspace: { workspace: hereWorkspace.name, run: () => requestWorkspaceAdmin({ kind: "rename", server: here.server, workspace: here.workspace }) },
+          deleteWorkspace: { workspace: hereWorkspace.name, run: () => requestWorkspaceAdmin({ kind: "delete", server: here.server, workspace: here.workspace }) },
+        }
+      : {}),
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
     ...(assistant

@@ -282,3 +282,26 @@ describe("Members of … (ADR-0024)", () => {
     expect(log).toEqual(["members"]);
   });
 });
+
+describe("Workspaces (ADR-0025)", () => {
+  it("offers New workspace and Recently deleted where the server manages workspaces, and rename and delete for an owner", () => {
+    const { actions, log } = spies();
+    const none = buildCommands(actions, en, "web", "mac");
+    for (const id of ["workspace.new", "workspace.deleted", "workspace.rename", "workspace.delete"]) expect(find(none, id), id).toBeUndefined();
+    const run = (name: string) => vi.fn(() => void log.push(name));
+    const all: CommandActions = {
+      ...actions,
+      newWorkspace: run("newWorkspace"),
+      deletedWorkspaces: run("deletedWorkspaces"),
+      renameWorkspace: { workspace: "Design", run: run("renameWorkspace") },
+      deleteWorkspace: { workspace: "Design", run: run("deleteWorkspace") },
+    };
+    const list = buildCommands(all, en, "desktop", "mac");
+    expect(["workspace.new", "workspace.deleted", "workspace.rename", "workspace.delete"].map((id) => find(list, id)?.title)).toEqual(["New workspace…", "Recently deleted workspaces…", "Rename workspace Design…", "Delete workspace Design…"]);
+    for (const id of ["workspace.new", "workspace.deleted", "workspace.rename", "workspace.delete"]) find(list, id)!.run();
+    expect(log).toEqual(["newWorkspace", "deletedWorkspaces", "renameWorkspace", "deleteWorkspace"]);
+    expect(titles(filterCommands("> restore", list))).toContain("Recently deleted workspaces…");
+    expect(titles(filterCommands("> create workspace", list))).toContain("New workspace…");
+    expect(titles(buildCommands(all, th, "desktop", "mac"))).toEqual(expect.arrayContaining(["เวิร์กสเปซใหม่…", "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้…", "เปลี่ยนชื่อเวิร์กสเปซ Design…", "ลบเวิร์กสเปซ Design…"]));
+  });
+});

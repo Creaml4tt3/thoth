@@ -6,6 +6,8 @@ import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
+import { requestWorkspaceAdmin } from "@thoth/app-ui/workspace/workspace-admin-request.ts";
+import { ServerWorkspaceActions, ServerWorkspacesFooter } from "@thoth/app-ui/workspace/ServerWorkspaces.tsx";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { RenameDialog } from "@thoth/app-ui/order/RenameDialog.tsx";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -170,6 +172,16 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         }
       : {}),
     ...(current && here && hasCapability(capabilities, "members") ? { members: { workspace: here.name, run: () => requestMembers({ server: current.server, workspace: current.workspace }) } } : {}),
+    // ADR-0025: several workspaces per account.
+    ...(hasCapability(capabilities, "workspace-management") && workspaces !== null
+      ? { newWorkspace: () => requestWorkspaceAdmin({ kind: "new", server: SERVER_ID }), deletedWorkspaces: () => requestWorkspaceAdmin({ kind: "deleted", server: SERVER_ID }) }
+      : {}),
+    ...(current && here?.role === "owner" && hasCapability(capabilities, "workspace-management")
+      ? {
+          renameWorkspace: { workspace: here.name, run: () => requestWorkspaceAdmin({ kind: "rename", server: current.server, workspace: current.workspace }) },
+          deleteWorkspace: { workspace: here.name, run: () => requestWorkspaceAdmin({ kind: "delete", server: current.server, workspace: current.workspace }) },
+        }
+      : {}),
     theme: { current: theme, set: setTheme },
     openSettings,
     tabs: {
@@ -245,6 +257,11 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           <nav aria-label={t.web.pages} className="tree-wrap">
             <div className="sec">
               <span className="sec-name">{t.web.workspaces}</span>
+              {entry && (
+                <span className="sec-actions">
+                  <ServerWorkspaceActions directory={directory} server={SERVER_ID} serverLabel={entry.info.label} />
+                </span>
+              )}
             </div>
             {entry?.error ? (
               <p className="muted tree-empty">{entry.error}</p>
@@ -269,6 +286,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 ))}
               </TreeList>
             )}
+            {workspaces !== null && <ServerWorkspacesFooter directory={directory} server={SERVER_ID} />}
           </nav>
           <div className="web-account">
             <p className="server-caution">{t.web.caution}</p>

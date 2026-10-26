@@ -12,7 +12,7 @@
 import { newStableId } from "@thoth/domain";
 import type { ServerInfo, Servers } from "@thoth/platform";
 import { ProblemError, RevisionConflict, WorkspaceClient, type Send } from "@thoth/workspace-client";
-import { PAGE_TITLE_MAX, type ChangeEntry, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
+import { PAGE_TITLE_MAX, type ChangeEntry, type DeletedWorkspace, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { placeAt } from "../order/fractional.ts";
 import { folderMarkdown, isFolderMarkdown } from "./folders.ts";
 import { childrenOf, isWithin } from "./tree.ts";
@@ -52,6 +52,10 @@ export interface DirectoryState {
   expanded: string[];
   /** Capability IDs each server lists (`/capabilities`), by server. Missing until the server answered. */
   capabilities: Record<string, string[]>;
+  /** The limits each server advertises (`/capabilities` `limits`), by server. */
+  limits: Record<string, Record<string, number>>;
+  /** ADR-0025: the deleted workspaces the user can restore, by server (servers with `workspace-management`). */
+  deleted: Record<string, DeletedWorkspace[]>;
 }
 
 export interface WorkspacePageRef {
@@ -73,7 +77,7 @@ function kindsOf(nodes: readonly TreeNode[]): TreeState["kinds"] {
 const KIND_WORKERS = 4;
 
 export class ServerDirectory {
-  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {} };
+  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {}, limits: {}, deleted: {} };
   private readonly kindWork = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private readonly servers: Servers;
@@ -146,6 +150,75 @@ export class ServerDirectory {
   /** Does the server offer invite links (`invite-links`, ADR-0024)? */
   canInvite(server: string): boolean {
     return this.state.capabilities[server]?.includes("invite-links") ?? false;
+  }
+
+  /** Does the server let its users create, rename, delete and restore workspaces (`workspace-management`, ADR-0025)? */
+  canManageWorkspaces(server: string): boolean {
+    return this.state.capabilities[server]?.includes("workspace-management") ?? false;
+  }
+
+  /**
+   * How many workspaces the user owns on the server and how many it allows (`maxWorkspacesPerAccount`, absent when
+   * there is no limit). Deleted workspaces that can still be restored count, as the server counts them (ADR-0025).
+   */
+  ownership(server: string): { owned: number; deleted: number; limit: number | undefined } {
+    const live = this.server(server)?.workspaces?.filter((w) => w.role === "owner").length ?? 0;
+    const deleted = this.state.deleted[server]?.length ?? 0;
+    return { owned: live + deleted, deleted, limit: this.state.limits[server]?.["maxWorkspacesPerAccount"] };
+  }
+
+  /**
+   * Creates a workspace the user owns (ADR-0025), reads the list again and opens it in the sidebar. `idempotencyKey`
+   * stays the same for retries of one attempt, so a lost response never makes two workspaces.
+   */
+  async createWorkspace(server: string, input: { name: string; exportRestricted: boolean }, idempotencyKey: string): Promise<Workspace> {
+    const made = await this.client(server).createWorkspace(input, { idempotencyKey });
+    const entry = this.server(server);
+    if (entry?.workspaces && !entry.workspaces.some((w) => w.id === made.id)) this.patchServer(server, { workspaces: [...entry.workspaces, made] });
+    this.expand(server, made.id);
+    await this.loadWorkspaces(server);
+    return made;
+  }
+
+  /** Owners only. The sidebar shows the new name at once. */
+  async renameWorkspace(server: string, workspace: string, name: string): Promise<Workspace> {
+    const renamed = await this.client(server).renameWorkspace(workspace, name);
+    const entry = this.server(server);
+    if (entry?.workspaces) this.patchServer(server, { workspaces: entry.workspaces.map((w) => (w.id === renamed.id ? renamed : w)) });
+    return renamed;
+  }
+
+  /** Owners only. It leaves the sidebar at once and shows in Recently deleted. */
+  async deleteWorkspace(server: string, workspace: string): Promise<void> {
+    await this.client(server).deleteWorkspace(workspace);
+    await this.forgetWorkspace(server, workspace);
+  }
+
+  /** Brings a deleted workspace back into the sidebar, opened. */
+  async restoreWorkspace(server: string, workspace: string): Promise<Workspace> {
+    const restored = await this.client(server).restoreWorkspace(workspace);
+    this.set({ deleted: { ...this.state.deleted, [server]: (this.state.deleted[server] ?? []).filter((w) => w.id !== workspace) } });
+    this.expand(server, restored.id);
+    await this.loadWorkspaces(server);
+    return restored;
+  }
+
+  /** Deletes a deleted workspace for good; it stops counting toward the user's workspaces. */
+  async purgeWorkspace(server: string, workspace: string): Promise<void> {
+    await this.client(server).purgeWorkspace(workspace);
+    this.set({ deleted: { ...this.state.deleted, [server]: (this.state.deleted[server] ?? []).filter((w) => w.id !== workspace) } });
+    await this.loadDeleted(server);
+  }
+
+  /** Reads the server's restorable deleted workspaces again (nothing when it lacks `workspace-management`). */
+  async loadDeleted(server: string): Promise<void> {
+    if (!this.canManageWorkspaces(server)) return;
+    try {
+      const deleted = await this.client(server).listDeletedWorkspaces();
+      this.set({ deleted: { ...this.state.deleted, [server]: deleted } });
+    } catch {
+      // kept as it was; read again with the workspaces
+    }
   }
 
   /** The known server at this origin (`ServerInfo.url` is the normalized origin). */
@@ -248,6 +321,7 @@ export class ServerDirectory {
       const [workspaces] = await Promise.all([this.client(server).listWorkspaces(), this.loadCapabilities(server)]);
       if (this.server(server)?.info.auth === "signed-out") return;
       this.patchServer(server, { workspaces, error: null });
+      await this.loadDeleted(server);
     } catch (error) {
       if (error instanceof ProblemError && error.status === 401) return; // shown as signed out
       this.patchServer(server, { error: message(error) });
@@ -258,8 +332,9 @@ export class ServerDirectory {
   private async loadCapabilities(server: string): Promise<void> {
     if (this.state.capabilities[server]) return;
     try {
-      const { capabilities } = await this.client(server).getCapabilities();
-      this.set({ capabilities: { ...this.state.capabilities, [server]: [...capabilities] } });
+      const { capabilities, limits } = await this.client(server).getCapabilities();
+      const numbers = Object.fromEntries(Object.entries(limits ?? {}).filter((e): e is [string, number] => typeof e[1] === "number"));
+      this.set({ capabilities: { ...this.state.capabilities, [server]: [...capabilities] }, limits: { ...this.state.limits, [server]: numbers } });
     } catch {
       // retried the next time the workspaces load
     }
@@ -277,7 +352,9 @@ export class ServerDirectory {
     this.dropTrees(server);
     this.clients.delete(server);
     const { [server]: _gone, ...capabilities } = this.state.capabilities;
-    this.set({ servers: this.state.servers.filter((s) => s.info.id !== server), capabilities });
+    const { [server]: _noLimits, ...limits } = this.state.limits;
+    const { [server]: _noDeleted, ...deleted } = this.state.deleted;
+    this.set({ servers: this.state.servers.filter((s) => s.info.id !== server), capabilities, limits, deleted });
   }
 
   private async signedIn(info: ServerInfo): Promise<ServerInfo> {

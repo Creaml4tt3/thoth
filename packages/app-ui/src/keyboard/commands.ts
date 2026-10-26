@@ -39,6 +39,13 @@ export interface CommandActions {
   sharePage?(): void;
   /** The members of the open page's workspace (ADR-0024), on a server with `members`, named for the menu. */
   members?: { workspace: string; run(): void };
+  /** A new workspace on a server with `workspace-management` (ADR-0025). */
+  newWorkspace?(): void;
+  /** The deleted workspaces the user can restore (ADR-0025). */
+  deletedWorkspaces?(): void;
+  /** Rename or delete the open page's workspace: owners, on a server with `workspace-management`, named for the menu. */
+  renameWorkspace?: { workspace: string; run(): void };
+  deleteWorkspace?: { workspace: string; run(): void };
   reorder?(delta: -1 | 1): void;
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
@@ -85,6 +92,10 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.moveTo) add("page.moveTo", t.moveTo, a.moveTo, { keywords: "folder nest" });
   if (a.sharePage) add("page.share", t.share, a.sharePage, { keywords: "public link publish url read-only" });
   if (a.members) add("workspace.members", t.members(a.members.workspace), a.members.run, { keywords: "people invite invitation share team role owner editor viewer leave remove" });
+  if (a.newWorkspace) add("workspace.new", t.newWorkspace, a.newWorkspace, { keywords: "create add team space" });
+  if (a.deletedWorkspaces) add("workspace.deleted", t.deletedWorkspaces, a.deletedWorkspaces, { keywords: "restore trash bin undo recover permanently" });
+  if (a.renameWorkspace) add("workspace.rename", t.renameWorkspace(a.renameWorkspace.workspace), a.renameWorkspace.run, { keywords: "name title" });
+  if (a.deleteWorkspace) add("workspace.delete", t.deleteWorkspace(a.deleteWorkspace.workspace), a.deleteWorkspace.run, { keywords: "remove trash" });
   if (a.reorder) {
     const reorder = a.reorder;
     // The table writes both keys as "Alt+Shift+↑ / ↓"; each command shows its own.

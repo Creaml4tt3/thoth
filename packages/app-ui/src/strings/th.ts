@@ -137,7 +137,7 @@ export const th: Strings = {
     newPageTitle: "ไม่มีชื่อ",
     creating: "กำลังสร้าง…",
     noAccessTitle: "คุณไม่มีสิทธิ์เข้าถึงเวิร์กสเปซนี้แล้ว",
-    noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ หรือเจ้าของนำคุณออก ขอลิงก์เชิญใหม่จากเจ้าของเพื่อกลับเข้ามา", // REVIEW
+    noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ เจ้าของนำคุณออก หรือเวิร์กสเปซถูกลบ เจ้าของกู้คืนเวิร์กสเปซที่ลบได้ภายใน 30 วัน หรือส่งลิงก์เชิญใหม่ให้คุณ", // REVIEW
   },
 
   tree: {
@@ -280,6 +280,62 @@ export const th: Strings = {
     done: "เสร็จ",
   },
 
+  workspaces: {
+    newWorkspace: "เวิร์กสเปซใหม่…",
+    newOn: (server) => `เวิร์กสเปซใหม่บน ${server}`,
+    newTitle: "เวิร์กสเปซใหม่",
+    newIntro: "คุณจะเป็นเจ้าของ เชิญคนอื่นได้จาก “สมาชิก…” หลังจากสร้างแล้ว", // REVIEW
+    name: "ชื่อ",
+    empty: "ตั้งชื่อก่อน",
+    restrict: "ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกจากเวิร์กสเปซนี้", // REVIEW
+    restrictHint: "สมาชิกจะคัดลอกหรือย้ายหน้าไปยังพื้นที่ส่วนตัวไม่ได้ และเปลี่ยนการตั้งค่านี้ภายหลังไม่ได้", // REVIEW
+    count: (owned, limit) => `คุณเป็นเจ้าของ ${count(owned)} จาก ${count(limit)} เวิร์กสเปซที่เซิร์ฟเวอร์นี้อนุญาต`, // REVIEW
+    countDeleted: (deleted) => `นับรวมเวิร์กสเปซที่เพิ่งลบ ${count(deleted)} รายการ ซึ่งยังนับอยู่จนกว่าจะลบถาวร`, // REVIEW
+    atLimit: (limit) => `คุณเป็นเจ้าของครบ ${count(limit)} เวิร์กสเปซแล้ว ซึ่งเป็นจำนวนสูงสุดที่เซิร์ฟเวอร์นี้อนุญาต ลบเวิร์กสเปซหนึ่ง หรือลบถาวรจาก “ที่ลบไปเร็ว ๆ นี้” เพื่อเพิ่มที่ว่าง`, // REVIEW
+    usage: (owned, limit) => `${count(owned)} จาก ${count(limit)} เวิร์กสเปซ`,
+    tooManyToday: "วันนี้คุณสร้างเวิร์กสเปซครบตามที่เซิร์ฟเวอร์นี้อนุญาตแล้ว ลองใหม่พรุ่งนี้", // REVIEW
+    create: "สร้างเวิร์กสเปซ",
+    creating: "กำลังสร้าง…",
+    created: (name) => `สร้าง ${name} แล้ว`,
+    createFailed: (detail) => `สร้างเวิร์กสเปซไม่ได้: ${detail}`,
+    cancel: "ยกเลิก",
+    rename: "เปลี่ยนชื่อ…",
+    renameLabel: (name) => `เปลี่ยนชื่อ ${name}`,
+    renamed: (name) => `เปลี่ยนชื่อเป็น ${name} แล้ว`,
+    renameFailed: (detail) => `เปลี่ยนชื่อเวิร์กสเปซไม่ได้: ${detail}`,
+    delete: "ลบ…",
+    deleteTitle: (name) => `ลบ “${name}” ไหม`,
+    deleteBody: (people) =>
+      `${people === 1 ? "คุณ" : `สมาชิกทั้ง ${count(people)} คน`}จะเข้าถึงไม่ได้ทันที และลิงก์แชร์กับลิงก์เชิญจะใช้ไม่ได้อีกเลย ภายใน 30 วัน เจ้าของกู้คืนเวิร์กสเปซพร้อมหน้าและสมาชิกได้จาก “ที่ลบไปเร็ว ๆ นี้” หลังจากนั้นจะถูกลบถาวร`, // REVIEW
+    typeToConfirm: (name) => `พิมพ์ชื่อเวิร์กสเปซเพื่อยืนยัน: ${name}`, // REVIEW
+    mismatch: "ชื่อไม่ตรงกัน",
+    deleteConfirm: "ลบเวิร์กสเปซ",
+    deleting: "กำลังลบ…",
+    deleted: (name) => `ลบ ${name} แล้ว กู้คืนได้ภายใน 30 วันจาก “ที่ลบไปเร็ว ๆ นี้”`, // REVIEW
+    deleteFailed: (detail) => `ลบเวิร์กสเปซไม่ได้: ${detail}`,
+    recentlyDeleted: "ที่ลบไปเร็ว ๆ นี้…", // REVIEW
+    recentlyDeletedCount: (n) => `ที่ลบไปเร็ว ๆ นี้ (${count(n)})`, // REVIEW
+    recentlyDeletedOn: (server) => `ที่ลบไปเร็ว ๆ นี้บน ${server}`, // REVIEW
+    deletedTitle: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้", // REVIEW
+    deletedIntro: "เวิร์กสเปซที่คุณหรือเจ้าของคนอื่นลบในช่วง 30 วันที่ผ่านมา การกู้คืนจะนำหน้าและสมาชิกกลับมา แต่ลิงก์แชร์และลิงก์เชิญเดิมยังใช้ไม่ได้", // REVIEW
+    loadingDeleted: "กำลังโหลด…",
+    noneDeleted: "ไม่มีเวิร์กสเปซที่ถูกลบในช่วง 30 วันที่ผ่านมา",
+    deletedLine: (deleted, until) => `ลบเมื่อ ${deleted} · กู้คืนได้ถึง ${until}`,
+    restore: "กู้คืน",
+    restoreLabel: (name) => `กู้คืน ${name}`,
+    restored: (name) => `กู้คืน ${name} แล้ว`,
+    restoreFailed: (detail) => `กู้คืนเวิร์กสเปซไม่ได้: ${detail}`,
+    purge: "ลบถาวร…",
+    purgeLabel: (name) => `ลบ ${name} ถาวร`,
+    purgeTitle: (name) => `ลบ “${name}” ถาวรไหม`,
+    purgeBody: "หน้า ประวัติของหน้า และไฟล์แนบจะถูกลบทันที และจะไม่นับรวมในเวิร์กสเปซของคุณอีก ย้อนกลับไม่ได้", // REVIEW
+    purgeConfirm: "ลบถาวร",
+    purged: (name) => `ลบ ${name} ถาวรแล้ว`,
+    purgeFailed: (detail) => `ลบเวิร์กสเปซถาวรไม่ได้: ${detail}`,
+    loadDeletedFailed: (detail) => `โหลดเวิร์กสเปซที่ถูกลบไม่ได้: ${detail}`,
+    done: "เสร็จ",
+  },
+
   join: {
     title: "เข้าร่วมด้วยลิงก์เชิญ",
     intro: "วางลิงก์เชิญที่มีคนส่งให้ Thoth จะเพิ่มเซิร์ฟเวอร์ให้ถ้ายังไม่มี ขอให้คุณลงชื่อเข้าใช้ แล้วเข้าร่วมเวิร์กสเปซ", // REVIEW
@@ -338,6 +394,10 @@ export const th: Strings = {
       moveDown: "ย้ายหน้าลง",
       share: "แชร์หน้า…",
       members: (workspace) => `สมาชิกของ ${workspace}…`,
+      newWorkspace: "เวิร์กสเปซใหม่…",
+      deletedWorkspaces: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้…", // REVIEW
+      renameWorkspace: (workspace) => `เปลี่ยนชื่อเวิร์กสเปซ ${workspace}…`,
+      deleteWorkspace: (workspace) => `ลบเวิร์กสเปซ ${workspace}…`,
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
       ask: "ถาม Thoth",
