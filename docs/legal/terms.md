@@ -10,7 +10,7 @@
 > `/th/terms/`, without this block and without HTML comments.
 <!-- repo-only:end -->
 
-Last updated: 24 October 2026
+Last updated: 26 October 2026
 
 1. **What this is.** The Thoth website at `thoth.creaml4tt3.me`, the web
    version at `thoth.creaml4tt3.me/app`, and the Thoth demo server at
@@ -25,9 +25,11 @@ Last updated: 24 October 2026
    without warranty of any kind. It may be slow, unavailable, reset or shut
    down at any time, with or without notice. Keep your own copy of anything
    you care about: the desktop app's Private Space is the right place for it.
-4. **Limits.** Each account may own 1 workspace. Each workspace may have up to
-   10 members, 200 pages and 20 MB of attachments (4 MB per file). Earlier
-   page versions are kept for 30 days. Accounts unused for 90 days are
+4. **Limits.** Each account may own up to 3 workspaces. A workspace you delete
+   can be restored for 30 days and still counts toward your 3 until it is
+   deleted permanently; after 30 days it is deleted permanently. Each workspace
+   may have up to 10 members, 200 pages and 20 MB of attachments (4 MB per
+   file). Earlier page versions are kept for 30 days. Accounts unused for 90 days are
    deleted. Current limits are shown in the app, and limits may change.
 5. **Acceptable use.** Do not use the service to:
    - break the law, including Thailand's Computer Crime Act;
@@ -38,9 +40,11 @@ Last updated: 24 October 2026
    - probe or attack the service or other users;
    - get around limits, for example by creating many accounts.
 6. **Your content.** You keep all rights to your content. You give the
-   operator only the permission needed to store, copy and show it to you and
-   the members of your workspaces, in order to run the service. You are
-   responsible for the content you put on the service.
+   operator only the permission needed to store, copy and show it to you, to
+   the members of your workspaces, and to anyone who opens a public share link
+   you or another member created, in order to run the service. You are
+   responsible for the content you put on the service, and for whom you invite
+   or give a share link to.
 7. **Suspension.** The operator may suspend or delete accounts or content that
    break these terms, or when needed to protect the service or its users.
 8. **Reporting abuse.** Report abuse or illegal content to
