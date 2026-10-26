@@ -125,13 +125,15 @@ The owner approved rules 1 to 5 on 2026-10-25. Rules 6 to 8 are how they are bui
 - ADR-0014: trial limits.
 - docs/protocol/README.md section 10.
 
+## Settled after acceptance
+
+- **Export-restricted workspaces** (confirmed by the owner, 2026-10-26). Creating a link in a workspace with
+  ADR-0009's export restriction is refused (403 `export_restricted`), and existing links stop working if the
+  restriction is switched on later. A public link takes content out of the workspace, which the restriction forbids.
+
 ## Open questions
 
-1. **Export-restricted workspaces.** The implementation refuses to create a link in a workspace with ADR-0009's
-   export restriction (403 `export_restricted`), and links stop working if the restriction is switched on later. The
-   reason is that a public link takes content out of the workspace. The owner's rules do not mention this case.
-   Confirm it, or allow links there.
-2. **Language of the page chrome.** The words around the content ("Shared page · read-only", "Pages inside", the 404
+1. **Language of the page chrome.** The words around the content ("Shared page · read-only", "Pages inside", the 404
    text) are English only. Choosing a language by `Accept-Language` is open.
-3. **Retention of revoked and expired links.** They are kept, as a record of what was public. Whether maintenance
+2. **Retention of revoked and expired links.** They are kept, as a record of what was public. Whether maintenance
    should remove them, and after how long, is open.

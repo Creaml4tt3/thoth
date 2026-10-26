@@ -1,6 +1,6 @@
 # ADR-0020: Links from pasted URLs and link previews
 
-- **Status:** Proposed
+- **Status:** Accepted (owner, 2026-10-26)
 - **Date:** 2026-10-26
 - **Deciders:** project owner (the request, 2026-10-25, implementation plan Track 6); rules 1 to 6 were decided by
   the orchestrator for the owner. The details marked "(this ADR)" were decided while implementing them.

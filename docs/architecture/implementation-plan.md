@@ -968,8 +968,8 @@ AC:
    other (the vault watcher and compare-and-swap writes already cover two writers).
 3. Web client: reorder only (a browser window per tab is the browser's job).
 
-Status (2026-10-25): AC 1–3 implemented on branch `tab-drag-reorder-new-window`, ADR-0019 **Proposed** (owner to
-accept).
+Status (2026-10-25): AC 1–3 implemented on branch `tab-drag-reorder-new-window`, ADR-0019 **Accepted** by the owner
+on 2026-10-26.
 
 - **Reorder.** Pointer drag in the tab bar (`packages/app-ui/src/tabs/drag.ts`), with an accent line, a picture of
   the tab at the pointer, auto-scroll and a FLIP slide on drop. The slide is transform only and does not run under

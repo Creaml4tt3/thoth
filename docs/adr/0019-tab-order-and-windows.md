@@ -1,6 +1,6 @@
 # ADR-0019: Tab order and windows
 
-- **Status:** Proposed
+- **Status:** Accepted (owner, 2026-10-26)
 - **Date:** 2026-10-25
 - **Deciders:** project owner (to accept)
 - **Refines:** ADR-0016 rule 5 (tabs). Builds on ADR-0001 (compare-and-swap writes, the journal), ADR-0007 (agent
