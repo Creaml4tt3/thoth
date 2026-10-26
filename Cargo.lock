@@ -4089,7 +4089,7 @@ dependencies = [
 
 [[package]]
 name = "thoth-desktop"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "keyring",
  "serde",

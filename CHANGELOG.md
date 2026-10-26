@@ -8,13 +8,14 @@ The website’s changelog page (https://thoth.creaml4tt3.me/changelog/) and each
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-26
 
 ### Added
 
 - Codex as a second assistant next to Claude Code. It runs inside Codex’s own sandbox and has no spending limit.
 - The Thoth mascot and its prompt bubble (Cmd/Ctrl+J) start assistant runs, with the pages you picked as context.
 - A run’s answer appears in the bubble and in the run’s own tab, with Copy answer; the sidebar lists recent runs.
+- Ask a follow-up: a run’s tab is a conversation, and each new question is sent with the earlier questions and answers.
 - Notifications: a bell with a list in the app, and system notifications while Thoth is in the background.
 - Drag a tab to reorder it, or out of the tab bar to open it in a new window on the same Private Space.
 - Pasting a web address makes a link, and links can show a preview card fetched by the app.
@@ -25,6 +26,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Several workspaces per account: create, rename and delete them, and restore a deleted one for 30 days. The trial allows 3 per account.
 - Drag pages between the Private Space and a workspace to open the copy and move dialog.
 - The sidebar can be resized, and its sections can be reordered and folded. A section’s drag handle shows only while you hover over its header.
+- Favorites: star a page to keep it in the sidebar’s Favorites section, in the Private Space and in workspaces.
+- Pinned tabs stay at the start of the tab bar, compact, and are not closed by Cmd/Ctrl+W.
+- Add an image to a page from the / menu, by pasting or by dropping a file; it is copied next to the page. Its alt text can be edited.
 
 ### Changed
 
@@ -38,6 +42,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The window no longer scrolls as a whole; only the page area scrolls.
 - Closing one window no longer closes the others.
 - An unknown share link no longer logs a server error behind its “not found” page.
+- Images in pages show, including SVG files and the images of imported pages; a missing image names its file, and web images show as a link.
+- The mascot’s bubble no longer cuts off the start of a long question or answer.
+- An assistant’s answer names your pages by their paths in the Private Space, not by the run’s private copy.
 
 ## [0.1.3] - 2026-10-25
 
@@ -95,7 +102,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thoth.creaml4tt3.me/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...HEAD
+[0.2.0]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/Creaml4tt3/thoth/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Creaml4tt3/thoth/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Creaml4tt3/thoth/compare/v0.1.0...v0.1.1
