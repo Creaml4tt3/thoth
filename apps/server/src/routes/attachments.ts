@@ -8,6 +8,7 @@ import { ApiError, fieldError, jsonReply, zodFailure } from "../errors.ts";
 import { bodyOf, headerOf, mutate, principalOf } from "../http.ts";
 import { checkStorableText, sha256Hex } from "../pages.ts";
 import { assertAttachmentFits } from "../quota.ts";
+import { holdBlobsShared } from "../blob.ts";
 
 const MIME = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/;
 
@@ -56,6 +57,8 @@ export function registerAttachmentRoutes(app: FastifyInstance, deps: Deps): void
         await assertAttachmentFits(tx, config, ws.id, sha256Hex(bytes), bytes.length);
         // Content-addressed and idempotent. The Postgres store joins `tx` (rollback removes the blob too); if the
         // transaction rolls back the filesystem store leaves an unreferenced, harmless blob (README, deviation 8).
+        // ADR-0025: held until this row commits, so purging another workspace cannot remove bytes this upload reuses.
+        await holdBlobsShared(tx);
         const stored = await blobs.put(bytes, tx);
         const id = newStableId();
         const { rows } = await tx.query<AttachmentRow>(

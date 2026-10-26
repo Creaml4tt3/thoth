@@ -18,6 +18,35 @@ export interface BlobStore {
   /** `null` when the hash is unknown. */
   open(hash: string): Promise<{ stream: Readable; size: number } | null>;
   has(hash: string): Promise<boolean>;
+  /**
+   * Removes the bytes of `hash` (nothing happens when they are not stored). Only `releaseBlobs` calls this, under the
+   * blob lock and after checking that no attachment row names the hash (ADR-0025: purging a workspace).
+   */
+  remove(hash: string, tx?: Queryable): Promise<void>;
+}
+
+/**
+ * The lock that keeps a blob from being removed while an upload that reuses it is in flight. An upload holds it shared
+ * (from before `put` until its attachment row commits), `releaseBlobs` holds it exclusively. Advisory-lock key space as
+ * in quota.ts; nothing takes another lock after this one.
+ */
+export const BLOB_LOCK = "blob-gc";
+export const holdBlobsShared = (tx: Queryable) => tx.query("SELECT pg_advisory_xact_lock_shared(hashtextextended($1, 1))", [BLOB_LOCK]);
+
+/**
+ * Removes the stored bytes of each hash that no attachment row names any more (after a workspace was purged). Runs in
+ * its own transaction under the exclusive blob lock, so an upload of the same bytes either committed its attachment
+ * row before (the blob is kept) or stores the bytes again after (the blob is written anew). Returns how many were removed.
+ */
+export async function releaseBlobs(db: { tx<T>(fn: (tx: Queryable) => Promise<T>): Promise<T> }, blobs: BlobStore, hashes: readonly string[]): Promise<number> {
+  const candidates = [...new Set(hashes)].filter((h) => HASH.test(h));
+  if (candidates.length === 0) return 0;
+  return db.tx(async (tx) => {
+    await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))", [BLOB_LOCK]);
+    const { rows } = await tx.query<{ hash: string }>("SELECT h AS hash FROM unnest($1::text[]) AS h WHERE NOT EXISTS (SELECT 1 FROM attachments a WHERE a.hash = h)", [candidates]);
+    for (const { hash } of rows) await blobs.remove(hash, tx);
+    return rows.length;
+  });
 }
 
 const HASH = /^[0-9a-f]{64}$/;
@@ -79,6 +108,12 @@ export class FsBlobStore implements BlobStore {
       throw error;
     }
   }
+
+  async remove(hash: string, _tx?: Queryable): Promise<void> {
+    await unlink(this.#pathFor(hash).file).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
 }
 
 /**
@@ -112,5 +147,10 @@ export class PgBlobStore implements BlobStore {
   async has(hash: string): Promise<boolean> {
     if (!HASH.test(hash)) throw new Error("invalid blob hash");
     return ((await this.#db.query("SELECT 1 FROM blobs WHERE hash = $1", [hash])).rowCount ?? 0) > 0;
+  }
+
+  async remove(hash: string, tx?: Queryable): Promise<void> {
+    if (!HASH.test(hash)) throw new Error("invalid blob hash");
+    await (tx ?? this.#db).query("DELETE FROM blobs WHERE hash = $1", [hash]);
   }
 }

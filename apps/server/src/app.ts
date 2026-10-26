@@ -13,6 +13,7 @@ import { registerEventRoutes } from "./routes/events.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
 import { registerShareRoutes } from "./routes/shares.ts";
 import { registerMemberRoutes } from "./routes/members.ts";
+import { registerWorkspaceRoutes } from "./routes/workspaces.ts";
 import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
 import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
@@ -77,6 +78,11 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
   { capability: "members", test: (_m, p) => /^\/workspaces\/[^/]+\/members(\/[^/]+)?$/.test(p) },
   { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },
+  // ADR-0025. `GET /workspaces` is a core route and stays open.
+  {
+    capability: "workspace-management",
+    test: (m, p) => (m === "POST" && p === "/workspaces") || /^\/workspaces\/[^/]+\/name$/.test(p) || (m === "DELETE" && /^\/workspaces\/[^/]+$/.test(p)) || /^\/deleted-workspaces(\/[^/]+(\/restore)?)?$/.test(p),
+  },
 ];
 
 /** A share or invite token in a request path is a credential: it never reaches a log line (ADR-0023, ADR-0024). */
@@ -200,6 +206,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerTransferRoutes(app, deps);
   registerShareRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerWorkspaceRoutes(app, deps);
   const invitePages = registerInvitePages(app, deps);
   registerMaintenanceRoutes(app, deps);
   invitePages.useBroker(registerSignInRoutes(app, deps, { inviteSignedIn: invitePages.signedIn }));

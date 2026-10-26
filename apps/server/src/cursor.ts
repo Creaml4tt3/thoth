@@ -5,7 +5,7 @@ import { ApiError } from "./errors.ts";
  * collection, the scope (workspace, page, query digest) to one instance of it. Cursors carry only
  * a position, never authorization; every request is re-authorized.
  */
-export type CursorKind = "w" | "t" | "r" | "c" | "s" | "l" | "m" | "i";
+export type CursorKind = "w" | "t" | "r" | "c" | "s" | "l" | "m" | "i" | "d";
 
 export function encodeCursor(kind: CursorKind, scope: string, value: string): string {
   return kind + Buffer.from(`${scope}|${value}`, "utf8").toString("base64url");

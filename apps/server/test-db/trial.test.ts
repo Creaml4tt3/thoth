@@ -24,7 +24,7 @@ describe("EVENTS=off", () => {
       expect(env.server.deps.hub).toBeNull();
       expect(await listeners(env)).toBe(0);
       const caps = (await env.api(null, "GET", "/capabilities")).json;
-      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
+      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"]);
       const events = await env.api(who, "GET", `/workspaces/${ws}/events`);
       expect([events.status, events.json.code]).toEqual([501, "capability_not_supported"]);
       expect(events.headers.get("content-type")).toContain("application/problem+json");
@@ -422,7 +422,7 @@ describe("maintenance", () => {
     }
     const ok = await callCron(`Bearer ${secret}`);
     expect(ok.status).toBe(200);
-    expect(Object.keys(ok.json).sort()).toEqual(["idempotencyRecordsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted"]);
+    expect(Object.keys(ok.json).sort()).toEqual(["idempotencyRecordsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted", "workspacesPurged"]);
     expect((await fetch(`${env.url}/internal/maintenance`, { method: "POST", headers: { authorization: `Bearer ${secret}` } })).status).toBe(405);
     await env.restart({ logStream }); // startup logs too
     responses.push(JSON.stringify(await callCron(`Bearer ${secret}`)));
@@ -512,10 +512,12 @@ describe("CLI", () => {
     const userId = ok.stdout.trim();
     const first = await cli(["create-workspace", "--name", "One", "--owner", userId], { THOTH_PROFILE: "trial" });
     expect(first.code).toBe(0);
-    const second = await cli(["create-workspace", "--name", "Two", "--owner", userId], { THOTH_PROFILE: "trial" });
-    expect(second.code).toBe(2);
-    expect(second.stderr).toMatch(/at most 1 workspace/);
-    expect(await num(env, "SELECT count(*) AS n FROM workspaces WHERE name IN ('One','Two')")).toBe(1);
+    // ADR-0025: the trial lets an account own 3.
+    for (const name of ["Two", "Three"]) expect((await cli(["create-workspace", "--name", name, "--owner", userId], { THOTH_PROFILE: "trial" })).code, name).toBe(0);
+    const fourth = await cli(["create-workspace", "--name", "Four", "--owner", userId], { THOTH_PROFILE: "trial" });
+    expect(fourth.code).toBe(2);
+    expect(fourth.stderr).toMatch(/at most 3 workspaces/);
+    expect(await num(env, "SELECT count(*) AS n FROM workspaces WHERE name IN ('One','Two','Three','Four')")).toBe(3);
     const wsId = first.stdout.trim();
     const member = async (n: number) => {
       const u = (await cli(["create-user", "--name", `m${n}`])).stdout.trim();

@@ -3,6 +3,8 @@ import type { Database } from "./db.ts";
 import { purgeIdempotencyRecords } from "./idempotency.ts";
 import { purgeRateLimits } from "./ratelimit.ts";
 import { purgeSignIn } from "./signin/sessions.ts";
+import type { BlobStore } from "./blob.ts";
+import { purgeExpiredWorkspaces } from "./workspaces.ts";
 
 export interface MaintenanceResult {
   revisionsPruned: number;
@@ -10,6 +12,8 @@ export interface MaintenanceResult {
   rateLimitRowsDeleted: number;
   /** Expired auth requests, codes, refresh and session access tokens, finished sessions, old sign-up counters, expired invite join tickets. */
   signInRowsDeleted: number;
+  /** Workspaces deleted more than 30 days ago, purged with their pages, revisions and attachments (ADR-0025). */
+  workspacesPurged: number;
 }
 
 /**
@@ -41,8 +45,10 @@ export async function pruneRevisions(db: Database, retentionDays: number): Promi
 }
 
 /** Everything periodic, safe to run on any instance at any time and to run concurrently. */
-export async function runMaintenance(db: Database, options: { revisionRetentionDays: number | undefined }): Promise<MaintenanceResult> {
+export async function runMaintenance(db: Database, options: { revisionRetentionDays: number | undefined; blobs: BlobStore }): Promise<MaintenanceResult> {
   return {
+    // First, so the revisions of a purged workspace are not pruned one by one.
+    workspacesPurged: await purgeExpiredWorkspaces(db, options.blobs),
     revisionsPruned: options.revisionRetentionDays === undefined ? 0 : await pruneRevisions(db, options.revisionRetentionDays),
     idempotencyRecordsDeleted: await purgeIdempotencyRecords(db),
     rateLimitRowsDeleted: await purgeRateLimits(db),

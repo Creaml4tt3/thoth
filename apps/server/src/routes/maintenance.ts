@@ -15,7 +15,7 @@ export function registerMaintenanceRoutes(app: FastifyInstance, deps: Deps): voi
   if (secret === undefined) return;
   app.get("/internal/maintenance", async (request, reply) => {
     if (!bearerMatches(request.headers.authorization, secret)) throw new ApiError("unauthenticated", "a valid bearer credential is required");
-    const result = await runMaintenance(deps.db, { revisionRetentionDays: deps.config.revisionRetentionDays });
+    const result = await runMaintenance(deps.db, { revisionRetentionDays: deps.config.revisionRetentionDays, blobs: deps.blobs });
     return send(reply, jsonReply(200, result));
   });
 }

@@ -20,6 +20,7 @@ import { ConfigError, loadConfig } from "./config.ts";
 import { createDatabase } from "./db.ts";
 import { ApiError } from "./errors.ts";
 import { runMaintenance } from "./maintenance.ts";
+import { FsBlobStore, PgBlobStore } from "./blob.ts";
 import { migrate } from "./migrate.ts";
 
 const USAGE = `Usage: node src/cli.ts <command> [options]   (DATABASE_URL must be set)
@@ -35,8 +36,9 @@ Commands:
   create-token --user <id> --out <file> [--label <text>] [--expires-days <n>]
                                                             writes the token to <file> (mode 0600); prints the token ID
   revoke-token --token-id <id>
-  maintenance                                               prune old revisions (REVISION_RETENTION_DAYS), expired idempotency
-                                                            records, rate-limit rows and sign-in rows; prints what was removed
+  maintenance                                               purge workspaces deleted more than 30 days ago, prune old revisions
+                                                            (REVISION_RETENTION_DAYS), expired idempotency records, rate-limit
+                                                            rows and sign-in rows; prints what was removed
 
 create-user, create-workspace and add-member enforce the quotas of the environment (THOTH_PROFILE, MAX_*).
 create-workspace takes --owner <user id> to make that user the owner (and count it against MAX_WORKSPACES_PER_ACCOUNT).
@@ -108,7 +110,8 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "maintenance": {
-        const result = await runMaintenance(db, { revisionRetentionDays: config.revisionRetentionDays });
+        const blobs = config.blobStore === "postgres" ? new PgBlobStore(db) : new FsBlobStore(config.blobDir);
+        const result = await runMaintenance(db, { revisionRetentionDays: config.revisionRetentionDays, blobs });
         console.log(JSON.stringify(result));
         return 0;
       }

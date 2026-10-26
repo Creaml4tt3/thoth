@@ -14,14 +14,14 @@ export interface ActiveShareLink {
 
 /**
  * The link for a token hash, if it may be served now: not revoked, not expired, its page not deleted (a page moved
- * out of the workspace is deleted there), its creator still an owner or editor, and the workspace not export
- * restricted. One statement of one shape whatever the outcome, so an unknown token and a dead one cost the same.
+ * out of the workspace is deleted there), its creator still an owner or editor, and the workspace neither export
+ * restricted nor deleted (ADR-0025). One statement of one shape whatever the outcome, so an unknown token and a dead one cost the same.
  */
 export async function resolveShareLink(q: Queryable, tokenHash: string): Promise<ActiveShareLink | null> {
   const { rows } = await q.query<{ id: string; workspace_id: string; page_id: string; token_hash: string }>(
     `SELECT l.id, l.workspace_id, l.page_id, l.token_hash
        FROM share_links l
-       JOIN workspaces w ON w.id = l.workspace_id AND NOT w.export_restricted
+       JOIN workspaces w ON w.id = l.workspace_id AND NOT w.export_restricted AND w.deleted_at IS NULL
        JOIN memberships m ON m.workspace_id = l.workspace_id AND m.user_id = l.created_by AND m.role IN ('owner', 'editor')
        JOIN pages p ON p.workspace_id = l.workspace_id AND p.id = l.page_id AND p.deleted_at IS NULL
       WHERE l.token_hash = $1 AND l.revoked_at IS NULL AND (l.expires_at IS NULL OR l.expires_at > now())`,

@@ -44,7 +44,7 @@ interface InviteRow {
 }
 
 const ACTIVE_INVITE_SQL = `SELECT l.id, l.workspace_id, w.name AS workspace_name, l.role, u.display_name AS inviter_name, l.token_hash
-   FROM invite_links l JOIN workspaces w ON w.id = l.workspace_id JOIN users u ON u.id = l.created_by
+   FROM invite_links l JOIN workspaces w ON w.id = l.workspace_id AND w.deleted_at IS NULL JOIN users u ON u.id = l.created_by
   WHERE`;
 
 const toInvite = (row: InviteRow | undefined): ActiveInvite | null =>
@@ -86,7 +86,7 @@ export async function acceptInviteIn(tx: Queryable, inviteId: string, userId: st
   const { rows: found } = await tx.query<{ workspace_id: string }>("SELECT workspace_id FROM invite_links WHERE id = $1", [inviteId]);
   const workspaceId = found[0]?.workspace_id;
   if (!workspaceId) throw inviteNotFound();
-  const { rows: ws } = await tx.query<{ name: string }>("SELECT name FROM workspaces WHERE id = $1 FOR NO KEY UPDATE", [workspaceId]);
+  const { rows: ws } = await tx.query<{ name: string }>("SELECT name FROM workspaces WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE", [workspaceId]);
   if (!ws[0]) throw inviteNotFound();
   const { rows: live } = await tx.query<{ role: Exclude<Role, "owner"> }>(`SELECT l.role FROM invite_links l WHERE l.id = $1 AND ${INVITE_ACTIVE} FOR UPDATE OF l`, [inviteId]);
   const link = live[0];

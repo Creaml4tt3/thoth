@@ -1,3 +1,4 @@
+import { DELETED_WORKSPACE_RESTORE_DAYS } from "@thoth/workspace-protocol";
 import type { ServerConfig } from "./config.ts";
 import type { Queryable } from "./db.ts";
 import { ApiError } from "./errors.ts";
@@ -12,6 +13,9 @@ export function quotaExceeded(quota: string, detail: string, usage?: { limit: nu
 
 /** Advisory-lock key space for the server-wide and per-account serialization points (distinct from migrations). */
 const lock = (q: Queryable, name: string) => q.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))", [name]);
+
+/** A workspace that is live or still restorable (ADR-0025); `w` is the workspaces row. */
+export const RESTORABLE_OR_LIVE = `(w.deleted_at IS NULL OR w.deleted_at > now() - make_interval(days => ${DELETED_WORKSPACE_RESTORE_DAYS}))`;
 
 const countOf = async (q: Queryable, sql: string, values: unknown[]): Promise<number> => Number((await q.query<{ n: string | number }>(sql, values)).rows[0]!.n);
 
@@ -62,12 +66,17 @@ export async function assertCanAddMember(q: Queryable, quotas: Quotas, workspace
   if (current + 1 > limit) throw quotaExceeded("membersPerWorkspace", `this workspace is limited to ${limit} members (${current} in use)`, { limit, current });
 }
 
-/** Workspaces an account owns (`owner` memberships). Serializes concurrent creations by the same account. */
+/**
+ * Workspaces an account owns (`owner` memberships). Serializes concurrent creations by the same account. A deleted
+ * workspace still counts while it can be restored (ADR-0025): creating and deleting cannot pile up data on the server,
+ * and purging it frees the place at once.
+ */
 export async function assertCanOwnAnotherWorkspace(q: Queryable, quotas: Quotas, userId: string): Promise<void> {
   const limit = quotas.maxWorkspacesPerAccount;
   if (limit === undefined) return;
   await lock(q, `owner:${userId}`);
-  const current = await countOf(q, "SELECT count(*) AS n FROM memberships WHERE user_id = $1 AND role = 'owner'", [userId]);
+  const current = await countOf(q, `SELECT count(*) AS n FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
+     WHERE m.user_id = $1 AND m.role = 'owner' AND ${RESTORABLE_OR_LIVE}`, [userId]);
   if (current + 1 > limit) throw quotaExceeded("workspacesPerAccount", `an account may own at most ${limit} workspace${limit === 1 ? "" : "s"} (${current} owned)`, { limit, current });
 }
 

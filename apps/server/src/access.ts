@@ -12,7 +12,8 @@ export interface WorkspaceAccess {
 /**
  * The single authorization gate for everything inside a workspace (ADR-0009).
  *
- * - Not a member (or no such workspace, or a malformed ID): 404 `not_found`, so existence is not leaked.
+ * - Not a member (or no such workspace, a deleted one (ADR-0025), or a malformed ID): 404 `not_found`, so existence is
+ *   not leaked.
  * - A member whose role lacks `need`: 403 `forbidden`. `administer` is the owners' permission (ADR-0024: members and
  *   invite links).
  *
@@ -27,7 +28,7 @@ export async function workspaceAccess(q: Queryable, workspaceId: string, userId:
   const { rows } = await q.query<{ id: string; name: string; export_restricted: boolean; role: Role }>(
     `SELECT w.id, w.name, w.export_restricted, m.role
        FROM workspaces w JOIN memberships m ON m.workspace_id = w.id AND m.user_id = $2
-      WHERE w.id = $1 ${options.lock ? "FOR NO KEY UPDATE OF w" : ""}`,
+      WHERE w.id = $1 AND w.deleted_at IS NULL ${options.lock ? "FOR NO KEY UPDATE OF w" : ""}`,
     [workspaceId, userId],
   );
   const row = rows[0];

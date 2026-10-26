@@ -855,7 +855,7 @@ describe("capabilities, maintenance", () => {
     await env.db.query("INSERT INTO access_tokens (id, user_id, token_hash, expires_at, session_id) VALUES ('tok_old', $1, $2, now() - interval '2 days', 'ses_revoked')", [user, sha256Hex("old-at")]);
     await env.db.query("INSERT INTO sign_ups (ip_hash, created_at) VALUES ($1, now() - interval '2 days')", [sha256Hex("ip:old")]);
 
-    const result = await runMaintenance(env.db, { revisionRetentionDays: undefined });
+    const result = await runMaintenance(env.db, { revisionRetentionDays: undefined, blobs: env.server.deps.blobs });
     expect(result.signInRowsDeleted).toBeGreaterThanOrEqual(6);
     expect(await count("SELECT count(*) AS n FROM auth_requests WHERE state_hash = $1", [sha256Hex("old-req")])).toBe(0);
     expect(await count("SELECT count(*) AS n FROM auth_requests WHERE state_hash = $1", [sha256Hex("live-req")])).toBe(1);

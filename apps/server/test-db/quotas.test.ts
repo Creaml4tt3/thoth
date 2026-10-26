@@ -310,7 +310,7 @@ describe("limits are advertised", () => {
     const env = await startTestEnv({ env: { THOTH_PROFILE: "trial" } });
     try {
       const { limits, capabilities } = (await env.api(null, "GET", "/capabilities")).json;
-      expect(limits).toMatchObject({ maxPagesPerWorkspace: 200, maxWorkspaceAttachmentBytes: 20 * 1_048_576, maxMembersPerWorkspace: 10, maxWorkspacesPerAccount: 1, revisionRetentionDays: 30, maxAttachmentBytes: 4 * 1_048_576, maxMarkdownBytes: 256 * 1024 });
+      expect(limits).toMatchObject({ maxPagesPerWorkspace: 200, maxWorkspaceAttachmentBytes: 20 * 1_048_576, maxMembersPerWorkspace: 10, maxWorkspacesPerAccount: 3, revisionRetentionDays: 30, maxAttachmentBytes: 4 * 1_048_576, maxMarkdownBytes: 256 * 1024 });
       expect(capabilities).toContain("attachments");
       const who = await env.user("T");
       const ws = await env.workspace("W", { members: { [who.userId]: "owner" } });

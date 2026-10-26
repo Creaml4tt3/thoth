@@ -32,6 +32,11 @@ export interface ServerConfig {
   /** Server-wide, not advertised: stored attachment bytes (each distinct blob once) and number of accounts. */
   maxTotalAttachmentBytes: number | undefined;
   maxAccounts: number | undefined;
+  /**
+   * Workspaces one account may create through `createWorkspace` per UTC day (ADR-0025): a guard against creating and
+   * purging over and over. Not advertised; one more is 409 `quota_exceeded` (`workspaceCreationsPerDay`).
+   */
+  maxWorkspaceCreationsPerDay: number | undefined;
   /** Exact origins (scheme://host[:port]) that may call the API from a browser. */
   corsOrigins: string[];
   rateLimit: RateLimitConfig;
@@ -108,7 +113,7 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"];
 
 /** ADR-0024: invite pages and joins are rate limited per client IP on every server unless the operator says otherwise. */
 export const INVITE_DEFAULTS = { opensPerIp: 60, acceptsPerIp: 20 } as const;
@@ -118,7 +123,10 @@ const MIB = 1_048_576;
 
 /** What `THOTH_PROFILE=trial` fills in. Every value can be overridden by its own variable. */
 export const TRIAL_PROFILE = {
-  maxWorkspacesPerAccount: 1,
+  // ADR-0025: the owner asked for several workspaces per account on the trial and chose 3 (2026-10-26). Deleted
+  // workspaces count until they are purged, and at most 10 can be created per account per day.
+  maxWorkspacesPerAccount: 3,
+  maxWorkspaceCreationsPerDay: 10,
   maxMembersPerWorkspace: 10,
   maxPagesPerWorkspace: 200,
   maxWorkspaceAttachmentBytes: 20 * MIB,
@@ -371,6 +379,8 @@ function publicUrlFrom(env: NodeJS.ProcessEnv, options: { strict: boolean }): st
  *   INVITE_LINKS  on (default) | off: invite links (ADR-0024, capability invite-links); members management stays on
  *   MAX_INVITE_LINKS_PER_WORKSPACE   active invite links per workspace (trial 20; unset = no limit)
  *   INVITE_OPENS_PER_IP, INVITE_ACCEPTS_PER_IP   invite pages opened and joins per RATE_LIMIT_WINDOW_SECONDS (default 60 and 20; "unlimited" = off)
+ *   WORKSPACE_MANAGEMENT  on (default) | off: creating, renaming, deleting and restoring workspaces from the API (ADR-0025)
+ *   MAX_WORKSPACE_CREATIONS_PER_DAY   workspaces one account may create per UTC day through the API (trial 10; unset = no limit)
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -395,6 +405,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     viewsPerLink: limitFrom(env, "SHARE_VIEWS_PER_LINK", trial?.shareViewsPerLink, 1_000_000),
     viewsPerIp: limitFrom(env, "SHARE_VIEWS_PER_IP", trial?.shareViewsPerIp, 1_000_000),
   };
+  // ADR-0025: workspaces are created, renamed and deleted from the clients on every server unless the operator says otherwise.
+  const workspacesEnabled = oneOf(env, "WORKSPACE_MANAGEMENT", ["on", "off"], "on") === "on";
   // ADR-0024: invite links are on by default on every server; an operator can switch them off.
   const invitesEnabled = oneOf(env, "INVITE_LINKS", ["on", "off"], "on") === "on";
   const invite: InviteConfig = {
@@ -423,11 +435,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     revisionRetentionDays: limitFrom(env, "REVISION_RETENTION_DAYS", trial?.revisionRetentionDays, 36_500),
     maxTotalAttachmentBytes: limitFrom(env, "MAX_TOTAL_ATTACHMENT_BYTES", trial?.maxTotalAttachmentBytes, 2 ** 40),
     maxAccounts: limitFrom(env, "MAX_ACCOUNTS", trial?.maxAccounts, 100_000_000),
+    maxWorkspaceCreationsPerDay: limitFrom(env, "MAX_WORKSPACE_CREATIONS_PER_DAY", trial?.maxWorkspaceCreationsPerDay, 1_000_000),
     corsOrigins: parseCorsOrigins(env.CORS_ORIGINS),
     rateLimit,
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
-    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share") && (invitesEnabled || c !== "invite-links")),
+    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share") && (invitesEnabled || c !== "invite-links") && (workspacesEnabled || c !== "workspace-management")),
     serverName: serverNameFrom(env),
     signIn: signInFrom(env, trial),
     publicUrl: publicUrlFrom(env, { strict: false }),

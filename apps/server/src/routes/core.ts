@@ -93,7 +93,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
               (SELECT coalesce(json_agg(json_build_object('userId', u.id, 'displayName', u.display_name, 'role', mm.role) ORDER BY mm.user_id), '[]'::json)
                  FROM (SELECT user_id, role FROM memberships WHERE workspace_id = w.id ORDER BY user_id LIMIT 50) mm JOIN users u ON u.id = mm.user_id) AS members
          FROM workspaces w JOIN memberships m ON m.workspace_id = w.id AND m.user_id = $1
-        WHERE ($2::text IS NULL OR w.id > $2)
+        WHERE w.deleted_at IS NULL AND ($2::text IS NULL OR w.id > $2)
         ORDER BY w.id LIMIT $3`,
       [me.id, after, limit + 1],
     );

@@ -33,7 +33,9 @@ describe("configuration", () => {
     const c = loadConfig(env({ THOTH_PROFILE: "trial" }));
     expect(c).toMatchObject({
       profile: "trial",
-      maxWorkspacesPerAccount: 1,
+      // ADR-0025: several workspaces per account on the trial (the owner's choice, 2026-10-26).
+      maxWorkspacesPerAccount: 3,
+      maxWorkspaceCreationsPerDay: 10,
       maxMembersPerWorkspace: 10,
       maxPagesPerWorkspace: 200,
       maxWorkspaceAttachmentBytes: 20 * 1_048_576,
@@ -61,8 +63,17 @@ describe("configuration", () => {
 
   it("EVENTS=off drops events.sse from the capabilities; the rest stay", () => {
     const c = loadConfig(env({ EVENTS: "off" }));
-    expect(c.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
+    expect(c.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"]);
     expect(loadConfig(env({ EVENTS: "on" })).capabilities).toContain("events.sse");
+  });
+
+  it("WORKSPACE_MANAGEMENT=off drops workspace-management; MAX_WORKSPACE_CREATIONS_PER_DAY is its own variable (ADR-0025)", () => {
+    expect(loadConfig(env()).capabilities).toContain("workspace-management");
+    expect(loadConfig(env()).maxWorkspaceCreationsPerDay).toBeUndefined();
+    expect(loadConfig(env({ WORKSPACE_MANAGEMENT: "off" })).capabilities).not.toContain("workspace-management");
+    expect(loadConfig(env({ MAX_WORKSPACE_CREATIONS_PER_DAY: "4" })).maxWorkspaceCreationsPerDay).toBe(4);
+    expect(loadConfig(env({ THOTH_PROFILE: "trial", MAX_WORKSPACE_CREATIONS_PER_DAY: "unlimited" })).maxWorkspaceCreationsPerDay).toBeUndefined();
+    expect(() => loadConfig(env({ WORKSPACE_MANAGEMENT: "maybe" }))).toThrow(/WORKSPACE_MANAGEMENT/);
   });
 
   it("MIGRATE_ON_START, DATABASE_POOL_MAX, TRUST_PROXY, BLOB_STORE", () => {

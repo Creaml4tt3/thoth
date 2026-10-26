@@ -41,8 +41,11 @@ export async function createWorkspace(db: Database, input: { name: string; expor
   return db.tx((tx) => createWorkspaceIn(tx, input, quotas));
 }
 
-/** `createWorkspace` inside the caller's transaction (the sign-in broker creates a new account's first workspace with the account). */
-export async function createWorkspaceIn(tx: Queryable, input: { name: string; exportRestricted: boolean; ownerId?: string }, quotas: Quotas = {}): Promise<{ id: string }> {
+/**
+ * `createWorkspace` inside the caller's transaction (the sign-in broker creates a new account's first workspace with the
+ * account; `createWorkspace` of ADR-0025 one more, with the account as `actorId` in the audit trail).
+ */
+export async function createWorkspaceIn(tx: Queryable, input: { name: string; exportRestricted: boolean; ownerId?: string }, quotas: Quotas = {}, options: { actorId?: string } = {}): Promise<{ id: string }> {
   const name = input.name.trim();
   if (name.length < 1 || name.length > 200) throw new AdminError("name must be 1 to 200 characters");
   const id = opaqueId("ws");
@@ -52,7 +55,7 @@ export async function createWorkspaceIn(tx: Queryable, input: { name: string; ex
   }
   await tx.query("INSERT INTO workspaces (id, name, export_restricted) VALUES ($1, $2, $3)", [id, name, input.exportRestricted]);
   if (input.ownerId !== undefined) await tx.query("INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [id, input.ownerId]);
-  await tx.query("INSERT INTO audit_events (actor_id, workspace_id, action, detail) VALUES (NULL, $1, 'workspace.created', $2)", [id, JSON.stringify({ exportRestricted: input.exportRestricted })]);
+  await tx.query("INSERT INTO audit_events (actor_id, workspace_id, action, detail) VALUES ($3, $1, 'workspace.created', $2)", [id, JSON.stringify({ exportRestricted: input.exportRestricted }), options.actorId ?? null]);
   return { id };
 }
 
@@ -78,7 +81,7 @@ export function firstWorkspaceName(displayName: string | undefined): string {
 export async function addMember(db: Database, input: { workspaceId: string; userId: string; role: string }, quotas: Quotas = {}): Promise<void> {
   if (!(ROLES as readonly string[]).includes(input.role)) throw new AdminError(`role must be one of ${ROLES.join(", ")}`);
   await db.tx(async (tx) => {
-    const ws = await tx.query("SELECT 1 FROM workspaces WHERE id = $1 FOR NO KEY UPDATE", [input.workspaceId]);
+    const ws = await tx.query("SELECT 1 FROM workspaces WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE", [input.workspaceId]);
     if (ws.rowCount === 0) throw new AdminError("no such workspace");
     const user = await tx.query("SELECT 1 FROM users WHERE id = $1", [input.userId]);
     if (user.rowCount === 0) throw new AdminError("no such user");
