@@ -275,6 +275,8 @@ function Composer({ agents, state, conversation }: { agents: AgentsService; stat
         id={`${id}-text`}
         ref={box}
         className="input"
+        name="follow-up"
+        autoComplete="off"
         rows={3}
         value={text}
         onChange={(e) => setText(e.target.value)}
