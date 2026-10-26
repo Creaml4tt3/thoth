@@ -66,6 +66,10 @@ node apps/server/src/main.ts
 | `MAX_SHARE_LINKS_PER_WORKSPACE` | none (trial 20) | Active (not revoked, not expired) share links per workspace; one more is 409 `quota_exceeded` (`shareLinksPerWorkspace`). |
 | `SHARE_VIEWS_PER_LINK` | off (trial 300) | Requests to one share link (pages and pictures) per `RATE_LIMIT_WINDOW_SECONDS`, counted per token as given, known or not. |
 | `SHARE_VIEWS_PER_IP` | off (trial 120) | Requests to any share link per client IP per window. |
+| `INVITE_LINKS` | `on` | Invite links (ADR-0024, capability `invite-links`). `off`: not advertised, the invite calls answer 501, every `/i/<token>` address is the not-found page. Members management (`members`) stays on. |
+| `MAX_INVITE_LINKS_PER_WORKSPACE` | none (trial 20) | Active (not revoked, not expired, not used up) invite links per workspace; one more is 409 `quota_exceeded` (`inviteLinksPerWorkspace`). |
+| `INVITE_OPENS_PER_IP` | 60 | Invite pages (`/i/...`) opened per client IP per `RATE_LIMIT_WINDOW_SECONDS`; `unlimited` turns it off. |
+| `INVITE_ACCEPTS_PER_IP` | 20 | Joins (`acceptInvite` and the join form) per client IP per window, counted before the token is looked up. |
 
 Every limit is its own optional variable: unset means no limit. Each accepts a positive integer, or the word
 `unlimited` to remove a value the trial profile would set. Invalid values stop the server at startup with a
@@ -107,6 +111,7 @@ SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
 | `RATE_LIMIT_PER_ACCOUNT` / `RATE_LIMIT_PER_IP` | 300 / 600 per 60 s | ample for a person whose client polls the change feed, small for a script |
 | `SIGNUP_LIMIT_PER_IP` | 10 per 24 h | ADR-0014 rule 4: sign-up is limited per IP |
 | `MAX_SHARE_LINKS_PER_WORKSPACE` / `SHARE_VIEWS_PER_LINK` / `SHARE_VIEWS_PER_IP` | 20 / 300 / 120 per 60 s | ADR-0023 rule 4: share links stay on in the trial, capped and rate limited |
+| `MAX_INVITE_LINKS_PER_WORKSPACE` | 20 | ADR-0024: members and invite links are on in the trial, with the 10-member limit above |
 
 Recommended companions (not part of the profile because they depend on the deployment):
 `MIGRATE_ON_START=false`, `DATABASE_POOL_MAX=1` to `3`, `TRUST_PROXY=true`, `CORS_ORIGINS`, `CRON_SECRET`.
@@ -136,6 +141,26 @@ not 403/413/429) with `quota`, `limit` and `current`, and writes nothing.
 - All checks run under the per-workspace row lock (or, for server-wide and per-account counts, a transaction-scoped
   advisory lock), so concurrent requests cannot overshoot: at limit - 1 exactly one of N concurrent creates wins.
 - A `quota_exceeded` reply is not stored under its `Idempotency-Key`: retrying after freeing room runs the request.
+
+### Members and invite links (ADR-0024)
+
+Every member reads the member list (`GET .../members`: names and roles, never emails); owners change roles and remove
+members; anyone leaves. A workspace always keeps one owner (409 `last_owner`), checked under the workspace row lock.
+Owners make invite links (`<PUBLIC_URL>/i/<token>`: editor or viewer, 1, 7 or 30 days, 1, 5 or 10 uses). On by
+default; for a self-hosted server:
+
+- **Off:** `INVITE_LINKS=off` hides invite links; members management stays.
+- **Joining** without the web: `POST /api/v1/invites/accept` with the user's normal credential (the desktop app's
+  Settings → Servers → "Join with an invite link"). With a sign-in provider configured, the invite page also offers
+  "Sign in with … to join": that sign-in issues no code or token, only a 15-minute single-use join ticket (an HttpOnly
+  cookie, stored as a SHA-256 in `invite_tickets`), and a `POST /i/accept` form joins. Without a provider the page
+  explains the desktop path.
+- **"Open in Thoth"** after joining points at the web client, derived from the first `WEB_REDIRECT_URIS` entry.
+- **The CLI** `add-member` keeps working and refuses to demote a workspace's last owner.
+- **Audit:** `member.role_changed`, `member.removed`, `member.left`, `member.joined`, `invite.created`,
+  `invite.revoked`, each with the acting account.
+- **Migration** `011_invites.sql` must be applied before a build that lists `members` and `invite-links` serves
+  traffic (with `MIGRATE_ON_START=false`, `node src/cli.ts migrate` with the direct URL). It is additive.
 
 ### Public share links (ADR-0023)
 

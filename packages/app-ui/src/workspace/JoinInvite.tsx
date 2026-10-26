@@ -99,7 +99,7 @@ export function JoinInvite({ directory, signIn }: Props) {
       >
         <label className="field">
           <span>{t.label}</span>
-          <input className="input" type="text" inputMode="url" placeholder="https://thoth.example.com/i/…" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" spellCheck={false} />
+          <input className="input" type="text" name="invite-link" inputMode="url" placeholder="https://thoth.example.com/i/…" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" spellCheck={false} />
         </label>
         <Button variant="primary" small type="submit" disabled={phase.kind === "busy"}>
           {phase.kind === "busy" ? t.joining : t.join}

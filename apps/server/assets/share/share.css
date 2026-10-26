@@ -182,7 +182,7 @@ th { background: var(--thoth-bg-sidebar); font-weight: 600; }
 /* Invite pages (ADR-0024): one card with the invitation or the join form, and a note for the desktop app. */
 .invite { max-width: 34rem; padding-top: 10vh; }
 .invite-card { padding: 28px; border: 1px solid var(--thoth-border-strong); border-radius: 16px; background: var(--thoth-bg-sidebar); }
-.invite-card h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; }
+.invite-card h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; text-wrap: balance; }
 .invite-card p { margin: 0 0 12px; }
 .invite-lede { font-size: 17px; }
 .invite-role, .invite-note, .invite-who, .invite-aside p { color: var(--thoth-ink-secondary); font-size: 15px; }
@@ -213,6 +213,7 @@ th { background: var(--thoth-bg-sidebar); font-weight: 600; }
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .button.primary { border-color: var(--thoth-accent); background: var(--thoth-accent); color: #fff; }
 .button:hover { filter: brightness(1.06); }

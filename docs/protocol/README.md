@@ -64,7 +64,8 @@ when either is stale.
 
 `GET /api/v1/capabilities` is the only protocol route reachable without credentials, so clients
 can discover a server before signing in. (A server that lists `public-share` also serves read-only
-HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 10.)
+HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 10. A server that lists
+`invite-links` serves invite pages under `/i/<token>` the same way; section 10.)
 
 ```json
 {
@@ -93,6 +94,8 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `page-order` | `movePage` | the optional `position` member of pages, tree nodes and change entries; section 7 |
 | `page-kind` | none | the optional `kind` member of tree nodes and page metadata, and `pageKind` of change entries, derived from frontmatter `thoth_kind`; section 7, ADR-0017 |
 | `public-share` | `createShareLink`, `listShareLinks`, `revokeShareLink` | public read-only links to a page and its sub-pages, served as HTML at `/s/<token>`; section 10, ADR-0023 |
+| `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
+| `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -168,7 +171,9 @@ Rules for every credential:
 | create `to_workspace` transfers, create `from_workspace` move transfers | no | yes | yes |
 | create `from_workspace` copy transfers | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted |
 | create, list and revoke share links (`public-share`) | no | yes, unless export restricted | yes, unless export restricted |
-| administer membership | no | no | yes (not part of this protocol draft) |
+| read the member list (`members`) | yes | yes | yes |
+| change roles, remove members, create, list and revoke invite links (`members`, `invite-links`) | no | no | yes |
+| leave the workspace | yes | yes | yes, unless the last owner |
 
 - **Existence is not leaked.** A workspace, page, attachment or transfer the principal may
   not read is 404 `not_found`. 403 `forbidden` is used only when the principal can see the
@@ -242,6 +247,7 @@ violation.
 | `method_not_allowed` | 405 | Route exists, method does not |
 | `invalid_transfer_state` | 409 | The transfer state does not allow the action |
 | `cursor_expired` | 410 | Cursor points before retained change history; resynchronize from the tree |
+| `last_owner` | 409 | The change would leave the workspace without an owner (ADR-0024) |
 | `quota_exceeded` | 409 | Valid, permitted request that would exceed a quota; may carry `quota`, `limit`, `current` |
 | `revision_conflict` | 412 | Conditional write did not match; body has `currentRevision` |
 | `payload_too_large` | 413 | Body exceeds an advertised limit |
@@ -481,7 +487,7 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   correctness and SHOULD poll the feed on reconnect and at a low background interval.
 - A server MAY send comment lines (`:`) as keep-alives.
 
-## 10. Search, attachments and share links
+## 10. Search, attachments, share links, members and invite links
 
 - `POST .../search` (capability `search`) takes `{ query, limit?, cursor?, withinPageId? }`
   and returns a paginated envelope of `{ pageId, title, revisionId, snippet?, score? }`. It
@@ -528,6 +534,52 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   Markdown is never passed through.
 - Attachments keep their stored `Content-Type`. Only raster images are inline; SVG and
   everything else download.
+
+### Members (capability `members`, ADR-0024)
+
+- `GET .../members` (every member) lists `{ userId, displayName, role }`, paginated, ordered by user
+  ID. Emails are never returned.
+- `PUT .../members/{userId}` (owners) takes `{ role }` and returns the member. Setting the role a member
+  already has changes nothing. Making someone an owner counts against that account's
+  `maxWorkspacesPerAccount` (409 `quota_exceeded`, `quota: workspacesPerAccount`).
+- `DELETE .../members/{userId}` (204): owners remove anyone; any member removes themself (leaves).
+- **One owner is always kept.** Demoting or removing the last owner, or the last owner leaving, is 409
+  `last_owner`. The check runs under the workspace's write lock, so two owners stepping down at once
+  cannot both succeed.
+- Removal takes effect at once: the account's next request to the workspace is 404, and share links
+  it made stop working (their creator is re-checked on every view). An open event stream ends at its
+  next re-check (30 seconds).
+- Editors and viewers get 403 for the owners' calls; non-members get 404.
+
+### Invite links (capability `invite-links`, ADR-0024)
+
+- `POST .../invite-links` (owners) takes `{ role: "editor" | "viewer", expiresInDays?: 1 | 7 | 30,
+  maxUses?: 1 | 5 | 10 }` (absent: 7 days, 1 use) and returns 201 with the link (`id`, `workspaceId`,
+  `role`, `maxUses`, `usesLeft`, `createdAt`, `createdBy`, `createdByName`, `expiresAt`) plus `token`
+  and `url` (`<origin>/i/<token>`). As for share links, the token is returned this once, only a hash is
+  stored, and `Idempotency-Key` is not honoured. Owner is not offered: an owner promotes an existing
+  member instead.
+- Refusals: 403 `forbidden` for editors and viewers; 409 `quota_exceeded` with `quota:
+  inviteLinksPerWorkspace` past the server's number of active links, or `quota: membersPerWorkspace`
+  when `maxUses` is more than the member limit leaves room for.
+- `GET .../invite-links` lists the active links (not revoked, not expired, not used up), newest first,
+  without tokens. `DELETE .../invite-links/{inviteId}` revokes at once (204, also for a dead link).
+  Dead links are kept as records.
+- `POST /invites/accept` (any signed-in account) takes `{ token }` and returns `{ workspaceId, name,
+  role, joined }`. Someone already a member keeps their role and spends no use (`joined: false`). A
+  full workspace is 409 `quota_exceeded` (`membersPerWorkspace`). Uses and the member limit are counted
+  under the workspace's write lock: two people racing for the last use, or the last place, cannot both
+  join.
+- **One answer for every dead token.** Unknown, malformed, expired, revoked, used up, a token of another
+  server, and a link whose creator is no longer an owner all get the same 404. Per-client-address rate
+  limits run before the token is looked up.
+- `GET <origin>/i/<token>` is an HTML page with no script (the share pages' headers, with
+  `form-action 'self'`). It names only the workspace, the inviter's display name and the role. On a
+  server with a sign-in broker it offers "Sign in with … to join": the broker's provider callback, for
+  this sign-in only, issues no code, session or token, but a short-lived, single-use join ticket in an
+  HttpOnly `SameSite=Lax` cookie, and returns to `/i/accept`. There a form `POST /i/accept` joins; it
+  needs the ticket, a value derived from it in the form, and a same-origin request (`Origin`, or Fetch
+  Metadata when `Origin` is `null`). A GET never joins.
 
 ## 11. Transfers
 
@@ -654,8 +706,8 @@ the fixture tests, and `Retry-After`.
 7. **Titles and frontmatter:** whether the server derives `title` from Markdown, and whether it
    checks that frontmatter `thoth_id` equals the path ID; newline and Unicode normalization of
    stored Markdown.
-8. **Roles and sharing:** a members listing route and who may see members; role changes and
-   last-owner protection; page-level permissions; guest links (public read-only links are decided in ADR-0023); the definition of
+8. **Roles and sharing:** page-level permissions; guest links (public read-only links are decided in ADR-0023;
+   the member list, role changes, the last-owner rule and invite links in ADR-0024); the definition of
    "export" (copy, move, download, agent context) for the restriction flag (ADR-0009).
 9. **Search:** query syntax, ranking, snippet format, tokenization (notably Thai), and a bound on
    index lag.

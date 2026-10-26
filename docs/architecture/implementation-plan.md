@@ -1098,6 +1098,26 @@ Each needs its own ADR and an owner decision before work starts.
 3. **Update notice.** A popup when a new desktop version is out (Tauri's updater, signed updates, the release feed
    next to the downloads in docs/deploy/release.md).
 
+### Members and invite links (ADR-0024, 2026-10-26), built, waiting for review
+
+The owner decided on 2026-10-26: workspace Members management and invite links on the server, the desktop app and the
+web client, on by default and on the trial server.
+
+- **Protocol.** Capabilities `members` (listMembers, setMemberRole, removeMember) and `invite-links`
+  (createInviteLink, listInviteLinks, revokeInviteLink, acceptInvite), the error code `last_owner`, OpenAPI and JSON
+  Schemas, and nine conformance checks that adapt to the caller's role (never skipped).
+- **Server.** Migration `011_invites.sql` (additive). The one-owner rule and the member quota are checked under the
+  workspace row lock. The invite pages under `/i/` have no script, and their sign-in through the broker ends in a
+  single-use join ticket, not a session. Per-IP limits apply; the trial allows 20 active links. The CLI refuses to
+  demote the last owner.
+- **Apps.** "Members…" on the workspace row (button, menu, Menu key) and in the palette; the Members dialog with
+  roles, remove, leave and invite links. On the desktop, Settings → Servers → "Join with an invite link". A departed
+  workspace leaves the sidebar, and its open page says "no access".
+- **Evidence.** `apps/server/test-db/members.test.ts` and `invites.test.ts`, `apps/server/test/invite.test.ts`,
+  `apps/desktop/test/members.test.tsx`, `apps/web/test/members.test.tsx`, `tests/e2e/members-invites.e2e.ts`, and the
+  conformance suite against the reference server.
+- **Before the deploy:** apply `apps/server/migrations/011_invites.sql` to Neon (docs/deploy/trial.md).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

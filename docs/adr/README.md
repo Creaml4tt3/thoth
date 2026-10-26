@@ -33,6 +33,7 @@ trade-off.
 | [0021](0021-connected-apps-read-only-mcp-server.md) | Connected apps: a read-only MCP server | Accepted 2026-10-26 |
 | [0022](0022-update-notice.md) | Update notice: a popup when a new desktop version is out | Accepted 2026-10-26 |
 | [0023](0023-public-read-only-share-links.md) | Public read-only share links for workspace pages | Accepted 2026-10-25 |
+| [0024](0024-workspace-members-and-invite-links.md) | Workspace members and invite links | Accepted 2026-10-26 |
 
 Template: [0000-template.md](0000-template.md).
 

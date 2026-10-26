@@ -152,11 +152,13 @@ function shell(lang: Lang, title: string, main: string, referrer = "no-referrer"
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="${referrer}">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 <title>${esc(title)} · Thoth</title>
 <link rel="stylesheet" href="/assets/share/share.css">
 </head>
 <body>
-<header class="bar"><span class="brand">${MARK}<span>Thoth</span></span><span class="badge">${esc(w.badge)}</span></header>
+<header class="bar"><span class="brand">${MARK}<span translate="no">Thoth</span></span><span class="badge">${esc(w.badge)}</span></header>
 <main class="invite">
 ${main}
 </main>

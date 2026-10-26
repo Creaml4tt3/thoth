@@ -61,6 +61,14 @@ Domains used below (change them when you buy your own domain):
    the apps offer "Share…" right away. Without the table, every share call and
    every `/s/<token>` page fails with a database error.
 
+   Migration `011_invites.sql` (ADR-0024, members and invite links) adds two
+   tables (`invite_links`, `invite_tickets`) and one nullable column
+   (`auth_requests.invite_id`) and needs no backfill. It is additive and safe
+   while the old build runs. **Apply it to Neon before you deploy the server
+   build that contains it.** That build lists `members` and `invite-links`, so
+   the apps offer "Members…" and invite links right away; without the tables
+   every invite call and `/i/<token>` page fails with a database error.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
@@ -128,6 +136,24 @@ names do not work for sign-in cookies.
    Share addresses are built from `PUBLIC_URL`
    (`https://api.thoth.creaml4tt3.me/s/<token>`). The pages are served by the
    same function as the API.
+
+   Members and invite links (ADR-0024) are on in the trial with no extra
+   variable. Members management has no switch; the trial keeps the 10-member
+   limit (`MAX_MEMBERS_PER_WORKSPACE`), and an invite link never offers more
+   uses than that leaves room for:
+
+   | Variable | Trial default | Meaning |
+   | --- | --- | --- |
+   | `INVITE_LINKS` | `on` | `off` hides invite links in the apps, answers the invite calls `501`, and makes every `/i/<token>` address the not-found page |
+   | `MAX_INVITE_LINKS_PER_WORKSPACE` | `20` | Active (not revoked, not expired, not used up) links per workspace. One more is `409 quota_exceeded` (`quota: inviteLinksPerWorkspace`) |
+   | `INVITE_OPENS_PER_IP` | `60` | Invite pages opened per client IP per window (every server, not only the trial). Needs `TRUST_PROXY=true` behind Vercel |
+   | `INVITE_ACCEPTS_PER_IP` | `20` | Joins per client IP per window, counted before the token is looked up |
+
+   Invite addresses are `https://api.thoth.creaml4tt3.me/i/<token>`. "Sign in
+   to join" uses the Google and GitHub providers already registered: the
+   callback addresses (`/auth/callback/google`, `/auth/callback/github`) do not
+   change. After joining, "Open in Thoth" goes to the web client, derived from
+   `WEB_REDIRECT_URIS` (`https://thoth.creaml4tt3.me/app/`).
 
 5. The daily cron job that calls `/internal/maintenance` is part of the build
    (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.
