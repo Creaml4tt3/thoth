@@ -8,6 +8,12 @@ The website’s changelog page (https://thoth.creaml4tt3.me/changelog/) and each
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Fixed
+
+- On Windows, an Obsidian vault or Private Space on a USB stick, SD card or other FAT32 or exFAT drive opens again, instead of “The parameter is incorrect”.
+
 ## [0.2.0] - 2026-10-26
 
 ### Added
@@ -102,6 +108,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thoth.creaml4tt3.me/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/Creaml4tt3/thoth/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Creaml4tt3/thoth/compare/v0.1.1...v0.1.2

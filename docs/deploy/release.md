@@ -85,6 +85,9 @@ path (`GetFinalPathNameByHandleW`) must still be that path, which refuses a junc
 - Names Windows cannot hold (`CON`, `nul.md`, `a.md:stream`, a trailing dot or space, `<>:"|?*`) are refused when
   creating and are "not found" when reading. Names match case-insensitively (per-folder case sensitivity is
   honoured), and a name stored in NFD (copied from a Mac) is found by its NFC spelling.
+- FAT32 and exFAT volumes (USB sticks, SD cards, many external drives) do not support the attribute-tag query
+  (`FileAttributeTagInfo`, error 87); there the host reads the attributes from `FileBasicInfo` instead. Those volumes
+  hold no reparse points, and one seen without its tag is still refused (`win/nt.rs`, `attr_tag`).
 - Long paths work: relative opens have no `MAX_PATH` limit and roots are opened with the `\\?\` prefix. The
   host shows and stores roots without it (`C:\Users\you\Notes`).
 - The Agent Hub runs Claude Code in a Job Object (kill-on-close): cancel, timeout and app exit end the whole

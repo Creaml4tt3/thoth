@@ -6,6 +6,12 @@
 
 <!-- REVIEW: ทั้งไฟล์ควรให้ผู้อ่านภาษาไทยตรวจอีกรอบ -->
 
+## [Unreleased]
+
+### Fixed
+
+- บน Windows คลัง Obsidian หรือ Private Space ที่อยู่บนแฟลชไดรฟ์ การ์ด SD หรือไดรฟ์อื่นที่เป็น FAT32 หรือ exFAT เปิดได้แล้ว ไม่ขึ้นข้อความ “The parameter is incorrect” อีก <!-- REVIEW -->
+
 ## [0.2.0] - 2026-10-26
 
 ### Added
@@ -100,6 +106,7 @@
 - เว็บแอปที่ thoth.creaml4tt3.me/app/ เปิดเวิร์กสเปซบนเซิร์ฟเวอร์ทดลองที่ใช้ฟรี
 - แอปมีทั้งภาษาอังกฤษและภาษาไทย ตามภาษาของระบบ และเลือกได้ใน การตั้งค่า → ภาษา
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/Creaml4tt3/thoth/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Creaml4tt3/thoth/compare/v0.1.1...v0.1.2
