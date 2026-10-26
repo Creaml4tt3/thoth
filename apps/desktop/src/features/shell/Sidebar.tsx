@@ -16,6 +16,7 @@ import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { useServerSections } from "../servers/ServersSidebar.tsx";
 import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
 import { PRIVATE_SECTION } from "./sections.ts";
+import { AgentsSidebar } from "../agents/AgentsSidebar.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -25,6 +26,8 @@ interface Props {
   current: string | null;
   /** The open workspace page, if any. */
   currentRemote?: WorkspacePageRef | null;
+  /** The run of the current tab, if it is an assistant session. */
+  currentRun?: string | null;
   onSearch(): void;
   onNewPage(): void;
   /** Creates a folder in the Private Space (inside the folder the tree has focus in, else at the top level). */
@@ -75,7 +78,7 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
+export function Sidebar({ pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
@@ -234,6 +237,7 @@ export function Sidebar({ pages, current, currentRemote = null, onSearch, onNewP
       </button>
       <nav aria-label={t.pages} className="tree-wrap">
         <SidebarSections root={connection.root} sections={[privateSection, ...serverSections]} />
+        <AgentsSidebar current={currentRun} />
       </nav>
       <PendingTransfers />
       <div className="side-actions">

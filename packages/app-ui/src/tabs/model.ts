@@ -4,12 +4,13 @@
  *
  * - Clicking a page opens it in the current tab; Cmd/Ctrl+click, middle-click and Cmd/Ctrl+Enter open a new tab
  *   (`open(state, target, { newTab: true })`). A new tab goes right after the current one, as in a browser.
- * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. The review of
- *   the assistant's run (desktop only) is one tab in the same way.
+ * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. A session of
+ *   the assistant (desktop only) is one tab per run in the same way: opening the same run again goes to its tab.
  * - There is always at least one tab. Closing the last one leaves an empty tab.
  * - Only the current tab is mounted. Leaving a tab writes its pending edits first (`flushAll`, done by the app),
  *   so a switch never loses an edit.
  */
+import { isStableId } from "@thoth/domain";
 
 export type TabTarget =
   /** A page of the Private Space (desktop). */
@@ -17,8 +18,8 @@ export type TabTarget =
   /** A page of a workspace on a server. */
   | { kind: "workspace"; server: string; workspace: string; page: string }
   | { kind: "settings"; section?: "servers" | "agents" }
-  /** The review of the assistant's current run (desktop only; the web client drops it). */
-  | { kind: "agents" }
+  /** A session of the assistant: one run, by its record's UUIDv7 (desktop only; the web client drops it). */
+  | { kind: "agent-run"; run: string }
   /** A new, empty tab. */
   | { kind: "blank" };
 
@@ -65,8 +66,8 @@ export function sameTarget(a: TabTarget, b: TabTarget): boolean {
       return b.kind === "workspace" && a.server === b.server && a.workspace === b.workspace && a.page === b.page;
     case "settings":
       return b.kind === "settings";
-    case "agents":
-      return b.kind === "agents";
+    case "agent-run":
+      return b.kind === "agent-run" && a.run === b.run;
     case "blank":
       return b.kind === "blank";
   }
@@ -87,8 +88,8 @@ export function retarget(state: TabsState, id: string, target: TabTarget): TabsS
 
 /** Opens `target` in the current tab, or in a new one next to it. */
 export function open(state: TabsState, target: TabTarget, options: OpenOptions = {}): TabsState {
-  if (target.kind === "settings" || target.kind === "agents") {
-    const existing = state.tabs.find((t) => t.target.kind === target.kind);
+  if (target.kind === "settings" || target.kind === "agent-run") {
+    const existing = state.tabs.find((t) => (target.kind === "settings" ? t.target.kind === "settings" : sameTarget(t.target, target)));
     if (existing) return { ...retarget(state, existing.id, target), active: existing.id };
     return activeTab(state).target.kind === "blank" ? retarget(state, state.active, target) : insertAfterActive(state, target);
   }
@@ -206,8 +207,8 @@ function storedTarget(target: TabTarget): unknown {
       return { k: "ws", server: target.server, workspace: target.workspace, page: target.page };
     case "settings":
       return target.section ? { k: "settings", section: target.section } : { k: "settings" };
-    case "agents":
-      return { k: "agents" };
+    case "agent-run":
+      return { k: "run", run: target.run };
     case "blank":
       return { k: "blank" };
   }
@@ -223,8 +224,9 @@ function targetFromStored(value: unknown): TabTarget | null {
       return text(v["server"]) && text(v["workspace"]) && text(v["page"]) ? { kind: "workspace", server: v["server"], workspace: v["workspace"], page: v["page"] } : null;
     case "settings":
       return v["section"] === "servers" || v["section"] === "agents" ? { kind: "settings", section: v["section"] } : { kind: "settings" };
-    case "agents":
-      return { kind: "agents" };
+    case "run":
+      return typeof v["run"] === "string" && isStableId(v["run"]) ? { kind: "agent-run", run: v["run"] } : null;
+    // The old single review tab ({ k: "agents" }) showed the current run; no run is current at start, so it is dropped.
     case "blank":
       return BLANK;
     default:

@@ -17,7 +17,8 @@ import { transferTargetFor } from "./space-drop.ts";
 import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
 import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
-import { AgentRunView } from "../agents/AgentRunView.tsx";
+import { AgentSessionView } from "../agents/AgentSessionView.tsx";
+import { taskTitle } from "../agents/parts.tsx";
 import { MascotLayer } from "../mascot/Mascot.tsx";
 import { UpdateNotice } from "../updates/UpdateNotice.tsx";
 import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
@@ -44,6 +45,8 @@ import { roleCan } from "@thoth/workspace-protocol";
 import { desktopTheme } from "../settings/theme.ts";
 import { loadSidebarWidth, saveSidebarWidth } from "../../app/sidebar-store.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
+
+const noSubscribe = () => () => undefined;
 
 type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
@@ -72,9 +75,11 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, windowId } = useSession();
+  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId } = useSession();
   const t = useDesktopStrings().shell;
-  const agentsTitle = useDesktopStrings().agents.runView.tab;
+  const sessionTitle = useDesktopStrings().agents.session.tab;
+  // Session tabs are named by their run's task.
+  const runs = useSyncExternalStore(agents?.subscribe ?? noSubscribe, () => agents?.getState() ?? null);
   const strings = useStrings();
   const tt = strings.tabs;
   const [problem, setProblem] = useState<string | null>(null);
@@ -116,8 +121,10 @@ export function Shell() {
         return remoteTitle(directory, tab) ?? tt.untitled;
       case "settings":
         return tt.settings;
-      case "agents":
-        return agentsTitle;
+      case "agent-run": {
+        const record = runs?.record?.id === tab.run ? runs.record : runs?.history.find((r) => r.id === tab.run);
+        return record ? taskTitle(record.task.prompt) || sessionTitle : sessionTitle;
+      }
       case "blank":
         return tt.blank;
     }
@@ -290,7 +297,7 @@ export function Shell() {
   return (
     <HintContext value={hints}>
     <div className="shell" ref={shell} style={sidebar.style}>
-      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
+      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
       <main className="main">
         <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} {...(windows ? { onDetach: moveToWindow } : {})} />
         {watchError && (
@@ -310,8 +317,8 @@ export function Shell() {
         <TabPanel id={tabs.active.id}>
           {target.kind === "settings" ? (
             <SettingsView section={target.section ?? "top"} />
-          ) : target.kind === "agents" ? (
-            <AgentRunView />
+          ) : target.kind === "agent-run" ? (
+            <AgentSessionView key={`${tabs.active.id}\n${target.run}`} run={target.run} />
           ) : target.kind === "workspace" ? (
             <WorkspacePageView key={`${tabs.active.id}\n${target.server}\n${target.workspace}\n${target.page}`} target={target} onTransfer={transfer} />
           ) : target.kind === "page" ? (

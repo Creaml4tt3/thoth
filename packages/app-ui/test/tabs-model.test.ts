@@ -72,14 +72,32 @@ describe("opening", () => {
     expect(paths(blank)).toEqual(["settings"]);
   });
 
-  it("the Agent Hub is one tab like Settings, and survives a restart", () => {
+  it("an assistant session is one tab per run: opening it again goes to it, and it survives a restart", () => {
+    const RUN_A = "019e1a2b-3c4d-7e5f-8a6b-7c8d9e0f1a2b";
+    const RUN_B = "019e1a2b-3c4d-7e5f-9a6b-7c8d9e0f1a2c";
+    const run = (id: string): TabTarget => ({ kind: "agent-run", run: id });
     let s = initialTabs([page("A.md")]);
-    s = open(s, { kind: "agents" });
-    s = open(activate(s, s.tabs[0]!.id), { kind: "agents" });
-    expect(paths(s)).toEqual(["A.md", "agents"]);
-    expect(activeIndex(s)).toBe(1);
-    expect(parseTabs(serializeTabs(s))!.tabs.map((t) => t.target)).toEqual([page("A.md"), { kind: "agents" }]);
-    expect(sameTarget({ kind: "agents" }, { kind: "settings" })).toBe(false);
+    s = open(s, run(RUN_A));
+    s = open(activate(s, s.tabs[0]!.id), run(RUN_B));
+    expect(s.tabs.map((t) => t.target)).toEqual([page("A.md"), run(RUN_B), run(RUN_A)]);
+    s = open(activate(s, s.tabs[0]!.id), run(RUN_A));
+    expect(s.tabs).toHaveLength(3);
+    expect(activeTab(s).target).toEqual(run(RUN_A));
+    // An empty tab is taken, as for Settings.
+    expect(open(initialTabs(), run(RUN_A)).tabs.map((t) => t.target)).toEqual([run(RUN_A)]);
+    expect(sameTarget(run(RUN_A), run(RUN_B))).toBe(false);
+    expect(sameTarget(run(RUN_A), { kind: "settings" })).toBe(false);
+    const back = parseTabs(serializeTabs(s))!;
+    expect(back.tabs.map((t) => t.target)).toEqual([page("A.md"), run(RUN_B), run(RUN_A)]);
+    expect(activeTab(back).target).toEqual(run(RUN_A));
+  });
+
+  it("drops a stored session tab whose run is not a UUIDv7, and the old single review tab (no run is current at start)", () => {
+    const stored = (tabs: unknown[]) => JSON.stringify({ v: 1, active: 0, tabs });
+    for (const bad of ["../../etc", "019e1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b", "", 42, null, "019E1A2B-3C4D-7E5F-8A6B-7C8D9E0F1A2B"]) {
+      expect(parseTabs(stored([{ k: "run", run: bad }, { k: "page", path: "A.md" }]))!.tabs.map((t) => t.target)).toEqual([page("A.md")]);
+    }
+    expect(parseTabs(stored([{ k: "agents" }, { k: "page", path: "A.md" }]))!.tabs.map((t) => t.target)).toEqual([page("A.md")]);
   });
 
   it("a new tab is empty, goes after the current tab and is shown", () => {

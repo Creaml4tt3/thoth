@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** Six dots: something that can be dragged to a new place (a sidebar section's handle). */
@@ -97,6 +97,14 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     <>
       <path d="M14 4h6v6M10 20H4v-6" />
       <path d="M20 4l-6 6M4 20l6-6" />
+    </>
+  ),
+  // A page with an arrow leaving it: "open this in a tab of its own".
+  "open-tab": (
+    <>
+      <path d="M13.5 4H20v6.5" />
+      <path d="M20 4l-8.5 8.5" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
     </>
   ),
   "sign-out": (

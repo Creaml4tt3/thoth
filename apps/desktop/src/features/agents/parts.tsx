@@ -1,11 +1,12 @@
 /**
- * Pieces of the agent UI shared by the prompt bubble (features/mascot), the review tab (AgentRunView) and the
+ * Pieces of the agent UI shared by the prompt bubble (features/mascot), the session tab (AgentSessionView) and the
  * assistant's settings (AgentSettings): detection status with fix instructions, transcript lines, the run's outcome,
  * the result of applying, and the run history with its saved details. Agent output is shown as plain text.
  */
-import { useEffect, useRef } from "react";
-import type { AgentEvent, AgentInstallationStatus, RunRecord } from "@thoth/agent-core";
+import { useEffect, useRef, useState } from "react";
+import type { AgentEvent, AgentInstallationStatus, DetailChange, RunRecord } from "@thoth/agent-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { copyText } from "@thoth/app-ui/ui/clipboard.ts";
 import { conflictCopyPath } from "@thoth/app-ui/editor/page-session.ts";
 import { isMarkdownPath } from "@thoth/domain";
 import { useSession } from "../../app/context.ts";
@@ -163,9 +164,40 @@ export function StoppedNotice({ record, t }: { record: RunRecord; t: T["run"] })
   );
 }
 
-export function Outcome({ record, t, p }: { record: RunRecord; t: T["run"]; p: ProviderStrings }) {
+/**
+ * What the agent said at the end of a run (ADR-0007, amendment of 2026-10-26): plain text with its line breaks, never
+ * HTML or Markdown, in a box of bounded height that scrolls (and takes focus, so the keys scroll it), with "Copy answer".
+ */
+export function Answer({ text, id, level = 3 }: { text: string; id: string; level?: 2 | 3 }) {
+  const t = useDesktopStrings().agents.answer;
+  const [said, setSaid] = useState("");
+  const heading = `${id}-heading`;
+  const Heading = level === 2 ? "h2" : "h3";
+  useEffect(() => setSaid(""), [text]);
+  return (
+    <section className="agents-answer" aria-labelledby={heading} data-level={level}>
+      <div className="agents-answer-head">
+        <Heading id={heading} className="agents-answer-title">
+          {t.heading}
+        </Heading>
+        <span role="status" className="muted small">
+          {said}
+        </span>
+        <Button variant="quiet" small onClick={() => void copyText(text).then(() => setSaid(t.copied), () => setSaid(t.copyFailed))}>
+          {t.copy}
+        </Button>
+      </div>
+      <div className="agents-answer-text" data-testid="agent-answer" role="group" aria-labelledby={heading} tabIndex={0}>
+        {text}
+      </div>
+    </section>
+  );
+}
+
+/** The run's outcome. With an answer above it, a run that changed nothing says so in a small secondary line. */
+export function Outcome({ record, t, p, answered = false }: { record: RunRecord; t: T["run"]; p: ProviderStrings; answered?: boolean }) {
   if (record.state === "cancelled") return <p className="alert">{t.cancelled}</p>;
-  if (record.state === "done") return <p className="alert">{t.noChanges}</p>;
+  if (record.state === "done") return answered ? <p className="muted small agents-no-changes">{t.noPageChanges}</p> : <p className="alert">{t.noChanges}</p>;
   if (record.state !== "failed" || record.outcome?.stoppedBy) return null;
   const error = record.outcome?.error;
   return (
@@ -289,38 +321,7 @@ export function HistoryDetail({ agents, detail }: { agents: AgentsService; detai
             <ol className="agents-log">{eventLines(details.events, t.run, providerOf(t, record.provider.id))}</ol>
           </div>
           <h5>{t.history.changes}</h5>
-          {details.changes === null ? (
-            <p className="muted">{t.history.noReview}</p>
-          ) : details.changes.length === 0 ? (
-            <p className="muted">{t.history.noChanges}</p>
-          ) : (
-            <ul className="agents-changes">
-              {details.changes.map((c) => {
-                const recorded = record.changes.find((r) => r.path === c.path);
-                return (
-                  <li key={c.path} className="agents-change" data-change={c.change} data-problem={c.problem}>
-                    <div className="agents-change-head">
-                      <b className="mono agents-path">{c.path}</b>
-                      <span className="badge badge-muted">{t.review.kinds[c.change]}</span>
-                      {recorded?.result === "applied" && <span className="badge badge-muted">{t.applied.applied}</span>}
-                    </div>
-                    {c.problem ? (
-                      <p className={c.problem === "read_only" ? "alert alert-warning small" : "alert alert-danger small"} role="note">
-                        {t.review.problems[c.problem] ?? c.problem}
-                      </p>
-                    ) : c.omitted ? (
-                      <p className="muted small">{t.history.omitted}</p>
-                    ) : c.page ? (
-                      <>
-                        {c.change === "modified" && c.original === null && <p className="muted small">{t.history.noOriginal}</p>}
-                        <DiffView path={c.path} before={c.original} after={c.after} />
-                      </>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <DetailChanges record={record} changes={details.changes} />
         </>
       )}
       <div className="set-actions">
@@ -331,6 +332,44 @@ export function HistoryDetail({ agents, detail }: { agents: AgentsService; detai
     </section>
   );
 }
+
+/** What an earlier run proposed, from its saved details: one row per file with its diff (original against proposal). */
+export function DetailChanges({ record, changes }: { record: RunRecord; changes: DetailChange[] | null }) {
+  const t = useDesktopStrings().agents;
+  if (changes === null) return <p className="muted">{t.history.noReview}</p>;
+  if (changes.length === 0) return <p className="muted">{t.history.noChanges}</p>;
+  return (
+    <ul className="agents-changes">
+      {changes.map((c) => {
+        const recorded = record.changes.find((r) => r.path === c.path);
+        return (
+          <li key={c.path} className="agents-change" data-change={c.change} data-problem={c.problem}>
+            <div className="agents-change-head">
+              <b className="mono agents-path">{c.path}</b>
+              <span className="badge badge-muted">{t.review.kinds[c.change]}</span>
+              {recorded?.result === "applied" && <span className="badge badge-muted">{t.applied.applied}</span>}
+            </div>
+            {c.problem ? (
+              <p className={c.problem === "read_only" ? "alert alert-warning small" : "alert alert-danger small"} role="note">
+                {t.review.problems[c.problem] ?? c.problem}
+              </p>
+            ) : c.omitted ? (
+              <p className="muted small">{t.history.omitted}</p>
+            ) : c.page ? (
+              <>
+                {c.change === "modified" && c.original === null && <p className="muted small">{t.history.noOriginal}</p>}
+                <DiffView path={c.path} before={c.original} after={c.after} />
+              </>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The first line of a run's task: its title in the sidebar, the tab bar and the session tab. */
+export const taskTitle = (prompt: string): string => prompt.trim().split("\n")[0]!.trim();
 
 /** Earlier runs (date, task, agent, model, cost or tokens, outcome); a run waiting for review opens it with `onReview`. */
 export function History({ state, agents, onReview }: { state: AgentsState; agents: AgentsService; onReview(id: string): void }) {

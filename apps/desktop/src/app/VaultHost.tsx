@@ -222,8 +222,10 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   // unfinished runs marked interrupted (ADR-0007, cleanup on next start).
   const agents = useMemo(() => (platform.agents ? createAgentsService(vault, platform.agents, { onApplied: bump, servers }) : null), [platform, vault, bump, servers]);
   useEffect(() => () => void agents?.dispose(), [agents]);
+  // A window that is not alone does not recover (the runs may be another window's) but still lists them.
   useEffect(() => {
     if (alone) void agents?.recover();
+    else void agents?.refresh();
   }, [agents, alone]);
   // The mascot: its preferences are the user's (not this Private Space's), read once per window.
   const assistant = useMemo(() => (agents ? createAssistantController() : null), [agents]);
@@ -258,20 +260,21 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     [flushAll, vault, tabs],
   );
 
-  /** A run from a notification: its review or result tab, its outcome in the bubble, or the history. */
+  /** A run from a notification: its session tab (review, result or answer), or its outcome in the bubble. */
   const openRun = useCallback(
     (runId: string) => {
       if (!agents || !assistant) return;
       const s = agents.getState();
+      const session = { kind: "agent-run" as const, run: runId };
       if (s.record?.id === runId) {
-        if (s.phase === "review" || s.phase === "applying" || (s.phase === "finished" && s.results !== null)) return tabs.open({ kind: "agents" });
+        if (s.phase === "review" || s.phase === "applying" || (s.phase === "finished" && s.results !== null)) return tabs.open(session);
         if (s.phase !== "idle") return assistant.openBubble();
       }
       if ((s.phase === "idle" || s.phase === "finished") && waitingReviews(s).includes(runId)) {
-        void agents.reopenReview(runId).then(() => (agents.getState().phase === "review" ? tabs.open({ kind: "agents" }) : assistant.openBubble()));
+        void agents.reopenReview(runId).then(() => (agents.getState().phase === "review" ? tabs.open(session) : assistant.openBubble()));
         return;
       }
-      tabs.open({ kind: "settings", section: "agents" });
+      tabs.open(session);
     },
     [agents, assistant, tabs],
   );
@@ -318,7 +321,12 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         if (selection && selection.length > 0 && (phase === "idle" || phase === "finished")) agents.setDraft({ selection: [...selection].sort(), wholeSpace: false });
         assistant.openBubble();
       },
-      openAgentReview: () => tabs.open({ kind: "agents" }),
+      openAgentReview: () => {
+        const run = agents?.getState().record?.id;
+        if (run) tabs.open({ kind: "agent-run", run });
+      },
+      openAgentRun: (run) => tabs.open({ kind: "agent-run", run }),
+      alone,
       openWorkspacePage: (ref, options) => tabs.open({ kind: "workspace", ...ref }, options),
       openFolder,
       notifications,
@@ -338,7 +346,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       watchError,
       windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
   );
 
   return (

@@ -112,7 +112,12 @@ describe("agent runs", () => {
     const message = await screen.findByRole("button", { name: "Changes ready for review" });
     expect(message.closest("[data-testid=mascot-message]")).toBeTruthy();
     expect(document.activeElement).not.toBe(message);
-    expect(document.body.textContent).not.toContain("SECRET");
+    // The task is the person's own words: the sidebar's Assistant section lists it (as Settings' history does). Nothing
+    // else on screen carries it, and nothing carries the output.
+    const rest = document.body.cloneNode(true) as HTMLElement;
+    rest.querySelector('[data-section="agents"]')?.remove();
+    expect(rest.textContent).not.toContain("SECRET");
+    expect(document.body.textContent).not.toContain("SECRET-OUTPUT");
     expect(JSON.stringify(shown)).not.toContain("SECRET");
 
     // Clicking the message opens the review, and the entry is read.

@@ -98,3 +98,33 @@
 .agents-usage-table[open] summary { margin-bottom: var(--thoth-space-2); }
 /* A stored transcript is shown at once (and inside a closed <details> an entrance would never finish). */
 .agents-transcript .agents-log > li { animation: none; }
+/* What the agent answered (bubble and session tab): plain text with its line breaks, selectable, in a bounded box that scrolls. */
+.agents-answer { display: grid; gap: var(--thoth-space-2); min-width: 0; }
+.agents-answer-head { display: flex; align-items: center; gap: var(--thoth-space-2); min-width: 0; }
+.agents-answer-title { margin: 0 auto 0 0; font: 600 14px / 20px var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
+.agents-answer[data-level="2"] .agents-answer-title { font: 600 15px / 1.4 var(--thoth-font-sans); }
+.agents-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; max-height: 24rem; overflow: auto; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+.agents-answer-text:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.agents-no-changes { margin: 0; color: var(--thoth-ink-secondary); }
+/* A session tab: the task, a line of facts, then what the run did. */
+.agents-session-title { overflow-wrap: anywhere; }
+.agents-session-facts { display: flex; flex-wrap: wrap; gap: var(--thoth-space-2) var(--thoth-space-6); margin: 0; font: var(--thoth-text-small); }
+.agents-session-facts > div { display: grid; gap: 2px; min-width: 0; }
+.agents-session-facts dt { color: var(--thoth-ink-secondary); }
+.agents-session-facts dd { margin: 0; overflow-wrap: anywhere; }
+.agents-session-run { display: grid; gap: var(--thoth-space-3); }
+.agents-session-log { max-height: 28rem; overflow: auto; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); }
+/* The sidebar's Assistant section: rows like the page tree's, the state in words beside the task. */
+.agents-section { margin-top: 6px; }
+.agents-rows { list-style: none; margin: 0; padding: 0; }
+.agents-row { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; transition: background-color var(--thoth-dur-instant) var(--thoth-ease-out); }
+.agents-row:hover { background: var(--thoth-bg-hover); }
+.agents-row:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+.agents-row[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.agents-row-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agents-row-state { flex: none; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); white-space: nowrap; }
+.agents-row[aria-current="page"] .agents-row-state { color: inherit; }
+.agents-row-state[data-open]::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-inline-end: 5px; border-radius: 50%; background: var(--thoth-accent); vertical-align: 1px; }
+.agents-more { margin: 2px 8px 0; }
+@media (pointer: coarse) { .agents-row { min-height: 44px; } .agents-more { display: inline-block; padding: 8px 0; } }
+@media (prefers-reduced-motion: reduce) { .agents-row { transition: none; } }

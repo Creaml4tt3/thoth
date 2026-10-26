@@ -438,6 +438,7 @@ export const th: DesktopStrings = {
       stoppedTime: (minutes) => `หยุดเมื่อถึงเวลาสูงสุด${minutes === null ? "" : ` (${count(minutes)} นาที)`} ยังตรวจสิ่งที่เอเจนต์ทำไว้ก่อนหน้านั้นได้`, // REVIEW
       stoppedBudget: (usd) => `หยุดเมื่อถึงวงเงินค่าใช้จ่าย${usd === null ? "" : ` (US$${Number.isInteger(usd) ? usd : usd.toFixed(2)})`} ยังตรวจสิ่งที่เอเจนต์ทำไว้ก่อนหน้านั้นได้`, // REVIEW
       noChanges: "เอเจนต์ทำงานเสร็จโดยไม่ได้เปลี่ยนอะไร",
+      noPageChanges: "ไม่มีหน้าใดถูกเปลี่ยน", // REVIEW
       failed: "เอเจนต์หยุดเพราะมีข้อผิดพลาด ไม่มีอะไรใน Private Space ถูกเปลี่ยน",
       errors: {
         budget: "ถึงวงเงินค่าใช้จ่ายแล้ว",
@@ -533,11 +534,35 @@ export const th: DesktopStrings = {
       localOnly: "เก็บไว้ในคอมพิวเตอร์เครื่องนี้เท่านั้น ไม่อยู่ใน Private Space",
     },
 
-    runView: {
-      tab: "การเปลี่ยนแปลงของเอเจนต์", // REVIEW
-      title: "การเปลี่ยนแปลงของเอเจนต์", // REVIEW
-      none: "ไม่มีงานที่รอการตรวจ เริ่มงานได้จากมาสคอตที่มุมหน้าต่าง", // REVIEW
+    answer: {
+      heading: "คำตอบ",
+      copy: "คัดลอกคำตอบ",
+      copied: "คัดลอกแล้ว",
+      copyFailed: "คัดลอกไม่ได้ เลือกข้อความแล้วคัดลอกเองแทน", // REVIEW
+    },
+
+    session: {
+      tab: "เซสชันผู้ช่วย", // REVIEW
+      facts: "เกี่ยวกับงานนี้", // REVIEW
+      agent: "เอเจนต์",
+      model: "โมเดล",
+      started: "เริ่มเมื่อ", // REVIEW
+      state: "สถานะ",
+      defaultModel: "ค่าเริ่มต้น",
       transcript: "บันทึกการทำงาน",
+      loading: "กำลังโหลด…",
+      missing: "งานนี้ไม่อยู่ในรายการงานแล้ว งานที่เก่าที่สุดจะถูกลบเมื่อมีครบ 200 งาน", // REVIEW
+      elsewhere: "งานนี้เป็นของหน้าต่างอื่น ติดตาม ยกเลิก หรือตรวจการเปลี่ยนแปลงได้ที่หน้าต่างนั้น", // REVIEW
+      detailsGone: "คำตอบและบันทึกการทำงานของงานนี้ถูกลบแล้วตามที่ตั้งไว้ใน การตั้งค่า → ผู้ช่วย Thoth → ประวัติการทำงาน รายการงานยังเก็บงานที่สั่งและผลลัพธ์ไว้", // REVIEW
+      reviewAgain: "ตรวจการเปลี่ยนแปลง",
+      askAgain: "ถามอีกครั้ง",
+      changes: "สิ่งที่เอเจนต์เสนอ", // REVIEW
+    },
+
+    sidebar: {
+      heading: "ผู้ช่วย",
+      more: (n) => `แสดงเพิ่มอีก ${count(n)} รายการ`, // REVIEW
+      less: "แสดงน้อยลง",
     },
 
     providersHeading: "เอเจนต์",
@@ -625,6 +650,8 @@ export const th: DesktopStrings = {
       reviewReady: "การเปลี่ยนแปลงพร้อมให้คุณตรวจแล้ว", // REVIEW
       openReview: "ตรวจการเปลี่ยนแปลง",
       openResult: "เปิดผลลัพธ์",
+      openInTab: "เปิดในแท็บ",
+      askAgain: "ถามอีกครั้ง",
       settings: "การตั้งค่าผู้ช่วย",
       appliedSummary: (n) => (n === 0 ? "ไม่ได้นำการเปลี่ยนแปลงใดไปใช้" : `นำการเปลี่ยนแปลง ${count(n)} รายการไปใช้แล้ว`), // REVIEW
     },

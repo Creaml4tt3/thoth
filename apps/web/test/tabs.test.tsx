@@ -175,7 +175,13 @@ describe("restoring tabs in the same browser", () => {
   });
 
   it("starts with one empty tab when the stored text is unreadable or from another client", async () => {
-    for (const bad of ["{oops", JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }] }), JSON.stringify({ v: 1, active: 0, tabs: [{ k: "ws", server: "elsewhere", workspace: "w", page: "p" }] })]) {
+    for (const bad of [
+      "{oops",
+      JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }] }),
+      JSON.stringify({ v: 1, active: 0, tabs: [{ k: "ws", server: "elsewhere", workspace: "w", page: "p" }] }),
+      // A desktop assistant session: the web client has no assistant.
+      JSON.stringify({ v: 1, active: 0, tabs: [{ k: "run", run: "019e1a2b-3c4d-7e5f-8a6b-7c8d9e0f1a2b" }] }),
+    ]) {
       const server = new FakeWebServer();
       server.workspace("Notes");
       const browser = fakeBrowser(server, { local: new Map([[TABS_KEY, bad]]) });

@@ -438,7 +438,7 @@ describe("the assistant's runs: context", () => {
     await writeAndStart(app, "Explain it.\n@sleep 300");
     // The CLI gets the quote; the run record in the Private Space keeps only the task (no page text in records).
     expect((await fakeRecord(await workDir())).stdin).toContain('Explain it.\n@sleep 300\n\nSelected text (from Diary.md):\n"""\nDiary\n"""');
-    await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
+    await within(bubble()).findByText("No pages were changed.", undefined, { timeout: 15_000 });
     expect((await savedRecords())[0]!["task"]["prompt"]).toBe("Explain it.\n@sleep 300");
   });
 
@@ -494,7 +494,7 @@ describe("the assistant's runs: limits and settings", () => {
     await pickOnly(app, ["Diary"]);
     await writeAndStart(app, "@sleep 300\n");
     expect(budgetArg(await argvOf())).toBe("1");
-    await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
+    await within(bubble()).findByText("No pages were changed.", undefined, { timeout: 15_000 });
     expect(mascotState()).toBe("done");
     expect((await savedRecords())[0]).toMatchObject({ task: { maxBudgetUsd: 1, timeoutMs: 30 * 60_000 } });
 
@@ -505,7 +505,7 @@ describe("the assistant's runs: limits and settings", () => {
     await writeAndStart(app, "@sleep 300\n");
     await waitFor(async () => expect(await readdir(join(data, "agent-runs"))).toHaveLength(1));
     expect(budgetArg(await argvOf())).toBe("0.25");
-    await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
+    await within(bubble()).findByText("No pages were changed.", undefined, { timeout: 15_000 });
     expect((await savedRecords())[1]).toMatchObject({ task: { maxBudgetUsd: 0.25, timeoutMs: 5 * 60_000 } });
 
     // No limit: the flag is not passed at all.
@@ -514,7 +514,7 @@ describe("the assistant's runs: limits and settings", () => {
     await writeAndStart(app, "@sleep 300\n");
     await waitFor(async () => expect(await readdir(join(data, "agent-runs"))).toHaveLength(1));
     expect(budgetArg(await argvOf())).toBeNull();
-    await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
+    await within(bubble()).findByText("No pages were changed.", undefined, { timeout: 15_000 });
     const last = (await savedRecords())[2]!;
     expect(last["task"]["maxBudgetUsd"]).toBeUndefined();
   });
@@ -542,7 +542,7 @@ describe("the assistant's runs: limits and settings", () => {
     await writeAndStart(app, "@sleep 300\n");
     await waitFor(async () => expect(await readdir(join(data, "agent-runs"))).toHaveLength(1));
     expect(budgetArg(await argvOf())).toBeNull();
-    await within(bubble()).findByText("The agent finished without changing anything.", undefined, { timeout: 15_000 });
+    await within(bubble()).findByText("No pages were changed.", undefined, { timeout: 15_000 });
     expect((await savedRecords())[0]!["task"]["timeoutMs"]).toBe(60 * 60_000);
 
     // A new window reads them back; anything that is not an offered choice falls back to the default.

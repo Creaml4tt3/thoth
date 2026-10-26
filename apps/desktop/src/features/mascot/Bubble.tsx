@@ -4,9 +4,10 @@
  * Before a run: context chips (the current page by default, the text selected in the editor if any, and "+" for more
  * pages, folders, the whole Private Space or read-only workspace pages, with the existing context picker), the task,
  * the agent (Claude Code or Codex with its detection state), options (model, time limit, spending limit: off for Codex,
- * as before) and Start. While it runs: a compact streamed transcript and Cancel. After: the outcome, the result of
- * applying, and New task. When the run waits for review, it says so and opens the review tab (as a click on the mascot
- * does then).
+ * as before) and Start. While it runs: a compact streamed transcript and Cancel. After: what the agent answered
+ * (plain text, with Copy answer), the outcome, the result of applying, Ask again and New task. When the run waits for
+ * review, it says so and opens the review in the run's session tab (as a click on the mascot does then). While there is
+ * a run, an "Open in a tab" icon in the head opens its session tab.
  *
  * Esc closes it and gives focus back to the mascot; a press outside closes it too. Everything a run does still goes
  * through the Agent service (review before apply, compare-and-swap, read-only workspace copies).
@@ -21,7 +22,7 @@ import { tip, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ContextPicker } from "../agents/ContextPicker.tsx";
-import { EventLine, Outcome, StoppedNotice, providerOf } from "../agents/parts.tsx";
+import { Answer, EventLine, Outcome, StoppedNotice, providerOf } from "../agents/parts.tsx";
 import { MAX_EXCERPT, PROVIDER_FEATURES, workspaceChoiceKey, type AgentsService, type AgentsState } from "../agents/service.ts";
 import { AGENT_PROVIDERS } from "../agents/settings.ts";
 import type { Insets, Size } from "./placement.ts";
@@ -361,8 +362,9 @@ function Finished({ state, agents, focusNonce }: { state: AgentsState; agents: A
     <div className="bubble-run">
       <p className="bubble-prompt">{record.task.prompt.split("\n")[0]}</p>
       <StoppedNotice record={record} t={all.run} />
-      {/* The outcome says it all; the whole transcript stays in the review tab and the history. */}
-      {state.results === null ? <Outcome record={record} t={all.run} p={p} /> : <p role="status">{record.state === "discarded" ? all.applied.discarded : t.appliedSummary(applied)}</p>}
+      {/* What the agent said, then the outcome; the whole transcript stays in the session tab and the history. */}
+      {state.answer !== null && <Answer text={state.answer} id="bubble-answer" />}
+      {state.results === null ? <Outcome record={record} t={all.run} p={p} answered={state.answer !== null} /> : <p role="status">{record.state === "discarded" ? all.applied.discarded : t.appliedSummary(applied)}</p>}
       <div className="bubble-actions">
         {state.results !== null ? (
           <Button variant="quiet" small onClick={() => openAgentReview()}>
@@ -371,9 +373,14 @@ function Finished({ state, agents, focusNonce }: { state: AgentsState; agents: A
         ) : (
           <span />
         )}
-        <Button ref={next} variant="primary" onClick={() => void agents.newTask()}>
-          {all.applied.newTask}
-        </Button>
+        <span className="bubble-actions-end">
+          <Button variant="ghost" onClick={() => void agents.askAgain()}>
+            {t.askAgain}
+          </Button>
+          <Button ref={next} variant="primary" onClick={() => void agents.newTask()}>
+            {all.applied.newTask}
+          </Button>
+        </span>
       </div>
     </div>
   );
@@ -473,7 +480,19 @@ export function Bubble({
     >
       <div className="bubble-head">
         <h2 id="mascot-bubble-title">{t.title}</h2>
-        <IconButton icon="close" label={t.close} onClick={() => onClose(true)} />
+        <span className="bubble-head-actions">
+          {(running || reviewing || finished) && state.record !== null && (
+            <IconButton
+              icon="open-tab"
+              label={t.openInTab}
+              onClick={() => {
+                onClose(false);
+                openAgentReview();
+              }}
+            />
+          )}
+          <IconButton icon="close" label={t.close} onClick={() => onClose(true)} />
+        </span>
       </div>
       <div className="bubble-body">
         {running ? (

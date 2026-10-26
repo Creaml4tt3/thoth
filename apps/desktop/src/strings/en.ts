@@ -462,6 +462,8 @@ export const en = {
       stoppedTime: (minutes: number | null) => `Stopped at the time limit${minutes === null ? "" : ` (${minutes} minutes)`}. What the agent did before then can still be reviewed.`,
       stoppedBudget: (usd: number | null) => `Stopped at the spending limit${usd === null ? "" : ` (US$${Number.isInteger(usd) ? usd : usd.toFixed(2)})`}. What the agent did before then can still be reviewed.`,
       noChanges: "The agent finished without changing anything.",
+      /** Under the answer of a run that changed nothing: a secondary line, not the whole message. */
+      noPageChanges: "No pages were changed.",
       failed: "The agent stopped with an error. Nothing in your Private Space was changed.",
       errors: {
         budget: "The spending limit was reached.",
@@ -557,12 +559,39 @@ export const en = {
       localOnly: "Kept on this computer only, never in your Private Space.",
     },
 
-    /** The review tab: what a run proposed, the review with per-file diffs, and the result of applying. */
-    runView: {
-      tab: "Agent changes",
-      title: "Agent changes",
-      none: "No run is waiting for review. Start a task from the mascot in the corner of the window.",
+    /** What the agent said at the end of a run: plain text, in the bubble and the session tab. */
+    answer: {
+      heading: "Answer",
+      copy: "Copy answer",
+      copied: "Copied.",
+      copyFailed: "Could not copy. Select the text and copy it instead.",
+    },
+
+    /** A session tab: one run, its task, its live transcript, its answer, its review and the result. */
+    session: {
+      /** The tab's name when the run's task is not known (yet). */
+      tab: "Assistant session",
+      facts: "About this run",
+      agent: "Agent",
+      model: "Model",
+      started: "Started",
+      state: "State",
+      defaultModel: "Default",
       transcript: "Transcript",
+      loading: "Loading…",
+      missing: "This run is no longer in the list of runs. The oldest are removed after 200 runs.",
+      elsewhere: "This run belongs to another window. Follow it, cancel it or review its changes there.",
+      detailsGone: "The answer and transcript of this run were deleted, as Settings → Thoth assistant → Run history says. The list of runs keeps the task and the outcome.",
+      reviewAgain: "Review the changes",
+      askAgain: "Ask again",
+      changes: "What the agent proposed",
+    },
+
+    /** The Assistant section of the sidebar: the newest runs, each opening its session tab. */
+    sidebar: {
+      heading: "Assistant",
+      more: (n: number) => `Show ${n} more`,
+      less: "Show less",
     },
 
     providersHeading: "Agents",
@@ -653,6 +682,8 @@ export const en = {
       reviewReady: "The changes are ready for your review.",
       openReview: "Review the changes",
       openResult: "Open the result",
+      openInTab: "Open in a tab",
+      askAgain: "Ask again",
       settings: "Assistant settings",
       appliedSummary: (n: number) => (n === 0 ? "Nothing was applied." : n === 1 ? "1 change was applied." : `${n} changes were applied.`),
     },

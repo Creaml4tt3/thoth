@@ -123,6 +123,8 @@ export interface AgentsState {
   phase: RunPhase;
   record: RunRecord | null;
   events: AgentEvent[];
+  /** What the agent said at the end of the current run (`runAnswer`); null while it runs or when it said nothing. */
+  answer: string | null;
   changes: ProposedChange[] | null;
   /** Paths the user chose to apply (review). */
   approved: string[];
@@ -173,6 +175,16 @@ export interface AgentsService {
   clearHistory(): Promise<void>;
   /** Back to the form (after a run ended); keeps the selection. */
   newTask(): Promise<void>;
+  /**
+   * Back to the form with the task of run `id` (the current run when absent) to send again: a follow-up is a new
+   * run (runs are one-shot, ADR-0007). The current run keeps the draft's context; an earlier one gives the Private
+   * Space pages and files it was given (workspace pages are picked again). False when a run is still going.
+   */
+  askAgain(id?: string): Promise<boolean>;
+  /** Reads the run history again (the sidebar's Assistant section and the session tabs follow it). */
+  refresh(): Promise<void>;
+  /** The local details of a run (transcript, answer, diffs), or null when there are none. */
+  runDetails(id: string): Promise<RunDetails | null>;
   recover(): Promise<void>;
   dismissRecovered(): void;
   dispose(): Promise<void>;
@@ -193,6 +205,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     phase: "idle",
     record: null,
     events: [],
+    answer: null,
     changes: null,
     approved: [],
     results: null,
@@ -336,7 +349,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
       // Only a CLI that enforces a spending limit gets one; Codex has none, and none is pretended.
       const budgetUsd = !PROVIDER_FEATURES[provider].budget ? null : budget === "default" ? state.settings.budgetUsd : budget === "none" ? null : budget;
       const minutes = timeMinutes === "default" ? state.settings.timeMinutes : timeMinutes;
-      set({ phase: "starting", error: null, notice: null, events: [], changes: null, approved: [], results: null, record: null, detail: null });
+      set({ phase: "starting", error: null, notice: null, events: [], answer: null, changes: null, approved: [], results: null, record: null, detail: null });
       try {
         const { record, finished } = await hub.start(
           {
@@ -362,6 +375,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
         const changes = hub.changes(done.id);
         set({
           record: done,
+          answer: hub.answer(done.id),
           changes: done.state === "review" ? changes : null,
           approved: done.state === "review" ? (changes ?? []).filter((c) => c.problem === undefined).map((c) => c.path) : [],
           phase: done.state === "review" ? "review" : "finished",
@@ -434,6 +448,7 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
           phase: "review",
           record: reopened.record,
           events: details?.events ?? [],
+          answer: hub.answer(id) ?? details?.answer ?? null,
           changes: reopened.changes,
           approved: reopened.changes.filter((c) => c.problem === undefined).map((c) => c.path),
           results: null,
@@ -468,8 +483,31 @@ export function createAgentsService(vault: Vault, host: AgentHost, options: { no
     async newTask() {
       if (state.phase === "running" || state.phase === "cancelling" || state.phase === "starting" || state.phase === "applying") return;
       if (state.record && state.phase !== "review") await hub.close(state.record.id);
-      set({ phase: "idle", record: null, events: [], changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "", excerpt: null } });
+      set({ phase: "idle", record: null, events: [], answer: null, changes: null, approved: [], results: null, error: null, notice: null, draft: { ...state.draft, prompt: "", excerpt: null } });
     },
+
+    async askAgain(id) {
+      const busy = state.phase === "running" || state.phase === "cancelling" || state.phase === "starting" || state.phase === "applying" || state.phase === "review";
+      const record = id === undefined || id === state.record?.id ? state.record : (state.history.find((r) => r.id === id) ?? null);
+      if (busy || !record) return false;
+      const current = record.id === state.record?.id;
+      const prompt = record.task.prompt;
+      await service.newTask();
+      if (current) set({ draft: { ...state.draft, prompt } });
+      else {
+        // What the run was given from the Private Space (folders come back as the files they gave); workspace pages
+        // need their server, which the record does not keep, so they are picked again.
+        const wholeSpace = record.task.wholeSpace === true;
+        const selection = wholeSpace ? [] : [...new Set(record.context.filter((c) => !c.readOnly && (c.via === "selected" || c.via === "folder")).map((c) => c.path))].sort();
+        set({ draft: { ...state.draft, prompt, selection, wholeSpace, workspace: [], excerpt: null } });
+        void service.refreshPreview();
+      }
+      return true;
+    },
+
+    refresh: () => refreshHistory(),
+
+    runDetails: (id) => hub.details(id).catch(() => null),
 
     async recover() {
       const { interrupted } = await hub.recover().catch(() => ({ interrupted: [] as string[] }));

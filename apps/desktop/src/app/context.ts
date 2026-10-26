@@ -68,8 +68,15 @@ export interface Session {
   assistant: AssistantController | null;
   /** Opens the mascot's prompt bubble; `selection` (vault paths) becomes the next task's context. */
   askAssistant(selection?: string[]): void;
-  /** Opens the review tab of the current run (its proposed changes, then the result of applying). */
+  /** Opens the session tab of the current run (its transcript, answer, review and result); nothing without a run. */
   openAgentReview(): void;
+  /** Opens the session tab of run `id` (one tab per run: an open one is brought forward). */
+  openAgentRun(id: string): void;
+  /**
+   * True while this window is the only one on its Private Space (ADR-0019 rule 5). A run waiting for review that this
+   * window does not run may then be reopened here; with other windows open it may be theirs, so it is shown read-only.
+   */
+  alone: boolean;
   /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
   openFolder(path: string): void;
   reveal: { path: string; nonce: number } | null;
