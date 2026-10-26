@@ -15,13 +15,17 @@ import { ancestorFolders, buildTree } from "./tree.ts";
 import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { useServerSections } from "../servers/ServersSidebar.tsx";
 import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
-import { PRIVATE_SECTION } from "./sections.ts";
+import { FAVORITES_SECTION, PRIVATE_SECTION } from "./sections.ts";
+import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
+import type { FavoritesController } from "../favorites/useFavoritesController.ts";
 import { useAgentsSection } from "../agents/AgentsSidebar.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
 
 interface Props {
+  /** The Favorites (ADR-0027): their section is first by default, and hidden while there are none. */
+  favorites?: FavoritesController;
   pages: PageSummary[];
   current: string | null;
   /** The open workspace page, if any. */
@@ -78,7 +82,7 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
+export function Sidebar({ favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
@@ -223,6 +227,16 @@ export function Sidebar({ pages, current, currentRemote = null, currentRun = nul
       </>
     ),
   };
+  const tf = useStrings().favorites;
+  const favoritesSection: SidebarSection | null =
+    favorites && favorites.items.length > 0
+      ? {
+          id: FAVORITES_SECTION,
+          name: tf.section,
+          label: tf.section,
+          children: <FavoritesList items={favorites.items} onOpen={favorites.open} onMove={favorites.move} onRemove={favorites.remove} scroller={() => document.querySelector<HTMLElement>(".sidebar .tree-wrap")} />,
+        }
+      : null;
   const serverSections = useServerSections(currentRemote);
   const agentsSection = useAgentsSection(currentRun);
 
@@ -237,7 +251,7 @@ export function Sidebar({ pages, current, currentRemote = null, currentRun = nul
         <kbd>⌘K</kbd>
       </button>
       <nav aria-label={t.pages} className="tree-wrap">
-        <SidebarSections root={connection.root} sections={[privateSection, ...serverSections, ...(agentsSection ? [agentsSection] : [])]} />
+        <SidebarSections root={connection.root} sections={[...(favoritesSection ? [favoritesSection] : []), privateSection, ...serverSections, ...(agentsSection ? [agentsSection] : [])]} />
       </nav>
       <PendingTransfers />
       <div className="side-actions">

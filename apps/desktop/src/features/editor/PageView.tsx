@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { basename, stripExtension } from "@thoth/domain";
 import { PageFrame } from "@thoth/app-ui/editor/PageFrame.tsx";
+import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { Backlinks } from "./Backlinks.tsx";
@@ -37,6 +38,7 @@ export function PageView({ path }: { path: string }) {
       readOnlyNote={t.readOnly}
       missing={{ title: t.goneTitle, detail: t.goneDetail(path) }}
       footer={<Backlinks path={path} />}
+      actions={<FavoriteButton target={{ kind: "private", path }} />}
     />
   );
 }

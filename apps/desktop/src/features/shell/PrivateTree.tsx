@@ -17,6 +17,7 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
+import { useFavorites } from "@thoth/app-ui/favorites/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
 import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
@@ -59,6 +60,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
+  const favorites = useFavorites();
+  const tf = useStrings().favorites;
   /** `path` is null for the menu of the empty area (the top level). */
   const [menu, setMenu] = useState<{ path: string | null; at: { x: number; y: number } } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -288,7 +291,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const menuItems = (node: TreeNode): MenuItem[] => {
     const list = childrenAt(tree, dirname(node.path));
     const i = list.findIndex((n) => n.path === node.path);
+    const ref = { kind: "private" as const, path: node.path };
     return [
+      ...(node.kind === "page" && favorites ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }] : []),
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(node.path) },
       ...(node.kind === "folder" ? [{ id: "new-folder", label: tt.newFolderInside, onSelect: () => void newFolder(node.path) }] : []),
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },

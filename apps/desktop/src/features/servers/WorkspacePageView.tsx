@@ -3,6 +3,7 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
+import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { workspaceKey, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { useSession } from "../../app/context.ts";
@@ -31,10 +32,15 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
 
   // Offered whenever the user is signed in; the dialog explains an export restriction or a missing capability.
   const actions =
-    onTransfer && workspace && !signedOut ? (
+    workspace && !signedOut ? (
       <span className="page-actions">
+        <FavoriteButton target={{ kind: "workspace", server: target.server, workspace: target.workspace, page: target.page }} />
+        {onTransfer && (
+          <>
         <IconButton icon="copy" label={tt.copyHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })} />
         <IconButton icon="move-in" label={tt.moveHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "move" })} />
+          </>
+        )}
       </span>
     ) : undefined;
 

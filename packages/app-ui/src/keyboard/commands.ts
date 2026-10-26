@@ -47,6 +47,8 @@ export interface CommandActions {
   renameWorkspace?: { workspace: string; run(): void };
   deleteWorkspace?: { workspace: string; run(): void };
   reorder?(delta: -1 | 1): void;
+  /** Star or unstar the open page (ADR-0027); `on`: it is a favorite now. */
+  favorite?: { on: boolean; run(): void };
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
   /** The Thoth assistant (the desktop only): its prompt bubble, its size, and its settings. */
@@ -68,6 +70,10 @@ export interface CommandActions {
     moveRight?(): void;
     /** The current tab into a new window (the desktop only, and not a window's only tab). */
     moveToWindow?(): void;
+    /** Pin or unpin the current tab (ADR-0027); absent for an empty tab. */
+    pin?: { pinned: boolean; run(): void };
+    /** Close every tab but the current one and the pinned ones; absent when there is none to close. */
+    closeOthers?(): void;
   };
   toggleMode?(): void;
   showShortcuts(): void;
@@ -103,6 +109,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
     add("page.moveUp", t.moveUp, () => reorder(-1), { shortcut: keys.replace("↑ / ↓", "↑"), keywords: "order reorder earlier" });
     add("page.moveDown", t.moveDown, () => reorder(1), { shortcut: keys.replace("↑ / ↓", "↓"), keywords: "order reorder later" });
   }
+  if (a.favorite) add("page.favorite", a.favorite.on ? strings.favorites.remove : strings.favorites.add, a.favorite.run, { ...key("page.favorite"), keywords: "favourite favorite star bookmark pin sidebar" });
   for (const theme of THEMES) add(`theme.${theme}`, t.theme(strings.theme[theme]), () => a.theme.set(theme), { keywords: `appearance colour mode ${theme === "dark" ? "night" : ""}`.trim() });
   add("settings.open", t.settings, a.openSettings, { ...key("settings.open"), keywords: "preferences" });
   if (a.askAssistant) add("assistant.ask", t.ask, a.askAssistant, { ...key("assistant.ask"), keywords: "agent ai claude codex assistant mascot ibis prompt" });
@@ -117,6 +124,8 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   const tabKeys = shortcutText("tab.move", client, platform);
   if (a.tabs.moveLeft) add("tab.moveLeft", t.moveTabLeft, a.tabs.moveLeft, { shortcut: tabKeys.replace("← / →", "←"), keywords: "reorder order earlier" });
   if (a.tabs.moveRight) add("tab.moveRight", t.moveTabRight, a.tabs.moveRight, { shortcut: tabKeys.replace("← / →", "→"), keywords: "reorder order later" });
+  if (a.tabs.pin) add("tab.pin", a.tabs.pin.pinned ? strings.tabs.unpin : strings.tabs.pin, a.tabs.pin.run, { ...key("tab.pin"), keywords: "pin keep stick tab" });
+  if (a.tabs.closeOthers) add("tab.closeOthers", strings.tabs.closeOthers, a.tabs.closeOthers, { keywords: "close tabs others all" });
   if (a.tabs.moveToWindow) add("tab.moveToWindow", t.moveTabToWindow, a.tabs.moveToWindow, { keywords: "window detach tear off split" });
   a.tabs.list.forEach((tab, index) => {
     if (tab.id !== a.tabs.active) add(`tab.go.${tab.id}`, t.goToTab(tab.label), () => a.tabs.goTo(tab.id), { keywords: `switch tab ${index + 1}` });

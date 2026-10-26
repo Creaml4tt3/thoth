@@ -17,6 +17,7 @@ import { tipIfClipped } from "../ui/Tooltip.tsx";
 import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
+import { useFavorites } from "../favorites/context.ts";
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
@@ -34,6 +35,8 @@ interface Ctx {
   server: string;
   workspace: string;
   canWrite: boolean;
+  /** A row has a menu: for writers, or for anyone where the app has Favorites (Add to Favorites, ADR-0027). */
+  hasMenu: boolean;
   /** The server keeps page order (`page-order`). */
   ordered: boolean;
   current: WorkspacePageRef | null;
@@ -102,7 +105,8 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
       expanded,
       expand: () => ctx.toggle(item.id, true),
       collapse: () => ctx.toggle(item.id, false),
-      ...(ctx.canWrite ? { rename: () => ctx.startRename(item.id), reorder: (delta: -1 | 1) => ctx.reorder(item.id, delta), menu: () => ctx.openMenu(item.id, anchorOf(event.currentTarget)) } : {}),
+      ...(ctx.canWrite ? { rename: () => ctx.startRename(item.id), reorder: (delta: -1 | 1) => ctx.reorder(item.id, delta) } : {}),
+      ...(ctx.hasMenu ? { menu: () => ctx.openMenu(item.id, anchorOf(event.currentTarget)) } : {}),
     });
 
   return (
@@ -129,7 +133,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
           onKeyDown(event);
         }}
         onContextMenu={(event: MouseEvent<HTMLElement>) => {
-          if (!ctx.canWrite) return;
+          if (!ctx.hasMenu) return;
           event.preventDefault();
           ctx.openMenu(item.id, { x: event.clientX, y: event.clientY });
         }}
@@ -206,6 +210,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const tt = useStrings().tree;
   const tm = useStrings().members;
   const tw = useStrings().workspaces;
+  const tf = useStrings().favorites;
+  const favorites = useFavorites();
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const key = workspaceKey(server, workspace.id);
   const expanded = state.expanded.includes(key);
@@ -405,6 +411,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     server,
     workspace: workspace.id,
     canWrite,
+    hasMenu: canWrite || favorites !== null,
     ordered,
     current,
     open,
@@ -469,7 +476,15 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const menuItems = (id: string): MenuItem[] => {
     const at = siblingsOf(id);
     const i = at ? at.list.findIndex((n) => n.id === id) : -1;
+    const ref = { kind: "workspace" as const, server, workspace: workspace.id, page: id };
+    // Folders hold pages; only a page is starred (ADR-0027).
+    const star: MenuItem[] =
+      favorites && favorites.can(ref) && tree?.kinds[id]?.folder !== true
+        ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }]
+        : [];
+    if (!canWrite) return star;
     return [
+      ...star,
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(id) },
       { id: "new-page", label: tt.newPageInside, onSelect: () => void create("page", id) },
       { id: "new-folder", label: tt.newFolderInside, onSelect: () => void create("folder", id) },

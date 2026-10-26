@@ -305,3 +305,32 @@ describe("Workspaces (ADR-0025)", () => {
     expect(titles(buildCommands(all, th, "desktop", "mac"))).toEqual(expect.arrayContaining(["เวิร์กสเปซใหม่…", "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้…", "เปลี่ยนชื่อเวิร์กสเปซ Design…", "ลบเวิร์กสเปซ Design…"]));
   });
 });
+
+describe("Favorites and pinned tabs (ADR-0027)", () => {
+  it("offers Add to Favorites or Remove from Favorites for the open page, with its shortcut", () => {
+    const { actions, log } = spies();
+    const off = buildCommands({ ...actions, favorite: { on: false, run: vi.fn(() => void log.push("favorite")) } }, en, "desktop", "mac");
+    expect(find(off, "page.favorite")?.title).toBe("Add to Favorites");
+    expect(find(off, "page.favorite")?.shortcut).toBe("Cmd+D");
+    find(off, "page.favorite")!.run();
+    const on = buildCommands({ ...actions, favorite: { on: true, run: vi.fn() } }, th, "web", "other");
+    expect(find(on, "page.favorite")?.title).toBe(th.favorites.remove);
+    expect(find(on, "page.favorite")?.shortcut).toBe("Alt+Shift+D");
+    expect(find(buildCommands(actions, en, "desktop", "mac"), "page.favorite")).toBeUndefined(); // no page open
+    expect(log).toEqual(["favorite"]);
+  });
+
+  it("offers Pin tab or Unpin tab and Close other tabs for the current tab", () => {
+    const { actions, log } = spies();
+    const list = buildCommands({ ...actions, tabs: { ...actions.tabs, pin: { pinned: false, run: () => void log.push("pin") }, closeOthers: () => void log.push("others") } }, en, "desktop", "other");
+    expect(find(list, "tab.pin")?.title).toBe("Pin tab");
+    expect(find(list, "tab.pin")?.shortcut).toBe("Alt+Shift+P");
+    expect(find(list, "tab.closeOthers")?.title).toBe("Close other tabs");
+    find(list, "tab.pin")!.run();
+    find(list, "tab.closeOthers")!.run();
+    expect(log).toEqual(["pin", "others"]);
+    const pinned = buildCommands({ ...actions, tabs: { ...actions.tabs, pin: { pinned: true, run: () => undefined } } }, en, "desktop", "other");
+    expect(find(pinned, "tab.pin")?.title).toBe("Unpin tab");
+    expect(find(buildCommands(actions, en, "desktop", "other"), "tab.pin")).toBeUndefined();
+  });
+});

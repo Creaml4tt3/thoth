@@ -500,6 +500,22 @@ export const th: Strings = {
     updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้", // REVIEW
   },
 
+  favorites: {
+    section: "รายการโปรด",
+    list: "หน้าในรายการโปรด",
+    button: "รายการโปรด",
+    add: "เพิ่มในรายการโปรด",
+    remove: "เอาออกจากรายการโปรด",
+    added: (title: string) => `เพิ่ม ${title} ในรายการโปรดแล้ว`,
+    removed: (title: string) => `เอา ${title} ออกจากรายการโปรดแล้ว`,
+    menu: (title: string) => `รายการโปรด: ${title}`,
+    openNewTab: "เปิดในแท็บใหม่",
+    moveUp: "ย้ายขึ้น",
+    moveDown: "ย้ายลง",
+    moved: (title: string, position: number, total: number) => `ย้าย ${title} ไปตำแหน่งที่ ${position} จาก ${total}`,
+    unavailable: "ใช้งานไม่ได้ในขณะนี้", // REVIEW
+    failed: (reason: string) => `เปลี่ยนรายการโปรดไม่ได้: ${reason}`,
+  },
   tabs: {
     list: "หน้าที่เปิดอยู่",
     new: "แท็บใหม่",

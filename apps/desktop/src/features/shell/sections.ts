@@ -1,14 +1,16 @@
 /**
- * The order of the sidebar's sections (ADR-0019 amendment, 2026-10-26): the Private Space (`private`), one per workspace
- * server (`server:<id>`) and, where the app has it, the agents (`agents`). The brand row, search and the actions at the
- * bottom are not sections and never move.
+ * The order of the sidebar's sections (ADR-0019 amendment, 2026-10-26): the Favorites (`favorites`, ADR-0027, shown only
+ * when there is a favorite), the Private Space (`private`), one per workspace server (`server:<id>`) and, where the app
+ * has it, the agents (`agents`). The brand row, search and the actions at the bottom are not sections and never move.
  *
  * The stored order is a list of ids. Sections that are there now follow it; a section it does not name (new, or added
- * by a later version) goes at the end, in its natural place among the other new ones; ids it names that are not there
+ * by a later version) goes at the end, in its natural place among the other new ones, except the Favorites, which go
+ * first (they are there to be at hand; an order stored before they existed gets them at the top); ids it names that are not there
  * now (a server removed, or signed out of this list for a while) are ignored, and keep their place for when they come
  * back.
  */
 
+export const FAVORITES_SECTION = "favorites";
 export const PRIVATE_SECTION = "private";
 export const AGENTS_SECTION = "agents";
 export const serverSection = (id: string): string => `server:${id}`;
@@ -18,7 +20,9 @@ export function arrangeSections(stored: readonly string[], present: readonly str
   const here = new Set(present);
   const known = stored.filter((id) => here.has(id));
   const seen = new Set(known);
-  return [...known, ...present.filter((id) => !seen.has(id))];
+  const fresh = present.filter((id) => !seen.has(id));
+  const top = fresh.filter((id) => id === FAVORITES_SECTION);
+  return [...top, ...known, ...fresh.filter((id) => id !== FAVORITES_SECTION)];
 }
 
 /**

@@ -124,6 +124,15 @@ describe("the order of the sidebar's sections", () => {
     expect(arrangeSections(["server:demo", "server:gone", "private"], ["private", "server:demo", "agents"])).toEqual(["server:demo", "private", "agents"]);
   });
 
+  it("puts the Favorites first when the stored order does not name them, new or old; once moved they keep their place (ADR-0027)", () => {
+    expect(arrangeSections([], ["favorites", "private", "server:demo"])).toEqual(["favorites", "private", "server:demo"]);
+    expect(arrangeSections(["server:demo", "private"], ["private", "server:demo", "favorites"])).toEqual(["favorites", "server:demo", "private"]);
+    const moved = moveSection(["server:demo", "private"], ["favorites", "server:demo", "private"], "favorites", 2);
+    expect(arrangeSections(moved, ["favorites", "private", "server:demo"])).toEqual(["server:demo", "private", "favorites"]);
+    // Hidden while empty, they keep that place for when they come back.
+    expect(arrangeSections(moved, ["private", "server:demo"])).toEqual(["server:demo", "private"]);
+  });
+
   it("moving a section keeps the places of stored ids that are not shown now", () => {
     const stored = ["server:demo", "server:gone", "private"];
     const present = ["private", "server:demo"];

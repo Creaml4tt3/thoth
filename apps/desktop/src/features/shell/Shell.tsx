@@ -46,6 +46,10 @@ import { roleCan } from "@thoth/workspace-protocol";
 import { desktopTheme } from "../settings/theme.ts";
 import { loadSidebarWidth, saveSidebarWidth } from "../../app/sidebar-store.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
+import { FavoritesContext, type FavoriteRef } from "@thoth/app-ui/favorites/context.ts";
+import { isPinned } from "@thoth/app-ui/tabs/model.ts";
+import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
+import { useFavoritesController } from "../favorites/useFavoritesController.ts";
 
 const noSubscribe = () => () => undefined;
 
@@ -94,6 +98,10 @@ export function Shell() {
   const target = tabs.active.target;
   const path = target.kind === "page" ? target.path : null;
   const remote = target.kind === "workspace" ? { server: target.server, workspace: target.workspace, page: target.page } : null;
+  /** What a tab shows, as a favorite (ADR-0027): a page of the Private Space or of a workspace; nothing else is starred. */
+  const favoriteOf = (tab: TabTarget): FavoriteRef | null =>
+    tab.kind === "page" ? { kind: "private", path: tab.path } : tab.kind === "workspace" ? { kind: "workspace", server: tab.server, workspace: tab.workspace, page: tab.page } : null;
+  const favoriteHere = favoriteOf(target);
 
   useEffect(() => {
     let live = true;
@@ -105,6 +113,18 @@ export function Shell() {
       live = false;
     };
   }, [vault, revision]);
+
+  const favorites = useFavoritesController({ pages, current: favoriteHere });
+  /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
+  const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
+  const togglePin = (id: string = tabs.active.id) => {
+    const tab = tabs.state.tabs.find((x) => x.id === id);
+    if (!tab || tab.target.kind === "blank") return;
+    tabs.setPinned(!tab.pinned, id);
+  };
+  const toggleFavorite = () => {
+    if (favoriteHere && favorites.api.can(favoriteHere)) favorites.api.toggle(favoriteHere);
+  };
 
   const toggleSearch = () => setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
   const toggleShortcuts = () => setDialog((d) => (d?.kind === "shortcuts" ? null : { kind: "shortcuts" }));
@@ -171,6 +191,9 @@ export function Shell() {
   };
   /** Cmd/Ctrl+W: the current tab, and after the last one the window itself when another window stays open. */
   const closeTab = () => {
+    // A pinned tab stays (ADR-0027): nothing closes, and the bar says how to close it. Less surprising than moving on
+    // to another tab, which would look as if the pinned one had closed.
+    if (isPinned(tabs.state, tabs.active.id)) return setTabNotice((n) => ({ text: tt.pinnedNoClose, seq: (n?.seq ?? 0) + 1 }));
     if (!windows || tabs.state.tabs.length > 1) return tabs.close();
     void flushAll().then(async (ok) => {
       if (!ok) return;
@@ -225,6 +248,7 @@ export function Shell() {
           deleteWorkspace: { workspace: hereWorkspace.name, run: () => requestWorkspaceAdmin({ kind: "delete", server: here.server, workspace: here.workspace }) },
         }
       : {}),
+    ...(favoriteHere && favorites.api.can(favoriteHere) ? { favorite: { on: favorites.api.has(favoriteHere), run: toggleFavorite } } : {}),
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
     ...(assistant
@@ -240,6 +264,8 @@ export function Shell() {
       goTo: tabs.activate,
       ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
       ...(windows && tabs.state.tabs.length > 1 ? { moveToWindow: () => moveToWindow(tabs.active.id, null) } : {}),
+      ...(tabs.active.target.kind !== "blank" ? { pin: { pinned: tabs.active.pinned === true, run: () => togglePin() } } : {}),
+      ...(tabs.state.tabs.some((tab) => tab.id !== tabs.active.id && !tab.pinned) ? { closeOthers: () => tabs.closeOthers() } : {}),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -259,6 +285,8 @@ export function Shell() {
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
+    "tab.pin": () => togglePin(),
+    "page.favorite": toggleFavorite,
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
 
@@ -291,7 +319,14 @@ export function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantedKey, servers, directory.servers]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}) }));
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
+  /** The tab's menu also stars its page (ADR-0027). */
+  const tabMenuExtras = (id: string): MenuItem[] => {
+    const tab = tabs.state.tabs.find((x) => x.id === id);
+    const ref = tab ? favoriteOf(tab.target) : null;
+    if (!ref || !favorites.api.can(ref)) return [];
+    return [{ id: "favorite", label: favorites.api.has(ref) ? strings.favorites.remove : strings.favorites.add, onSelect: () => favorites.api.toggle(ref) }];
+  };
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
@@ -309,13 +344,34 @@ export function Shell() {
 
   return (
     <HintContext value={hints}>
+    <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style}>
-      <Sidebar pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
+      <Sidebar favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
       <main className="main">
-        <TabBar tabs={items} active={tabs.active.id} onActivate={tabs.activate} onClose={tabs.close} onNew={tabs.newTab} onMove={tabs.move} {...(windows ? { onDetach: moveToWindow } : {})} />
+        <TabBar
+          tabs={items}
+          active={tabs.active.id}
+          onActivate={tabs.activate}
+          onClose={tabs.close}
+          onNew={tabs.newTab}
+          onMove={tabs.move}
+          onPin={(id, pinned) => tabs.setPinned(pinned, id)}
+          onCloseOthers={(id) => tabs.closeOthers(id)}
+          menuExtras={tabMenuExtras}
+          notice={tabNotice}
+          {...(windows ? { onDetach: moveToWindow } : {})}
+        />
         {watchError && (
           <p role="alert" className="alert alert-warning banner">
             {t.watchError(watchError)}
+          </p>
+        )}
+        {favorites.error && (
+          <p role="alert" className="alert alert-danger banner">
+            {favorites.error}{" "}
+            <Button variant="quiet" small onClick={favorites.dismissError}>
+              {dismissText}
+            </Button>
           </p>
         )}
         {problem && (
@@ -350,12 +406,16 @@ export function Shell() {
       <UpdateNotice />
       <TooltipLayer />
       <SpaceDragBadge />
+      <div className="sr-only" aria-live="polite" aria-atomic="true" data-favorites-note="">
+        {favorites.said}
+      </div>
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />}
     </div>
+    </FavoritesContext>
     </HintContext>
   );
 }

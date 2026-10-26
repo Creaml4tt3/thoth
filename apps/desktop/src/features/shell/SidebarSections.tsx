@@ -24,7 +24,7 @@ import { tip, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { loadSidebarLayout, saveSectionCollapsed, saveSectionOrder, subscribeSidebarLayout, type SidebarLayout } from "../../app/sidebar-store.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { arrangeSections, moveSection } from "./sections.ts";
-import { useSectionDrag } from "./section-drag.ts";
+import { useListDrag } from "@thoth/app-ui/order/list-drag.ts";
 
 export interface SidebarSection {
   /** `private`, `server:<id>` or `agents` (sections.ts). */
@@ -123,10 +123,10 @@ export function SidebarSections({ root, sections }: { root: string; sections: re
     saveSectionCollapsed(root, [...next]);
   };
 
-  const { drag, onPointerDown, swallowClick } = useSectionDrag({
+  const { drag, onPointerDown, swallowClick } = useListDrag({
     order,
     scroller: () => host.current?.closest<HTMLElement>(".tree-wrap") ?? host.current,
-    section: (id) => boxes.current.get(id) ?? null,
+    item: (id) => boxes.current.get(id) ?? null,
     onMove: (id, to) => void move(id, to),
     onEnd: rememberPlaces,
   });

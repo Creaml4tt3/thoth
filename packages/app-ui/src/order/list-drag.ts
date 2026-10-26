@@ -1,9 +1,9 @@
 /**
- * Dragging a sidebar section by its header to a new place (ADR-0019 amendment), with the same live preview as the tabs
- * (`@thoth/app-ui/tabs/drag.ts`): the section lifts and follows the pointer up and down the sidebar, and the other
- * sections slide aside to open the gap where it would land. Pointer events, not HTML5 drag and drop: the page trees
- * inside the sections use HTML5 drag and drop on their rows, and a press there never reaches a header, so neither drag
- * can start the other.
+ * Dragging an item of a vertical list to a new place, with the same live preview as the tabs (`../tabs/drag.ts`): the
+ * item lifts and follows the pointer up and down, and the others slide aside to open the gap where it would land. The
+ * sidebar's sections use it by their headers (ADR-0019 amendment) and the Favorites by their rows (ADR-0027). Pointer
+ * events, not HTML5 drag and drop: the page trees use HTML5 drag and drop on their rows, and a press there never
+ * reaches a section header or a favorite, so neither drag can start the other.
  *
  * - A press becomes a drag after it moves `DRAG_PX`; less is a click. Touch never drags (it scrolls the sidebar).
  * - Positions are measured from the sections' boxes cached when the drag began, plus how far the sidebar has scrolled
@@ -12,26 +12,28 @@
  * - `onEnd` is called just before a drag that had started ends, while the sections are still shown where it put them.
  */
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { gapBetween, previewShifts, slotIndex, type Span } from "@thoth/app-ui/order/live-reorder.ts";
+import { gapBetween, previewShifts, slotIndex, type Span } from "./live-reorder.ts";
 
 export const DRAG_PX = 5;
 const EDGE_PX = 32;
 const EDGE_SPEED = 14;
 
-export interface SectionDragState {
+export interface ListDragState {
   id: string;
   /** The index it would land at. */
   to: number;
-  /** How far each section is shown moved down (px). */
+  /** How far each item is shown moved down (px). */
   shifts: Readonly<Record<string, number>>;
 }
 
-export interface SectionDragOptions {
-  /** The sections in order (ids). */
+export interface ListDragOptions {
+  /** The items in order (ids). */
   order: readonly string[];
-  /** The element that scrolls (the sidebar's list) and each section's element. */
+  /** The element that scrolls (the sidebar's list) and each item's element. */
   scroller(): HTMLElement | null;
-  section(id: string): HTMLElement | null;
+  item(id: string): HTMLElement | null;
+  /** The indexes the item `id` may land at, both included (a favorite stays among those of its space). Omitted: anywhere. */
+  bounds?(id: string): readonly [number, number];
   onMove(id: string, to: number): void;
   onEnd?(): void;
 }
@@ -52,13 +54,13 @@ interface Cache {
   max: number;
 }
 
-/** A press on one of these inside a header is the control's own, not the start of a drag (the grip and the name are). */
+/** A press on one of these inside an item is the control's own, not the start of a drag (a header's grip and name are). */
 const OWN_CONTROLS = ".sec-actions, input, select, textarea, a";
 
-export function useSectionDrag(options: SectionDragOptions) {
+export function useListDrag(options: ListDragOptions) {
   const opts = useRef(options);
   opts.current = options;
-  const [drag, setDrag] = useState<SectionDragState | null>(null);
+  const [drag, setDrag] = useState<ListDragState | null>(null);
   const pending = useRef<Pending | null>(null);
   const cache = useRef<Cache | null>(null);
   const last = useRef<number | null>(null);
@@ -69,13 +71,13 @@ export function useSectionDrag(options: SectionDragOptions) {
   const remember = useCallback((scroller: HTMLElement): Cache => {
     const o = opts.current;
     const spans = o.order.map((id) => {
-      const r = o.section(id)?.getBoundingClientRect();
+      const r = o.item(id)?.getBoundingClientRect();
       return { start: r?.top ?? 0, size: r?.height ?? 0 };
     });
     return { order: [...o.order], spans, scroll: scroller.scrollTop, gap: gapBetween(spans), min: Math.min(...spans.map((s) => s.start)), max: Math.max(...spans.map((s) => s.start + s.size)) };
   }, []);
 
-  const measure = useCallback((y: number): SectionDragState | null => {
+  const measure = useCallback((y: number): ListDragState | null => {
     const p = pending.current;
     const c = cache.current;
     const scroller = opts.current.scroller();
@@ -85,7 +87,9 @@ export function useSectionDrag(options: SectionDragOptions) {
     if (!self) return null;
     const scrolled = scroller.scrollTop - c.scroll;
     const dy = y - p.y;
-    const to = slotIndex(c.spans.filter((_, i) => i !== from), self.start + self.size / 2 + dy, false, scrolled);
+    const slot = slotIndex(c.spans.filter((_, i) => i !== from), self.start + self.size / 2 + dy, false, scrolled);
+    const [first, last] = opts.current.bounds?.(p.id) ?? [0, c.order.length - 1];
+    const to = Math.max(first, Math.min(slot, last));
     const moved = previewShifts(c.order.length, from, to, self.size, c.gap);
     // It follows the pointer, kept between the first section's top and the last one's bottom, and within what the
     // sidebar shows (unless it is taller than that, then it just follows).
@@ -112,7 +116,7 @@ export function useSectionDrag(options: SectionDragOptions) {
 
   useEffect(() => end, [end]);
 
-  // A section that comes or goes during the drag (a server added in Settings): the measured places are gone.
+  // An item that comes or goes during the drag (a server added in Settings): the measured places are gone.
   const orderKey = options.order.join("\u0000");
   useEffect(() => {
     const c = cache.current;

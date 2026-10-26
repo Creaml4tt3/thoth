@@ -27,6 +27,20 @@
 .tree-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .tree-item[aria-selected="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
+/* Favorites (ADR-0027): rows like the tree's, with a small hint of their space, reordered by a pointer drag with a live
+   preview (transforms only, nothing under reduced motion where the duration tokens are 0). */
+.fav-row { position: relative; }
+.fav-item { padding-left: 24px; min-height: 28px; }
+.fav-item[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-faint); }
+.fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-faint); }
+[data-fav-dragging] .fav-row:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
+.fav-row[data-dragging] { z-index: 2; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); }
+[data-fav-dragging], [data-fav-dragging] .fav-item { cursor: grabbing; }
+.fav-row { -webkit-user-select: none; user-select: none; }
+/* The star in a page's header: an outline, filled once the page is a favorite. */
+.fav-star-on { color: var(--thoth-accent); }
+.fav-star-on .icon-star { fill: currentColor; }
 .tree-caret { width: 12px; height: 12px; display: inline-grid; place-items: center; color: var(--thoth-ink-faint); flex: none; border-radius: var(--thoth-radius-xs); }
 .tree-caret svg { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-caret[data-open] svg { transform: rotate(90deg); }

@@ -541,6 +541,25 @@ export const en = {
     updateBody: "Open to download it, read what is new, or skip it.",
   },
 
+  /** Favorites (ADR-0027): starred pages, at the top of the sidebar. */
+  favorites: {
+    section: "Favorites",
+    list: "Favorite pages",
+    /** The star in a page's header: one name, its state is `aria-pressed`. */
+    button: "Favorite",
+    add: "Add to Favorites",
+    remove: "Remove from Favorites",
+    added: (title: string) => `${title} added to Favorites`,
+    removed: (title: string) => `${title} removed from Favorites`,
+    menu: (title: string) => `Favorite: ${title}`,
+    openNewTab: "Open in new tab",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    moved: (title: string, position: number, total: number) => `${title} moved to position ${position} of ${total}`,
+    /** A workspace favorite whose server is signed out or not loaded yet: it stays, and opening it says why. */
+    unavailable: "Not available right now",
+    failed: (reason: string) => `Could not change Favorites: ${reason}`,
+  },
   tabs: {
     list: "Open pages",
     new: "New tab",
