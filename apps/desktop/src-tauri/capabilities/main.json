@@ -42,6 +42,8 @@
     "allow-source-temp-create",
     "allow-source-temp-write",
     "allow-source-close",
+    "allow-image-pick",
+    "allow-image-read",
     "allow-server-list",
     "allow-server-add",
     "allow-server-remove",

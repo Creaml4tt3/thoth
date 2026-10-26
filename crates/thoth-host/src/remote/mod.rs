@@ -469,6 +469,12 @@ impl Remote {
                 kept.insert(name.clone(), Value::String(joined));
             }
         }
+        // `responseBytes` (an attachment's bytes, ADR-0028): a successful body is sent as base64, never as lossy text.
+        if args.get("responseBytes").and_then(Value::as_bool) == Some(true) && (200..300).contains(&response.status) {
+            use base64::Engine;
+            let encoded = base64::engine::general_purpose::STANDARD.encode(&response.body);
+            return Ok(json!({ "status": response.status, "headers": kept, "body": "", "bodyBase64": encoded }));
+        }
         Ok(json!({ "status": response.status, "headers": kept, "body": String::from_utf8_lossy(&response.body) }))
     }
 

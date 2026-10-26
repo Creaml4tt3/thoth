@@ -111,6 +111,13 @@ export interface Commands {
   "source.temp.write": { args: { file: string; position: number }; result: null };
   "source.close": { args: { source: string }; result: null };
 
+  /**
+   * The image picker (ADR-0028): a png, jpeg, gif, webp, avif, svg, bmp or ico file of at most 20 MB, or null when
+   * cancelled. The page never learns the path; `image.read` gives the bytes of a picked image once.
+   */
+  "image.pick": { args: Record<string, never>; result: { image: string; name: string; size: number } | null };
+  "image.read": { args: { image: string }; result: Bytes };
+
   // ---- Workspace servers (Phase 2b part 3). The host is the HTTP client: tokens never enter the webview.
   "server.list": { args: Record<string, never>; result: ServerInfo[] };
   /** Fetches `/api/v1/capabilities` from `url` and remembers the server. `https`, or `http` on a loopback host only. */
@@ -338,14 +345,18 @@ export interface ApiCallArgs {
   query?: Record<string, string>;
   /** Only `if-match`, `if-none-match`, `idempotency-key` and `content-type` are forwarded. */
   headers?: Record<string, string>;
+  /** A binary response (an attachment's bytes, ADR-0028): a 2xx body comes as `bodyBase64`, not as text. */
+  responseBytes?: boolean;
 }
 
 export interface ApiCallResult {
   status: number;
   /** Only `content-type`, `etag`, `location` and `retry-after`. */
   headers: Record<string, string>;
-  /** The response body as UTF-8 text (JSON or problem JSON). At most 32 MiB. */
+  /** The response body as UTF-8 text (JSON or problem JSON). At most 32 MiB. Empty when `bodyBase64` is set. */
   body: string;
+  /** With `responseBytes`, a successful response's body, base64. */
+  bodyBase64?: string;
 }
 
 export type CommandName = keyof Commands;

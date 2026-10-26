@@ -9,6 +9,7 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "watch_start", "watch_stop",
     "source_pick", "source_open", "source_list", "source_file_open", "source_file_read", "source_file_close",
     "source_temp_create", "source_temp_write", "source_close",
+    "image_pick", "image_read",
     "server_list", "server_add", "server_remove", "server_signIn", "server_signInCancel", "server_useToken", "server_signOut",
     "api_call",
     "agent_detect", "agent_run_create", "agent_fs_stat", "agent_fs_read", "agent_fs_list", "agent_fs_mkdirp", "agent_fs_write",

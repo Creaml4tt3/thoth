@@ -65,6 +65,7 @@ pub const COMMANDS: &[&str] = &[
     "watch.start", "watch.stop",
     "source.pick", "source.open", "source.list", "source.file.open", "source.file.read", "source.file.close",
     "source.temp.create", "source.temp.write", "source.close",
+    "image.pick", "image.read",
     "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
     "api.call",
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
@@ -79,11 +80,19 @@ pub const VAULT_CHANGED: &str = "vault.changed";
 const MAX_OPEN_VAULTS: usize = 64;
 const MAX_OPEN_SOURCES: usize = 64;
 const MAX_RECENT: usize = 20;
+/// The largest image a page accepts (ADR-0028), and the image types it shows.
+pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"];
+const MAX_PICKED_IMAGES: usize = 16;
 
 /// Native pickers. The desktop shell shows dialogs; the harness returns fixed paths.
 pub trait Picker: Send + Sync {
     fn pick_vault(&self) -> Option<PathBuf>;
     fn pick_source(&self, directory: bool) -> Option<PathBuf>;
+    /// An image file to add to a page (ADR-0028). None: cancelled, or no picker (the default).
+    fn pick_image(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 /// Shows an open vault's folder in the system file manager (Finder, File Explorer, Files). The desktop shell
@@ -136,6 +145,8 @@ struct FileEntry {
 struct State {
     picked_vaults: HashSet<PathBuf>,
     picked_sources: HashSet<PathBuf>,
+    /// Images the user picked and the page has not read yet (`image.pick`, then `image.read` once).
+    picked_images: HashMap<String, PathBuf>,
     vaults: HashMap<String, Arc<VaultEntry>>,
     sources: HashMap<String, Arc<Mutex<Source>>>,
     files: HashMap<String, Arc<FileEntry>>,
@@ -344,6 +355,8 @@ impl Host {
                 self.close_source(str_arg(args, "source")?)?;
                 null()
             }
+            "image.pick" => json(self.pick_image()?),
+            "image.read" => Ok((Value::Null, Some(self.read_picked_image(str_arg(args, "image")?)?))),
             "server.list" => json(self.remote.list()),
             "server.add" => json(self.remote.add(str_arg(args, "url")?)?),
             "server.remove" => {
@@ -575,6 +588,50 @@ impl Host {
         let shown = location.to_string_lossy().into_owned();
         self.state().picked_sources.insert(location);
         Value::String(shown)
+    }
+
+    /// The image picker (ADR-0028): `{ image, name, size }` for a picked image file, or null when cancelled. The page
+    /// never learns the path; `image.read` with the handle gives the bytes once.
+    fn pick_image(&self) -> HostResult<Value> {
+        let Some(picked) = self.config.picker.pick_image() else { return Ok(Value::Null) };
+        let Ok(path) = canonicalize_path(&picked) else { return Ok(Value::Null) };
+        let name = path.file_name().and_then(|n| n.to_str()).map(str::to_owned).ok_or_else(|| HostError::bad_argument("The picked file has no usable name"))?;
+        let ext = path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+        if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+            return Err(HostError::new("NOT_AN_IMAGE", "This file is not an image a page can show"));
+        }
+        let meta = std::fs::metadata(&path).map_err(|e| HostError::io(&e, "stat", &name))?;
+        if !meta.is_file() {
+            return Err(HostError::new("NOT_A_REGULAR_FILE", format!("Not a regular file: {name}")));
+        }
+        if meta.len() > MAX_IMAGE_BYTES {
+            return Err(HostError::new("TOO_LARGE", "The image is larger than 20 MB"));
+        }
+        let handle = handles::new_handle("image")?;
+        let mut state = self.state();
+        // Picks that were never read (a page closed meanwhile) do not pile up.
+        if state.picked_images.len() >= MAX_PICKED_IMAGES {
+            state.picked_images.clear();
+        }
+        state.picked_images.insert(handle.clone(), path);
+        Ok(json!({ "image": handle, "name": name, "size": meta.len() }))
+    }
+
+    /// The bytes of a picked image; the handle is used up.
+    fn read_picked_image(&self, handle: &str) -> HostResult<Vec<u8>> {
+        let path = self.state().picked_images.remove(handle).ok_or_else(|| HostError::bad_handle("image"))?;
+        let shown = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let file = std::fs::File::open(&path).map_err(|e| HostError::io(&e, "open", &shown))?;
+        let meta = file.metadata().map_err(|e| HostError::io(&e, "stat", &shown))?;
+        if !meta.is_file() {
+            return Err(HostError::new("NOT_A_REGULAR_FILE", format!("Not a regular file: {shown}")));
+        }
+        let mut out = Vec::new();
+        std::io::Read::read_to_end(&mut std::io::Read::take(file, MAX_IMAGE_BYTES + 1), &mut out).map_err(|e| HostError::io(&e, "read", &shown))?;
+        if out.len() as u64 > MAX_IMAGE_BYTES {
+            return Err(HostError::new("TOO_LARGE", "The image is larger than 20 MB"));
+        }
+        Ok(out)
     }
 
     fn open_source(&self, raw: &str) -> HostResult<Value> {

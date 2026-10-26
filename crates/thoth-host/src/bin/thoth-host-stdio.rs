@@ -16,7 +16,7 @@
 //! `link.*` (link previews fetch from the network) and `update.*` (the update check does too).
 //!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
-//! --pick-source <path>, --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
+//! --pick-source <path>, --pick-image <path> (the image picker's answer, ADR-0028), --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
 //! there, so tests run a fake `claude` and can make it missing), --secrets-file <path> (keep server secrets in
 //! that file instead of memory: it stands in for the system keychain, so a test can restart the host and still
 //! be signed in, as the desktop app is), --link-preview-loopback (link previews may fetch from loopback
@@ -41,6 +41,7 @@ const MAX_LINE: usize = 1024 * 1024 * 1024 / 3 * 4 + 1024 * 1024;
 struct FixedPicker {
     vault: Option<PathBuf>,
     source: Option<PathBuf>,
+    image: Option<PathBuf>,
 }
 
 impl Picker for FixedPicker {
@@ -49,6 +50,9 @@ impl Picker for FixedPicker {
     }
     fn pick_source(&self, _directory: bool) -> Option<PathBuf> {
         self.source.clone()
+    }
+    fn pick_image(&self) -> Option<PathBuf> {
+        self.image.clone()
     }
 }
 
@@ -120,7 +124,7 @@ impl SecretStore for FileSecretStore {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS]");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS]");
     std::process::exit(2);
 }
 
@@ -128,6 +132,7 @@ fn main() {
     let mut allow_roots = Vec::new();
     let mut vault = None;
     let mut source = None;
+    let mut image = None;
     let mut data_dir = None;
     let mut agent_dirs: Option<Vec<PathBuf>> = None;
     let mut secrets_file = None;
@@ -146,6 +151,7 @@ fn main() {
             Some("--allow-root") => allow_roots.push(value()),
             Some("--pick-vault") => vault = Some(value()),
             Some("--pick-source") => source = Some(value()),
+            Some("--pick-image") => image = Some(value()),
             Some("--data-dir") => data_dir = Some(value()),
             Some("--agent-search-dir") => agent_dirs.get_or_insert_with(Vec::new).push(value()),
             Some("--secrets-file") => secrets_file = Some(value()),
@@ -171,7 +177,7 @@ fn main() {
     let host = Host::new(HostConfig {
         data_dir,
         allow_roots,
-        picker: Arc::new(FixedPicker { vault, source }),
+        picker: Arc::new(FixedPicker { vault, source, image }),
         events: Arc::new(move |event, payload| event_emit(json!({ "event": event, "payload": payload }))),
         disable_hardlink: std::env::var_os("THOTH_TEST_DISABLE_HARDLINK").is_some_and(|v| v == "1"),
         secrets: match secrets_file {

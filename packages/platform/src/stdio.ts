@@ -15,6 +15,8 @@ export interface StdioTransportOptions {
   allowRoots?: string[];
   pickVault?: string;
   pickSource?: string;
+  /** The image picker's answer (`--pick-image`, ADR-0028). */
+  pickImage?: string;
   dataDir?: string;
   /** Test hook: look for agent CLIs only in these folders (`--agent-search-dir`). */
   agentSearchDirs?: string[];
@@ -48,7 +50,7 @@ interface Pending {
 }
 
 /** Commands whose result is raw bytes (out of band). */
-const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read", "agent.fs.read", "agent.history.read"]);
+const BYTE_RESULTS = new Set<CommandName>(["fs.read", "source.file.read", "agent.fs.read", "agent.history.read", "image.read"]);
 
 export class StdioTransport implements Transport {
   private readonly child: ChildProcessWithoutNullStreams;
@@ -65,6 +67,7 @@ export class StdioTransport implements Transport {
     for (const root of options.allowRoots ?? []) args.push("--allow-root", root);
     if (options.pickVault !== undefined) args.push("--pick-vault", options.pickVault);
     if (options.pickSource !== undefined) args.push("--pick-source", options.pickSource);
+    if (options.pickImage !== undefined) args.push("--pick-image", options.pickImage);
     if (options.dataDir !== undefined) args.push("--data-dir", options.dataDir);
     for (const dir of options.agentSearchDirs ?? []) args.push("--agent-search-dir", dir);
     if (options.secretsFile !== undefined) args.push("--secrets-file", options.secretsFile);

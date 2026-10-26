@@ -348,5 +348,10 @@ export function createRemotePlatform(transport: Transport, kind: Platform["kind"
     openVault: (root) => openRemoteVault(transport, root),
     pickImportSource: (sourceKind) => transport.call("source.pick", { kind: sourceKind }),
     openImportSource: (location) => RemoteSourceHost.open(transport, location),
+    async pickImage() {
+      const picked = await transport.call("image.pick", {});
+      if (!picked) return null;
+      return { name: picked.name, bytes: await transport.call("image.read", { image: picked.image }) };
+    },
   };
 }

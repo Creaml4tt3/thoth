@@ -68,6 +68,10 @@ impl Picker for DialogPicker {
         let picked = if directory { dialog.blocking_pick_folder() } else { dialog.add_filter("Export archive", &["zip"]).blocking_pick_file() };
         picked?.into_path().ok()
     }
+
+    fn pick_image(&self) -> Option<PathBuf> {
+        self.app.dialog().file().set_title("Add an image").add_filter("Images", thoth_host::IMAGE_EXTENSIONS).blocking_pick_file()?.into_path().ok()
+    }
 }
 
 /// Workspace-server secrets in the OS keychain (macOS Keychain, Windows Credential Manager, Linux keyutils),
@@ -299,6 +303,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     .title("Thoth")
                     .inner_size(1200.0, 800.0)
                     .min_inner_size(720.0, 480.0)
+                    // Files dropped from the system arrive as the page's own drop events (images, ADR-0028), not as paths.
+                    .disable_drag_drop_handler()
                     .focused(true);
                 // The tab was let go here: the new window's tab bar starts under the pointer.
                 if let Some((x, y)) = window.at {

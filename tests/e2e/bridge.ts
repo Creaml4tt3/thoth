@@ -19,7 +19,7 @@ const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javas
  * is JSON. Request bytes (`fs.write`, `source.temp.write`, `api.call`, `agent.fs.write`, `agent.start`, `agent.history.write`) are forwarded
  * for any command.
  */
-const BYTE_RESULTS = new Set<string>(["fs.read", "source.file.read", "agent.fs.read", "agent.history.read"]);
+const BYTE_RESULTS = new Set<string>(["fs.read", "source.file.read", "agent.fs.read", "agent.history.read", "image.read"]);
 
 export interface Bridge {
   url: string;

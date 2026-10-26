@@ -10,6 +10,19 @@ import { selectNotifier } from "./platform/notifier.ts";
 const container = document.getElementById("root");
 if (!container) throw new Error("Missing #root");
 
+// Files dropped from the system reach the page (ADR-0028): a page takes image files; a file dropped anywhere else
+// must never make the window open it in place of the app.
+const carriesFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+window.addEventListener("dragover", (event) => {
+  if (carriesFiles(event) && !event.defaultPrevented) {
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = "none";
+  }
+});
+window.addEventListener("drop", (event) => {
+  if (carriesFiles(event)) event.preventDefault();
+});
+
 selectPlatform()
   // A window the app opened says which it is, and what it shows, in its address (ADR-0019).
   .then((platform) => createRoot(container).render(<App platform={platform} launch={readLaunch(window.location.search)} options={{ notifier: selectNotifier() }} />))

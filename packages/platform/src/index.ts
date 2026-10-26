@@ -40,6 +40,11 @@ export interface Platform {
   /** Native picker for an import source: an archive file or a folder. */
   pickImportSource(kind: "file" | "directory"): Promise<string | null>;
   openImportSource(location: string): Promise<SourceHost>;
+  /**
+   * Native picker for an image to add to a page (ADR-0028): its file name and bytes, or null when cancelled. Absent
+   * where the host has none. The page never learns where the file was.
+   */
+  pickImage?(): Promise<{ name: string; bytes: Uint8Array } | null>;
   /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
   readonly servers: Servers;
   /**
