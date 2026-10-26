@@ -910,6 +910,19 @@ day: drag-onto-text waits for the settled tree, the app is built once in a globa
 folder" steps wait for focus to come back after a rename).
 Not yet checked by a person in a real window: the mascot's look and motion, the drag feel, Thai on screen.
 
+**Answers and sessions (2026-10-26)** (ADR-0007 amendment, decisions 14–20, Proposed): a run's answer (the result's
+text, else its last text; `runAnswer` in `packages/agent-core/src/answer.ts`) is shown when it ends, as plain text
+with Copy answer, in the bubble and in the run's session tab; "No pages were changed." is a line under it. It is kept in
+memory and read back from the local transcript, never in the run record. Each run has its own session tab (`agent-run`
+tab kind, replacing the single review tab), opened by the bubble's "Open in a tab" icon, the sidebar, notifications and
+the mascot; it holds the live transcript and Cancel, the answer, the review and the result, or an earlier run's answer,
+transcript and changes from its local details (read-only for a run another window owns). The sidebar's Assistant
+section (id `agents`) lists the five newest runs and expands to the rest. "Ask again" starts the bubble with the same
+task and context. Tests: `apps/desktop/test/agent-sessions.test.tsx`, `packages/agent-core/test/answer.test.ts`,
+`tests/agent/hub.test.ts` › "keeps a run's answer…", `tests/e2e/agent-hub.e2e.ts` › "a question gets its answer…".
+Not yet checked by a person in a real window: the answer box with a long real answer, the sidebar section beside the
+reorderable sections, Thai on screen.
+
 Not done / follow-ups (see §4 item 12):
 - A Thoth OS-level sandbox (planned in ADR-0007); git worktrees.
 - Codex on Windows and Linux was not tried on a real machine; the sandbox probe decides there. Codex's permission
