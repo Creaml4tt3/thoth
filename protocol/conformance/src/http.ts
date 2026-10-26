@@ -36,7 +36,8 @@ export interface Client {
   /** Opens a streaming GET for a route (SSE). The caller aborts the controller. */
   stream(operationId: string, init: CallInit, controller: AbortController): Promise<{ response: Response; issues: string[] }>;
   /**
-   * A GET outside /api/v1 without any credential, for the public pages of a capability (`public-share`: `/s/<token>`).
+   * A GET outside /api/v1 without any credential, for the public pages of a capability (`public-share`: `/s/<token>`;
+   * `invite-links`: `/i/<token>`).
    * Not validated against the route registry; the check asserts what it needs.
    */
   publicGet(path: string, accept: string): Promise<{ status: number; headers: Headers; text: string }>;

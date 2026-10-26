@@ -3,6 +3,7 @@ import { PageResourceSchema, parseEtag } from "@thoth/workspace-protocol";
 import { attachmentChecks, eventChecks, pageKindChecks, pageOrderChecks, searchChecks, transferChecks } from "./checks-capabilities.ts";
 import { coreChecks } from "./checks-core.ts";
 import { shareChecks } from "./checks-share.ts";
+import { inviteChecks, memberChecks } from "./checks-members.ts";
 import { createClient } from "./http.ts";
 import { CheckFailure, CheckSkip, type Check, type Context } from "./support.ts";
 import type { CheckGroup, CheckResult, ConformanceGroup, ConformanceOptions, ConformanceReport } from "./types.ts";
@@ -50,7 +51,7 @@ const cleanupCheck: Check = {
   },
 };
 
-export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, ...pageOrderChecks, ...pageKindChecks, ...shareChecks, cleanupCheck, responseContractCheck];
+export const ALL_CHECKS: readonly Check[] = [...coreChecks, ...attachmentChecks, ...searchChecks, ...eventChecks, ...transferChecks, ...pageOrderChecks, ...pageKindChecks, ...shareChecks, ...memberChecks, ...inviteChecks, cleanupCheck, responseContractCheck];
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

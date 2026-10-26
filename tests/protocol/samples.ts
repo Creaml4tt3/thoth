@@ -10,6 +10,7 @@ const REV = {
   contentHash: "a".repeat(64),
 };
 const SHARE_LINK = { id: "shl_1", workspaceId: "ws_1", pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", createdAt: "2026-10-21T10:00:00Z", createdBy: "user_1", expiresAt: "2026-11-20T10:00:00Z" };
+const INVITE_LINK = { id: "inv_1", workspaceId: "ws_1", role: "viewer", maxUses: 5, usesLeft: 4, createdAt: "2026-10-26T10:00:00Z", createdBy: "user_1", createdByName: "Ada", expiresAt: "2026-11-02T10:00:00Z" };
 const META = {
   workspaceId: "ws_1",
   parentId: null,
@@ -71,4 +72,12 @@ export const SAMPLES: Record<string, unknown> = {
   ShareLink: SHARE_LINK,
   ShareLinkCreated: { ...SHARE_LINK, token: "c2hhcmUtdG9rZW4tZXhhbXBsZS0xMjM0NTY3OA", url: "https://notes.example.org/s/c2hhcmUtdG9rZW4tZXhhbXBsZS0xMjM0NTY3OA" },
   ShareLinkList: { items: [SHARE_LINK, { ...SHARE_LINK, id: "shl_2", expiresAt: null }], nextCursor: null },
+  MemberList: { items: [{ userId: "user_1", displayName: "Ada", role: "owner" }, { userId: "user_2", displayName: "Grace", role: "viewer" }], nextCursor: null },
+  MemberRoleChange: { role: "editor" },
+  InviteLinkCreateRequest: { role: "viewer", expiresInDays: 7, maxUses: 5 },
+  InviteLink: INVITE_LINK,
+  InviteLinkCreated: { ...INVITE_LINK, token: "aW52aXRlLXRva2VuLWV4YW1wbGUtMTIzNDU2Nzg", url: "https://notes.example.org/i/aW52aXRlLXRva2VuLWV4YW1wbGUtMTIzNDU2Nzg" },
+  InviteLinkList: { items: [INVITE_LINK], nextCursor: null },
+  InviteAcceptRequest: { token: "aW52aXRlLXRva2VuLWV4YW1wbGUtMTIzNDU2Nzg" },
+  InviteAccepted: { workspaceId: "ws_1", name: "Team", role: "viewer", joined: true },
 };

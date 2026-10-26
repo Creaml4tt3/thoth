@@ -9,6 +9,7 @@ import { AttachmentResourceSchema } from "./attachments.ts";
 import { ChangeEntrySchema, ChangeHintEventSchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemSchema, TransferResourceSchema } from "./transfers.ts";
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
+import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
   /** OpenAPI component name. */
@@ -55,4 +56,12 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "ShareLink", file: "share-link.v1", schema: ShareLinkSchema },
   { name: "ShareLinkCreated", file: "share-link-created.v1", schema: ShareLinkCreatedSchema },
   { name: "ShareLinkList", file: "share-link-list.v1", schema: ShareLinkListSchema },
+  { name: "MemberList", file: "member-list.v1", schema: MemberListSchema },
+  { name: "MemberRoleChange", file: "member-role-change.v1", schema: MemberRoleChangeSchema },
+  { name: "InviteLinkCreateRequest", file: "invite-link-create-request.v1", schema: InviteLinkCreateRequestSchema },
+  { name: "InviteLink", file: "invite-link.v1", schema: InviteLinkSchema },
+  { name: "InviteLinkCreated", file: "invite-link-created.v1", schema: InviteLinkCreatedSchema },
+  { name: "InviteLinkList", file: "invite-link-list.v1", schema: InviteLinkListSchema },
+  { name: "InviteAcceptRequest", file: "invite-accept-request.v1", schema: InviteAcceptRequestSchema },
+  { name: "InviteAccepted", file: "invite-accepted.v1", schema: InviteAcceptedSchema },
 ];

@@ -22,6 +22,8 @@
               "page-order",
               "page-kind",
               "public-share",
+              "members",
+              "invite-links",
               "databases",
               "realtime-collab"
             ]

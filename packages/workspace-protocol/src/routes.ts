@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { API_BASE_PATH, PaginationQuerySchema, WorkspaceIdSchema } from "./common.ts";
+import { API_BASE_PATH, OpaqueIdSchema, PaginationQuerySchema, WorkspaceIdSchema } from "./common.ts";
 import { CapabilitiesSchema, type CapabilityId } from "./capabilities.ts";
 import { ERROR_CODES, ProblemDetailsSchema, type ErrorCode } from "./errors.ts";
-import { MeSchema, WorkspaceListSchema } from "./identity.ts";
+import { MemberSchema, MeSchema, WorkspaceListSchema } from "./identity.ts";
 import { GetPageQuerySchema, PageIdSchema, PageMoveSchema, PageResourceSchema, PageWriteSchema, RevisionConflictProblemSchema, RevisionListSchema } from "./pages.ts";
 import { TreeNodeSchema, TreePageSchema } from "./tree.ts";
 import { SearchRequestSchema, SearchResponseSchema } from "./search.ts";
@@ -10,6 +10,7 @@ import { AttachmentIdSchema, AttachmentResourceSchema, UploadAttachmentQuerySche
 import { ChangesQuerySchema, ChangesResponseSchema } from "./changes.ts";
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferOperationIdSchema, TransferResourceSchema } from "./transfers.ts";
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema, ShareLinkListSchema } from "./shares.ts";
+import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -95,6 +96,7 @@ const LOCATION_HEADER: ResponseHeaderSpec = { name: "Location", description: "Ab
 
 const workspaceParams = { workspaceId: WorkspaceIdSchema } as const;
 const pageParams = { workspaceId: WorkspaceIdSchema, pageId: PageIdSchema } as const;
+const memberParams = { workspaceId: WorkspaceIdSchema, userId: OpaqueIdSchema } as const;
 
 interface RouteInit {
   operationId: string;
@@ -412,6 +414,101 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     responses: [{ status: 204, description: "Revoked.", headers: [] }],
     errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "listMembers",
+    method: "get",
+    path: "/workspaces/{workspaceId}/members",
+    tag: "Members",
+    summary: "Members of a workspace",
+    description: "ADR-0024. Every member may read the list: display names and roles, never emails. Ordered by user ID.",
+    capability: "members",
+    pathParams: workspaceParams,
+    query: PaginationQuerySchema,
+    responses: [json(200, "A page of members.", MemberListSchema)],
+    errors: ["validation_failed", "not_found", "cursor_invalid"],
+  }),
+  route({
+    operationId: "setMemberRole",
+    method: "put",
+    path: "/workspaces/{workspaceId}/members/{userId}",
+    tag: "Members",
+    summary: "Change a member's role",
+    description:
+      "Owners only (403 for others; 404 for non-members and for a user who is not a member). Making someone an owner counts against that account's `maxWorkspacesPerAccount` (409 `quota_exceeded`, `quota: workspacesPerAccount`). Demoting the last owner is 409 `last_owner`. Setting the role a member already has succeeds and changes nothing.",
+    capability: "members",
+    pathParams: memberParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: MemberRoleChangeSchema, required: true, description: "The new role." },
+    responses: [json(200, "The member with the new role.", MemberSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "last_owner", "quota_exceeded", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "removeMember",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/members/{userId}",
+    tag: "Members",
+    summary: "Remove a member, or leave",
+    description:
+      "Owners remove any member; any member removes themself (leaves). Access ends at once: the removed account's requests to the workspace are 404 from then on, and share links it made stop working. Removing the last owner, or the last owner leaving, is 409 `last_owner`.",
+    capability: "members",
+    pathParams: memberParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Removed.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "last_owner", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "createInviteLink",
+    method: "post",
+    path: "/workspaces/{workspaceId}/invite-links",
+    tag: "Members",
+    summary: "Create an invite link",
+    description:
+      "ADR-0024. Owners only. Whoever opens the returned `url` (`<origin>/i/<token>`) and signs in joins with `role`. The token is returned this once: the server stores only its hash, so `Idempotency-Key` is not honoured. 409 `quota_exceeded` past the server's number of active links (`quota: inviteLinksPerWorkspace`) or when `maxUses` is more than the member quota leaves room for (`quota: membersPerWorkspace`).",
+    capability: "invite-links",
+    pathParams: workspaceParams,
+    requestBody: { contentType: JSON_CT, schema: InviteLinkCreateRequestSchema, required: true, description: "The role, and optionally the expiry (1, 7 or 30 days; default 7) and the number of uses (1, 5 or 10; default 1)." },
+    responses: [json(201, "The link, with its token and address (shown once).", InviteLinkCreatedSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "quota_exceeded"],
+  }),
+  route({
+    operationId: "listInviteLinks",
+    method: "get",
+    path: "/workspaces/{workspaceId}/invite-links",
+    tag: "Members",
+    summary: "Active invite links of a workspace",
+    description: "Owners only. Links that are neither revoked, expired nor used up, newest first. Tokens are never returned here.",
+    capability: "invite-links",
+    pathParams: workspaceParams,
+    query: PaginationQuerySchema,
+    responses: [json(200, "A page of invite links.", InviteLinkListSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "cursor_invalid"],
+  }),
+  route({
+    operationId: "revokeInviteLink",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/invite-links/{inviteId}",
+    tag: "Members",
+    summary: "Revoke an invite link",
+    description: "Owners only. The link stops working at once. Revoking a link that is already revoked, expired or used up succeeds and changes nothing.",
+    capability: "invite-links",
+    pathParams: { workspaceId: WorkspaceIdSchema, inviteId: InviteLinkIdSchema },
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Revoked.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "acceptInvite",
+    method: "post",
+    path: "/invites/accept",
+    tag: "Members",
+    summary: "Join a workspace with an invite link",
+    description:
+      "Any signed-in account. The same 404 for a token that is unknown, malformed, expired, revoked, used up or from another server. A member already in the workspace keeps their role and uses nothing (`joined: false`). 409 `quota_exceeded` (`quota: membersPerWorkspace`) when the workspace is full. Rate limited per client address.",
+    capability: "invite-links",
+    requestBody: { contentType: JSON_CT, schema: InviteAcceptRequestSchema, required: true, description: "The token from the link." },
+    responses: [json(200, "The workspace joined (or already a member of).", InviteAcceptedSchema)],
+    errors: ["validation_failed", "not_found", "quota_exceeded"],
   }),
 ];
 

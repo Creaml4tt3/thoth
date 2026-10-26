@@ -111,6 +111,7 @@ describe("error-code registry", () => {
     cursor_invalid: 400,
     payload_too_large: 413,
     rate_limited: 429,
+    last_owner: 409,
   };
 
   it("contains every required code with its HTTP status", () => {

@@ -1,0 +1,16 @@
+{
+  "$id": "https://thoth.invalid/schemas/invite-accept-request.v1.json",
+  "title": "invite-accept-request.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  },
+  "required": [
+    "token"
+  ]
+}

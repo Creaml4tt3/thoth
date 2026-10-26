@@ -29,6 +29,7 @@
             "not_found",
             "method_not_allowed",
             "invalid_transfer_state",
+            "last_owner",
             "quota_exceeded",
             "cursor_expired",
             "revision_conflict",

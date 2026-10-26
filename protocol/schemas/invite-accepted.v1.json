@@ -1,0 +1,34 @@
+{
+  "$id": "https://thoth.invalid/schemas/invite-accepted.v1.json",
+  "title": "invite-accepted.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "workspaceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.~-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "editor",
+        "viewer"
+      ]
+    },
+    "joined": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "workspaceId",
+    "name",
+    "role",
+    "joined"
+  ]
+}

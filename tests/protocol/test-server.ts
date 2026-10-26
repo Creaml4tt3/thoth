@@ -2,7 +2,7 @@
  * Minimal in-memory workspace server used to test the conformance suite.
  *
  * `startTestServer()` implements the protocol subset the suite exercises (all core
- * routes plus attachments, search, SSE hints, transfers, page order and kind, and public share links). `startBrokenServer()` is
+ * routes plus attachments, search, SSE hints, transfers, page order and kind, public share links, members and invite links). `startBrokenServer()` is
  * the same server with deliberate violations, so tests can prove the suite notices them.
  * It is a test fixture, not the reference server.
  */
@@ -13,6 +13,9 @@ import {
   API_BASE_PATH,
   ERROR_CODES,
   IdempotencyKeySchema,
+  InviteAcceptRequestSchema,
+  InviteLinkCreateRequestSchema,
+  MemberRoleChangeSchema,
   PAGE_SIZE_DEFAULT,
   PAGE_SIZE_MAX,
   PROBLEM_CONTENT_TYPE,
@@ -52,11 +55,13 @@ export interface Flaws {
   leakAuthorization?: boolean;
   /** Derives a page's kind only when the page is created, so an update that adds or removes `thoth_kind: folder` leaves it stale. */
   staleKind?: boolean;
+  /** Revoking an invite link records it but the link keeps working (ADR-0024). */
+  inviteRevokeIgnored?: boolean;
 }
 
 export interface TestServerOptions {
   flaws?: Flaws;
-  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share. */
+  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share, members, invite-links. */
   capabilities?: CapabilityId[];
 }
 
@@ -166,7 +171,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -753,6 +758,104 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     return { status: 200, headers: SHARE_HEADERS, body: `<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>${escapeText(rev.title)}</title></head><body><main><h1>${escapeText(rev.title)}</h1><pre>${escapeText(rev.markdown)}</pre></main></body></html>` };
   }
 
+  // ----- members and invite-links (ADR-0024): owners administer; one owner is always kept -----
+  const displayNameOf = (userId: string) => Object.values(users).find((u) => u.id === userId)?.displayName ?? userId;
+  function ownerOf(ctx: Ctx): (typeof workspaces)[number] & { role: Role } {
+    const ws = workspaceFor(ctx, "read");
+    if (ws.role !== "owner") throw new ApiError("forbidden", "only owners may do this");
+    return ws;
+  }
+  const realWorkspace = (id: string) => workspaces.find((w) => w.id === id)!;
+  const owners = (id: string) => Object.values(realWorkspace(id).members).filter((r) => r === "owner").length;
+  add("GET", "/workspaces/:workspaceId/members", "members", (ctx) => {
+    const ws = workspaceFor(ctx, "read");
+    const items = Object.entries(realWorkspace(ws.id).members)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([userId, role]) => ({ userId, displayName: displayNameOf(userId), role }));
+    return jsonReply(200, { items, nextCursor: null });
+  });
+  add("PUT", "/workspaces/:workspaceId/members/:userId", "members", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = ownerOf(ctx);
+      const parsed = MemberRoleChangeSchema.safeParse(parseJson(ctx));
+      if (!parsed.success) throw zodFail(parsed.error);
+      const members = realWorkspace(ws.id).members;
+      const userId = ctx.params.userId ?? "";
+      const current = members[userId];
+      if (!current) throw new ApiError("not_found", "no such member");
+      if (current === "owner" && parsed.data.role !== "owner" && owners(ws.id) === 1) throw new ApiError("last_owner", "a workspace keeps at least one owner");
+      members[userId] = parsed.data.role;
+      return jsonReply(200, { userId, displayName: displayNameOf(userId), role: parsed.data.role });
+    }),
+  );
+  add("DELETE", "/workspaces/:workspaceId/members/:userId", "members", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = workspaceFor(ctx, "read");
+      const userId = ctx.params.userId ?? "";
+      if (userId !== ctx.user.id && ws.role !== "owner") throw new ApiError("forbidden", "only owners remove other members");
+      const members = realWorkspace(ws.id).members;
+      if (!members[userId]) throw new ApiError("not_found", "no such member");
+      if (members[userId] === "owner" && owners(ws.id) === 1) throw new ApiError("last_owner", "a workspace keeps at least one owner");
+      delete members[userId];
+      return { status: 204, headers: {} };
+    }),
+  );
+
+  const inviteLinks = new Map<string, { id: string; workspaceId: string; role: "editor" | "viewer"; maxUses: number; uses: number; tokenHash: string; createdAt: string; createdBy: string; expiresAt: string; revoked: boolean }>();
+  type Invite = typeof inviteLinks extends Map<string, infer V> ? V : never;
+  const inviteActive = (l: Invite) => (!l.revoked || flaws.inviteRevokeIgnored === true) && l.uses < l.maxUses && Date.parse(l.expiresAt) > Date.now();
+  const inviteResource = (l: Invite) => ({ id: l.id, workspaceId: l.workspaceId, role: l.role, maxUses: l.maxUses, usesLeft: l.maxUses - l.uses, createdAt: l.createdAt, createdBy: l.createdBy, createdByName: displayNameOf(l.createdBy), expiresAt: l.expiresAt });
+  const inviteByToken = (token: string) => {
+    const hash = sha256(token);
+    const link = [...inviteLinks.values()].find((l) => l.tokenHash === hash);
+    return link && inviteActive(link) ? link : undefined;
+  };
+  add("POST", "/workspaces/:workspaceId/invite-links", "invite-links", (ctx) => {
+    const ws = ownerOf(ctx);
+    const parsed = InviteLinkCreateRequestSchema.safeParse(parseJson(ctx));
+    if (!parsed.success) throw zodFail(parsed.error);
+    const token = randomBytes(24).toString("base64url");
+    const now = Date.now();
+    const link: Invite = { id: `inv_${randomBytes(6).toString("hex")}`, workspaceId: ws.id, role: parsed.data.role, maxUses: parsed.data.maxUses ?? 1, uses: 0, tokenHash: sha256(token), createdAt: new Date(now).toISOString(), createdBy: ctx.user.id, expiresAt: new Date(now + (parsed.data.expiresInDays ?? 7) * 86_400_000).toISOString(), revoked: false };
+    inviteLinks.set(link.id, link);
+    return jsonReply(201, { ...inviteResource(link), token, url: `http://${ctx.headers.host ?? "127.0.0.1"}/i/${token}` });
+  });
+  add("GET", "/workspaces/:workspaceId/invite-links", "invite-links", (ctx) => {
+    const ws = ownerOf(ctx);
+    const active = [...inviteLinks.values()].filter((l) => l.workspaceId === ws.id && inviteActive(l));
+    return jsonReply(200, { items: active.reverse().map(inviteResource), nextCursor: null });
+  });
+  add("DELETE", "/workspaces/:workspaceId/invite-links/:inviteId", "invite-links", (ctx) =>
+    withIdempotency(ctx, () => {
+      const ws = ownerOf(ctx);
+      const link = inviteLinks.get(ctx.params.inviteId ?? "");
+      if (!link || link.workspaceId !== ws.id) throw new ApiError("not_found", "invite link not found");
+      link.revoked = true;
+      return { status: 204, headers: {} };
+    }),
+  );
+  add("POST", "/invites/accept", "invite-links", (ctx) => {
+    const parsed = InviteAcceptRequestSchema.safeParse(parseJson(ctx));
+    if (!parsed.success) throw zodFail(parsed.error);
+    const link = inviteByToken(parsed.data.token);
+    if (!link) throw new ApiError("not_found", "no such invite");
+    const ws = realWorkspace(link.workspaceId);
+    const existing = ws.members[ctx.user.id];
+    if (existing) return jsonReply(200, { workspaceId: ws.id, name: ws.name, role: existing, joined: false });
+    ws.members[ctx.user.id] = link.role;
+    link.uses++;
+    return jsonReply(200, { workspaceId: ws.id, name: ws.name, role: link.role, joined: true });
+  });
+  const INVITE_HEADERS = { "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff", "content-type": "text/html; charset=utf-8" };
+  function invitePage(pathname: string): Reply {
+    const missing: Reply = { status: 404, headers: INVITE_HEADERS, body: '<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>Not found</title></head><body><p>This invite is not available.</p></body></html>' };
+    const m = /^\/i\/([A-Za-z0-9_-]+)$/.exec(pathname);
+    const link = caps.has("invite-links") && m ? inviteByToken(m[1]!) : undefined;
+    if (!link) return missing;
+    const ws = realWorkspace(link.workspaceId);
+    return { status: 200, headers: INVITE_HEADERS, body: `<!doctype html><html lang="en"><head><meta name="robots" content="noindex, nofollow"><title>Join ${escapeText(ws.name)}</title></head><body><main><h1>Join ${escapeText(ws.name)}</h1><p>${escapeText(displayNameOf(link.createdBy))} invites you as ${link.role}.</p></main></body></html>` };
+  }
+
   // ---------- dispatch ----------
   function matchRoute(segments: string[]): { route: Route; params: Record<string, string> }[] {
     const found: { route: Route; params: Record<string, string> }[] = [];
@@ -790,6 +893,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       const method = req.method ?? "GET";
       const body = await readBody(req);
       if (method === "GET" && url.pathname.startsWith("/s/")) return send(res, sharePage(url.pathname));
+      if (method === "GET" && url.pathname.startsWith("/i/")) return send(res, invitePage(url.pathname));
       if (!url.pathname.startsWith(`${API_BASE_PATH}/`)) return send(res, errorReply(new ApiError("not_found", "no such route"), req));
       const segments = url.pathname.slice(API_BASE_PATH.length).split("/").filter(Boolean);
 

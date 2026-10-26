@@ -30,6 +30,12 @@ const REQUIRED_CHECKS = [
   "page-kind.derived-from-frontmatter",
   "page-kind.follows-the-latest-write",
   "page-kind.change-feed",
+  "members.list.includes-caller",
+  "members.role.owners-only-and-one-owner-kept",
+  "invite-links.create.returns-token-and-address",
+  "invite-links.page.html",
+  "invite-links.accept.member-keeps-role",
+  "invite-links.revoke.stops-link",
 ];
 
 describe("conformance suite against a correct server", () => {
@@ -55,8 +61,8 @@ describe("conformance suite against a correct server", () => {
 
   it("returns structured results grouped by capability", () => {
     expect(report.protocolVersion).toBe("1.0");
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"]);
-    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"]);
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
+    expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"]);
     for (const group of report.groups) {
       expect(group.results.length).toBeGreaterThan(0);
       for (const r of group.results) {
@@ -246,6 +252,12 @@ describe("conformance suite against deliberately broken servers", () => {
     const report = await runAgainst({ staleKind: true });
     expect(failedIds(report)).toEqual(["page-kind.follows-the-latest-write"]);
     expect(report.results.find((r) => r.id === "page-kind.follows-the-latest-write")!.detail).toMatch(/did not make the page a folder/);
+  });
+
+  it("notices an invite link that keeps working after it was revoked (ADR-0024)", async () => {
+    const report = await runAgainst({ inviteRevokeIgnored: true });
+    expect(failedIds(report)).toEqual(["invite-links.revoke.stops-link"]);
+    expect(report.results.find((r) => r.id === "invite-links.revoke.stops-link")!.detail).toMatch(/revoked link answers HTTP 200/);
   });
 
   it("fails each of them at once on the fully broken server, but still returns a complete report", async () => {

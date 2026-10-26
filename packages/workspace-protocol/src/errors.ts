@@ -14,6 +14,7 @@ export const ERROR_CODES = {
   not_found: { status: 404, title: "Not found", description: "The route or resource does not exist, or the principal may not know that it exists." },
   method_not_allowed: { status: 405, title: "Method not allowed", description: "The route exists but not for this method." },
   invalid_transfer_state: { status: 409, title: "Invalid transfer state", description: "The transfer is in a state that does not allow the requested action." },
+  last_owner: { status: 409, title: "Last owner", description: "The change would leave the workspace without an owner (ADR-0024). Make another member an owner first." },
   quota_exceeded: { status: 409, title: "Quota exceeded", description: "The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`." },
   cursor_expired: { status: 410, title: "Cursor expired", description: "The cursor points before the retained change history; the client must resynchronize from the tree." },
   revision_conflict: { status: 412, title: "Revision conflict", description: "A conditional write did not match the current revision. The body carries `currentRevision`." },
@@ -70,7 +71,7 @@ export const ProblemDetailsSchema = z.looseObject({
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>;
 
 /** Names the quota a `quota_exceeded` problem refers to. Open set: clients ignore values they do not know. */
-export const QUOTA_NAMES = ["pagesPerWorkspace", "attachmentBytesPerWorkspace", "membersPerWorkspace", "workspacesPerAccount", "serverAttachmentBytes", "accounts"] as const;
+export const QUOTA_NAMES = ["pagesPerWorkspace", "attachmentBytesPerWorkspace", "membersPerWorkspace", "workspacesPerAccount", "serverAttachmentBytes", "accounts", "shareLinksPerWorkspace", "inviteLinksPerWorkspace"] as const;
 
 /**
  * Problem body for HTTP 409 `quota_exceeded`. `limit` and `current` are omitted for server-wide quotas

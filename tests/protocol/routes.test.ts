@@ -60,7 +60,32 @@ describe("route registry", () => {
       createShareLink: "public-share",
       listShareLinks: "public-share",
       revokeShareLink: "public-share",
+      listMembers: "members",
+      setMemberRole: "members",
+      removeMember: "members",
+      createInviteLink: "invite-links",
+      listInviteLinks: "invite-links",
+      revokeInviteLink: "invite-links",
+      acceptInvite: "invite-links",
     });
+  });
+
+  it("puts the members and invite-link calls where ADR-0024 says, with last_owner on the calls that can empty the owners", () => {
+    const at = (id: string) => `${getRoute(id).method.toUpperCase()} ${getRoute(id).path}`;
+    expect(at("listMembers")).toBe("GET /workspaces/{workspaceId}/members");
+    expect(at("setMemberRole")).toBe("PUT /workspaces/{workspaceId}/members/{userId}");
+    expect(at("removeMember")).toBe("DELETE /workspaces/{workspaceId}/members/{userId}");
+    expect(at("createInviteLink")).toBe("POST /workspaces/{workspaceId}/invite-links");
+    expect(at("listInviteLinks")).toBe("GET /workspaces/{workspaceId}/invite-links");
+    expect(at("revokeInviteLink")).toBe("DELETE /workspaces/{workspaceId}/invite-links/{inviteId}");
+    expect(at("acceptInvite")).toBe("POST /invites/accept");
+    for (const id of ["setMemberRole", "removeMember"]) expect(getRoute(id).errors, id).toEqual(expect.arrayContaining(["last_owner", "forbidden", "not_found"]));
+    expect(getRoute("setMemberRole").errors).toContain("quota_exceeded");
+    expect(getRoute("createInviteLink").errors).toEqual(expect.arrayContaining(["forbidden", "not_found", "quota_exceeded", "validation_failed"]));
+    expect(getRoute("acceptInvite").errors).toEqual(expect.arrayContaining(["not_found", "quota_exceeded", "rate_limited"]));
+    // A replayed create would have to store the token: Idempotency-Key is not offered there.
+    expect(getRoute("createInviteLink").requestHeaders).toEqual([]);
+    expect(getRoute("acceptInvite").requestHeaders).toEqual([]);
   });
 
   it("only exposes GET /capabilities without credentials", () => {

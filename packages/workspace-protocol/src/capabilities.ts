@@ -13,10 +13,13 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `page-kind`        no routes; the optional `kind` member of tree nodes and page metadata, and `pageKind` of changes (ADR-0017)
  * - `public-share`     routes: createShareLink, listShareLinks, revokeShareLink; plus the unauthenticated, read-only
  *                      HTML pages under `/s/<token>` on the server origin (ADR-0023)
+ * - `members`          routes: listMembers, setMemberRole, removeMember (ADR-0024)
+ * - `invite-links`     routes: createInviteLink, listInviteLinks, revokeInviteLink, acceptInvite; plus the
+ *                      unauthenticated invite pages under `/i/<token>` on the server origin (ADR-0024)
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
