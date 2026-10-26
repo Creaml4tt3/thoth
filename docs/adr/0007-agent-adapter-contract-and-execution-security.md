@@ -3,8 +3,9 @@
 - **Status:** Accepted for the Claude Code CLI adapter (Phase 4), with the decisions below decided on 2026-10-25 by the
   owner. The Codex CLI adapter follows decision 13 (2026-10-25), implemented within the owner's decisions and
   proposed for the owner's review. A Thoth OS-level sandbox is deferred (see "Future: OS-level sandbox"); Codex runs
-  inside its own.
-- **Date:** 2026-10-20 (decisions added 2026-10-25; context scope, limits and history answered by the owner the same day)
+  inside its own. The amendment "Answers and sessions" (decisions 14–20, 2026-10-26) is Proposed.
+- **Date:** 2026-10-20 (decisions added 2026-10-25; context scope, limits and history answered by the owner the same day;
+  answers and sessions 2026-10-26)
 
 ## Context
 
@@ -170,6 +171,43 @@ Phase 4 started with conservative defaults for the open questions. On 2026-10-25
       now". Details are pruned by age at start and after every run, and "Delete history now" removes all of them,
       in both cases except for the runs still going and the ones waiting for review (they are work in progress,
       not history). The metadata records stay either way.
+
+## Amendment: answers and sessions (2026-10-26, Proposed)
+
+The owner's report: a question such as "What content is on this page?" got only "The agent finished without changing
+anything." The CLI had answered, but the answer was never shown. Decided for the owner (to accept):
+
+14. **The answer is shown.** When a run ends, its answer is shown (`runAnswer`, `packages/agent-core/src/answer.ts`):
+    the `result` event's text; when that is empty or there is no result (a time-limit stop, a crash), the last
+    assistant text blocks after the last tool call (or the last text before it); never the text of a failed result,
+    which is the error the outcome already shows. Same rule for Claude Code and Codex (Codex's result carries its last
+    agent message). It is plain text: line breaks kept, no HTML, no Markdown, no auto-linking, as clipped by the
+    adapters; selectable, with "Copy answer". It shows in the bubble's finished view (a bounded box that scrolls) and
+    in the session tab. "No pages were changed." is a small line under it; with no answer the old sentence stays.
+15. **Where it lives.** Never in the vault's run record (decision 9 unchanged; a test checks the record). In memory
+    for the run just finished (`AgentHub.answer`), and read back from the local transcript (`RunDetails.answer`,
+    decision 12) for earlier runs. When retention deleted the transcript, the session tab says so. Notifications keep
+    their fixed text (ADR-0018).
+16. **A session tab per run.** Tab target `{ kind: "agent-run", run }` (stored `{ k: "run", run }`; a run that is not
+    a UUIDv7 is dropped on parse). Opening a run again goes to its tab. It shows the task (first line as title and tab
+    name, the whole task below), agent, model, start time and state; for this window's current run, the live transcript
+    with Cancel, the answer, the existing review (unchanged: per-file approval, compare-and-swap) and the result; for
+    any other run, its answer, transcript and proposed changes from the local details. The old single review tab
+    (`{ k: "agents" }`) showed the current run; no run is current at start, so a stored one is dropped. The web client
+    drops session tabs as it dropped that one. Notifications about a run open its session tab.
+17. **The bubble's "Open in a tab" icon** (running, review-ready and finished views) opens the current run's tab.
+18. **The sidebar's Assistant section** (stable section id `agents`, its own `<section>` with a `.sec` header, after the
+    Private Space and the workspaces): runs newest first from the records; the five newest, "Show N more" for the rest
+    (up to the 200 records kept), "Show less"; collapsed by default and not remembered. A row is the task's first line;
+    a run going or waiting for review says so in words with a dot. The current tab's run is marked (`aria-current`).
+    Not shown without agents or before the first run.
+19. **Several windows** (ADR-0019 rule 8). A window shows any run read-only from its record and transcript. It cannot
+    cancel a run it does not run, and while other windows are open it does not reopen a run waiting for review (it may
+    be theirs): the tab says to use the window that owns it. Alone on the Private Space, it may reopen such a run as
+    before. A window that is not alone now also reads the history at start (it skipped recovery and so the list).
+20. **Follow-up questions** stay out of scope (`--no-session-persistence` stays). "Ask again" returns to the bubble
+    with the same task and context (an earlier run gives back its Private Space pages and files; workspace pages are
+    picked again, since the record does not keep their server).
 
 ## Decision for the Codex adapter (2026-10-25, proposed for the owner's review)
 
