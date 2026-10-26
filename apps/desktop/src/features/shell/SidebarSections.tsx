@@ -195,21 +195,6 @@ export function SidebarSections({ root, sections }: { root: string; sections: re
             >
               <button
                 type="button"
-                className="sec-grip"
-                aria-label={t.sectionOptions(s.name)}
-                aria-haspopup="menu"
-                aria-keyshortcuts={KEYS}
-                {...tip(t.sectionGripTip)}
-                onClick={(event) => {
-                  if (swallowClick.current) return;
-                  const r = event.currentTarget.getBoundingClientRect();
-                  setMenu({ id, at: { x: r.left, y: r.bottom }, from: "grip" });
-                }}
-              >
-                <Icon name="grip" size={14} />
-              </button>
-              <button
-                type="button"
                 className="sec-toggle"
                 aria-expanded={!folded}
                 aria-controls={body}
@@ -223,6 +208,22 @@ export function SidebarSections({ root, sections }: { root: string; sections: re
                 <span className="sec-name" {...(s.title ? { title: s.title } : {})} {...tipIfClipped(s.name)}>
                   {s.name}
                 </span>
+              </button>
+              {/* After the name, so showing it on hover moves nothing that is read. */}
+              <button
+                type="button"
+                className="sec-grip"
+                aria-label={t.sectionOptions(s.name)}
+                aria-haspopup="menu"
+                aria-keyshortcuts={KEYS}
+                {...tip(t.sectionGripTip)}
+                onClick={(event) => {
+                  if (swallowClick.current) return;
+                  const r = event.currentTarget.getBoundingClientRect();
+                  setMenu({ id, at: { x: r.left, y: r.bottom }, from: "grip" });
+                }}
+              >
+                <Icon name="grip" size={14} />
               </button>
               {s.actions && <span className="sec-actions">{s.actions}</span>}
             </div>

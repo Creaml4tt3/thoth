@@ -313,3 +313,32 @@ test("the window never scrolls as a whole, even on the long Settings page: only 
   // The tab bar is still at the top.
   expect(await page.locator(".tabstrip").evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
 });
+
+test("a section's drag grip is hidden and takes no room until the pointer is over its header; the name does not move", async ({ page }) => {
+  const section = page.locator('.side-section[data-section="private"]');
+  const header = section.locator(":scope > .sec");
+  const grip = section.getByRole("button", { name: /^Section options: / });
+  const name = section.locator(".sec-name");
+  const width = () => grip.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+  await page.mouse.move(700, 500);
+  await settled(page);
+  expect(await width()).toBe(0);
+  const nameX = (await name.boundingBox())!.x;
+  await header.hover();
+  await expect.poll(width).toBe(24);
+  await expect(grip).toHaveCSS("opacity", "1");
+  expect((await name.boundingBox())!.x).toBe(nameX);
+  // A mouse click on the name folds the section and leaves the grip hidden once the pointer leaves.
+  await section.locator(".sec-toggle").click();
+  await page.mouse.move(700, 500);
+  await expect.poll(width).toBe(0);
+  await section.locator(".sec-toggle").click();
+  // The keyboard still reaches it: Tab from the name shows it, and its menu opens.
+  await section.locator(".sec-toggle").focus();
+  await page.keyboard.press("Tab");
+  await expect(grip).toBeFocused();
+  await expect.poll(width).toBe(24);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+});
