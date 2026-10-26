@@ -27,7 +27,7 @@ A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empt
 
 ## Releasing a version
 
-0. **Changelog and post, before the tag** (ADR-0025; the website build and the release job fail without them):
+0. **Changelog and post, before the tag** (ADR-0026; the website build and the release job fail without them):
    - In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - yyyy-mm-dd`, keep only what ships, add a new
      `[Unreleased]` only when there is something in it (the parser refuses an empty section), and update the compare links at the bottom.
      Entries are user-facing, one line each, under Added, Changed or Fixed; links only as absolute `https` URLs.
