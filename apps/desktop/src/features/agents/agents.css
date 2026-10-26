@@ -103,7 +103,7 @@
 .agents-answer-head { display: flex; align-items: center; gap: var(--thoth-space-2); min-width: 0; }
 .agents-answer-title { margin: 0 auto 0 0; font: 600 14px / 20px var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
 .agents-answer[data-level="2"] .agents-answer-title { font: 600 15px / 1.4 var(--thoth-font-sans); }
-.agents-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; max-height: 24rem; overflow: auto; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
+.agents-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; max-height: 24rem; overflow: auto; overscroll-behavior: contain; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .agents-answer-text:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .agents-no-changes { margin: 0; color: var(--thoth-ink-secondary); }
 /* A session tab: the task, a line of facts, then what the run did. */
@@ -113,7 +113,7 @@
 .agents-session-facts dt { color: var(--thoth-ink-secondary); }
 .agents-session-facts dd { margin: 0; overflow-wrap: anywhere; }
 .agents-session-run { display: grid; gap: var(--thoth-space-3); }
-.agents-session-log { max-height: 28rem; overflow: auto; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); }
+.agents-session-log { max-height: 28rem; overflow: auto; overscroll-behavior: contain; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); }
 /* The sidebar's Assistant section: rows like the page tree's, the state in words beside the task. */
 .agents-section { margin-top: 6px; }
 .agents-rows { list-style: none; margin: 0; padding: 0; }
@@ -125,6 +125,5 @@
 .agents-row-state { flex: none; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); white-space: nowrap; }
 .agents-row[aria-current="page"] .agents-row-state { color: inherit; }
 .agents-row-state[data-open]::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-inline-end: 5px; border-radius: 50%; background: var(--thoth-accent); vertical-align: 1px; }
-.agents-more { margin: 2px 8px 0; }
-@media (pointer: coarse) { .agents-row { min-height: 44px; } .agents-more { display: inline-block; padding: 8px 0; } }
-@media (prefers-reduced-motion: reduce) { .agents-row { transition: none; } }
+.sec-link.agents-more { display: inline-block; margin: 4px 8px 0; }
+@media (pointer: coarse) { .agents-row { min-height: 44px; } .sec-link.agents-more { padding: 8px 0; } }

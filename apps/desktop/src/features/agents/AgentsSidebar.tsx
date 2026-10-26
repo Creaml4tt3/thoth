@@ -1,8 +1,8 @@
 /**
  * The sidebar's Assistant section (ADR-0007 amendment of 2026-10-26): the runs of this Private Space, newest first,
  * from the run records (the history). The five newest are shown; "Show N more" lists the rest (up to the history's
- * limit) and "Show less" folds them again. Each row is the task's first line and its state in words (a run going or
- * waiting for review also gets a dot, never colour alone); it opens the run's session tab, and the run of the current
+ * limit) and "Show less" folds them again. Each row is the task's first line; a run going or waiting for review also
+ * says so in words, with a dot (never colour alone); it opens the run's session tab, and the run of the current
  * tab is marked. Not shown where agents cannot run, nor before the first run.
  *
  * It is its own `<section>` with a `.sec` header and the stable id `agents`, so it can join the sidebar's section
@@ -55,9 +55,12 @@ function Section({ agents, current }: { agents: AgentsService; current: string |
                 <span className="agents-row-task" {...tipIfClipped(title)}>
                   {title}
                 </span>
-                <span className="agents-row-state" data-open={open ? "" : undefined}>
-                  {label}
-                </span>
+                {/* Only what still needs the person: a run going, or waiting for review. The tab says the rest. */}
+                {open && (
+                  <span className="agents-row-state" data-open="">
+                    {label}
+                  </span>
+                )}
               </button>
             </li>
           );
