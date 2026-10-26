@@ -102,7 +102,6 @@ const EN: Words = {
   busyText: "This page was opened too often in a short time. Wait a little and try again.",
 };
 
-// REVIEW: Thai wording of the invite pages (native reviewer).
 const TH: Words = {
   badge: "คำเชิญ",
   footer: "คำเชิญเข้าร่วมเวิร์กสเปซใน Thoth ผู้ที่มีที่อยู่นี้ใช้ได้จนกว่าจะหมดอายุหรือใช้ครบ",

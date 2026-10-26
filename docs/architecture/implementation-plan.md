@@ -1200,6 +1200,12 @@ The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial
   `sidebar.test.tsx`; `apps/web/test/favorites.test.tsx`; `tests/e2e/favorites.e2e.ts` (axe light and dark).
 - Not done: a native reader for the Thai marked `REVIEW`.
 
+### Thai strings accepted (2026-10-26)
+
+The owner used the app in Thai and accepted every string that was marked `REVIEW` (in the app, the website, the
+changelog and the posts); the markers are removed. Changes to the wording will come from the owner. New Thai is
+still marked `REVIEW` until the owner has seen it.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

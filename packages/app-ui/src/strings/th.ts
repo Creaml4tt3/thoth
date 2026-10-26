@@ -67,14 +67,14 @@ export const th: Strings = {
       withShortcut: (label, shortcut) => `${label} (${shortcut})`,
     },
 
-    // Link previews (ADR-0020). Strings marked REVIEW are the least certain.
+    // Link previews (ADR-0020).
     linkCard: {
       label: (name) => `ตัวอย่างลิงก์: ${name}`,
       loading: "กำลังโหลดตัวอย่าง…",
       load: "โหลดตัวอย่าง",
-      loadHint: "การโหลดตัวอย่างจะทำให้เว็บไซต์รู้ว่าคุณเปิดดู", // REVIEW
+      loadHint: "การโหลดตัวอย่างจะทำให้เว็บไซต์รู้ว่าคุณเปิดดู",
       options: "ตัวเลือกของตัวอย่างลิงก์",
-      showAsLink: "แสดงเป็นลิงก์", // REVIEW
+      showAsLink: "แสดงเป็นลิงก์",
       open: "เปิด",
       copy: "คัดลอกลิงก์",
     },
@@ -84,21 +84,21 @@ export const th: Strings = {
       unnamed: (name) => `รูปภาพ: ${name}`,
       loading: (name) => `กำลังโหลดรูป: ${name}`,
       missing: (name) => `ไม่พบรูป: ${name}`,
-      refused: (name) => `ไม่แสดงรูปที่อยู่นอกพื้นที่นี้: ${name}`, // REVIEW
+      refused: (name) => `ไม่แสดงรูปที่อยู่นอกพื้นที่นี้: ${name}`,
       notImage: (name) => `ไม่ใช่ไฟล์รูป: ${name}`,
       tooLarge: (name) => `รูปใหญ่เกิน 20 MB จึงไม่แสดง: ${name}`,
       unreadable: (name) => `อ่านไฟล์รูปไม่ได้: ${name}`,
-      remote: "รูปจากเว็บ ไม่ได้โหลด:", // REVIEW
-      remoteTitle: "แอปไม่โหลดรูปจากเว็บ เปิดที่อยู่นี้ในเบราว์เซอร์ได้", // REVIEW
-      editAlt: "แก้ข้อความแทนรูป", // REVIEW
-      altLabel: "ข้อความแทนรูป", // REVIEW
-      altHint: "อธิบายรูปสำหรับคนที่มองไม่เห็นรูป กด Enter เพื่อบันทึก กด Escape เพื่อยกเลิก", // REVIEW
+      remote: "รูปจากเว็บ ไม่ได้โหลด:",
+      remoteTitle: "แอปไม่โหลดรูปจากเว็บ เปิดที่อยู่นี้ในเบราว์เซอร์ได้",
+      editAlt: "แก้ข้อความแทนรูป",
+      altLabel: "ข้อความแทนรูป",
+      altHint: "อธิบายรูปสำหรับคนที่มองไม่เห็นรูป กด Enter เพื่อบันทึก กด Escape เพื่อยกเลิก",
       save: "บันทึก",
       cancel: "ยกเลิก",
       adding: "กำลังเพิ่มรูป…",
       added: (name) => `เพิ่มรูปแล้ว: ${name}`,
       addFailed: (detail) => `เพิ่มรูปไม่สำเร็จ: ${detail}`,
-      notAnImageFile: "ไฟล์นี้ไม่ใช่รูปที่หน้าแสดงได้", // REVIEW
+      notAnImageFile: "ไฟล์นี้ไม่ใช่รูปที่หน้าแสดงได้",
       fileTooLarge: "รูปใหญ่เกิน 20 MB",
     },
 
@@ -160,7 +160,7 @@ export const th: Strings = {
     newPageTitle: "ไม่มีชื่อ",
     creating: "กำลังสร้าง…",
     noAccessTitle: "คุณไม่มีสิทธิ์เข้าถึงเวิร์กสเปซนี้แล้ว",
-    noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ เจ้าของนำคุณออก หรือเวิร์กสเปซถูกลบ เจ้าของกู้คืนเวิร์กสเปซที่ลบได้ภายใน 30 วัน หรือส่งลิงก์เชิญใหม่ให้คุณ", // REVIEW
+    noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ เจ้าของนำคุณออก หรือเวิร์กสเปซถูกลบ เจ้าของกู้คืนเวิร์กสเปซที่ลบได้ภายใน 30 วัน หรือส่งลิงก์เชิญใหม่ให้คุณ",
   },
 
   tree: {
@@ -211,75 +211,75 @@ export const th: Strings = {
       copyTo: (name) => `คัดลอกไปที่ ${name}…`,
       moveTo: (name) => `ย้ายไปที่ ${name}…`,
       privateSpace: "Private Space",
-      viewer: (workspace) => `คุณเป็นผู้ดูใน ${workspace}`, // REVIEW
-      noTransfers: (server) => `${server} ไม่รับการโอนย้าย`, // REVIEW
+      viewer: (workspace) => `คุณเป็นผู้ดูใน ${workspace}`,
+      noTransfers: (server) => `${server} ไม่รับการโอนย้าย`,
       exportRestricted: (workspace) => `${workspace} ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกไป`,
-      signedOut: (server) => `เข้าสู่ระบบ ${server} ก่อน`, // REVIEW
+      signedOut: (server) => `เข้าสู่ระบบ ${server} ก่อน`,
     },
   },
 
-  // ลิงก์สาธารณะแบบอ่านอย่างเดียว (ADR-0023). Strings marked REVIEW are the least certain.
+  // ลิงก์สาธารณะแบบอ่านอย่างเดียว (ADR-0023).
   share: {
     title: (name) => `แชร์ “${name}”`,
     intro: "ทุกคนที่มีลิงก์จะอ่านหน้านี้และหน้าย่อยข้างในได้ แต่แก้ไขหรือแสดงความคิดเห็นไม่ได้ และไม่ต้องลงชื่อเข้าใช้",
-    expiry: "ลิงก์จะใช้ไม่ได้หลังจาก", // REVIEW
+    expiry: "ลิงก์จะใช้ไม่ได้หลังจาก",
     days: (n) => `${n} วัน`,
-    never: "ไม่มีกำหนด", // REVIEW
+    never: "ไม่มีกำหนด",
     create: "สร้างลิงก์",
     creating: "กำลังสร้าง…",
     newLink: "ลิงก์สาธารณะ",
     copy: "คัดลอกลิงก์",
     copied: "คัดลอกลิงก์แล้ว",
     copyFailed: "คัดลอกไม่ได้ เลือกลิงก์แล้วคัดลอกเอง",
-    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ", // REVIEW
+    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ",
     active: "ลิงก์ที่ใช้งานอยู่",
     none: "ไม่มีลิงก์ที่ใช้งานอยู่",
     loading: "กำลังโหลดลิงก์…",
     created: (date) => `สร้างเมื่อ ${date}`,
-    expires: (date) => `ใช้ได้ถึง ${date}`, // REVIEW
-    neverExpires: "ใช้ได้ตลอด", // REVIEW
-    revoke: "เพิกถอน", // REVIEW
-    revokeLabel: (date) => `เพิกถอนลิงก์ที่สร้างเมื่อ ${date}`, // REVIEW
-    revoked: "เพิกถอนลิงก์แล้ว ลิงก์นี้ใช้ไม่ได้อีก", // REVIEW
+    expires: (date) => `ใช้ได้ถึง ${date}`,
+    neverExpires: "ใช้ได้ตลอด",
+    revoke: "เพิกถอน",
+    revokeLabel: (date) => `เพิกถอนลิงก์ที่สร้างเมื่อ ${date}`,
+    revoked: "เพิกถอนลิงก์แล้ว ลิงก์นี้ใช้ไม่ได้อีก",
     failed: (detail) => `สร้างลิงก์ไม่ได้: ${detail}`,
     listFailed: (detail) => `โหลดลิงก์ไม่ได้: ${detail}`,
-    revokeFailed: (detail) => `เพิกถอนลิงก์ไม่ได้: ${detail}`, // REVIEW
+    revokeFailed: (detail) => `เพิกถอนลิงก์ไม่ได้: ${detail}`,
     done: "เสร็จ",
   },
 
   members: {
     menuItem: "สมาชิก…",
     button: (workspace) => `สมาชิกของ ${workspace}`,
-    workspaceMenu: (workspace) => `การทำงานของ ${workspace}`, // REVIEW
+    workspaceMenu: (workspace) => `การทำงานของ ${workspace}`,
     title: (workspace) => `สมาชิกของ “${workspace}”`,
-    intro: "ทุกคนในเวิร์กสเปซเห็นว่ามีใครอยู่บ้างและแต่ละคนมีบทบาทอะไร ไม่แสดงอีเมล", // REVIEW
+    intro: "ทุกคนในเวิร์กสเปซเห็นว่ามีใครอยู่บ้างและแต่ละคนมีบทบาทอะไร ไม่แสดงอีเมล",
     list: "สมาชิก",
     loading: "กำลังโหลดสมาชิก…",
     you: "คุณ",
     roles: { owner: "เจ้าของ", editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
-    roleHints: { owner: "จัดการสมาชิกและลิงก์เชิญ", editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" }, // REVIEW
+    roleHints: { owner: "จัดการสมาชิกและลิงก์เชิญ", editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" },
     roleOf: (name) => `บทบาทของ ${name}`,
     remove: "นำออก",
     removeLabel: (name) => `นำ ${name} ออกจากเวิร์กสเปซ`,
     confirmRemove: (name) => `นำ ${name} ออกไหม`,
-    confirmRemoveBody: "เขาจะเข้าถึงไม่ได้ทันที และลิงก์สาธารณะที่เขาสร้างจะใช้ไม่ได้", // REVIEW
+    confirmRemoveBody: "เขาจะเข้าถึงไม่ได้ทันที และลิงก์สาธารณะที่เขาสร้างจะใช้ไม่ได้",
     removeConfirm: "นำสมาชิกออก",
     leave: "ออกจากเวิร์กสเปซ",
     confirmLeave: (workspace) => `ออกจาก ${workspace} ไหม`,
-    confirmLeaveBody: "คุณจะเข้าถึงไม่ได้ทันที หากต้องการกลับมา เจ้าของต้องเชิญคุณใหม่", // REVIEW
+    confirmLeaveBody: "คุณจะเข้าถึงไม่ได้ทันที หากต้องการกลับมา เจ้าของต้องเชิญคุณใหม่",
     leaveConfirm: "ออก",
     cancel: "ยกเลิก",
     roleChanged: (name, role) => `ตอนนี้ ${name} เป็น${role}`,
     removed: (name) => `นำ ${name} ออกจากเวิร์กสเปซแล้ว`,
-    lastOwner: "เวิร์กสเปซต้องมีเจ้าของอย่างน้อยหนึ่งคน ให้คนอื่นเป็นเจ้าของก่อน", // REVIEW
+    lastOwner: "เวิร์กสเปซต้องมีเจ้าของอย่างน้อยหนึ่งคน ให้คนอื่นเป็นเจ้าของก่อน",
     failed: (detail) => `เปลี่ยนสมาชิกไม่ได้: ${detail}`,
     loadFailed: (detail) => `โหลดสมาชิกไม่ได้: ${detail}`,
     readOnlyNote: "เฉพาะเจ้าของเท่านั้นที่เปลี่ยนบทบาทและเชิญคนได้",
     invite: "เชิญคน",
-    inviteIntro: "ทุกคนที่มีลิงก์จะลงชื่อเข้าใช้และเข้าร่วมด้วยบทบาทที่คุณเลือกได้ จนกว่าลิงก์จะใช้ไม่ได้", // REVIEW
+    inviteIntro: "ทุกคนที่มีลิงก์จะลงชื่อเข้าใช้และเข้าร่วมด้วยบทบาทที่คุณเลือกได้ จนกว่าลิงก์จะใช้ไม่ได้",
     inviteRole: "เข้าร่วมในฐานะ",
-    inviteExpiry: "ลิงก์จะใช้ไม่ได้หลังจาก", // REVIEW
-    inviteUses: "จำนวนคนที่เข้าร่วมด้วยลิงก์นี้ได้", // REVIEW
+    inviteExpiry: "ลิงก์จะใช้ไม่ได้หลังจาก",
+    inviteUses: "จำนวนคนที่เข้าร่วมด้วยลิงก์นี้ได้",
     days: (n) => `${count(n)} วัน`,
     people: (n) => `${count(n)} คน`,
     noRoom: "เวิร์กสเปซนี้ไม่มีที่ว่างสำหรับสมาชิกเพิ่มแล้ว",
@@ -289,17 +289,17 @@ export const th: Strings = {
     copy: "คัดลอกลิงก์",
     copied: "คัดลอกลิงก์แล้ว",
     copyFailed: "คัดลอกไม่ได้ เลือกลิงก์แล้วคัดลอกเอง",
-    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ", // REVIEW
+    onlyOnce: "คัดลอกไว้ตอนนี้ ลิงก์จะแสดงเพียงครั้งนี้ครั้งเดียว สร้างลิงก์ใหม่ได้ทุกเมื่อ",
     active: "ลิงก์เชิญที่ใช้งานอยู่",
     none: "ไม่มีลิงก์เชิญที่ใช้งานอยู่",
     loadingLinks: "กำลังโหลดลิงก์…",
-    linkLine: (role, left, date, by) => `${role} · เหลือ ${count(left)} ที่ · ใช้ได้ถึง ${date} · โดย ${by}`, // REVIEW
-    revoke: "เพิกถอน", // REVIEW
-    revokeLabel: (role, date) => `เพิกถอนลิงก์เชิญ${role}ที่ใช้ได้ถึง ${date}`, // REVIEW
-    revoked: "เพิกถอนลิงก์เชิญแล้ว ลิงก์นี้ใช้ไม่ได้อีก", // REVIEW
+    linkLine: (role, left, date, by) => `${role} · เหลือ ${count(left)} ที่ · ใช้ได้ถึง ${date} · โดย ${by}`,
+    revoke: "เพิกถอน",
+    revokeLabel: (role, date) => `เพิกถอนลิงก์เชิญ${role}ที่ใช้ได้ถึง ${date}`,
+    revoked: "เพิกถอนลิงก์เชิญแล้ว ลิงก์นี้ใช้ไม่ได้อีก",
     inviteFailed: (detail) => `สร้างลิงก์เชิญไม่ได้: ${detail}`,
     linksFailed: (detail) => `โหลดลิงก์เชิญไม่ได้: ${detail}`,
-    revokeFailed: (detail) => `เพิกถอนลิงก์เชิญไม่ได้: ${detail}`, // REVIEW
+    revokeFailed: (detail) => `เพิกถอนลิงก์เชิญไม่ได้: ${detail}`,
     done: "เสร็จ",
   },
 
@@ -307,16 +307,16 @@ export const th: Strings = {
     newWorkspace: "เวิร์กสเปซใหม่…",
     newOn: (server) => `เวิร์กสเปซใหม่บน ${server}`,
     newTitle: "เวิร์กสเปซใหม่",
-    newIntro: "คุณจะเป็นเจ้าของ เชิญคนอื่นได้จาก “สมาชิก…” หลังจากสร้างแล้ว", // REVIEW
+    newIntro: "คุณจะเป็นเจ้าของ เชิญคนอื่นได้จาก “สมาชิก…” หลังจากสร้างแล้ว",
     name: "ชื่อ",
     empty: "ตั้งชื่อก่อน",
-    restrict: "ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกจากเวิร์กสเปซนี้", // REVIEW
-    restrictHint: "สมาชิกจะคัดลอกหรือย้ายหน้าไปยังพื้นที่ส่วนตัวไม่ได้ และเปลี่ยนการตั้งค่านี้ภายหลังไม่ได้", // REVIEW
-    count: (owned, limit) => `คุณเป็นเจ้าของ ${count(owned)} จาก ${count(limit)} เวิร์กสเปซที่เซิร์ฟเวอร์นี้อนุญาต`, // REVIEW
-    countDeleted: (deleted) => `นับรวมเวิร์กสเปซที่เพิ่งลบ ${count(deleted)} รายการ ซึ่งยังนับอยู่จนกว่าจะลบถาวร`, // REVIEW
-    atLimit: (limit) => `คุณเป็นเจ้าของครบ ${count(limit)} เวิร์กสเปซแล้ว ซึ่งเป็นจำนวนสูงสุดที่เซิร์ฟเวอร์นี้อนุญาต ลบเวิร์กสเปซหนึ่ง หรือลบถาวรจาก “ที่ลบไปเร็ว ๆ นี้” เพื่อเพิ่มที่ว่าง`, // REVIEW
+    restrict: "ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกจากเวิร์กสเปซนี้",
+    restrictHint: "สมาชิกจะคัดลอกหรือย้ายหน้าไปยังพื้นที่ส่วนตัวไม่ได้ และเปลี่ยนการตั้งค่านี้ภายหลังไม่ได้",
+    count: (owned, limit) => `คุณเป็นเจ้าของ ${count(owned)} จาก ${count(limit)} เวิร์กสเปซที่เซิร์ฟเวอร์นี้อนุญาต`,
+    countDeleted: (deleted) => `นับรวมเวิร์กสเปซที่เพิ่งลบ ${count(deleted)} รายการ ซึ่งยังนับอยู่จนกว่าจะลบถาวร`,
+    atLimit: (limit) => `คุณเป็นเจ้าของครบ ${count(limit)} เวิร์กสเปซแล้ว ซึ่งเป็นจำนวนสูงสุดที่เซิร์ฟเวอร์นี้อนุญาต ลบเวิร์กสเปซหนึ่ง หรือลบถาวรจาก “ที่ลบไปเร็ว ๆ นี้” เพื่อเพิ่มที่ว่าง`,
     usage: (owned, limit) => `${count(owned)} จาก ${count(limit)} เวิร์กสเปซ`,
-    tooManyToday: "วันนี้คุณสร้างเวิร์กสเปซครบตามที่เซิร์ฟเวอร์นี้อนุญาตแล้ว ลองใหม่พรุ่งนี้", // REVIEW
+    tooManyToday: "วันนี้คุณสร้างเวิร์กสเปซครบตามที่เซิร์ฟเวอร์นี้อนุญาตแล้ว ลองใหม่พรุ่งนี้",
     create: "สร้างเวิร์กสเปซ",
     creating: "กำลังสร้าง…",
     created: (name) => `สร้าง ${name} แล้ว`,
@@ -329,18 +329,18 @@ export const th: Strings = {
     delete: "ลบ…",
     deleteTitle: (name) => `ลบ “${name}” ไหม`,
     deleteBody: (people) =>
-      `${people === 1 ? "คุณ" : `สมาชิกทั้ง ${count(people)} คน`}จะเข้าถึงไม่ได้ทันที และลิงก์แชร์กับลิงก์เชิญจะใช้ไม่ได้อีกเลย ภายใน 30 วัน เจ้าของกู้คืนเวิร์กสเปซพร้อมหน้าและสมาชิกได้จาก “ที่ลบไปเร็ว ๆ นี้” หลังจากนั้นจะถูกลบถาวร`, // REVIEW
-    typeToConfirm: (name) => `พิมพ์ชื่อเวิร์กสเปซเพื่อยืนยัน: ${name}`, // REVIEW
+      `${people === 1 ? "คุณ" : `สมาชิกทั้ง ${count(people)} คน`}จะเข้าถึงไม่ได้ทันที และลิงก์แชร์กับลิงก์เชิญจะใช้ไม่ได้อีกเลย ภายใน 30 วัน เจ้าของกู้คืนเวิร์กสเปซพร้อมหน้าและสมาชิกได้จาก “ที่ลบไปเร็ว ๆ นี้” หลังจากนั้นจะถูกลบถาวร`,
+    typeToConfirm: (name) => `พิมพ์ชื่อเวิร์กสเปซเพื่อยืนยัน: ${name}`,
     mismatch: "ชื่อไม่ตรงกัน",
     deleteConfirm: "ลบเวิร์กสเปซ",
     deleting: "กำลังลบ…",
-    deleted: (name) => `ลบ ${name} แล้ว กู้คืนได้ภายใน 30 วันจาก “ที่ลบไปเร็ว ๆ นี้”`, // REVIEW
+    deleted: (name) => `ลบ ${name} แล้ว กู้คืนได้ภายใน 30 วันจาก “ที่ลบไปเร็ว ๆ นี้”`,
     deleteFailed: (detail) => `ลบเวิร์กสเปซไม่ได้: ${detail}`,
-    recentlyDeleted: "ที่ลบไปเร็ว ๆ นี้…", // REVIEW
-    recentlyDeletedCount: (n) => `ที่ลบไปเร็ว ๆ นี้ (${count(n)})`, // REVIEW
-    recentlyDeletedOn: (server) => `ที่ลบไปเร็ว ๆ นี้บน ${server}`, // REVIEW
-    deletedTitle: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้", // REVIEW
-    deletedIntro: "เวิร์กสเปซที่คุณหรือเจ้าของคนอื่นลบในช่วง 30 วันที่ผ่านมา การกู้คืนจะนำหน้าและสมาชิกกลับมา แต่ลิงก์แชร์และลิงก์เชิญเดิมยังใช้ไม่ได้", // REVIEW
+    recentlyDeleted: "ที่ลบไปเร็ว ๆ นี้…",
+    recentlyDeletedCount: (n) => `ที่ลบไปเร็ว ๆ นี้ (${count(n)})`,
+    recentlyDeletedOn: (server) => `ที่ลบไปเร็ว ๆ นี้บน ${server}`,
+    deletedTitle: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้",
+    deletedIntro: "เวิร์กสเปซที่คุณหรือเจ้าของคนอื่นลบในช่วง 30 วันที่ผ่านมา การกู้คืนจะนำหน้าและสมาชิกกลับมา แต่ลิงก์แชร์และลิงก์เชิญเดิมยังใช้ไม่ได้",
     loadingDeleted: "กำลังโหลด…",
     noneDeleted: "ไม่มีเวิร์กสเปซที่ถูกลบในช่วง 30 วันที่ผ่านมา",
     deletedLine: (deleted, until) => `ลบเมื่อ ${deleted} · กู้คืนได้ถึง ${until}`,
@@ -351,7 +351,7 @@ export const th: Strings = {
     purge: "ลบถาวร…",
     purgeLabel: (name) => `ลบ ${name} ถาวร`,
     purgeTitle: (name) => `ลบ “${name}” ถาวรไหม`,
-    purgeBody: "หน้า ประวัติของหน้า และไฟล์แนบจะถูกลบทันที และจะไม่นับรวมในเวิร์กสเปซของคุณอีก ย้อนกลับไม่ได้", // REVIEW
+    purgeBody: "หน้า ประวัติของหน้า และไฟล์แนบจะถูกลบทันที และจะไม่นับรวมในเวิร์กสเปซของคุณอีก ย้อนกลับไม่ได้",
     purgeConfirm: "ลบถาวร",
     purged: (name) => `ลบ ${name} ถาวรแล้ว`,
     purgeFailed: (detail) => `ลบเวิร์กสเปซถาวรไม่ได้: ${detail}`,
@@ -361,15 +361,15 @@ export const th: Strings = {
 
   join: {
     title: "เข้าร่วมด้วยลิงก์เชิญ",
-    intro: "วางลิงก์เชิญที่มีคนส่งให้ Thoth จะเพิ่มเซิร์ฟเวอร์ให้ถ้ายังไม่มี ขอให้คุณลงชื่อเข้าใช้ แล้วเข้าร่วมเวิร์กสเปซ", // REVIEW
+    intro: "วางลิงก์เชิญที่มีคนส่งให้ Thoth จะเพิ่มเซิร์ฟเวอร์ให้ถ้ายังไม่มี ขอให้คุณลงชื่อเข้าใช้ แล้วเข้าร่วมเวิร์กสเปซ",
     label: "ลิงก์เชิญ",
     join: "เข้าร่วม",
     joining: "กำลังเข้าร่วม…",
     notInvite: "นี่ไม่ใช่ลิงก์เชิญ ลิงก์เชิญจะมีหน้าตาแบบ https://server/i/…",
-    signIn: (server) => `ลงชื่อเข้าใช้ ${server} เพื่อเข้าร่วม Thoth จะเข้าร่วมให้ทันทีหลังลงชื่อเข้าใช้`, // REVIEW
+    signIn: (server) => `ลงชื่อเข้าใช้ ${server} เพื่อเข้าร่วม Thoth จะเข้าร่วมให้ทันทีหลังลงชื่อเข้าใช้`,
     joined: (workspace, role) => `คุณเข้าร่วม ${workspace} ในฐานะ${role}แล้ว เวิร์กสเปซอยู่ในแถบด้านข้าง`,
     already: (workspace, role) => `คุณเป็นสมาชิกของ ${workspace} อยู่แล้ว (${role}) ไม่มีอะไรเปลี่ยน`,
-    gone: "ลิงก์เชิญนี้ใช้ไม่ได้ อาจพิมพ์ผิด หมดอายุ ใช้ครบแล้ว หรือถูกเพิกถอน", // REVIEW
+    gone: "ลิงก์เชิญนี้ใช้ไม่ได้ อาจพิมพ์ผิด หมดอายุ ใช้ครบแล้ว หรือถูกเพิกถอน",
     full: (detail) => `เวิร์กสเปซนี้เต็มแล้ว: ${detail}`,
     unsupported: "เซิร์ฟเวอร์นั้นไม่มีลิงก์เชิญ",
     failed: (detail) => `เข้าร่วมไม่ได้: ${detail}`,
@@ -418,13 +418,13 @@ export const th: Strings = {
       share: "แชร์หน้า…",
       members: (workspace) => `สมาชิกของ ${workspace}…`,
       newWorkspace: "เวิร์กสเปซใหม่…",
-      deletedWorkspaces: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้…", // REVIEW
+      deletedWorkspaces: "เวิร์กสเปซที่ลบไปเร็ว ๆ นี้…",
       renameWorkspace: (workspace) => `เปลี่ยนชื่อเวิร์กสเปซ ${workspace}…`,
       deleteWorkspace: (workspace) => `ลบเวิร์กสเปซ ${workspace}…`,
       theme: (name) => `เปลี่ยนธีม: ${name}`,
       settings: "เปิดการตั้งค่า",
       ask: "ถาม Thoth",
-      assistantSize: "ย่อหรือขยายผู้ช่วย", // REVIEW
+      assistantSize: "ย่อหรือขยายผู้ช่วย",
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
       newTab: "แท็บใหม่",
@@ -434,7 +434,7 @@ export const th: Strings = {
       goToTab: (label) => `ไปที่แท็บ: ${label}`,
       moveTabLeft: "ย้ายแท็บไปทางซ้าย",
       moveTabRight: "ย้ายแท็บไปทางขวา",
-      moveTabToWindow: "ย้ายแท็บไปหน้าต่างใหม่", // REVIEW
+      moveTabToWindow: "ย้ายแท็บไปหน้าต่างใหม่",
       toggleMode: "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
       shortcuts: "แสดงปุ่มลัด",
       format: (style) => `จัดรูปแบบ: ${style}`,
@@ -447,7 +447,7 @@ export const th: Strings = {
       "page.new": "หน้าใหม่",
       "folder.new": "โฟลเดอร์ใหม่",
       "theme.cycle": "เปลี่ยนธีม (สว่าง มืด ตามระบบ)",
-      "page.favorite": "เพิ่มหน้าที่เปิดอยู่ในรายการโปรด หรือเอาออก", // REVIEW
+      "page.favorite": "เพิ่มหน้าที่เปิดอยู่ในรายการโปรด หรือเอาออก",
       "tab.new": "แท็บใหม่",
       "tab.close": "ปิดแท็บ",
       "tab.next": "แท็บถัดไป",
@@ -463,7 +463,7 @@ export const th: Strings = {
       "tree.rename": "เปลี่ยนชื่อ",
       "tree.reorder": "ย้ายหน้าขึ้นหรือลง",
       "tree.menu": "เปิดเมนูของหน้า",
-      "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง", // REVIEW
+      "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง",
       "editor.save": "บันทึกทันที",
       "editor.mode": "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
       "editor.blockMenu": "เมนูบล็อก",
@@ -477,50 +477,50 @@ export const th: Strings = {
       "style.link": "ลิงก์",
       "style.toolbar": "ไปที่แถบเครื่องมือจัดรูปแบบ",
       "dialog.close": "ปิดกล่องโต้ตอบหรือเมนู",
-      "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)", // REVIEW
-      "assistant.size": "ย่อหรือขยายผู้ช่วย", // REVIEW
+      "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)",
+      "assistant.size": "ย่อหรือขยายผู้ช่วย",
     },
   },
 
   /** แท็บเหนือหน้า (ADR-0016 ข้อ 5) */
   sidebar: {
-    resize: "ปรับความกว้างแถบด้านข้าง", // REVIEW
-    resizeHint: "ลากเพื่อปรับขนาด ดับเบิลคลิกหรือกด Enter เพื่อคืนค่าเดิม", // REVIEW
+    resize: "ปรับความกว้างแถบด้านข้าง",
+    resizeHint: "ลากเพื่อปรับขนาด ดับเบิลคลิกหรือกด Enter เพื่อคืนค่าเดิม",
   },
 
-  // Notifications (ADR-0018). Strings marked REVIEW are the least certain.
+  // Notifications (ADR-0018).
   notifications: {
     bell: "การแจ้งเตือน",
     bellUnread: (n) => `การแจ้งเตือน ยังไม่ได้อ่าน ${count(n)} รายการ`,
     heading: "การแจ้งเตือน",
-    empty: "ยังไม่มีการแจ้งเตือน งานของเอเจนต์ การคัดลอกหรือย้าย การนำเข้า และการบันทึกที่ขัดกันจะแสดงที่นี่", // REVIEW
+    empty: "ยังไม่มีการแจ้งเตือน งานของเอเจนต์ การคัดลอกหรือย้าย การนำเข้า และการบันทึกที่ขัดกันจะแสดงที่นี่",
     markAllRead: "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
     clear: "ล้าง",
     unread: "ยังไม่ได้อ่าน",
     pages: (first, more) => (more === 0 ? first : `${first} และอีก ${count(more)} หน้า`),
-    agentReview: "การแก้ไขพร้อมให้ตรวจแล้ว", // REVIEW
-    agentFinished: "คำตอบพร้อมแล้ว", // REVIEW
-    agentFailed: (reason) => `งานล้มเหลว: ${reason}`, // REVIEW
+    agentReview: "การแก้ไขพร้อมให้ตรวจแล้ว",
+    agentFinished: "คำตอบพร้อมแล้ว",
+    agentFailed: (reason) => `งานล้มเหลว: ${reason}`,
     failures: {
       notSignedIn: (agent) => `${agent} ยังไม่ได้ลงชื่อเข้าใช้`,
-      billing: (agent) => `${agent} ต้องใช้แพ็กเกจแบบเสียเงินหรือเครดิต`, // REVIEW
-      rateLimit: (agent) => `${agent} ใช้งานถึงขีดจำกัดแล้ว`, // REVIEW
-      modelNotFound: (agent) => `${agent} ไม่รู้จักโมเดลนั้น`, // REVIEW
+      billing: (agent) => `${agent} ต้องใช้แพ็กเกจแบบเสียเงินหรือเครดิต`,
+      rateLimit: (agent) => `${agent} ใช้งานถึงขีดจำกัดแล้ว`,
+      modelNotFound: (agent) => `${agent} ไม่รู้จักโมเดลนั้น`,
       error: (agent) => `${agent} หยุดทำงานเพราะเกิดข้อผิดพลาด`,
     },
-    agentLimitTime: "งานหยุดเพราะถึงเวลาที่กำหนด", // REVIEW
-    agentLimitBudget: "งานหยุดเพราะถึงวงเงินที่กำหนด", // REVIEW
-    agentLimitReview: "ยังตรวจงานที่ทำไปแล้วได้", // REVIEW
+    agentLimitTime: "งานหยุดเพราะถึงเวลาที่กำหนด",
+    agentLimitBudget: "งานหยุดเพราะถึงวงเงินที่กำหนด",
+    agentLimitReview: "ยังตรวจงานที่ทำไปแล้วได้",
     transferDone: (mode, where) => (mode === "copy" ? `คัดลอกไปที่ ${where} แล้ว` : `ย้ายไปที่ ${where} แล้ว`),
     transferFailed: (mode, where) => (mode === "copy" ? `คัดลอกไปที่ ${where} ไม่สำเร็จ` : `ย้ายไปที่ ${where} ไม่สำเร็จ`),
     privateSpace: "Private Space",
     importDone: "นำเข้าเสร็จแล้ว",
-    importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด", // REVIEW
+    importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด",
     importBody: (pages, folder) => `${count(pages)} หน้าใน ${folder}`,
-    saveConflict: (page) => `${page} ถูกแก้ไขที่อื่นระหว่างที่คุณกำลังแก้ไข`, // REVIEW
+    saveConflict: (page) => `${page} ถูกแก้ไขที่อื่นระหว่างที่คุณกำลังแก้ไข`,
     saveConflictBody: "เลือกฉบับที่จะเก็บไว้",
-    update: (version) => `Thoth ${version} ออกแล้ว`, // REVIEW
-    updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้", // REVIEW
+    update: (version) => `Thoth ${version} ออกแล้ว`,
+    updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้",
   },
 
   favorites: {
@@ -536,7 +536,7 @@ export const th: Strings = {
     moveUp: "ย้ายขึ้น",
     moveDown: "ย้ายลง",
     moved: (title: string, position: number, total: number) => `ย้าย ${title} ไปตำแหน่งที่ ${position} จาก ${total}`,
-    unavailable: "ใช้งานไม่ได้ในขณะนี้", // REVIEW
+    unavailable: "ใช้งานไม่ได้ในขณะนี้",
     failed: (reason: string) => `เปลี่ยนรายการโปรดไม่ได้: ${reason}`,
   },
   tabs: {
@@ -550,18 +550,18 @@ export const th: Strings = {
     menu: (label) => `แท็บ: ${label}`,
     moveLeft: "ย้ายแท็บไปทางซ้าย",
     moveRight: "ย้ายแท็บไปทางขวา",
-    moveToWindow: "ย้ายแท็บไปหน้าต่างใหม่", // REVIEW
+    moveToWindow: "ย้ายแท็บไปหน้าต่างใหม่",
     movedTo: (label, position, total) => `ย้าย ${label} ไปลำดับที่ ${count(position)} จาก ${count(total)}`,
-    movedToWindow: (label) => `ย้าย ${label} ไปหน้าต่างใหม่แล้ว`, // REVIEW
-    releaseForWindow: "ปล่อยเพื่อเปิดในหน้าต่างใหม่", // REVIEW
+    movedToWindow: (label) => `ย้าย ${label} ไปหน้าต่างใหม่แล้ว`,
+    releaseForWindow: "ปล่อยเพื่อเปิดในหน้าต่างใหม่",
     /** Pinned tabs (ADR-0027). */
     pin: "ปักหมุดแท็บ",
     unpin: "เลิกปักหมุดแท็บ",
     closeOthers: "ปิดแท็บอื่น",
-    pinnedName: (label: string) => `${label}, ปักหมุดอยู่`, // REVIEW
+    pinnedName: (label: string) => `${label}, ปักหมุดอยู่`,
     pinnedSaid: (label: string) => `ปักหมุด ${label} แล้ว`,
     unpinnedSaid: (label: string) => `เลิกปักหมุด ${label} แล้ว`,
-    pinnedNoClose: "แท็บที่ปักหมุดไว้: เลิกปักหมุดก่อนจึงจะปิดได้", // REVIEW
+    pinnedNoClose: "แท็บที่ปักหมุดไว้: เลิกปักหมุดก่อนจึงจะปิดได้",
   },
 
   web: {
