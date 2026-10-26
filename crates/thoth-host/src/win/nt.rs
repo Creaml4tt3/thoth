@@ -156,9 +156,25 @@ fn query<T: Default>(handle: &OwnedHandle, class: fs::FILE_INFO_BY_HANDLE_CLASS)
 }
 
 /// `(FileAttributes, ReparseTag)` of an open handle.
+///
+/// FAT32 and exFAT (USB sticks, SD cards, many external drives) do not support `FileAttributeTagInfo` and answer
+/// ERROR_INVALID_PARAMETER. Those volumes have no reparse points, so the attributes from `FileBasicInfo` are enough;
+/// see `attr_tag_from`.
 pub fn attr_tag(handle: &OwnedHandle) -> Result<(u32, u32), OsError> {
-    let info: fs::FILE_ATTRIBUTE_TAG_INFO = query(handle, fs::FileAttributeTagInfo)?;
-    Ok((info.FileAttributes, info.ReparseTag))
+    attr_tag_from(
+        query::<fs::FILE_ATTRIBUTE_TAG_INFO>(handle, fs::FileAttributeTagInfo).map(|info| (info.FileAttributes, info.ReparseTag)),
+        || query::<fs::FILE_BASIC_INFO>(handle, fs::FileBasicInfo).map(|info| info.FileAttributes),
+    )
+}
+
+/// The attributes and reparse tag from the tag query, or, where the volume does not support it, the attributes from
+/// the basic query with no tag. A reparse point seen that way (which FAT volumes cannot hold) has no tag, so it is
+/// never taken for a plain file or folder: `kind_of` makes it `Kind::Other`, which is refused.
+pub fn attr_tag_from(tagged: Result<(u32, u32), OsError>, basic: impl FnOnce() -> Result<u32, OsError>) -> Result<(u32, u32), OsError> {
+    match tagged {
+        Err(error) if unsupported(error) => Ok((basic()?, 0)),
+        other => other,
+    }
 }
 
 pub fn kind(handle: &OwnedHandle) -> Result<Kind, OsError> {
@@ -332,5 +348,33 @@ pub fn final_path(handle: &OwnedHandle) -> Result<PathBuf, OsError> {
             return Ok(PathBuf::from(std::ffi::OsString::from_wide(&buf)));
         }
         buf.resize(n + 1, 0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const INVALID_PARAMETER: OsError = OsError(f::ERROR_INVALID_PARAMETER);
+
+    #[test]
+    fn a_volume_without_the_tag_query_falls_back_to_the_basic_attributes() {
+        // exFAT and FAT32: the tag query fails with ERROR_INVALID_PARAMETER (os error 87).
+        let dir = attr_tag_from(Err(INVALID_PARAMETER), || Ok(fs::FILE_ATTRIBUTE_DIRECTORY));
+        assert_eq!(dir.map(|(a, t)| kind_of(a, t)), Ok(Kind::Directory));
+        let file = attr_tag_from(Err(OsError(f::ERROR_NOT_SUPPORTED)), || Ok(fs::FILE_ATTRIBUTE_ARCHIVE));
+        assert_eq!(file.map(|(a, t)| kind_of(a, t)), Ok(Kind::File));
+        // A reparse point seen without its tag is still refused, never taken for a folder.
+        let reparse = attr_tag_from(Err(INVALID_PARAMETER), || Ok(fs::FILE_ATTRIBUTE_DIRECTORY | fs::FILE_ATTRIBUTE_REPARSE_POINT));
+        assert_eq!(reparse.map(|(a, t)| kind_of(a, t)), Ok(Kind::Other));
+    }
+
+    #[test]
+    fn other_errors_and_answers_are_kept() {
+        let mut asked = false;
+        assert_eq!(attr_tag_from(Err(OsError(f::ERROR_ACCESS_DENIED)), || { asked = true; Ok(0) }), Err(OsError(f::ERROR_ACCESS_DENIED)));
+        assert!(!asked);
+        assert_eq!(attr_tag_from(Ok((fs::FILE_ATTRIBUTE_REPARSE_POINT, 0xA000_0003)), || Ok(0)).map(|(a, t)| kind_of(a, t)), Ok(Kind::Symlink));
+        assert_eq!(attr_tag_from(Err(INVALID_PARAMETER), || Err(OsError(f::ERROR_ACCESS_DENIED))), Err(OsError(f::ERROR_ACCESS_DENIED)));
     }
 }

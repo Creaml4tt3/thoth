@@ -376,3 +376,91 @@ fn a_folder_source_never_follows_a_junction_or_names_a_stream() {
     let zip = host.call("source.open", &json!({ "location": archive.to_string_lossy() }), None).unwrap().0;
     assert_eq!(zip["rootKind"], json!("file"));
 }
+
+/// A small exFAT volume in a virtual disk, at a free drive letter as a USB drive would be (diskpart needs an
+/// administrator, which CI runners are). None where it cannot be made, except in CI, where that is a failure.
+struct ExFat {
+    vdisk: PathBuf,
+    mount: PathBuf,
+    _dir: tempfile::TempDir,
+}
+
+impl ExFat {
+    fn make() -> Option<Self> {
+        let dir = tempfile::tempdir().unwrap();
+        let vdisk = canonical(dir.path()).join("exfat.vhdx");
+        let skip = |why: &str| {
+            assert!(std::env::var_os("CI").is_none(), "could not make an exFAT volume in CI: {why}");
+            eprintln!("skipped: no exFAT volume (diskpart needs an administrator): {why}");
+        };
+        let Some(letter) = ('M'..='Y').rev().find(|l| !Path::new(&format!("{l}:\\")).exists()) else {
+            skip("no free drive letter");
+            return None;
+        };
+        let script = format!(
+            "create vdisk file=\"{0}\" maximum=64 type=expandable\nselect vdisk file=\"{0}\"\nattach vdisk\ncreate partition primary\nformat fs=exfat quick label=THOTHX\nassign letter={letter}\n",
+            vdisk.display()
+        );
+        let script_file = dir.path().join("make.txt");
+        std::fs::write(&script_file, script).unwrap();
+        let out = std::process::Command::new("diskpart").arg("/s").arg(&script_file).output().unwrap();
+        let mount = PathBuf::from(format!("{letter}:\\"));
+        let made = Self { vdisk, mount, _dir: dir };
+        if !out.status.success() || std::fs::read_dir(&made.mount).is_err() {
+            skip(&String::from_utf8_lossy(&out.stdout));
+            return None;
+        }
+        Some(made)
+    }
+}
+
+impl Drop for ExFat {
+    fn drop(&mut self) {
+        let script = format!("select vdisk file=\"{}\"\ndetach vdisk\n", self.vdisk.display());
+        let file = self.vdisk.with_extension("detach.txt");
+        let _ = std::fs::write(&file, script);
+        let _ = std::process::Command::new("diskpart").arg("/s").arg(&file).output();
+    }
+}
+
+/// FAT32 and exFAT drives (USB sticks, SD cards, external drives) answer the attribute-tag query with "The parameter
+/// is incorrect" (os error 87): an Obsidian vault on one must still import, and open as a Private Space.
+#[test]
+fn an_exfat_drive_imports_and_opens() {
+    let Some(volume) = ExFat::make() else { return };
+    // A folder with a space in its name, as in the report (E:\\01 Work WISS\\Popnaja).
+    let root = canonical(&volume.mount).join("01 Work");
+    std::fs::create_dir_all(root.join("Popnaja/.obsidian")).unwrap();
+    std::fs::create_dir_all(root.join("Popnaja/Notes")).unwrap();
+    std::fs::write(root.join("Popnaja/Notes/a.md"), "# A\n").unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let host = host(&root, data.path(), false);
+
+    // The folder import (the reported error: fstat on the source's root).
+    let source = host.call("source.open", &json!({ "location": root.join("Popnaja").to_string_lossy() }), None).unwrap().0;
+    assert_eq!(source["rootKind"], json!("directory"));
+    let id = source["source"].as_str().unwrap().to_owned();
+    let listed = host.call("source.list", &json!({ "source": id, "dir": "Notes" }), None).unwrap().0;
+    assert_eq!(listed[0]["name"], json!("a.md"));
+    let file = host.call("source.file.open", &json!({ "source": id, "path": "Notes/a.md" }), None).unwrap().0;
+    assert_eq!(file["size"], json!(4));
+    host.call("source.close", &json!({ "source": id }), None).unwrap();
+
+    // The same folder as a Private Space: stat, write, rename and remove.
+    std::fs::create_dir(root.join("Vault")).unwrap();
+    let vault = host.call("vault.open", &json!({ "root": root.join("Vault").to_string_lossy() }), None).unwrap().0["vault"].as_str().unwrap().to_owned();
+    let call = |c: &str, a: Value| {
+        let mut a = a;
+        a["vault"] = json!(vault);
+        host.call(c, &a, None).map(|r| r.0)
+    };
+    host.call("fs.write", &json!({ "vault": vault, "path": "n.md", "exclusive": true }), Some(b"one")).unwrap();
+    host.call("fs.write", &json!({ "vault": vault, "path": "n.md" }), Some(b"two")).unwrap();
+    assert_eq!(call("fs.stat", json!({ "path": "n.md" })).unwrap()["kind"], json!("file"));
+    assert_eq!(call("fs.stat", json!({ "path": "" })).unwrap()["kind"], json!("directory"));
+    call("fs.mkdirp", json!({ "dir": "sub" })).unwrap();
+    call("fs.rename", json!({ "from": "n.md", "to": "sub/m.md", "noReplace": true })).unwrap();
+    assert_eq!(std::fs::read(root.join("Vault/sub/m.md")).unwrap(), b"two");
+    call("fs.remove", json!({ "path": "sub" })).unwrap();
+    assert_eq!(call("fs.stat", json!({ "path": "sub" })).unwrap(), Value::Null);
+}

@@ -1,0 +1,29 @@
+# Temporary: runs the Windows host tests for fix/windows-exfat. Deleted before the branch is merged.
+name: Windows host tests (temporary)
+on:
+  push:
+    branches: [fix/windows-exfat]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # stable, 2026-10-01
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: windows-test
+      - name: Host tests
+        run: cargo test -p thoth-host -- --nocapture --test-threads=4 2>&1 | Tee-Object -FilePath out.txt; if ($LASTEXITCODE -ne 0) { exit 1 }
+        shell: pwsh
+      - name: Results
+        if: always()
+        shell: pwsh
+        run: Select-String -Path out.txt -Pattern 'test result|exfat|attr_tag|skipped|panicked|FAILED' | ForEach-Object { $_.Line }
