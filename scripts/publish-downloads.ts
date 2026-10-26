@@ -4,7 +4,9 @@
  *
  *   v<version>/<installer>   each file, immutable (cached for a year)
  *   v<version>/SHA256SUMS    `sha256sum -c` format
- *   latest.json              the newest release; the website's download manifest has the same facts
+ *   latest.json              the newest release; the website's download manifest has the same facts. Its `notes` is
+ *                            the version's entry on the website's changelog page, the update popup's "What's new"
+ *                            link (ADR-0022); CHANGELOG.md must have the version (scripts/release-notes.ts checks it).
  *
  * The version is read from the file names (Tauri names them `Thoth_<version>_...`) and must match
  * apps/desktop/src-tauri/tauri.conf.json. Uploads use the AWS CLI on the runner, whose S3 API R2 speaks;
@@ -15,6 +17,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { changelogUrl } from "./changelog.ts";
 
 export const BUCKET = "thoth-downloads";
 export const PUBLIC_BASE = "https://download.thoth.creaml4tt3.me/";
@@ -32,6 +35,8 @@ export interface Release {
   version: string;
   date: string;
   base: string;
+  /** The release notes: `https://thoth.creaml4tt3.me/changelog/#v0-1-3`. */
+  notes: string;
   files: ReleaseFile[];
 }
 
@@ -66,7 +71,7 @@ export async function collect(dir: string, today: string): Promise<Release> {
     const bytes = await readFile(join(dir, name));
     files.push({ ...info, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
   }
-  return { version: version!, date: today, base: `${PUBLIC_BASE}v${version}/`, files };
+  return { version: version!, date: today, base: `${PUBLIC_BASE}v${version}/`, notes: changelogUrl(version!), files };
 }
 
 export function sha256sums(release: Release): string {
