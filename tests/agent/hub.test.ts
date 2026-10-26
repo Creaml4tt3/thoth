@@ -364,6 +364,101 @@ describe.each(runtimes)("Agent Hub on the $name", (runtime) => {
     expect(await readdir(join(env.data, "agent-runs"))).toEqual([]);
     await expect(stat(runDir)).rejects.toThrow();
   });
+
+  // ------------------------------------------------------------- conversations
+
+  describe("conversations", () => {
+    /** Runs a turn and returns what the fake CLI read on stdin (read before it ends: a run that changed nothing deletes its folder). */
+    async function turn(prompt: string, extra: Partial<StartTask> = {}, using: AgentHub = hub) {
+      const { started, work } = await runTask(`${prompt}\n@sleep 300`, ["Notes/Plan.md"], extra, using);
+      const seen = await fakeRecord(work);
+      const finished = await started.finished;
+      return { record: finished, stdin: seen.stdin, argv: seen.argv };
+    }
+    const saved = (id: string) => readFile(join(root, ".thoth/agent/runs", `${id}.json`), "utf8");
+
+    it("a follow-up quotes the earlier questions and answers, oldest first; the record keeps only the new question, the conversation and the turn; the flags do not change", async () => {
+      const first = await turn("What is on the page?\n@answer A plan about a cat.");
+      expect(first.record.conversation).toEqual({ id: first.record.id, turn: 1 });
+      expect(first.stdin).not.toContain("Earlier turn");
+
+      const second = await turn("Who owns the cat?\n@answer Nobody says.", { followUp: first.record.id });
+      // The earlier question and answer came first, then the new question.
+      const q1 = second.stdin.indexOf("What is on the page?");
+      const a1 = second.stdin.indexOf("A plan about a cat.");
+      const q2 = second.stdin.indexOf("Who owns the cat?");
+      expect(q1).toBeGreaterThan(-1);
+      expect(q1).toBeLessThan(a1);
+      expect(a1).toBeLessThan(q2);
+      expect(second.stdin.endsWith("--- End of earlier turns ---\n\nWho owns the cat?\n@answer Nobody says.\n@sleep 300")).toBe(true);
+      // Only the earlier turn's own directives were quoted, not acted on: this turn answered for itself.
+      expect(hub.answer(second.record.id)).toBe("Nobody says.");
+      // The same flags as the first turn (no --resume, --continue or session id; the policy's fixture list).
+      expect(first.argv).toEqual(ARGV);
+      expect(second.argv).toEqual(first.argv);
+
+      expect(second.record.task.prompt).toBe("Who owns the cat?\n@answer Nobody says.\n@sleep 300");
+      expect(second.record.conversation).toEqual({ id: first.record.id, turn: 2, context: { earlier: 1, sent: 1, deleted: 0, notAllowed: 0 } });
+      const raw = await saved(second.record.id);
+      expect(raw).not.toContain("What is on the page?");
+      expect(raw).not.toContain("A plan about a cat.");
+
+      // Turn 3, asked from any turn of the conversation: both earlier turns, oldest first.
+      const third = await turn("And its name?", { followUp: second.record.id });
+      expect(third.stdin.indexOf("What is on the page?")).toBeLessThan(third.stdin.indexOf("Who owns the cat?"));
+      expect(third.stdin.indexOf("Nobody says.")).toBeLessThan(third.stdin.indexOf("And its name?"));
+      expect(third.record.conversation).toMatchObject({ id: first.record.id, turn: 3, context: { earlier: 2, sent: 2 } });
+      const rawThird = await saved(third.record.id);
+      for (const text of ["What is on the page?", "A plan about a cat.", "Who owns the cat?", "Nobody says."]) expect(rawThird).not.toContain(text);
+    });
+
+    it("after a restart the answers come from the local transcripts, and a turn whose transcript was deleted is left out", async () => {
+      const first = await turn("First question?\n@answer First answer.");
+      const second = await turn("Second question?\n@answer Second answer.", { followUp: first.record.id });
+      await hub.dispose();
+      const host = await env.restart();
+      hub = makeHub(host);
+      await host.history.delete(first.record.id);
+      const third = await turn("Third question?", { followUp: second.record.id });
+      expect(third.stdin).not.toContain("First question?");
+      expect(third.stdin).not.toContain("First answer.");
+      expect(third.stdin.indexOf("Second question?")).toBeLessThan(third.stdin.indexOf("Second answer."));
+      expect(third.record.conversation).toEqual({ id: first.record.id, turn: 3, context: { earlier: 2, sent: 1, deleted: 1, notAllowed: 0 } });
+    });
+
+    it("keeps the newest turns that fit the prompt limit", async () => {
+      // Two answers of 12 000 characters: with the new question only the newer fits in 20 000.
+      const first = await turn("Oldest?\n@answer-long 12000");
+      const second = await turn("Middle?\n@answer-long 12000", { followUp: first.record.id });
+      const third = await turn("Newest?", { followUp: second.record.id });
+      expect(third.stdin).not.toContain("Oldest?");
+      expect(third.stdin).toContain("Middle?");
+      expect(third.record.conversation?.context).toEqual({ earlier: 2, sent: 1, deleted: 0, notAllowed: 0 });
+    });
+
+    it("waits while the last turn runs or waits for review, and refuses a conversation it does not know", async () => {
+      const running = await runTask("@sleep 800\n@replace Notes/Plan.md :: cat => dog\n");
+      await expect(hub.start({ provider: "claude", prompt: "Next?", selection: ["Notes/Plan.md"], followUp: running.started.record.id })).rejects.toThrow(/still running|waiting for review/);
+      const review = await running.started.finished;
+      expect(review.state).toBe("review");
+      await expect(hub.start({ provider: "claude", prompt: "Next?", selection: ["Notes/Plan.md"], followUp: review.id })).rejects.toThrow(/waiting for review/);
+      await hub.discard(review.id);
+      const next = await turn("Next?", { followUp: review.id });
+      expect(next.record.conversation).toMatchObject({ id: review.id, turn: 2 });
+      await expect(hub.start({ provider: "claude", prompt: "x", selection: ["Notes/Plan.md"], followUp: "01900000-0000-7000-8000-000000000000" })).rejects.toThrow(/not in the history/);
+      expect(await readdir(join(env.data, "agent-runs")).catch(() => [])).toEqual([]);
+    });
+
+    it("continues an older run that has no conversation as its turn 1", async () => {
+      const first = await turn("Old question?\n@answer Old answer.");
+      const old = JSON.parse(await saved(first.record.id)) as RunRecord;
+      delete old.conversation;
+      await env.vault.writeRecord(`.thoth/agent/runs/${first.record.id}.json`, old);
+      const next = await turn("New question?", { followUp: first.record.id });
+      expect(next.stdin.indexOf("Old answer.")).toBeLessThan(next.stdin.indexOf("New question?"));
+      expect(next.record.conversation).toMatchObject({ id: first.record.id, turn: 2 });
+    });
+  });
   // ------------------------------------------------------------------ context
 
   it("gives the whole Private Space when asked, without .thoth/, and the agent's edits still need approval", async () => {
@@ -428,6 +523,29 @@ describe.each(runtimes)("Agent Hub on the $name", (runtime) => {
       expect(finished.task.prompt).toBe("Summarize the spec.\n@say reading\n@sleep 300");
       // Read with the user's access, and nothing was written to the server.
       expect(fake.calls.filter((c) => c.path.includes("/pages/")).map((c) => c.method)).toEqual(["GET", "GET"]);
+      expect(writes()).toEqual([]);
+    });
+
+    it("a follow-up re-reads them with the person's access, and leaves out an earlier turn that had them when this turn is not given that workspace", async () => {
+      const { refs } = team();
+      const { started, work } = await runTask("What does the spec say?\n@answer Ship in May.\n@sleep 300", ["Notes/Plan.md"], { workspacePages: refs });
+      await fakeRecord(work);
+      const first = await started.finished;
+      // With the workspace pages again: fetched again (GET), and the earlier turn is quoted.
+      const again = await runTask("And the budget?\n@sleep 300", ["Notes/Plan.md"], { workspacePages: refs, followUp: first.id });
+      const seen = await fakeRecord(again.work);
+      const second = await again.started.finished;
+      expect(seen.stdin).toContain("Ship in May.");
+      expect(seen.stdin).toContain('the folder "workspace/" holds read-only copies of pages');
+      expect(second.conversation?.context).toEqual({ earlier: 1, sent: 1, deleted: 0, notAllowed: 0 });
+      expect(fake.calls.filter((c) => c.path.includes("/pages/")).map((c) => c.method)).toEqual(["GET", "GET", "GET", "GET"]);
+      // Without them: the answers that may quote them stay out.
+      const without = await runTask("Anything else?\n@sleep 300", ["Notes/Plan.md"], { followUp: second.id });
+      const seenWithout = await fakeRecord(without.work);
+      const third = await without.started.finished;
+      expect(seenWithout.stdin).not.toContain("Ship in May.");
+      expect(seenWithout.stdin).not.toContain("And the budget?");
+      expect(third.conversation?.context).toEqual({ earlier: 2, sent: 0, deleted: 0, notAllowed: 2 });
       expect(writes()).toEqual([]);
     });
 

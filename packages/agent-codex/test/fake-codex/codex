@@ -121,7 +121,9 @@ const fail = (text) => {
 emit({ type: "thread.started", thread_id: "00000000-0000-7000-8000-0000000000aa" });
 emit({ type: "turn.started" });
 
-for (const raw of prompt.split("\n")) {
+// A follow-up (ADR-0007, "Conversations") quotes the earlier turns first: only the lines after them are acted on.
+const promptLines = prompt.split("\n");
+for (const raw of promptLines.slice(promptLines.lastIndexOf("--- End of earlier turns ---") + 1)) {
   const line = raw.trim();
   if (!line.startsWith("@")) continue;
   const [directive, ...rest] = line.split(" ");

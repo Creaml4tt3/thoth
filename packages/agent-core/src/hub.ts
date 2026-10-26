@@ -17,6 +17,7 @@ import { newStableId } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
 import { AnswerTracker, runAnswer } from "./answer.ts";
 import { applyChanges, saveAsCopy, type ApplyResult, type ReviewedFiles } from "./apply.ts";
+import { conversationKey, conversationTurns, fitConversation, turnOf, type ConversationFit, type EarlierTurn } from "./conversation.ts";
 import { loadReview, loadRunDetails, loadTranscript, rebuildChanges, reviewIsIntact, saveReview, storedFiles, TranscriptSaver, type RunDetails } from "./details.ts";
 import type { AgentHost } from "./host.ts";
 import { checkBudgetUsd, checkTimeLimitMs, DEFAULT_RETENTION_DAYS, LimitError } from "./limits.ts";
@@ -45,6 +46,12 @@ export interface StartTask {
    * framing it is sent but not kept: the run record holds only the user's own words, never page text (spec §3.3).
    */
   excerpt?: { text: string; from?: string };
+  /**
+   * A follow-up question (ADR-0007, "Conversations"): the id of any run of the conversation it continues. The run is a
+   * new one-shot run like any other; its earlier turns (questions and answers, oldest first) are quoted to the CLI in
+   * front of `prompt`, the newest that fit, and the record keeps only `prompt` with the conversation's id and the turn.
+   */
+  followUp?: string;
 }
 
 /** The longest selected-text excerpt quoted after a task. */
@@ -116,6 +123,8 @@ export class AgentHub {
   private readonly transcriptFlushMs: number | undefined;
   /** Serializes record writes per run, so a late event never overwrites a newer state. */
   private writes: Promise<unknown> = Promise.resolve();
+  /** Conversations a follow-up is being started for (before its record exists), so two cannot start at once. */
+  private readonly asking = new Set<string>();
 
   constructor(options: AgentHubOptions) {
     this.vault = options.vault;
@@ -199,6 +208,43 @@ export class AgentHub {
       if (!(await provider.getCapabilities()).includes("spending-limit")) throw new LimitError("budget", `${provider.name} has no spending limit`);
     }
     if (task.timeoutMs !== undefined) checkTimeLimitMs(task.timeoutMs);
+    const thread = task.followUp === undefined ? null : await this.thread(task.followUp);
+    if (thread) this.asking.add(thread.id);
+    try {
+      return await this.startTurn(task, provider, prompt, thread, onEvent);
+    } finally {
+      if (thread) this.asking.delete(thread.id);
+    }
+  }
+
+  /**
+   * The conversation a follow-up continues, by the id of any of its runs. Refused when it is not in the history, or
+   * while one of its turns still runs or waits for review (the review comes first).
+   */
+  private async thread(id: string): Promise<{ id: string; turn: number; earlier: RunRecord[] }> {
+    const records = await listRuns(this.vault);
+    const target = records.find((r) => r.id === id) ?? this.live.get(id)?.record;
+    if (!target) throw new RunStateError("That conversation is not in the history of this Private Space");
+    const key = conversationKey(target);
+    const turns = conversationTurns(records).find((c) => c.id === key)?.turns ?? [target];
+    if (this.asking.has(key)) throw new RunStateError("The last turn of this conversation is still running");
+    for (const turn of turns) {
+      const state = this.live.get(turn.id)?.record.state ?? turn.state;
+      if (state === "staging" || state === "running") throw new RunStateError("The last turn of this conversation is still running");
+      if (state === "review") throw new RunStateError("The last turn of this conversation is waiting for review: apply or discard its changes first");
+    }
+    return { id: key, turn: Math.max(...turns.map(turnOf)) + 1, earlier: turns };
+  }
+
+  /** What an earlier turn answered: from memory for a run this session knows, else from its local transcript. */
+  private async earlierAnswer(id: string): Promise<{ kept: boolean; answer: string | null }> {
+    const live = this.live.get(id);
+    if (live && live.record.state !== "running" && live.record.state !== "staging") return { kept: true, answer: live.answer };
+    const events = await loadTranscript(this.host.history, id).catch(() => null);
+    return events === null ? { kept: false, answer: null } : { kept: true, answer: runAnswer(events) };
+  }
+
+  private async startTurn(task: StartTask, provider: AgentProvider, prompt: string, thread: { id: string; turn: number; earlier: RunRecord[] } | null, onEvent: (event: AgentEvent) => void): Promise<{ record: RunRecord; finished: Promise<RunRecord> }> {
     const status = await provider.detect();
     if (status.state !== "ready") throw new AgentUnavailableError(status);
 
@@ -218,10 +264,25 @@ export class AgentHub {
       await this.host.dispose(workspace).catch(() => undefined);
       throw error;
     }
+    // A follow-up's earlier turns: an answer can quote what its turn was given, so a turn goes along only when this one
+    // is given the same kind of material (Private Space pages, the same workspaces), checked on what was staged now.
+    let fit: ConversationFit | null = null;
+    if (thread) {
+      const privatePages = context.some((c) => !c.readOnly);
+      const workspaces = new Set(context.flatMap((c) => (c.workspace ? [c.workspace.workspaceId] : [])));
+      const earlier: EarlierTurn[] = [];
+      for (const turn of thread.earlier) {
+        const { kept, answer } = await this.earlierAnswer(turn.id);
+        const allowed = turn.context.every((c) => (c.readOnly || c.workspace ? c.workspace !== undefined && workspaces.has(c.workspace.workspaceId) : privatePages));
+        earlier.push({ turn: turnOf(turn), question: turn.task.prompt, answer, kept, allowed });
+      }
+      fit = fitConversation(earlier, prompt);
+    }
     const now = this.now();
+    const id = newStableId(now);
     const record: RunRecord = {
       version: 1,
-      id: newStableId(now),
+      id,
       provider: { id: provider.id, name: provider.name, version: status.version },
       task: {
         prompt,
@@ -235,6 +296,7 @@ export class AgentHub {
       createdAt: now,
       updatedAt: now,
       changes: [],
+      conversation: thread && fit ? { id: thread.id, turn: thread.turn, context: { earlier: fit.earlier, sent: fit.sent, deleted: fit.deleted, notAllowed: fit.notAllowed } } : { id, turn: 1 },
     };
     const live: Live = { record, workspace, provider, context, changes: null, open: true, answer: null };
     this.live.set(record.id, live);
@@ -243,7 +305,8 @@ export class AgentHub {
     try {
       // The reference folder is announced to the model, in front of the user's own words (the record keeps only those).
       const readOnly = context.find((c) => c.readOnly);
-      const framed = (readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt) + quoteExcerpt(task.excerpt);
+      // A follow-up's earlier turns come first; like the framing and the excerpt they are sent, never recorded.
+      const framed = (fit?.context ?? "") + (readOnly ? workspaceFraming(readOnly.path.split("/")[0]!) + prompt : prompt) + quoteExcerpt(task.excerpt);
       await provider.startTask({ workspace, dir, prompt: framed, ...(task.model ? { model: task.model } : {}), ...(task.maxBudgetUsd !== undefined ? { maxBudgetUsd: task.maxBudgetUsd } : {}), ...(task.timeoutMs !== undefined ? { timeoutMs: task.timeoutMs } : {}) });
     } catch (error) {
       record.state = "failed";

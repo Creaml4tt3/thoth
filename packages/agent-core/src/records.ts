@@ -17,6 +17,8 @@ export const RECORD_VERSION = 1;
 export const MAX_RECORDS = 200;
 export const MAX_PROMPT_CHARS = 20_000;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 export const runPath = (id: string): string => `${RUNS_DIR}/${id}.json`;
 
 export const RunStateSchema = z.enum([
@@ -100,6 +102,19 @@ export const RunRecordSchema = z.object({
     })
     .optional(),
   changes: z.array(ChangeRecordSchema),
+  /**
+   * The conversation this run is a turn of (ADR-0007, amendment "Conversations"): its id (the first turn's run id) and
+   * this run's turn number, and for a follow-up how many earlier turns were sent as context and why the others were
+   * left out. Counts only: the earlier questions and answers are sent to the CLI, never kept here. A record without
+   * it (an older run) is a one-turn conversation of its own.
+   */
+  conversation: z
+    .object({
+      id: z.string().regex(UUID),
+      turn: z.number().int().min(1),
+      context: z.object({ earlier: z.number().int().min(0), sent: z.number().int().min(0), deleted: z.number().int().min(0), notAllowed: z.number().int().min(0) }).optional(),
+    })
+    .optional(),
 });
 export type RunRecord = z.infer<typeof RunRecordSchema>;
 

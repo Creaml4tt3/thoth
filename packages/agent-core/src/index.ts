@@ -1,5 +1,6 @@
 export * from "./answer.ts";
 export * from "./apply.ts";
+export * from "./conversation.ts";
 export * from "./details.ts";
 export * from "./host.ts";
 export * from "./hub.ts";

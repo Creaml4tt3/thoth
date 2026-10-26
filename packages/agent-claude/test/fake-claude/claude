@@ -16,6 +16,9 @@
 //   @symlink PATH -> TARGET          @mkdir PATH                                @say TEXT
 //   @unlock PATH (make a read-only file writable, as an agent that works around a file mode would)
 //   @answer TEXT (the final message and the result's text, instead of "Done."; \n for a newline)
+//   @answer-long N (an answer of N letters)
+//   @echo-context (answers with how many earlier turns of a conversation its input quoted, and the first question)
+// In a follow-up, only the lines after "--- End of earlier turns ---" are read for directives.
 //   @sleep MS                        @hang (start a grandchild, then wait to be killed)
 //   @ignore-term (ignore SIGTERM)    @not-logged-in                             @exit CODE
 //   @budget (stop the way Claude Code does when --max-budget-usd is used up: a result with subtype
@@ -99,7 +102,15 @@ const useTool = (name, input) => {
   return toolId;
 };
 
-for (const raw of prompt.split("\n")) {
+// A follow-up (ADR-0007, "Conversations") quotes the earlier turns before the new question: their directives are
+// context, not instructions for this run, so only the lines after the end of the quoted turns are acted on.
+const END_OF_TURNS = "--- End of earlier turns ---";
+const lines = prompt.split("\n");
+const end = lines.lastIndexOf(END_OF_TURNS);
+const earlier = end < 0 ? [] : lines.slice(0, end);
+const earlierTurns = earlier.filter((l) => /^--- Earlier turn \d+ ---$/.test(l)).length;
+
+for (const raw of lines.slice(end + 1)) {
   const line = raw.trim();
   if (!line.startsWith("@")) continue;
   const [directive, ...rest] = line.split(" ");
@@ -144,6 +155,12 @@ for (const raw of prompt.split("\n")) {
     assistant([{ type: "text", text: arg }]);
   } else if (directive === "@answer") {
     answer = arg.replaceAll("\\n", "\n");
+  } else if (directive === "@answer-long") {
+    answer = "a".repeat(Number(arg));
+  } else if (directive === "@echo-context") {
+    // Says what the input held before the new question: how many earlier turns, and the first one's question.
+    const first = earlier.indexOf("Question:");
+    answer = earlierTurns === 0 ? "No earlier turns in my input." : `Earlier turns in my input: ${earlierTurns}. The first question was: ${earlier[first + 2] ?? "?"}`;
   } else if (directive === "@sleep") {
     await sleep(Number(arg));
   } else if (directive === "@ignore-term") {
