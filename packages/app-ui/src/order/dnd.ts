@@ -13,8 +13,22 @@
  *   `relatedTarget` on `dragleave`, so leaving is decided by where the pointer is, not by what it entered.
  *
  * Dragging is a mouse feature; the keyboard has Alt+Shift+Up/Down and "Move to…" (see `tree-keys.ts`).
+ *
+ * A row can also be dragged onto the other space's tree (`carry` in the source tree, `across` in the target; see
+ * `space-drag.ts`). That only asks for the transfer dialog; within one tree everything works as described above.
  */
-import { useCallback, useEffect, useRef, useState, type DragEvent, type HTMLAttributes } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type HTMLAttributes } from "react";
+import { SPACE_DRAG_TYPE, beginSpaceDrag, clearSpaceHover, currentSpaceDrag, dropAcrossSpaces, encodeSpaceDrag, endSpaceDrag, modeAtDrop, setSpaceHover, type SpaceDestination, type SpaceDrag } from "./space-drag.ts";
+
+/** Where a drag from the other space would land over a row, and what the pointer says. */
+export interface AcrossTarget {
+  /** The row to light ("inside"); null when the light is elsewhere (the Private Space header) or the drop is refused. */
+  highlight: string | null;
+  /** Null: refused, and `text` says why. */
+  to: SpaceDestination | null;
+  /** "Copy to Studio…", or the reason it is refused. */
+  text: string;
+}
 
 export type DropZone = "before" | "inside" | "after";
 export interface DropState {
@@ -53,6 +67,13 @@ export interface TreeDndOptions {
    * inside it": that is where a line drawn under the folder row lands, and a drop "after" it would land below all its children.
    */
   firstChild?(id: string): string | null;
+  /**
+   * What a drag of this row would take to the other space, asked at dragstart; null: nothing. With `carry` a row is
+   * draggable even when `enabled` is false (a viewer can still copy pages out), but then it is never reordered.
+   */
+  carry?(id: string): SpaceDrag | null;
+  /** A drag from another tree is over row `id`: where it would land, or null when this row is no place for it at all. */
+  across?(drag: SpaceDrag, id: string, move: boolean): AcrossTarget | null;
 }
 
 export interface TreeDnd {
@@ -86,6 +107,8 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
   const active = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The row whose events last set `drop` (the indicator may sit on another row: the first child of an open folder). */
   const via = useRef<string | null>(null);
+  /** This tree's name in the shared hover state (`space-drag.ts`). */
+  const owner = useId();
 
   const clearHover = useCallback(() => {
     if (hover.current) clearTimeout(hover.current.timer);
@@ -105,6 +128,7 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
   );
 
   const reset = useCallback(() => {
+    if (drag.current !== null && currentSpaceDrag()?.row === drag.current) endSpaceDrag();
     drag.current = null;
     via.current = null;
     clearHover();
@@ -116,7 +140,8 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
   /** Where a drop on the row `id` would go, or null when it would not be allowed. */
   const target = (event: DragEvent<HTMLElement>, id: string): DropState | null => {
     const from = drag.current;
-    if (from === null) return null;
+    // A row of a tree that cannot reorder was only dragged to be carried elsewhere.
+    if (from === null || !opts.current.enabled) return null;
     const rect = event.currentTarget.getBoundingClientRect();
     const o = opts.current;
     const zone = o.onlyInside?.(id) ? "inside" : dropZone(event.clientY - rect.top, rect.height, { canContain: o.canContain(id), canOrder: o.canOrder });
@@ -129,9 +154,45 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
     return o.canDrop(from, id, zone) ? { id, zone } : null;
   };
 
+  /** A drag from another tree over row `id`: where it would land, or null (not a place for it at all). */
+  const acrossTarget = (event: DragEvent<HTMLElement>, id: string): { drag: SpaceDrag; to: AcrossTarget } | null => {
+    if (drag.current !== null || !opts.current.across) return null;
+    const carried = currentSpaceDrag();
+    if (carried === null) return null;
+    const to = opts.current.across(carried, id, modeAtDrop(event) === "move");
+    return to ? { drag: carried, to } : null;
+  };
+
+  /** dragenter and dragover of a drag from another tree: light the target, or say why it is refused. */
+  const hoverAcross = (event: DragEvent<HTMLElement>, id: string) => {
+    const found = acrossTarget(event, id);
+    const key = `${owner}\n${id}`;
+    if (found === null || found.to.to === null) {
+      // Refused (or no place for it): no indicator, and without preventDefault the pointer shows "no drop".
+      clearHover();
+      if (via.current === id) via.current = null;
+      setDrop(null);
+      if (found) setSpaceHover({ owner: key, x: event.clientX, y: event.clientY, text: found.to.text, to: null });
+      else clearSpaceHover(key);
+      return;
+    }
+    const { highlight, to, text } = found.to;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = modeAtDrop(event);
+    via.current = id;
+    setDrop((d) => (highlight === null ? null : d?.id === highlight && d.zone === "inside" ? d : { id: highlight, zone: "inside" }));
+    setSpaceHover({ owner: key, x: event.clientX, y: event.clientY, text, to });
+    if (highlight === id && opts.current.onHoverOpen) {
+      if (hover.current?.id !== id) {
+        clearHover();
+        hover.current = { id, timer: setTimeout(() => opts.current.onHoverOpen?.(id), HOVER_OPEN_MS) };
+      }
+    } else clearHover();
+  };
+
   /** dragenter and dragover: accept the drop where it is allowed and show where it would go. */
   const hoverOn = (event: DragEvent<HTMLElement>, id: string) => {
-    if (drag.current === null) return;
+    if (drag.current === null) return hoverAcross(event, id);
     const to = target(event, id);
     if (to === null) {
       // Nothing may be dropped here: no row shows an indicator.
@@ -153,17 +214,26 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
   };
 
   const rowProps: TreeDnd["rowProps"] = (id) => {
-    if (!options.enabled) return {};
+    if (!options.enabled && !options.carry && !options.across) return {};
     return {
-      draggable: true,
+      ...(options.enabled || options.carry ? { draggable: true } : {}),
       "data-drop": drop?.id === id ? drop.zone : undefined,
       onDragStart(event) {
         event.stopPropagation();
+        const carried = opts.current.carry?.(id) ?? null;
+        if (!opts.current.enabled && carried === null) {
+          event.preventDefault(); // nothing to reorder, nothing to carry
+          return;
+        }
         drag.current = id;
         setDragging(id);
-        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.effectAllowed = carried ? "copyMove" : "move";
         // Firefox starts no drag without data.
         event.dataTransfer.setData("text/plain", id);
+        if (carried) {
+          event.dataTransfer.setData(SPACE_DRAG_TYPE, encodeSpaceDrag(carried));
+          beginSpaceDrag(carried);
+        }
         const picture = dragImage(event.currentTarget);
         if (picture) {
           event.dataTransfer.setDragImage?.(picture.node, picture.x, picture.y);
@@ -184,13 +254,25 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
         if (event.clientX > r.left && event.clientX < r.right && event.clientY > r.top && event.clientY < r.bottom) return;
         // `dragenter` of the next row comes before this `dragleave`: only clear what this row set.
         if (hover.current?.id === id) clearHover();
+        clearSpaceHover(`${owner}\n${id}`);
         if (via.current !== id) return;
         via.current = null;
         setDrop(null);
       },
       onDrop(event) {
         const from = drag.current;
-        if (from === null) return;
+        if (from === null) {
+          const found = acrossTarget(event, id);
+          via.current = null;
+          clearHover();
+          setDrop(null);
+          clearSpaceHover(`${owner}\n${id}`);
+          if (found === null || found.to.to === null) return;
+          event.preventDefault();
+          event.stopPropagation();
+          dropAcrossSpaces({ drag: found.drag, to: found.to.to, mode: modeAtDrop(event) });
+          return;
+        }
         const to = target(event, id);
         event.preventDefault();
         event.stopPropagation();
@@ -202,4 +284,46 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
   };
 
   return { dragging, drop, rowProps };
+}
+
+/**
+ * A place outside the trees that takes drags from another space (the Private Space header). `resolve` says where a
+ * drop would land, as for a tree row; spread `props` on the element. Its light (`data-drop`) is the caller's: it is
+ * on whenever the shared hover state lands where this place stands for, also from a row (`useSpaceHoverAt`).
+ */
+export function useAcrossDropZone(resolve: (drag: SpaceDrag, move: boolean) => AcrossTarget | null): Pick<HTMLAttributes<HTMLElement>, "onDragEnter" | "onDragOver" | "onDragLeave" | "onDrop"> {
+  const owner = useId();
+  const latest = useRef(resolve);
+  latest.current = resolve;
+  const find = (event: DragEvent<HTMLElement>) => {
+    const carried = currentSpaceDrag();
+    const to = carried ? latest.current(carried, modeAtDrop(event) === "move") : null;
+    return carried && to ? { drag: carried, to } : null;
+  };
+  const over = (event: DragEvent<HTMLElement>) => {
+    const found = find(event);
+    if (found === null) return clearSpaceHover(owner);
+    setSpaceHover({ owner, x: event.clientX, y: event.clientY, text: found.to.text, to: found.to.to });
+    if (found.to.to === null) return; // refused: the pointer shows "no drop"
+    event.preventDefault();
+    event.dataTransfer.dropEffect = modeAtDrop(event);
+  };
+  return {
+    onDragEnter: over,
+    onDragOver: over,
+    onDragLeave(event) {
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      const r = event.currentTarget.getBoundingClientRect();
+      if (event.clientX > r.left && event.clientX < r.right && event.clientY > r.top && event.clientY < r.bottom) return;
+      clearSpaceHover(owner);
+    },
+    onDrop(event) {
+      const found = find(event);
+      clearSpaceHover(owner);
+      if (found === null || found.to.to === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dropAcrossSpaces({ drag: found.drag, to: found.to.to, mode: modeAtDrop(event) });
+    },
+  };
 }

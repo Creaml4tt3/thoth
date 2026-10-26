@@ -182,6 +182,15 @@ export const th: Strings = {
       move: "ย้าย",
       cancel: "ยกเลิก",
     },
+    across: {
+      copyTo: (name) => `คัดลอกไปที่ ${name}…`,
+      moveTo: (name) => `ย้ายไปที่ ${name}…`,
+      privateSpace: "Private Space",
+      viewer: (workspace) => `คุณเป็นผู้ดูใน ${workspace}`, // REVIEW
+      noTransfers: (server) => `${server} ไม่รับการโอนย้าย`, // REVIEW
+      exportRestricted: (workspace) => `${workspace} ไม่อนุญาตให้คัดลอกหรือย้ายหน้าออกไป`,
+      signedOut: (server) => `เข้าสู่ระบบ ${server} ก่อน`, // REVIEW
+    },
   },
 
   // ลิงก์สาธารณะแบบอ่านอย่างเดียว (ADR-0023). Strings marked REVIEW are the least certain.

@@ -93,6 +93,13 @@
 .tree-item[data-drop="after"] { box-shadow: inset 0 -2px 0 0 var(--thoth-drop-indicator); }
 .tree-item[data-drop="inside"] { background: var(--thoth-accent-soft); box-shadow: inset 0 0 0 1.5px var(--thoth-drop-indicator); }
 .tree-root-drop { margin: 6px 4px 0; padding: 8px; border-radius: var(--thoth-radius-sm); border: 1.5px dashed var(--thoth-border-strong); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); text-align: center; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+/* Across spaces (space-drag.ts): the Private Space header takes workspace pages for its top level, lit like a row. */
+.sec-drop { border-radius: var(--thoth-radius-sm); }
+.sec-drop[data-drop="inside"] { background: var(--thoth-accent-soft); box-shadow: inset 0 0 0 1.5px var(--thoth-drop-indicator); color: var(--thoth-ink-primary); }
+/* The words by the pointer: what a drop would do, or (refused) why not. Drawn under the browser's drag picture. */
+.space-drag-badge { position: fixed; z-index: 1000; max-width: 280px; padding: 3px 8px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-drop-indicator); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-small); overflow-wrap: anywhere; pointer-events: none; }
+.space-drag-badge[data-refused] { border-color: var(--thoth-border-strong); color: var(--thoth-ink-secondary); }
+.space-drag-badge[data-refused]::before { content: "⊘ "; color: var(--thoth-danger); }
 .tree-root-drop[data-drop] { border-color: var(--thoth-drop-indicator); background: var(--thoth-accent-soft); color: var(--thoth-ink-primary); }
 
 /* Rename in place. */

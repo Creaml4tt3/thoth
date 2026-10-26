@@ -207,6 +207,16 @@ export const en = {
       move: "Move",
       cancel: "Cancel",
     },
+    /** By the pointer while pages are dragged from one space onto the other (ADR-0006, amendment of 2026-10-26). */
+    across: {
+      copyTo: (name: string) => `Copy to ${name}…`,
+      moveTo: (name: string) => `Move to ${name}…`,
+      privateSpace: "Private Space",
+      viewer: (workspace: string) => `You are a viewer in ${workspace}.`,
+      noTransfers: (server: string) => `${server} does not accept transfers.`,
+      exportRestricted: (workspace: string) => `${workspace} does not allow copying or moving its pages out.`,
+      signedOut: (server: string) => `Sign in to ${server} first.`,
+    },
   },
 
   /** Public read-only share links of a workspace page (ADR-0023). */
