@@ -1148,6 +1148,18 @@ The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial
 - **Before the deploy:** apply `apps/server/migrations/012_workspace_deletion.sql` to Neon, and check the Vercel
   variable `MAX_WORKSPACES_PER_ACCOUNT` (docs/deploy/trial.md).
 
+### Blog and changelog on the website (ADR-0026, 2026-10-26), built, waiting for review
+
+- `CHANGELOG.md` (Keep a Changelog) and `CHANGELOG.th.md` for v0.1.0–v0.1.3 and Unreleased; `scripts/release-notes.ts`
+  for the GitHub release body (wired into `release-desktop.yml`, tags only); `latest.json` gets `notes` (ADR-0022).
+- `/blog/`, one post per version (`thoth-0-1-0` … `thoth-0-1-3`, English and Thai), `/changelog/`, Atom feeds,
+  sitemap, llms.txt and llms-full.txt entries, BlogPosting / Blog / ItemList / FAQPage JSON-LD. `thoth-0-2-0` is a
+  draft for the next release.
+- Evidence: `apps/site/test/blog.test.ts`, `tests/release/release-notes.test.ts`, `tests/release/publish-downloads.test.ts`,
+  `tests/e2e/site.e2e.ts` (blog, post, changelog: axe in light and dark system schemes, phone width, keyboard, header).
+- Not done: the post pictures (made separately; the Open Graph card stands in), the GitHub releases' bodies (the
+  orchestrator updates them), a native reader for the Thai marked `REVIEW`.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

@@ -27,15 +27,29 @@ A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empt
 
 ## Releasing a version
 
+0. **Changelog and post, before the tag** (ADR-0025; the website build and the release job fail without them):
+   - In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - yyyy-mm-dd`, keep only what ships, add a new
+     `[Unreleased]` only when there is something in it (the parser refuses an empty section), and update the compare links at the bottom.
+     Entries are user-facing, one line each, under Added, Changed or Fixed; links only as absolute `https` URLs.
+   - Do the same in `CHANGELOG.th.md`: same versions, dates, sections and number of entries (a test checks).
+   - Publish the version's post in both languages, `apps/site/src/content/blog/{en,th}/thoth-<x-y-z>.md`: set
+     `date`, remove `draft: true`, check every line against the build being released. Its picture goes to
+     `apps/site/public/blog/images/thoth-<x-y-z>.png` (1200×630).
+   - Check the notes: `node scripts/release-notes.ts vx.y.z` prints what the GitHub release will say.
 1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json` and
    `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`). The publish step
    refuses installers whose version differs from `tauri.conf.json`.
 2. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS,
    Windows and Linux, runs the Windows host tests (`test-windows`), and uploads the installers only if every
    build and those tests pass. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
-   without a tag; untick "Upload to R2" to build only.
+   without a tag; untick "Upload to R2" to build only. On a tag, the `github-release` job then creates (or edits)
+   the GitHub release with `scripts/release-notes.ts` as its body, and `latest.json` carries
+   `notes: https://thoth.creaml4tt3.me/changelog/#v<x-y-z>` for the app's "What's new" link.
 3. Copy the published `latest.json` into the website's download manifest
-   (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website.
+   (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website, with the new post, the
+   changelog entry and the feeds.
+4. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
+   edit v0.1.3 --notes-file notes.md`.
 
 ## Windows
 

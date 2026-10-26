@@ -35,6 +35,7 @@ trade-off.
 | [0023](0023-public-read-only-share-links.md) | Public read-only share links for workspace pages | Accepted 2026-10-25 |
 | [0024](0024-workspace-members-and-invite-links.md) | Workspace members and invite links | Accepted 2026-10-26 |
 | [0025](0025-several-workspaces-per-account.md) | Several workspaces per account: create, rename, delete, restore | Accepted 2026-10-26 |
+| [0026](0026-blog-and-changelog-on-the-website.md) | A blog and a changelog on the website | Proposed 2026-10-26 |
 
 Template: [0000-template.md](0000-template.md).
 
