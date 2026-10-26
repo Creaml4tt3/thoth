@@ -50,7 +50,7 @@
 .page-image-alt-button { min-height: 32px; min-width: 44px; padding: 0 10px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; cursor: pointer; }
 .page-image-alt-button.is-primary { background: var(--thoth-accent); border-color: var(--thoth-accent); color: var(--thoth-on-accent); }
 .page-image-alt-hint { flex-basis: 100%; color: var(--thoth-ink-tertiary); }
-.image-insert-status { position: absolute; }
+.image-insert-status.is-error { margin-top: var(--thoth-space-2); padding: 6px 12px; border-radius: var(--thoth-radius-md); background: color-mix(in srgb, var(--thoth-danger) 10%, transparent); color: var(--thoth-danger); font: var(--thoth-text-small); }
 .ProseMirror-selectednode { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: var(--thoth-radius-sm); }
 
 /* Wikilink chips: content uses Notion radii, not pills */

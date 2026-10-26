@@ -15,6 +15,7 @@ import { Extension } from "@tiptap/core";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { createBlockMenu, type BlockAction, type BlockMenu } from "./block-menu.ts";
+import { editImageAlt } from "./image-views.ts";
 import type { EditorStrings } from "../strings/en.ts";
 import {
   applyAsOneStep,
@@ -94,6 +95,8 @@ export function blockHandleExtension(strings: EditorStrings) {
               return moveBlock(tr, target, "up");
             case "down":
               return moveBlock(tr, target, "down");
+            case "alt":
+              return false;
           }
         });
       };
@@ -103,7 +106,7 @@ export function blockHandleExtension(strings: EditorStrings) {
         menuTarget = target;
         const parent = view.state.doc.resolve(target.pos).parent;
         const moves = canMove(view.state.doc, target);
-        menu.open({ current: kindOfBlock(target.node, parent), canTurn: canTurnInto(target), canMoveUp: moves.up, canMoveDown: moves.down }, anchor);
+        menu.open({ current: kindOfBlock(target.node, parent), canTurn: canTurnInto(target), canMoveUp: moves.up, canMoveDown: moves.down, isImage: target.node.type.name === "image" }, anchor);
       };
 
       const place = (view: EditorView, target: BlockTarget): void => {
@@ -200,7 +203,8 @@ export function blockHandleExtension(strings: EditorStrings) {
             menu = createBlockMenu({
               onAction: (action) => {
                 const target = menuTarget ? refreshTarget(view, menuTarget) : null;
-                if (target) run(view, target, action);
+                if (target && action.type === "alt") editImageAlt(view, target.pos);
+                else if (target) run(view, target, action);
               },
               onClose: (refocus) => {
                 menuTarget = null;

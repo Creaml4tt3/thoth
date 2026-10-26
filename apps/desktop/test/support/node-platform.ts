@@ -17,6 +17,9 @@ export interface NodePlatform extends Platform {
   /** Path `pickVaultFolder` returns (null simulates cancelling). */
   pickedVault: string | null;
   pickedSource: string | null;
+  /** What `pickImage` returns (null simulates cancelling); each call is counted in `imagePicks`. */
+  pickedImage: { name: string; bytes: Uint8Array } | null;
+  imagePicks: number;
   recent: string[];
   /** Fires the watcher listeners like the host would. */
   emit(event?: Partial<Omit<VaultChangedEvent, "vault">>): void;
@@ -87,6 +90,8 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     kind: "node",
     pickedVault: options.vault ?? null,
     pickedSource: null,
+    pickedImage: null,
+    imagePicks: 0,
     recent: options.recent ?? [],
     connections,
     sharedWith: [],
@@ -133,6 +138,10 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     },
     async pickImportSource() {
       return platform.pickedSource;
+    },
+    async pickImage() {
+      platform.imagePicks++;
+      return platform.pickedImage;
     },
     async openImportSource(location) {
       return openNodeSourceHost(location);

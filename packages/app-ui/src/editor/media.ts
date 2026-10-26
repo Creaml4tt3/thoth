@@ -136,6 +136,42 @@ export interface ImageSpace {
   create(path: string, bytes: Uint8Array): Promise<boolean>;
 }
 
+/** The `accept` list of a file input for images. */
+export const IMAGE_ACCEPT = [...Object.keys(IMAGE_TYPES), ...new Set(Object.values(IMAGE_TYPES))].join(",");
+
+/**
+ * The browser's own file picker for one image (the web client, ADR-0028). Null when cancelled. A file over the cap
+ * is refused before it is read.
+ */
+export function pickImageWithInput(doc: Document = document): Promise<ImageFile | null> {
+  return new Promise((resolve, reject) => {
+    const input = doc.createElement("input");
+    input.type = "file";
+    input.accept = IMAGE_ACCEPT;
+    input.hidden = true;
+    let settled = false;
+    const done = (value: ImageFile | null, error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    input.addEventListener("cancel", () => done(null));
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return done(null);
+      if (file.size > MAX_IMAGE_BYTES) return done(null, new ImageRejectedError("too-large", "The image is larger than 20 MB."));
+      file.arrayBuffer().then(
+        (buffer) => done({ name: file.name, bytes: new Uint8Array(buffer), type: file.type }),
+        (error: unknown) => done(null, error),
+      );
+    });
+    doc.body.append(input);
+    input.click();
+  });
+}
+
 /** Loads the image `src` of the page at `page` from a Private Space. */
 export async function loadPageImage(space: ImageSpace, page: string, src: string): Promise<ImageLoad> {
   const target = resolveImageSrc(src, page);

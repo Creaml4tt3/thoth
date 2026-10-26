@@ -10,6 +10,7 @@ import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
 import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
 import { imageView } from "./image-views.ts";
+import { imageInsertExtension } from "./image-insert.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
@@ -86,10 +87,11 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     Editing,
     calloutKeysExtension(),
     listKeysExtension(),
-    slashExtension(ctx.strings),
+    slashExtension(ctx),
     blockHandleExtension(ctx.strings),
     textStylesExtension(ctx.strings, ctx.client),
     linkSuggestExtension(ctx),
+    imageInsertExtension(ctx),
     pasteLinksExtension(ctx),
     ...(links ? [linkCardsExtension({ ...ctx, links })] : []),
   ];

@@ -9,7 +9,7 @@
 import { localizedBlockKinds, type BlockKind } from "./block-kinds.ts";
 import type { EditorStrings } from "../strings/en.ts";
 
-export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" };
+export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" } | { type: "alt" };
 
 export interface BlockMenuState {
   /** Block type of the target, shown as checked in "Turn into"; null when it has none in the list. */
@@ -17,6 +17,8 @@ export interface BlockMenuState {
   canTurn: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** The block is an image: offer "Edit alt text" (ADR-0028). */
+  isImage?: boolean;
 }
 
 export interface BlockMenu {
@@ -127,6 +129,7 @@ export function createBlockMenu(opts: Options): BlockMenu {
     hideSub();
     const turn = item(t.turnInto, { icon: "↻", popup: true, disabled: !state.canTurn, onRun: () => openSub(turn, state, true) });
     root.replaceChildren(
+      ...(state.isImage ? [item(t.image.editAlt, { icon: "Aa", onRun: () => run({ type: "alt" }) })] : []),
       turn,
       item(t.duplicate, { icon: "⧉", onRun: () => run({ type: "duplicate" }) }),
       item(t.delete, { icon: "✕", onRun: () => run({ type: "delete" }) }),

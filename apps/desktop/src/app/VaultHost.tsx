@@ -186,8 +186,16 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   // Link previews (ADR-0020): the host fetches them; a platform without `links` shows plain links.
   const linkPreviews = useMemo(() => (platform.links ? createLinkPreviewService(platform.links) : undefined), [platform]);
   const pageHost = useMemo<PageHost>(
-    () => ({ client: "desktop", autosaveMs: options.autosaveMs, now: options.now, registerFlush, ...(linkPreviews ? { links: linkPreviews } : {}) }),
-    [options.autosaveMs, options.now, registerFlush, linkPreviews],
+    () => ({
+      client: "desktop",
+      autosaveMs: options.autosaveMs,
+      now: options.now,
+      registerFlush,
+      ...(linkPreviews ? { links: linkPreviews } : {}),
+      // Images (ADR-0028): the host's picker; the page gets the name and the bytes, never the path.
+      ...(platform.pickImage ? { pickImage: () => platform.pickImage!() } : {}),
+    }),
+    [options.autosaveMs, options.now, registerFlush, linkPreviews, platform],
   );
   // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
   const transfers = useMemo(

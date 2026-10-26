@@ -145,7 +145,9 @@ describe("/ menu", () => {
     await newLineAfter(ctx, "First paragraph.");
     type(ctx.editor, "/");
     await waitFor(() => expect(slashOpen()).toBe(true));
-    expect(slashOptions()).toHaveLength(12);
+    // The 12 block types, and Image (ADR-0028): this page's space takes files and the host has a picker.
+    expect(slashOptions()).toHaveLength(13);
+    expect(slashOptions().at(-1)).toBe("Image");
     expect(ctx.box.getAttribute("aria-controls")).toBe(slashMenu()!.id);
     type(ctx.editor, "head");
     expect(slashOptions()).toEqual(["Heading 1", "Heading 2", "Heading 3"]);

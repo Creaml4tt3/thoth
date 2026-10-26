@@ -34,7 +34,7 @@ export const BLOCK_KINDS: readonly BlockKindInfo[] = [
 export const kindInfo = (kind: BlockKind): BlockKindInfo => BLOCK_KINDS.find((k) => k.kind === kind)!;
 
 /** Lower is better; null means no match. */
-function rank(info: BlockKindInfo, query: string): number | null {
+function rank(info: Pick<BlockKindInfo, "title" | "aliases" | "description">, query: string): number | null {
   const title = info.title.toLowerCase();
   if (title === query) return 0;
   if (title.startsWith(query)) return 1;
@@ -59,11 +59,11 @@ export function localizedBlockKinds(text: Record<BlockKind, { title: string; des
 }
 
 /** Items matching `query` (title, aliases, description), best first, catalog order within a rank. */
-export function filterBlockKinds(query: string, kinds: readonly BlockKindInfo[] = BLOCK_KINDS): BlockKindInfo[] {
+export function filterBlockKinds<T extends Pick<BlockKindInfo, "title" | "aliases" | "description"> = BlockKindInfo>(query: string, kinds: readonly T[] = BLOCK_KINDS as unknown as readonly T[]): T[] {
   const q = query.trim().toLowerCase();
   if (q === "") return [...kinds];
   return kinds.map((info, i) => ({ info, i, r: rank(info, q) }))
-    .filter((x): x is { info: BlockKindInfo; i: number; r: number } => x.r !== null)
+    .filter((x): x is { info: T; i: number; r: number } => x.r !== null)
     .sort((a, b) => a.r - b.r || a.i - b.i)
     .map((x) => x.info);
 }

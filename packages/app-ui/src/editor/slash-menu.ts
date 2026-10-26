@@ -9,12 +9,17 @@
  * (`a/b`, URLs).
  */
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { filterBlockKinds, localizedBlockKinds, type BlockKindInfo } from "./block-kinds.ts";
-import type { EditorStrings } from "../strings/en.ts";
 import { applyAsOneStep, insertAfter, slashTarget, turnInto } from "./block-ops.ts";
+import type { EditorContext } from "./context.ts";
+import { canAddImages, pickAndInsertImage } from "./image-insert.ts";
 import { createSuggestMenu, type SuggestMenu } from "./suggest-menu.ts";
+
+/** `/` Image (ADR-0028): not a block type to convert to, but a file to add, so it is offered by the `/` menu only. */
+export type ImageItem = Omit<BlockKindInfo, "kind"> & { kind: "image" };
+export type SlashItem = BlockKindInfo | ImageItem;
 
 export interface SlashTrigger {
   /** Document position of the `/`. */
@@ -43,13 +48,29 @@ export function findSlashTrigger(state: EditorState): SlashTrigger | null {
   return { from: $pos.pos - query.length - 1, to: $pos.pos, query };
 }
 
+/** Deletes `/query` (and the space that opened the menu at the end of a line); returns where it was. */
+function removeTrigger(tr: Transaction, trigger: SlashTrigger): number {
+  // `text /toggle`: the space that opened the menu would be left dangling at the end of the line (and saved as `&#x20;`).
+  const $from = tr.doc.resolve(trigger.from);
+  const lead = $from.parentOffset > 0 && trigger.to === $from.end() && /[ \t]/.test($from.parent.textBetween($from.parentOffset - 1, $from.parentOffset)) ? 1 : 0;
+  tr.delete(trigger.from - lead, trigger.to);
+  return trigger.from - lead;
+}
+
+/** `/` Image: removes `/query` (one undo step), then asks for a file and puts its image there (another). */
+export function pickImageItem(view: EditorView, trigger: SlashTrigger, ctx: EditorContext): void {
+  let at = trigger.from;
+  applyAsOneStep(view, (tr) => {
+    at = removeTrigger(tr, trigger);
+    return true;
+  });
+  void pickAndInsertImage(view, ctx, at);
+}
+
 /** Replaces `/query` with the block: converts an empty block, otherwise inserts after it. One undo step. */
 export function pickBlock(view: EditorView, trigger: SlashTrigger, info: BlockKindInfo): void {
   applyAsOneStep(view, (tr) => {
-    // `text /toggle`: the space that opened the menu would be left dangling at the end of the line (and saved as `&#x20;`).
-    const $from = tr.doc.resolve(trigger.from);
-    const lead = $from.parentOffset > 0 && trigger.to === $from.end() && /[ \t]/.test($from.parent.textBetween($from.parentOffset - 1, $from.parentOffset)) ? 1 : 0;
-    tr.delete(trigger.from - lead, trigger.to);
+    const lead = trigger.from - removeTrigger(tr, trigger);
     const $at = tr.doc.resolve(trigger.from - lead);
     const target = slashTarget($at);
     // Picking the block's own type just removes the `/query`.
@@ -59,36 +80,47 @@ export function pickBlock(view: EditorView, trigger: SlashTrigger, info: BlockKi
   });
 }
 
-export function slashExtension(strings: EditorStrings) {
+export function slashExtension(ctx: EditorContext) {
+  const strings = ctx.strings;
   const kinds = localizedBlockKinds(strings.blocks);
+  const image: ImageItem = {
+    kind: "image",
+    title: strings.image.slash.title,
+    description: strings.image.slash.description,
+    aliases: ["image", "picture", "photo", "img", "png", "jpg", "svg", "gif", "file", "upload"],
+    icon: "▣",
+  };
   return Extension.create({
     name: "thothSlashMenu",
     addProseMirrorPlugins() {
-      let menu: SuggestMenu<BlockKindInfo> | null = null;
+      let menu: SuggestMenu<SlashItem> | null = null;
       let current: SlashTrigger | null = null;
       let editorView: EditorView | null = null;
 
-      const pick = (info: BlockKindInfo) => {
+      const pick = (info: SlashItem) => {
         if (!editorView || !current) return;
         const trigger = current;
         menu?.hide();
         current = null;
-        pickBlock(editorView, trigger, info);
         editorView.focus();
+        if (info.kind === "image") pickImageItem(editorView, trigger, ctx);
+        else pickBlock(editorView, trigger, info);
       };
+      /** The catalog, plus Image where the page can take files and there is a picker. */
+      const items = (view: EditorView): readonly SlashItem[] => (ctx.pickImage && canAddImages(view, ctx) ? [...kinds, image] : kinds);
 
       const refresh = (view: EditorView) => {
         const dismissedAt = key.getState(view.state)?.dismissedAt ?? null;
         current = view.editable && view.hasFocus() ? findSlashTrigger(view.state) : null;
-        const items = current ? filterBlockKinds(current.query, kinds) : [];
+        const found = current ? filterBlockKinds<SlashItem>(current.query, items(view)) : [];
         // Nothing matches: close, so Enter and spaces behave as plain typing.
-        if (!current || items.length === 0 || dismissedAt === current.from) {
+        if (!current || found.length === 0 || dismissedAt === current.from) {
           current = null;
           menu?.hide();
           return;
         }
         const caret = view.coordsAtPos(current.to);
-        menu?.show(items, current.query, new DOMRect(caret.left, caret.top, 0, caret.bottom - caret.top));
+        menu?.show(found, current.query, new DOMRect(caret.left, caret.top, 0, caret.bottom - caret.top));
       };
 
       return [
@@ -107,7 +139,7 @@ export function slashExtension(strings: EditorStrings) {
           },
           view(view) {
             editorView = view;
-            menu = createSuggestMenu<BlockKindInfo>(view.dom, {
+            menu = createSuggestMenu<SlashItem>(view.dom, {
               prefix: "slash",
               label: strings.insertBlock,
               width: 300,
