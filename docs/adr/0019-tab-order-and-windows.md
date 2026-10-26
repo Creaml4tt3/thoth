@@ -156,6 +156,92 @@ What the desktop runtime does today, checked in the code before deciding:
     - When the main window is closed this way, it is saved with one empty tab.
     - A new window gets the focus.
 
+## Amendment 2026-10-26: live tab preview, narrower tabs, reorderable sidebar sections
+
+- **Status:** Proposed (owner's requests of 2026-10-26; the rules above stay Accepted). Replaces rule 2's feedback
+  (the faded tab, the picture at the pointer while reordering, the accent line and the FLIP after the drop); the rest
+  of rule 2 (5 px, mouse and pen only, auto-scroll, Escape/cancel/blur) and rules 3 and 11 are unchanged.
+
+### A. Live preview while dragging a tab
+
+A1. **The tab follows the pointer.** Once a press becomes a drag, the dragged tab lifts (raised, `--thoth-shadow-pop`,
+    a solid background) and moves along the bar with the pointer, kept between the first tab's start and the last
+    tab's end and within what the bar shows. It does not follow the pointer up or down.
+
+A2. **The others make room.** The tabs between its old place and the place it would land slide aside by its width
+    plus the gap (`transform: translateX`, `--thoth-dur-fast`, `--thoth-ease-out`; only the others transition, so the
+    dragged tab stays under the pointer). There is no accent line any more: the gap is the preview.
+
+A3. **Stable measures.** The place is worked out from the tabs' boxes cached when the drag began, plus how far the bar
+    has scrolled since (`packages/app-ui/src/order/live-reorder.ts`: the dragged tab's middle against the others'
+    middles, in reading order; right to left too). Moved tabs are never measured, so the gap does not chase the pointer.
+    The middle used is where the pointer has taken the tab, not held back at the ends, so the far end is always
+    reachable. Edge auto-scroll still works. A tab opened or closed during the drag ends it.
+
+A4. **Out for a new window** (desktop): far enough out (rule 11), every tab goes back to its place, the dragged one
+    waits there faded, and the existing picture at the pointer says "Release to open in a new window". Back in the bar,
+    the gap returns.
+
+A5. **Ending.** On release the tab settles into the gap. One FLIP runs when the drag ends, from where each tab was
+    *shown* to its place: after a drop the others are already there, so only the dropped tab moves; after Escape, blur
+    or a cancelled pointer, every shifted tab slides back. No second animation.
+
+A6. **Reduced motion.** The durations are 0 under `prefers-reduced-motion: reduce` (tokens.css), so the tabs jump to
+    their preview places, and the FLIP does not run. The app's only Motion setting is the mascot's (Settings → Thoth
+    assistant → Mascot), which says it applies to the mascot; it is not applied to the tabs or sections.
+
+A7. **Announcement and keyboard.** A drop still says "<tab> moved to position 3 of 7" in the polite live region. The
+    keyboard (Alt/Option+Shift+Left/Right, the tab's menu, the palette) is unchanged. The web client shares the tab bar
+    and so gets the same preview (reorder only).
+
+### B. Tab width
+
+B1. A tab is 202px wide when there is room (three quarters of the 270px before), at most 248px, and still shrinks to
+    96px as more open (96px kept: below it the close button leaves almost no text). The three values are tokens on the
+    strip, `--thoth-tab-width`, `--thoth-tab-max-width` and `--thoth-tab-min-width`, used by `.tab` and by the enter and
+    leave keyframes.
+
+### C. Reorderable sidebar sections (desktop)
+
+C1. **Sections.** The Private Space (`private`), each workspace server (`server:<server id>`) and, where the app has it,
+    the agents (`agents`). The brand row, search and the bottom actions stay fixed. The sidebar takes a list of sections
+    (`apps/desktop/src/features/shell/SidebarSections.tsx`); a new section is one more entry with its id.
+
+C2. **Header.** Each section is a region named by what it holds ("Private Space Vault", "Server Team server"). Its
+    header has a grip (shown on hover and focus, always on touch screens), the name as a button that folds the section
+    (`aria-expanded`), and the section's own actions.
+
+C3. **Pointer.** The header (grip or name) is dragged with the same live preview as the tabs, up and down: the section
+    lifts and follows the pointer, the others slide (transform only), the sidebar auto-scrolls near its ends, Escape,
+    blur or a cancelled pointer put everything back, and reduced motion makes it jump. Pointer events, not HTML5 drag
+    and drop: the page trees keep their own HTML5 drag and drop on their rows, a press on a row never reaches a header,
+    and a header is not `draggable`, so neither drag starts the other. Touch does not drag (it scrolls); a tap on the
+    grip opens the menu.
+
+C4. **Keyboard and menu.** Clicking the grip, right-clicking the header, the Menu key or Shift+F10 opens "Section: <name>"
+    with Move section up and Move section down. Alt/Option+Shift+Up/Down on the header's grip or name moves the section
+    one place; focus stays on that control. Every move is announced ("Vault moved to position 2 of 3"). The key is in the
+    shortcut table as `section.move`, scope `sidebar`, desktop only.
+
+C5. **Folding** (a cheap companion): the name button hides or shows the section's content (kept mounted, `hidden`).
+
+C6. **Storage.** Per Private Space with the sidebar width, in the same key (`thoth.desktop.sidebar.<root>`), now a
+    versioned value: `{"v":2,"width":300,"order":["server:demo","private"],"collapsed":["agents"]}`, defaults left out
+    and nothing stored when all is the default. The old value (a bare width, "300") is still read and kept. Only
+    section ids are stored. Sections the stored order does not name go at the end in their natural order; stored ids
+    not shown now are ignored and keep their place among the others when the order is saved again; values that are not
+    a layout are ignored.
+
+C7. **Windows.** Every window on the Private Space reads the same key. A change in one window applies to the others at
+    once where the webview delivers the `storage` event (Chromium does, in the e2e bridge's windows), and otherwise on
+    their next read (opening the Private Space, a reload).
+
+C8. **Web client.** Its sidebar has one server and is not built from these sections, so it is unchanged.
+
+Consequences of the amendment: the dragged tab no longer shows where it lands with a line, but with the gap; the
+Private Space's header now scrolls with the sidebar's list (it is a section like the others); the stored sidebar value
+changed shape (read back compatible, not forward: an older build reads a v2 value as the default width).
+
 ## Consequences
 
 - Positive:

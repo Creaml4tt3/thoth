@@ -28,7 +28,7 @@ trade-off.
 | [0016](0016-editor-ux-text-styles-order-tabs-and-themes.md) | Text styles, page order, folders, tabs and themes | Accepted 2026-10-24 |
 | [0017](0017-page-kind-in-the-workspace-protocol.md) | Page kind in the workspace protocol | Accepted 2026-10-25 |
 | [0018](0018-notifications.md) | Notifications: in-app list, mascot, system notifications | Accepted 2026-10-25 |
-| [0019](0019-tab-order-and-windows.md) | Tab order and windows | Accepted 2026-10-26 |
+| [0019](0019-tab-order-and-windows.md) | Tab order and windows | Accepted 2026-10-26; amendment (live tab preview, tab width, sidebar sections) Proposed 2026-10-26 |
 | [0020](0020-links-from-pasted-urls-and-link-previews.md) | Links from pasted URLs and link previews | Accepted 2026-10-26 |
 | [0021](0021-connected-apps-read-only-mcp-server.md) | Connected apps: a read-only MCP server | Accepted 2026-10-26 |
 | [0022](0022-update-notice.md) | Update notice: a popup when a new desktop version is out | Accepted 2026-10-26 |

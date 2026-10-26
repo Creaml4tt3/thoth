@@ -1024,6 +1024,22 @@ Not covered:
 ADR-0019 open questions: closing a window with a running agent; window sizes and positions; macOS Window menu
 items; live state across windows.
 
+Status (2026-10-26), owner's follow-up (ADR-0019 amendment, Proposed), branch `tab-drag-preview-sidebar-order`:
+
+- **Live tab preview.** The dragged tab lifts and follows the pointer; the others slide aside to open the gap
+  (`packages/app-ui/src/order/live-reorder.ts`, `tabs/drag.ts`, `TabBar.tsx`). No accent line; one FLIP when the drag
+  ends. Same on the web client.
+- **Tabs 202px** (max 248px, min 96px) from `--thoth-tab-width` and friends.
+- **Sidebar sections** (`apps/desktop/src/features/shell/SidebarSections.tsx`, `section-drag.ts`, `sections.ts`):
+  the Private Space and each server, reordered by pointer (live preview), the section's menu and
+  Alt/Option+Shift+↑/↓, foldable, kept per Private Space in the versioned sidebar value (`app/sidebar-store.ts`).
+  The agents section from the parallel branch slots in as one more entry with id `agents`.
+- Evidence: `packages/app-ui/test/live-reorder.test.ts`, `tab-drag.test.tsx`, `icon-buttons.test.tsx`;
+  `apps/desktop/test/sidebar.test.tsx`, `sidebar-sections.test.tsx`, `servers.test.tsx`; e2e `tabs.e2e.ts`,
+  `web-client.e2e.ts`, `sidebar-ui.e2e.ts`, `sidebar-dnd-workspace.e2e.ts` › sidebar sections.
+- Not yet checked in a real window: the feel of both drags in WKWebView, the `storage` event between Tauri windows,
+  the Thai strings marked `REVIEW`.
+
 ### Phase 5 — MVP end-to-end (§14) ✅
 
 All twelve steps of spec §14 as one automated scenario.
