@@ -596,11 +596,17 @@ describe("the invite page and joining from a browser", () => {
     expect(crossSite.status).toBe(403);
     const noOrigin = await browser.post("/i/accept", { csrf }, {});
     expect(noOrigin.status).toBe(403);
+    // A browser that sends `Origin: null` is judged by Fetch Metadata, which a page on another site cannot fake.
+    expect((await browser.post("/i/accept", { csrf }, { origin: "null", "sec-fetch-site": "cross-site" })).status).toBe(403);
+    expect((await browser.post("/i/accept", { csrf }, { "sec-fetch-site": "same-site" })).status).toBe(403);
+    // The join form's page lets the browser name this origin on its POST (no token is in its address).
+    expect(ready.headers.get("referrer-policy")).toBe("same-origin");
+    expect(ready.text).toContain('<meta name="referrer" content="same-origin">');
     const stranger = new Browser(() => env);
     expect((await stranger.post("/i/accept", { csrf })).status).toBe(404);
     expect(await membership(env, ws, userId)).toBeNull();
-    // The real form still works afterwards.
-    expect((await browser.post("/i/accept", { csrf })).status).toBe(200);
+    // The real form still works afterwards, also from a browser that sends Origin: null with Sec-Fetch-Site: same-origin.
+    expect((await browser.post("/i/accept", { csrf }, { origin: "null", "sec-fetch-site": "same-origin" })).status).toBe(200);
     expect(await membership(env, ws, userId)).toBe("viewer");
   });
 

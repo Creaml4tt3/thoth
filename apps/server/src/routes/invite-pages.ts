@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Deps } from "../deps.ts";
 import { ApiError } from "../errors.ts";
 import { bodyOf, headerOf } from "../http.ts";
-import { INVITE_HEADERS, WORDS, donePage, invitePage, langOf, messagePage, readyPage, type Lang } from "../invite/html.ts";
+import { FORM_REFERRER_POLICY, INVITE_HEADERS, WORDS, donePage, invitePage, langOf, messagePage, readyPage, type Lang } from "../invite/html.ts";
 import { acceptInviteIn, activeInviteById, memberRole, resolveInvite } from "../invites.ts";
 import { clientIp, hit } from "../ratelimit.ts";
 import { cookieValue, type SignInBroker } from "../signin/routes.ts";
@@ -101,7 +101,7 @@ export function registerInvitePages(app: FastifyInstance, deps: Deps): InvitePag
     const l = lang(request);
     const role = await memberRole(db, invite.workspaceId, ticket.userId);
     if (role) return html(reply, 200, donePage(l, { workspace: invite.workspaceName, role, joined: false, webClient, server: serverName() }));
-    return html(reply, 200, readyPage(l, { workspace: invite.workspaceName, role: invite.role, account: ticket.account, csrf: csrfFor(ticket.value) }));
+    return html(reply, 200, readyPage(l, { workspace: invite.workspaceName, role: invite.role, account: ticket.account, csrf: csrfFor(ticket.value) }), { "referrer-policy": FORM_REFERRER_POLICY });
   });
 
   app.post("/i/accept", async (request, reply) => {
@@ -113,8 +113,12 @@ export function registerInvitePages(app: FastifyInstance, deps: Deps): InvitePag
     const l = lang(request);
     const w = WORDS[l];
     const stale = () => html(reply, 403, messagePage(l, w.staleTitle, w.staleText));
-    // CSRF: the cookie is SameSite=Lax, the Origin must be this server, and the form must carry the value derived from the cookie.
-    if (headerOf(request, "origin") !== signIn.publicUrl) return stale();
+    // CSRF: the cookie is SameSite=Lax, the request must come from this origin, and the form must carry the value derived
+    // from the cookie. "From this origin": `Origin` names it, or (a browser that sends `Origin: null`) the browser's own
+    // Fetch Metadata says so; a page on another site can set neither.
+    const origin = headerOf(request, "origin");
+    const fromHere = origin === signIn.publicUrl || ((origin === undefined || origin === "null") && headerOf(request, "sec-fetch-site") === "same-origin");
+    if (!fromHere) return stale();
     const type = (headerOf(request, "content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const body = bodyOf(request);
     if (type !== "application/x-www-form-urlencoded" || body.length > FORM_LIMIT) return stale();
@@ -138,7 +142,7 @@ export function registerInvitePages(app: FastifyInstance, deps: Deps): InvitePag
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
       if (error.code === "quota_exceeded") {
-        return html(reply, 409, readyPage(l, { workspace: invite.workspaceName, role: invite.role, account: ticket.account, csrf: csrfFor(ticket.value), notice: { title: w.fullTitle, text: w.fullText(invite.workspaceName) } }));
+        return html(reply, 409, readyPage(l, { workspace: invite.workspaceName, role: invite.role, account: ticket.account, csrf: csrfFor(ticket.value), notice: { title: w.fullTitle, text: w.fullText(invite.workspaceName) } }), { "referrer-policy": FORM_REFERRER_POLICY });
       }
       if (error.code === "not_found") return notFound(request, reply);
       throw error;

@@ -137,7 +137,13 @@ const TH: Words = {
 
 export const WORDS: Readonly<Record<Lang, Words>> = { en: EN, th: TH };
 
-function shell(lang: Lang, title: string, main: string): string {
+/**
+ * The join form's page (`/i/accept`, no token in its address) lets the browser name this origin on the form's POST,
+ * which the server checks; every other invite page sends no referrer at all.
+ */
+export const FORM_REFERRER_POLICY = "same-origin";
+
+function shell(lang: Lang, title: string, main: string, referrer = "no-referrer"): string {
   const w = WORDS[lang];
   return `<!doctype html>
 <html lang="${lang}">
@@ -145,7 +151,7 @@ function shell(lang: Lang, title: string, main: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="${referrer}">
 <title>${esc(title)} · Thoth</title>
 <link rel="stylesheet" href="/assets/share/share.css">
 </head>
@@ -195,7 +201,7 @@ export function readyPage(lang: Lang, view: { workspace: string; role: "editor" 
 <p class="invite-lede">${w.joinAs(esc(view.workspace), view.role)}</p>
 <p class="invite-role">${esc(w.roleHint(view.role))}</p>
 <form method="post" action="/i/accept"><input type="hidden" name="csrf" value="${esc(view.csrf)}"><button type="submit" class="button primary">${esc(view.notice ? w.tryAgain : w.join)}</button></form>
-<p class="invite-note">${esc(w.notYou)}</p>`));
+<p class="invite-note">${esc(w.notYou)}</p>`), FORM_REFERRER_POLICY);
 }
 
 /** Joined, or already a member: where to go next. */
