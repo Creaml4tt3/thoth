@@ -583,8 +583,8 @@ export const th: DesktopStrings = {
       sameContext: (what) => `ใช้หน้าและการตั้งค่าเดียวกับคำถามล่าสุด: ${what}`, // REVIEW
       pages: (n) => `${count(n)} หน้า`,
       wholeSpace: "ทั้ง Private Space",
-      workspacePages: (n) => `หน้าจากเวิร์กสเปซ ${count(n)} หน้า`, // REVIEW
       anyModel: "โมเดลเริ่มต้น", // REVIEW
+      workspacePages: (n) => `หน้าจากเวิร์กสเปซ ${count(n)} หน้า`, // REVIEW
       workspaceDropped: "หน้าจากเวิร์กสเปซจะไม่ถูกเก็บไว้หลัง Thoth เริ่มใหม่ เพิ่มอีกครั้งได้ที่ เปลี่ยนหน้าหรือการตั้งค่า", // REVIEW
       change: "เปลี่ยนหน้าหรือการตั้งค่า…", // REVIEW
       blocked: {
