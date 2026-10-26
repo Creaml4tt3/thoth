@@ -90,7 +90,7 @@ describe("config", () => {
   });
   it("reads HOST, PORT, BLOB_DIR and limits with sane defaults and range checks", () => {
     const c = loadConfig({ DATABASE_URL: "postgres://u:p@h/db" });
-    expect(c).toMatchObject({ host: "127.0.0.1", port: 8080, blobDir: "./data/blobs", capabilities: ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"] });
+    expect(c).toMatchObject({ host: "127.0.0.1", port: 8080, blobDir: "./data/blobs", capabilities: ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"] });
     expect(loadConfig({ DATABASE_URL: "postgres://u:p@h/db", HOST: "0.0.0.0", PORT: "9000", BLOB_DIR: "/b" })).toMatchObject({ host: "0.0.0.0", port: 9000, blobDir: "/b" });
     expect(() => loadConfig({ DATABASE_URL: "postgres://u:p@h/db", PORT: "70000" })).toThrow(ConfigError);
     expect(() => loadConfig({ DATABASE_URL: "postgres://u:p@h/db", MAX_MARKDOWN_BYTES: "10" })).toThrow(ConfigError);

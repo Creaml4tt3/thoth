@@ -179,7 +179,54 @@ th { background: var(--thoth-bg-sidebar); font-weight: 600; }
 .missing h1 { font-size: 28px; }
 .missing p { color: var(--thoth-ink-secondary); }
 
+/* Invite pages (ADR-0024): one card with the invitation or the join form, and a note for the desktop app. */
+.invite { max-width: 34rem; padding-top: 10vh; }
+.invite-card { padding: 28px; border: 1px solid var(--thoth-border-strong); border-radius: 16px; background: var(--thoth-bg-sidebar); }
+.invite-card h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; }
+.invite-card p { margin: 0 0 12px; }
+.invite-lede { font-size: 17px; }
+.invite-role, .invite-note, .invite-who, .invite-aside p { color: var(--thoth-ink-secondary); font-size: 15px; }
+.invite-who { font-weight: 500; }
+.invite-actions { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 16px; }
+.invite-card form { margin: 20px 0 16px; }
+.invite-alert { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--thoth-text-red); border-radius: 10px; }
+.invite-alert p { margin: 0; }
+.invite-alert p + p { margin-top: 4px; color: var(--thoth-ink-secondary); }
+.invite-aside { margin-top: 24px; padding: 0 4px; }
+.invite-aside h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 0; }
+.invite-footer { max-width: 34rem; }
+.missing-card { text-align: center; }
+.missing-card h1 { font-size: 24px; }
+.missing-card p { color: var(--thoth-ink-secondary); }
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--thoth-border-strong);
+  border-radius: 10px;
+  background: var(--thoth-bg);
+  color: var(--thoth-ink-primary);
+  font: 600 16px / 22px var(--thoth-font-sans);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button.primary { border-color: var(--thoth-accent); background: var(--thoth-accent); color: #fff; }
+.button:hover { filter: brightness(1.06); }
+.button:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 3px; }
+@media (prefers-color-scheme: dark) {
+  .button.primary { color: #0a0a0a; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .button { transition: filter 120ms ease-out; }
+}
+
 @media (max-width: 600px) {
+  .invite { padding-top: 24px; }
+  .invite-card { padding: 20px; }
   main { padding-top: 28px; }
   h1 { font-size: 30px; }
   h2 { font-size: 23px; }

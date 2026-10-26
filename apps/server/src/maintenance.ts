@@ -8,7 +8,7 @@ export interface MaintenanceResult {
   revisionsPruned: number;
   idempotencyRecordsDeleted: number;
   rateLimitRowsDeleted: number;
-  /** Expired auth requests, codes, refresh and session access tokens, finished sessions, old sign-up counters. */
+  /** Expired auth requests, codes, refresh and session access tokens, finished sessions, old sign-up counters, expired invite join tickets. */
   signInRowsDeleted: number;
 }
 

@@ -48,6 +48,17 @@ export interface ServerConfig {
   publicUrl: string | undefined;
   /** Public share links (ADR-0023, capability `public-share`). `undefined` = no limit. */
   share: ShareConfig;
+  /** Invite links (ADR-0024, capability `invite-links`). `undefined` = no limit. */
+  invite: InviteConfig;
+}
+
+export interface InviteConfig {
+  /** Active (not revoked, not expired, not used up) invite links per workspace; one more is 409 `quota_exceeded`. */
+  maxLinksPerWorkspace: number | undefined;
+  /** Invite pages (`/i/...`, the sign-in start and the join form) opened per client IP per rate-limit window. */
+  opensPerIp: number | undefined;
+  /** Joins (`acceptInvite` and the join form's POST) per client IP per rate-limit window, counted before the token is looked up. */
+  acceptsPerIp: number | undefined;
 }
 
 export interface ShareConfig {
@@ -97,7 +108,10 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links"];
+
+/** ADR-0024: invite pages and joins are rate limited per client IP on every server unless the operator says otherwise. */
+export const INVITE_DEFAULTS = { opensPerIp: 60, acceptsPerIp: 20 } as const;
 
 const KIB = 1024;
 const MIB = 1_048_576;
@@ -129,6 +143,9 @@ export const TRIAL_PROFILE = {
   maxShareLinksPerWorkspace: 20,
   shareViewsPerLink: 300,
   shareViewsPerIp: 120,
+  // ADR-0024: members and invite links are on in the trial, with at most 20 active invite links per workspace (and the
+  // 10-member limit above).
+  maxInviteLinksPerWorkspace: 20,
 } as const;
 
 export class ConfigError extends Error {
@@ -351,6 +368,9 @@ function publicUrlFrom(env: NodeJS.ProcessEnv, options: { strict: boolean }): st
  *   PUBLIC_SHARE  on (default) | off: public read-only share links (ADR-0023, capability public-share)
  *   MAX_SHARE_LINKS_PER_WORKSPACE   active share links per workspace (trial 20; unset = no limit)
  *   SHARE_VIEWS_PER_LINK, SHARE_VIEWS_PER_IP   share-page views per RATE_LIMIT_WINDOW_SECONDS (trial 300 and 120; unset = off)
+ *   INVITE_LINKS  on (default) | off: invite links (ADR-0024, capability invite-links); members management stays on
+ *   MAX_INVITE_LINKS_PER_WORKSPACE   active invite links per workspace (trial 20; unset = no limit)
+ *   INVITE_OPENS_PER_IP, INVITE_ACCEPTS_PER_IP   invite pages opened and joins per RATE_LIMIT_WINDOW_SECONDS (default 60 and 20; "unlimited" = off)
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -374,6 +394,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxLinksPerWorkspace: limitFrom(env, "MAX_SHARE_LINKS_PER_WORKSPACE", trial?.maxShareLinksPerWorkspace, 1_000_000),
     viewsPerLink: limitFrom(env, "SHARE_VIEWS_PER_LINK", trial?.shareViewsPerLink, 1_000_000),
     viewsPerIp: limitFrom(env, "SHARE_VIEWS_PER_IP", trial?.shareViewsPerIp, 1_000_000),
+  };
+  // ADR-0024: invite links are on by default on every server; an operator can switch them off.
+  const invitesEnabled = oneOf(env, "INVITE_LINKS", ["on", "off"], "on") === "on";
+  const invite: InviteConfig = {
+    maxLinksPerWorkspace: limitFrom(env, "MAX_INVITE_LINKS_PER_WORKSPACE", trial?.maxInviteLinksPerWorkspace, 1_000_000),
+    opensPerIp: limitFrom(env, "INVITE_OPENS_PER_IP", INVITE_DEFAULTS.opensPerIp, 1_000_000),
+    acceptsPerIp: limitFrom(env, "INVITE_ACCEPTS_PER_IP", INVITE_DEFAULTS.acceptsPerIp, 1_000_000),
   };
 
   return {
@@ -400,10 +427,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     rateLimit,
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
-    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share")),
+    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share") && (invitesEnabled || c !== "invite-links")),
     serverName: serverNameFrom(env),
     signIn: signInFrom(env, trial),
     publicUrl: publicUrlFrom(env, { strict: false }),
     share,
+    invite,
   };
 }

@@ -8,7 +8,7 @@ import { opaqueId } from "../ids.ts";
 import { assertCanCreateAccount } from "../quota.ts";
 import { clientIp } from "../ratelimit.ts";
 import { DESKTOP, WEB, knownClient, redirectAllowed, type ClientId } from "./clients.ts";
-import { chooserPage, errorPage, sendHtml } from "./html.ts";
+import { chooserPage, errorPage, inviteErrorPage, sendHtml } from "./html.ts";
 import { TokenRejected } from "./jwt.ts";
 import { ProviderError, createProvider, type UpstreamIdentity, type UpstreamProvider } from "./providers.ts";
 import { PKCE_SHAPE, randomSecret, s256, safeEqual, sha256Hex } from "./secrets.ts";
@@ -114,13 +114,37 @@ export function authErrorReply(path: string, error: ApiError, reply: FastifyRepl
 class SignUpRefused extends Error {}
 
 /**
+ * ADR-0024: the invite page signs its visitor in through this broker. Such an auth request is marked with this client
+ * ID and the invite it returns to; it never yields an OAuth code, session or token. The callback hands the account to
+ * `SignInHooks.inviteSignedIn`, which gives that browser a short-lived, single-use join ticket instead.
+ */
+export const INVITE_CLIENT = "thoth-invite";
+
+export interface SignInHooks {
+  /** Called on the provider callback of a sign-in started from an invite page, with the account it resolved to. */
+  inviteSignedIn?(request: FastifyRequest, reply: FastifyReply, account: { userId: string; inviteId: string }): Promise<FastifyReply>;
+}
+
+/** What the invite pages may ask of the broker. */
+export interface SignInBroker {
+  providers: { id: string; name: string }[];
+  /**
+   * Starts a sign-in with `providerId` that returns to `inviteId` and sends the redirect (or an error page); false, with
+   * nothing sent or stored, for an unknown provider. (A boolean, not the reply: a Fastify reply is a thenable.)
+   */
+  startInvite(reply: FastifyReply, providerId: string, inviteId: string): Promise<boolean>;
+}
+
+const INVITE_FAILED_TITLE = "Could not sign you in";
+
+/**
  * The broker (docs/protocol/sign-in.md). Registered only when a provider is configured; otherwise `/auth/*` is 404
  * like any unknown route. Provider secrets and tokens, our codes, tokens, states, verifiers and nonces are never
  * logged: log lines carry the provider, the client and a fixed reason.
  */
-export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
+export function registerSignInRoutes(app: FastifyInstance, deps: Deps, hooks: SignInHooks = {}): SignInBroker | undefined {
   const config = deps.config.signIn;
-  if (config === undefined) return;
+  if (config === undefined) return undefined;
   const { db } = deps;
   const providers = new Map<string, UpstreamProvider>(config.providers.map((p) => [p.id, createProvider(p)]));
   const corsOrigins = deps.config.corsOrigins;
@@ -184,10 +208,10 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
     if (provider === undefined || params === null || upstreamState === undefined || upstreamState.length > 512) return expired();
 
     // Consumed atomically whatever happens next: one auth request completes at most once. The verifier and nonce are nulled.
-    const { rows } = await db.query<{ binding_hash: string; provider: string; client_id: string; redirect_uri: string; code_challenge: string; client_state: string; pkce_verifier: string | null; nonce: string | null; live: boolean }>(
+    const { rows } = await db.query<{ binding_hash: string; provider: string; client_id: string; redirect_uri: string; code_challenge: string; client_state: string; pkce_verifier: string | null; nonce: string | null; invite_id: string | null; live: boolean }>(
       `WITH prev AS (SELECT * FROM auth_requests WHERE state_hash = $1 AND consumed_at IS NULL FOR UPDATE)
        UPDATE auth_requests a SET consumed_at = now(), pkce_verifier = NULL, nonce = NULL FROM prev WHERE a.state_hash = prev.state_hash
-       RETURNING prev.binding_hash, prev.provider, prev.client_id, prev.redirect_uri, prev.code_challenge, prev.client_state, prev.pkce_verifier, prev.nonce, prev.expires_at > now() AS live`,
+       RETURNING prev.binding_hash, prev.provider, prev.client_id, prev.redirect_uri, prev.code_challenge, prev.client_state, prev.pkce_verifier, prev.nonce, prev.invite_id, prev.expires_at > now() AS live`,
       [sha256Hex(upstreamState)],
     );
     const pending = rows[0];
@@ -196,6 +220,7 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
       request.log.info({ provider: providerId, reason: !pending ? "unknown or used state" : !pending.live ? "expired" : pending.provider !== providerId ? "provider mismatch" : "binding mismatch" }, "sign-in: callback refused");
       return expired();
     }
+    if (pending.client_id === INVITE_CLIENT) return inviteCallback(request, reply, providerId, provider, params, pending.pkce_verifier, pending.nonce, pending.invite_id);
     const client = knownClient(config, pending.client_id);
     if (client === null || !redirectAllowed(config, client, pending.redirect_uri)) return expired();
     const back = (params: Record<string, string>) => redirect(reply, clientRedirect(pending.redirect_uri, { ...params, state: pending.client_state, iss: config.publicUrl }));
@@ -232,6 +257,34 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
     await db.query("INSERT INTO auth_codes (code_hash, user_id, client_id, redirect_uri, code_challenge, provider, expires_at) VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(secs => $7))", [sha256Hex(code), userId, client, pending.redirect_uri, pending.code_challenge, providerId, CODE_TTL_SECONDS]);
     return back({ code });
   });
+
+  /**
+   * The callback of a sign-in started from an invite page. Every failure is an HTML page (there is no client to send an
+   * OAuth error back to); success hands the account to the invite pages. No code, session or token is issued.
+   */
+  async function inviteCallback(request: FastifyRequest, reply: FastifyReply, providerId: string, provider: UpstreamProvider, params: Map<string, string>, verifier: string, nonce: string | null, inviteId: string | null): Promise<FastifyReply> {
+    const failed = (status: number, text: string) => sendHtml(reply, status, inviteErrorPage(INVITE_FAILED_TITLE, text));
+    if (inviteId === null || hooks.inviteSignedIn === undefined) return sendHtml(reply, 400, errorPage(EXPIRED_TITLE, EXPIRED_TEXT));
+    if (params.has("error")) return failed(400, "Signing in was cancelled or refused. Open the invite link again to try once more.");
+    const upstreamCode = params.get("code");
+    if (upstreamCode === undefined || upstreamCode.length === 0 || upstreamCode.length > 2048) return failed(502, "The sign-in provider did not answer as expected. Open the invite link again to try once more.");
+    let identity: UpstreamIdentity;
+    try {
+      identity = await provider.exchange({ code: upstreamCode, verifier, nonce, redirectUri: `${config!.publicUrl}${AUTH_PATHS.callback}/${providerId}` });
+    } catch (error) {
+      request.log.warn({ provider: providerId, clientId: INVITE_CLIENT, reason: error instanceof TokenRejected ? error.reason : error instanceof ProviderError ? error.message : "unexpected" }, "sign-in: invite sign-in failed");
+      return failed(502, "The sign-in provider's answer could not be used. Open the invite link again to try once more.");
+    }
+    let userId: string;
+    try {
+      userId = await findOrCreateAccount(deps, providerId, identity, clientIp(request.headers, request.socket.remoteAddress, deps.config.trustProxy));
+    } catch (error) {
+      if (!(error instanceof SignUpRefused)) throw error;
+      request.log.info({ provider: providerId, clientId: INVITE_CLIENT, reason: error.message }, "sign-in: sign-up refused");
+      return failed(403, "This server is not accepting new accounts right now, so it cannot sign you up.");
+    }
+    return hooks.inviteSignedIn(request, reply, { userId, inviteId });
+  }
 
   /** Account by (provider, subject), never by email. A new one passes the per-IP sign-up limit and the account cap first, and gets its first workspace in the same transaction. */
   async function findOrCreateAccount(d: Deps, providerId: string, identity: UpstreamIdentity, ip: string): Promise<string> {
@@ -349,4 +402,32 @@ export function registerSignInRoutes(app: FastifyInstance, deps: Deps): void {
     reply.header("cache-control", "no-store");
     return reply.code(200).send();
   });
+
+  return {
+    providers: config.providers.map((p) => ({ id: p.id, name: p.name })),
+    async startInvite(reply, providerId, inviteId) {
+      const provider = providers.get(providerId);
+      if (provider === undefined) return false;
+      const upstreamState = randomSecret();
+      const binding = randomSecret();
+      const verifier = randomSecret();
+      const nonce = provider.usesNonce ? randomSecret() : null;
+      let location: string;
+      try {
+        location = await provider.authorizationUrl({ state: upstreamState, codeChallenge: s256(verifier), nonce, redirectUri: `${config.publicUrl}${AUTH_PATHS.callback}/${provider.id}` });
+      } catch {
+        sendHtml(reply, 502, inviteErrorPage(INVITE_FAILED_TITLE, "The sign-in provider could not be reached. Try again in a moment."));
+        return true;
+      }
+      // No client of ours waits for a code: the redirect URI, challenge and state of a client are left empty.
+      await db.query(
+        `INSERT INTO auth_requests (state_hash, binding_hash, provider, client_id, redirect_uri, code_challenge, client_state, pkce_verifier, nonce, invite_id, expires_at)
+         VALUES ($1, $2, $3, $4, '', '', '', $5, $6, $7, now() + make_interval(secs => $8))`,
+        [sha256Hex(upstreamState), sha256Hex(binding), provider.id, INVITE_CLIENT, verifier, nonce, inviteId, AUTH_REQUEST_TTL_SECONDS],
+      );
+      reply.header("set-cookie", bindingCookie(config, binding, AUTH_REQUEST_TTL_SECONDS));
+      redirect(reply, location);
+      return true;
+    },
+  };
 }

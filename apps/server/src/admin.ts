@@ -72,7 +72,7 @@ export function firstWorkspaceName(displayName: string | undefined): string {
 
 /**
  * Adds a member or changes a role. A NEW membership counts against the member quota (a role change does not),
- * and an `owner` membership counts against the account's workspace quota. The workspace row is locked like
+ * and an `owner` membership counts against the account's workspace quota. The last owner cannot be demoted. The workspace row is locked like
  * every other write, so concurrent additions cannot overshoot.
  */
 export async function addMember(db: Database, input: { workspaceId: string; userId: string; role: string }, quotas: Quotas = {}): Promise<void> {
@@ -84,6 +84,11 @@ export async function addMember(db: Database, input: { workspaceId: string; user
     if (user.rowCount === 0) throw new AdminError("no such user");
     const existing = (await tx.query<{ role: string }>("SELECT role FROM memberships WHERE workspace_id = $1 AND user_id = $2", [input.workspaceId, input.userId])).rows[0];
     if (!existing) await assertCanAddMember(tx, quotas, input.workspaceId);
+    // ADR-0024: a workspace always keeps at least one owner, also through the CLI.
+    if (existing?.role === "owner" && input.role !== "owner") {
+      const owners = Number((await tx.query<{ n: string }>("SELECT count(*) AS n FROM memberships WHERE workspace_id = $1 AND role = 'owner'", [input.workspaceId])).rows[0]!.n);
+      if (owners <= 1) throw new AdminError("that user is the workspace's last owner; make another member an owner first");
+    }
     if (input.role === "owner" && existing?.role !== "owner") await assertCanOwnAnotherWorkspace(tx, quotas, input.userId);
     await tx.query("INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role", [input.workspaceId, input.userId, input.role]);
     await tx.query("INSERT INTO audit_events (actor_id, workspace_id, action, detail) VALUES (NULL, $1, 'member.set', $2)", [input.workspaceId, JSON.stringify({ userId: input.userId, role: input.role })]);

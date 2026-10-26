@@ -144,6 +144,8 @@ export async function purgeSignIn(db: Queryable): Promise<number> {
     // Cascades to the session's remaining refresh and access tokens.
     "DELETE FROM sessions WHERE revoked_at IS NOT NULL OR expires_at <= now()",
     "DELETE FROM sign_ups WHERE created_at <= now() - interval '1 day'",
+    // ADR-0024: join tickets of invite pages, once expired (used or not).
+    "DELETE FROM invite_tickets WHERE expires_at <= now()",
   ]) total += (await db.query(sql)).rowCount ?? 0;
   return total;
 }

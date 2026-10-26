@@ -12,6 +12,8 @@ import { registerCoreRoutes } from "./routes/core.ts";
 import { registerEventRoutes } from "./routes/events.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
 import { registerShareRoutes } from "./routes/shares.ts";
+import { registerMemberRoutes } from "./routes/members.ts";
+import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
 import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
 import type { CapabilityId } from "@thoth/workspace-protocol";
@@ -73,10 +75,12 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "page-order", test: (m, p) => m === "POST" && /^\/workspaces\/[^/]+\/pages\/[^/]+\/move$/.test(p) },
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
   { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
+  { capability: "members", test: (_m, p) => /^\/workspaces\/[^/]+\/members(\/[^/]+)?$/.test(p) },
+  { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },
 ];
 
-/** A share token in a request path is a credential: it never reaches a log line (ADR-0023). */
-export const redactSharePath = (url: string): string => url.replace(/^\/s\/[^/]*/, "/s/[token]");
+/** A share or invite token in a request path is a credential: it never reaches a log line (ADR-0023, ADR-0024). */
+export const redactSharePath = (url: string): string => url.replace(/^\/s\/[^/]*/, "/s/[token]").replace(/^\/i\/(?!accept$)[^/]*/, "/i/[token]");
 
 export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstance {
   const { config } = deps;
@@ -195,8 +199,10 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerEventRoutes(app, deps);
   registerTransferRoutes(app, deps);
   registerShareRoutes(app, deps);
+  registerMemberRoutes(app, deps);
+  const invitePages = registerInvitePages(app, deps);
   registerMaintenanceRoutes(app, deps);
-  registerSignInRoutes(app, deps);
+  invitePages.useBroker(registerSignInRoutes(app, deps, { inviteSignedIn: invitePages.signedIn }));
   return app;
 }
 

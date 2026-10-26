@@ -51,6 +51,11 @@ export function chooserPage(links: { name: string; href: string }[]): string {
   return page("Sign in to Thoth", `<p>Choose how to sign in.</p>\n${buttons}`);
 }
 
+/** A sign-in started from an invite page (ADR-0024) that cannot continue. `message` is fixed text, never request data. */
+export function inviteErrorPage(title: string, message: string): string {
+  return page(title, `<p>${escapeHtml(message)}</p>`);
+}
+
 /** A sign-in that cannot continue and cannot safely be sent back to the client. `message` is fixed text, never request data. */
 export function errorPage(title: string, message: string): string {
   return page(title, `<p>${escapeHtml(message)}</p>\n<p>Close this window and start signing in again from the Thoth app.</p>`);

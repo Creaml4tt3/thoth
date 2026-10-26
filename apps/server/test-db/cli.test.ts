@@ -100,6 +100,17 @@ describe("admin CLI", () => {
     expect(unreachable.stdout + unreachable.stderr).not.toContain("hunter2secret");
   });
 
+  it("add-member keeps working, but never demotes a workspace's last owner (ADR-0024)", async () => {
+    const owner = (await cli(["create-user", "--name", "Olga"])).stdout.trim();
+    const other = (await cli(["create-user", "--name", "Otto"])).stdout.trim();
+    const wsId = (await cli(["create-workspace", "--name", "Kept", "--owner", owner])).stdout.trim();
+    const demote = await cli(["add-member", "--workspace", wsId, "--user", owner, "--role", "editor"]);
+    expect(demote.code).toBe(2);
+    expect(demote.stderr).toContain("last owner");
+    expect((await cli(["add-member", "--workspace", wsId, "--user", other, "--role", "owner"])).stdout.trim()).toBe("ok");
+    expect((await cli(["add-member", "--workspace", wsId, "--user", owner, "--role", "editor"])).stdout.trim()).toBe("ok");
+  });
+
   it("the audit log records provisioning without secrets", async () => {
     const client = (await import("pg")).default;
     const c = new client.Client({ connectionString: database.url });
