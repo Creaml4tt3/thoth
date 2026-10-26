@@ -424,6 +424,7 @@ export const th: Strings = {
       "page.new": "หน้าใหม่",
       "folder.new": "โฟลเดอร์ใหม่",
       "theme.cycle": "เปลี่ยนธีม (สว่าง มืด ตามระบบ)",
+      "page.favorite": "เพิ่มหน้าที่เปิดอยู่ในรายการโปรด หรือเอาออก", // REVIEW
       "tab.new": "แท็บใหม่",
       "tab.close": "ปิดแท็บ",
       "tab.next": "แท็บถัดไป",
@@ -432,6 +433,7 @@ export const th: Strings = {
       "tab.openNew": "เปิดหน้าในแท็บใหม่",
       "tab.move": "ย้ายแท็บไปทางซ้ายหรือขวา",
       "tab.menu": "เปิดเมนูของแท็บ",
+      "tab.pin": "ปักหมุดหรือเลิกปักหมุดแท็บปัจจุบัน",
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",
@@ -513,6 +515,14 @@ export const th: Strings = {
     movedTo: (label, position, total) => `ย้าย ${label} ไปลำดับที่ ${count(position)} จาก ${count(total)}`,
     movedToWindow: (label) => `ย้าย ${label} ไปหน้าต่างใหม่แล้ว`, // REVIEW
     releaseForWindow: "ปล่อยเพื่อเปิดในหน้าต่างใหม่", // REVIEW
+    /** Pinned tabs (ADR-0027). */
+    pin: "ปักหมุดแท็บ",
+    unpin: "เลิกปักหมุดแท็บ",
+    closeOthers: "ปิดแท็บอื่น",
+    pinnedName: (label: string) => `${label}, ปักหมุดอยู่`, // REVIEW
+    pinnedSaid: (label: string) => `ปักหมุด ${label} แล้ว`,
+    unpinnedSaid: (label: string) => `เลิกปักหมุด ${label} แล้ว`,
+    pinnedNoClose: "แท็บที่ปักหมุดไว้: เลิกปักหมุดก่อนจึงจะปิดได้", // REVIEW
   },
 
   web: {

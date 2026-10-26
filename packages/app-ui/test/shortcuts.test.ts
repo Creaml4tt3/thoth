@@ -89,7 +89,7 @@ describe("the shortcut table", () => {
     // The desktop keys that a browser keeps...
     const desktopTaken = placed("desktop", "other").filter(({ chord }) => reservedBy(chord, BROWSER_RESERVED, "other"));
     const ids = [...new Set(desktopTaken.map((p) => p.def.id))].sort();
-    expect(ids).toEqual(["folder.new", "page.new", "style.link", "style.strike", "tab.close", "tab.jump", "tab.new", "tab.next", "tab.previous"]);
+    expect(ids).toEqual(["folder.new", "page.favorite", "page.new", "style.link", "style.strike", "tab.close", "tab.jump", "tab.new", "tab.next", "tab.previous"]);
     // ...each have a different key on the web, and the list says so.
     for (const id of ids) {
       const def = shortcutById(id as never)!;
@@ -138,6 +138,22 @@ describe("the shortcut table", () => {
     expect(formatShortcut(def, "desktop", "mac")).toBe("Option+Shift+← / →");
     expect(formatShortcut(def, "web", "other")).toBe("Alt+Shift+← / →");
     expect(shortcutById("tab.menu" as never)!.scope).toBe("tabs");
+  });
+
+  it("stars the open page with Cmd/Ctrl+D (the browser's bookmark key, so Alt+Shift+D on the web) and pins the current tab with Alt+Shift+P (ADR-0027)", () => {
+    const favorite = shortcutById("page.favorite" as never)!;
+    expect(favorite.scope).toBe("global");
+    expect(favorite.desktop).toEqual([{ key: "d", mod: true }]);
+    expect(favorite.web).toEqual([{ code: "KeyD", alt: true, shift: true }]);
+    expect(reservedBy({ key: "d", mod: true }, BROWSER_RESERVED, "mac")?.reason).toBe("Bookmark this page");
+    expect(formatShortcut(favorite, "desktop", "mac")).toBe("Cmd+D");
+    expect(formatShortcut(favorite, "web", "other")).toBe("Alt+Shift+D");
+    const pin = shortcutById("tab.pin" as never)!;
+    expect(pin.scope).toBe("global");
+    expect(pin.web).toBeUndefined(); // a browser keeps neither
+    expect(pin.desktop).toEqual([{ code: "KeyP", alt: true, shift: true }]);
+    expect(formatShortcut(pin, "desktop", "mac")).toBe("Option+Shift+P");
+    expect(shortcutFor({ key: "∏", code: "KeyP", metaKey: false, ctrlKey: false, altKey: true, shiftKey: true }, "desktop", "mac")).toEqual({ id: "tab.pin" });
   });
 
   it("reads Tiptap's notation", () => {

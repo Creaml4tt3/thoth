@@ -459,6 +459,7 @@ export const en = {
       "page.new": "New page",
       "folder.new": "New folder",
       "theme.cycle": "Change theme (light, dark, system)",
+      "page.favorite": "Add the open page to Favorites, or take it out",
       "tab.new": "New tab",
       "tab.close": "Close tab",
       "tab.next": "Next tab",
@@ -467,6 +468,7 @@ export const en = {
       "tab.openNew": "Open a page in a new tab",
       "tab.move": "Move the tab left or right",
       "tab.menu": "Open the tab's menu",
+      "tab.pin": "Pin or unpin the current tab",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
@@ -557,6 +559,16 @@ export const en = {
     movedToWindow: (label: string) => `${label} moved to a new window`,
     /** Shown on a tab dragged far enough out of the bar (desktop). */
     releaseForWindow: "Release to open in a new window",
+    /** Pinned tabs (ADR-0027). */
+    pin: "Pin tab",
+    unpin: "Unpin tab",
+    closeOthers: "Close other tabs",
+    /** A pinned tab shows its first letters; this is its name for a screen reader. */
+    pinnedName: (label: string) => `${label}, pinned`,
+    pinnedSaid: (label: string) => `${label} pinned`,
+    unpinnedSaid: (label: string) => `${label} unpinned`,
+    /** Cmd/Ctrl+W, Delete or a middle-click on a pinned tab: it stays. */
+    pinnedNoClose: "Pinned tab: unpin it to close it",
   },
 
   web: {

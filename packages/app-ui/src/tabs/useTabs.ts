@@ -9,8 +9,12 @@ export interface TabsController {
   /** Opens a target in the current tab, or in a new one (`newTab`). */
   open(target: TabTarget, options?: OpenOptions): void;
   newTab(): void;
-  /** Closes a tab (the current one by default). */
+  /** Closes a tab (the current one by default). A pinned tab is not closed (ADR-0027). */
   close(id?: string): void;
+  /** Closes every tab but `id` (the current one by default) and the pinned ones; `id` becomes current. */
+  closeOthers(id?: string): void;
+  /** Pins or unpins the tab `id` (the current one by default). The current tab does not change. */
+  setPinned(pinned: boolean, id?: string): void;
   activate(id: string): void;
   /** The next (1) or previous (-1) tab. */
   step(delta: number): void;
@@ -78,6 +82,12 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
         if (target !== latest.current.active) setState((s) => model.close(s, target));
         else guarded((s) => model.close(s, target));
       },
+      closeOthers: (id) => {
+        const target = id ?? latest.current.active;
+        if (target === latest.current.active) setState((s) => model.closeOthers(s, target));
+        else guarded((s) => model.closeOthers(s, target));
+      },
+      setPinned: (pinned, id) => setState((s) => model.setPinned(s, id ?? s.active, pinned)),
       activate: (id) => guarded((s) => model.activate(s, id)),
       step: (delta) => guarded((s) => model.step(s, delta)),
       jump: (n) => guarded((s) => model.jump(s, n)),
@@ -91,7 +101,8 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
         const out = model.detach(latest.current, id);
         if (!out) return false;
         const sent = await send(out.moved).catch(() => false);
-        if (sent) setState((s) => model.close(s, id));
+        // `removeTab`: a pinned tab leaves too (it is pinned in the new window).
+        if (sent) setState((s) => model.removeTab(s, id));
         return sent;
       },
     }),

@@ -15,6 +15,16 @@ export interface TabItem {
   label: string;
   /** A longer name for the tooltip (for example the file path). */
   title?: string;
+  /** Pinned (ADR-0027): at the start of the bar, compact, with no close button. The pinned tabs come first in `tabs`. */
+  pinned?: boolean;
+}
+
+/** The first two letters (graphemes, so a Thai vowel or an emoji is not cut in half) of a pinned tab's name. */
+export function tabInitials(label: string): string {
+  const text = label.trim();
+  const Segmenter = (Intl as { Segmenter?: new (locale?: string, options?: { granularity: "grapheme" }) => { segment(s: string): Iterable<{ segment: string }> } }).Segmenter;
+  const parts = Segmenter ? [...new Segmenter(undefined, { granularity: "grapheme" }).segment(text)].map((p) => p.segment) : Array.from(text);
+  return parts.slice(0, 2).join("") || "·";
 }
 
 const tabDomId = (id: string) => `thoth-tab-${id}`;
@@ -33,6 +43,14 @@ interface BarProps {
    * it was asked for from the menu. Without it there is no new window (the web client: that is the browser's job).
    */
   onDetach?(id: string, at: { x: number; y: number } | null): void;
+  /** Pins or unpins the tab `id` (ADR-0027). Without it the menu offers neither. */
+  onPin?(id: string, pinned: boolean): void;
+  /** Closes every tab but `id` and the pinned ones ("Close other tabs"). */
+  onCloseOthers?(id: string): void;
+  /** More items for the tab's menu, after the bar's own (for example Add to Favorites). */
+  menuExtras?(id: string): MenuItem[];
+  /** Something to say about the tabs from outside the bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
+  notice?: { text: string; seq: number } | null;
 }
 
 /** A tab that was closed and is still narrowing away: where it sat (after which tab), what it looked like. */
@@ -74,7 +92,7 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * others are already there after a drop, so only the dropped tab settles). Tabs present at the start, moves made with
  * the keyboard, and everything under reduced motion (the tabs jump to their places), skip it.
  */
-export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach }: BarProps) {
+export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice }: BarProps) {
   const t = useStrings().tabs;
   const closeHint = useShortcutHint("tab.close");
   const hints = useContext(HintContext);
@@ -92,6 +110,23 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   /** A tab sent to a new window from the keyboard or the menu: focus goes to the current tab once it has left. */
   const refocus = useRef<string | null>(null);
   useEffect(() => setStop(active), [active]);
+  /** A short note under the bar that a pinned tab was not closed (the live region says it for a screen reader). */
+  const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sayPinned = () => {
+    setSaid(t.pinnedNoClose);
+    setNote(t.pinnedNoClose);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(null), 2500);
+  };
+  useEffect(() => () => void (noteTimer.current && clearTimeout(noteTimer.current)), []);
+  const noticeSeq = notice?.seq;
+  useEffect(() => {
+    if (noticeSeq === undefined || !notice) return;
+    if (notice.text === t.pinnedNoClose) sayPinned();
+    else setSaid(notice.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noticeSeq]);
 
   // What changed since the last render, worked out while rendering (derived state): which tabs are new, which just left.
   const [seen, setSeen] = useState({ tabs, active, fresh: [] as string[], leaving: [] as Leaving[] });
@@ -154,6 +189,24 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   const order = tabs.map((tab) => tab.id);
   const canDetach = onDetach !== undefined && tabs.length > 1;
   const labelOf = (id: string) => tabs.find((tab) => tab.id === id)?.label ?? "";
+  const pinnedCount = tabs.filter((tab) => tab.pinned).length;
+  const isPinned = (id: string) => tabs.some((tab) => tab.id === id && tab.pinned === true);
+  /** The indexes a tab may take: among the pinned tabs, or among the others (ADR-0027). */
+  const bounds = (id: string): readonly [number, number] => (isPinned(id) ? [0, pinnedCount - 1] : [pinnedCount, tabs.length - 1]);
+  /** Closes a tab unless it is pinned; a pinned one says how to close it instead. */
+  const closeTab = (id: string): boolean => {
+    if (isPinned(id)) {
+      sayPinned();
+      return false;
+    }
+    onClose(id);
+    return true;
+  };
+  const pinTab = (id: string, pinned: boolean) => {
+    if (!onPin) return;
+    onPin(id, pinned);
+    setSaid(pinned ? t.pinnedSaid(labelOf(id)) : t.unpinnedSaid(labelOf(id)));
+  };
 
   /** Where every tab is shown now (with the drag's shifts), for the slide once the drag has ended. */
   const rememberPlaces = () => {
@@ -166,7 +219,8 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   /** Moves a tab and says so. A pointer drop has already remembered where the tabs were shown (`rememberPlaces`). */
   const moveTab = (id: string, to: number) => {
     if (!onMove) return;
-    const at = Math.max(0, Math.min(to, tabs.length - 1));
+    const [lo, hi] = bounds(id);
+    const at = Math.max(lo, Math.min(to, hi));
     if (at === order.indexOf(id)) return;
     onMove(id, at);
     setSaid(t.movedTo(labelOf(id), at + 1, tabs.length));
@@ -184,6 +238,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
     list: () => listRef.current,
     tab: (id) => boxes.current.get(id) ?? null,
     canDetach,
+    bounds,
     onMove: (id, to) => moveTab(id, to),
     onDetach: (id, at) => detachTab(id, at),
     onEnd: rememberPlaces,
@@ -221,7 +276,8 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       if (!onMove) return;
       handled();
       const delta = (event.key === "ArrowRight") !== rtl ? 1 : -1;
-      if (at + delta < 0 || at + delta >= tabs.length) return;
+      const [lo, hi] = bounds(id);
+      if (at + delta < lo || at + delta > hi) return;
       moveTab(id, at + delta);
       focusSoon(id);
       return;
@@ -250,24 +306,34 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
         event.preventDefault();
         // Focus moves to the neighbour that stays, so the keyboard is not left on a tab that is gone.
         const next = tabs[at + 1] ?? tabs[at - 1];
-        onClose(id);
-        if (next) setTimeout(() => focusTab(next.id), 0);
+        if (closeTab(id) && next) setTimeout(() => focusTab(next.id), 0);
       }
     }
   };
 
+  const pinKeys = shortcutById("tab.pin");
+  const pinChord = pinKeys ? chordsFor(pinKeys, client)[0] : undefined;
   const menuItems = (id: string): MenuItem[] => {
     const at = order.indexOf(id);
+    const [lo, hi] = bounds(id);
+    const pinned = isPinned(id);
     const hint = (i: number) => (moveChords[i] ? formatChordShort(moveChords[i]!, platform) : undefined);
     const items: MenuItem[] = [];
+    if (onPin) {
+      const keys = pinChord ? formatChordShort(pinChord, platform) : undefined;
+      items.push({ id: "pin", label: pinned ? t.unpin : t.pin, ...(keys ? { hint: keys } : {}), onSelect: () => (pinTab(id, !pinned), focusSoon(id)) });
+    }
     if (onMove) {
       const left = hint(0);
       const right = hint(1);
-      items.push({ id: "left", label: t.moveLeft, ...(left ? { hint: left } : {}), disabled: at <= 0, onSelect: () => (moveTab(id, at - 1), focusSoon(id)) });
-      items.push({ id: "right", label: t.moveRight, ...(right ? { hint: right } : {}), disabled: at >= tabs.length - 1, onSelect: () => (moveTab(id, at + 1), focusSoon(id)) });
+      items.push({ id: "left", label: t.moveLeft, ...(left ? { hint: left } : {}), disabled: at <= lo, onSelect: () => (moveTab(id, at - 1), focusSoon(id)) });
+      items.push({ id: "right", label: t.moveRight, ...(right ? { hint: right } : {}), disabled: at >= hi, onSelect: () => (moveTab(id, at + 1), focusSoon(id)) });
     }
     if (onDetach) items.push({ id: "window", label: t.moveToWindow, disabled: tabs.length < 2, onSelect: () => detachTab(id, null) });
-    items.push({ id: "close", label: t.close, onSelect: () => onClose(id) });
+    items.push(...(menuExtras?.(id) ?? []));
+    // A pinned tab has no Close: unpin it first (ADR-0027).
+    if (!pinned) items.push({ id: "close", label: t.close, onSelect: () => onClose(id) });
+    if (onCloseOthers) items.push({ id: "others", label: t.closeOthers, disabled: tabs.every((tab) => tab.id === id || tab.pinned), onSelect: () => onCloseOthers(id) });
     return items;
   };
 
@@ -287,6 +353,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
           }
           const tab = row.item;
           const selected = tab.id === active;
+          const pinned = tab.pinned === true;
           const dragged = drag?.id === tab.id ? drag : null;
           const shift = drag?.shifts[tab.id];
           return (
@@ -299,6 +366,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
               role="none"
               className="tab"
               data-selected={selected || undefined}
+              data-pinned={pinned ? "" : undefined}
               data-enter={fresh.includes(tab.id) || undefined}
               data-dragging={dragged ? "" : undefined}
               data-detach={dragged?.detach ? "" : undefined}
@@ -318,8 +386,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
                 aria-keyshortcuts={keyshortcuts}
                 tabIndex={tab.id === stop ? 0 : -1}
                 className="tab-label"
-                {...(tab.title ? { title: tab.title } : {})}
-                {...tipIfClipped(tab.label)}
+                {...(pinned ? { "aria-label": t.pinnedName(tab.label), ...tip(tab.label, undefined, tab.title) } : { ...(tab.title ? { title: tab.title } : {}), ...tipIfClipped(tab.label) })}
                 onClick={() => {
                   if (swallowClick.current) return;
                   onActivate(tab.id);
@@ -335,15 +402,17 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
                 onAuxClick={(event: MouseEvent) => {
                   if (event.button !== 1) return;
                   event.preventDefault();
-                  onClose(tab.id);
+                  closeTab(tab.id);
                 }}
               >
-                <span className="tab-text">{tab.label}</span>
+                <span className="tab-text">{pinned ? tabInitials(tab.label) : tab.label}</span>
               </button>
-              {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. */}
-              <span className="tab-close" aria-hidden="true" {...tip(t.close, closeHint?.keys)} onClick={() => onClose(tab.id)}>
-                <Icon name="close" size={12} />
-              </span>
+              {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. A pinned tab has none (ADR-0027). */}
+              {!pinned && (
+                <span className="tab-close" aria-hidden="true" {...tip(t.close, closeHint?.keys)} onClick={() => onClose(tab.id)}>
+                  <Icon name="close" size={12} />
+                </span>
+              )}
             </div>
           );
         })}
@@ -360,6 +429,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tabs-said="">
         {said}
       </div>
+      {note && (
+        // What the live region says, for the eyes: Cmd/Ctrl+W, Delete or a middle-click left a pinned tab open.
+        <div className="tab-note" aria-hidden="true">
+          {note}
+        </div>
+      )}
       {menu && (
         <ContextMenu
           label={t.menu(labelOf(menu.id))}

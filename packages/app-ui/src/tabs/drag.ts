@@ -55,6 +55,11 @@ export interface TabDragOptions {
   list(): HTMLElement | null;
   tab(id: string): HTMLElement | null;
   canDetach: boolean;
+  /**
+   * The indexes the tab `id` may land at, both included (ADR-0027: a pinned tab among the pinned ones, another among
+   * the others). Omitted: anywhere. The preview never opens a gap past them.
+   */
+  bounds?(id: string): readonly [number, number];
   onMove(id: string, to: number): void;
   onDetach(id: string, at: { x: number; y: number }): void;
   /** A drag that had started is about to end (drop or cancel); the tabs are still where it showed them. */
@@ -129,7 +134,9 @@ export function useTabDrag(options: TabDragOptions) {
     const dx = x - p.x;
     // Its middle where the pointer has taken it (not held back at the ends, so the far end is always reachable).
     const center = self.start + self.size / 2 + dx;
-    const to = detach ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
+    const slot = detach ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
+    const [lo, hi] = opts.current.bounds?.(p.id) ?? [0, c.order.length - 1];
+    const to = slot === null ? null : Math.max(lo, Math.min(slot, hi));
     const moved = previewShifts(c.order.length, from, to, self.size, c.gap, c.rtl);
     if (!detach) {
       // The tab follows the pointer along the bar, kept between the first tab's start and the last tab's end, and

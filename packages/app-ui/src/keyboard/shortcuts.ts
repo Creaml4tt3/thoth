@@ -45,6 +45,8 @@ export type ShortcutId =
   | "tab.openNew"
   | "tab.move"
   | "tab.menu"
+  | "tab.pin"
+  | "page.favorite"
   | "tree.move"
   | "tree.expand"
   | "tree.open"
@@ -125,6 +127,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "page.new", group: "general", scope: "global", desktop: [{ key: "n", mod: true }], web: [{ code: "KeyN", alt: true }] },
   { id: "folder.new", group: "general", scope: "global", desktop: [{ key: "n", mod: true, shift: true }], web: [{ code: "KeyN", alt: true, shift: true }] },
   { id: "theme.cycle", group: "general", scope: "global", desktop: [{ key: "l", mod: true, shift: true }] },
+  // Add the open page to Favorites, or take it out (ADR-0027). Cmd/Ctrl+D is a browser's bookmark key.
+  { id: "page.favorite", group: "general", scope: "global", desktop: [{ key: "d", mod: true }], web: [{ code: "KeyD", alt: true, shift: true }] },
   { id: "dialog.close", group: "general", scope: "dialog", desktop: [{ key: "Escape" }] },
 
   // The Thoth assistant (the mascot; desktop only)
@@ -148,6 +152,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   // On the focused tab (ADR-0019): the keyboard way to reorder tabs, beside dragging them. Not global: in text,
   // Option+Shift+Left/Right selects by word.
   { id: "tab.move", group: "tabs", scope: "tabs", desktop: [{ key: "ArrowLeft", alt: true, shift: true }, { key: "ArrowRight", alt: true, shift: true }], display: { desktop: "Alt+Shift+← / →" } },
+  // Pin or unpin the current tab (ADR-0027). By physical key: Option changes the letter on a Mac.
+  { id: "tab.pin", group: "tabs", scope: "global", desktop: [{ code: "KeyP", alt: true, shift: true }] },
   { id: "tab.menu", group: "tabs", scope: "tabs", desktop: [{ key: "ContextMenu" }, { key: "F10", shift: true }], display: { desktop: "Menu key / Shift+F10" } },
 
   // The page trees
@@ -268,6 +274,7 @@ export const BROWSER_RESERVED: readonly Reserved[] = [
   { key: "s", mod: true, shift: true, reason: "Screenshots (Firefox)" },
   { key: "r", mod: true, reason: "Reload" },
   { key: "l", mod: true, reason: "Address bar" },
+  { key: "d", mod: true, reason: "Bookmark this page" },
   { key: "F5", reason: "Reload" },
   { key: "F11", reason: "Full screen" },
   { key: "F12", reason: "Developer tools" },

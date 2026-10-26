@@ -201,7 +201,7 @@
    a flex-basis alone does not size the strip around it and a short title would shrink the tab), and shrinks toward
    --thoth-tab-min-width as more are open; then the strip scrolls. The enter and leave animations use the same tokens.
    The top padding is on the list, not the strip, so a lifted tab's shadow (while dragged) is not clipped by it. */
-.tabstrip { --thoth-tab-width: 202px; --thoth-tab-min-width: 96px; --thoth-tab-max-width: 248px; flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 0 8px; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
+.tabstrip { position: relative; --thoth-tab-width: 202px; --thoth-tab-min-width: 96px; --thoth-tab-max-width: 248px; flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 0 8px; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
 .tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding-top: 6px; overflow-x: auto; scrollbar-width: thin; }
 .tab { position: relative; display: flex; align-items: center; flex: 0 1 var(--thoth-tab-width); width: var(--thoth-tab-width); min-width: var(--thoth-tab-min-width); max-width: var(--thoth-tab-max-width); margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 /* A tab the user opened enters by widening and fading in; one that closes narrows and fades out (TabBar.tsx keeps it for
@@ -222,6 +222,12 @@
 @media (hover: none) { .tab-close { opacity: 1; } }
 .tab-close:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .tab-new { margin: 0 0 3px 4px; }
+/* Pinned tabs (ADR-0027): compact at the start of the bar, the first letters in place of the name, no close button.
+   44px wide keeps the target well over 28px; a line after the last one marks where the others begin. */
+.tab[data-pinned] { flex: none; width: 44px; min-width: 44px; max-width: 44px; }
+.tab[data-pinned] .tab-label { padding: 7px 0; text-align: center; font-weight: 600; letter-spacing: 0.02em; }
+.tab[data-pinned]:has(+ .tab:not([data-pinned]))::after { content: ""; position: absolute; right: -2px; top: 25%; bottom: 25%; width: 1px; background: var(--thoth-border); }
+.tab-note { position: absolute; z-index: 40; top: calc(100% + 4px); left: 8px; max-width: min(360px, 80vw); padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-small); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 /* Dragging a tab (ADR-0019 amended, tabs/drag.ts): a live preview. The dragged tab lifts (raised, a shadow) and follows the
    pointer along the bar; the others slide aside to open the gap where it would land (TabBar.tsx sets each one's
    translateX; only the others transition, so the dragged tab stays under the pointer). Well out of the bar the dragged
