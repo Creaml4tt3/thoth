@@ -27,7 +27,9 @@ import {
   TransferResourceSchema,
   TreeNodeSchema,
   TreePageSchema,
+  DeletedWorkspaceListSchema,
   WorkspaceListSchema,
+  WorkspaceSchema,
   formatEtag,
   type AttachmentResource,
   type Capabilities,
@@ -51,7 +53,9 @@ import {
   type TransferCreateRequest,
   type TransferResource,
   type TreeNode,
+  type DeletedWorkspace,
   type Workspace,
+  type WorkspaceCreateRequest,
 } from "@thoth/workspace-protocol";
 import { ProtocolError, problemFromResponse } from "./errors.ts";
 
@@ -337,6 +341,51 @@ export class WorkspaceClient {
   /** Stops an invite link at once. Revoking one that is already revoked, expired or used up succeeds. */
   async revokeInviteLink(workspaceId: string, inviteId: string): Promise<void> {
     await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/invite-links/${seg(inviteId)}`, ok: [204] });
+  }
+
+  /**
+   * Creates a workspace owned by the caller (capability `workspace-management`, ADR-0025). Over the owned-workspace limit
+   * it throws `QuotaExceeded` (`workspacesPerAccount`, with `limit` and `current`). With an `idempotencyKey`, a retry
+   * after a lost response returns the workspace made the first time instead of making a second one.
+   */
+  async createWorkspace(input: WorkspaceCreateRequest, options: { idempotencyKey?: string } = {}): Promise<Workspace> {
+    const headers: Record<string, string> = { ...JSON_HEADERS };
+    if (options.idempotencyKey !== undefined) headers["idempotency-key"] = options.idempotencyKey;
+    return (await this.request(WorkspaceSchema, { method: "POST", path: "/workspaces", headers, body: encoder.encode(JSON.stringify(input)), ok: [201] })).data;
+  }
+
+  /** Owners only. Returns the workspace with its new name. */
+  async renameWorkspace(workspaceId: string, name: string): Promise<Workspace> {
+    return (await this.request(WorkspaceSchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/name`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ name })) })).data;
+  }
+
+  /** Owners only. The workspace is gone for every member at once and can be restored for 30 days. */
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}`, ok: [204] });
+  }
+
+  /** The caller's deleted workspaces that can still be restored, newest first (follows pagination). */
+  async listDeletedWorkspaces(): Promise<DeletedWorkspace[]> {
+    const out: DeletedWorkspace[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(DeletedWorkspaceListSchema, { method: "GET", path: "/deleted-workspaces", query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    throw new ProtocolError("The server's list of deleted workspaces never ended.", 200);
+  }
+
+  /** Brings a deleted workspace back, with its pages and members (not its share or invite links). */
+  async restoreWorkspace(workspaceId: string): Promise<Workspace> {
+    return (await this.request(WorkspaceSchema, { method: "POST", path: `/deleted-workspaces/${seg(workspaceId)}/restore` })).data;
+  }
+
+  /** Deletes a deleted workspace for good, now. It cannot be undone. */
+  async purgeWorkspace(workspaceId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/deleted-workspaces/${seg(workspaceId)}`, ok: [204] });
   }
 
   /** Joins the workspace of an invite token. Already a member: `joined` is false and the role is unchanged. */

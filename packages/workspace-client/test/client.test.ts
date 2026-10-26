@@ -298,6 +298,43 @@ describe("members and invite links (capabilities members and invite-links, ADR-0
   });
 });
 
+describe("several workspaces (capability workspace-management, ADR-0025)", () => {
+  const workspace = (id: string, name: string) => ({ id, kind: "workspace", name, role: "owner", exportRestricted: false, memberCount: 1, members: [{ userId: "usr_a", displayName: "Ada", role: "owner" }], createdAt: T });
+  const deleted = (id: string) => ({ id, name: "Old", exportRestricted: false, memberCount: 2, deletedAt: T, deletedBy: "usr_a", restorableUntil: "2026-11-22T10:00:00Z" });
+
+  it("creates with POST /workspaces and an Idempotency-Key, renames with PUT …/name, deletes, lists the deleted ones, restores and purges", async () => {
+    const { client, requests } = fake((req, n) => {
+      if (req.method === "DELETE") return { status: 204, headers: {}, body: "" };
+      if (req.path === "/api/v1/workspaces") return ok(workspace("ws_new", "Design"), 201);
+      if (req.path.endsWith("/name")) return ok(workspace("ws_new", "Design team"));
+      if (req.path.endsWith("/restore")) return ok(workspace("ws_old", "Old"));
+      return ok(n === 4 ? { items: [deleted("ws_old")], nextCursor: "d1" } : { items: [deleted("ws_older")], nextCursor: null });
+    });
+    const made = await client.createWorkspace({ name: "Design", exportRestricted: false }, { idempotencyKey: "key-1" });
+    expect(made).toMatchObject({ id: "ws_new", name: "Design", role: "owner" });
+    expect(requests[0]).toMatchObject({ method: "POST", path: "/api/v1/workspaces", headers: { "content-type": "application/json", "idempotency-key": "key-1" } });
+    expect(bodyOf(requests[0]!)).toEqual({ name: "Design", exportRestricted: false });
+    expect((await client.renameWorkspace("ws_new", "Design team")).name).toBe("Design team");
+    expect(requests[1]).toMatchObject({ method: "PUT", path: "/api/v1/workspaces/ws_new/name" });
+    expect(bodyOf(requests[1]!)).toEqual({ name: "Design team" });
+    await client.deleteWorkspace("ws_new");
+    expect(requests[2]).toMatchObject({ method: "DELETE", path: "/api/v1/workspaces/ws_new" });
+    expect((await client.restoreWorkspace("ws_old")).id).toBe("ws_old");
+    expect(requests[3]).toMatchObject({ method: "POST", path: "/api/v1/deleted-workspaces/ws_old/restore" });
+    expect((await client.listDeletedWorkspaces()).map((w) => w.id)).toEqual(["ws_old", "ws_older"]);
+    expect(requests[5]).toMatchObject({ method: "GET", path: "/api/v1/deleted-workspaces", query: { cursor: "d1" } });
+    await client.purgeWorkspace("ws_old");
+    expect(requests[6]).toMatchObject({ method: "DELETE", path: "/api/v1/deleted-workspaces/ws_old" });
+  });
+
+  it("turns the owned-workspace limit into a QuotaExceeded with the limit and the count", async () => {
+    const { client } = fake(() => ({ status: 409, headers: { "content-type": "application/problem+json" }, body: JSON.stringify({ ...problem("quota_exceeded"), quota: "workspacesPerAccount", limit: 3, current: 3 }) }));
+    const error = await client.createWorkspace({ name: "Four" }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(QuotaExceeded);
+    expect(error).toMatchObject({ quota: "workspacesPerAccount", limit: 3, current: 3, message: "This server allows at most 3 workspaces you can own." });
+  });
+});
+
 describe("invite addresses", () => {
   it("parses https://<server>/i/<token> and nothing else", () => {
     const token = "C".repeat(32);

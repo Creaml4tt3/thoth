@@ -67,6 +67,7 @@ const QUOTA_UNITS: Record<string, string> = {
   pagesPerWorkspace: "pages in this workspace",
   membersPerWorkspace: "members in this workspace",
   workspacesPerAccount: "workspaces you can own",
+  workspaceCreationsPerDay: "new workspaces a day",
   attachmentBytesPerWorkspace: "bytes of attachments in this workspace",
 };
 
