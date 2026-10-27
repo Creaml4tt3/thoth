@@ -18,3 +18,6 @@ tests/.tmp/
 .agents/skills/
 .codex/skills/
 .mcp.json
+
+# Local code index (CodeGraph)
+/.codegraph/
