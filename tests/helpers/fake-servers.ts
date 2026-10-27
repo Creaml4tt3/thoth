@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { DELETED_WORKSPACE_RESTORE_DAYS, InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { DELETED_WORKSPACE_RESTORE_DAYS, FeedbackRequestSchema, InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -90,6 +90,8 @@ export class FakeServers implements Servers {
   private readonly serverOf = new WeakMap<FakeWorkspace, string>();
   /** Every api.call, in order. */
   readonly calls: ApiCallArgs[] = [];
+  /** Feedback received (capability `feedback`, ADR-0033), by server, as sent. */
+  readonly feedback: { server: string; body: unknown }[] = [];
   readonly transfers = new Map<string, FakeTransfer>();
   /** Stored replies by (server, Idempotency-Key): a retry with the same key and body replays, another body is 422. */
   private readonly idempotent = new Map<string, { body: string; reply: ApiCallResult }>();
@@ -273,6 +275,14 @@ export class FakeServers implements Servers {
     for (const name of Object.keys(args.headers ?? {})) if (!ALLOWED_HEADERS.has(name.toLowerCase())) throw new HostCallError("NOT_ALLOWED", `Header ${name} refused`);
     const path = args.path.slice("/api/v1".length);
     if (path === "/capabilities") return json(200, this.capabilities(known.config));
+    // ADR-0033: feedback needs no sign-in.
+    if (path === "/feedback" && args.method === "POST") {
+      if (!this.capable(args.server, "feedback")) return fail("capability_not_supported");
+      const parsed = FeedbackRequestSchema.safeParse(JSON.parse(body ? decoder.decode(body) : "null"));
+      if (!parsed.success) return fail("validation_failed");
+      this.feedback.push({ server: args.server, body: parsed.data });
+      return { status: 204, headers: {}, body: "" };
+    }
     if (known.expired) {
       const { account: _account, ...info } = known.info;
       known.info = { ...info, auth: "signed-out" };

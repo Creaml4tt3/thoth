@@ -445,6 +445,7 @@ export const th: Strings = {
       moveTabToWindow: "ย้ายแท็บไปหน้าต่างใหม่",
       focusOtherPane: "ไปยังอีกฝั่งหนึ่ง", // REVIEW
       toggleMode: "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
+      sendFeedback: "ส่งความคิดเห็น…", // REVIEW
       shortcuts: "แสดงปุ่มลัด",
       format: (style) => `จัดรูปแบบ: ${style}`,
       color: (name) => `สีข้อความ: ${name}`,
@@ -747,6 +748,41 @@ export const th: Strings = {
     pendingList: "การย้ายที่ยังเก็บต้นฉบับไว้",
     pendingItem: (n, where) => `เก็บต้นฉบับไว้ ${count(n)} หน้า · ${where}`,
   },
+  /** ส่งความคิดเห็น (ADR-0033) */
+  feedback: {
+    title: "ส่งความคิดเห็น", // REVIEW
+    open: "ส่งความคิดเห็น…", // REVIEW
+    intro: "บอกเราเกี่ยวกับปัญหา ไอเดีย หรือคำถาม", // REVIEW
+    kind: "เรื่องอะไร", // REVIEW
+    kinds: { problem: "ปัญหา", idea: "ไอเดีย", question: "คำถาม" },
+    message: "ข้อความของคุณ",
+    messageHint: (max: number) => `ไม่เกิน ${max.toLocaleString()} ตัวอักษร`,
+    email: "อีเมลของคุณ (ไม่บังคับ)",
+    emailHint: "ใส่เฉพาะเมื่อต้องการคำตอบ", // REVIEW
+    include: "แนบเวอร์ชันของแอปและระบบ", // REVIEW
+    includeHint: "สิ่งที่จะแนบไปมีเพียงเท่านี้:", // REVIEW
+    privacy: "จะส่งเฉพาะสิ่งที่คุณพิมพ์ที่นี่ และรายละเอียดด้านบนหากคุณเปิดไว้ ไม่มีการส่งหน้า ชื่อหน้า หรือชื่อไฟล์ของคุณ", // REVIEW
+    sendingTo: (server: string) => `ส่งไปที่ ${server}`,
+    send: "ส่ง",
+    sending: "กำลังส่ง…",
+    cancel: "ยกเลิก",
+    close: "ปิด",
+    sent: "ขอบคุณ ส่งข้อความของคุณแล้ว",
+    errors: {
+      kind: "เลือกว่าเป็นเรื่องอะไร", // REVIEW
+      message: "เขียนข้อความ",
+      messageLong: (max: number) => `ไม่เกิน ${max.toLocaleString()} ตัวอักษร`,
+      email: "ตรวจสอบอีเมล หรือเว้นว่างไว้", // REVIEW
+    },
+    busy: "ส่งข้อความมากเกินไปในตอนนี้ รอสักครู่ หรือเขียนถึงเราทางอีเมล", // REVIEW
+    failed: (reason: string) => `ส่งไม่สำเร็จ: ${reason}`,
+    looking: "กำลังหาที่ส่ง…", // REVIEW
+    noServer: "ตอนนี้ยังไม่มีเซิร์ฟเวอร์ที่รับความคิดเห็นได้ เพิ่มเซิร์ฟเวอร์ทดลองใน การตั้งค่า → เซิร์ฟเวอร์ หรือเขียนถึงเราทางอีเมล", // REVIEW
+    orEmail: "หรือเขียนถึงเราทางอีเมล", // REVIEW
+    copyEmail: "คัดลอกที่อยู่",
+    copied: "คัดลอกแล้ว",
+  },
+
   web: {
     loading: "กำลังโหลด…",
     signInTitle: "เข้าสู่ระบบ Thoth",
@@ -791,6 +827,8 @@ export const th: Strings = {
       keyboard: "แป้นพิมพ์",
       keyboardNote: "ทุกคำสั่งใช้ได้ด้วยแป้นพิมพ์ เบราว์เซอร์เก็บบางปุ่มไว้ใช้เอง เวอร์ชันเว็บจึงใช้ปุ่มอื่นแทน และรายการจะบอกไว้",
       showShortcuts: "แสดงปุ่มลัด",
+      feedback: "ความช่วยเหลือและความคิดเห็น", // REVIEW
+      feedbackNote: "เจอปัญหา มีไอเดีย หรือมีคำถาม ส่งถึงทีมของเซิร์ฟเวอร์นี้ได้ จะส่งเฉพาะสิ่งที่คุณพิมพ์ และรายละเอียดของเบราว์เซอร์หากคุณเปิดไว้", // REVIEW
     },
   },
 };

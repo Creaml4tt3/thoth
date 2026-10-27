@@ -93,6 +93,8 @@ export interface CommandActions {
   };
   toggleMode?(): void;
   showShortcuts(): void;
+  /** Send feedback (ADR-0033): the dialog with the kind, the message and an optional email. */
+  sendFeedback?(): void;
   /** Present when text is selected and may be styled. */
   format?(command: FormatCommand): void;
 }
@@ -157,6 +159,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   });
   if (a.toggleMode) add("editor.mode", t.toggleMode, a.toggleMode, { ...key("editor.mode"), keywords: "plain blocks markdown editor" });
   add("shortcuts.open", t.shortcuts, a.showShortcuts, { ...key("shortcuts.open"), keywords: "keys keyboard help" });
+  if (a.sendFeedback) add("feedback.send", t.sendFeedback, a.sendFeedback, { keywords: "help support bug problem idea question contact report" });
 
   if (a.format) {
     const format = a.format;

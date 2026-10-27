@@ -348,3 +348,16 @@ describe("Show the tour", () => {
     expect(find(buildCommands(withTour, th, "desktop", "mac"), "tour.show")?.title).toBe("แสดงทัวร์");
   });
 });
+
+describe("Send feedback (ADR-0033)", () => {
+  it("is offered where the app has the dialog, and found by help, bug or contact", () => {
+    const { actions, log } = spies();
+    expect(find(buildCommands(actions, en, "web", "mac"), "feedback.send")).toBeUndefined();
+    const list = buildCommands({ ...actions, sendFeedback: vi.fn(() => void log.push("feedback")) }, en, "desktop", "mac");
+    expect(find(list, "feedback.send")?.title).toBe("Send feedback…");
+    for (const words of ["> help", "> bug", "> contact"]) expect(filterCommands(words, list).map((c) => c.id)).toContain("feedback.send");
+    find(list, "feedback.send")!.run();
+    expect(log).toEqual(["feedback"]);
+    expect(titles(buildCommands({ ...actions, sendFeedback: () => undefined }, th, "desktop", "mac"))).toContain("ส่งความคิดเห็น…");
+  });
+});

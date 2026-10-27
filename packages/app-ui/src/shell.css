@@ -366,3 +366,9 @@ div.tree-empty > p { margin: 0 0 6px; }
 .shell[data-sidebar-hidden] { grid-template-columns: 0px 1fr; }
 .sidebar { transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), transform var(--thoth-dur-fast) var(--thoth-ease-out); }
 .shell[data-sidebar-hidden] > .sidebar { min-width: 0; overflow: hidden; opacity: 0; transform: translateX(-16px); padding-inline: 0; border-right-width: 0; pointer-events: none; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-in), transform var(--thoth-dur-fast) var(--thoth-ease-in); }
+/* Send feedback (ADR-0033). */
+.feedback-message { resize: vertical; min-height: 7.5rem; }
+.feedback-details ul { margin: 4px 0 0; padding-left: 1.1em; color: var(--thoth-ink-secondary); overflow-wrap: anywhere; }
+.field-error { margin: 0; padding-inline-start: 8px; border-inline-start: 3px solid var(--thoth-danger); font: var(--thoth-text-small); color: var(--thoth-ink-primary); }
+.input[aria-invalid="true"] { border-color: var(--thoth-danger); }
+.feedback-mail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
