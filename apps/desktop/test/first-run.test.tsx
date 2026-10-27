@@ -80,7 +80,7 @@ describe("the Welcome pages", () => {
   });
 });
 
-const STEPS = ["Your pages", "New page, new folder, import", "Search and commands", "Write in blocks", "Tabs", "Home"];
+const STEPS = ["Your pages", "New page, new folder, import", "Search and commands", "Write in blocks", "Tabs", "Private Spaces"];
 
 describe("the first-run tour", () => {
   beforeEach(() => laidOut());

@@ -117,7 +117,7 @@ describe("tab keys", () => {
     await app.user.keyboard("{Control>}t{/Control}");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "New tab"]));
     expect(current()).toBe("New tab");
-    expect(screen.getByRole("heading", { level: 1, name: "Welcome back" })).toBeTruthy(); // a new tab shows Home (ADR-0029)
+    expect(screen.getByRole("heading", { level: 1, name: "New tab" })).toBeTruthy(); // empty: no Home on the desktop (ADR-0029 amendment)
     await app.user.keyboard("{Control>}w{/Control}");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
     expect(current()).toBe("Alpha");
@@ -152,7 +152,7 @@ describe("tab keys", () => {
     await waitFor(() => expect(tabNames()).toEqual(["New tab"]));
     await new Promise((r) => setTimeout(r, 50));
     expect(tabNames()).toEqual(["New tab"]);
-    expect(screen.getByRole("heading", { level: 1, name: "Welcome back" })).toBeTruthy(); // a new tab shows Home (ADR-0029)
+    expect(screen.getByRole("heading", { level: 1, name: "New tab" })).toBeTruthy();
   });
 
   it("does not switch tabs behind an open dialog", async () => {

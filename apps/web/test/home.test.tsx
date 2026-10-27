@@ -52,4 +52,18 @@ describe("Home on the web", () => {
     expect(stored?.[1]).toContain('"k":"ws"');
     expect(stored?.[1]).not.toContain("Alpha");
   });
+
+  // The desktop's Home is its Private Space picker (ADR-0029, amendment of 2026-10-28); the web keeps the Home tab.
+  it("keeps its Home tab: the palette's Go home opens it, under the name Home", async () => {
+    const browser = await signedIn();
+    await browser.user.click(await row("Alpha"));
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
+    await browser.user.keyboard("{Control>}k{/Control}");
+    await browser.user.keyboard(">go home");
+    await browser.user.keyboard("{Enter}");
+    await waitFor(() => expect(current()).toBe("Home"));
+    expect(tabNames()).toEqual(["Alpha", "Home"]);
+    expect(screen.getByRole("button", { name: "Home" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Private Spaces/ })).toBeNull();
+  });
 });

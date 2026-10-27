@@ -475,6 +475,8 @@ export const en = {
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
       goHome: "Go home",
+      /** Desktop only: closes this Private Space in this window and shows the picker. */
+      leaveSpace: "Back to Private Spaces",
       /** Desktop only: the first-run tour (ADR-0032), again. */
       showTour: "Show the tour",
       hideSidebar: "Hide sidebar",
@@ -538,7 +540,7 @@ export const en = {
       "dialog.close": "Close a dialog or menu",
       "assistant.ask": "Ask Thoth (open the assistant's bubble)",
       "assistant.size": "Shrink or expand the assistant",
-      "home.open": "Go home (recent pages and favorites)",
+      "home.open": "Back to Private Spaces (closes this one in this window)",
       "sidebar.toggle": "Hide or show the sidebar",
     } satisfies Record<ShortcutId, string>,
   },

@@ -14,8 +14,8 @@ import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { createLinkPreviewService } from "@thoth/app-ui/editor/link-previews.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
-import { parseLayout, serializeLayout } from "@thoth/app-ui/tabs/layout.ts";
-import { loadTabs, saveTabs } from "./tabs-store.ts";
+import { serializeLayout } from "@thoth/app-ui/tabs/layout.ts";
+import { loadTabs, parseDesktopLayout, saveTabs } from "./tabs-store.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
 import { createNotificationPrefsStore } from "../features/notifications/prefs.ts";
@@ -26,12 +26,7 @@ import { createWindowPresence } from "../platform/notifier.ts";
 import { MAIN_WINDOW } from "./windows.ts";
 import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
-import { createRecentStore } from "@thoth/app-ui/home/recent.ts";
 import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
-import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
-
-/** The recent pages of a Private Space (ADR-0029): this prefix and its folder. */
-export const RECENT_KEY_PREFIX = "thoth.desktop.recent.";
 
 interface Props {
   platform: Platform;
@@ -74,24 +69,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   }, [flushOnClose, flushAll]);
 
   // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
-  const pageTabs = useTabs({
-    initial: () => (startTabs !== null ? parseLayout(startTabs) : null) ?? loadTabs(connection.root, windowId),
+  const tabs = useTabs({
+    initial: () => (startTabs !== null ? parseDesktopLayout(startTabs) : null) ?? loadTabs(connection.root, windowId),
     flush: flushAll,
     save: (layout) => saveTabs(connection.root, layout, windowId),
   });
-  // Recent pages (ADR-0029): per Private Space, in localStorage, shared by its windows. A page that moves keeps its
-  // entry the way it keeps its tabs, so every rename and move that remaps the tabs remaps it too.
-  const recent = useMemo(() => createRecentStore(() => globalThis.localStorage ?? null, `${RECENT_KEY_PREFIX}${connection.root}`), [connection.root]);
-  const tabs = useMemo<TabsController>(
-    () => ({
-      ...pageTabs,
-      remapPaths: (from, to) => {
-        pageTabs.remapPaths(from, to);
-        recent.remap(from, to);
-      },
-    }),
-    [pageTabs, recent],
-  );
   const started = useRef(onStarted);
   useEffect(() => started.current?.(), []);
 
@@ -373,18 +355,18 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       reveal,
       registerFlush,
       flushAll,
-      recent,
       switchVault: () =>
-        void flushAll().then((ok) => {
-          if (!ok) return;
+        flushAll().then((ok) => {
+          if (!ok) return false;
           // A window the app opened leaves this Private Space: it is not brought back on it.
           if (windowId !== MAIN_WINDOW) forgetWindow(windowId);
           switchVault();
+          return true;
         }),
       watchError,
       windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, recent, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
   );
 
   return (

@@ -435,6 +435,7 @@ export const th: Strings = {
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
       goHome: "ไปหน้าแรก", // REVIEW
+      leaveSpace: "กลับไปที่ Private Space", // REVIEW
       showTour: "แสดงทัวร์", // REVIEW
       hideSidebar: "ซ่อนแถบด้านข้าง",
       showSidebar: "แสดงแถบด้านข้าง",
@@ -495,7 +496,7 @@ export const th: Strings = {
       "dialog.close": "ปิดกล่องโต้ตอบหรือเมนู",
       "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)",
       "assistant.size": "ย่อหรือขยายผู้ช่วย",
-      "home.open": "ไปหน้าแรก (หน้าล่าสุดและรายการโปรด)", // REVIEW
+      "home.open": "กลับไปที่ Private Space (ปิด Private Space นี้ในหน้าต่างนี้)", // REVIEW
       "sidebar.toggle": "ซ่อนหรือแสดงแถบด้านข้าง",
     },
   },

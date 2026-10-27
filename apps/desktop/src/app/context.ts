@@ -17,7 +17,6 @@ import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
 import type { NotificationCenter, NotificationTarget, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
 import type { NotificationPrefsStore } from "../features/notifications/prefs.ts";
 import type { UpdateService } from "../features/updates/service.ts";
-import type { RecentStore } from "@thoth/app-ui/home/recent.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -39,11 +38,6 @@ export interface AppOptions {
   /** The update notice (ADR-0022): time from the start to its first check, and between checks after that. */
   updateDelayMs: number;
   updateIntervalMs: number;
-  /**
-   * What a window shows when nothing was open (ADR-0029): Home, or (false) the first page by path, as before Home.
-   * The unit tests start on the first page unless they test Home.
-   */
-  startOnHome: boolean;
 }
 
 export interface Session {
@@ -94,8 +88,6 @@ export interface Session {
   registerFlush(flush: () => Promise<boolean>): () => void;
   /** Writes every pending edit. False when something (a conflict, an error) still needs the user. */
   flushAll(): Promise<boolean>;
-  /** The pages opened last in this Private Space (ADR-0029), for Home. */
-  recent: RecentStore;
   /** The notification list of this window (ADR-0018), and the user's settings for system notifications. */
   notifications: NotificationCenter;
   notificationPrefs: NotificationPrefsStore;
@@ -103,8 +95,11 @@ export interface Session {
   openNotification(target: NotificationTarget): void;
   /** The notice that a new desktop version is out (ADR-0022); null where the host has none. */
   updates: UpdateService | null;
-  /** Closes this Private Space and returns to onboarding. */
-  switchVault(): void;
+  /**
+   * Closes this Private Space in this window, after writing its edits, and shows the picker (ADR-0029, amendment of
+   * 2026-10-28). False when an edit could not be written: nothing closes.
+   */
+  switchVault(): Promise<boolean>;
   /** Set when the filesystem watcher could not start; saving still works. */
   watchError: string | null;
   /** Which window this is (ADR-0019): "main", or the id of a window the app opened (`platform.windows`). */

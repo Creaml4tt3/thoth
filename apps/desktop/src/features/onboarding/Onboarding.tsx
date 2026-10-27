@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Platform } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
@@ -10,16 +10,23 @@ interface Props {
   platform: Platform;
   busy: boolean;
   error: string | null;
+  /** The Private Space this window just closed: first in Recent, and focus starts on the main button. */
+  left?: string | null;
   onOpen(root: string): void;
 }
 
 const leaf = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 /** First screen (Night): choose or create the folder that becomes a Private Space. */
-export function Onboarding({ platform, busy, error, onOpen }: Props) {
+export function Onboarding({ platform, busy, error, left = null, onOpen }: Props) {
   const t = useDesktopStrings().onboarding;
   const [recent, setRecent] = useState<string[]>([]);
   const [pickError, setPickError] = useState<string | null>(null);
+  const choose = useRef<HTMLButtonElement>(null);
+  // Back from a Private Space: focus was on a control that is gone.
+  useEffect(() => {
+    if (left !== null) choose.current?.focus();
+  }, [left]);
 
   useEffect(() => {
     let live = true;
@@ -43,6 +50,7 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
   };
 
   const shown = error ?? pickError;
+  const listed = left === null ? recent : [left, ...recent.filter((root) => root !== left)];
 
   return (
     <main className="onboarding" data-theme="night">
@@ -52,7 +60,7 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
         </h1>
         <p className="lede">{t.lede}</p>
         <div className="ctas">
-          <Button variant="primary" onClick={() => void pick()} disabled={busy} data-autofocus>
+          <Button ref={choose} variant="primary" onClick={() => void pick()} disabled={busy} data-autofocus>
             {busy ? t.opening : t.choose}
           </Button>
         </div>
@@ -62,13 +70,13 @@ export function Onboarding({ platform, busy, error, onOpen }: Props) {
             {shown}
           </p>
         )}
-        {recent.length > 0 && (
+        {listed.length > 0 && (
           <section aria-labelledby="recent-heading" className="recent">
             <h2 id="recent-heading" className="label">
               {t.recent}
             </h2>
             <ul>
-              {recent.map((root) => (
+              {listed.map((root) => (
                 <li key={root}>
                   <button type="button" className="recent-item" disabled={busy} onClick={() => onOpen(root)} title={root} {...tipIfClipped(root)}>
                     <b>{leaf(root)}</b>

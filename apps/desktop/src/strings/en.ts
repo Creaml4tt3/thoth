@@ -56,6 +56,15 @@ export const en = {
     folderCreated: (name: string) => `Created the folder ${name}`,
     /** A tab could not be moved to a new window (ADR-0019); the tab stays. */
     windowFailed: (reason: string) => `The tab could not be moved to a new window: ${reason}`,
+    /**
+     * Home on the desktop (ADR-0029, amendment of 2026-10-28): the logo, the tab bar's house, Alt/Option+Shift+H and
+     * the palette close this Private Space in this window and show the picker. The logo's name starts with its word.
+     */
+    leave: "Back to Private Spaces",
+    leaveBrand: "Thoth, back to Private Spaces",
+    leaveFailed: "Your edits could not be saved yet, so this Private Space stays open. Check the open page, then try again.",
+    /** A new tab: nothing is open in it yet. */
+    newTabHint: (keys: string) => `Open a page from the sidebar, or search with ${keys}.`,
     /** Said after a rename when the page changed meanwhile, so the title inside it was left alone. */
     titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
     unsavedChanges: "The open page has changes that could not be saved yet.",
@@ -124,7 +133,7 @@ export const en = {
     importNote: "Bring pages in from Notion or Obsidian. Your originals are only ever read.",
     importFrom: "Import from Notion or Obsidian",
     gettingStarted: "Getting started",
-    tourNote: "A short tour of the sidebar, search, the editor, tabs and Home.",
+    tourNote: "A short tour of the sidebar, search, the editor, tabs and getting back to your Private Spaces.",
     showTour: "Show the tour again",
   },
 
@@ -141,7 +150,7 @@ export const en = {
       search: { title: "Search and commands", body: (keys: string) => `${keys} finds any page. Type > first to run a command by its name.` },
       editor: { title: "Write in blocks", body: "Type / on an empty line for the block menu. The handle at the left of a block moves it, or opens its menu." },
       tabs: { title: "Tabs", body: "Each page opens in a tab. Right-click a tab to pin it, or to split it to the right." },
-      home: { title: "Home", body: "Your recent pages and favorites, one click away." },
+      home: { title: "Private Spaces", body: "The logo or the house closes this Private Space, with your edits saved, so you can open another." },
       assistant: { title: "The assistant", body: "Ask the assistant about your pages. It shows you every change before anything is written." },
     },
   },

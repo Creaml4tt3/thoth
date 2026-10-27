@@ -46,7 +46,7 @@ interface Props {
   /** Whether the notification list under the bell is open (the palette opens it too). */
   notificationsOpen: boolean;
   onNotificationsOpen(open: boolean): void;
-  /** Opens Home (ADR-0029): the brand row is its button. */
+  /** Back to the Private Space picker (ADR-0029, amendment of 2026-10-28): the logo is its button. */
   onHome(): void;
 }
 
@@ -97,7 +97,6 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   const ta = useDesktopStrings().agents;
   const importFrom = useDesktopStrings().settings.importFrom;
   const homeKeys = useShortcutHint("home.open");
-  const th = useStrings().home;
   const hideLabel = useStrings().sidebar.hide;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
@@ -254,7 +253,7 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   return (
     <aside ref={hidden.sidebarRef} className="sidebar" aria-label={t.sidebar} inert={hidden.hidden} aria-hidden={hidden.hidden || undefined}>
       <div className="ws">
-        <button type="button" className="ws-home" aria-label={th.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(th.title, homeKeys?.keys)} onClick={onHome}>
+        <button type="button" className="ws-home" aria-label={t.leaveBrand} aria-keyshortcuts={homeKeys?.aria} {...tip(t.leave, homeKeys?.keys)} onClick={onHome}>
           <Mark size={18} />
           <span className="ws-name">Thoth</span>
         </button>

@@ -25,7 +25,6 @@ export const DEFAULT_OPTIONS: AppOptions = {
   // it stays open.
   updateDelayMs: 2_000,
   updateIntervalMs: 24 * 60 * 60 * 1000,
-  startOnHome: true,
 };
 
 interface Host {
@@ -76,6 +75,8 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
   const [host, setHost] = useState<Host | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The Private Space this window just left (ADR-0029, amendment of 2026-10-28): the picker lists it first. */
+  const [left, setLeft] = useState<string | null>(null);
   const hostRef = useRef<Host | null>(null);
   const merged: AppOptions = { ...DEFAULT_OPTIONS, ...options };
 
@@ -142,7 +143,10 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     const current = hostRef.current;
     hostRef.current = null;
     setHost(null);
-    if (current) void closeHost(current);
+    if (current) {
+      setLeft(current.connection.root);
+      void closeHost(current);
+    }
   }, []);
 
   useEffect(
@@ -154,7 +158,7 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     [],
   );
 
-  if (!host) return <Onboarding platform={platform} busy={busy} error={error} onOpen={openRoot} />;
+  if (!host) return <Onboarding platform={platform} busy={busy} error={error} left={left} onOpen={openRoot} />;
   return (
     <VaultHost
       key={host.connection.root}

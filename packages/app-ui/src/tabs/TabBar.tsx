@@ -55,6 +55,8 @@ interface BarProps {
   notice?: { text: string; seq: number } | null;
   /** Opens Home (ADR-0029): a house button at the start of the bar, before the tabs. */
   onHome?(): void;
+  /** The house button's name, when it does something else than open Home (the desktop: back to Private Spaces). */
+  homeLabel?: string;
   /** Shows the hidden sidebar: a button before Home, only while the sidebar is hidden. */
   onShowSidebar?(): void;
   showSidebarRef?: Ref<HTMLButtonElement>;
@@ -116,7 +118,7 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * others are already there after a drop, so only the dropped tab settles). Tabs present at the start, moves made with
  * the keyboard, and everything under reduced motion (the tabs jump to their places), skip it.
  */
-export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice, onHome, onShowSidebar, showSidebarRef, label, windowTabs, paneDrop }: BarProps) {
+export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice, onHome, homeLabel, onShowSidebar, showSidebarRef, label, windowTabs, paneDrop }: BarProps) {
   const strings = useStrings();
   const t = strings.tabs;
   const closeHint = useShortcutHint("tab.close");
@@ -377,7 +379,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       {(onShowSidebar || onHome) && (
         <span className="tab-start">
           {onShowSidebar && <IconButton {...(showSidebarRef ? { ref: showSidebarRef } : {})} icon="sidebar" label={strings.sidebar.show} shortcut="sidebar.toggle" className="tab-show-sidebar" onClick={onShowSidebar} />}
-          {onHome && <IconButton icon="home" label={strings.home.title} shortcut="home.open" className="tab-home" onClick={onHome} />}
+          {onHome && <IconButton icon="home" label={homeLabel ?? strings.home.title} shortcut="home.open" className="tab-home" onClick={onHome} />}
         </span>
       )}
       <div ref={listRef} role="tablist" aria-label={label ?? t.list} aria-orientation="horizontal" className="tablist">

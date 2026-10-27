@@ -54,16 +54,28 @@ import { useSidebarHidden } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
 import { FavoritesContext, type FavoriteRef } from "@thoth/app-ui/favorites/context.ts";
 import { isPinned } from "@thoth/app-ui/tabs/model.ts";
-import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useFavoritesController } from "../favorites/useFavoritesController.ts";
-import { HOME } from "@thoth/app-ui/tabs/model.ts";
-import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
-import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
-import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
-import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
+import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
 
 const noSubscribe = () => () => undefined;
+
+/** A new tab (ADR-0029, amendment of 2026-10-28): nothing open yet, and how to open something. */
+function NewTabView() {
+  const title = useStrings().tabs.blank;
+  const hint = useDesktopStrings().shell.newTabHint;
+  const keys = useShortcutHint("palette.open");
+  return (
+    <div className="home">
+      <div className="home-inner">
+        <div className="home-head">
+          <h1>{title}</h1>
+          <p>{hint(keys?.keys ?? "")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
@@ -92,7 +104,7 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { platform: host, vault, connection, revision, watchError, options, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, recent: recentStore } = useSession();
+  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault } = useSession();
   const t = useDesktopStrings().shell;
   const sessionTitle = useDesktopStrings().agents.session.tab;
   // Session tabs are named by their run's task.
@@ -127,9 +139,9 @@ export function Shell() {
   }, [vault, revision]);
 
   const favorites = useFavoritesController({ pages, current: favoriteHere });
-  // Home (ADR-0029): one tab; a new tab shows the same view.
-  const goHome = () => tabs.open(HOME);
-  const recent = useRecentPages(recentStore, tabs.active);
+  // Home is the Private Space picker (ADR-0029, amendment of 2026-10-28): edits are written first; one that cannot be
+  // keeps this Private Space open.
+  const leave = () => void switchVault().then((ok) => ok || setProblem(t.leaveFailed));
   /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
   const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
   const everyTab = allTabs(tabs.layout);
@@ -160,13 +172,12 @@ export function Shell() {
         return remoteTitle(directory, tab) ?? tt.untitled;
       case "settings":
         return tt.settings;
-      case "home":
-        return strings.home.title;
       case "agent-run": {
         // A tab is a conversation: named by its first question.
         const record = runs ? agents?.conversation(tab.run)[0] : undefined;
         return record ? taskTitle(record.task.prompt) || sessionTitle : sessionTitle;
       }
+      case "home": // never shown: the desktop drops a saved Home tab
       case "blank":
         return tt.blank;
     }
@@ -309,14 +320,14 @@ export function Shell() {
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     sendFeedback: () => setDialog({ kind: "feedback" }),
     openNotifications: () => setNotificationsOpen(true),
-    goHome,
+    leaveSpace: leave,
     showTour: requestTour,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
   useShortcuts("desktop", {
-    "home.open": goHome,
+    "home.open": leave,
     "sidebar.toggle": side.toggle,
     "palette.open": toggleSearch,
     "shortcuts.open": toggleShortcuts,
@@ -336,59 +347,23 @@ export function Shell() {
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
 
-  // Home when nothing is open at start (ADR-0029), or the first page where the options say so. Once: closing every
-  // tab leaves a new tab, which shows Home too.
+  // The first page when nothing is open at start. Once: closing every tab leaves a new tab.
   const startedEmpty = useRef(tabs.layout.panes.length === 1 && tabs.state.tabs.length === 1 && tabs.active.target.kind === "blank");
-  const startOnHome = options.startOnHome;
   useEffect(() => {
-    if (!startedEmpty.current || (!startOnHome && (!pages || pages.length === 0))) return;
+    if (!startedEmpty.current || !pages || pages.length === 0) return;
     startedEmpty.current = false;
-    if (startOnHome) tabs.open(HOME);
-    else openPage(pages![0]!.path);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pages, openPage, startOnHome]);
+    openPage(pages[0]!.path);
+  }, [pages, openPage]);
 
   // Background tabs whose page is gone (moved out, deleted, renamed) close; the current tab says "not found" itself.
-  // Recent pages that are gone drop out by the same rules.
   const { prune } = tabs;
   useEffect(() => {
     if (!pages) return;
     const known = new Set(pages.map((p) => p.path));
     prune((tab) => (tab.kind === "page" ? !known.has(tab.path) : tab.kind === "workspace" ? remoteGone(directory, tab) : false));
   }, [pages, directory, prune]);
-  // Each kind on its own list's change: a page list from before a rename must not drop the entry the rename just moved.
-  // The current tab's page stays, as its tab does: a rename's new list can arrive before the rename remaps it.
-  const shownPath = useRef<string | null>(null);
-  shownPath.current = path;
-  useEffect(() => {
-    if (!pages) return;
-    const known = new Set(pages.map((p) => p.path));
-    recentStore.prune((ref) => ref.kind === "private" && ref.path !== shownPath.current && !known.has(ref.path));
-  }, [pages, recentStore]);
-  useEffect(() => recentStore.prune((ref) => ref.kind === "workspace" && remoteGone(directory, ref)), [directory, recentStore]);
-
-  const shownRecent = recent.slice(0, RECENT_SHOWN);
-  const pending = strings.tabs.loading;
-  const homeRecent: HomeRow[] = shownRecent.map(({ ref }) => {
-    const how = (o: { newTab: boolean }) => (o.newTab ? { newTab: true } : undefined);
-    if (ref.kind === "private") {
-      const folder = folderOf(ref.path);
-      return { id: `p:${ref.path}`, title: pages?.find((p) => p.path === ref.path)?.title ?? stripExtension(basename(ref.path)), space: t.local, local: true, ...(folder ? { folder } : {}), open: (o) => openPage(ref.path, how(o)) };
-    }
-    const target = { server: ref.server, workspace: ref.workspace, page: ref.page };
-    return { id: `w:${ref.server}\n${ref.workspace}\n${ref.page}`, ...workspaceRow(directory, target, { untitled: tt.untitled, pending }), open: (o) => openWorkspacePage(target, how(o)) };
-  });
-  const homeFavorites: HomeRow[] = favorites.items.map((item) => {
-    const ref = workspaceRefOf(item.key);
-    const folder = ref ? workspaceRow(directory, ref, { untitled: tt.untitled, pending }).folder : item.detail ? folderOf(item.detail) : undefined;
-    return { id: item.key, title: item.title, space: item.hint ?? "", ...(ref ? {} : { local: true }), ...(folder ? { folder } : {}), ...(item.unavailable ? { unavailable: true } : {}), open: (o) => favorites.open(item.key, o) };
-  });
-
-  // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
-  const wanted = [
-    ...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
-    ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [`${ref.server}\n${ref.workspace}`] : [])),
-  ];
+  // Titles of background workspace tabs come from their trees, so those trees load.
+  const wanted = everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : []));
   const wantedKey = [...new Set(wanted)].join("\u0000");
   useEffect(() => {
     for (const key of wantedKey ? wantedKey.split("\u0000") : []) {
@@ -400,7 +375,7 @@ export function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantedKey, servers, directory.servers]);
 
-  const itemsOf = (state: TabsState): TabItem[] => state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
+  const itemsOf = (state: TabsState): TabItem[] => state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
   /** The tab's menu also stars its page (ADR-0027). */
   const tabMenuExtras = (id: string): MenuItem[] => {
     const tab = everyTab.find((x) => x.id === id);
@@ -420,7 +395,7 @@ export function Shell() {
     ) : shown.kind === "page" ? (
       <PageView key={`${id}\n${shown.path}`} path={shown.path} />
     ) : (
-      <HomeView recent={homeRecent} favorites={homeFavorites} />
+      <NewTabView />
     );
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
@@ -441,7 +416,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
-      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} />
       <main className="main">
         <Panes
           tabs={tabs}
@@ -463,7 +438,7 @@ export function Shell() {
               onCloseOthers={(id) => tabs.closeOthers(id)}
               menuExtras={(id) => [...pane.menuItems(id), ...tabMenuExtras(id)]}
               notice={pane.index === tabs.layout.active ? tabNotice : null}
-              {...(pane.index === 0 ? { onHome: goHome } : {})}
+              {...(pane.index === 0 ? { onHome: leave, homeLabel: t.leave } : {})}
               {...(pane.index === 0 && side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
               {...(windows ? { onDetach: moveToWindow } : {})}
             />

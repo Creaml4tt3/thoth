@@ -159,8 +159,8 @@ describe("hiding the whole sidebar", () => {
     expect(document.querySelector("[data-sidebar-hidden]")).toBe(document.querySelector(".shell"));
     expect(screen.queryByRole("separator", { name: "Resize sidebar" })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(showButton()));
-    // The Show button sits at the start of the tab bar, before Home.
-    expect(showButton()!.closest(".tab-start")!.querySelectorAll("button")[1]!.getAttribute("aria-label")).toBe("Home");
+    // The Show button sits at the start of the tab bar, before the house (back to Private Spaces).
+    expect(showButton()!.closest(".tab-start")!.querySelectorAll("button")[1]!.getAttribute("aria-label")).toBe("Back to Private Spaces");
     await app.user.click(showButton()!);
     await waitFor(() => expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeTruthy());
     expect(sidebar().hasAttribute("inert")).toBe(false);

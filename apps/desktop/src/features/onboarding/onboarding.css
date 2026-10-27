@@ -14,3 +14,5 @@
 .recent-item:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .recent-item b { font-weight: 550; }
 .recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The picker is Night on near-black: the tertiary ink (4.3:1) is too faint for small text, so its hints use the secondary. */
+.onboarding .muted, .onboarding .label { color: var(--thoth-ink-secondary); }

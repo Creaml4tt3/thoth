@@ -41,6 +41,10 @@ export const th: DesktopStrings = {
     untitledFolder: "โฟลเดอร์ไม่มีชื่อ",
     folderCreated: (name) => `สร้างโฟลเดอร์ ${name} แล้ว`,
     windowFailed: (reason) => `ย้ายแท็บไปหน้าต่างใหม่ไม่ได้: ${reason}`,
+    leave: "กลับไปที่ Private Space", // REVIEW
+    leaveBrand: "Thoth กลับไปที่ Private Space", // REVIEW
+    leaveFailed: "ยังบันทึกการแก้ไขไม่ได้ จึงยังเปิด Private Space นี้ไว้ ตรวจสอบหน้าที่เปิดอยู่ แล้วลองอีกครั้ง", // REVIEW
+    newTabHint: (keys) => `เปิดหน้าจากแถบด้านข้าง หรือค้นหาด้วย ${keys}`, // REVIEW
     titleNotUpdated: (name) => `เปลี่ยนชื่อเป็น ${name} แล้ว แต่ไม่ได้อัปเดตชื่อภายในหน้า เพราะหน้านี้มีการเปลี่ยนแปลง`,
     unsavedChanges: "หน้าที่เปิดอยู่มีการเปลี่ยนแปลงที่ยังบันทึกไม่ได้",
     settings: "การตั้งค่า",
@@ -108,7 +112,7 @@ export const th: DesktopStrings = {
     importNote: "นำหน้าเข้ามาจาก Notion หรือ Obsidian Thoth แค่อ่านต้นฉบับของคุณเท่านั้น",
     importFrom: "นำเข้าจาก Notion หรือ Obsidian",
     gettingStarted: "เริ่มต้นใช้งาน",
-    tourNote: "ทัวร์สั้น ๆ ของแถบด้านข้าง การค้นหา ตัวแก้ไข แท็บ และหน้าแรก",
+    tourNote: "ทัวร์สั้น ๆ ของแถบด้านข้าง การค้นหา ตัวแก้ไข แท็บ และการกลับไปที่ Private Space", // REVIEW
     showTour: "แสดงทัวร์อีกครั้ง",
   },
 
@@ -125,7 +129,7 @@ export const th: DesktopStrings = {
       search: { title: "ค้นหาและคำสั่ง", body: (keys) => `${keys} ค้นหาหน้าใดก็ได้ พิมพ์ > ก่อนเพื่อเรียกคำสั่งด้วยชื่อ` },
       editor: { title: "เขียนเป็นบล็อก", body: "พิมพ์ / ที่บรรทัดว่างเพื่อเปิดเมนูบล็อก ที่จับทางซ้ายของบล็อกใช้ย้ายบล็อกหรือเปิดเมนูของบล็อก" },
       tabs: { title: "แท็บ", body: "ทุกหน้าเปิดในแท็บ คลิกขวาที่แท็บเพื่อปักหมุด หรือแยกไปทางขวา" },
-      home: { title: "หน้าแรก", body: "หน้าที่เปิดล่าสุดและรายการโปรดของคุณ แค่คลิกเดียว" },
+      home: { title: "Private Space", body: "โลโก้หรือรูปบ้านจะปิด Private Space นี้โดยบันทึกการแก้ไขไว้ เพื่อให้คุณเปิด Private Space อื่นได้" }, // REVIEW
       assistant: { title: "ผู้ช่วย", body: "ถามผู้ช่วยเกี่ยวกับหน้าของคุณ ผู้ช่วยจะแสดงทุกการเปลี่ยนแปลงให้ดูก่อนเขียนลงไฟล์" },
     },
   },

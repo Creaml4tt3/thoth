@@ -95,18 +95,6 @@ describe("splitting", () => {
     await app.user.keyboard("{Control>}w{/Control}");
     await waitFor(() => expect(names(bar("Open pages"))).toEqual(["Alpha"]));
   });
-
-  it("Home stays one per window: opening it from the other pane goes there", async () => {
-    const app = await start();
-    menu("Beta", "Split right");
-    await waitFor(() => expect(right()).toEqual(["Beta"]));
-    await app.user.keyboard("{Alt>}{Shift>}h{/Shift}{/Alt}");
-    await waitFor(() => expect(right()).toEqual(["Beta", "Home"]));
-    await app.user.click(within(bar("Open pages, left")).getByRole("tab", { name: "Alpha" }));
-    await app.user.keyboard("{Alt>}{Shift>}h{/Shift}{/Alt}");
-    await waitFor(() => expect(within(bar("Open pages, right")).getByRole("tab", { name: "Home" }).getAttribute("aria-selected")).toBe("true"));
-    expect(left()).toEqual(["Alpha"]);
-  });
 });
 
 describe("one page in both panes", () => {
