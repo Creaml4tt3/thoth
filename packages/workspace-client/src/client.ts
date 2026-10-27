@@ -10,6 +10,7 @@
 import type { z } from "zod";
 import { newStableId } from "@thoth/domain";
 import {
+  type FeedbackRequest,
   API_BASE_PATH,
   AttachmentResourceSchema,
   CapabilitiesSchema,
@@ -128,6 +129,11 @@ export class WorkspaceClient {
 
   async getCapabilities(): Promise<Capabilities> {
     return (await this.request(CapabilitiesSchema, { method: "GET", path: "/capabilities" })).data;
+  }
+
+  /** ADR-0033: a problem, an idea or a question for the server's operator. No sign-in needed; 204 when received. */
+  async sendFeedback(input: FeedbackRequest): Promise<void> {
+    await this.request(null, { method: "POST", path: "/feedback", headers: JSON_HEADERS, body: encoder.encode(JSON.stringify(input)), ok: [204] });
   }
 
   async getMe(): Promise<Me> {

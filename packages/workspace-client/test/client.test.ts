@@ -345,3 +345,17 @@ describe("invite addresses", () => {
     }
   });
 });
+
+describe("feedback (capability feedback, ADR-0033)", () => {
+  it("sends the kind, the message and what the person chose to include with POST /feedback, and expects 204", async () => {
+    const { client, requests } = fake(() => ({ status: 204, headers: {}, body: "" }));
+    await client.sendFeedback({ kind: "idea", message: "Tags", email: "ada@example.org", context: { client: "desktop", version: "0.4.0", os: "macOS", language: "en" } });
+    expect(requests[0]).toMatchObject({ method: "POST", path: "/api/v1/feedback", headers: { "content-type": "application/json" } });
+    expect(bodyOf(requests[0]!)).toEqual({ kind: "idea", message: "Tags", email: "ada@example.org", context: { client: "desktop", version: "0.4.0", os: "macOS", language: "en" } });
+  });
+
+  it("turns a refusal into a ProblemError with its code", async () => {
+    const { client } = fake(() => ({ status: 429, headers: { "content-type": "application/problem+json", "retry-after": "60" }, body: JSON.stringify(problem("rate_limited", { detail: "slow down" })) }));
+    await expect(client.sendFeedback({ kind: "idea", message: "x" })).rejects.toMatchObject({ code: "rate_limited", status: 429 });
+  });
+});
