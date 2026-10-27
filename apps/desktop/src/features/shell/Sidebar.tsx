@@ -24,8 +24,11 @@ import { useAgentsSection } from "../agents/AgentsSidebar.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
+import type { SidebarHidden } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 
 interface Props {
+  /** Whether the whole sidebar is hidden, and its Hide button (`sidebar-hidden.ts`). */
+  hidden: SidebarHidden;
   /** The Favorites (ADR-0027): their section is first by default, and hidden while there are none. */
   favorites?: FavoritesController;
   pages: PageSummary[];
@@ -86,7 +89,7 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome }: Props) {
+export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
@@ -95,6 +98,7 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
   const importFrom = useDesktopStrings().settings.importFrom;
   const homeKeys = useShortcutHint("home.open");
   const th = useStrings().home;
+  const hideLabel = useStrings().sidebar.hide;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
@@ -248,12 +252,13 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
   const agentsSection = useAgentsSection(currentRun);
 
   return (
-    <aside className="sidebar" aria-label={t.sidebar}>
+    <aside ref={hidden.sidebarRef} className="sidebar" aria-label={t.sidebar} inert={hidden.hidden} aria-hidden={hidden.hidden || undefined}>
       <div className="ws">
         <button type="button" className="ws-home" aria-label={th.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(th.title, homeKeys?.keys)} onClick={onHome}>
           <Mark size={18} />
           <span className="ws-name">Thoth</span>
         </button>
+        <IconButton ref={hidden.hideRef} icon="sidebar" label={hideLabel} shortcut="sidebar.toggle" onClick={() => hidden.setHidden(true)} />
       </div>
       <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">
         <span>{t.search}</span>

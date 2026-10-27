@@ -2,8 +2,8 @@
 // The web client's sidebar: the drag handle keeps only a width in localStorage; icon buttons are named with the web client's keys.
 import { afterEach, describe, expect, it } from "vitest";
 import { FakeWebServer } from "./support/fake-web-server.ts";
-import { SIDEBAR_KEY, loadSidebarWidth, saveSidebarWidth } from "../src/sidebar-store.ts";
-import { cleanup, fakeBrowser, screen, signInThroughUi, waitFor } from "./support/render.tsx";
+import { SIDEBAR_HIDDEN_KEY, SIDEBAR_KEY, loadSidebarWidth, saveSidebarWidth } from "../src/sidebar-store.ts";
+import { cleanup, fakeBrowser, open, screen, signInThroughUi, waitFor, within } from "./support/render.tsx";
 
 afterEach(() => cleanup());
 
@@ -53,5 +53,33 @@ describe("web sidebar", () => {
       expect(button.textContent).toBe("");
       expect(button.getAttribute("data-tip")).toMatch(name);
     }
+  });
+});
+
+describe("hiding the web sidebar", () => {
+  it("Hide sidebar and Ctrl+\\ take it out of the page's tab order and accessibility tree, and it is kept in this browser", async () => {
+    const browser = await signedIn();
+    const aside = document.querySelector<HTMLElement>("aside.sidebar")!;
+    await browser.user.click(within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: "Hide sidebar" }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "Sidebar" })).toBeNull());
+    expect(aside.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("separator", { name: "Resize sidebar" })).toBeNull();
+    const show = screen.getByRole("button", { name: "Show sidebar" });
+    expect(document.activeElement).toBe(show);
+    expect(browser.local.get(SIDEBAR_HIDDEN_KEY)).toBe("1");
+    await browser.user.keyboard("{Control>}\\{/Control}");
+    await waitFor(() => expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeTruthy());
+    expect(browser.local.has(SIDEBAR_HIDDEN_KEY)).toBe(false);
+    expect(handle()).toBeTruthy();
+  });
+
+  it("comes back hidden after a reload", async () => {
+    const browser = await signedIn();
+    await browser.user.keyboard("{Control>}\\{/Control}");
+    await waitFor(() => expect(browser.local.get(SIDEBAR_HIDDEN_KEY)).toBe("1"));
+    cleanup();
+    open(browser);
+    expect(await screen.findByRole("button", { name: "Show sidebar" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).toBeNull();
   });
 });

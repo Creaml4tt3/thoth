@@ -26,6 +26,7 @@ import { MAIN_WINDOW } from "./windows.ts";
 import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 import { createRecentStore } from "@thoth/app-ui/home/recent.ts";
+import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
 
 /** The recent pages of a Private Space (ADR-0029): this prefix and its folder. */
@@ -276,6 +277,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   const openFolder = useCallback(
     (folder: string, { openFirstPage = true, keepCurrent = false }: { openFirstPage?: boolean; keepCurrent?: boolean } = {}) => {
+      // The folder is shown in the sidebar, so a hidden sidebar comes back first.
+      requestShowSidebar();
       if (!openFirstPage) return setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
       void flushAll().then(async (ok) => {
         if (!ok) return;

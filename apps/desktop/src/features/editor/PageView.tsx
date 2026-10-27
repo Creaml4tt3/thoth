@@ -5,6 +5,7 @@ import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { PRIVATE_SECTION } from "../shell/sections.ts";
+import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import { Backlinks } from "./Backlinks.tsx";
 import { loadLinkLookup, vaultPageStore } from "./vault-store.ts";
 import { vaultPageMedia } from "./vault-media.ts";
@@ -49,7 +50,10 @@ export function PageView({ path }: { path: string }) {
           openFolder(folder, { openFirstPage: false });
           focusWhenShown(() => [...document.querySelectorAll<HTMLElement>(".private-tree [data-tree-id]")].find((el) => el.dataset["treeId"] === folder) ?? null);
         },
-        onBadge: () => focusWhenShown(() => document.querySelector<HTMLElement>(`[data-section="${PRIVATE_SECTION}"] .sec-toggle`)),
+        onBadge: () => {
+          requestShowSidebar();
+          focusWhenShown(() => document.querySelector<HTMLElement>(`[data-section="${PRIVATE_SECTION}"] .sec-toggle`));
+        },
       }}
       checkTick={revision}
       onWritten={onWritten}

@@ -43,7 +43,8 @@ import { track } from "./analytics.ts";
 import type { WebEnv } from "./env.ts";
 import { SERVER_ID } from "./servers.ts";
 import { SettingsView } from "./SettingsView.tsx";
-import { loadSidebarWidth, saveSidebarWidth } from "./sidebar-store.ts";
+import { loadSidebarHidden, loadSidebarWidth, saveSidebarHidden, saveSidebarWidth } from "./sidebar-store.ts";
+import { useSidebarHidden } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import { clearTabs, loadTabs, saveTabs } from "./tabs-store.ts";
 import { FavoritesContext, type FavoriteRef, type FavoritesApi } from "@thoth/app-ui/favorites/context.ts";
 import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
@@ -182,6 +183,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   // The sidebar's width: dragged by its edge, remembered in this browser (the width and nothing else).
   const shell = useRef<HTMLDivElement>(null);
   const sidebar = useSidebarWidth({ initial: () => loadSidebarWidth(env.localStorage), save: (width) => saveSidebarWidth(env.localStorage, width) });
+  const side = useSidebarHidden({ initial: () => loadSidebarHidden(env.localStorage), save: (hidden) => saveSidebarHidden(env.localStorage, hidden) });
   const themeStore = useContext(ThemeStoreContext)!;
   const { theme, setTheme, cycle } = useTheme(themeStore);
   const editor = useEditorActions();
@@ -277,6 +279,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
+    sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
@@ -294,6 +297,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
     "home.open": goHome,
+    "sidebar.toggle": side.toggle,
   });
 
   // Background tabs whose page is gone close; the current tab says "not found" itself.
@@ -332,13 +336,14 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     <HintContext value={hints}>
     <FavoritesContext value={favoritesApi}>
     <PageHostContext.Provider value={pageHost}>
-      <div className="shell web-shell" ref={shell} style={sidebar.style}>
-        <aside className="sidebar" aria-label={t.web.sidebar}>
+      <div className="shell web-shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined}>
+        <aside ref={side.sidebarRef} className="sidebar" aria-label={t.web.sidebar} inert={side.hidden} aria-hidden={side.hidden || undefined}>
           <div className="ws">
             <button type="button" className="ws-home" aria-label={t.home.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(t.home.title, homeKeys?.keys)} onClick={goHome}>
               <Mark size={18} />
               <span className="ws-name">Thoth</span>
             </button>
+            <IconButton ref={side.hideRef} icon="sidebar" label={t.sidebar.hide} shortcut="sidebar.toggle" onClick={() => side.setHidden(true)} />
           </div>
           {canSearch && (
             <button type="button" className="search-trigger" onClick={() => setDialog({ kind: "search" })} aria-label={t.web.search} aria-keyshortcuts="Control+K Meta+K">
@@ -439,6 +444,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             menuExtras={tabMenuExtras}
             notice={tabNotice}
             onHome={goHome}
+            {...(side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
           />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
@@ -487,7 +493,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             )}
           </TabPanel>
         </main>
-        <SidebarResizer sidebar={sidebar} shell={shell} />
+        {!side.hidden && <SidebarResizer sidebar={sidebar} shell={shell} />}
         <TooltipLayer />
         <div className="sr-only" aria-live="polite" aria-atomic="true" data-favorites-note="">
           {favoriteSaid}

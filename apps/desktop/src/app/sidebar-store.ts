@@ -1,10 +1,10 @@
 /**
- * The sidebar's layout per Private Space: the width the person chose by dragging its edge, the order of its sections
- * and which sections are folded (ADR-0019 amendment). Like the open tabs, the language and the theme it is an app
- * preference kept in the webview's localStorage; the key names the vault's folder.
+ * The sidebar's layout per Private Space: the width the person chose by dragging its edge, the order of its sections,
+ * which sections are folded (ADR-0019 amendment), and whether the whole sidebar is hidden. Like the open tabs, the
+ * language and the theme it is an app preference kept in the webview's localStorage; the key names the vault's folder.
  *
- * The value is versioned JSON, `{"v":2,"width":300,"order":["server:demo","private"],"collapsed":["agents"]}`, with the
- * defaults left out, and nothing stored at all when everything is the default. Version 1 was the width alone ("300"),
+ * The value is versioned JSON, `{"v":2,"width":300,"order":["server:demo","private"],"collapsed":["agents"],"hidden":true}`,
+ * with the defaults left out, and nothing stored at all when everything is the default. Version 1 was the width alone ("300"),
  * which is still read. Only section ids are stored: no page, folder or server name.
  *
  * Every window on the same Private Space reads the same key. A change made in one window reaches the others through the
@@ -25,9 +25,11 @@ export interface SidebarLayout {
   order: string[];
   /** Section ids folded away. */
   collapsed: string[];
+  /** The whole sidebar is hidden (Cmd/Ctrl+\). Older versions ignore the field, so the version stays 2. */
+  hidden: boolean;
 }
 
-const EMPTY: SidebarLayout = { width: null, order: [], collapsed: [] };
+const EMPTY: SidebarLayout = { width: null, order: [], collapsed: [], hidden: false };
 
 function storage(): Storage | null {
   try {
@@ -59,8 +61,8 @@ export function parseSidebarLayout(raw: string | null | undefined): SidebarLayou
   try {
     const value = JSON.parse(raw) as unknown;
     if (typeof value !== "object" || value === null || Array.isArray(value) || (value as { v?: unknown }).v !== VERSION) return { ...EMPTY };
-    const v = value as { width?: unknown; order?: unknown; collapsed?: unknown };
-    return { width: typeof v.width === "number" ? parseSidebarWidth(String(v.width)) : null, order: ids(v.order), collapsed: ids(v.collapsed) };
+    const v = value as { width?: unknown; order?: unknown; collapsed?: unknown; hidden?: unknown };
+    return { width: typeof v.width === "number" ? parseSidebarWidth(String(v.width)) : null, order: ids(v.order), collapsed: ids(v.collapsed), hidden: v.hidden === true };
   } catch {
     return { ...EMPTY };
   }
@@ -68,10 +70,11 @@ export function parseSidebarLayout(raw: string | null | undefined): SidebarLayou
 
 /** The text to store, or null when everything is the default (then nothing is stored). */
 function serialize(layout: SidebarLayout): string | null {
-  const out: { v: number; width?: number; order?: string[]; collapsed?: string[] } = { v: VERSION };
+  const out: { v: number; width?: number; order?: string[]; collapsed?: string[]; hidden?: true } = { v: VERSION };
   if (layout.width !== null) out.width = layout.width;
   if (layout.order.length > 0) out.order = ids(layout.order);
   if (layout.collapsed.length > 0) out.collapsed = ids(layout.collapsed);
+  if (layout.hidden) out.hidden = true;
   return Object.keys(out).length === 1 ? null : JSON.stringify(out);
 }
 
@@ -107,6 +110,10 @@ export function saveSidebarWidth(root: string, width: number | null): void {
 
 export function saveSectionOrder(root: string, order: readonly string[]): void {
   update(root, { order: [...order] });
+}
+
+export function saveSidebarHidden(root: string, hidden: boolean): void {
+  update(root, { hidden });
 }
 
 export function saveSectionCollapsed(root: string, collapsed: readonly string[]): void {

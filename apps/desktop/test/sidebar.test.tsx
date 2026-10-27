@@ -2,10 +2,10 @@
 // The desktop sidebar: icon buttons with names and shortcuts, and the drag handle on its edge with its width kept per Private Space.
 import { fireEvent } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
-import { sidebarKey, loadSidebarLayout, loadSidebarWidth, saveSectionCollapsed, saveSectionOrder, saveSidebarWidth } from "../src/app/sidebar-store.ts";
+import { sidebarKey, loadSidebarLayout, loadSidebarWidth, saveSectionCollapsed, saveSectionOrder, saveSidebarHidden, saveSidebarWidth } from "../src/app/sidebar-store.ts";
 import { arrangeSections, moveSection } from "../src/features/shell/sections.ts";
 
 const dirs = tempDirs();
@@ -87,7 +87,7 @@ describe("sidebar width", () => {
 describe("the sidebar's stored layout (width, section order, folded sections)", () => {
   it("reads the old width-only value, and keeps that width when the order is first saved", () => {
     localStorage.setItem(sidebarKey("/old"), "300");
-    expect(loadSidebarLayout("/old")).toEqual({ width: 300, order: [], collapsed: [] });
+    expect(loadSidebarLayout("/old")).toEqual({ width: 300, order: [], collapsed: [], hidden: false });
     saveSectionOrder("/old", ["server:demo", "private"]);
     expect(JSON.parse(localStorage.getItem(sidebarKey("/old"))!)).toEqual({ v: 2, width: 300, order: ["server:demo", "private"] });
     expect(loadSidebarWidth("/old")).toBe(300);
@@ -97,7 +97,7 @@ describe("the sidebar's stored layout (width, section order, folded sections)", 
     saveSectionOrder("/a", ["agents", "private"]);
     saveSectionCollapsed("/a", ["agents"]);
     saveSidebarWidth("/a", 320);
-    expect(loadSidebarLayout("/a")).toEqual({ width: 320, order: ["agents", "private"], collapsed: ["agents"] });
+    expect(loadSidebarLayout("/a")).toEqual({ width: 320, order: ["agents", "private"], collapsed: ["agents"], hidden: false });
     saveSidebarWidth("/a", null);
     saveSectionOrder("/a", []);
     saveSectionCollapsed("/a", []);
@@ -107,10 +107,10 @@ describe("the sidebar's stored layout (width, section order, folded sections)", 
   it("ignores what is not a layout: another version, bad ids, repeats, a bad width", () => {
     for (const bad of ["{", "[]", '{"v":3,"order":["private"]}', "null", '"private"']) {
       localStorage.setItem(sidebarKey("/x"), bad);
-      expect(loadSidebarLayout("/x")).toEqual({ width: null, order: [], collapsed: [] });
+      expect(loadSidebarLayout("/x")).toEqual({ width: null, order: [], collapsed: [], hidden: false });
     }
     localStorage.setItem(sidebarKey("/x"), JSON.stringify({ v: 2, width: 12, order: ["private", 7, "", "private", "x".repeat(300), "server:a"], collapsed: "agents" }));
-    expect(loadSidebarLayout("/x")).toEqual({ width: null, order: ["private", "server:a"], collapsed: [] });
+    expect(loadSidebarLayout("/x")).toEqual({ width: null, order: ["private", "server:a"], collapsed: [], hidden: false });
   });
 });
 
@@ -139,5 +139,69 @@ describe("the order of the sidebar's sections", () => {
     expect(moveSection(stored, present, "private", 0)).toEqual(["private", "server:gone", "server:demo"]);
     expect(moveSection([], ["private", "server:demo", "agents"], "agents", 0)).toEqual(["agents", "private", "server:demo"]);
     expect(moveSection([], ["private", "server:demo"], "private", 5)).toEqual(["server:demo", "private"]); // past the end: last
+  });
+});
+
+describe("hiding the whole sidebar", () => {
+  const sidebar = () => document.querySelector<HTMLElement>("aside.sidebar")!;
+  const showButton = () => screen.queryByRole("button", { name: "Show sidebar" });
+
+  it("the brand row's Hide sidebar button takes it out of the tab order and the accessibility tree, and focus goes to Show sidebar", async () => {
+    const app = await openApp(root);
+    await screen.findByRole("tree");
+    expect(showButton()).toBeNull();
+    const hide = within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: "Hide sidebar" });
+    expect(hide.getAttribute("data-tip-keys")).toMatch(/^(⌘\\|Ctrl\+\\)$/);
+    await app.user.click(hide);
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "Sidebar" })).toBeNull());
+    expect(sidebar().hasAttribute("inert")).toBe(true);
+    expect(sidebar().getAttribute("aria-hidden")).toBe("true");
+    expect(document.querySelector("[data-sidebar-hidden]")).toBe(document.querySelector(".shell"));
+    expect(screen.queryByRole("separator", { name: "Resize sidebar" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(showButton()));
+    // The Show button sits at the start of the tab bar, before Home.
+    expect(showButton()!.closest(".tab-start")!.querySelectorAll("button")[1]!.getAttribute("aria-label")).toBe("Home");
+    await app.user.click(showButton()!);
+    await waitFor(() => expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeTruthy());
+    expect(sidebar().hasAttribute("inert")).toBe(false);
+    expect(showButton()).toBeNull();
+    expect(document.activeElement).toBe(within(sidebar()).getByRole("button", { name: "Hide sidebar" }));
+    expect(handle()).toBeTruthy();
+  });
+
+  it("Cmd/Ctrl+\\ and the palette hide and show it, and it is remembered for this Private Space", async () => {
+    const app = await openApp(root);
+    await editorBox();
+    await app.user.keyboard("{Control>}\\{/Control}");
+    await waitFor(() => expect(showButton()).toBeTruthy());
+    expect(JSON.parse(localStorage.getItem(sidebarKey(root))!)).toEqual({ v: 2, hidden: true });
+    expect(loadSidebarLayout(root).hidden).toBe(true);
+    await app.user.keyboard("{Control>}k{/Control}");
+    await app.user.keyboard(">show sidebar");
+    await app.user.keyboard("{Enter}");
+    await waitFor(() => expect(showButton()).toBeNull());
+    expect(localStorage.getItem(sidebarKey(root))).toBeNull();
+    await app.user.keyboard("{Control>}k{/Control}");
+    await app.user.keyboard(">hide sidebar");
+    await app.user.keyboard("{Enter}");
+    await waitFor(() => expect(showButton()).toBeTruthy());
+    cleanup();
+    await openApp(root);
+    await waitFor(() => expect(showButton()).toBeTruthy());
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).toBeNull();
+  });
+
+  it("comes back to show a folder a breadcrumb asks for", async () => {
+    await seed(root, { "Notes/Plan.md": "# Plan\n" });
+    saveSidebarHidden(root, true);
+    const app = await openApp(root);
+    await screen.findByRole("tree", { hidden: true });
+    await waitFor(() => expect(showButton()).toBeTruthy());
+    await app.user.keyboard("{Control>}k{/Control}");
+    await app.user.keyboard("Plan");
+    await app.user.click(await screen.findByRole("option", { name: /Plan/ }));
+    await app.user.click(await screen.findByRole("button", { name: "Notes" }));
+    await waitFor(() => expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeTruthy());
+    expect(loadSidebarLayout(root).hidden).toBe(false);
   });
 });

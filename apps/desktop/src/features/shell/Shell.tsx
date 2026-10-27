@@ -43,7 +43,8 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { roleCan } from "@thoth/workspace-protocol";
 import { desktopTheme } from "../settings/theme.ts";
-import { loadSidebarWidth, saveSidebarWidth } from "../../app/sidebar-store.ts";
+import { loadSidebarLayout, loadSidebarWidth, saveSidebarHidden, saveSidebarWidth } from "../../app/sidebar-store.ts";
+import { useSidebarHidden } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
 import { FavoritesContext, type FavoriteRef } from "@thoth/app-ui/favorites/context.ts";
 import { isPinned } from "@thoth/app-ui/tabs/model.ts";
@@ -141,6 +142,8 @@ export function Shell() {
   // The sidebar's width: dragged by its edge, remembered per Private Space.
   const shell = useRef<HTMLDivElement>(null);
   const sidebar = useSidebarWidth({ initial: () => loadSidebarWidth(connection.root), save: (width) => saveSidebarWidth(connection.root, width) });
+  // The whole sidebar hidden or shown, remembered per Private Space too.
+  const side = useSidebarHidden({ initial: () => loadSidebarLayout(connection.root).hidden, save: (hidden) => saveSidebarHidden(connection.root, hidden) });
 
   const label = (tab: TabTarget): TabItem["label"] => {
     switch (tab.kind) {
@@ -282,11 +285,13 @@ export function Shell() {
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
+    sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
   useShortcuts("desktop", {
     "home.open": goHome,
+    "sidebar.toggle": side.toggle,
     "palette.open": toggleSearch,
     "shortcuts.open": toggleShortcuts,
     "theme.cycle": cycle,
@@ -393,8 +398,8 @@ export function Shell() {
   return (
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
-    <div className="shell" ref={shell} style={sidebar.style}>
-      <Sidebar favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
+    <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined}>
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
       <main className="main">
         <TabBar
           tabs={items}
@@ -408,6 +413,7 @@ export function Shell() {
           menuExtras={tabMenuExtras}
           notice={tabNotice}
           onHome={goHome}
+          {...(side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
           {...(windows ? { onDetach: moveToWindow } : {})}
         />
         {watchError && (
@@ -446,7 +452,7 @@ export function Shell() {
           )}
         </TabPanel>
       </main>
-      <SidebarResizer sidebar={sidebar} shell={shell} />
+      {!side.hidden && <SidebarResizer sidebar={sidebar} shell={shell} />}
       <MascotLayer />
       <UpdateNotice />
       <TooltipLayer />

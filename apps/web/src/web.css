@@ -47,6 +47,8 @@
   .web-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .web-shell .sidebar-resizer { display: none; }
   .web-shell .sidebar { border-right: 0; border-bottom: 1px solid var(--thoth-border); max-height: 45vh; }
+  .web-shell[data-sidebar-hidden] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .web-shell[data-sidebar-hidden] > .sidebar { display: none; }
   .page-scroll { padding: var(--thoth-space-4); }
 }
 .signin-switches { display: inline-flex; gap: var(--thoth-space-2); align-items: center; }

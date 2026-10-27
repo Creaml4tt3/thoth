@@ -336,3 +336,12 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-badge { flex: none; }
 @media (max-width: 520px) { .home { padding: 24px 12px; } .home-row-meta { max-width: 40%; } }
+
+/* The whole sidebar hidden (ui/sidebar-hidden.ts): its column closes and it fades and slides out, then it is not drawn
+   at all (visibility waits for the transition). Its markup stays (inert, aria-hidden) so it comes back as it was. Under
+   reduced motion the duration tokens are 0 and it goes at once. No transition while the edge is dragged. */
+.shell { transition: grid-template-columns var(--thoth-dur-fast) var(--thoth-ease-out); }
+.shell[data-resizing] { transition: none; }
+.shell[data-sidebar-hidden] { grid-template-columns: 0px 1fr; }
+.sidebar { transition: opacity var(--thoth-dur-fast) var(--thoth-ease-out), transform var(--thoth-dur-fast) var(--thoth-ease-out), visibility 0s linear 0s; }
+.shell[data-sidebar-hidden] > .sidebar { min-width: 0; overflow: hidden; opacity: 0; transform: translateX(-16px); visibility: hidden; padding-inline: 0; border-right-width: 0; transition: opacity var(--thoth-dur-fast) var(--thoth-ease-in), transform var(--thoth-dur-fast) var(--thoth-ease-in), visibility 0s linear var(--thoth-dur-fast); }
