@@ -68,7 +68,9 @@ export type ShortcutId =
   | "style.toolbar"
   | "dialog.close"
   | "assistant.ask"
-  | "assistant.size";
+  | "assistant.size"
+  | "home.open"
+  | "sidebar.toggle";
 
 export type ShortcutGroup = "general" | "assistant" | "tabs" | "tree" | "editor";
 
@@ -130,6 +132,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   // Add the open page to Favorites, or take it out (ADR-0027). Cmd/Ctrl+D is a browser's bookmark key.
   { id: "page.favorite", group: "general", scope: "global", desktop: [{ key: "d", mod: true }], web: [{ code: "KeyD", alt: true, shift: true }] },
   { id: "dialog.close", group: "general", scope: "dialog", desktop: [{ key: "Escape" }] },
+  // Home (ADR-0029). Cmd/Ctrl+Shift+H is Highlight; by physical key, as Option changes the letter on a Mac (like Pin tab).
+  { id: "home.open", group: "general", scope: "global", desktop: [{ code: "KeyH", alt: true, shift: true }] },
+  // Hide or show the whole sidebar. Not Cmd/Ctrl+B, which is bold. By key and by physical key, like Cmd/Ctrl+/.
+  { id: "sidebar.toggle", group: "general", scope: "global", desktop: [{ key: "\\", mod: true }, { code: "Backslash", mod: true }] },
 
   // The Thoth assistant (the mascot; desktop only)
   { id: "assistant.ask", group: "assistant", scope: "global", only: "desktop", desktop: [{ code: "KeyJ", mod: true }] },

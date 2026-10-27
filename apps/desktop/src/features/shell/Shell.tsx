@@ -7,7 +7,6 @@ import { SettingsView } from "../settings/SettingsView.tsx";
 import { NewPageDialog } from "./NewPageDialog.tsx";
 import { SearchPalette } from "./SearchPalette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
-import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { SidebarResizer, useSidebarWidth } from "@thoth/app-ui/ui/SidebarResizer.tsx";
 import { TooltipLayer } from "@thoth/app-ui/ui/Tooltip.tsx";
@@ -48,8 +47,14 @@ import { loadSidebarWidth, saveSidebarWidth } from "../../app/sidebar-store.ts";
 import { RenamePage, type RenameTarget } from "./RenamePage.tsx";
 import { FavoritesContext, type FavoriteRef } from "@thoth/app-ui/favorites/context.ts";
 import { isPinned } from "@thoth/app-ui/tabs/model.ts";
+import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useFavoritesController } from "../favorites/useFavoritesController.ts";
+import { HOME } from "@thoth/app-ui/tabs/model.ts";
+import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
+import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
+import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
+import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
 
 const noSubscribe = () => () => undefined;
 
@@ -80,7 +85,7 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId } = useSession();
+  const { platform: host, vault, connection, revision, watchError, options, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, recent: recentStore } = useSession();
   const t = useDesktopStrings().shell;
   const sessionTitle = useDesktopStrings().agents.session.tab;
   // Session tabs are named by their run's task.
@@ -115,6 +120,9 @@ export function Shell() {
   }, [vault, revision]);
 
   const favorites = useFavoritesController({ pages, current: favoriteHere });
+  // Home (ADR-0029): one tab; a new tab shows the same view.
+  const goHome = () => tabs.open(HOME);
+  const recent = useRecentPages(recentStore, tabs.active);
   /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
   const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
   const togglePin = (id: string = tabs.active.id) => {
@@ -142,6 +150,8 @@ export function Shell() {
         return remoteTitle(directory, tab) ?? tt.untitled;
       case "settings":
         return tt.settings;
+      case "home":
+        return strings.home.title;
       case "agent-run": {
         // A tab is a conversation: named by its first question.
         const record = runs ? agents?.conversation(tab.run)[0] : undefined;
@@ -271,10 +281,12 @@ export function Shell() {
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     openNotifications: () => setNotificationsOpen(true),
+    goHome,
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
   useShortcuts("desktop", {
+    "home.open": goHome,
     "palette.open": toggleSearch,
     "shortcuts.open": toggleShortcuts,
     "theme.cycle": cycle,
@@ -291,24 +303,59 @@ export function Shell() {
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
 
-  // Open the first page when nothing is open at start, so the shell is never blank. Once: closing every tab leaves it empty.
+  // Home when nothing is open at start (ADR-0029), or the first page where the options say so. Once: closing every
+  // tab leaves a new tab, which shows Home too.
   const startedEmpty = useRef(tabs.state.tabs.length === 1 && tabs.active.target.kind === "blank");
+  const startOnHome = options.startOnHome;
   useEffect(() => {
-    if (!startedEmpty.current || !pages || pages.length === 0) return;
+    if (!startedEmpty.current || (!startOnHome && (!pages || pages.length === 0))) return;
     startedEmpty.current = false;
-    openPage(pages[0]!.path);
-  }, [pages, openPage]);
+    if (startOnHome) tabs.open(HOME);
+    else openPage(pages![0]!.path);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages, openPage, startOnHome]);
 
   // Background tabs whose page is gone (moved out, deleted, renamed) close; the current tab says "not found" itself.
+  // Recent pages that are gone drop out by the same rules.
   const { prune } = tabs;
   useEffect(() => {
     if (!pages) return;
     const known = new Set(pages.map((p) => p.path));
     prune((tab) => (tab.kind === "page" ? !known.has(tab.path) : tab.kind === "workspace" ? remoteGone(directory, tab) : false));
   }, [pages, directory, prune]);
+  // Each kind on its own list's change: a page list from before a rename must not drop the entry the rename just moved.
+  // The current tab's page stays, as its tab does: a rename's new list can arrive before the rename remaps it.
+  const shownPath = useRef<string | null>(null);
+  shownPath.current = path;
+  useEffect(() => {
+    if (!pages) return;
+    const known = new Set(pages.map((p) => p.path));
+    recentStore.prune((ref) => ref.kind === "private" && ref.path !== shownPath.current && !known.has(ref.path));
+  }, [pages, recentStore]);
+  useEffect(() => recentStore.prune((ref) => ref.kind === "workspace" && remoteGone(directory, ref)), [directory, recentStore]);
 
-  // Titles of background workspace tabs come from their trees, so those trees load.
-  const wanted = tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : []));
+  const shownRecent = recent.slice(0, RECENT_SHOWN);
+  const pending = strings.tabs.loading;
+  const homeRecent: HomeRow[] = shownRecent.map(({ ref }) => {
+    const how = (o: { newTab: boolean }) => (o.newTab ? { newTab: true } : undefined);
+    if (ref.kind === "private") {
+      const folder = folderOf(ref.path);
+      return { id: `p:${ref.path}`, title: pages?.find((p) => p.path === ref.path)?.title ?? stripExtension(basename(ref.path)), space: t.local, local: true, ...(folder ? { folder } : {}), open: (o) => openPage(ref.path, how(o)) };
+    }
+    const target = { server: ref.server, workspace: ref.workspace, page: ref.page };
+    return { id: `w:${ref.server}\n${ref.workspace}\n${ref.page}`, ...workspaceRow(directory, target, { untitled: tt.untitled, pending }), open: (o) => openWorkspacePage(target, how(o)) };
+  });
+  const homeFavorites: HomeRow[] = favorites.items.map((item) => {
+    const ref = workspaceRefOf(item.key);
+    const folder = ref ? workspaceRow(directory, ref, { untitled: tt.untitled, pending }).folder : item.detail ? folderOf(item.detail) : undefined;
+    return { id: item.key, title: item.title, space: item.hint ?? "", ...(ref ? {} : { local: true }), ...(folder ? { folder } : {}), ...(item.unavailable ? { unavailable: true } : {}), open: (o) => favorites.open(item.key, o) };
+  });
+
+  // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
+  const wanted = [
+    ...tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
+    ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [`${ref.server}\n${ref.workspace}`] : [])),
+  ];
   const wantedKey = [...new Set(wanted)].join("\u0000");
   useEffect(() => {
     for (const key of wantedKey ? wantedKey.split("\u0000") : []) {
@@ -320,7 +367,7 @@ export function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantedKey, servers, directory.servers]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
   /** The tab's menu also stars its page (ADR-0027). */
   const tabMenuExtras = (id: string): MenuItem[] => {
     const tab = tabs.state.tabs.find((x) => x.id === id);
@@ -347,7 +394,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style}>
-      <Sidebar favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} />
+      <Sidebar favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
       <main className="main">
         <TabBar
           tabs={items}
@@ -360,6 +407,7 @@ export function Shell() {
           onCloseOthers={(id) => tabs.closeOthers(id)}
           menuExtras={tabMenuExtras}
           notice={tabNotice}
+          onHome={goHome}
           {...(windows ? { onDetach: moveToWindow } : {})}
         />
         {watchError && (
@@ -394,11 +442,7 @@ export function Shell() {
           ) : target.kind === "page" ? (
             <PageView key={`${tabs.active.id}\n${target.path}`} path={target.path} />
           ) : (
-            <div className="empty">
-              <Mark size={40} />
-              <h1>{t.nothingOpen}</h1>
-              <p className="muted">{t.nothingOpenHint}</p>
-            </div>
+            <HomeView recent={homeRecent} favorites={homeFavorites} />
           )}
         </TabPanel>
       </main>

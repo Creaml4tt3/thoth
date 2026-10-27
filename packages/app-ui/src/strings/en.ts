@@ -468,6 +468,9 @@ export const en = {
       assistantSize: "Shrink or expand the assistant",
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
+      goHome: "Go home",
+      hideSidebar: "Hide sidebar",
+      showSidebar: "Show sidebar",
       importPages: "Import from Notion or Obsidian…",
       newTab: "New tab",
       closeTab: "Close tab",
@@ -522,6 +525,8 @@ export const en = {
       "dialog.close": "Close a dialog or menu",
       "assistant.ask": "Ask Thoth (open the assistant's bubble)",
       "assistant.size": "Shrink or expand the assistant",
+      "home.open": "Go home (recent pages and favorites)",
+      "sidebar.toggle": "Hide or show the sidebar",
     } satisfies Record<ShortcutId, string>,
   },
 
@@ -530,6 +535,24 @@ export const en = {
   sidebar: {
     resize: "Resize sidebar",
     resizeHint: "Drag to resize. Double-click or press Enter to reset.",
+    /** The whole sidebar folded away and back: the button in its brand row, and the one at the start of the tab bar. */
+    hide: "Hide sidebar",
+    show: "Show sidebar",
+  },
+
+  /** Home (ADR-0029): the tab with recent pages and favorites, which a new tab shows too. */
+  home: {
+    title: "Home",
+    /** The brand row in the sidebar (the mark and "Thoth"): a button that opens Home. Its name keeps the word shown. */
+    brand: "Thoth home",
+    greeting: "Welcome back",
+    lead: "Pick up where you left off.",
+    recent: "Recent",
+    recentEmpty: "Pages you open show here.",
+    favorites: "Favorites",
+    favoritesEmpty: "Star a page to keep it here.",
+    /** A row's folder, after its space. */
+    topLevel: "Top level",
   },
 
   /**
@@ -651,8 +674,6 @@ export const en = {
     searchPlaceholder: "Search pages",
     searchNone: "No pages match.",
     searchHint: "Type to search this workspace.",
-    nothingOpen: "Nothing open",
-    nothingOpenHint: "Choose a page on the left, or create one with New page.",
     language: "Language",
     sessionEnded: "You were signed out. Signing in again leaves this page, so copy any text you have not saved first.",
     signInAgain: "Sign in again",

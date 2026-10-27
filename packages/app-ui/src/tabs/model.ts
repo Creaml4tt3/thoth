@@ -4,8 +4,9 @@
  *
  * - Clicking a page opens it in the current tab; Cmd/Ctrl+click, middle-click and Cmd/Ctrl+Enter open a new tab
  *   (`open(state, target, { newTab: true })`). A new tab goes right after the current one, as in a browser.
- * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. A session of
- *   the assistant (desktop only) is one tab per run in the same way: opening the same run again goes to its tab.
+ * - Settings is one tab: opening it again goes to it. If the current tab is empty, Settings takes it. Home (ADR-0029)
+ *   is one tab in the same way, and a session of the assistant (desktop only) is one tab per run: opening the same run
+ *   again goes to its tab.
  * - There is always at least one tab. Closing the last one leaves an empty tab.
  * - Only the current tab is mounted. Leaving a tab writes its pending edits first (`flushAll`, done by the app),
  *   so a switch never loses an edit.
@@ -24,7 +25,9 @@ export type TabTarget =
   | { kind: "settings"; section?: "servers" | "agents" | "import" }
   /** A session of the assistant: one conversation, by its first run's UUIDv7 (desktop only; the web client drops it). */
   | { kind: "agent-run"; run: string }
-  /** A new, empty tab. */
+  /** Home (ADR-0029): recent pages and favorites. One tab at most. */
+  | { kind: "home" }
+  /** A new tab: it shows the Home view too, so a new tab is never empty. */
   | { kind: "blank" };
 
 /** How a page is opened: in the current tab (the default), or in a new one. */
@@ -51,6 +54,7 @@ export interface TabsState {
 export const MAX_TABS = 30;
 
 export const BLANK: TabTarget = { kind: "blank" };
+export const HOME: TabTarget = { kind: "home" };
 
 const makeId = (seq: number): string => `t${seq}`;
 
@@ -85,6 +89,8 @@ export function sameTarget(a: TabTarget, b: TabTarget): boolean {
       return b.kind === "settings";
     case "agent-run":
       return b.kind === "agent-run" && a.run === b.run;
+    case "home":
+      return b.kind === "home";
     case "blank":
       return b.kind === "blank";
   }
@@ -110,7 +116,7 @@ export function retarget(state: TabsState, id: string, target: TabTarget): TabsS
 
 /** Opens `target` in the current tab, or in a new one next to it. */
 export function open(state: TabsState, target: TabTarget, options: OpenOptions = {}): TabsState {
-  if (target.kind === "settings" || target.kind === "agent-run") {
+  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home") {
     const existing = state.tabs.find((t) => (target.kind === "settings" ? t.target.kind === "settings" : sameTarget(t.target, target)));
     if (existing) return { ...retarget(state, existing.id, target), active: existing.id };
     return activeTab(state).target.kind === "blank" ? retarget(state, state.active, target) : insertAfterActive(state, target);
@@ -285,6 +291,8 @@ function storedTarget(target: TabTarget): unknown {
       return target.section ? { k: "settings", section: target.section } : { k: "settings" };
     case "agent-run":
       return { k: "run", run: target.run };
+    case "home":
+      return { k: "home" };
     case "blank":
       return { k: "blank" };
   }
@@ -303,6 +311,8 @@ function targetFromStored(value: unknown): TabTarget | null {
     case "run":
       return typeof v["run"] === "string" && isStableId(v["run"]) ? { kind: "agent-run", run: v["run"] } : null;
     // The old single review tab ({ k: "agents" }) showed the current run; no run is current at start, so it is dropped.
+    case "home":
+      return HOME;
     case "blank":
       return BLANK;
     default:

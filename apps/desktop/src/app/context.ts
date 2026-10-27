@@ -17,6 +17,7 @@ import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
 import type { NotificationCenter, NotificationTarget, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
 import type { NotificationPrefsStore } from "../features/notifications/prefs.ts";
 import type { UpdateService } from "../features/updates/service.ts";
+import type { RecentStore } from "@thoth/app-ui/home/recent.ts";
 
 /** Tunables that tests (and later settings) override. */
 export interface AppOptions {
@@ -38,6 +39,11 @@ export interface AppOptions {
   /** The update notice (ADR-0022): time from the start to its first check, and between checks after that. */
   updateDelayMs: number;
   updateIntervalMs: number;
+  /**
+   * What a window shows when nothing was open (ADR-0029): Home, or (false) the first page by path, as before Home.
+   * The unit tests start on the first page unless they test Home.
+   */
+  startOnHome: boolean;
 }
 
 export interface Session {
@@ -88,6 +94,8 @@ export interface Session {
   registerFlush(flush: () => Promise<boolean>): () => void;
   /** Writes every pending edit. False when something (a conflict, an error) still needs the user. */
   flushAll(): Promise<boolean>;
+  /** The pages opened last in this Private Space (ADR-0029), for Home. */
+  recent: RecentStore;
   /** The notification list of this window (ADR-0018), and the user's settings for system notifications. */
   notifications: NotificationCenter;
   notificationPrefs: NotificationPrefsStore;

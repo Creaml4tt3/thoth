@@ -428,6 +428,9 @@ export const th: Strings = {
       assistantSize: "ย่อหรือขยายผู้ช่วย",
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
+      goHome: "ไปหน้าแรก", // REVIEW
+      hideSidebar: "ซ่อนแถบด้านข้าง",
+      showSidebar: "แสดงแถบด้านข้าง",
       importPages: "นำเข้าจาก Notion หรือ Obsidian…", // REVIEW
       newTab: "แท็บใหม่",
       closeTab: "ปิดแท็บ",
@@ -481,6 +484,8 @@ export const th: Strings = {
       "dialog.close": "ปิดกล่องโต้ตอบหรือเมนู",
       "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)",
       "assistant.size": "ย่อหรือขยายผู้ช่วย",
+      "home.open": "ไปหน้าแรก (หน้าล่าสุดและรายการโปรด)", // REVIEW
+      "sidebar.toggle": "ซ่อนหรือแสดงแถบด้านข้าง",
     },
   },
 
@@ -488,6 +493,21 @@ export const th: Strings = {
   sidebar: {
     resize: "ปรับความกว้างแถบด้านข้าง",
     resizeHint: "ลากเพื่อปรับขนาด ดับเบิลคลิกหรือกด Enter เพื่อคืนค่าเดิม",
+    hide: "ซ่อนแถบด้านข้าง",
+    show: "แสดงแถบด้านข้าง",
+  },
+
+  /** หน้าแรก (ADR-0029) */
+  home: {
+    title: "หน้าแรก", // REVIEW
+    brand: "Thoth หน้าแรก", // REVIEW
+    greeting: "ยินดีต้อนรับกลับมา",
+    lead: "ทำต่อจากที่ค้างไว้ได้เลย", // REVIEW
+    recent: "ล่าสุด",
+    recentEmpty: "หน้าที่คุณเปิดจะแสดงที่นี่", // REVIEW
+    favorites: "รายการโปรด",
+    favoritesEmpty: "ติดดาวให้หน้าเพื่อเก็บไว้ที่นี่", // REVIEW
+    topLevel: "ระดับบนสุด", // REVIEW
   },
 
   // Notifications (ADR-0018).
@@ -596,8 +616,6 @@ export const th: Strings = {
     searchPlaceholder: "ค้นหาหน้า",
     searchNone: "ไม่พบหน้าที่ตรงกัน",
     searchHint: "พิมพ์เพื่อค้นหาในเวิร์กสเปซนี้",
-    nothingOpen: "ยังไม่ได้เปิดหน้าไหน",
-    nothingOpenHint: "เลือกหน้าทางซ้าย หรือกด หน้าใหม่ เพื่อเริ่มเขียน",
     language: "ภาษา",
     sessionEnded: "คุณออกจากระบบแล้ว การเข้าสู่ระบบอีกครั้งจะออกจากหน้านี้ หากมีข้อความที่ยังไม่ได้บันทึก ให้คัดลอกเก็บไว้ก่อน",
     signInAgain: "เข้าสู่ระบบอีกครั้ง",

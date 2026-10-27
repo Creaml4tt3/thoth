@@ -59,6 +59,10 @@ export interface CommandActions {
   openAssistantSettings?(): void;
   /** Opens the notification list (the bell in the sidebar). */
   openNotifications?(): void;
+  /** Home (ADR-0029): recent pages and favorites. */
+  goHome?(): void;
+  /** Hides the whole sidebar (`hidden: false`) or shows it again. */
+  sidebar?: { hidden: boolean; toggle(): void };
   tabs: {
     newTab(): void;
     closeTab(): void;
@@ -119,6 +123,8 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.toggleAssistantSize) add("assistant.size", t.assistantSize, a.toggleAssistantSize, { ...key("assistant.size"), keywords: "mascot compact full small big" });
   if (a.openAssistantSettings) add("assistant.settings", t.assistantSettings, a.openAssistantSettings, { keywords: "agent hub ai claude codex history usage permissions mascot preferences" });
   if (a.openNotifications) add("notifications.open", t.notifications, a.openNotifications, { keywords: "bell notification unread alerts done failed" });
+  if (a.goHome) add("home.open", t.goHome, a.goHome, { ...key("home.open"), keywords: "home start recent favorites dashboard" });
+  if (a.sidebar) add("sidebar.toggle", a.sidebar.hidden ? t.showSidebar : t.hideSidebar, a.sidebar.toggle, { ...key("sidebar.toggle"), keywords: "sidebar collapse expand hide show panel focus full width" });
   add("tab.new", t.newTab, a.tabs.newTab, key("tab.new"));
   add("tab.close", t.closeTab, a.tabs.closeTab, key("tab.close"));
   add("tab.next", t.nextTab, a.tabs.next, key("tab.next"));

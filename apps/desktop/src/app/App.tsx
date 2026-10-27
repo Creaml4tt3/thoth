@@ -25,6 +25,7 @@ export const DEFAULT_OPTIONS: AppOptions = {
   // it stays open.
   updateDelayMs: 2_000,
   updateIntervalMs: 24 * 60 * 60 * 1000,
+  startOnHome: true,
 };
 
 interface Host {

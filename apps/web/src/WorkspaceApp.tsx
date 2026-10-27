@@ -50,8 +50,17 @@ import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
 import { useWorkspaceFavorites, workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import { createWorkspaceFavorites } from "@thoth/app-ui/favorites/workspace-favorites.ts";
-import { isPinned } from "@thoth/app-ui/tabs/model.ts";
+import { HOME, isPinned } from "@thoth/app-ui/tabs/model.ts";
+import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
+import { createRecentStore, RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
+import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
+import { workspaceRow } from "@thoth/app-ui/home/rows.ts";
+import { tip } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
+
+/** The recent pages of an account in this browser (ADR-0029): this prefix and the account's id. */
+export const RECENT_KEY_PREFIX = "thoth.web.recent.";
 
 interface Props {
   env: WebEnv;
@@ -127,6 +136,27 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     if (tabs.active.target.kind !== "blank") tabs.setPinned(!tabs.active.pinned);
   };
 
+  // Home (ADR-0029): one tab, and what a new tab shows. Its recent pages are kept in this browser per account, by id;
+  // with no account known they last for the visit.
+  const goHome = () => tabs.open(HOME);
+  const recentStore = useMemo(() => createRecentStore(() => (accountId ? (env.localStorage ?? null) : null), `${RECENT_KEY_PREFIX}${accountId ?? ""}`), [env, accountId]);
+  const recent = useRecentPages(recentStore, tabs.active);
+  useEffect(() => recentStore.prune((ref) => ref.kind === "workspace" && remoteGone(state, ref)), [recentStore, state]);
+  const shownRecent = recent.slice(0, RECENT_SHOWN);
+  const homeWords = { untitled: t.tabs.untitled, pending: t.tabs.loading };
+  const homeRecent: HomeRow[] = shownRecent.flatMap(({ ref }) => {
+    if (ref.kind !== "workspace") return [];
+    const page = { server: ref.server, workspace: ref.workspace, page: ref.page };
+    return [{ id: `${ref.workspace}\n${ref.page}`, ...workspaceRow(state, page, homeWords), open: (o: { newTab: boolean }) => openPage(page, o.newTab ? { newTab: true } : undefined) }];
+  });
+  const homeFavorites: HomeRow[] = favorites.items.flatMap((item) => {
+    const ref = workspaceRefOf(item.key);
+    if (!ref) return [];
+    const { folder } = workspaceRow(state, ref, homeWords);
+    return [{ id: item.key, title: item.title, space: item.hint ?? "", ...(folder ? { folder } : {}), ...(item.unavailable ? { unavailable: true } : {}), open: (o: { newTab: boolean }) => openPage(ref, o.newTab ? { newTab: true } : undefined) }];
+  });
+  const homeKeys = useShortcutHint("home.open");
+
   // Notifications (ADR-0018): the list under the bell only, in memory for this tab. Its one event is a save conflict;
   // nothing is shown outside the browser tab (there is no system notifier on the web).
   const strings = useRef(t);
@@ -177,6 +207,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         return remoteTitle(state, tab) ?? t.tabs.untitled;
       case "settings":
         return t.tabs.settings;
+      case "home":
+        return t.home.title;
       default:
         return t.tabs.blank;
     }
@@ -244,6 +276,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     openNotifications: () => setNotificationsOpen(true),
+    goHome,
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
 
@@ -260,6 +293,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
+    "home.open": goHome,
   });
 
   // Background tabs whose page is gone close; the current tab says "not found" itself.
@@ -268,14 +302,14 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     prune((tab) => tab.kind === "workspace" && remoteGone(state, tab));
   }, [state, prune]);
 
-  // The titles of background tabs come from their workspace trees, so those trees load.
-  const wanted = [...new Set(tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [tab.target.workspace] : [])))].join("\u0000");
+  // The titles of background tabs and recent pages come from their workspace trees, so those trees load.
+  const wanted = [...new Set([...tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [tab.target.workspace] : [])), ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [ref.workspace] : []))])].join("\u0000");
   useEffect(() => {
     if (signedOut || !workspaces) return;
     for (const id of wanted ? wanted.split("\u0000") : []) if (workspaces.some((w) => w.id === id)) directory.expand(SERVER_ID, id);
   }, [directory, wanted, workspaces, signedOut]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.pinned ? { pinned: true } : {}) }));
+  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
   const tabMenuExtras = (id: string): MenuItem[] => {
     const tab = tabs.state.tabs.find((x) => x.id === id);
     if (tab?.target.kind !== "workspace") return [];
@@ -301,8 +335,10 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
       <div className="shell web-shell" ref={shell} style={sidebar.style}>
         <aside className="sidebar" aria-label={t.web.sidebar}>
           <div className="ws">
-            <Mark size={18} />
-            <span className="ws-name">Thoth</span>
+            <button type="button" className="ws-home" aria-label={t.home.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(t.home.title, homeKeys?.keys)} onClick={goHome}>
+              <Mark size={18} />
+              <span className="ws-name">Thoth</span>
+            </button>
           </div>
           {canSearch && (
             <button type="button" className="search-trigger" onClick={() => setDialog({ kind: "search" })} aria-label={t.web.search} aria-keyshortcuts="Control+K Meta+K">
@@ -402,6 +438,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             onCloseOthers={(id) => tabs.closeOthers(id)}
             menuExtras={tabMenuExtras}
             notice={tabNotice}
+            onHome={goHome}
           />
           {signedOut && (
             <p role="alert" className="alert alert-warning banner">
@@ -446,11 +483,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 }}
               />
             ) : (
-              <div className="empty">
-                <Mark size={40} />
-                <h1>{t.web.nothingOpen}</h1>
-                <p className="muted">{t.web.nothingOpenHint}</p>
-              </div>
+              <HomeView recent={homeRecent} favorites={homeFavorites} />
             )}
           </TabPanel>
         </main>

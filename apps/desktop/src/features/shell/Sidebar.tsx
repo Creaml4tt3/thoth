@@ -5,6 +5,8 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
+import { tip } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
 import { useAcrossDropZone } from "@thoth/app-ui/order/dnd.ts";
 import { onSpaceDrop, useSpaceHoverAt } from "@thoth/app-ui/order/space-drag.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -41,6 +43,8 @@ interface Props {
   /** Whether the notification list under the bell is open (the palette opens it too). */
   notificationsOpen: boolean;
   onNotificationsOpen(open: boolean): void;
+  /** Opens Home (ADR-0029): the brand row is its button. */
+  onHome(): void;
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -82,13 +86,15 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen }: Props) {
+export function Sidebar({ favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
   const importFrom = useDesktopStrings().settings.importFrom;
+  const homeKeys = useShortcutHint("home.open");
+  const th = useStrings().home;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
@@ -244,8 +250,10 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
   return (
     <aside className="sidebar" aria-label={t.sidebar}>
       <div className="ws">
-        <Mark size={18} />
-        <span className="ws-name">Thoth</span>
+        <button type="button" className="ws-home" aria-label={th.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(th.title, homeKeys?.keys)} onClick={onHome}>
+          <Mark size={18} />
+          <span className="ws-name">Thoth</span>
+        </button>
       </div>
       <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">
         <span>{t.search}</span>

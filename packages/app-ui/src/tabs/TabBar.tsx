@@ -1,10 +1,10 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { HintContext, useShortcutHint } from "../keyboard/hints.ts";
 import { ariaKeyShortcut, chordsFor, currentPlatform, formatChordShort, shortcutById } from "../keyboard/shortcuts.ts";
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
 import { useStrings } from "../strings/index.ts";
 import { IconButton } from "../ui/IconButton.tsx";
-import { Icon } from "../ui/Icon.tsx";
+import { Icon, type IconName } from "../ui/Icon.tsx";
 import { motionOff } from "../ui/presence.ts";
 import { tip, tipIfClipped } from "../ui/Tooltip.tsx";
 import { useTabDrag } from "./drag.ts";
@@ -17,6 +17,8 @@ export interface TabItem {
   title?: string;
   /** Pinned (ADR-0027): at the start of the bar, compact, with no close button. The pinned tabs come first in `tabs`. */
   pinned?: boolean;
+  /** An icon before the name (Home's house). */
+  icon?: IconName;
 }
 
 /** The first two letters (graphemes, so a Thai vowel or an emoji is not cut in half) of a pinned tab's name. */
@@ -51,6 +53,11 @@ interface BarProps {
   menuExtras?(id: string): MenuItem[];
   /** Something to say about the tabs from outside the bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
   notice?: { text: string; seq: number } | null;
+  /** Opens Home (ADR-0029): a house button at the start of the bar, before the tabs. */
+  onHome?(): void;
+  /** Shows the hidden sidebar: a button before Home, only while the sidebar is hidden. */
+  onShowSidebar?(): void;
+  showSidebarRef?: Ref<HTMLButtonElement>;
 }
 
 /** A tab that was closed and is still narrowing away: where it sat (after which tab), what it looked like. */
@@ -92,8 +99,9 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * others are already there after a drop, so only the dropped tab settles). Tabs present at the start, moves made with
  * the keyboard, and everything under reduced motion (the tabs jump to their places), skip it.
  */
-export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice }: BarProps) {
-  const t = useStrings().tabs;
+export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice, onHome, onShowSidebar, showSidebarRef }: BarProps) {
+  const strings = useStrings();
+  const t = strings.tabs;
   const closeHint = useShortcutHint("tab.close");
   const hints = useContext(HintContext);
   const platform = hints?.platform ?? currentPlatform();
@@ -339,6 +347,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
 
   return (
     <div className="tabstrip" data-tab-dragging={drag ? "" : undefined}>
+      {(onShowSidebar || onHome) && (
+        <span className="tab-start">
+          {onShowSidebar && <IconButton {...(showSidebarRef ? { ref: showSidebarRef } : {})} icon="sidebar" label={strings.sidebar.show} shortcut="sidebar.toggle" className="tab-show-sidebar" onClick={onShowSidebar} />}
+          {onHome && <IconButton icon="home" label={strings.home.title} shortcut="home.open" className="tab-home" onClick={onHome} />}
+        </span>
+      )}
       <div ref={listRef} role="tablist" aria-label={t.list} aria-orientation="horizontal" className="tablist">
         {rows.map((row) => {
           if (row.ghost) {
@@ -405,7 +419,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
                   closeTab(tab.id);
                 }}
               >
-                <span className="tab-text">{pinned ? tabInitials(tab.label) : tab.label}</span>
+                {tab.icon && (
+                  <span className="tab-icon">
+                    <Icon name={tab.icon} size={14} />
+                  </span>
+                )}
+                {!(pinned && tab.icon) && <span className="tab-text">{pinned ? tabInitials(tab.label) : tab.label}</span>}
               </button>
               {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. A pinned tab has none (ADR-0027). */}
               {!pinned && (

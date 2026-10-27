@@ -44,8 +44,6 @@ export const th: DesktopStrings = {
     unsavedChanges: "หน้าที่เปิดอยู่มีการเปลี่ยนแปลงที่ยังบันทึกไม่ได้",
     settings: "การตั้งค่า",
     watchError: (detail) => `การเปลี่ยนแปลงจากนอก Thoth อาจไม่แสดงขึ้นมาเอง: ${detail}`,
-    nothingOpen: "ยังไม่ได้เปิดหน้าไหน",
-    nothingOpenHint: "สร้างหน้าด้วยปุ่ม หน้าใหม่ หรือกด Ctrl/Cmd+K เพื่อค้นหา",
   },
 
   newPage: {

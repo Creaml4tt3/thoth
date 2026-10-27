@@ -12,7 +12,7 @@ export const TABS_KEY = "thoth.web.tabs";
 type Store = Pick<NonNullable<WebEnv["localStorage"]>, "getItem" | "setItem">;
 
 /** The web client only has workspace pages and Settings; anything else (a desktop leftover) is dropped. */
-const supported = (target: TabTarget): boolean => target.kind === "settings" || target.kind === "blank" || (target.kind === "workspace" && target.server === SERVER_ID);
+const supported = (target: TabTarget): boolean => target.kind === "settings" || target.kind === "blank" || target.kind === "home" || (target.kind === "workspace" && target.server === SERVER_ID);
 
 export function loadTabs(storage: Store | null): TabsState {
   try {

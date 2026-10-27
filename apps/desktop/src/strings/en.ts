@@ -60,8 +60,6 @@ export const en = {
     unsavedChanges: "The open page has changes that could not be saved yet.",
     settings: "Settings",
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
-    nothingOpen: "Nothing open",
-    nothingOpenHint: "Create a page with New page, or press Ctrl/Cmd+K to search.",
   },
 
   newPage: {
