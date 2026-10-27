@@ -16,6 +16,7 @@ import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode 
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
 import { currentOs, displayPath } from "./path.ts";
+import { requestTour } from "../tour/store.ts";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
@@ -66,6 +67,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   // Every section's heading id, in page order; the list leaves out those this build does not show.
   const sections = [
     { id: "set-vault", label: t.privateSpace },
+    { id: "set-tour", label: t.gettingStarted },
     { id: "set-servers", label: d.servers.title },
     { id: "set-agents", label: d.agents.title },
     { id: "set-notifications", label: d.notifications.title },
@@ -107,6 +109,16 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
             {revealError}
           </p>
         )}
+      </section>
+
+      <section aria-labelledby="set-tour" className="set-section">
+        <h2 id="set-tour">{t.gettingStarted}</h2>
+        <p className="muted">{t.tourNote}</p>
+        <div className="set-actions">
+          <Button variant="ghost" small onClick={requestTour}>
+            {t.showTour}
+          </Button>
+        </div>
       </section>
 
       <ServersSettings focus={section === "servers"} />

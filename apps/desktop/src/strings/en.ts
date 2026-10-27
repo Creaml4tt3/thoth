@@ -123,6 +123,27 @@ export const en = {
     importExport: "Import & Export",
     importNote: "Bring pages in from Notion or Obsidian. Your originals are only ever read.",
     importFrom: "Import from Notion or Obsidian",
+    gettingStarted: "Getting started",
+    tourNote: "A short tour of the sidebar, search, the editor, tabs and Home.",
+    showTour: "Show the tour again",
+  },
+
+  /** The first-run tour (ADR-0032). */
+  tour: {
+    progress: (step: number, total: number) => `${step} of ${total}`,
+    back: "Back",
+    next: "Next",
+    done: "Done",
+    skip: "Skip tour",
+    steps: {
+      tree: { title: "Your pages", body: "Every page and folder of this Private Space. Click one to open it, or drag it to put it in order." },
+      create: { title: "New page, new folder, import", body: "Make a page or a folder here, or bring in your notes from Notion or Obsidian." },
+      search: { title: "Search and commands", body: (keys: string) => `${keys} finds any page. Type > first to run a command by its name.` },
+      editor: { title: "Write in blocks", body: "Type / on an empty line for the block menu. The handle at the left of a block moves it, or opens its menu." },
+      tabs: { title: "Tabs", body: "Each page opens in a tab. Right-click a tab to pin it, or to split it to the right." },
+      home: { title: "Home", body: "Your recent pages and favorites, one click away." },
+      assistant: { title: "The assistant", body: "Ask the assistant about your pages. It shows you every change before anything is written." },
+    },
   },
 
   /** Settings → Notifications (ADR-0018). The list under the bell always has every event; these are the system's. */

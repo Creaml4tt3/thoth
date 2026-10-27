@@ -7,6 +7,7 @@ import { createTransferService } from "../features/transfer/service.ts";
 import { createAgentsService } from "../features/agents/service.ts";
 import { createAssistantController } from "../features/mascot/controller.ts";
 import { Shell } from "../features/shell/Shell.tsx";
+import { requestFirstRunTour } from "../features/tour/store.ts";
 import { SessionContext, type AppOptions, type Session } from "./context.ts";
 import { createReconciler } from "./reconciler.ts";
 import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
@@ -389,7 +390,21 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   return (
     <SessionContext.Provider value={session}>
       <PageHostContext.Provider value={pageHost}>
-        {showIntro ? <Intro onContinue={() => setShowIntro(false)} /> : <Shell />}
+        {showIntro ? (
+          <Intro
+            onContinue={(welcome) => {
+              if (welcome) {
+                // The Welcome pages were just written (ADR-0032): open the first, then the tour, unless it was seen.
+                bump();
+                tabs.open({ kind: "page", path: welcome });
+                requestFirstRunTour();
+              }
+              setShowIntro(false);
+            }}
+          />
+        ) : (
+          <Shell />
+        )}
         {/* Connected apps (ADR-0021): this window answers apps' requests for its Private Space, and asks Allow or Deny. */}
         {platform.connectedApps && <ConnectedAppsHost connectedApps={platform.connectedApps} />}
       </PageHostContext.Provider>

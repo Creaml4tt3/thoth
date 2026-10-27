@@ -20,6 +20,8 @@ import { AgentSessionView } from "../agents/AgentSessionView.tsx";
 import { taskTitle } from "../agents/parts.tsx";
 import { MascotLayer } from "../mascot/Mascot.tsx";
 import { UpdateNotice } from "../updates/UpdateNotice.tsx";
+import { Tour } from "../tour/Tour.tsx";
+import { requestTour } from "../tour/store.ts";
 import type { Tab, TabTarget, TabsState } from "@thoth/app-ui/tabs/model.ts";
 import { TabBar, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { tabMoves } from "@thoth/app-ui/tabs/useTabs.ts";
@@ -306,6 +308,7 @@ export function Shell() {
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
+    showTour: requestTour,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
@@ -495,6 +498,7 @@ export function Shell() {
       {!side.hidden && <SidebarResizer sidebar={sidebar} shell={shell} />}
       <MascotLayer />
       <UpdateNotice />
+      <Tour />
       <TooltipLayer />
       <SpaceDragBadge />
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-favorites-note="">

@@ -8,6 +8,7 @@ import { fireEvent } from "@testing-library/react";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
+import { WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
 import { th } from "../src/strings/index.ts";
 import { th as sharedTh } from "@thoth/app-ui/strings/index.ts";
 
@@ -371,8 +372,9 @@ describe("New folder", () => {
 
   it("works in an empty Private Space, where the tree has no rows yet", async () => {
     root = await dirs.dir();
+    await seed(root, { [WELCOME_RECORD]: '{ "version": 1 }\n' }); // its Welcome pages (ADR-0032) were deleted
     const app = await openApp(root);
-    await app.user.click(await screen.findByRole("button", { name: /start writing/i })); // a new, empty folder
+    await app.user.click(await screen.findByRole("button", { name: /start writing/i })); // an empty folder
     await screen.findByText("No pages yet.");
     await app.user.click(await screen.findByRole("button", { name: "New folder" }));
     await naming("Untitled folder");

@@ -6,3 +6,4 @@
 @import "../features/settings/settings.css";
 @import "../features/import/import.css";
 @import "@thoth/app-ui/transfer/transfer.css";
+@import "../features/tour/tour.css";

@@ -7,6 +7,7 @@ import { createUnavailablePlatform, selectPlatform } from "../src/platform/selec
 import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
+import { WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
 
 const tauriPlatform = createNodePlatform();
 vi.mock("../src/platform/load-tauri.ts", () => ({ loadTauriPlatform: async () => tauriPlatform }));
@@ -151,6 +152,8 @@ describe("Import from Notion or Obsidian", () => {
 
   it("is offered in an empty Private Space's tree", async () => {
     root = await dirs.dir();
+    // Had its Welcome pages once (ADR-0032), and they were deleted: the tree is empty.
+    await seed(root, { [WELCOME_RECORD]: '{ "version": 1 }\n' });
     const app = await openApp(root);
     await app.user.click(await screen.findByRole("button", { name: /start writing/i }));
     const empty = (await screen.findByText("No pages yet.")).closest(".tree-empty")!;
