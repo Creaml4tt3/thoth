@@ -1,0 +1,204 @@
+/**
+ * Feedback (ADR-0033) end to end, against the real reference server (PostgreSQL in Podman):
+ *
+ * - The website's /support/ page, with JavaScript off: the plain form POST reaches the server, which stores it and
+ *   answers its thank-you page in the form's language, linking back. axe on the English and Thai pages.
+ * - The desktop app on the real Rust host: signed in to the server, Settings → Help and feedback → Send feedback; the
+ *   message arrives with the account and the details the dialog showed, and nothing about the Private Space.
+ *
+ * Pictures (light and dark) go to tests/.tmp/feedback/.
+ */
+import { AxeBuilder } from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { REPO } from "../ports/harness.ts";
+import { buildSite } from "../../apps/site/src/build.ts";
+import { readConfig } from "../../apps/site/src/config.ts";
+import { serveStatic, type StaticServer } from "../../apps/site/src/serve.ts";
+import { opaqueId } from "../../apps/server/src/ids.ts";
+import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import { axe } from "./assistant.ts";
+import { startBridge, type Bridge } from "./bridge.ts";
+import { actAsBrowser, freePort, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
+import { settled } from "./settled.ts";
+import { buildAll } from "./setup.ts";
+
+const SHOTS = join(REPO, "tests", ".tmp", "feedback");
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const HOST_LIB = readFileSync(join(REPO, "crates/thoth-host/src/lib.rs"), "utf8");
+const HOST_HAS_SERVERS = /"server\.add"/.test(HOST_LIB) && /"api\.call"/.test(HOST_LIB);
+
+async function serious(page: Page): Promise<string[]> {
+  const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  return results.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+}
+
+const rows = async (ref: ReferenceServer) => (await ref.db.query<{ kind: string; message: string; email: string | null; context: Record<string, string> | null; account_id: string | null }>("SELECT kind, message, email, context, account_id FROM feedback ORDER BY created_at")).rows;
+
+test.describe("the website's support page (ADR-0033)", () => {
+  let ref: ReferenceServer;
+  let site: StaticServer;
+  let siteUrl: string;
+  let scratch: string;
+
+  test.beforeAll(async () => {
+    await mkdir(SHOTS, { recursive: true });
+    const sitePort = await freePort();
+    const apiPort = await freePort();
+    siteUrl = `http://127.0.0.1:${sitePort}`;
+    scratch = await mkdtemp(join(tmpdir(), "thoth-support-e2e-"));
+    const out = join(scratch, "dist");
+    await buildSite(readConfig({ SITE_URL: siteUrl, API_URL: `http://127.0.0.1:${apiPort}` }, out));
+    site = await serveStatic(out, sitePort);
+    ref = await startReferenceServer({ port: apiPort, env: { CORS_ORIGINS: siteUrl, RATE_LIMIT_PER_IP: "unlimited" } });
+  });
+  test.afterAll(async () => {
+    await site?.close();
+    await ref?.close();
+    await rm(scratch, { recursive: true, force: true });
+  });
+
+  test("sends the form with JavaScript off, thanks in the page's language, and links back", async ({ browser }) => {
+    // The form must work without any script.
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1100, height: 900 } });
+    await context.route((url) => url.hostname !== "127.0.0.1", (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto(`${siteUrl}/support/`);
+    await expect(page.getByRole("heading", { level: 1, name: "Support and feedback" })).toBeVisible();
+    // The honeypot is not something a person sees.
+    await expect(page.locator("input[name=website]")).not.toBeInViewport();
+    await page.screenshot({ path: join(SHOTS, "site-support-dark.png"), fullPage: true });
+
+    await page.getByRole("radio", { name: "An idea" }).check();
+    await page.getByRole("textbox", { name: "Your message" }).fill("A calendar view, please.");
+    await page.getByRole("textbox", { name: "Your email (optional)" }).fill("ada@example.org");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Thank you" })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Your message has reached us");
+    for (const scheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.screenshot({ path: join(SHOTS, `site-thanks-${scheme}.png`) });
+    }
+    expect(await rows(ref)).toEqual([{ kind: "idea", message: "A calendar view, please.", email: "ada@example.org", context: { client: "site", language: "en" }, account_id: null }]);
+    await page.getByRole("link", { name: "Back to Support" }).click();
+    expect(page.url()).toBe(`${siteUrl}/support/`);
+
+    // In Thai, the thank-you page is in Thai and links back to the Thai page.
+    await page.goto(`${siteUrl}/th/support/`);
+    await page.getByRole("textbox", { name: "ข้อความของคุณ" }).fill("ทดสอบ");
+    await page.getByRole("button", { name: "ส่ง", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "ขอบคุณ" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "กลับไปหน้าช่วยเหลือ" })).toHaveAttribute("href", `${siteUrl}/th/support/`);
+    await context.close();
+  });
+
+  test("the English and Thai pages and the thank-you page pass axe", async ({ page, context }) => {
+    await context.route((url) => url.hostname !== "127.0.0.1", (route) => route.abort());
+    for (const path of ["/support/", "/th/support/"]) {
+      await page.goto(`${siteUrl}${path}`);
+      await page.waitForLoadState("networkidle");
+      await settled(page);
+      expect(await serious(page), path).toEqual([]);
+    }
+    await page.goto(`${siteUrl}/support/`);
+    await page.getByRole("textbox", { name: "Your message" }).fill("Checked by axe.");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Thank you" })).toBeVisible();
+    expect(await serious(page)).toEqual([]);
+  });
+});
+
+test.describe("Send feedback in the desktop app (ADR-0033)", () => {
+  test.skip(!HOST_HAS_SERVERS, "Pending on the Rust side: crates/thoth-host does not list the server.* and api.call commands yet.");
+  const SUBJECT = "sub-e2e-feedback";
+  let built: { dist: string; bridgeDir: string; binary: string };
+  let ref: ReferenceServer;
+  let issuer: FakeIssuer;
+  let scratch: string;
+  let bridge: Bridge;
+  let opened: string[];
+
+  test.beforeAll(async () => {
+    await mkdir(SHOTS, { recursive: true });
+    built = await buildAll();
+    ref = await startReferenceServer({ issuer: true });
+    issuer = ref.issuer!;
+    issuer.reset({ sub: SUBJECT, name: "Ada Lovelace", email: "ada@example.org" });
+  });
+  test.afterAll(async () => {
+    await ref?.close();
+  });
+
+  test.beforeEach(async ({ page, context }) => {
+    scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-fb-")));
+    await mkdir(join(scratch, "Vault"));
+    await writeFile(join(scratch, "Vault", "Secret plan.md"), "# Secret plan\n\nDo not send.\n");
+    opened = [];
+    bridge = await startBridge({
+      dist: built.dist,
+      bridgeDir: built.bridgeDir,
+      host: { binary: built.binary, pickVault: join(scratch, "Vault"), dataDir: join(scratch, "data"), onHostEvent: (event, payload) => void (event === "browser.open" && opened.push((payload as { url: string }).url)) },
+    });
+    await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
+    await page.addInitScript(bridge.initScript);
+    await page.goto(bridge.url);
+    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  });
+  test.afterEach(async ({ page }) => {
+    await page.close();
+    await bridge.close();
+    await rm(scratch, { recursive: true, force: true });
+  });
+
+  test("signed in, the message reaches the server with the account and exactly the details shown", async ({ page }) => {
+    const ada = opaqueId("usr");
+    await ref.db.query("INSERT INTO users (id, display_name, email) VALUES ($1, 'Ada Lovelace', 'ada@example.org')", [ada]);
+    await ref.db.query("INSERT INTO identities (provider, subject, user_id) VALUES ('google', $1, $2)", [SUBJECT, ada]);
+
+    await page.getByRole("button", { name: "Settings" }).click();
+    const servers = page.getByRole("region", { name: "Servers" });
+    await servers.getByRole("textbox", { name: "Server address" }).fill(ref.url);
+    await servers.getByRole("button", { name: "Add server" }).click();
+    const card = servers.getByRole("article");
+    await card.getByRole("button", { name: "Sign in with Google" }).click();
+    await expect.poll(() => opened.length, { timeout: 15_000 }).toBe(1);
+    await actAsBrowser(opened[0]!);
+    await expect(card.getByTestId("server-account")).toHaveText(/Signed in as Ada Lovelace/, { timeout: 15_000 });
+
+    const section = page.getByRole("region", { name: "Help and feedback" });
+    await section.getByRole("button", { name: "Send feedback…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Send feedback" });
+    await expect(dialog.getByText(/^Sent to /)).toBeVisible();
+    await dialog.getByRole("radio", { name: "A problem" }).check();
+    await dialog.getByRole("textbox", { name: "Your message" }).fill("The sidebar froze after a drag.");
+    const shown = (await dialog.locator(".feedback-details li").allTextContents()).map((line) => line.split(": ") as [string, string]);
+    expect(shown.map(([k]) => k)).toEqual(expect.arrayContaining(["client", "os", "language"]));
+    for (const dark of [false, true]) {
+      await page.evaluate((night) => document.documentElement.setAttribute("data-theme", night ? "night" : "light"), dark);
+      await settled(page);
+      await dialog.screenshot({ path: join(SHOTS, `desktop-dialog-${dark ? "dark" : "light"}.png`) });
+      await axe(page, ".modal");
+    }
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+
+    // An empty message is refused in the dialog, with the focus on the field.
+    await dialog.getByRole("textbox", { name: "Your message" }).fill("");
+    await dialog.getByRole("button", { name: "Send" }).click();
+    await expect(dialog.getByRole("textbox", { name: "Your message" })).toBeFocused();
+    await expect(dialog.getByRole("textbox", { name: "Your message" })).toHaveAttribute("aria-invalid", "true");
+    expect(await rows(ref)).toEqual([]);
+
+    await dialog.getByRole("textbox", { name: "Your message" }).fill("The sidebar froze after a drag.");
+    await dialog.getByRole("button", { name: "Send" }).click();
+    await expect(dialog.getByRole("status")).toHaveText("Thank you. Your message was sent.");
+    await dialog.screenshot({ path: join(SHOTS, "desktop-dialog-sent-light.png") });
+    const stored = await rows(ref);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ kind: "problem", message: "The sidebar froze after a drag.", email: null, account_id: ada });
+    expect(stored[0]!.context).toEqual(Object.fromEntries(shown));
+    expect(JSON.stringify(stored)).not.toMatch(/Secret plan|Vault/);
+  });
+});
