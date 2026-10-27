@@ -320,9 +320,14 @@ function targetFromStored(value: unknown): TabTarget | null {
   }
 }
 
-export function serializeTabs(state: TabsState): string {
+/** One tab list in its stored form (the body of `v: 1`, and of each pane of `v: 2`). */
+export function storedTabs(state: TabsState): { active: number; tabs: unknown[] } {
   const entry = (t: Tab): unknown => (t.pinned ? { ...(storedTarget(t.target) as object), pin: true } : storedTarget(t.target));
-  const stored: Stored = { v: 1, active: activeIndex(state), tabs: state.tabs.map(entry) };
+  return { active: activeIndex(state), tabs: state.tabs.map(entry) };
+}
+
+export function serializeTabs(state: TabsState): string {
+  const stored: Stored = { v: 1, ...storedTabs(state) };
   return JSON.stringify(stored);
 }
 
@@ -342,18 +347,27 @@ export function parseTabs(raw: string | null | undefined, keep: (target: TabTarg
   if (typeof data !== "object" || data === null) return null;
   const stored = data as Partial<Stored>;
   if (stored.v !== 1 || !Array.isArray(stored.tabs)) return null;
-  const wanted = typeof stored.active === "number" ? stored.active : 0;
+  return tabsFromStored(stored.tabs, stored.active, keep) ?? initialTabs();
+}
+
+/**
+ * One stored list of tabs (a `v: 1` list, or one pane of a `v: 2` layout, ADR-0030) as tabs; null when none of its
+ * entries is readable and kept.
+ */
+export function tabsFromStored(entries: readonly unknown[], storedActive: unknown, keep: (target: TabTarget) => boolean = () => true): TabsState | null {
+  const wanted = typeof storedActive === "number" ? storedActive : 0;
   const targets: TabTarget[] = [];
   const pinned: boolean[] = [];
   // The current tab, or the first kept one after it when it was dropped; the last one when none is left after it.
   let active = -1;
-  stored.tabs.slice(0, MAX_TABS).forEach((value, i) => {
+  entries.slice(0, MAX_TABS).forEach((value, i) => {
     const target = targetFromStored(value);
     if (!target || !keep(target)) return;
     if (active < 0 && i >= wanted) active = targets.length;
     targets.push(target);
     pinned.push(target.kind !== "blank" && (value as { pin?: unknown }).pin === true);
   });
+  if (targets.length === 0) return null;
   const state = initialTabs(targets, active < 0 ? targets.length - 1 : active);
   if (!pinned.includes(true)) return state;
   // Pinned tabs first, each group in its stored order (a list edited by hand may have them anywhere).
