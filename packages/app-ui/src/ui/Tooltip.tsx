@@ -16,6 +16,7 @@
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { placeBeside } from "./place.ts";
 
 /** How long the pointer rests on an element before its tooltip shows (ms). */
 export const TOOLTIP_DELAY_MS = 500;
@@ -210,17 +211,9 @@ export function TooltipLayer({ delayMs = TOOLTIP_DELAY_MS }: { delayMs?: number 
   useLayoutEffect(() => {
     const el = box.current;
     if (!shown || !el) return;
-    const anchor = shown.host.getBoundingClientRect();
-    const size = el.getBoundingClientRect();
-    const viewW = document.documentElement.clientWidth || window.innerWidth;
-    const viewH = document.documentElement.clientHeight || window.innerHeight;
-    const below = anchor.bottom + GAP;
-    const fitsBelow = below + size.height <= viewH - MARGIN;
-    const above = anchor.top - GAP - size.height;
-    const side = !fitsBelow && above >= MARGIN ? "top" : "bottom";
-    const top = side === "bottom" ? Math.max(MARGIN, Math.min(below, viewH - MARGIN - size.height)) : above;
-    const left = Math.max(MARGIN, Math.min(anchor.left + anchor.width / 2 - size.width / 2, viewW - MARGIN - size.width));
-    setPlace({ top, left, side });
+    const view = { width: document.documentElement.clientWidth || window.innerWidth, height: document.documentElement.clientHeight || window.innerHeight };
+    const { top, left, side } = placeBeside(shown.host.getBoundingClientRect(), el.getBoundingClientRect(), view, ["bottom", "top"], { gap: GAP, margin: MARGIN });
+    setPlace({ top, left, side: side === "top" ? "top" : "bottom" });
   }, [shown]);
 
   if (!shown) return null;
