@@ -166,8 +166,9 @@ test("a popup right after the app opens for a newer version; Skip is remembered 
   await page.getByRole("dialog", { name: "Notifications" }).getByRole("button", { name: /Thoth 9\.9\.9 is out/ }).click();
   await popup(page).getByRole("button", { name: "Skip this version" }).click();
   await expect(popup(page)).toBeHidden();
-  const kept = JSON.parse(await readFile(join(scratch, "data", "update.json"), "utf8")) as { notify: boolean; lastCheck: number; skipped: string };
-  expect(kept).toMatchObject({ notify: true, lastCheck: T0, skipped: "9.9.9" });
+  // The popup closes before the host has written the choice down: wait for the file, not for the popup.
+  const kept = () => readFile(join(scratch, "data", "update.json"), "utf8").then((text) => JSON.parse(text) as { notify: boolean; lastCheck: number; skipped: string }, () => null);
+  await expect.poll(kept).toMatchObject({ notify: true, lastCheck: T0, skipped: "9.9.9" });
   expect(asked).toHaveLength(1);
 
   // Restart an hour later: every start of the app asks again, but the version was skipped.

@@ -55,6 +55,16 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
   });
   const token = randomBytes(24).toString("hex");
   let hold: { command: CommandName; when: (args: Record<string, unknown>) => boolean; arrive(): void; gate: Promise<void> } | null = null;
+  // The vaults each window opened. The desktop shell releases a window's handles when its page starts loading
+  // (`on_page_load` → `Host::detach`), so a reloaded page never meets its old page's index connection, which may still
+  // hold the write lock; the bridge does the same when it serves a window's page.
+  const opened = new Map<string, Set<string>>();
+  const releaseWindow = async (owner: string) => {
+    const handles = opened.get(owner);
+    if (!handles) return;
+    opened.delete(owner);
+    for (const vault of handles) await transport.as(owner).call("vault.close", { vault }).catch(() => undefined);
+  };
   const unlisten = await transport.listen("vault.changed", (event: VaultChangedEvent) => {
     for (const res of streams) res.write(`data: ${JSON.stringify(event)}\n\n`);
   });
@@ -75,6 +85,9 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
           // Each page is its own window (ADR-0019): the host sees its id as the desktop shell's webview label.
           const caller = typeof owner === "string" ? transport.as(owner) : transport;
           const result = await caller.call(command, args, bytes === undefined ? undefined : decodeBase64(bytes));
+          const window = typeof owner === "string" ? owner : "";
+          if (command === "vault.open") opened.set(window, (opened.get(window) ?? new Set()).add((result as { vault: string }).vault));
+          if (command === "vault.close") opened.get(window)?.delete((args as { vault: string }).vault);
           const payload = BYTE_RESULTS.has(command) ? { ok: true, bytes: encodeBase64(result as Uint8Array) } : { ok: true, result };
           res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(payload));
         } catch (error) {
@@ -97,6 +110,8 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
       // Static files from dist only; anything else falls back to index.html.
       const file = normalize(join(options.dist, url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname)));
       const safe = file.startsWith(options.dist + sep) ? file : join(options.dist, "index.html");
+      // A window's page starting to load (a reload, a restart on the same origin): its old handles go, as in the shell.
+      if (safe.endsWith(`${sep}index.html`)) await releaseWindow(url.searchParams.get("window") ?? "main");
       const data = await readFile(safe).catch(() => readFile(join(options.dist, "index.html")));
       res.writeHead(200, { "content-type": TYPES[extname(safe)] ?? "application/octet-stream" }).end(data);
     })().catch((error: unknown) => res.writeHead(500).end(String(error)));
