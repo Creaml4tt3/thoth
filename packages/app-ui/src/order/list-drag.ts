@@ -179,6 +179,7 @@ export function useListDrag(options: ListDragOptions) {
     if (event.button !== 0 || event.pointerType === "touch" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if ((event.target as Element).closest?.(OWN_CONTROLS)) return;
     end();
+    swallowClick.current = false; // a new press: whatever a cancelled drag held back is over
     pending.current = { id, pointer: event.pointerId, y: event.clientY, started: false };
     try {
       (event.target as Element).setPointerCapture?.(event.pointerId);
@@ -189,7 +190,13 @@ export function useListDrag(options: ListDragOptions) {
       if (e.key !== "Escape" || !pending.current?.started) return;
       e.preventDefault();
       e.stopPropagation();
-      swallowNextClick();
+      // The click that comes with letting go of the button (often long after Escape) must not act as a click.
+      swallowClick.current = true;
+      const release = () => {
+        window.removeEventListener("pointerup", release, true);
+        swallowNextClick();
+      };
+      window.addEventListener("pointerup", release, true);
       end();
     };
     const cancel = () => end();

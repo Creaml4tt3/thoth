@@ -247,6 +247,7 @@ export function useTabDrag(options: TabDragOptions) {
     if (event.button !== 0 || event.pointerType === "touch" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if ((event.target as Element).closest?.(".tab-close")) return;
     end();
+    swallowClick.current = false; // a new press: whatever a cancelled drag held back is over
     pending.current = { id, pointer: event.pointerId, x: event.clientX, y: event.clientY, started: false };
     // Keep getting the pointer when it leaves the window, so a release out there is seen (and opens a new window).
     try {
@@ -258,8 +259,14 @@ export function useTabDrag(options: TabDragOptions) {
       if (e.key !== "Escape" || !pending.current?.started) return;
       e.preventDefault();
       e.stopPropagation();
+      // The click that comes with letting go of the button (often long after Escape) must not open the tab: it is
+      // swallowed until just after that release.
       swallowClick.current = true;
-      setTimeout(() => (swallowClick.current = false), 0);
+      const release = () => {
+        window.removeEventListener("pointerup", release, true);
+        setTimeout(() => (swallowClick.current = false), 0);
+      };
+      window.addEventListener("pointerup", release, true);
       end();
     };
     const cancel = () => end();

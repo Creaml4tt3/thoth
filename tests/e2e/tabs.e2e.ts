@@ -133,6 +133,7 @@ test("tabs are dragged to a new place with a real pointer, and come back in that
   await expectPlaces(page, { Gamma: start0["Alpha"]!, Alpha: start0["Beta"]! });
   await drag.cancel();
   await expect.poll(() => tabNames(page)).toEqual(["Gamma", "Beta", "Alpha"]);
+  await expect(current(page)).toHaveText("Gamma"); // a cancelled drag of Beta does not open it
   await expectPlaces(page, { Gamma: start0["Alpha"]!, Beta: start0["Beta"]!, Alpha: start0["Gamma"]! });
 
   // The keyboard way: Option/Alt+Shift+Right on the focused tab.
@@ -141,6 +142,7 @@ test("tabs are dragged to a new place with a real pointer, and come back in that
   await expect.poll(() => tabNames(page)).toEqual(["Beta", "Gamma", "Alpha"]);
   await expect(page.getByRole("tab", { name: "Gamma" })).toBeFocused();
 
+  await expect(current(page)).toHaveText("Gamma");
   // Restart: the order comes back, and the same tab is current.
   await page.reload();
   await page.getByRole("button", { name: /choose or create a private space/i }).click();

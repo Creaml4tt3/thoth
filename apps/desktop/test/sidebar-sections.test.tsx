@@ -171,6 +171,22 @@ describe("dragging a section by its header", () => {
     expect(localStorage.getItem(sidebarKey(root))).toBeNull();
   });
 
+  it("a drag cancelled with Escape does not fold the section when the button is let go later", async () => {
+    await start();
+    layout();
+    const header = region("Server Team server").querySelector<HTMLElement>(".sec")!;
+    const toggle = header.querySelector<HTMLElement>("[aria-expanded]")!;
+    const before = toggle.getAttribute("aria-expanded");
+    pointer("pointerDown", toggle, 110);
+    pointer("pointerMove", window, 120);
+    pointer("pointerMove", window, 5);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(() => new Promise((r) => setTimeout(r, 20))); // the button is let go well after Escape
+    pointer("pointerUp", window, 5);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe(before);
+  });
+
   it("a press on a page in the tree never starts a section drag, and a press on the header is not a page drag", async () => {
     await start();
     layout();

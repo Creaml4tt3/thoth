@@ -241,6 +241,23 @@ describe("dragging a tab along the bar", () => {
     expect(tabNames()).toEqual(["A", "B", "C", "D"]);
   });
 
+  it("a drag cancelled with Escape does not open the tab when the button is let go later", async () => {
+    const spies = setup();
+    const drag = press("B");
+    drag.move(drag.from + 10);
+    drag.move(360);
+    fireEvent.keyDown(window, { key: "Escape" });
+    // A person lets go of the button well after pressing Escape.
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    drag.up(360);
+    fireEvent.click(screen.getByRole("tab", { name: "B" }));
+    expect(spies.onActivate).not.toHaveBeenCalled();
+    // The next real click opens it.
+    await act(() => new Promise((r) => setTimeout(r, 5)));
+    fireEvent.click(screen.getByRole("tab", { name: "B" }));
+    expect(spies.onActivate).toHaveBeenCalledWith("B");
+  });
+
   it("a cancelled pointer or the window losing focus puts everything back too", () => {
     const spies = setup();
     let drag = press("B");
