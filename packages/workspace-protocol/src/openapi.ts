@@ -160,7 +160,8 @@ export function buildOpenApiDocument(): Json {
       };
     }
     operation.responses = responses;
-    if (route.public) operation.security = [];
+    // An empty requirement object means "no credentials"; listing it with the bearer one makes the bearer optional.
+    if (route.public) operation.security = route.optionalAuth ? [{}, { bearerAuth: [] }] : [];
     if (route.capability) operation["x-thoth-capability"] = route.capability;
     operation["x-thoth-error-codes"] = [...route.errors];
     return operation;

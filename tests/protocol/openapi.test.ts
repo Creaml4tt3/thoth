@@ -148,6 +148,8 @@ describe("protocol/openapi.yaml", () => {
     expect(text).not.toMatch(/authorizationCode|clientCredentials|openIdConnect|oauth2/);
     const open = operations().filter((o) => Array.isArray(o.op.security) && o.op.security.length === 0).map((o) => o.op.operationId);
     expect(open).toEqual(["getCapabilities"]);
+    // ADR-0033: feedback needs no credentials but keeps the account when a valid one is sent.
+    expect(operations().find((o) => o.op.operationId === "sendFeedback")!.op.security).toEqual([{}, { bearerAuth: [] }]);
   });
 
   it("names the capability every gated operation requires", () => {

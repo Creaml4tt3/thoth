@@ -18,10 +18,11 @@ import { PROTOCOL_VERSION } from "./common.ts";
  *                      unauthenticated invite pages under `/i/<token>` on the server origin (ADR-0024)
  * - `workspace-management` routes: createWorkspace, renameWorkspace, deleteWorkspace, listDeletedWorkspaces,
  *                      restoreWorkspace, purgeWorkspace (ADR-0025)
+ * - `feedback`         routes: sendFeedback (ADR-0033); no sign-in needed
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

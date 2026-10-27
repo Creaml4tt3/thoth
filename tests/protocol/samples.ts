@@ -85,4 +85,6 @@ export const SAMPLES: Record<string, unknown> = {
   WorkspaceRename: { name: "Design team" },
   DeletedWorkspace: DELETED_WORKSPACE,
   DeletedWorkspaceList: { items: [DELETED_WORKSPACE], nextCursor: null },
+  FeedbackRequest: { kind: "idea", message: "A dark sidebar, please.", email: "ada@example.org", context: { client: "desktop", version: "0.4.0", os: "macOS", language: "th" } },
+  FeedbackContext: { client: "web", language: "en" },
 };

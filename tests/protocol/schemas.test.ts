@@ -21,6 +21,7 @@ import {
   parseEtag,
   problem,
   CursorSchema,
+  FeedbackRequestSchema,
 } from "@thoth/workspace-protocol";
 import { SAMPLES } from "./samples.ts";
 
@@ -247,5 +248,32 @@ describe("page kind (capability page-kind, ADR-0017)", () => {
     expect(pageKindOf("---\n- a\n- b\n---\n")).toBeNull(); // not a mapping
     expect(pageKindOf("---\nkey: *missing\n---\n")).toBeNull();
     expect(pageKindOf("---\n\t: bad\n---\n")).toBeNull();
+  });
+});
+
+describe("feedback request (ADR-0033)", () => {
+  const ok = { kind: "problem", message: "It crashed." };
+  it("accepts the three kinds, an optional email and a short client description", () => {
+    for (const kind of ["problem", "idea", "question"]) expect(FeedbackRequestSchema.safeParse({ ...ok, kind }).success, kind).toBe(true);
+    expect(FeedbackRequestSchema.safeParse({ ...ok, email: "a@example.org", context: { client: "site", language: "th" } }).success).toBe(true);
+    expect(FeedbackRequestSchema.safeParse({ ...ok, message: "x".repeat(5000) }).success).toBe(true);
+  });
+  it("refuses an empty, blank or too long message, a bad email, an unknown kind or client", () => {
+    for (const bad of [
+      { ...ok, message: "" },
+      { ...ok, message: "   \n" },
+      { ...ok, message: "x".repeat(5001) },
+      { ...ok, email: "not-an-email" },
+      { ...ok, email: `${"a".repeat(250)}@x.org` },
+      { ...ok, kind: "bug" },
+      { ...ok, context: { client: "cli" } },
+      { ...ok, context: { client: "web", os: "a\u0000b" } },
+      { ...ok, context: { client: "web", version: "x".repeat(41) } },
+      { kind: "idea" },
+    ]) expect(FeedbackRequestSchema.safeParse(bad).success, JSON.stringify(bad).slice(0, 80)).toBe(false);
+  });
+  it("is strict: page text, titles or file names cannot ride along", () => {
+    expect(FeedbackRequestSchema.safeParse({ ...ok, pageTitle: "Secret plan" }).success).toBe(false);
+    expect(FeedbackRequestSchema.safeParse({ ...ok, context: { client: "desktop", file: "Notes/Plan.md" } }).success).toBe(false);
   });
 });

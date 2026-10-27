@@ -73,7 +73,18 @@ describe("route registry", () => {
       listDeletedWorkspaces: "workspace-management",
       restoreWorkspace: "workspace-management",
       purgeWorkspace: "workspace-management",
+      sendFeedback: "feedback",
     });
+  });
+
+  it("puts sendFeedback where ADR-0033 says: POST /feedback, no sign-in, 204, rate limited, nothing else", () => {
+    const r = getRoute("sendFeedback");
+    expect(`${r.method.toUpperCase()} ${r.path}`).toBe("POST /feedback");
+    expect(r.public).toBe(true);
+    expect(r.responses.map((x) => x.status)).toEqual([204]);
+    expect(r.errors).toEqual(expect.arrayContaining(["validation_failed", "rate_limited", "capability_not_supported"]));
+    expect(r.errors).not.toContain("unauthenticated");
+    expect(r.requestHeaders).toEqual([]);
   });
 
   it("puts the workspace-management calls where ADR-0025 says: create with Idempotency-Key, owners-only changes, restore and purge of deleted ones", () => {
@@ -112,8 +123,8 @@ describe("route registry", () => {
     expect(getRoute("acceptInvite").requestHeaders).toEqual([]);
   });
 
-  it("only exposes GET /capabilities without credentials", () => {
-    expect(ROUTES.filter((r) => r.public).map((r) => r.operationId)).toEqual(["getCapabilities"]);
+  it("only exposes GET /capabilities and POST /feedback without credentials", () => {
+    expect(ROUTES.filter((r) => r.public).map((r) => r.operationId)).toEqual(["getCapabilities", "sendFeedback"]);
   });
 
   it("declares the conditional-write headers on page writes", () => {

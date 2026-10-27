@@ -29,6 +29,7 @@ tags:
   - name: Sharing
   - name: Members
   - name: Workspaces
+  - name: Feedback
 paths:
   /api/v1/capabilities:
     get:
@@ -2118,6 +2119,63 @@ paths:
         - internal_error
         - capability_not_supported
         - service_unavailable
+  /api/v1/feedback:
+    post:
+      operationId: sendFeedback
+      tags:
+        - Feedback
+      summary: Send a problem, an idea or a question to the server's operator
+      description: |-
+        ADR-0033. No credentials needed; a valid bearer credential, when sent, ties the feedback to that account (an invalid one is ignored, never 401). The body is strict: only `kind`, `message`, an optional `email`, an optional `context` (client, version, os, language) and the website form's honeypot `website`. Nothing is stored for a refused request. A request whose honeypot is filled in gets the same 204 and is not stored. Rate limited per client address and per account, a short and a daily window (429 with `Retry-After`). The website's no-JavaScript form may send the same fields form-encoded (`context` as `client`, `version`, `os`, `language`) and gets an HTML page back; such a request must come from an origin the server allows for CORS.
+
+        Requires capability `feedback`.
+      requestBody:
+        required: true
+        description: The kind, the message, and optionally an email address and the client's description of itself.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+      responses:
+        "204":
+          description: Received.
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "413":
+          $ref: "#/components/responses/Problem413"
+          description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
+        "415":
+          $ref: "#/components/responses/Problem415"
+          description: "`unsupported_media_type`: The request content type is not accepted."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      security:
+        - {}
+        - bearerAuth: []
+      x-thoth-capability: feedback
+      x-thoth-error-codes:
+        - validation_failed
+        - forbidden
+        - payload_too_large
+        - unsupported_media_type
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
 components:
   schemas:
     AttachmentResource:
@@ -2183,6 +2241,7 @@ components:
                   - members
                   - invite-links
                   - workspace-management
+                  - feedback
                   - databases
                   - realtime-collab
               - type: string
@@ -2398,6 +2457,58 @@ components:
       required:
         - items
         - nextCursor
+    FeedbackContext:
+      type: object
+      properties:
+        client:
+          type: string
+          enum:
+            - desktop
+            - web
+            - site
+        version:
+          type: string
+          maxLength: 40
+          pattern: ^[0-9A-Za-z][0-9A-Za-z.+-]*$
+        os:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: ^[^\u0000-\u001f\u007f-\u009f]+$
+        language:
+          type: string
+          maxLength: 35
+          pattern: ^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$
+      required:
+        - client
+      additionalProperties: false
+    FeedbackRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+            - problem
+            - idea
+            - question
+        message:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        email:
+          type: string
+          maxLength: 254
+          format: email
+          pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+        context:
+          $ref: "#/components/schemas/FeedbackContext"
+        website:
+          type: string
+          maxLength: 500
+      required:
+        - kind
+        - message
+      additionalProperties: false
     InviteAccepted:
       type: object
       properties:
@@ -3801,5 +3912,6 @@ x-thoth-capabilities:
   - members
   - invite-links
   - workspace-management
+  - feedback
   - databases
   - realtime-collab

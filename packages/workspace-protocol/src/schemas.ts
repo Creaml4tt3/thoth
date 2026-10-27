@@ -10,6 +10,7 @@ import { ChangeEntrySchema, ChangeHintEventSchema, ChangesResponseSchema } from 
 import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemSchema, TransferResourceSchema } from "./transfers.ts";
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
+import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -69,4 +70,6 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "WorkspaceRename", file: "workspace-rename.v1", schema: WorkspaceRenameSchema },
   { name: "DeletedWorkspace", file: "deleted-workspace.v1", schema: DeletedWorkspaceSchema },
   { name: "DeletedWorkspaceList", file: "deleted-workspace-list.v1", schema: DeletedWorkspaceListSchema },
+  { name: "FeedbackRequest", file: "feedback-request.v1", schema: FeedbackRequestSchema },
+  { name: "FeedbackContext", file: "feedback-context.v1", schema: FeedbackContextSchema },
 ];

@@ -12,6 +12,7 @@ import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferOpera
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema, ShareLinkListSchema } from "./shares.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
+import { FeedbackRequestSchema } from "./feedback.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -64,6 +65,8 @@ export interface RouteDefinition {
   capability: CapabilityId | null;
   /** True when the route is reachable without credentials. */
   public: boolean;
+  /** A public route that also reads a bearer credential when one is sent (sendFeedback). */
+  optionalAuth: boolean;
   pathParams: Readonly<Record<string, z.ZodType>>;
   query: z.ZodObject | null;
   requestHeaders: readonly RequestHeaderSpec[];
@@ -108,6 +111,7 @@ interface RouteInit {
   description: string;
   capability?: CapabilityId;
   public?: boolean;
+  optionalAuth?: boolean;
   pathParams?: Record<string, z.ZodType>;
   query?: z.ZodObject;
   requestHeaders?: RequestHeaderSpec[];
@@ -129,6 +133,7 @@ function route(init: RouteInit): RouteDefinition {
     description: init.description,
     capability: init.capability ?? null,
     public: init.public ?? false,
+    optionalAuth: init.optionalAuth ?? false,
     pathParams: init.pathParams ?? {},
     query: init.query ?? null,
     requestHeaders: init.requestHeaders ?? [],
@@ -592,6 +597,20 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     responses: [{ status: 204, description: "Purged.", headers: [] }],
     errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),  route({
+    operationId: "sendFeedback",
+    method: "post",
+    path: "/feedback",
+    tag: "Feedback",
+    summary: "Send a problem, an idea or a question to the server's operator",
+    description:
+      "ADR-0033. No credentials needed; a valid bearer credential, when sent, ties the feedback to that account (an invalid one is ignored, never 401). The body is strict: only `kind`, `message`, an optional `email`, an optional `context` (client, version, os, language) and the website form's honeypot `website`. Nothing is stored for a refused request. A request whose honeypot is filled in gets the same 204 and is not stored. Rate limited per client address and per account, a short and a daily window (429 with `Retry-After`). The website's no-JavaScript form may send the same fields form-encoded (`context` as `client`, `version`, `os`, `language`) and gets an HTML page back; such a request must come from an origin the server allows for CORS.",
+    capability: "feedback",
+    public: true,
+    optionalAuth: true,
+    requestBody: { contentType: JSON_CT, schema: FeedbackRequestSchema, required: true, description: "The kind, the message, and optionally an email address and the client's description of itself." },
+    responses: [{ status: 204, description: "Received.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "payload_too_large", "unsupported_media_type", "rate_limited", "internal_error", "service_unavailable"],
   }),
 ];
 

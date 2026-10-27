@@ -41,6 +41,7 @@ import {
   type ErrorCode,
   type Role,
   type TransferResource,
+  FeedbackRequestSchema,
 } from "@thoth/workspace-protocol";
 
 export const EDITOR_TOKEN = "tok_conformance_editor_9f3a7c1e5b";
@@ -67,7 +68,7 @@ export interface Flaws {
 
 export interface TestServerOptions {
   flaws?: Flaws;
-  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share, members, invite-links, workspace-management. */
+  /** Capabilities to list and serve. Default: attachments, search, events.sse, transfers, page-order, page-kind, public-share, members, invite-links, workspace-management, feedback. */
   capabilities?: CapabilityId[];
 }
 
@@ -177,7 +178,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -989,6 +990,18 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       const auth = req.headers.authorization;
       const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
       const user = token ? users[token] : undefined;
+      // ADR-0033: feedback needs no credentials; the fake keeps nothing.
+      if (method === "POST" && segments.length === 1 && segments[0] === "feedback") {
+        if (!caps.has("feedback")) return send(res, errorReply(new ApiError("capability_not_supported", "capability feedback is not supported"), req));
+        const parsed = FeedbackRequestSchema.safeParse((() => {
+          try {
+            return JSON.parse(body.toString("utf8"));
+          } catch {
+            return undefined;
+          }
+        })());
+        return send(res, parsed.success ? { status: 204, headers: {} } : errorReply(zodFail(parsed.error), req));
+      }
       if (!user) return send(res, errorReply(new ApiError("unauthenticated", "a valid bearer credential is required"), req));
 
       const candidates = matchRoute(segments);
