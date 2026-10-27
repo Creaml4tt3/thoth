@@ -391,6 +391,12 @@ test("Settings: a link to one of the last (short) sections scrolls only the sett
     return out;
   });
   expect(moved).toEqual([]);
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await settled(page);
+    await page.screenshot({ path: join(SHOTS, `settings-last-section-${scheme}.png`) });
+  }
+  await page.emulateMedia({ colorScheme: "light" });
   // The keyboard path does the same.
   await nav.getByRole("link", { name: "Search index" }).focus();
   await page.keyboard.press("Enter");
