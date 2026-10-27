@@ -35,7 +35,7 @@ export function ContextMenu({ label, at, items, onClose }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
-  const [place, setPlace] = useState<{ left: number; top: number; maxHeight?: number; origin: string } | null>(null);
+  const [place, setPlace] = useState<{ left: number; top: number; maxHeight: number | undefined; origin: string } | null>(null);
 
   // Before paint: open at the point, flip above / to the left when it would overflow, then keep it inside the window.
   useLayoutEffect(() => {
