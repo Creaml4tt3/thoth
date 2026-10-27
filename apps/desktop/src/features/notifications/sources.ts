@@ -6,7 +6,6 @@
 import { basename, stripExtension } from "@thoth/domain";
 import type { RunRecord } from "@thoth/agent-core";
 import type { ImportReport } from "@thoth/importer-core";
-import type { OperationRecord } from "@thoth/transfer";
 import type { AgentFailure, NotificationCenter, NotificationEvent } from "@thoth/app-ui/notifications/core.ts";
 import type { AgentsService, RunPhase } from "../agents/service.ts";
 
@@ -60,26 +59,7 @@ export function watchAgentRuns(agents: AgentsService, center: NotificationCenter
   });
 }
 
-/** The event for a transfer that settled (done, failed or interrupted); null when it was undone. */
-export function transferEvent(record: OperationRecord, interrupted: boolean): NotificationEvent | null {
-  const done = !interrupted && (record.state === "done" || record.state === "destination_committed_source_cleanup_pending");
-  if (!interrupted && !done && record.state !== "failed") return null;
-  const where = record.direction === "to_workspace" ? record.workspace.name : null;
-  const pages = record.items.filter((i) => !i.folder).map((i) => (record.direction === "to_workspace" ? pageTitle(i.sourcePath) : i.title));
-  const first = (done ? record.items.find((i) => i.state !== "failed") : record.items[0]) ?? record.items[0];
-  if (!first) return null;
-  const ws = { server: record.server.id, workspace: record.workspace.id };
-  // Done: the result, where it went. Not finished: the originals, where they still are.
-  const open =
-    record.direction === "to_workspace"
-      ? done
-        ? { kind: "workspacePage" as const, ...ws, page: first.destId }
-        : { kind: "page" as const, path: first.sourcePath }
-      : done && first.destPath
-        ? { kind: "page" as const, path: first.destPath }
-        : { kind: "workspacePage" as const, ...ws, page: first.sourceId };
-  return { kind: done ? "transferDone" : "transferFailed", transferId: record.id, mode: record.mode, where, pages, open };
-}
+export { transferEvent } from "@thoth/app-ui/transfer/notify.ts";
 
 /** The event for an import that ended: complete, or with errors (a report or a thrown error); null when cancelled. */
 export function importEvent(jobId: string, folder: string, report: ImportReport | null): NotificationEvent | null {

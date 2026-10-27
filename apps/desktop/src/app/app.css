@@ -5,4 +5,4 @@
 @import "@thoth/app-ui/plain.css";
 @import "../features/settings/settings.css";
 @import "../features/import/import.css";
-@import "../features/transfer/transfer.css";
+@import "@thoth/app-ui/transfer/transfer.css";

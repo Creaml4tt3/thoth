@@ -123,7 +123,7 @@ describe("app CSS uses the tested accent", () => {
     "../src/shell.css",
     "../src/plain.css",
     "../src/ui.css",
-    "../../../apps/desktop/src/features/transfer/transfer.css",
+    "../src/transfer/transfer.css",
     "../../../apps/desktop/src/features/agents/agents.css",
     "../../../apps/desktop/src/features/import/import.css",
     "../../../apps/desktop/src/features/settings/settings.css",

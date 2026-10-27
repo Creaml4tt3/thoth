@@ -45,12 +45,16 @@ export interface SpaceDrop {
   mode: "copy" | "move";
 }
 
-export type Direction = "to_workspace" | "from_workspace";
+export type Direction = "to_workspace" | "from_workspace" | "between_workspaces";
 
-/** Which transfer a drop of a drag from `from` onto `to` would start; null within one space or between two workspaces. */
+/**
+ * Which transfer a drop of a drag from `from` onto `to` would start; null within one space. Two workspaces, on one
+ * server or two, are two spaces (ADR-0006, amendment of 2026-10-27).
+ */
 export function crossDirection(from: Space, to: Space): Direction | null {
   if (from.kind === "private") return to.kind === "workspace" ? "to_workspace" : null;
-  return to.kind === "private" ? "from_workspace" : null;
+  if (to.kind === "private") return "from_workspace";
+  return from.server === to.server && from.workspace === to.workspace ? null : "between_workspaces";
 }
 
 /** What the drop rules need to know about the workspace on the other end. */
@@ -69,10 +73,12 @@ export type SpaceRefusal = "signed_out" | "no_transfers" | "viewer" | "export_re
 
 /**
  * Why a drop across spaces is refused before the dialog could even open, or null. The workspace is the destination
- * (to_workspace) or the source (from_workspace). The server still decides (ADR-0009); this only spares people a
- * dialog that could not start. Moving out of a workspace one only views is left to the dialog, which says so.
+ * (to_workspace) or the source (from_workspace); between two workspaces both ends are asked, the destination as
+ * to_workspace and the source as from_workspace (`betweenRefusal`). The server still decides (ADR-0009); this only
+ * spares people a dialog that could not start. Moving out of a workspace one only views is left to the dialog,
+ * which says so.
  */
-export function spaceDropRefusal(direction: Direction, access: WorkspaceAccess): SpaceRefusal | null {
+export function spaceDropRefusal(direction: Exclude<Direction, "between_workspaces">, access: WorkspaceAccess): SpaceRefusal | null {
   if (!access.signedIn) return "signed_out";
   if (access.transfers === false) return "no_transfers";
   if (direction === "to_workspace" && access.role !== null && !roleCan(access.role, "write")) return "viewer";
@@ -94,6 +100,14 @@ export function workspaceAccess(directory: ServerDirectory, server: string, work
     transfers: capabilities ? capabilities.includes("transfers") : null,
     exportRestricted: ws?.exportRestricted ?? false,
   };
+}
+
+/** Why a drop from the workspace `source` onto the workspace `destination` is refused, and which end says so; or null. */
+export function betweenRefusal(source: WorkspaceAccess, destination: WorkspaceAccess): { refusal: SpaceRefusal; access: WorkspaceAccess } | null {
+  const to = spaceDropRefusal("to_workspace", destination);
+  if (to) return { refusal: to, access: destination };
+  const from = spaceDropRefusal("from_workspace", source);
+  return from ? { refusal: from, access: source } : null;
 }
 
 /** What the pointer says over a place that refuses the drop. */

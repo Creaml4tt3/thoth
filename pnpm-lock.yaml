@@ -404,6 +404,9 @@ importers:
       '@thoth/platform':
         specifier: workspace:*
         version: link:../platform
+      '@thoth/transfer':
+        specifier: workspace:*
+        version: link:../transfer
       '@thoth/workspace-client':
         specifier: workspace:*
         version: link:../workspace-client

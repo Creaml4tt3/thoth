@@ -23,11 +23,19 @@ export function privateAcross(servers: ServerDirectory, drag: SpaceDrag, folder:
   return { highlight, to: { kind: "private", folder }, text: (move ? s.moveTo : s.copyTo)(s.privateSpace) };
 }
 
+/** The dialog for a workspace page (and what it carries) going to another workspace; `to` prefills the destination. */
+export function betweenTarget(drag: SpaceDrag, mode: "copy" | "move", to?: { server: string; workspace: string; parentId: string | null }): TransferTarget | null {
+  if (drag.from.kind !== "workspace") return null;
+  return { direction: "between_workspaces", server: drag.from.server, workspace: drag.from.workspace, pageId: drag.row, pageIds: drag.ids, title: drag.title, mode, ...(to ? { to } : {}) };
+}
+
 /** The transfer dialog a drop opens, prefilled; null for a drop that is not across spaces. */
 export function transferTargetFor({ drag, to, mode }: SpaceDrop): TransferTarget | null {
   if (drag.from.kind === "private" && to.kind === "workspace")
     return { direction: "to_workspace", paths: drag.ids, mode, server: to.server, workspace: to.workspace, parentId: to.parentId, ...(drag.base !== undefined ? { base: drag.base } : {}) };
   if (drag.from.kind === "workspace" && to.kind === "private")
     return { direction: "from_workspace", server: drag.from.server, workspace: drag.from.workspace, pageId: drag.row, pageIds: drag.ids, title: drag.title, mode, folder: to.folder };
+  if (drag.from.kind === "workspace" && to.kind === "workspace" && !(drag.from.server === to.server && drag.from.workspace === to.workspace))
+    return betweenTarget(drag, mode, { server: to.server, workspace: to.workspace, parentId: to.parentId });
   return null;
 }

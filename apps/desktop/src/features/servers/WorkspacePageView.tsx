@@ -7,6 +7,7 @@ import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { workspaceKey, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { ShareButton } from "@thoth/app-ui/workspace/ShareButton.tsx";
+import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/elsewhere.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -25,6 +26,7 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
   const signedOut = entry?.info.auth === "signed-out";
   const workspace = entry?.workspaces?.find((w) => w.id === target.workspace);
   const title = directory.trees[workspaceKey(target.server, target.workspace)]?.nodes.find((n) => n.id === target.page)?.title ?? "";
+  const elsewhere = hasOtherWritableWorkspace(directory, target);
   /** Signing in over the open page, so unsaved edits stay where they are. */
   const [signingIn, setSigningIn] = useState(false);
   useEffect(() => {
@@ -41,6 +43,7 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
           <>
         <IconButton icon="copy" label={tt.copyHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })} />
         <IconButton icon="move-in" label={tt.moveHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "move" })} />
+        {elsewhere && <IconButton icon="to-workspace" label={tt.toOther} onClick={() => onTransfer({ direction: "between_workspaces", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })} />}
           </>
         )}
       </span>

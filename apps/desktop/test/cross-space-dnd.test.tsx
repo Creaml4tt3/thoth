@@ -36,6 +36,8 @@ interface Options {
   role?: "owner" | "editor" | "viewer";
   exportRestricted?: boolean;
   capabilities?: string[];
+  /** Also a workspace "Library" the person only views. */
+  library?: boolean;
 }
 
 /** A signed-in server "Team" with the workspaces "Archive" (owner) and "Studio" (as given), Studio holding "Board" and "Roadmap". */
@@ -43,6 +45,7 @@ async function start(options: Options = {}) {
   const servers = new FakeServers();
   const server = servers.connect({ ...TEAM, ...(options.capabilities ? { capabilities: options.capabilities } : {}) });
   const archive = servers.addWorkspace(server, { name: "Archive", role: "owner" });
+  if (options.library) servers.addWorkspace(server, { id: "ws_library", name: "Library", role: "viewer" });
   const ws = servers.addWorkspace(server, { name: "Studio", role: options.role ?? "owner", ...(options.exportRestricted ? { exportRestricted: true } : {}) });
   const board = servers.writeAsOther(ws, { title: "Board", markdown: "# Board\n" });
   const roadmap = servers.writeAsOther(ws, { title: "Roadmap", markdown: "# Roadmap\n\nไทย\n" });
@@ -252,14 +255,63 @@ describe("workspace → Private Space by drag and drop", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("a page dragged to another workspace is not accepted there (no transfer between workspaces)", async () => {
-    const { app, list } = await start();
+});
+
+describe("workspace → another workspace by drag and drop (amendment of 2026-10-27)", () => {
+  it("a page dropped on another workspace's row opens the dialog for its top level; Alt/Option moves it, with its sub-page", async () => {
+    const { app, servers, ws, archive, roadmap, list } = await start();
+    servers.writeAsOther(ws, { title: "Milestones", markdown: "# Milestones\n", parentId: roadmap.id });
+    const group = await expand(app, list);
+    const drag = hold(row(group, "Roadmap"), row(list, /^Archive/), { alt: true });
+    expect(drag.accepted).toBe(true);
+    expect(drag.effect).toBe("move");
+    expect(row(list, /^Archive/).getAttribute("data-drop")).toBe("inside");
+    expect(badge()?.textContent).toBe("Move to Archive…");
+    drag.drop();
+    const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to another workspace" });
+    expect(workspaceSelect(dialog).value.endsWith(`\n${archive.id}`)).toBe(true);
+    // The source is not offered as a destination.
+    expect([...workspaceSelect(dialog).options].map((o) => o.textContent)).toEqual(["Archive"]);
+    expect(radio(dialog, "Move").checked).toBe(true);
+    const preview = await within(dialog).findByRole("region", { name: "Who can see it" });
+    await waitFor(() => expect(preview.textContent).toContain("Milestones"));
+    expect(preview.textContent).toContain("From Studio");
+    expect(preview.textContent).toContain("Nothing has been written to Archive yet.");
+    await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
+    await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
+    await waitFor(() => expect(within(dialog).getByRole("status").textContent).toContain("2 pages were moved to Archive."), { timeout: 10_000 });
+    expect(live(archive).map((p) => p.title).sort()).toEqual(["Milestones", "Roadmap"]);
+    expect(live(ws).map((p) => p.title)).toEqual(["Board"]);
+  });
+
+  it("onto a page of the other workspace, that page is the parent", async () => {
+    const { app, servers, archive, list } = await start();
+    const shelf = servers.writeAsOther(archive, { title: "Shelf", markdown: "# Shelf\n" });
+    const group = await expand(app, list);
+    await app.user.click(row(list, /^Archive/));
+    const target = await within(list).findByRole("treeitem", { name: "Shelf" });
+    hold(row(group, "Roadmap"), target).drop();
+    const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to another workspace" });
+    await waitFor(() => expect(parentSelect(dialog).value).toBe(shelf.id));
+  });
+
+  it("an export-restricted workspace refuses a drop on another workspace, and says why", async () => {
+    const { app, list } = await start({ exportRestricted: true });
     const group = await expand(app, list);
     const drag = hold(row(group, "Roadmap"), row(list, /^Archive/));
     expect(drag.accepted).toBe(false);
-    expect(badge()).toBeNull();
+    expect(document.querySelector("[data-drop]")).toBeNull();
+    expect(badge()?.textContent).toBe("Studio does not allow copying or moving its pages out.");
     drag.drop();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("a workspace one only views refuses a drop from another workspace", async () => {
+    const { app, list } = await start({ library: true });
+    const group = await expand(app, list);
+    const drag = hold(row(group, "Roadmap"), row(list, /^Library/));
+    expect(drag.accepted).toBe(false);
+    expect(badge()?.textContent).toBe("You are a viewer in Library.");
   });
 });
 

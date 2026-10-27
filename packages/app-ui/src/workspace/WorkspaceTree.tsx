@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Keyboa
 import { PAGE_TITLE_MAX, WORKSPACE_NAME_MAX, roleCan, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
 import { useTreeDnd, type AcrossTarget, type DropZone, type TreeDnd } from "../order/dnd.ts";
-import { crossDirection, refusalText, spaceDropRefusal, workspaceAccess, type SpaceDrag } from "../order/space-drag.ts";
+import { betweenRefusal, crossDirection, refusalText, spaceDropRefusal, workspaceAccess, type SpaceDrag } from "../order/space-drag.ts";
 import { Disclosure, FolderIcon, PageIcon } from "../order/icons.tsx";
 import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
@@ -18,6 +18,7 @@ import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { useFavorites } from "../favorites/context.ts";
+import { hasOtherWritableWorkspace } from "../transfer/elsewhere.ts";
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
@@ -183,6 +184,12 @@ export interface WorkspaceSectionProps {
    * Space): what the page would carry in a drag, for the same transfer dialog. Move needs write here.
    */
   onToPrivate?(drag: SpaceDrag, mode: "copy" | "move"): void;
+  /**
+   * "Copy to another workspace…" and "Move to another workspace…" in a page's menu (ADR-0006, amendment of
+   * 2026-10-27), offered while there is another workspace the person can write to: what the page would carry in a
+   * drag, for the transfer dialog, which picks the destination. Move needs write here.
+   */
+  onToWorkspace?(drag: SpaceDrag, mode: "copy" | "move"): void;
 }
 
 const isThisWorkspace = (server: string, workspace: string) => (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "workspace" }> =>
@@ -210,9 +217,10 @@ function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: s
  * editors and owners, offers New page and New folder, rename (F2, context menu), and drag and drop, Alt+Shift+Up/Down
  * and "Move to…" to reorder and nest pages. Shared by the desktop sidebar and the web client.
  */
-export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false, onToPrivate }: WorkspaceSectionProps) {
+export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false, onToPrivate, onToWorkspace }: WorkspaceSectionProps) {
   const t = useStrings().workspace;
   const tt = useStrings().tree;
+  const tx = useStrings().transfer;
   const tm = useStrings().members;
   const tw = useStrings().workspaces;
   const tf = useStrings().favorites;
@@ -238,6 +246,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [said, setSaid] = useState("");
   const here = current?.server === server && current.workspace === workspace.id ? current.page : null;
   const canWrite = roleCan(workspace.role, "write");
+  /** Another workspace, on any server the person is signed in to, that takes pages. */
+  const elsewhere = hasOtherWritableWorkspace(state, { server, workspace: workspace.id });
   // ADR-0023: owners and editors, on a server that lists `public-share`.
   const canShare = canWrite && (state.capabilities[server]?.includes("public-share") ?? false);
   // ADR-0024: every member sees the members; owners also manage them and, with `invite-links`, invite people.
@@ -339,10 +349,13 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   };
   /** A drop lands at the top level (the workspace row) or inside the page under the pointer. */
   const across = (drag: SpaceDrag, id: string, move: boolean): AcrossTarget | null => {
-    if (crossDirection(drag.from, space) !== "to_workspace") return null;
+    const direction = crossDirection(drag.from, space);
+    if (direction !== "to_workspace" && direction !== "between_workspaces") return null;
     const access = workspaceAccess(directory, server, workspace.id);
-    const refusal = spaceDropRefusal("to_workspace", access);
-    if (refusal) return { highlight: null, to: null, text: refusalText(refusal, access, tt.across) };
+    // From another workspace both ends are asked: this one receives, the other gives (its export restriction).
+    const refused =
+      drag.from.kind === "workspace" ? betweenRefusal(workspaceAccess(directory, drag.from.server, drag.from.workspace), access) : ((r) => (r ? { refusal: r, access } : null))(spaceDropRefusal("to_workspace", access));
+    if (refused) return { highlight: null, to: null, text: refusalText(refused.refusal, refused.access, tt.across) };
     const parentId = id !== TOP && fresh()?.some((n) => n.id === id) ? id : null;
     return { highlight: parentId ?? TOP, to: { ...space, parentId }, text: (move ? tt.across.moveTo : tt.across.copyTo)(workspace.name) };
   };
@@ -496,7 +509,15 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             ...(canWrite ? [{ id: "move-to-private", label: tt.across.moveTo(tt.across.privateSpace), onSelect: () => onToPrivate(drag, "move") }] : []),
           ]
         : [];
-    if (!canWrite) return [...star, ...toPrivate];
+    const carried = onToWorkspace && elsewhere ? (drag ?? carry(id)) : null;
+    const toWorkspace: MenuItem[] =
+      onToWorkspace && carried
+        ? [
+            { id: "copy-to-workspace", label: tx.copyToOther, onSelect: () => onToWorkspace(carried, "copy") },
+            ...(canWrite ? [{ id: "move-to-workspace", label: tx.moveToOther, onSelect: () => onToWorkspace(carried, "move") }] : []),
+          ]
+        : [];
+    if (!canWrite) return [...star, ...toPrivate, ...toWorkspace];
     return [
       ...star,
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(id) },
@@ -506,6 +527,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
       ...toPrivate,
+      ...toWorkspace,
       ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
     ];
   };

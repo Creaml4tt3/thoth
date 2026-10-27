@@ -23,6 +23,7 @@
     "@thoth/domain": "workspace:*",
     "@thoth/editor": "workspace:*",
     "@thoth/platform": "workspace:*",
+    "@thoth/transfer": "workspace:*",
     "@thoth/workspace-client": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",
     "@tiptap/core": "^3.32.0",

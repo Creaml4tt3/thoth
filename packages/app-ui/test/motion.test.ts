@@ -15,7 +15,7 @@ const FILES: Record<string, string> = {
   "packages/app-ui/src/plain.css": read("../src/plain.css"),
   "apps/desktop/src/features/settings/settings.css": read("../../../apps/desktop/src/features/settings/settings.css"),
   "apps/desktop/src/features/import/import.css": read("../../../apps/desktop/src/features/import/import.css"),
-  "apps/desktop/src/features/transfer/transfer.css": read("../../../apps/desktop/src/features/transfer/transfer.css"),
+  "packages/app-ui/src/transfer/transfer.css": read("../src/transfer/transfer.css"),
   "apps/desktop/src/features/agents/agents.css": read("../../../apps/desktop/src/features/agents/agents.css"),
   "apps/desktop/src/features/onboarding/onboarding.css": read("../../../apps/desktop/src/features/onboarding/onboarding.css"),
   "apps/web/src/web.css": read("../../../apps/web/src/web.css"),

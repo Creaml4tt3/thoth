@@ -5,6 +5,7 @@
  */
 import type { System } from "../features/import/model.ts";
 import type { NotificationKind } from "@thoth/app-ui/notifications/core.ts";
+import { en as shared } from "@thoth/app-ui/strings/en.ts";
 
 type Phase = "staging" | "verifying" | "committing";
 type Step = "source" | "instructions" | "pick" | "preview" | "destination" | "options" | "run" | "report";
@@ -750,143 +751,9 @@ export const en = {
     },
   },
 
-  transfer: {
-    // Entry points.
-    select: "Select pages",
-    selectDone: "Done selecting",
-    selectPage: (title: string) => `Select ${title}`,
-    selected: (n: number) => `${n} selected`,
-    copyTo: "Copy to workspace…",
-    moveTo: "Move to workspace…",
-    copyHere: "Copy to Private Space…",
-    moveHere: "Move to Private Space…",
-    transfers: "Transfers",
-    noWorkspaces: "Add a server and sign in to a workspace first (Settings → Servers).",
+  /** Shared with the web client (`@thoth/app-ui/transfer`). */
+  transfer: shared.transfer,
 
-    // Dialog titles.
-    titleTo: (mode: "copy" | "move", n: number) => `${mode === "copy" ? "Copy" : "Move"} ${n === 1 ? "1 page" : `${n} pages`} to a workspace`,
-    titleFrom: (mode: "copy" | "move", title: string) => `${mode === "copy" ? "Copy" : "Move"} “${title}” to your Private Space`,
-
-    // Destination.
-    destination: "Destination",
-    workspace: "Workspace",
-    chooseWorkspace: "Choose a workspace",
-    parent: "Put the pages",
-    topLevel: "At the top level",
-    under: (title: string) => `Inside “${title}”`,
-    folder: "Folder in your Private Space (leave empty for the top level)",
-    folderHint: "A page that was moved out of this Private Space goes back where it was, if that place is free.",
-    mode: "What happens to the original",
-    copy: { title: "Copy", hint: "The original stays where it is. The copy gets its own identity." },
-    moveToWs: { title: "Move", hint: "The original is deleted from your Private Space after the workspace has confirmed every page. A page you edit in the meantime is kept." },
-    moveFromWs: { title: "Move", hint: "The page is deleted from the workspace after it is safely in your Private Space. If someone edits it in the meantime, it stays in the workspace." },
-    attachments: "Include attachments the pages link to",
-
-    // Preview.
-    checking: "Checking what this transfer would do…",
-    whoCanSee: "Who can see it",
-    visibleTo: (n: number) => (n === 1 ? "Only you, the only member of this workspace." : `Everyone in this workspace (${n} members) can see these pages.`),
-    membersHidden: (n: number) => `${n} members can see these pages. This server does not list them.`,
-    roles: { owner: "owner", editor: "editor", viewer: "viewer" },
-    you: (role: string) => `Your role: ${role}`,
-    pagesHeading: "Pages",
-    attachmentsHeading: (n: number) => (n === 1 ? "1 attachment is uploaded" : `${n} attachments are uploaded`),
-    linksHeading: "Links",
-    links: {
-      included: "point to pages or files in this transfer and are updated",
-      already_at_destination: "point to pages already in the workspace and are updated",
-      left_at_source: "point to pages that stay behind; they keep their target",
-      external: "are web links and stay as they are",
-      unresolved: "point to nothing that exists; they are kept as written",
-    },
-    linksIn: "From the workspace's point of view",
-    flaggedTitle: "Links that will not work at the destination",
-    noLinks: "These pages have no links.",
-    nothingLeaves: "Nothing has left this computer yet.",
-    nothingLeavesFrom: "Nothing has been written to your Private Space yet.",
-
-    // Problems (block the transfer).
-    problems: {
-      server_unknown: "This server is no longer in your list.",
-      unreachable: (detail: string) => `The server could not be reached. ${detail}`,
-      signed_out: "You are signed out of this server. Sign in again in Settings → Servers.",
-      incompatible: "This server speaks a different version of the workspace protocol.",
-      no_transfers: "This server does not accept transfers, so copying and moving pages is turned off for it.",
-      workspace_not_found: "The workspace no longer exists, or you are no longer a member.",
-      forbidden: (role: string) => `You are a ${role} in this workspace, which does not allow this.`,
-      export_restricted: "This workspace does not allow copying or moving its pages out. Its owner turned on an export restriction, and the server enforces it.",
-      not_editable: (path: string) => `${path} is not UTF-8 text, so it cannot be given the stable ID a transfer needs.`,
-      malformed_frontmatter: (path: string) => `${path} has frontmatter Thoth cannot read safely, so it cannot be given the stable ID a transfer needs.`,
-      page_too_large: (path: string, size: string, limit: string) => `${path} is ${size}; this server accepts pages up to ${limit}.`,
-      too_large_total: (size: string, limit: string) => `Together these pages are ${size}, more than ${limit} can be sent at once. Select fewer.`,
-      quota: (limit: number, current: number, adding: number) => `The workspace holds ${current} of at most ${limit} pages, so ${adding} more do not fit.`,
-      bad_folder: "That is not a valid folder in your Private Space.",
-      nothing_selected: "Select at least one page.",
-    },
-
-    // Warnings (do not block).
-    warnings: {
-      unresolved_links: (n: number) => `${n === 1 ? "1 link points" : `${n} links point`} to nothing that exists. ${n === 1 ? "It is" : "They are"} kept exactly as written.`,
-      left_at_source: (n: number) => `${n === 1 ? "1 link points" : `${n} links point`} to pages that are not part of this transfer, so ${n === 1 ? "it" : "they"} will not open at the destination.`,
-      attachments_unsupported: (n: number) => `This server does not take attachments, so ${n === 1 ? "1 linked file stays" : `${n} linked files stay`} behind.`,
-      attachment_too_large: (path: string, size: string, limit: string) => `${path} is ${size}, over this server's ${limit} limit for one file. It stays behind.`,
-      attachments_stay_in_workspace: (n: number) => `${n === 1 ? "1 linked file stays" : `${n} linked files stay`} in the workspace; Workspace → Private transfers bring pages only.`,
-      quota_near: (limit: number, current: number, adding: number) => `After this the workspace holds ${current + adding} of at most ${limit} pages.`,
-    },
-
-    // Actions.
-    cancel: "Cancel",
-    startCopy: "Copy",
-    startMove: "Move",
-    close: "Close",
-    retry: "Try again",
-    stop: "Stop and undo",
-    dismiss: "Dismiss",
-    openResult: "Open",
-
-    // Progress.
-    working: "Transferring…",
-    states: {
-      plan: "Planning",
-      validate: "Checking permissions and limits",
-      stage: "Preparing at the destination",
-      transfer: "Sending",
-      verify: "Verifying",
-      commit_destination: "Saving at the destination",
-      finalize_source: "Removing the originals",
-      done: "Done",
-      destination_committed_source_cleanup_pending: "Done, originals kept",
-      failed: "Not transferred",
-      aborted: "Stopped",
-    },
-    progressLabel: "Transfer progress",
-
-    // Results.
-    resultDone: (mode: "copy" | "move", n: number, where: string) => `${n === 1 ? "1 page was" : `${n} pages were`} ${mode === "copy" ? "copied" : "moved"} to ${where}. Every page was checked at the destination.`,
-    resultPending: (moved: number, kept: number, where: string) =>
-      `${moved === 1 ? "1 page is" : `${moved} pages are`} now in ${where}, but the move is not finished: ${kept === 1 ? "1 original was" : `${kept} originals were`} kept because ${kept === 1 ? "it was" : "they were"} changed after the transfer started. Nothing was lost. Compare the two versions, then delete the one you do not need.`,
-    resultFailed: (detail: string) => `Nothing was transferred, and the originals are unchanged. ${detail}`,
-    resultAborted: "The transfer was stopped and undone. Nothing changed at the destination, and the originals are unchanged.",
-    resultInterrupted: (detail: string) => `The transfer was interrupted: ${detail} Your originals are safe. Try again, or stop and undo.`,
-    keptItems: "Originals kept",
-    keptReason: {
-      source_changed: "edited after the transfer started",
-      source_moved: "moved after the transfer started",
-      revision_conflict: "edited in the workspace after the transfer started",
-      hash_mismatch: "could not be verified at the destination",
-    } as Record<string, string>,
-    keptOther: "kept for safety",
-    conflictCopies: (n: number) => `${n === 1 ? "1 page" : `${n} pages`} already existed here with other changes, so ${n === 1 ? "it was" : "they were"} saved next to the original as a conflict copy.`,
-    privateSpace: "your Private Space",
-
-    // Startup recovery and the transfers list.
-    recoveredTitle: "Unfinished transfers",
-    recoveredCompleted: (n: number) => `${n === 1 ? "1 transfer" : `${n} transfers`} that was interrupted when Thoth last closed ${n === 1 ? "has" : "have"} been finished.`,
-    recoveredRolledBack: (n: number) => `${n === 1 ? "1 transfer" : `${n} transfers`} that was interrupted before ${n === 1 ? "it was" : "they were"} saved at the destination ${n === 1 ? "was" : "were"} undone. The originals are unchanged.`,
-    recoveredWaiting: (n: number) => `${n === 1 ? "1 transfer" : `${n} transfers`} could not be settled because the server is not reachable. Thoth will try again next time.`,
-    pendingList: "Moves with originals kept",
-    pendingItem: (n: number, where: string) => `${n === 1 ? "1 original" : `${n} originals`} kept · ${where}`,
-  },
 
   wizard: {
     region: "Import",

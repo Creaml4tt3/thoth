@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A house: Home (ADR-0029). */
@@ -109,6 +109,12 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     <>
       <path d="M12 3v12M7 10.5l5 4.5 5-4.5" />
       <path d="M4 20h16" />
+    </>
+  ),
+  "to-workspace": (
+    <>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
     </>
   ),
   shrink: (

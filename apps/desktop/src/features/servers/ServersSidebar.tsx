@@ -7,13 +7,19 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { serverSection } from "../shell/sections.ts";
 import type { SidebarSection } from "../shell/SidebarSections.tsx";
-import { transferTargetFor } from "../shell/space-drop.ts";
+import { betweenTarget, transferTargetFor } from "../shell/space-drop.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
 import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
 
 /** A workspace page's menu, Copy / Move to Private Space…: the dialog a drop on the Private Space's top level opens. */
 function toPrivate(drag: SpaceDrag, mode: "copy" | "move", send: (target: TransferTarget) => void) {
   const target = transferTargetFor({ drag, to: { kind: "private", folder: "" }, mode });
+  if (target) send(target);
+}
+
+/** A workspace page's menu, Copy / Move to another workspace…: the dialog picks the destination. */
+function toWorkspace(drag: SpaceDrag, mode: "copy" | "move", send: (target: TransferTarget) => void) {
+  const target = betweenTarget(drag, mode);
   if (target) send(target);
 }
 
@@ -51,7 +57,7 @@ export function useServerSections(current: WorkspacePageRef | null, onTransfer?:
           ) : (
             <TreeList label={t.workspacesOn(entry.info.label)}>
               {entry.workspaces.map((workspace) => (
-                <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} spaceDrops {...(onTransfer ? { onToPrivate: (drag, mode) => toPrivate(drag, mode, onTransfer) } : {})} />
+                <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} spaceDrops {...(onTransfer ? { onToPrivate: (drag, mode) => toPrivate(drag, mode, onTransfer), onToWorkspace: (drag, mode) => toWorkspace(drag, mode, onTransfer) } : {})} />
               ))}
             </TreeList>
           )}

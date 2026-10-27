@@ -33,6 +33,7 @@ import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/keyboard/commands.ts";
+import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/elsewhere.ts";
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
@@ -261,6 +262,13 @@ export function Shell() {
           moveTo: () => requestMoveTo({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }),
           reorder: (delta: -1 | 1) => requestReorder({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }, delta),
           ...(servers.canShare(here.server) ? { sharePage: () => requestShare({ server: here.server, workspace: here.workspace, page: here.page }) } : {}),
+        }
+      : {}),
+    // ADR-0006, amendment of 2026-10-27: the open workspace page (and its sub-pages) to another workspace.
+    ...(here && hereWorkspace && hasOtherWritableWorkspace(directory, here)
+      ? {
+          copyToWorkspace: () => transfer({ direction: "between_workspaces", server: here.server, workspace: here.workspace, pageId: here.page, title: remoteTitle(directory, here) ?? "", mode: "copy" }),
+          ...(canWriteHere ? { moveToWorkspace: () => transfer({ direction: "between_workspaces", server: here.server, workspace: here.workspace, pageId: here.page, title: remoteTitle(directory, here) ?? "", mode: "move" }) } : {}),
         }
       : {}),
     ...(here && hereWorkspace && servers.canManageMembers(here.server) ? { members: { workspace: hereWorkspace.name, run: () => requestMembers({ server: here.server, workspace: here.workspace }) } } : {}),
