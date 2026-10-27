@@ -206,7 +206,7 @@ describe("workspace tree: order", () => {
     fireEvent.contextMenu(item(group, "Beta"));
     const menu = await screen.findByRole("menu", { name: "Actions for Beta" });
     expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "New page inside", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Copy to Private Space…", "Move to Private Space…"]);
-    await app.user.click(within(menu).getByRole("menuitem", { name: /Move to/ }));
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Move to…" }));
     expect(await screen.findByRole("dialog", { name: "Move “Beta” to…" })).toBeTruthy();
   });
 
