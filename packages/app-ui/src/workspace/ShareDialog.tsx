@@ -25,7 +25,8 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 /**
  * "Share…" on a workspace page (ADR-0023): make a public read-only link with an expiry, copy it, see the page's
  * active links and revoke them. The address is in the create response only (the server keeps a hash), so it is shown
- * once, right after it is made; the list names links by when they were made and when they stop working.
+ * once, right after it is made; the list names links by when they were made and the moment they stop working (the
+ * server stops a link at that exact time, so the time is shown, in the person's own zone).
  */
 export function ShareDialog({ client, workspace, page, title, onClose }: Props) {
   const strings = useStrings();
@@ -38,7 +39,6 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
   const [said, setSaid] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const ids = { expiry: useId(), url: useId(), active: useId(), once: useId() };
-  const day = useMemo(() => new Intl.DateTimeFormat(strings.lang, { dateStyle: "medium" }), [strings.lang]);
   const moment = useMemo(() => new Intl.DateTimeFormat(strings.lang, { dateStyle: "medium", timeStyle: "short" }), [strings.lang]);
   const live = useRef(true);
   useEffect(
@@ -176,7 +176,7 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
               return (
                 <li key={link.id} className="share-link">
                   <span>
-                    {t.created(made)} · {link.expiresAt === null ? t.neverExpires : t.expires(day.format(new Date(link.expiresAt)))}
+                    {t.created(made)} · {link.expiresAt === null ? t.neverExpires : t.expires(moment.format(new Date(link.expiresAt)))}
                   </span>
                   <Button small variant="quiet" aria-label={t.revokeLabel(made)} onClick={() => void revoke(link)}>
                     {t.revoke}
