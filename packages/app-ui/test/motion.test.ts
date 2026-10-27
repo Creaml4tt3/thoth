@@ -225,13 +225,16 @@ describe("what animates, and how", () => {
     expect(bad).toEqual([]);
   });
 
-  it("transitions only colours, opacity and transform, plus grid rows for an opening folder and a progress bar's width", () => {
+  it("transitions only colours, opacity and transform, plus grid rows for an opening folder, grid columns for the hidden sidebar and a progress bar's width", () => {
     const bad: string[] = [];
     for (const d of motionDeclarations) {
       if (!/^transition$/.test(d.prop) || d.value === "none") continue;
       for (const item of topLevel(d.value)) {
         const property = item.split(/\s+/)[0]!;
-        const allowed = CHEAP.has(property) || (property === "grid-template-rows" && d.rule.selector === ".tree-collapse") || (property === "width" && d.rule.selector.includes("::-webkit-progress-value"));
+        const allowed =
+          CHEAP.has(property) ||
+          (property === "grid-template-rows" && d.rule.selector === ".tree-collapse") ||
+          (property === "grid-template-columns" && d.rule.selector === ".shell") || (property === "width" && d.rule.selector.includes("::-webkit-progress-value"));
         if (!allowed) bad.push(`${where(d)}: ${property}`);
       }
     }
