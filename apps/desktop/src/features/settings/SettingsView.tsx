@@ -17,6 +17,7 @@ import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
 import { currentOs, displayPath } from "./path.ts";
 import { requestTour } from "../tour/store.ts";
+import { FeedbackSettings } from "../feedback/Feedback.tsx";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
@@ -78,6 +79,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
     { id: "set-editor", label: t.editor },
     { id: "set-index", label: t.index },
     { id: "set-import", label: t.importExport },
+    { id: "set-feedback", label: d.helpFeedback.title },
   ];
 
   return (
@@ -226,6 +228,8 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
           </>
         )}
       </section>
+
+      <FeedbackSettings />
     </SettingsLayout>
   );
 }

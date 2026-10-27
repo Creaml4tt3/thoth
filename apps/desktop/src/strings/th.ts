@@ -155,6 +155,14 @@ export const th: DesktopStrings = {
   },
 
   // The update notice (ADR-0022).
+  /** การตั้งค่า → ความช่วยเหลือและความคิดเห็น (ADR-0033) */
+  helpFeedback: {
+    title: "ความช่วยเหลือและความคิดเห็น", // REVIEW
+    intro: "เจอปัญหา มีไอเดีย หรือมีคำถาม ส่งมาได้จากที่นี่ จะส่งเฉพาะสิ่งที่คุณพิมพ์ และเวอร์ชันของแอปกับระบบหากคุณเปิดไว้", // REVIEW
+    send: "ส่งความคิดเห็น…", // REVIEW
+    email: (address: string) => `หรือเขียนถึง ${address}`, // REVIEW
+  },
+
   updates: {
     popup: (version) => `Thoth ${version} ออกแล้ว`,
     body: (date) => `${date ? `เผยแพร่เมื่อ ${date} ` : ""}ปุ่มดาวน์โหลดจะเปิดหน้าดาวน์โหลดในเบราว์เซอร์ของคุณ Thoth ไม่ติดตั้งให้เอง`,

@@ -110,7 +110,7 @@ describe("settings", () => {
     const nav = await screen.findByRole("navigation", { name: "Settings sections" });
     const links = within(nav).getAllByRole("link").map((a) => a.textContent);
     expect(links[0]).toBe("Private Space");
-    expect(links.slice(-5)).toEqual(["Language", "Theme", "Editor", "Search index", "Import & Export"]);
+    expect(links.slice(-6)).toEqual(["Language", "Theme", "Editor", "Search index", "Import & Export", "Help and feedback"]);
     expect(links).toContain("Servers");
     // Every link goes to a heading on the page.
     for (const a of within(nav).getAllByRole("link")) expect(document.querySelector(a.getAttribute("href")!)?.tagName).toBe("H2");

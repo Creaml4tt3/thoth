@@ -172,6 +172,14 @@ export const en = {
   },
 
   /** The update notice (ADR-0022): the popup in the corner, and Settings → General. */
+  /** Settings → Help and feedback (ADR-0033). */
+  helpFeedback: {
+    title: "Help and feedback",
+    intro: "Found a problem, have an idea or a question? Send it from here. Only what you type is sent, and the app version and system if you leave that on.",
+    send: "Send feedback…",
+    email: (address: string) => `Or write to ${address}`,
+  },
+
   updates: {
     popup: (version: string) => `Thoth ${version} is out`,
     body: (date: string | undefined) => `${date ? `Released ${date}. ` : ""}Download opens the downloads page in your browser. Thoth does not install it for you.`,

@@ -5,8 +5,9 @@ import { SettingsLayout } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { LanguageSwitch } from "./LanguageSwitch.tsx";
 import { ThemeSwitch } from "./ThemeSwitch.tsx";
 
-/** Settings, a tab of the web client: appearance, language and the account. */
-export function SettingsView({ account, signOut, signingOut, showShortcuts }: { account: { displayName: string } | null; signOut(): void; signingOut: boolean; showShortcuts(): void }) {
+/** Settings, a tab of the web client: appearance, language, the account, and help and feedback. */
+/** `sendFeedback`: present when the server takes feedback (ADR-0033). */
+export function SettingsView({ account, signOut, signingOut, showShortcuts, sendFeedback }: { account: { displayName: string } | null; signOut(): void; signingOut: boolean; showShortcuts(): void; sendFeedback?: () => void }) {
   const t = useStrings();
   const s = t.web.settingsView;
   return (
@@ -15,6 +16,7 @@ export function SettingsView({ account, signOut, signingOut, showShortcuts }: { 
         { id: "web-set-appearance", label: s.appearance },
         { id: "web-set-keyboard", label: s.keyboard },
         { id: "web-set-account", label: s.account },
+        { id: "web-set-feedback", label: s.feedback },
       ]}
     >
       <h1 className="page-title">{s.title}</h1>
@@ -50,6 +52,18 @@ export function SettingsView({ account, signOut, signingOut, showShortcuts }: { 
           </Button>
         </div>
       </section>
+
+      {sendFeedback && (
+        <section aria-labelledby="web-set-feedback" className="set-section">
+          <h2 id="web-set-feedback">{s.feedback}</h2>
+          <p className="muted">{s.feedbackNote}</p>
+          <div className="set-actions">
+            <Button variant="primary" small onClick={sendFeedback}>
+              {t.feedback.open}
+            </Button>
+          </div>
+        </section>
+      )}
     </SettingsLayout>
   );
 }

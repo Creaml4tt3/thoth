@@ -67,6 +67,13 @@ import { createTransferService, serverAccess } from "@thoth/app-ui/transfer/serv
 import { betweenTarget, betweenTargetFor, hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
 import { transferEvent } from "@thoth/app-ui/transfer/notify.ts";
 import { BetweenWorkspaces, storageRecords } from "@thoth/transfer";
+import { FeedbackDialog } from "@thoth/app-ui/feedback/FeedbackDialog.tsx";
+
+/** The system, in one word, for "Include the app version and system" (ADR-0033); nothing when it is not plain. */
+function browserOs(userAgent: string = globalThis.navigator?.userAgent ?? ""): { os?: string } {
+  const os = /iPhone|iPad/.test(userAgent) ? "iOS" : /Android/.test(userAgent) ? "Android" : /Mac OS X|Macintosh/.test(userAgent) ? "macOS" : /Windows/.test(userAgent) ? "Windows" : /Linux/.test(userAgent) ? "Linux" : undefined;
+  return os ? { os } : {};
+}
 
 /** The recent pages of an account in this browser (ADR-0029): this prefix and the account's id. */
 export const RECENT_KEY_PREFIX = "thoth.web.recent.";
@@ -86,12 +93,14 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const entry = state.servers.find((s) => s.info.id === SERVER_ID);
   const workspaces = entry?.workspaces ?? null;
-  type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "rename"; page: string; workspace: string; title: string } | { kind: "transfer"; target: TransferTarget } | null;
+  type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; page: string; workspace: string; title: string } | { kind: "transfer"; target: TransferTarget } | null;
   const [dialog, setDialog] = useState<Dialog>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const signedOut = entry?.info.auth === "signed-out";
   const canSearch = hasCapability(capabilities, "search");
+  const canFeedback = hasCapability(capabilities, "feedback");
+  const openFeedback = () => setDialog({ kind: "feedback" });
   const limits = capabilities.limits ? describeLimits(capabilities.limits as Record<string, number>, t.limits) : [];
   const target = env.analyticsTarget;
 
@@ -334,6 +343,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
+    ...(canFeedback ? { sendFeedback: openFeedback } : {}),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
@@ -384,7 +394,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const paneContent = ({ id, target: shown }: Tab) => {
     const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
     return shown.kind === "settings" ? (
-      <SettingsView account={account} signOut={() => void doSignOut()} signingOut={signingOut} showShortcuts={() => setDialog({ kind: "shortcuts" })} />
+      <SettingsView account={account} signOut={() => void doSignOut()} signingOut={signingOut} showShortcuts={() => setDialog({ kind: "shortcuts" })} {...(canFeedback ? { sendFeedback: openFeedback } : {})} />
       ) : current ? (
         <WorkspacePage
           key={`${id}\n${current.workspace}\n${current.page}`}
@@ -595,6 +605,13 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         )}
         {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} servers={directory} transfers={transfers} openWorkspacePage={(ref) => openPage(ref)} />}
         {dialog?.kind === "shortcuts" && <ShortcutsDialog client="web" platform={platform} onClose={() => setDialog(null)} />}
+        {dialog?.kind === "feedback" && (
+          <FeedbackDialog
+            target={() => Promise.resolve({ label: entry?.info.label ?? new URL(env.server).host, send: (input) => directory.client(SERVER_ID).sendFeedback(input) })}
+            context={{ client: "web", ...browserOs(), language: t.lang }}
+            onClose={() => setDialog(null)}
+          />
+        )}
         {dialog?.kind === "rename" && (
           <RenameDialog
             name={dialog.title}

@@ -38,6 +38,7 @@ import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/
 import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
+import { DesktopFeedbackDialog } from "../feedback/Feedback.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
@@ -64,7 +65,7 @@ import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
 
 const noSubscribe = () => () => undefined;
 
-type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
+type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
 /** What startup recovery did, said once (ADR-0006 §7: an interrupted transfer is never silent). */
 function RecoveryNotice() {
@@ -306,6 +307,7 @@ export function Shell() {
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
+    sendFeedback: () => setDialog({ kind: "feedback" }),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
     showTour: requestTour,
@@ -507,6 +509,7 @@ export function Shell() {
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "feedback" && <DesktopFeedbackDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />}
     </div>
