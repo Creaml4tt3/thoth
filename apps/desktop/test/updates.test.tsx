@@ -31,7 +31,10 @@ class FakeUpdates implements Updates {
   skipped: string | null = null;
   async check(options?: { force?: boolean }): Promise<UpdateCheck> {
     this.checks.push({ force: options?.force === true });
-    return this.notify ? this.answer : { state: "off" };
+    if (!this.notify) return { state: "off" };
+    // As the host does: a skipped version is answered as skipped, even by a check that started before the skip.
+    const a = this.answer;
+    return a.state === "available" && a.update.version === this.skipped ? { ...a, update: { ...a.update, skipped: true } } : a;
   }
   private settingsNow(): UpdateSettings {
     return { available: true, current: "0.1.3", notify: this.notify, skipped: this.skipped, lastChecked: null };
