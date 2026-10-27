@@ -162,6 +162,42 @@ export function referencedAttachments(pages: readonly { path: string; source: st
   return [...found].sort();
 }
 
+// --------------------------------------------------------- Workspace → Workspace
+
+/**
+ * Classifies one page's references for a transfer between two workspaces, where both ends name pages and
+ * attachments by ID. A `thoth:` link to a page or attachment that travels is rewritten to its new ID at the
+ * destination; one to anything else stays as written (`left_at_source`: it named the source workspace's page). A
+ * path or title link has nothing to resolve against in either workspace and is kept and flagged.
+ */
+export function classifyBetween(title: string, markdown: string, pages: ReadonlyMap<string, string>, attachments: ReadonlyMap<string, string | null>): ClassifiedReference[] {
+  const doc = parsePage("page.md", markdown);
+  return doc.references.map((reference): ClassifiedReference => {
+    const base = { sourcePath: title, reference };
+    const link = parseThothLink(reference.target);
+    if (!link) {
+      if (reference.external) return { ...base, class: "external" };
+      if (reference.target === "") return { ...base, class: "included" }; // same-page fragment
+      return { ...base, class: "unresolved" };
+    }
+    const dest = link.kind === "page" ? pages.get(link.id) : attachments.get(link.id);
+    if (dest === undefined) return { ...base, class: "left_at_source" };
+    // An attachment that travels but is not uploaded yet: classified, not yet rewritable.
+    if (dest === null) return { ...base, class: "included" };
+    return { ...base, class: "included", newTarget: `${link.kind === "page" ? PAGE_LINK_PREFIX : ATTACHMENT_LINK_PREFIX}${dest}` };
+  });
+}
+
+/** The attachment IDs a workspace page links to (`thoth:attachment/<id>`), in order of first appearance. */
+export function attachmentIdsIn(markdown: string): string[] {
+  const ids: string[] = [];
+  for (const ref of parsePage("page.md", markdown).references) {
+    const link = parseThothLink(ref.target);
+    if (link?.kind === "attachment" && !ids.includes(link.id)) ids.push(link.id);
+  }
+  return ids;
+}
+
 // --------------------------------------------------------- Workspace → Private
 
 export interface InboundContext {

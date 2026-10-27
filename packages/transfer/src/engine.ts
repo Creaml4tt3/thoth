@@ -59,6 +59,8 @@ import {
 } from "./links.ts";
 import { folderMarkdown, folderNameForTitle, folderTitle, isFolderMarkdown, planInboundFolders, planOutboundFolders } from "./folders.ts";
 import { isTerminal, listRecords, loadRecord, saveRecord, type AttachmentItem, type LinkSummary, type OperationRecord, type PageItem, RECORD_VERSION } from "./record.ts";
+import { BetweenWorkspaces, isBetween, type BetweenPreview, type BetweenRequest } from "./between.ts";
+import { codeOf, isRefusal, messageOf, TransferInterrupted, TransferRefused } from "./errors.ts";
 import { loadSync, projectAllSync, recordMappings, type SyncEntry, type SyncRecord } from "./sync.ts";
 
 /** The host's request body limit for one protocol call (crates/thoth-host `MAX_BODY`). */
@@ -103,7 +105,15 @@ export type Problem =
   | { code: "too_large_total"; size: number; limit: number }
   | { code: "quota"; limit: number; current: number; adding: number }
   | { code: "bad_folder"; folder: string }
-  | { code: "nothing_selected" };
+  | { code: "nothing_selected" }
+  /** Between workspaces: the source and the destination are the same workspace. */
+  | { code: "same_workspace" }
+  /** Between workspaces: the source workspace is gone, or the person is no longer in it. */
+  | { code: "source_workspace_not_found" }
+  /** Between workspaces: a move needs write on the source. */
+  | { code: "source_forbidden"; role: Role }
+  /** Between workspaces: a selected page was deleted at the source. */
+  | { code: "page_gone" };
 
 /** Something the user should know before confirming; it does not block. */
 export type Warning =
@@ -178,7 +188,7 @@ export interface FromWorkspacePreview extends PreviewBase {
   pages: { pageId: string; title: string; size: number; folder: boolean; parentId: string | null }[];
 }
 
-export type Preview = ToWorkspacePreview | FromWorkspacePreview;
+export type Preview = ToWorkspacePreview | FromWorkspacePreview | BetweenPreview;
 
 export interface RecoveryReport {
   /** Finished after the restart (they had passed their commit). */
@@ -191,25 +201,7 @@ export interface RecoveryReport {
   invalid: string[];
 }
 
-/** A known refusal: the operation stops and, before its commit, is rolled back. */
-export class TransferRefused extends Error {
-  readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "TransferRefused";
-    this.code = code;
-  }
-}
-
-/** The operation could not continue for now (network, server, sign-in); its record keeps the last durable state. */
-export class TransferInterrupted extends Error {
-  readonly record: OperationRecord;
-  constructor(record: OperationRecord, cause: unknown) {
-    super(cause instanceof Error ? cause.message : String(cause));
-    this.name = "TransferInterrupted";
-    this.record = record;
-  }
-}
+export { TransferInterrupted, TransferRefused } from "./errors.ts";
 
 /** Thrown through every layer when the checkpoint hook throws (a simulated crash). */
 class Halt extends Error {
@@ -225,14 +217,6 @@ const before = (a: TransferState, b: TransferState) => ORDER.indexOf(a) < ORDER.
 /** Before the destination commit: rollback is still possible and leaves no trace at the destination. */
 const beforeCommit = (r: OperationRecord) => r.state === "plan" || r.state === "validate" || r.state === "stage" || r.state === "transfer" || r.state === "verify";
 
-function isRefusal(error: unknown): error is ProblemError | TransferRefused {
-  if (error instanceof TransferRefused) return true;
-  return error instanceof ProblemError && error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 408 && error.status !== 429;
-}
-
-const codeOf = (error: unknown): string => (error instanceof TransferRefused || error instanceof ProblemError ? error.code : "interrupted");
-const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
 export class TransferEngine {
   private readonly vault: Vault;
   private readonly options: TransferEngineOptions;
@@ -240,12 +224,27 @@ export class TransferEngine {
   private readonly newId: () => string;
   /** One run per operation at a time. */
   private readonly running = new Map<string, Promise<OperationRecord>>();
+  /** Transfers between two workspaces; their records live with the others in `.thoth/operations/`. */
+  readonly between: BetweenWorkspaces;
 
   constructor(options: TransferEngineOptions) {
     this.vault = options.vault;
     this.options = options;
     this.now = options.now ?? (() => new Date());
     this.newId = options.newId ?? (() => newStableId(this.now().getTime()));
+    this.between = new BetweenWorkspaces({
+      records: options.vault,
+      server: options.server,
+      now: this.now,
+      newId: this.newId,
+      ...(options.checkpoint ? { checkpoint: options.checkpoint } : {}),
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+    });
+  }
+
+  /** What a transfer between two workspaces would do (`BetweenWorkspaces`). */
+  previewBetweenWorkspaces(request: BetweenRequest): Promise<BetweenPreview> {
+    return this.between.previewBetweenWorkspaces(request);
   }
 
   // ------------------------------------------------------------- discovery
@@ -386,6 +385,7 @@ export class TransferEngine {
 
   /** Records the plan (PLAN) and runs the transfer. Throws `TransferInterrupted` when it has to stop for now. */
   async start(preview: Preview): Promise<OperationRecord> {
+    if (preview.direction === "between_workspaces") return this.between.start(preview);
     if (!preview.canStart || !preview.workspace) throw new TransferRefused("not_startable", "This transfer cannot start; see the preview.");
     const access = this.options.server(preview.server.id);
     if (!access) throw new TransferRefused("server_unknown", "This server is no longer in the list.");
@@ -495,6 +495,7 @@ export class TransferEngine {
 
   /** Continues an unfinished operation forward from its last durable state (Retry). */
   async resume(id: string): Promise<OperationRecord> {
+    if ((await this.get(id))?.direction === "between_workspaces") return this.between.resume(id);
     return this.exclusive(id, async () => {
       const record = await this.mustLoad(id);
       return isTerminal(record.state) ? record : this.drive(record);
@@ -503,6 +504,7 @@ export class TransferEngine {
 
   /** Stops an operation that has not reached its commit, rolling it back. A committed one cannot be aborted. */
   async abort(id: string): Promise<OperationRecord> {
+    if ((await this.get(id))?.direction === "between_workspaces") return this.between.abort(id);
     return this.exclusive(id, async () => {
       const record = await this.mustLoad(id);
       if (isTerminal(record.state)) return record;
@@ -541,7 +543,7 @@ export class TransferEngine {
       if ((r.state === "done" || r.state === "aborted" || r.state === "failed") && Date.parse(r.updatedAt) < cutoff) await this.vault.removeRecord(`.thoth/operations/${r.id}.json`).catch(() => undefined);
     }
     for (const r of records) {
-      if (isTerminal(r.state)) continue;
+      if (isTerminal(r.state) || isBetween(r)) continue;
       try {
         const settled = await this.exclusive(r.id, () => this.settle(r));
         (settled.state === "aborted" || settled.state === "failed" ? report.rolledBack : report.completed).push(settled);
@@ -550,6 +552,10 @@ export class TransferEngine {
         report.waiting.push(error instanceof TransferInterrupted ? error.record : r);
       }
     }
+    const between = await this.between.recover();
+    report.completed.push(...between.completed);
+    report.rolledBack.push(...between.rolledBack);
+    report.waiting.push(...between.waiting);
     return report;
   }
 

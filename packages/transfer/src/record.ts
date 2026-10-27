@@ -9,13 +9,58 @@
  */
 import { z } from "zod";
 import { StableIdSchema, TransferStateSchema, type TransferState } from "@thoth/domain";
-import type { Vault } from "@thoth/local-store";
-import { TransferDirectionSchema, TransferModeSchema } from "@thoth/workspace-protocol";
+import { TransferModeSchema } from "@thoth/workspace-protocol";
 
 export const OPERATIONS_DIR = ".thoth/operations";
 export const RECORD_VERSION = 1;
 
 export const operationPath = (id: string): string => `${OPERATIONS_DIR}/${id}.json`;
+
+/**
+ * Where records are kept: the vault's `.thoth/` on the desktop; the browser's storage in the web client, which has no
+ * Private Space (`storageRecords`).
+ */
+export interface RecordStore {
+  writeRecord(path: string, value: unknown): Promise<void>;
+  readRecord(path: string): Promise<unknown>;
+  listRecords(dir: string): Promise<string[]>;
+  removeRecord(path: string): Promise<void>;
+  /** The vault's index projection; absent where there is no index. */
+  projectOperation?(row: { id: string; kind: string; state: string; updatedAt: number }): Promise<void>;
+}
+
+/** A `RecordStore` over a `Storage` (the web client's localStorage): one key per record, under `prefix`. */
+export function storageRecords(storage: Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">, prefix = "thoth.transfers/"): RecordStore {
+  return {
+    async writeRecord(path, value) {
+      storage.setItem(prefix + path, JSON.stringify(value));
+    },
+    async readRecord(path) {
+      const text = storage.getItem(prefix + path);
+      return text === null ? undefined : (JSON.parse(text) as unknown);
+    },
+    async listRecords(dir) {
+      const names: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key?.startsWith(`${prefix}${dir}/`)) continue;
+        const name = key.slice(prefix.length + dir.length + 1);
+        if (!name.includes("/") && name.endsWith(".json")) names.push(name);
+      }
+      return names.sort();
+    },
+    async removeRecord(path) {
+      storage.removeItem(prefix + path);
+    },
+  };
+}
+
+/**
+ * The record's direction. The first two are the protocol's (the workspace is the destination or the source);
+ * `between_workspaces` is two protocol transfers, one at each workspace (ADR-0006, amendment of 2026-10-27).
+ */
+export const RecordDirectionSchema = z.enum(["to_workspace", "from_workspace", "between_workspaces"]);
+export type RecordDirection = z.infer<typeof RecordDirectionSchema>;
 
 /** Per-item progress. `staged` and `committed` mirror the server; `cleanup_pending` is a move whose source survived on purpose. */
 export const ItemStateSchema = z.enum(["planned", "uploaded", "staged", "written", "verified", "committed", "source_deleted", "cleanup_pending", "skipped", "failed"]);
@@ -89,11 +134,16 @@ export const OperationRecordSchema = z.object({
   recordVersion: z.literal(RECORD_VERSION),
   id: StableIdSchema,
   kind: z.literal("transfer"),
-  direction: TransferDirectionSchema,
+  direction: RecordDirectionSchema,
   mode: TransferModeSchema,
-  /** The host's server handle and the server origin (no credential). */
+  /** The host's server handle and the server origin (no credential). between_workspaces: the destination. */
   server: z.object({ id: z.string(), url: z.string() }),
   workspace: z.object({ id: z.string(), name: z.string() }),
+  /**
+   * between_workspaces only: the source workspace, the ID of the from_workspace transfer there (the record's own `id`
+   * is the to_workspace transfer at the destination), and whether that server has it.
+   */
+  source: z.object({ server: z.object({ id: z.string(), url: z.string() }), workspace: z.object({ id: z.string(), name: z.string() }), operationId: StableIdSchema, known: z.boolean() }).optional(),
   state: TransferStateSchema,
   /** Last state reached before `failed`, so recovery knows what is safe. */
   failedAt: TransferStateSchema.nullable(),
@@ -113,16 +163,16 @@ export type OperationRecord = z.infer<typeof OperationRecordSchema>;
 export const TERMINAL_STATES: readonly TransferState[] = ["done", "destination_committed_source_cleanup_pending", "failed", "aborted"];
 export const isTerminal = (state: TransferState): boolean => TERMINAL_STATES.includes(state);
 
-export async function saveRecord(vault: Vault, record: OperationRecord, now: Date): Promise<OperationRecord> {
+export async function saveRecord(vault: RecordStore, record: OperationRecord, now: Date): Promise<OperationRecord> {
   const next = { ...record, updatedAt: now.toISOString() };
   OperationRecordSchema.parse(next);
   await vault.writeRecord(operationPath(next.id), next);
   // The projection may lag a crash; `TransferEngine.open` rebuilds it from the records.
-  await vault.projectOperation({ id: next.id, kind: "transfer", state: next.state, updatedAt: now.getTime() }).catch(() => undefined);
+  await vault.projectOperation?.({ id: next.id, kind: "transfer", state: next.state, updatedAt: now.getTime() }).catch(() => undefined);
   return next;
 }
 
-export async function loadRecord(vault: Vault, id: string): Promise<OperationRecord | undefined> {
+export async function loadRecord(vault: RecordStore, id: string): Promise<OperationRecord | undefined> {
   const raw = await vault.readRecord(operationPath(id));
   if (raw === undefined) return undefined;
   return OperationRecordSchema.parse(raw);
@@ -134,7 +184,7 @@ export interface ListedRecords {
   invalid: string[];
 }
 
-export async function listRecords(vault: Vault): Promise<ListedRecords> {
+export async function listRecords(vault: RecordStore): Promise<ListedRecords> {
   const records: OperationRecord[] = [];
   const invalid: string[] = [];
   for (const name of await vault.listRecords(OPERATIONS_DIR)) {

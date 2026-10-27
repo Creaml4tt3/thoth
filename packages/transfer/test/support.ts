@@ -28,7 +28,11 @@ export interface World {
 }
 
 export function clientFor(servers: FakeServers, server: string): WorkspaceClient {
-  const send: Send = async (req) => servers.call({ server, method: req.method, path: req.path, ...(req.query ? { query: req.query } : {}), ...(req.headers ? { headers: req.headers } : {}) }, req.body);
+  const send: Send = async (req) => {
+    const res = await servers.call({ server, method: req.method, path: req.path, ...(req.query ? { query: req.query } : {}), ...(req.headers ? { headers: req.headers } : {}) }, req.body);
+    // Attachment downloads come as base64, as the host sends them (ADR-0028).
+    return req.binary && res.bodyBase64 !== undefined ? { ...res, bytes: new Uint8Array(Buffer.from(res.bodyBase64, "base64")) } : res;
+  };
   return new WorkspaceClient(send);
 }
 
