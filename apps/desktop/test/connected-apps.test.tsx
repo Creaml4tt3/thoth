@@ -178,7 +178,7 @@ describe("Settings → Connected apps", () => {
       apps.state = { ...apps.state, enabled: true, listening: true, apps: decided };
       let app = await open();
       let section = await openSettings(app);
-      const shown = notice(section);
+      const shown = await section.findByRole("note", { name: "Copy the setup again" });
       expect(shown?.textContent).toMatch(/apps you set up before.*stop connecting.*copy the setup below/i);
       await app.user.click(within(shown!).getByRole("button", { name: "Got it" }));
       await waitFor(() => expect(notice(section)).toBeNull());
@@ -194,7 +194,7 @@ describe("Settings → Connected apps", () => {
       const app = await open();
       Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn(async () => undefined) } });
       const section = await openSettings(app);
-      expect(notice(section)).not.toBeNull();
+      await section.findByRole("note", { name: "Copy the setup again" });
       await app.user.click(section.getByRole("button", { name: "Copy the setup" }));
       await waitFor(() => expect(notice(section)).toBeNull());
     });
