@@ -1254,6 +1254,19 @@ still marked `REVIEW` until the owner has seen it.
   `tests/e2e/getting-around.e2e.ts`.
 - Not checked in a real window: Explorer's `/select,` and `xdg-open` (built here on macOS only).
 
+### Split view (ADR-0030, 2026-10-27), built, waiting for review
+
+- Up to two panes side by side on the desktop and the web: drag a tab to the right part of the page area, "Split right"
+  (tab menu, palette, Cmd/Ctrl+Option/Alt+\\), "Move to other pane", a drop on the other pane's tab bar. A pane whose last
+  tab leaves closes. F6 / Alt+Shift+\\ move focus to the other pane; a separator resizes (320px each at least).
+- The layout is stored as `v: 2` (panes, active pane, ratio) and still reads `v: 1`; moving a tab to a new window works
+  from either pane.
+- One page session per page per window (`editor/session-pool.ts`): the same page in both panes has one base hash and
+  one save, so it never conflicts with itself; edits reach the other pane within 150 ms or on focus.
+- Evidence: `packages/app-ui/test/tabs-layout.test.ts`, `session-pool.test.ts`, `tab-drag.test.tsx`;
+  `apps/desktop/test/split-view.test.tsx`; `apps/web/test/split-view.test.tsx`; `tests/e2e/split-view.e2e.ts`.
+- Not checked in a real window: the Tauri webview's drag and F6 (checked in Chromium through the bridge).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

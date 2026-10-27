@@ -39,7 +39,8 @@ each with its own tabs, made by dragging a tab to the right edge or with "Split 
    tab there instead.
 4. **Dragging.** While a tab is dragged (pointer only, ADR-0019 rule 2), the page area shows a drop zone:
    - with one pane, the right part of the page area (from 60% of its width). The zone shades the right half, where the
-     new pane will go, and says "Split right". A release there splits;
+     new pane will go (dashed while dragging, filled once the pointer is over it), and the tab's picture at the pointer
+     says "Release to split right". A release there splits;
    - with two panes, the other pane (its tab bar or its page). A release on its tab bar puts the tab where it was let
      go among that pane's tabs (pinned tabs stay among the pinned ones); on its page, after its current tab.
 
