@@ -11,6 +11,8 @@
  *   so the gap does not chase the pointer (`order/live-reorder.ts`).
  * - Released `DETACH_PX` below the bar or outside the window, with `canDetach`, it is a move to a new window. Out
  *   there, every tab is back in its place.
+ * - Over a pane drop zone (`zoneAt`, ADR-0030: the other pane, or the right part of the page area for a new one), a
+ *   release moves the tab there (`onZone`): never a new window. Out there too, every tab is back in its place.
  * - Escape, a cancelled pointer or losing the window's focus puts the tab back.
  * - `onEnd` is called just before a drag that had started ends, while the tabs are still shown where the drag put
  *   them, so they can slide from there to where they end up.
@@ -41,6 +43,8 @@ export interface DragState {
   to: number | null;
   /** Far enough out for a new window. */
   detach: boolean;
+  /** Over a pane drop zone (ADR-0030): what `zoneAt` said; null elsewhere. */
+  zone: string | null;
   /** The pointer, for the "new window" label. */
   x: number;
   y: number;
@@ -62,6 +66,10 @@ export interface TabDragOptions {
   bounds?(id: string): readonly [number, number];
   onMove(id: string, to: number): void;
   onDetach(id: string, at: { x: number; y: number }): void;
+  /** A place outside the bar the tab may go to instead (ADR-0030), at a point of the window; null: none there. */
+  zoneAt?(x: number, y: number): string | null;
+  /** Released over a zone. */
+  onZone?(id: string, zone: string): void;
   /** A drag that had started is about to end (drop or cancel); the tabs are still where it showed them. */
   onEnd?(): void;
 }
@@ -129,16 +137,19 @@ export function useTabDrag(options: TabDragOptions) {
     const self = c.spans[from];
     if (!self) return null;
     const bar = list.getBoundingClientRect();
-    const detach = opts.current.canDetach && (!inWindow(x, y) || y > bar.bottom + DETACH_PX);
+    // Within its own bar it reorders; a pane zone comes before a new window.
+    const inBar = y >= bar.top && y <= bar.bottom && x >= bar.left && x <= bar.right;
+    const zone = !inBar && inWindow(x, y) ? (opts.current.zoneAt?.(x, y) ?? null) : null;
+    const detach = zone === null && opts.current.canDetach && (!inWindow(x, y) || y > bar.bottom + DETACH_PX);
     const scrolled = list.scrollLeft - c.scroll;
     const dx = x - p.x;
     // Its middle where the pointer has taken it (not held back at the ends, so the far end is always reachable).
     const center = self.start + self.size / 2 + dx;
-    const slot = detach ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
+    const slot = detach || zone !== null ? null : slotIndex(c.spans.filter((_, i) => i !== from), center, c.rtl, scrolled);
     const [first, last] = opts.current.bounds?.(p.id) ?? [0, c.order.length - 1];
     const to = slot === null ? null : Math.max(first, Math.min(slot, last));
     const moved = previewShifts(c.order.length, from, to, self.size, c.gap, c.rtl);
-    if (!detach) {
+    if (!detach && zone === null) {
       // The tab follows the pointer along the bar, kept between the first tab's start and the last tab's end, and
       // within what the bar shows. Its own place has moved with the scroll, so it is shifted by that too.
       // Kept over its own group too (ADR-0027): an unpinned tab never covers the pinned ones.
@@ -152,7 +163,7 @@ export function useTabDrag(options: TabDragOptions) {
       moved[from] = left - (self.start - scrolled);
     }
     const shifts = Object.fromEntries(c.order.map((id, i) => [id, Math.round((moved[i] ?? 0) * 100) / 100 || 0]));
-    return { id: p.id, to, detach, x, y, shifts };
+    return { id: p.id, to, detach, zone, x, y, shifts };
   }, []);
 
   const stopFrame = () => {
@@ -225,7 +236,8 @@ export function useTabDrag(options: TabDragOptions) {
       setTimeout(() => (swallowClick.current = false), 0);
       end();
       if (!result) return;
-      if (result.detach) opts.current.onDetach(p.id, { x: event.screenX, y: event.screenY });
+      if (result.zone !== null) opts.current.onZone?.(p.id, result.zone);
+      else if (result.detach) opts.current.onDetach(p.id, { x: event.screenX, y: event.screenY });
       else if (result.to !== null && result.to !== from) opts.current.onMove(p.id, result.to);
     },
     [measure, end],

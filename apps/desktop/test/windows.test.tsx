@@ -10,7 +10,8 @@ import { createImportService } from "../src/features/import/service.ts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { initialTabs, parseTabs, serializeTabs, type TabTarget } from "@thoth/app-ui/tabs/model.ts";
+import { initialTabs, serializeTabs, type TabTarget } from "@thoth/app-ui/tabs/model.ts";
+import { parseLayout } from "@thoth/app-ui/tabs/layout.ts";
 import { App, DEFAULT_OPTIONS } from "../src/app/App.tsx";
 import { readLaunch } from "../src/app/windows.ts";
 import { tabsKey } from "../src/app/tabs-store.ts";
@@ -18,6 +19,9 @@ import { WINDOWS_KEY, rememberWindow, windowsOn } from "../src/app/windows-store
 import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, TEST_OPTIONS, waitFor, within } from "./support/render.tsx";
 import { createFakeWindows, createNodePlatform, tempDirs, type FakeWindows } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
+
+/** The first pane's stored tabs (`v: 2`, ADR-0030). */
+const storedTabs = (text: string | null) => (text ? JSON.parse(text)?.panes?.[0]?.tabs : undefined);
 
 const OBSIDIAN = resolve(import.meta.dirname, "../../../tests/fixtures/obsidian-vault");
 const dirs = tempDirs();
@@ -41,7 +45,7 @@ const tabNames = () => tabs().map((t) => t.textContent);
 const current = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const row = async (name: string) => within(await screen.findByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name });
 const page = (path: string): TabTarget => ({ kind: "page", path });
-const opened = (i = 0) => parseTabs(windows.opened[i]!.tabs)!.tabs.map((t) => (t.target.kind === "page" ? t.target.path : t.target.kind));
+const opened = (i = 0) => parseLayout(windows.opened[i]!.tabs)!.panes[0]!.tabs.map((t) => (t.target.kind === "page" ? t.target.path : t.target.kind));
 
 /** The main window with Alpha, Beta and Gamma open in tabs, Gamma current. */
 async function mainWindow() {
@@ -80,7 +84,7 @@ describe("moving a tab to a new window", () => {
     expect(opened()).toEqual(["Beta.md"]);
     expect(current()).toBe("Gamma");
     // Both come back on restart: this window without Beta, the new one with it.
-    expect(JSON.parse(localStorage.getItem(tabsKey(root))!).tabs).toEqual([{ k: "page", path: "Alpha.md" }, { k: "page", path: "Gamma.md" }]);
+    expect(storedTabs(localStorage.getItem(tabsKey(root)))).toEqual([{ k: "page", path: "Alpha.md" }, { k: "page", path: "Gamma.md" }]);
     expect(windowsOn(root)).toEqual([request.id]);
   });
 
@@ -138,7 +142,7 @@ describe("a window opened on a Private Space", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Beta"]));
     expect(await screen.findByRole("heading", { level: 1, name: "Beta" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /choose or create a private space/i })).toBeNull();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root, "space-0000000000000001")) ?? "null")?.tabs).toEqual([{ k: "page", path: "Beta.md" }]));
+    await waitFor(() => expect(storedTabs(localStorage.getItem(tabsKey(root, "space-0000000000000001")))).toEqual([{ k: "page", path: "Beta.md" }]));
     expect(localStorage.getItem(tabsKey(root))).toBeNull(); // the main window's list is not touched
     expect(windowsOn(root)).toEqual(["space-0000000000000001"]);
     // The whole shell: the page tree and the tab bar.
@@ -189,7 +193,8 @@ describe("a window opened on a Private Space", () => {
     await openApp(root, {}, createNodePlatform({ vault: root, windows }));
     await waitFor(() => expect(windows.opened.map((w) => w.id)).toEqual(["space-0000000000000003"]));
     expect(opened()).toEqual(["Gamma.md", "Beta.md"]);
-    expect(parseTabs(windows.opened[0]!.tabs)!.active).toBe(parseTabs(windows.opened[0]!.tabs)!.tabs[1]!.id);
+    const back = parseLayout(windows.opened[0]!.tabs)!.panes[0]!;
+    expect(back.active).toBe(back.tabs[1]!.id);
   });
 
   it("is forgotten when it is closed, so it does not come back", async () => {

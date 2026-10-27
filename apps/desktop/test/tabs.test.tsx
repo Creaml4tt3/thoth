@@ -318,7 +318,7 @@ describe("reordering tabs (ADR-0019)", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Gamma", "Beta"]));
     expect(current()).toBe("Gamma");
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Gamma" })));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root))!).tabs).toEqual([{ k: "page", path: "Alpha.md" }, { k: "page", path: "Gamma.md" }, { k: "page", path: "Beta.md" }]));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root))!).panes[0].tabs).toEqual([{ k: "page", path: "Alpha.md" }, { k: "page", path: "Gamma.md" }, { k: "page", path: "Beta.md" }]));
     expect(await app.read("Alpha.md")).toBe(ALPHA); // moving a tab writes nothing
   });
 
@@ -361,8 +361,9 @@ describe("restoring tabs on restart", () => {
     await app.user.keyboard("{Control>}");
     await app.user.click(await row("Beta"));
     await app.user.keyboard("{/Control}");
-    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root)) ?? "null")?.tabs).toHaveLength(2));
-    expect(JSON.parse(localStorage.getItem(tabsKey(root))!)).toEqual({ v: 1, active: 1, tabs: [{ k: "page", path: "Alpha.md" }, { k: "page", path: "Beta.md" }] });
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(tabsKey(root)) ?? "null")?.panes?.[0]?.tabs).toHaveLength(2));
+    // The layout of ADR-0030: one pane, and the split ratio (no titles, no text).
+    expect(JSON.parse(localStorage.getItem(tabsKey(root))!)).toEqual({ v: 2, active: 0, ratio: 0.5, panes: [{ active: 1, tabs: [{ k: "page", path: "Alpha.md" }, { k: "page", path: "Beta.md" }] }] });
     // Another Private Space has its own list.
     expect(localStorage.getItem(tabsKey(`${root}-other`))).toBeNull();
   });

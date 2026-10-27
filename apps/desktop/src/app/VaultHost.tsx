@@ -13,7 +13,7 @@ import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { createLinkPreviewService } from "@thoth/app-ui/editor/link-previews.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
-import { parseTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
+import { parseLayout, serializeLayout } from "@thoth/app-ui/tabs/layout.ts";
 import { loadTabs, saveTabs } from "./tabs-store.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
@@ -74,9 +74,9 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
   const pageTabs = useTabs({
-    initial: () => (startTabs !== null ? parseTabs(startTabs) : null) ?? loadTabs(connection.root, windowId),
+    initial: () => (startTabs !== null ? parseLayout(startTabs) : null) ?? loadTabs(connection.root, windowId),
     flush: flushAll,
-    save: (state) => saveTabs(connection.root, state, windowId),
+    save: (layout) => saveTabs(connection.root, layout, windowId),
   });
   // Recent pages (ADR-0029): per Private Space, in localStorage, shared by its windows. A page that moves keeps its
   // entry the way it keeps its tabs, so every rename and move that remaps the tabs remaps it too.
@@ -130,7 +130,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     if (windowId === MAIN_WINDOW && connection.shared !== true) {
       for (const id of windowsOn(connection.root)) {
         // An id already open (the main window came back to this Private Space) is refused by the shell: nothing to do.
-        void windows.open({ id, root: connection.root, tabs: serializeTabs(loadTabs(connection.root, id)) }).catch(() => undefined);
+        void windows.open({ id, root: connection.root, tabs: serializeLayout(loadTabs(connection.root, id)) }).catch(() => undefined);
       }
     }
     return () => {

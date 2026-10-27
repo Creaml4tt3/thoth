@@ -12,9 +12,11 @@ import { ServerWorkspaceActions, ServerWorkspacesFooter } from "@thoth/app-ui/wo
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { RenameDialog } from "@thoth/app-ui/order/RenameDialog.tsx";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
-import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import { TabBar, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
+import { Panes, focusPaneTab } from "@thoth/app-ui/tabs/Panes.tsx";
 import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
-import type { OpenOptions, TabTarget } from "@thoth/app-ui/tabs/model.ts";
+import type { OpenOptions, Tab, TabTarget, TabsState } from "@thoth/app-ui/tabs/model.ts";
 import { tabMoves, useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
@@ -98,7 +100,16 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const pageHost = useMemo<PageHost>(() => ({ client: "web", autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush, pickImage: () => pickImageWithInput() }), [env, registerFlush]);
 
   // Tabs: restored per browser (ids only, no titles), saved on every change. Leaving the page on screen writes its edits first.
-  const tabs = useTabs({ initial: () => loadTabs(env.localStorage), flush: flushAll, save: (state) => saveTabs(env.localStorage, state) });
+  const tabs = useTabs({ initial: () => loadTabs(env.localStorage), flush: flushAll, save: (layout) => saveTabs(env.localStorage, layout) });
+  const everyTab = allTabs(tabs.layout);
+  const split = tabs.layout.panes.length > 1;
+  /** Alt/Option+Shift+\ (ADR-0030): the other pane, with focus on its current tab. */
+  const focusOtherPane = () => {
+    if (!split) return;
+    const next = (tabs.layout.active + 1) % tabs.layout.panes.length;
+    tabs.focusOther();
+    focusPaneTab(next);
+  };
   const shown = tabs.active.target;
   const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
   const openPage = useCallback((ref: WorkspacePageRef, options?: OpenOptions) => tabs.open({ kind: "workspace", ...ref }, options), [tabs]);
@@ -268,12 +279,13 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
       closeTab,
       next: () => tabs.step(1),
       previous: () => tabs.step(-1),
-      list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
+      list: everyTab.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
       ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
       ...(tabs.active.target.kind !== "blank" ? { pin: { pinned: tabs.active.pinned === true, run: togglePin } } : {}),
       ...(tabs.state.tabs.some((tab) => tab.id !== tabs.active.id && !tab.pinned) ? { closeOthers: () => tabs.closeOthers() } : {}),
+      ...(split ? { moveToOtherPane: () => tabs.split(), focusOtherPane } : { split: () => tabs.split() }),
     },
     ...(editor ? { toggleMode: editor.toggleMode } : {}),
     showShortcuts: () => setDialog({ kind: "shortcuts" }),
@@ -292,6 +304,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     "tab.new": tabs.newTab,
     "tab.close": closeTab,
     "tab.pin": togglePin,
+    "tab.split": () => tabs.split(),
+    "pane.focusOther": focusOtherPane,
     "page.favorite": toggleFavorite,
     "tab.next": () => tabs.step(1),
     "tab.previous": () => tabs.step(-1),
@@ -307,18 +321,51 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   }, [state, prune]);
 
   // The titles of background tabs and recent pages come from their workspace trees, so those trees load.
-  const wanted = [...new Set([...tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [tab.target.workspace] : [])), ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [ref.workspace] : []))])].join("\u0000");
+  const wanted = [...new Set([...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [tab.target.workspace] : [])), ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [ref.workspace] : []))])].join("\u0000");
   useEffect(() => {
     if (signedOut || !workspaces) return;
     for (const id of wanted ? wanted.split("\u0000") : []) if (workspaces.some((w) => w.id === id)) directory.expand(SERVER_ID, id);
   }, [directory, wanted, workspaces, signedOut]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
+  const itemsOf = (state: TabsState): TabItem[] => state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
   const tabMenuExtras = (id: string): MenuItem[] => {
-    const tab = tabs.state.tabs.find((x) => x.id === id);
+    const tab = everyTab.find((x) => x.id === id);
     if (tab?.target.kind !== "workspace") return [];
     const ref: FavoriteRef = { kind: "workspace", server: tab.target.server, workspace: tab.target.workspace, page: tab.target.page };
     return favoritesApi.can(ref) ? [{ id: "favorite", label: favoritesApi.has(ref) ? t.favorites.remove : t.favorites.add, onSelect: () => favoritesApi.toggle(ref) }] : [];
+  };
+
+  /** What a tab shows. Keyed by the tab, so the same page in two panes is two editors (sharing one session, ADR-0030). */
+  const paneContent = ({ id, target: shown }: Tab) => {
+    const current: WorkspacePageRef | null = shown.kind === "workspace" ? { server: shown.server, workspace: shown.workspace, page: shown.page } : null;
+    return shown.kind === "settings" ? (
+      <SettingsView account={account} signOut={() => void doSignOut()} signingOut={signingOut} showShortcuts={() => setDialog({ kind: "shortcuts" })} />
+      ) : current ? (
+        <WorkspacePage
+          key={`${id}\n${current.workspace}\n${current.page}`}
+          directory={directory}
+          target={current}
+          modeSpace={env.server}
+          openPage={openPage}
+          goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
+          actions={
+            <span className="page-actions">
+              <FavoriteButton target={{ kind: "workspace", ...current }} />
+              <ShareButton directory={directory} target={current} />
+            </span>
+          }
+          signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
+          onOpened={() => track({ name: "page_open" }, target)}
+          onSaved={() => track({ name: "page_save" }, target)}
+          onConflict={(event) => {
+            track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target);
+            // The page's title and where it is, nothing of its text (ADR-0018).
+            if (event.kind === "shown") notifications.push({ kind: "saveConflict", page: remoteTitle(state, current) ?? t.tabs.untitled, open: { kind: "workspacePage", ...current } });
+          }}
+        />
+      ) : (
+      <HomeView recent={homeRecent} favorites={homeFavorites} />
+    );
   };
 
   const doSignOut = async () => {
@@ -432,66 +479,52 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           </div>
         </aside>
         <main className="main">
-          <TabBar
-            tabs={items}
-            active={tabs.active.id}
-            onActivate={tabs.activate}
-            onClose={tabs.close}
-            onNew={tabs.newTab}
-            onMove={tabs.move}
-            onPin={(id, pinned) => tabs.setPinned(pinned, id)}
-            onCloseOthers={(id) => tabs.closeOthers(id)}
-            menuExtras={tabMenuExtras}
-            notice={tabNotice}
-            onHome={goHome}
-            {...(side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
-          />
-          {signedOut && (
-            <p role="alert" className="alert alert-warning banner">
-              {t.web.sessionEnded}{" "}
-              <Button variant="quiet" small onClick={signInAgain}>
-                {t.web.signInAgain}
-              </Button>
-            </p>
-          )}
-          {problem && (
-            <p role="alert" className="alert alert-danger banner">
-              {problem}{" "}
-              <Button variant="quiet" small onClick={() => setProblem(null)}>
-                {t.keyboard.close}
-              </Button>
-            </p>
-          )}
-          <TabPanel id={tabs.active.id}>
-            {shown.kind === "settings" ? (
-              <SettingsView account={account} signOut={() => void doSignOut()} signingOut={signingOut} showShortcuts={() => setDialog({ kind: "shortcuts" })} />
-            ) : current ? (
-              <WorkspacePage
-                key={`${tabs.active.id}\n${current.workspace}\n${current.page}`}
-                directory={directory}
-                target={current}
-                modeSpace={env.server}
-                openPage={openPage}
-                goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
-                actions={
-                  <span className="page-actions">
-                    <FavoriteButton target={{ kind: "workspace", ...current }} />
-                    <ShareButton directory={directory} target={current} />
-                  </span>
-                }
-                signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
-                onOpened={() => track({ name: "page_open" }, target)}
-                onSaved={() => track({ name: "page_save" }, target)}
-                onConflict={(event) => {
-                  track(event.kind === "shown" ? { name: "conflict_shown" } : { name: "conflict_resolved", params: { choice: event.choice } }, target);
-                  // The page's title and where it is, nothing of its text (ADR-0018).
-                  if (event.kind === "shown") notifications.push({ kind: "saveConflict", page: remoteTitle(state, current) ?? t.tabs.untitled, open: { kind: "workspacePage", ...current } });
+          <Panes
+            tabs={tabs}
+            bar={(pane) => (
+              <TabBar
+                tabs={itemsOf(pane.state)}
+                active={pane.state.active}
+                label={pane.label}
+                windowTabs={pane.windowTabs}
+                paneDrop={pane.paneDrop}
+                onActivate={tabs.activate}
+                onClose={tabs.close}
+                onNew={() => {
+                  tabs.focusPane(pane.index);
+                  tabs.newTab();
                 }}
+                onMove={tabs.move}
+                onPin={(id, pinned) => tabs.setPinned(pinned, id)}
+                onCloseOthers={(id) => tabs.closeOthers(id)}
+                menuExtras={(id) => [...pane.menuItems(id), ...tabMenuExtras(id)]}
+                notice={pane.index === tabs.layout.active ? tabNotice : null}
+                {...(pane.index === 0 ? { onHome: goHome } : {})}
+                {...(pane.index === 0 && side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
               />
-            ) : (
-              <HomeView recent={homeRecent} favorites={homeFavorites} />
             )}
-          </TabPanel>
+            notices={
+              <>
+                {signedOut && (
+                  <p role="alert" className="alert alert-warning banner">
+                    {t.web.sessionEnded}{" "}
+                    <Button variant="quiet" small onClick={signInAgain}>
+                      {t.web.signInAgain}
+                    </Button>
+                  </p>
+                )}
+                {problem && (
+                  <p role="alert" className="alert alert-danger banner">
+                    {problem}{" "}
+                    <Button variant="quiet" small onClick={() => setProblem(null)}>
+                      {t.keyboard.close}
+                    </Button>
+                  </p>
+                )}
+              </>
+            }
+            content={(tab) => paneContent(tab)}
+          />
         </main>
         {!side.hidden && <SidebarResizer sidebar={sidebar} shell={shell} />}
         <TooltipLayer />

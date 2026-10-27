@@ -262,8 +262,29 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tab-drag-image { position: fixed; z-index: 50; display: grid; gap: 2px; max-width: 240px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-drag-label { overflow: hidden; text-overflow: ellipsis; }
 .tab-drag-hint { color: var(--thoth-ink-secondary); font: var(--thoth-text-small); }
-.tab-panel { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.tab-panel { position: relative; flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
 .tab-panel > * { min-height: 0; }
+
+/* Split view (ADR-0030, tabs/Panes.tsx): one or two panes side by side, each a tab bar over its current tab. The left
+   pane is --thoth-pane-ratio of the width, kept at 320px or more for each pane while there is room for both (in a
+   narrower window both stay, at half). The separator is the sidebar's: an 8px handle with a 2px line on hover and focus.
+   The inactive pane's current tab has a quiet top line, so the active one is the one in accent. */
+.panes { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.panes[data-split] { --thoth-pane-left: clamp(min(320px, 50%), calc(var(--thoth-pane-ratio, 0.5) * 100%), max(100% - 320px, 50%)); grid-template-columns: minmax(0, var(--thoth-pane-left)) minmax(0, 1fr); }
+.pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.panes[data-split] .pane + .pane { border-inline-start: 1px solid var(--thoth-border); }
+.panes[data-split] .pane:not([data-active-pane]) .tab[data-selected] { border-top-color: var(--thoth-border-strong); }
+.pane-resizer { position: absolute; z-index: 5; top: 0; bottom: 0; inset-inline-start: calc(var(--thoth-pane-left) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }
+.pane-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; inset-inline-start: 3px; width: 2px; background: transparent; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.pane-resizer:hover::after, .pane-resizer:focus-visible::after, .panes[data-resizing] .pane-resizer::after { background: var(--thoth-accent); }
+.pane-resizer:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
+.panes[data-resizing] { cursor: col-resize; -webkit-user-select: none; user-select: none; }
+.panes[data-resizing] .pane-resizer::after { transition: none; }
+/* While a tab is dragged: where it would go (dashed), filled in once the pointer is over it. Pointer-only pictures. */
+.pane-drop { position: absolute; z-index: 30; inset: 4px; display: grid; place-items: center; border: 2px dashed var(--thoth-drop-indicator); border-radius: var(--thoth-radius-md); background: transparent; opacity: 0.7; pointer-events: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.pane-drop[data-over] { opacity: 1; background: var(--thoth-accent-soft); }
+.pane-drop-split { inset: 4px 4px 4px 50%; }
+.pane-drop-label { padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); font: var(--thoth-text-small); }
 
 /* The command palette and the shortcuts list. */
 .result-command { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-4); }

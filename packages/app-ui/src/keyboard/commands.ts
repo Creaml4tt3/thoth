@@ -80,6 +80,11 @@ export interface CommandActions {
     pin?: { pinned: boolean; run(): void };
     /** Close every tab but the current one and the pinned ones; absent when there is none to close. */
     closeOthers?(): void;
+    /** Split view (ADR-0030): the current tab into a new right pane (one pane), or to the other pane (two). */
+    split?(): void;
+    moveToOtherPane?(): void;
+    /** Focus the other pane; absent with one pane. */
+    focusOtherPane?(): void;
   };
   toggleMode?(): void;
   showShortcuts(): void;
@@ -136,6 +141,9 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.tabs.pin) add("tab.pin", a.tabs.pin.pinned ? strings.tabs.unpin : strings.tabs.pin, a.tabs.pin.run, { ...key("tab.pin"), keywords: "pin keep stick tab" });
   if (a.tabs.closeOthers) add("tab.closeOthers", strings.tabs.closeOthers, a.tabs.closeOthers, { keywords: "close tabs others all" });
   if (a.tabs.moveToWindow) add("tab.moveToWindow", t.moveTabToWindow, a.tabs.moveToWindow, { keywords: "window detach tear off split" });
+  if (a.tabs.split) add("tab.split", strings.tabs.splitRight, a.tabs.split, { ...key("tab.split"), keywords: "split pane side by side right editor group view" });
+  if (a.tabs.moveToOtherPane) add("tab.otherPane", strings.tabs.moveToOtherPane, a.tabs.moveToOtherPane, { ...key("tab.split"), keywords: "split pane side move left right" });
+  if (a.tabs.focusOtherPane) add("pane.focusOther", t.focusOtherPane, a.tabs.focusOtherPane, { ...key("pane.focusOther"), keywords: "split pane switch focus left right" });
   a.tabs.list.forEach((tab, index) => {
     if (tab.id !== a.tabs.active) add(`tab.go.${tab.id}`, t.goToTab(tab.label), () => a.tabs.goTo(tab.id), { keywords: `switch tab ${index + 1}` });
   });

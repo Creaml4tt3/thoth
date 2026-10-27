@@ -481,6 +481,8 @@ export const en = {
       moveTabRight: "Move tab right",
       /** Desktop only (ADR-0019). */
       moveTabToWindow: "Move tab to new window",
+      /** Split view (ADR-0030). */
+      focusOtherPane: "Focus the other pane",
       toggleMode: "Switch between Blocks and Plain mode",
       shortcuts: "Show keyboard shortcuts",
       format: (style: string) => `Format: ${style}`,
@@ -503,6 +505,8 @@ export const en = {
       "tab.move": "Move the tab left or right",
       "tab.menu": "Open the tab's menu",
       "tab.pin": "Pin or unpin the current tab",
+      "tab.split": "Split the current tab to the right, or move it to the other pane",
+      "pane.focusOther": "Move focus to the other pane",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
@@ -642,6 +646,18 @@ export const en = {
     unpinnedSaid: (label: string) => `${label} unpinned`,
     /** Cmd/Ctrl+W, Delete or a middle-click on a pinned tab: it stays. */
     pinnedNoClose: "Pinned tab: unpin it to close it",
+    /** Split view (ADR-0030): two panes side by side. */
+    splitRight: "Split right",
+    moveToOtherPane: "Move to other pane",
+    /** The tab lists' names while there are two panes. */
+    listLeft: "Open pages, left",
+    listRight: "Open pages, right",
+    /** On a tab dragged over the other pane. */
+    dropHere: "Release to move to this pane",
+    dropSplit: "Release to split right",
+    movedToPane: (label: string, right: boolean) => `${label} moved to the ${right ? "right" : "left"} pane`,
+    resizePanes: "Resize panes",
+    resizePanesHint: "Drag, or use the arrow keys. Enter or a double-click makes them equal.",
   },
 
   web: {

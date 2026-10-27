@@ -58,6 +58,23 @@ interface BarProps {
   /** Shows the hidden sidebar: a button before Home, only while the sidebar is hidden. */
   onShowSidebar?(): void;
   showSidebarRef?: Ref<HTMLButtonElement>;
+  /** The tab list's name: "Open pages" by default; each pane's own while there are two (ADR-0030). */
+  label?: string;
+  /** How many tabs the window has (all panes): a tab may leave for a new window while there is another. Default: this bar's. */
+  windowTabs?: number;
+  /** Pane drop zones while a tab is dragged (ADR-0030): the other pane, or a new one on the right. */
+  paneDrop?: PaneDrop;
+}
+
+/** Where a dragged tab may go besides its own bar: other panes (ADR-0030). Zones are the shell's opaque names. */
+export interface PaneDrop {
+  /** The zone at a point of the window, or null. */
+  at(x: number, y: number): string | null;
+  /** What a release there does ("Split right"), shown on the tab's picture. */
+  label(zone: string): string;
+  /** Told while a tab is dragged (and over which zone), and with `false, null` once the drag ends. */
+  show(dragging: boolean, zone: string | null): void;
+  drop(id: string, zone: string): void;
 }
 
 /** A tab that was closed and is still narrowing away: where it sat (after which tab), what it looked like. */
@@ -99,7 +116,7 @@ function slideTiming(el: Element): { duration: number; easing: string } {
  * others are already there after a drop, so only the dropped tab settles). Tabs present at the start, moves made with
  * the keyboard, and everything under reduced motion (the tabs jump to their places), skip it.
  */
-export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice, onHome, onShowSidebar, showSidebarRef }: BarProps) {
+export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDetach, onPin, onCloseOthers, menuExtras, notice, onHome, onShowSidebar, showSidebarRef, label, windowTabs, paneDrop }: BarProps) {
   const strings = useStrings();
   const t = strings.tabs;
   const closeHint = useShortcutHint("tab.close");
@@ -195,7 +212,8 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   }, [tabs, active]);
 
   const order = tabs.map((tab) => tab.id);
-  const canDetach = onDetach !== undefined && tabs.length > 1;
+  const inWindow = windowTabs ?? tabs.length;
+  const canDetach = onDetach !== undefined && inWindow > 1;
   const labelOf = (id: string) => tabs.find((tab) => tab.id === id)?.label ?? "";
   const pinnedCount = tabs.filter((tab) => tab.pinned).length;
   const isPinned = (id: string) => tabs.some((tab) => tab.id === id && tab.pinned === true);
@@ -235,7 +253,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
   };
 
   const detachTab = (id: string, at: { x: number; y: number } | null) => {
-    if (!onDetach || tabs.length < 2) return;
+    if (!onDetach || inWindow < 2) return;
     if (at === null) refocus.current = id;
     setSaid(t.movedToWindow(labelOf(id)));
     onDetach(id, at);
@@ -250,7 +268,16 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
     onMove: (id, to) => moveTab(id, to),
     onDetach: (id, at) => detachTab(id, at),
     onEnd: rememberPlaces,
+    ...(paneDrop ? { zoneAt: (x: number, y: number) => paneDrop.at(x, y), onZone: (id: string, zone: string) => paneDrop.drop(id, zone) } : {}),
   });
+  // The shell shows the drop zones while a tab is dragged, and which one it is over.
+  const dropRef = useRef(paneDrop);
+  dropRef.current = paneDrop;
+  const dragging = drag !== null;
+  const overZone = drag?.zone ?? null;
+  useEffect(() => {
+    dropRef.current?.show(dragging, overZone);
+  }, [dragging, overZone]);
 
   /** Open tabs in order, each closed one still narrowing away where it sat. */
   const rows: Row[] = [
@@ -337,7 +364,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
       items.push({ id: "left", label: t.moveLeft, ...(left ? { hint: left } : {}), disabled: at <= lo, onSelect: () => (moveTab(id, at - 1), focusSoon(id)) });
       items.push({ id: "right", label: t.moveRight, ...(right ? { hint: right } : {}), disabled: at >= hi, onSelect: () => (moveTab(id, at + 1), focusSoon(id)) });
     }
-    if (onDetach) items.push({ id: "window", label: t.moveToWindow, disabled: tabs.length < 2, onSelect: () => detachTab(id, null) });
+    if (onDetach) items.push({ id: "window", label: t.moveToWindow, disabled: inWindow < 2, onSelect: () => detachTab(id, null) });
     items.push(...(menuExtras?.(id) ?? []));
     // A pinned tab has no Close: unpin it first (ADR-0027).
     if (!pinned) items.push({ id: "close", label: t.close, onSelect: () => onClose(id) });
@@ -353,7 +380,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
           {onHome && <IconButton icon="home" label={strings.home.title} shortcut="home.open" className="tab-home" onClick={onHome} />}
         </span>
       )}
-      <div ref={listRef} role="tablist" aria-label={t.list} aria-orientation="horizontal" className="tablist">
+      <div ref={listRef} role="tablist" aria-label={label ?? t.list} aria-orientation="horizontal" className="tablist">
         {rows.map((row) => {
           if (row.ghost) {
             // A tab on its way out: only a picture of it. Nothing in it can be focused or announced.
@@ -383,7 +410,7 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
               data-pinned={pinned ? "" : undefined}
               data-enter={fresh.includes(tab.id) || undefined}
               data-dragging={dragged ? "" : undefined}
-              data-detach={dragged?.detach ? "" : undefined}
+              data-detach={dragged?.detach || dragged?.zone ? "" : undefined}
               style={shift === undefined ? undefined : { transform: `translateX(${shift}px)` }}
               {...(onMove ? { onPointerDown: (event: PointerEvent<HTMLDivElement>) => onPointerDown(event, tab.id) } : {})}
             >
@@ -437,12 +464,12 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
         })}
       </div>
       <IconButton icon="plus" label={t.new} shortcut="tab.new" className="tab-new" onClick={onNew} />
-      {drag?.detach && (
+      {(drag?.detach || drag?.zone) && (
         // Out of the bar, a picture of the tab follows the pointer and says what letting go will do. The list clips
         // anything outside it, so this is fixed to the window.
         <div className="tab-drag-image" aria-hidden="true" style={{ left: drag.x + 12, top: drag.y + 16 }}>
           <span className="tab-drag-label">{labelOf(drag.id)}</span>
-          <span className="tab-drag-hint">{t.releaseForWindow}</span>
+          <span className="tab-drag-hint">{drag.zone && paneDrop ? paneDrop.label(drag.zone) : t.releaseForWindow}</span>
         </div>
       )}
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tabs-said="">

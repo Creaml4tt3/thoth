@@ -4,7 +4,7 @@
  * vault's folder, so each Private Space has its own tabs, and a window the app opened adds its id (the main window keeps
  * the key it always had). Tabs whose page is gone are dropped by the shell once it knows the pages.
  */
-import { initialTabs, parseTabs, serializeTabs, type TabsState } from "@thoth/app-ui/tabs/model.ts";
+import { emptyLayout, parseLayout, serializeLayout, type Layout } from "@thoth/app-ui/tabs/layout.ts";
 import { MAIN_WINDOW } from "./windows.ts";
 
 export const TABS_KEY_PREFIX = "thoth.desktop.tabs.";
@@ -19,18 +19,18 @@ function storage(): Storage | null {
 
 export const tabsKey = (root: string, window: string = MAIN_WINDOW): string => `${TABS_KEY_PREFIX}${root}${window === MAIN_WINDOW ? "" : `#${window}`}`;
 
-/** The saved tabs of a Private Space in this window, or one empty tab. */
-export function loadTabs(root: string, window: string = MAIN_WINDOW): TabsState {
+/** The saved tabs (panes, ADR-0030) of a Private Space in this window, or one empty tab. */
+export function loadTabs(root: string, window: string = MAIN_WINDOW): Layout {
   try {
-    return parseTabs(storage()?.getItem(tabsKey(root, window))) ?? initialTabs();
+    return parseLayout(storage()?.getItem(tabsKey(root, window))) ?? emptyLayout();
   } catch {
-    return initialTabs();
+    return emptyLayout();
   }
 }
 
-export function saveTabs(root: string, state: TabsState, window: string = MAIN_WINDOW): void {
+export function saveTabs(root: string, layout: Layout, window: string = MAIN_WINDOW): void {
   try {
-    storage()?.setItem(tabsKey(root, window), serializeTabs(state));
+    storage()?.setItem(tabsKey(root, window), serializeLayout(layout));
   } catch {
     // quota or privacy mode: the tabs last for the session
   }

@@ -428,3 +428,51 @@ describe("motion", () => {
     expect(animate).not.toHaveBeenCalled();
   });
 });
+
+describe("dragging a tab to a pane (ADR-0030)", () => {
+  /** A bar whose pane zone is everything right of x = 600 and below the bar. */
+  function withZone() {
+    const spies = { onMove: vi.fn(), onDetach: vi.fn(), drop: vi.fn(), show: vi.fn() };
+    render(
+      <HintContext value={{ client: "desktop", platform: "other" }}>
+        <TabBar
+          tabs={items("A", "B", "C")}
+          active="A"
+          onActivate={() => undefined}
+          onClose={() => undefined}
+          onNew={() => undefined}
+          onMove={spies.onMove}
+          onDetach={spies.onDetach}
+          paneDrop={{ at: (x, y) => (x > 600 && y > HEIGHT ? "split" : null), label: () => "Release to split right", show: spies.show, drop: spies.drop }}
+        />
+      </HintContext>,
+    );
+    return spies;
+  }
+
+  it("over the zone, a release moves the tab there: not a new window, not a reorder", () => {
+    const spies = withZone();
+    const drag = press("B");
+    drag.move(drag.from + 10);
+    drag.move(800, 300);
+    expect(screen.getByText("Release to split right")).toBeTruthy();
+    expect(shifts()).toEqual({ A: 0, B: 0, C: 0 });
+    expect(spies.show).toHaveBeenLastCalledWith(true, "split");
+    drag.up(800, 300);
+    expect(spies.drop).toHaveBeenCalledWith("B", "split");
+    expect(spies.onDetach).not.toHaveBeenCalled();
+    expect(spies.onMove).not.toHaveBeenCalled();
+    expect(spies.show).toHaveBeenLastCalledWith(false, null);
+  });
+
+  it("elsewhere below the bar it is still a new window, and the shell is told a drag is on", () => {
+    const spies = withZone();
+    const drag = press("B");
+    drag.move(drag.from + 10);
+    expect(spies.show).toHaveBeenLastCalledWith(true, null);
+    drag.move(200, 300);
+    drag.up(200, 300);
+    expect(spies.onDetach).toHaveBeenCalled();
+    expect(spies.drop).not.toHaveBeenCalled();
+  });
+});

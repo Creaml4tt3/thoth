@@ -440,6 +440,7 @@ export const th: Strings = {
       moveTabLeft: "ย้ายแท็บไปทางซ้าย",
       moveTabRight: "ย้ายแท็บไปทางขวา",
       moveTabToWindow: "ย้ายแท็บไปหน้าต่างใหม่",
+      focusOtherPane: "ไปยังอีกฝั่งหนึ่ง", // REVIEW
       toggleMode: "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",
       shortcuts: "แสดงปุ่มลัด",
       format: (style) => `จัดรูปแบบ: ${style}`,
@@ -462,6 +463,8 @@ export const th: Strings = {
       "tab.move": "ย้ายแท็บไปทางซ้ายหรือขวา",
       "tab.menu": "เปิดเมนูของแท็บ",
       "tab.pin": "ปักหมุดหรือเลิกปักหมุดแท็บปัจจุบัน",
+      "tab.split": "แยกแท็บปัจจุบันไปทางขวา หรือย้ายไปอีกฝั่ง", // REVIEW
+      "pane.focusOther": "ย้ายโฟกัสไปอีกฝั่ง", // REVIEW
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",
@@ -584,6 +587,16 @@ export const th: Strings = {
     pinnedSaid: (label: string) => `ปักหมุด ${label} แล้ว`,
     unpinnedSaid: (label: string) => `เลิกปักหมุด ${label} แล้ว`,
     pinnedNoClose: "แท็บที่ปักหมุดไว้: เลิกปักหมุดก่อนจึงจะปิดได้",
+    /** Split view (ADR-0030). REVIEW: "ฝั่ง" for a pane. */
+    splitRight: "แยกไปทางขวา", // REVIEW
+    moveToOtherPane: "ย้ายไปอีกฝั่ง", // REVIEW
+    listLeft: "หน้าที่เปิดอยู่ ฝั่งซ้าย", // REVIEW
+    listRight: "หน้าที่เปิดอยู่ ฝั่งขวา", // REVIEW
+    dropHere: "ปล่อยเพื่อย้ายมาฝั่งนี้", // REVIEW
+    dropSplit: "ปล่อยเพื่อแยกไปทางขวา", // REVIEW
+    movedToPane: (label: string, right: boolean) => `ย้าย ${label} ไปฝั่ง${right ? "ขวา" : "ซ้าย"}แล้ว`, // REVIEW
+    resizePanes: "ปรับขนาดสองฝั่ง", // REVIEW
+    resizePanesHint: "ลาก หรือใช้ปุ่มลูกศร กด Enter หรือดับเบิลคลิกเพื่อให้เท่ากัน", // REVIEW
   },
 
   web: {

@@ -20,10 +20,12 @@ import { AgentSessionView } from "../agents/AgentSessionView.tsx";
 import { taskTitle } from "../agents/parts.tsx";
 import { MascotLayer } from "../mascot/Mascot.tsx";
 import { UpdateNotice } from "../updates/UpdateNotice.tsx";
-import type { TabTarget } from "@thoth/app-ui/tabs/model.ts";
-import { TabBar, TabPanel, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
+import type { Tab, TabTarget, TabsState } from "@thoth/app-ui/tabs/model.ts";
+import { TabBar, type TabItem } from "@thoth/app-ui/tabs/TabBar.tsx";
 import { tabMoves } from "@thoth/app-ui/tabs/useTabs.ts";
-import { initialTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
+import { serializeTabs } from "@thoth/app-ui/tabs/model.ts";
+import { allTabs, emptyLayout } from "@thoth/app-ui/tabs/layout.ts";
+import { Panes, focusPaneTab } from "@thoth/app-ui/tabs/Panes.tsx";
 import { MAIN_WINDOW, newWindowId } from "../../app/windows.ts";
 import { rememberWindow } from "../../app/windows-store.ts";
 import { saveTabs } from "../../app/tabs-store.ts";
@@ -126,8 +128,9 @@ export function Shell() {
   const recent = useRecentPages(recentStore, tabs.active);
   /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
   const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
+  const everyTab = allTabs(tabs.layout);
   const togglePin = (id: string = tabs.active.id) => {
-    const tab = tabs.state.tabs.find((x) => x.id === id);
+    const tab = everyTab.find((x) => x.id === id);
     if (!tab || tab.target.kind === "blank") return;
     tabs.setPinned(!tab.pinned, id);
   };
@@ -207,13 +210,22 @@ export function Shell() {
     // A pinned tab stays (ADR-0027): nothing closes, and the bar says how to close it. Less surprising than moving on
     // to another tab, which would look as if the pinned one had closed.
     if (isPinned(tabs.state, tabs.active.id)) return setTabNotice((n) => ({ text: tt.pinnedNoClose, seq: (n?.seq ?? 0) + 1 }));
-    if (!windows || tabs.state.tabs.length > 1) return tabs.close();
+    // The last tab of one of two panes closes that pane (ADR-0030); the window's last tab, the window.
+    if (!windows || everyTab.length > 1) return tabs.close();
     void flushAll().then(async (ok) => {
       if (!ok) return;
       // The main window always comes back on restart: closed this way, it comes back empty.
-      if (windowId === MAIN_WINDOW) saveTabs(connection.root, initialTabs());
+      if (windowId === MAIN_WINDOW) saveTabs(connection.root, emptyLayout());
       if (!(await windows.closeThis().catch(() => false))) tabs.close();
     });
+  };
+  const split = tabs.layout.panes.length > 1;
+  /** Alt/Option+Shift+\ or F6 (ADR-0030): the other pane, with focus on its current tab. */
+  const focusOtherPane = () => {
+    if (!split) return;
+    const next = (tabs.layout.active + 1) % tabs.layout.panes.length;
+    tabs.focusOther();
+    focusPaneTab(next);
   };
   const makeActions = (): CommandActions => ({
     newPage: () => setDialog({ kind: "new" }),
@@ -273,11 +285,12 @@ export function Shell() {
       closeTab,
       next: () => tabs.step(1),
       previous: () => tabs.step(-1),
-      list: tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target) })),
+      list: everyTab.map((tab) => ({ id: tab.id, label: label(tab.target) })),
       active: tabs.active.id,
       goTo: tabs.activate,
       ...tabMoves(tabs.state.tabs.findIndex((tab) => tab.id === tabs.active.id), tabs.state.tabs.length, tabs.moveBy),
-      ...(windows && tabs.state.tabs.length > 1 ? { moveToWindow: () => moveToWindow(tabs.active.id, null) } : {}),
+      ...(windows && everyTab.length > 1 ? { moveToWindow: () => moveToWindow(tabs.active.id, null) } : {}),
+      ...(split ? { moveToOtherPane: () => tabs.split(), focusOtherPane } : { split: () => tabs.split() }),
       ...(tabs.active.target.kind !== "blank" ? { pin: { pinned: tabs.active.pinned === true, run: () => togglePin() } } : {}),
       ...(tabs.state.tabs.some((tab) => tab.id !== tabs.active.id && !tab.pinned) ? { closeOthers: () => tabs.closeOthers() } : {}),
     },
@@ -304,13 +317,15 @@ export function Shell() {
     "tab.previous": () => tabs.step(-1),
     "tab.jump": (digit) => digit !== undefined && tabs.jump(digit),
     "tab.pin": () => togglePin(),
+    "tab.split": () => tabs.split(),
+    "pane.focusOther": focusOtherPane,
     "page.favorite": toggleFavorite,
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
 
   // Home when nothing is open at start (ADR-0029), or the first page where the options say so. Once: closing every
   // tab leaves a new tab, which shows Home too.
-  const startedEmpty = useRef(tabs.state.tabs.length === 1 && tabs.active.target.kind === "blank");
+  const startedEmpty = useRef(tabs.layout.panes.length === 1 && tabs.state.tabs.length === 1 && tabs.active.target.kind === "blank");
   const startOnHome = options.startOnHome;
   useEffect(() => {
     if (!startedEmpty.current || (!startOnHome && (!pages || pages.length === 0))) return;
@@ -358,7 +373,7 @@ export function Shell() {
 
   // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
   const wanted = [
-    ...tabs.state.tabs.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
+    ...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
     ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [`${ref.server}\n${ref.workspace}`] : [])),
   ];
   const wantedKey = [...new Set(wanted)].join("\u0000");
@@ -372,14 +387,28 @@ export function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantedKey, servers, directory.servers]);
 
-  const items: TabItem[] = tabs.state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
+  const itemsOf = (state: TabsState): TabItem[] => state.tabs.map((tab) => ({ id: tab.id, label: label(tab.target), ...(tab.target.kind === "page" ? { title: tab.target.path } : {}), ...(tab.target.kind === "home" ? { icon: "home" as const } : {}), ...(tab.pinned ? { pinned: true } : {}) }));
   /** The tab's menu also stars its page (ADR-0027). */
   const tabMenuExtras = (id: string): MenuItem[] => {
-    const tab = tabs.state.tabs.find((x) => x.id === id);
+    const tab = everyTab.find((x) => x.id === id);
     const ref = tab ? favoriteOf(tab.target) : null;
     if (!ref || !favorites.api.can(ref)) return [];
     return [{ id: "favorite", label: favorites.api.has(ref) ? strings.favorites.remove : strings.favorites.add, onSelect: () => favorites.api.toggle(ref) }];
   };
+
+  /** What a tab shows. Keyed by the tab, so the same page in two panes is two editors (sharing one session, ADR-0030). */
+  const paneContent = ({ id, target: shown }: Tab) =>
+    shown.kind === "settings" ? (
+      <SettingsView section={shown.section ?? "top"} request={shown} />
+    ) : shown.kind === "agent-run" ? (
+      <AgentSessionView key={`${id}\n${shown.run}`} run={shown.run} />
+    ) : shown.kind === "workspace" ? (
+      <WorkspacePageView key={`${id}\n${shown.server}\n${shown.workspace}\n${shown.page}`} target={shown} onTransfer={transfer} />
+    ) : shown.kind === "page" ? (
+      <PageView key={`${id}\n${shown.path}`} path={shown.path} />
+    ) : (
+      <HomeView recent={homeRecent} favorites={homeFavorites} />
+    );
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
   const transfer = (target: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target }));
@@ -401,56 +430,59 @@ export function Shell() {
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
       <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
       <main className="main">
-        <TabBar
-          tabs={items}
-          active={tabs.active.id}
-          onActivate={tabs.activate}
-          onClose={tabs.close}
-          onNew={tabs.newTab}
-          onMove={tabs.move}
-          onPin={(id, pinned) => tabs.setPinned(pinned, id)}
-          onCloseOthers={(id) => tabs.closeOthers(id)}
-          menuExtras={tabMenuExtras}
-          notice={tabNotice}
-          onHome={goHome}
-          {...(side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
-          {...(windows ? { onDetach: moveToWindow } : {})}
-        />
-        {watchError && (
-          <p role="alert" className="alert alert-warning banner">
-            {t.watchError(watchError)}
-          </p>
-        )}
-        {favorites.error && (
-          <p role="alert" className="alert alert-danger banner">
-            {favorites.error}{" "}
-            <Button variant="quiet" small onClick={favorites.dismissError}>
-              {dismissText}
-            </Button>
-          </p>
-        )}
-        {problem && (
-          <p role="alert" className="alert alert-danger banner">
-            {problem}{" "}
-            <Button variant="quiet" small onClick={() => setProblem(null)}>
-              {dismissText}
-            </Button>
-          </p>
-        )}
-        <RecoveryNotice />
-        <TabPanel id={tabs.active.id}>
-          {target.kind === "settings" ? (
-            <SettingsView section={target.section ?? "top"} request={target} />
-          ) : target.kind === "agent-run" ? (
-            <AgentSessionView key={`${tabs.active.id}\n${target.run}`} run={target.run} />
-          ) : target.kind === "workspace" ? (
-            <WorkspacePageView key={`${tabs.active.id}\n${target.server}\n${target.workspace}\n${target.page}`} target={target} onTransfer={transfer} />
-          ) : target.kind === "page" ? (
-            <PageView key={`${tabs.active.id}\n${target.path}`} path={target.path} />
-          ) : (
-            <HomeView recent={homeRecent} favorites={homeFavorites} />
+        <Panes
+          tabs={tabs}
+          bar={(pane) => (
+            <TabBar
+              tabs={itemsOf(pane.state)}
+              active={pane.state.active}
+              label={pane.label}
+              windowTabs={pane.windowTabs}
+              paneDrop={pane.paneDrop}
+              onActivate={tabs.activate}
+              onClose={tabs.close}
+              onNew={() => {
+                tabs.focusPane(pane.index);
+                tabs.newTab();
+              }}
+              onMove={tabs.move}
+              onPin={(id, pinned) => tabs.setPinned(pinned, id)}
+              onCloseOthers={(id) => tabs.closeOthers(id)}
+              menuExtras={(id) => [...pane.menuItems(id), ...tabMenuExtras(id)]}
+              notice={pane.index === tabs.layout.active ? tabNotice : null}
+              {...(pane.index === 0 ? { onHome: goHome } : {})}
+              {...(pane.index === 0 && side.hidden ? { onShowSidebar: () => side.setHidden(false), showSidebarRef: side.showRef } : {})}
+              {...(windows ? { onDetach: moveToWindow } : {})}
+            />
           )}
-        </TabPanel>
+          notices={
+            <>
+              {watchError && (
+                <p role="alert" className="alert alert-warning banner">
+                  {t.watchError(watchError)}
+                </p>
+              )}
+              {favorites.error && (
+                <p role="alert" className="alert alert-danger banner">
+                  {favorites.error}{" "}
+                  <Button variant="quiet" small onClick={favorites.dismissError}>
+                    {dismissText}
+                  </Button>
+                </p>
+              )}
+              {problem && (
+                <p role="alert" className="alert alert-danger banner">
+                  {problem}{" "}
+                  <Button variant="quiet" small onClick={() => setProblem(null)}>
+                    {dismissText}
+                  </Button>
+                </p>
+              )}
+              <RecoveryNotice />
+            </>
+          }
+          content={(tab) => paneContent(tab)}
+        />
       </main>
       {!side.hidden && <SidebarResizer sidebar={sidebar} shell={shell} />}
       <MascotLayer />

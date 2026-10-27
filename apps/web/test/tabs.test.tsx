@@ -148,14 +148,15 @@ describe("restoring tabs in the same browser", () => {
     const browser = await signedIn();
     await browser.user.click(await row("Alpha"));
     await ctrlClick(browser, "Beta");
-    await waitFor(() => expect(JSON.parse(browser.local.get(TABS_KEY) ?? "null")?.tabs).toHaveLength(2));
+    await waitFor(() => expect(JSON.parse(browser.local.get(TABS_KEY) ?? "null")?.panes?.[0]?.tabs).toHaveLength(2));
     const stored = browser.local.get(TABS_KEY)!;
-    expect(Object.keys(JSON.parse(stored))).toEqual(["v", "active", "tabs"]);
+    expect(Object.keys(JSON.parse(stored))).toEqual(["v", "active", "ratio", "panes"]);
+    expect(Object.keys(JSON.parse(stored).panes[0])).toEqual(["active", "tabs"]);
     expect(stored).not.toMatch(/Alpha|Beta|Gamma|Notes|Body of/);
     // Word boundaries: a random page id ("…a41adabc…") must not look like the name.
     expect(stored).not.toMatch(/thoth_(at|rt|pat)_|token|email|\bAda\b/i);
-    for (const tab of JSON.parse(stored).tabs as Record<string, string>[]) expect(Object.keys(tab).sort()).toEqual(["k", "page", "server", "workspace"]);
-    expect(JSON.parse(stored).active).toBe(1);
+    for (const tab of JSON.parse(stored).panes[0].tabs as Record<string, string>[]) expect(Object.keys(tab).sort()).toEqual(["k", "page", "server", "workspace"]);
+    expect(JSON.parse(stored).panes[0].active).toBe(1);
     // Nothing else in storage changed because of the tabs, and the session storage holds none of it.
     expect([...browser.session.keys()]).toEqual([]);
   });
