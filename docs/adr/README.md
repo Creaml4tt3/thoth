@@ -38,6 +38,7 @@ trade-off.
 | [0026](0026-blog-and-changelog-on-the-website.md) | A blog and a changelog on the website | Proposed 2026-10-26 |
 | [0027](0027-favorites-and-pinned-tabs.md) | Favorites and pinned tabs | Proposed 2026-10-26 |
 | [0028](0028-images-in-pages.md) | Images in pages | Proposed 2026-10-26 |
+| [0029](0029-home-tab-and-recent-pages.md) | Home tab and recent pages | Proposed 2026-10-27 |
 
 Template: [0000-template.md](0000-template.md).
 

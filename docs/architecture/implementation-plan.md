@@ -1225,6 +1225,25 @@ still marked `REVIEW` until the owner has seen it.
   `editor-views.test.tsx`; `apps/web/test/share.test.tsx`, `tabs.test.tsx`; `tests/e2e/private-tree.e2e.ts`.
 - Not done: a native reader for the new Thai marked `REVIEW`.
 
+### Batch 2, getting around (2026-10-27), built, waiting for review
+
+- The whole sidebar hides and comes back: Cmd/Ctrl+\\, the palette, a Hide button in its brand row and a Show button at
+  the start of the tab bar. Hidden, it is inert and aria-hidden and the resizer is gone; focus moves to Show. Remembered
+  per Private Space (`hidden` in the sidebar layout) and per browser (`thoth.web.sidebar.hidden`). A breadcrumb folder,
+  the Local badge and an imported folder show it first.
+- A notification about a page goes to the tab that shows it, or opens it in a new tab (`openOrFocus`); an import's
+  notification does the same for the folder's first page. Desktop and web.
+- Home (ADR-0029): a Home tab with recent pages and favorites, opened by the brand row, a tab-bar button, Alt+Shift+H
+  and "Go home"; a new tab shows it; a window with nothing to restore opens on it.
+- Show in Finder / File Explorer / Files on Private Space pages and folders: `vault.reveal` takes an optional `path`,
+  checked by the host (inside the root, no `..`, no symlink, not `.thoth/`, must exist) and revealed selected (macOS
+  `open -R`, Windows `explorer /select,`, Linux the containing folder).
+- Evidence: `packages/app-ui/test/tabs-open-or-focus.test.ts`, `tabs-home.test.ts`, `recent.test.ts`;
+  `apps/desktop/test/home.test.tsx`, `sidebar.test.tsx`, `notifications.test.tsx`, `reveal.test.tsx`;
+  `apps/web/test/home.test.tsx`, `sidebar.test.tsx`, `notifications.test.tsx`; `crates/thoth-host/tests/reveal.rs`;
+  `tests/e2e/getting-around.e2e.ts`.
+- Not checked in a real window: Explorer's `/select,` and `xdg-open` (built here on macOS only).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and
