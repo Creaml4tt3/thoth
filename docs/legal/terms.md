@@ -10,7 +10,7 @@
 > `/th/terms/`, without this block and without HTML comments.
 <!-- repo-only:end -->
 
-Last updated: 26 October 2026
+Last updated: 27 October 2026
 
 1. **What this is.** The Thoth website at `thothnotes.com`, the web
    version at `thothnotes.com/app`, and the Thoth demo server at
@@ -48,7 +48,7 @@ Last updated: 26 October 2026
 7. **Suspension.** The operator may suspend or delete accounts or content that
    break these terms, or when needed to protect the service or its users.
 8. **Reporting abuse.** Report abuse or illegal content to
-   creaml4tt3@gmail.com with the subject "Abuse report". Include the workspace
+   support@thothnotes.com with the subject "Abuse report". Include the workspace
    or page link if you can.
 9. **Liability.** The service is free. To the extent permitted by Thai law,
    the operator is not liable for any loss of data, profits or anything else
@@ -63,4 +63,4 @@ Last updated: 26 October 2026
     accept the new terms.
 12. **Governing law.** These terms are governed by the laws of Thailand. Any
     dispute goes to the competent courts of Thailand.
-13. **Contact.** creaml4tt3@gmail.com.
+13. **Contact.** hello@thothnotes.com.

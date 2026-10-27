@@ -10,7 +10,7 @@
 > markers) and every HTML comment, so owner notes in comments stay in the repo.
 <!-- repo-only:end -->
 
-Last updated: 24 October 2026
+Last updated: 27 October 2026
 
 ## Who we are
 
@@ -20,7 +20,7 @@ and the Thoth demo server at `api.thothnotes.com`. For the personal data
 described here, Creaml4tt3 is the data controller under Thailand's Personal
 Data Protection Act B.E. 2562 (2019) ("PDPA").
 
-Contact: creaml4tt3@gmail.com
+Contact: privacy@thothnotes.com
 
 ## What this notice covers
 
@@ -138,7 +138,7 @@ Under the PDPA you have the right to:
 - **withdraw your consent** at any time, for example to analytics from Cookie
   settings. Withdrawing does not affect processing done before.
 
-To use these rights, email creaml4tt3@gmail.com. We may ask you to confirm that
+To use these rights, email privacy@thothnotes.com. We may ask you to confirm that
 the account is yours. We answer within 30 days. Some requests can be refused
 where the PDPA allows it; if so, we tell you why.
 

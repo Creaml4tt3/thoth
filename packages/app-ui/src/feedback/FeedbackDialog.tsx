@@ -10,7 +10,7 @@ import { copyText } from "../ui/clipboard.ts";
 import type { ServerEntry } from "../workspace/directory.ts";
 
 /** The fallback on every form (ADR-0033): mail always works, even with no server at all. */
-export const FEEDBACK_EMAIL = "creaml4tt3@gmail.com";
+export const FEEDBACK_EMAIL = "support@thothnotes.com";
 const MAILTO = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Thoth feedback")}`;
 
 /** Where the dialog sends: a server's name and its `sendFeedback`. */
