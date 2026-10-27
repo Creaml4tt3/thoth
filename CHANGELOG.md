@@ -8,7 +8,7 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
-## [Unreleased]
+## [0.2.2] - 2026-10-28
 
 ### Changed
 
@@ -145,6 +145,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.2.2]: https://github.com/Creaml4tt3/thoth/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/Creaml4tt3/thoth/compare/v0.1.2...v0.1.3
