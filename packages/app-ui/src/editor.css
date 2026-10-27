@@ -107,9 +107,9 @@
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
 /* Settings (ui/SettingsLayout.tsx): the list of sections beside the page, sticky while it scrolls; above the sections
-   when the page column would be squeezed (180px list + gap + the content width). */
+   when the page column would be squeezed below 600px (160px list + gap + 600px). */
 .settings-scroll { container-type: inline-size; }
-.settings-layout { display: grid; grid-template-columns: 180px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-8); justify-content: center; align-items: start; }
+.settings-layout { display: grid; grid-template-columns: 160px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-6); justify-content: center; align-items: start; }
 .settings-layout > .page-col { margin: 0; min-width: 0; }
 .settings-layout .settings > section { scroll-margin-top: var(--thoth-space-4); }
 .settings-nav { position: sticky; top: 0; padding-top: var(--thoth-space-4); }
@@ -118,7 +118,7 @@
 .settings-nav a:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .settings-nav a[aria-current="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .settings-nav a:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
-@container (max-width: 940px) {
+@container (max-width: 784px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--thoth-space-4); }
   .settings-layout > .page-col, .settings-nav { width: 100%; max-width: var(--thoth-content-width); margin: 0 auto; }
   .settings-nav { position: static; padding-top: 0; }
@@ -143,7 +143,7 @@
 .crumb-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; min-height: 24px; border-radius: var(--thoth-radius-xs); }
 .crumb-btn.crumb-text { display: block; line-height: 24px; }
 .crumb-btn:hover { color: var(--thoth-ink-secondary); text-decoration: underline; text-underline-offset: 3px; }
-.crumb-btn:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.crumb-btn:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .save-status { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .save-status[data-state="error"] { color: var(--thoth-danger); }
 

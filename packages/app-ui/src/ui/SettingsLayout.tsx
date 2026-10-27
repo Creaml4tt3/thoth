@@ -18,6 +18,8 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
   const content = useRef<HTMLDivElement>(null);
   const [present, setPresent] = useState<readonly string[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  /** Until when the section in view does not replace the one a link chose. */
+  const held = useRef(0);
   const wanted = sections.map((s) => s.id).join("\n");
 
   // Which headings are on the page; some sections show up later (they load their state first).
@@ -50,7 +52,8 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
           else visible.delete(id);
         }
         const first = order.find((id) => visible.has(id));
-        if (first) setActive(first);
+        // While a link's scroll is under way the sections it passes are not the one asked for.
+        if (first && Date.now() >= held.current) setActive(first);
       },
       { root: scroller, rootMargin: "0px 0px -50% 0px" },
     );
@@ -68,6 +71,7 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
     (heading.closest("section") ?? heading).scrollIntoView({ behavior: motionOff() ? "auto" : "smooth", block: "start" });
     if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
+    held.current = Date.now() + (motionOff() ? 100 : 1000); // shortcut: a fixed wait for the smooth scroll; `scrollend` where it is everywhere
     setActive(id);
   };
 
