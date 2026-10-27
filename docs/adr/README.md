@@ -39,6 +39,7 @@ trade-off.
 | [0027](0027-favorites-and-pinned-tabs.md) | Favorites and pinned tabs | Proposed 2026-10-26 |
 | [0028](0028-images-in-pages.md) | Images in pages | Proposed 2026-10-26 |
 | [0029](0029-home-tab-and-recent-pages.md) | Home tab and recent pages | Proposed 2026-10-27 |
+| [0030](0030-split-view-two-panes.md) | Split view, two panes side by side | Proposed 2026-10-27 |
 
 Template: [0000-template.md](0000-template.md).
 
