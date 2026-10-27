@@ -115,8 +115,10 @@ test.describe("web client", () => {
       await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + gamma.height / 2);
       await expect.poll(async () => Math.abs((await left("Gamma")) - betaWas) <= 2).toBe(true);
       await expect(page.locator(".tab[data-drop]")).toHaveCount(0);
-      await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + 300);
+      // Below the bar (left of the split zone of ADR-0030, which starts 60% across the page area): still no new window.
+      await drag.moveTo(400, gamma.y + 300);
       await expect(page.getByText("Release to open in a new window")).toHaveCount(0);
+      await drag.moveTo(gamma.x + gamma.width * 0.9, gamma.y + gamma.height / 2);
       await drag.drop();
       await expect.poll(tabNames).toEqual(["Beta", "Gamma", "Alpha"]);
       await expect(page.getByRole("tab", { selected: true })).toHaveText("Gamma");

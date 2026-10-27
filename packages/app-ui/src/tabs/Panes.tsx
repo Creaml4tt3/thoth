@@ -168,16 +168,13 @@ export function Panes({ tabs, bar, content, notices }: Props) {
                 {content(tab)}
                 {index === 0 && shown && !split && (
                   // Where the new pane will go: the right half of the page area, shaded once the pointer is over the zone.
-                  <div className="pane-drop pane-drop-split" aria-hidden="true" data-over={shown.zone === "split" ? "" : undefined}>
-                    <span className="pane-drop-label">{t.dropSplit}</span>
-                  </div>
+                  // The picture at the pointer says what letting go does; this only shows where.
+                  <div className="pane-drop pane-drop-split" aria-hidden="true" data-over={shown.zone === "split" ? "" : undefined} />
                 )}
               </TabPanel>
             </PaneContext>
             {target && split && (
-              <div className="pane-drop" aria-hidden="true" data-over={target.zone?.startsWith(`pane:${index}`) ? "" : undefined}>
-                <span className="pane-drop-label">{t.dropHere}</span>
-              </div>
+              <div className="pane-drop" aria-hidden="true" data-over={target.zone?.startsWith(`pane:${index}`) ? "" : undefined} />
             )}
           </div>
         );
