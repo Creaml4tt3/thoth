@@ -119,6 +119,16 @@ export function open(state: TabsState, target: TabTarget, options: OpenOptions =
   return options.newTab || activeTab(state).pinned ? insertAfterActive(state, target) : retarget(state, state.active, target);
 }
 
+/**
+ * Opens `target` without replacing what the current tab shows (a notification about a page): the tab that already shows
+ * it becomes current; otherwise it opens in a new tab after the current one, or in the current tab when that is empty.
+ */
+export function openOrFocus(state: TabsState, target: TabTarget): TabsState {
+  const existing = state.tabs.find((t) => sameTarget(t.target, target));
+  if (existing) return activate(state, existing.id);
+  return activeTab(state).target.kind === "blank" ? retarget(state, state.active, target) : insertAfterActive(state, target);
+}
+
 /** A new, empty tab after the current one. */
 export const newTab = (state: TabsState): TabsState => insertAfterActive(state, BLANK);
 

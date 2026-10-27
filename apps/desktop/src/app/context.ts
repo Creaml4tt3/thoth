@@ -79,9 +79,10 @@ export interface Session {
   alone: boolean;
   /**
    * Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"); with `openFirstPage: false`
-   * it only expands it (a breadcrumb: the open page stays).
+   * it only expands it (a breadcrumb: the open page stays). With `keepCurrent` (a notification) the first page goes to
+   * its tab, or opens in a new one, instead of replacing the current tab's page.
    */
-  openFolder(path: string, options?: { openFirstPage?: boolean }): void;
+  openFolder(path: string, options?: { openFirstPage?: boolean; keepCurrent?: boolean }): void;
   reveal: { path: string; nonce: number } | null;
   /** The open page registers how to write its pending edits; returns the unregister function. */
   registerFlush(flush: () => Promise<boolean>): () => void;

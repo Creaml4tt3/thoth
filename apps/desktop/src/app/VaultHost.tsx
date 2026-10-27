@@ -257,14 +257,17 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   );
 
   const openFolder = useCallback(
-    (folder: string, { openFirstPage = true }: { openFirstPage?: boolean } = {}) => {
+    (folder: string, { openFirstPage = true, keepCurrent = false }: { openFirstPage?: boolean; keepCurrent?: boolean } = {}) => {
       if (!openFirstPage) return setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
       void flushAll().then(async (ok) => {
         if (!ok) return;
         setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
         const prefix = folder === "" ? "" : `${folder}/`;
         const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
-        if (first) tabs.open({ kind: "page", path: first.path });
+        if (!first) return;
+        const target = { kind: "page" as const, path: first.path };
+        if (keepCurrent) tabs.openOrFocus(target);
+        else tabs.open(target);
       });
     },
     [flushAll, vault, tabs],
@@ -292,12 +295,13 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const openNotification = useCallback(
     (target: NotificationTarget) => {
       switch (target.kind) {
+        // A page goes to its tab, or opens in a new one: the page on screen stays where it is.
         case "page":
-          return tabs.open({ kind: "page", path: target.path });
+          return tabs.openOrFocus({ kind: "page", path: target.path });
         case "workspacePage":
-          return tabs.open({ kind: "workspace", server: target.server, workspace: target.workspace, page: target.page });
+          return tabs.openOrFocus({ kind: "workspace", server: target.server, workspace: target.workspace, page: target.page });
         case "folder":
-          return openFolder(target.path);
+          return openFolder(target.path, { keepCurrent: true });
         case "agentRun":
           return openRun(target.runId);
         case "update":

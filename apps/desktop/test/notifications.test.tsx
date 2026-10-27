@@ -273,6 +273,13 @@ describe("imports", () => {
     await waitFor(() => expect(shown).toEqual([{ title: "Import complete", body: "11 pages in Imports/obsidian-vault" }]));
     await toShell(app);
     expect(await entryTitles(app)).toEqual(["Import complete"]);
+    // The entry goes to the tab that shows the folder's first page, from a new tab, instead of opening it twice.
+    const first = screen.getByRole("tab", { selected: true }).textContent;
+    await app.user.keyboard("{Meta>}t{/Meta}");
+    await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+    await app.user.click(within(await openList(app)).getByRole("button", { name: /Import complete/ }));
+    await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toBe(first));
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
   it("an import that finished with errors", async () => {
@@ -317,6 +324,15 @@ describe("save conflicts", () => {
     expect(screen.getByTestId("notification-live").textContent).toBe("Alpha changed elsewhere while you were editing it. Choose which version to keep.");
     await app.user.click(within(list).getByRole("button", { name: /Alpha changed elsewhere/ }));
     await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toContain("Alpha"));
+    // It opened in a new tab: Beta, the page that was on screen, stays open beside it.
+    const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabNames()).toEqual(["Beta", "Alpha"]);
+    // Opened again from another tab, it goes to the tab that shows it instead of opening another.
+    await app.user.click(screen.getByRole("tab", { name: "Beta" }));
+    await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toContain("Beta"));
+    await app.user.click(within(await openList(app)).getByRole("button", { name: /Alpha changed elsewhere/ }));
+    await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toContain("Alpha"));
+    expect(tabNames()).toEqual(["Beta", "Alpha"]);
   });
 });
 

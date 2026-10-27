@@ -48,6 +48,8 @@ describe("web notifications", () => {
     await browser.user.click(within(list).getByRole("button", { name: /Roadmap changed elsewhere/ }));
     await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toContain("Roadmap"));
     expect(bell().getAttribute("aria-label")).toBe("Notifications");
+    // In a new tab: Other, the page on screen, stays open beside it.
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Other", "Roadmap"]);
 
     // The browser's own notifications are never used, and the list is not kept in the browser's storage.
     expect(notify).not.toHaveBeenCalled();

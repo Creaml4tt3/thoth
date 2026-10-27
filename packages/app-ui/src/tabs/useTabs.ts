@@ -8,6 +8,8 @@ export interface TabsController {
   active: Tab;
   /** Opens a target in the current tab, or in a new one (`newTab`). */
   open(target: TabTarget, options?: OpenOptions): void;
+  /** Goes to the tab that shows `target`, else opens it in a new tab (a notification about a page). */
+  openOrFocus(target: TabTarget): void;
   newTab(): void;
   /** Closes a tab (the current one by default). A pinned tab is not closed (ADR-0027). */
   close(id?: string): void;
@@ -75,6 +77,7 @@ export function useTabs({ initial, flush, save }: Options): TabsController {
       state,
       active: model.activeTab(state),
       open: (target, options) => guarded((s) => model.open(s, target, options)),
+      openOrFocus: (target) => guarded((s) => model.openOrFocus(s, target)),
       newTab: () => guarded(model.newTab),
       close: (id) => {
         const target = id ?? latest.current.active;

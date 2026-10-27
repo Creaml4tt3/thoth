@@ -133,9 +133,10 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   strings.current = t;
   const notifications = useMemo(() => createNotificationCenter({ strings: () => strings.current.notifications, now: () => env.now() }), [env]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // A page goes to its tab, or opens in a new one: the page on screen stays where it is.
   const openNotification = useCallback((to: NotificationTarget) => {
-    if (to.kind === "workspacePage") openPage({ server: to.server, workspace: to.workspace, page: to.page });
-  }, [openPage]);
+    if (to.kind === "workspacePage") tabs.openOrFocus({ kind: "workspace", server: to.server, workspace: to.workspace, page: to.page });
+  }, [tabs]);
 
   // The only workspace (a new account has exactly one) opens by itself.
   const only = workspaces?.length === 1 ? workspaces[0]!.id : null;
