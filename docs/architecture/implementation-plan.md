@@ -1277,6 +1277,19 @@ still marked `REVIEW` until the owner has seen it.
   `tests/e2e/first-run.e2e.ts`.
 - Not checked in a real window: the tour in the Tauri webview (checked in Chromium through the bridge).
 
+### Feedback from users (ADR-0033, 2026-10-27), built, waiting for review
+
+- `POST /api/v1/feedback` (capability `feedback`, no sign-in, strict body), migration `013_feedback.sql` (additive),
+  rate limits per address hash and account (5 per 10 minutes, 30 per day), the honeypot, the website's no-JavaScript
+  form with the server's thank-you page, `cli.ts feedback list|export --json`.
+- Forms: desktop and web Settings → Help and feedback, the palette's "Send feedback…", the site's `/support/` and
+  `/th/support/` (header, footer, sitemap, llms.txt).
+- **Before the deploy:** apply `013_feedback.sql` to Neon; keep the site's origin in `CORS_ORIGINS`.
+- Evidence: `apps/server/test-db/feedback.test.ts`, `cli.test.ts`; `tests/protocol/*`; `packages/app-ui/test/feedback.test.tsx`;
+  `apps/desktop/test/feedback.test.tsx`; `apps/web/test/feedback.test.tsx`; `apps/site/test/support.test.ts`;
+  `tests/e2e/feedback.e2e.ts`.
+- Not checked in a real window: the Tauri webview (checked in Chromium through the bridge).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

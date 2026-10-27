@@ -97,6 +97,7 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
+| `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; section 10, ADR-0033 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -600,6 +601,16 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   204) purges it now. Both: 403 for its other members, 404 for anyone else, a live workspace, and one
   past its 30 days (`DELETED_WORKSPACE_RESTORE_DAYS`).
 - After 30 days the server purges a deleted workspace with its pages, revisions and attachments.
+
+### Feedback (capability `feedback`, ADR-0033)
+
+- `POST /feedback` needs no credentials. A valid bearer credential ties the feedback to the account; an invalid one is
+  ignored (never 401). The body is strict: `kind` (`problem` | `idea` | `question`), `message` (1 to 5000 characters,
+  not blank), optional `email`, optional `context` `{ client, version?, os?, language? }`, and the honeypot `website`
+  (filled in: the same 204, nothing stored). 204 when received; 400 `validation_failed` for anything else; 429
+  `rate_limited` with `Retry-After`. Nothing is stored for a refused request.
+- A form-encoded body (the website without JavaScript) carries the same fields flat, plus `return` (a path); it must
+  come from an `Origin` the server allows for CORS (else 403), and the answer is an HTML page.
 
 ## 11. Transfers
 

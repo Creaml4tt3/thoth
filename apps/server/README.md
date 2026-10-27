@@ -87,6 +87,8 @@ node apps/server/src/cli.ts add-member --workspace <id> --user <id> --role owner
 node apps/server/src/cli.ts create-token --user <id> --out ./ada.token  # token goes ONLY to the file (0600)
 node apps/server/src/cli.ts revoke-token --token-id <id>
 node apps/server/src/cli.ts backfill-kind [--batch <n>]  # once after migration 009: fills the page kind of older pages (ADR-0017)
+node apps/server/src/cli.ts feedback list [--since 7d]    # feedback from users, newest first (ADR-0033)
+node apps/server/src/cli.ts feedback export --json        # the same as JSON
 ```
 
 `create-token` writes the token to `--out` with mode 0600, refuses to overwrite an existing file, and prints
@@ -181,6 +183,19 @@ delete them. On by default; `WORKSPACE_MANAGEMENT=off` switches it off.
   `workspace.restored`, `workspace.purged` (actor null when maintenance purged it).
 - **Migration** `012_workspace_deletion.sql` must be applied before a build that lists `workspace-management` serves
   traffic. It is additive.
+
+### Feedback (ADR-0033)
+
+`POST /api/v1/feedback` takes a problem, an idea or a question from the apps and the website's support page, without
+sign-in. On by default; `FEEDBACK=off` switches it off.
+
+- **Stored** in `feedback` (migration `013_feedback.sql`, additive; apply it before a build that lists `feedback`): the
+  kind, the message, the email given, the client details, the account of a valid credential, and an HMAC of the client
+  address with the database's own salt. Never the address.
+- **Limits:** 5 per 10 minutes and 30 per day per address and per account (429 with `Retry-After`). Behind a proxy, set
+  `TRUST_PROXY=true`.
+- **The website form** posts form-encoded from an origin in `CORS_ORIGINS` and gets an HTML page back.
+- **Read it** with `cli.ts feedback list` or `feedback export --json`.
 
 ### Public share links (ADR-0023)
 

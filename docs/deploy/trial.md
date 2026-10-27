@@ -78,6 +78,15 @@ Domains used below (change them when you buy your own domain):
    Delete… right away; without the columns every workspace route fails with a
    database error.
 
+   Migration `013_feedback.sql` (ADR-0033, feedback from users) adds two
+   tables (`feedback`, `feedback_settings` with a random salt) and needs no
+   backfill. It is additive and safe while the old build runs. **Apply it to
+   Neon before you deploy the server build that contains it.** That build lists
+   `feedback`, so the apps and the website's support page send to it right away;
+   without the tables every feedback request fails with a database error. The
+   website's form posts from the site's origin, which must stay in
+   `CORS_ORIGINS`.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.

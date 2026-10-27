@@ -41,6 +41,7 @@ trade-off.
 | [0029](0029-home-tab-and-recent-pages.md) | Home tab and recent pages | Proposed 2026-10-27 |
 | [0030](0030-split-view-two-panes.md) | Split view, two panes side by side | Proposed 2026-10-27 |
 | [0032](0032-first-run-welcome-pages-and-tour.md) | First run: Welcome pages and a tour of the basic tools | Proposed 2026-10-27 |
+| [0033](0033-feedback-from-users.md) | Feedback from users, in the apps and on the website | Proposed 2026-10-27 |
 
 Template: [0000-template.md](0000-template.md).
 
