@@ -1300,6 +1300,17 @@ still marked `REVIEW` until the owner has seen it.
 - Windows: `bundle.publisher` and `bundle.windows.wix.upgradeCode` pinned to 0.2.0's derived values.
 - Not checked in a real window: the folder move and keychain move on a real 0.2.0 install, and a Windows upgrade.
 
+### UI fixes for 0.2.2 (2026-10-28), built, waiting for review
+
+- Settings: a section link scrolls only the settings area (`scrollToSection`), and `.main`, `.tab-panel` and `.pane`
+  clip (`overflow: clip`) like `.shell`, so no scrollIntoView can scroll them. The chosen section stays marked until
+  the person scrolls.
+- Share dialog: an active link's expiry shows its time. Not done: listing old links' URLs (only token hashes are
+  stored, ADR-0023 rule 6) and a date-and-time expiry field (the protocol takes 7, 30 or 90 days or never); both
+  wait for an owner decision.
+- Share page: SVG pictures through `<img>`, the file inline with a no-script CSP (ADR-0023 amendment, Proposed).
+- Breadcrumbs scroll sideways on one row, starting at the page's crumb.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

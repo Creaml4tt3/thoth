@@ -8,6 +8,18 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- A breadcrumb too long for the page now scrolls sideways on one line, starting at the page itself, instead of cutting its parts short.
+
+### Fixed
+
+- Settings: choosing one of the last sections in the list no longer pushes the whole view up out of reach.
+- Share: an active link shows the time it stops working, not only the day.
+- A shared page shows SVG pictures instead of a download link; the file still cannot run a script.
+
 ## [0.2.1] - 2026-10-28
 
 ### Added
