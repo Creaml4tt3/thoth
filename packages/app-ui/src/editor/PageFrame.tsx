@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
-import { tip, tipIfClipped } from "../ui/Tooltip.tsx";
+import { tip } from "../ui/Tooltip.tsx";
 import { useShortcutHint } from "../keyboard/hints.ts";
 import { useStrings } from "../strings/index.ts";
 import { ConflictDialog } from "./ConflictDialog.tsx";
@@ -45,9 +45,37 @@ function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: 
 
 function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, children }: PageFrameProps["crumbs"] & { status: SaveStatus; children?: ReactNode }) {
   const t = useStrings().editor;
+  const trail = useRef<HTMLElement>(null);
+  const path = parts.join("\n");
+  // Start at the end, where the page's own crumb is, and stay there when the row's width changes, unless the person
+  // scrolled it away from the end.
+  useLayoutEffect(() => {
+    const el = trail.current;
+    if (!el) return;
+    let pinned = true;
+    const end = () => {
+      if (pinned) el.scrollLeft = el.scrollWidth;
+    };
+    const scrolled = () => {
+      pinned = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
+    };
+    end();
+    el.addEventListener("scroll", scrolled, { passive: true });
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(end);
+    watch?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", scrolled);
+      watch?.disconnect();
+    };
+  }, [path]);
+  // A plain wheel scrolls the row sideways (nothing above it scrolls vertically, so nothing is taken away).
+  const wheel = (event: WheelEvent<HTMLElement>) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.currentTarget.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+  };
   return (
     <header className="crumbs">
-      <nav aria-label={t.breadcrumb} className="crumb-trail">
+      <nav ref={trail} aria-label={t.breadcrumb} className="crumb-trail" onWheel={wheel} {...(onCrumb || onBadge ? {} : { tabIndex: 0 })}>
         <ol>
           <li>
             {onBadge ? (
@@ -63,11 +91,11 @@ function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, children }: PageF
             return (
               <li key={i} {...(last ? { "aria-current": "page" as const, className: "crumb-current" } : {})}>
                 {onCrumb && !last ? (
-                  <button type="button" className="crumb-btn crumb-text" onClick={() => onCrumb(i)} {...tipIfClipped(part)}>
+                  <button type="button" className="crumb-btn crumb-text" onClick={() => onCrumb(i)}>
                     {part}
                   </button>
                 ) : (
-                  <span className="crumb-text" {...tipIfClipped(part)}>
+                  <span className="crumb-text">
                     {part}
                   </span>
                 )}

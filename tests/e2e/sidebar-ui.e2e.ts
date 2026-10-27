@@ -21,6 +21,7 @@ let vault: string;
 let bridge: Bridge;
 const SHOTS = process.env["SHOTS"] ?? join(REPO, "tests", ".tmp", "screens");
 const LONG = "A very long page title that certainly will not fit in the sidebar or in a tab";
+const DEEP = ["Research notes", "Field trips in the northern hills", "Second season", "Birds seen near the river mouth"];
 
 test.beforeAll(async () => {
   built = await buildAll();
@@ -41,6 +42,7 @@ test.beforeEach(async ({ page, context }) => {
   await put(`${LONG}.md`, `# ${LONG}\n`);
   await put("Docs/One.md");
   await put("Docs/Two.md");
+  await put(`${DEEP.join("/")}.md`, `# ${DEEP.at(-1)}\n`);
   bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, pickSource: join(scratch, "source"), dataDir: join(scratch, "data") } });
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
@@ -208,12 +210,55 @@ test("text that is cut off shows in full in a tooltip, text that fits shows none
   await expect(tip(page)).toHaveText(LONG);
   await page.mouse.move(700, 500);
   await expect(tip(page)).toBeHidden();
+});
 
-  // The breadcrumb cuts a long part with an ellipsis and says so in the same way.
-  await page.setViewportSize({ width: 600, height: 800 });
-  await expect(page.locator(".crumb-current .crumb-text")).toBeVisible();
-  await page.locator(".crumb-current .crumb-text").hover();
-  await expect(tip(page)).toContainText(LONG);
+test("a breadcrumb too long for the page scrolls sideways on its own row: it starts at the page's crumb, a wheel and a focused crumb move only that row", async ({ page }) => {
+  for (const name of DEEP.slice(0, -1)) await page.getByRole("treeitem", { name, exact: true }).click();
+  await page.getByRole("treeitem", { name: DEEP.at(-1), exact: true }).click();
+  await page.setViewportSize({ width: 760, height: 700 });
+  const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+  const current = trail.locator('[aria-current="page"]');
+  await expect(current).toHaveText(`${DEEP.at(-1)}.md`);
+  await settled(page);
+  const row = () => trail.evaluate((el) => ({ scroll: el.scrollWidth - el.clientWidth, left: Math.round(el.scrollLeft), height: Math.round(el.getBoundingClientRect().height) }));
+  const first = await row();
+  expect(first.scroll, "the trail is wider than its row").toBeGreaterThan(0);
+  expect(first.height, "one line").toBeLessThan(40);
+  // Starts scrolled to its end: the page's own crumb is in full view, nothing cut.
+  expect(first.left).toBeGreaterThanOrEqual(first.scroll - 1);
+  const inRow = (el: Element) => {
+    const nav = el.closest("nav")!.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return r.left >= nav.left - 1 && r.right <= nav.right + 1;
+  };
+  expect(await current.evaluate(inRow)).toBe(true);
+  expect(await page.locator(".crumb-text").evaluateAll((els) => els.every((el) => el.scrollWidth <= el.clientWidth))).toBe(true);
+  expect(await trail.evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
+  // A plain (vertical) wheel over the trail scrolls it sideways.
+  const box = (await trail.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -2000);
+  await expect.poll(async () => (await row()).left).toBe(0);
+  await page.mouse.wheel(0, 2000);
+  await expect.poll(async () => (await row()).left).toBeGreaterThanOrEqual(first.scroll - 1);
+  // Keyboard: a focused crumb scrolls into view, and only the trail moves.
+  const folder = trail.getByRole("button", { name: DEEP[0], exact: true });
+  await folder.focus();
+  await settled(page);
+  expect(await folder.evaluate(inRow)).toBe(true);
+  const moved = await trail.evaluate((el) => {
+    const out: string[] = [];
+    for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollTop || p.scrollLeft) out.push(p.className || p.tagName);
+    return out;
+  });
+  expect(moved).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(page.locator(".tabstrip").first()).toBeInViewport();
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await settled(page);
+    await page.locator("header.crumbs").screenshot({ path: join(SHOTS, `breadcrumb-scroll-${scheme}.png`) });
+  }
 });
 
 test("a tooltip never gets in the way of a drag", async ({ page }) => {

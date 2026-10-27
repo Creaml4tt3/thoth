@@ -131,11 +131,12 @@
 .page-props { display: flex; gap: 14px; flex-wrap: wrap; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-4); }
 .page-props b { font-weight: 450; color: var(--thoth-ink-secondary); }
 .crumbs { display: flex; align-items: center; gap: var(--thoth-space-3); justify-content: space-between; padding: var(--thoth-space-3) var(--thoth-space-6); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); border-bottom: 1px solid var(--thoth-border); min-height: 44px; }
-/* One line: a part that does not fit is cut with an ellipsis and shows in full in a tooltip (ui/Tooltip.tsx). */
-.crumb-trail { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; min-width: 0; }
-.crumb-trail li { list-style: none; display: flex; gap: 4px; min-width: 0; }
-.crumb-trail li:first-child { flex: none; }
-.crumb-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* One line that scrolls sideways when it is wider than the page (PageFrame.tsx starts it at its end, the page's own
+   crumb), with the tab bar's thin scrollbar. Only this row scrolls: its ancestors clip (shell.css). */
+.crumb-trail { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; overscroll-behavior-x: contain; padding-block: 2px; }
+.crumb-trail:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; border-radius: var(--thoth-radius-xs); }
+.crumb-trail li { list-style: none; display: flex; gap: 4px; flex: none; }
+.crumb-text { white-space: nowrap; }
 .crumb-trail ol { display: contents; margin: 0; padding: 0; }
 .crumb-trail li + li::before { content: "/"; color: var(--thoth-ink-faint); flex: none; }
 .crumb-current { color: var(--thoth-ink-secondary); }
