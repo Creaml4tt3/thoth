@@ -40,7 +40,12 @@ use url::Url;
 /// The public OAuth client the desktop app signs in as (docs/protocol/sign-in.md section 2).
 pub const CLIENT_ID: &str = "thoth-desktop";
 /// Keychain service name of the desktop app's secrets (the bundle identifier).
-pub const KEYCHAIN_SERVICE: &str = "io.github.creaml4tt3.thoth";
+pub const KEYCHAIN_SERVICE: &str = "com.thothnotes.desktop";
+/// The service the secrets were kept under before the identifier changed (ADR-0031); `MovingSecretStore` reads it.
+pub const LEGACY_KEYCHAIN_SERVICE: &str = crate::data_dir::LEGACY_IDENTIFIER;
+/// The hosted trial (`packages/app-ui/src/workspace/starter.ts`) and where it was before ADR-0031.
+const TRIAL_ORIGIN: &str = "https://api.thothnotes.com";
+const LEGACY_TRIAL_ORIGIN: &str = "https://api.thoth.creaml4tt3.me";
 const LIST_FILE: &str = "servers.json";
 const MAX_SERVERS: usize = 64;
 const MAX_PROVIDERS: usize = 16;
@@ -93,6 +98,41 @@ impl SecretStore for MemorySecretStore {
     fn delete(&self, server: &str) -> HostResult<()> {
         lock(&self.secrets).remove(server);
         Ok(())
+    }
+}
+
+/// Secrets under the current keychain service, with the ones an older build kept under its service moved over the
+/// first time they are read (ADR-0031). A secret is removed from the old service only after the new one holds it.
+pub struct MovingSecretStore {
+    current: Arc<dyn SecretStore>,
+    legacy: Arc<dyn SecretStore>,
+}
+
+impl MovingSecretStore {
+    pub fn new(current: Arc<dyn SecretStore>, legacy: Arc<dyn SecretStore>) -> Self {
+        Self { current, legacy }
+    }
+}
+
+impl SecretStore for MovingSecretStore {
+    fn get(&self, server: &str) -> HostResult<Option<String>> {
+        if let Some(secret) = self.current.get(server)? {
+            return Ok(Some(secret));
+        }
+        let Some(secret) = self.legacy.get(server)? else { return Ok(None) };
+        if self.current.set(server, &secret).is_ok() {
+            let _ = self.legacy.delete(server);
+        }
+        Ok(Some(secret))
+    }
+
+    fn set(&self, server: &str, secret: &str) -> HostResult<()> {
+        self.current.set(server, secret)
+    }
+
+    fn delete(&self, server: &str) -> HostResult<()> {
+        self.current.delete(server)?;
+        self.legacy.delete(server)
     }
 }
 
@@ -233,8 +273,13 @@ impl Drop for SignInGuard<'_> {
 impl Remote {
     pub fn new(data_dir: Option<PathBuf>, secrets: Arc<dyn SecretStore>, browser: Arc<dyn Browser>) -> Self {
         let list_path = data_dir.map(|d| d.join(LIST_FILE));
-        let records = list_path.as_deref().map(load).unwrap_or_default();
-        Self { http: Http::new(), secrets, browser, list_path, records: Mutex::new(records), sessions: Mutex::default(), sign_ins: Mutex::default() }
+        let mut records = list_path.as_deref().map(load).unwrap_or_default();
+        let moved = move_trial(&mut records);
+        let remote = Self { http: Http::new(), secrets, browser, list_path, records: Mutex::new(records), sessions: Mutex::default(), sign_ins: Mutex::default() };
+        if moved {
+            remote.save(&lock(&remote.records));
+        }
+        remote
     }
 
     /// Cancels every sign-in in progress.
@@ -715,6 +760,30 @@ fn random_b64(bytes: usize) -> HostResult<String> {
 }
 
 /// Reads `servers.json`, keeping only well-formed entries.
+/// The hosted trial saved at its address before ADR-0031 moves to its address now: both hostnames serve the same
+/// server, and after the move the server signs in and names itself (`iss`, endpoints) on the new one only. The handle
+/// stays, so the keychain entry keyed by it and the session with it stay too. Left alone when the new address is
+/// saved as well. True when something moved.
+fn move_trial(records: &mut [Record]) -> bool {
+    if records.iter().any(|r| r.url == TRIAL_ORIGIN) {
+        return false;
+    }
+    let Some(record) = records.iter_mut().find(|r| r.url == LEGACY_TRIAL_ORIGIN) else { return false };
+    let moved = |endpoint: &str| match endpoint.strip_prefix(LEGACY_TRIAL_ORIGIN) {
+        Some(path) if path.starts_with('/') => format!("{TRIAL_ORIGIN}{path}"),
+        _ => endpoint.to_owned(),
+    };
+    record.url = TRIAL_ORIGIN.to_owned();
+    if record.label == host_label(LEGACY_TRIAL_ORIGIN) {
+        record.label = host_label(TRIAL_ORIGIN);
+    }
+    if let Some(endpoints) = &mut record.endpoints {
+        endpoints.token = moved(&endpoints.token);
+        endpoints.revocation = endpoints.revocation.as_deref().map(moved);
+    }
+    true
+}
+
 fn load(path: &std::path::Path) -> Vec<Record> {
     let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
     let Ok(value) = serde_json::from_str::<Value>(&text) else { return Vec::new() };
@@ -761,5 +830,122 @@ mod tests {
         let loaded = load(&path);
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].info(), json!({ "id": "server_1", "url": "https://a.example.org", "label": "A", "auth": "browser", "providers": [] }));
+    }
+
+    #[test]
+    fn a_secret_kept_under_the_old_keychain_service_is_read_once_and_moved() {
+        let (new, old) = (Arc::new(MemorySecretStore::default()), Arc::new(MemorySecretStore::default()));
+        old.set("server_a", "thoth_rt_old").unwrap();
+        let store = MovingSecretStore::new(new.clone(), old.clone());
+        assert_eq!(store.get("server_a").unwrap().as_deref(), Some("thoth_rt_old"));
+        // Moved: the new service has it, the old one no longer does.
+        assert_eq!(new.get("server_a").unwrap().as_deref(), Some("thoth_rt_old"));
+        assert!(old.is_empty());
+        assert_eq!(store.get("server_b").unwrap(), None);
+    }
+
+    #[test]
+    fn the_new_keychain_service_wins_and_deleting_clears_both() {
+        let (new, old) = (Arc::new(MemorySecretStore::default()), Arc::new(MemorySecretStore::default()));
+        new.set("server_a", "thoth_rt_new").unwrap();
+        old.set("server_a", "thoth_rt_stale").unwrap();
+        let store = MovingSecretStore::new(new.clone(), old.clone());
+        assert_eq!(store.get("server_a").unwrap().as_deref(), Some("thoth_rt_new"));
+        store.set("server_b", "thoth_pat_x").unwrap();
+        assert_eq!((new.len(), old.len()), (2, 1));
+        // Sign-out or remove: nothing is left under either service.
+        store.delete("server_a").unwrap();
+        assert_eq!(store.get("server_a").unwrap(), None);
+        assert!(old.is_empty());
+    }
+
+    /// The new service refuses writes: the old secret stays where it is (read again next time), never lost.
+    struct ReadOnly(MemorySecretStore);
+    impl SecretStore for ReadOnly {
+        fn get(&self, server: &str) -> HostResult<Option<String>> {
+            self.0.get(server)
+        }
+        fn set(&self, _: &str, _: &str) -> HostResult<()> {
+            Err(HostError::internal("Could not write to the system keychain"))
+        }
+        fn delete(&self, server: &str) -> HostResult<()> {
+            self.0.delete(server)
+        }
+    }
+
+    #[test]
+    fn a_secret_that_cannot_be_moved_stays_under_the_old_service() {
+        let old = Arc::new(MemorySecretStore::default());
+        old.set("server_a", "thoth_rt_old").unwrap();
+        let store = MovingSecretStore::new(Arc::new(ReadOnly(MemorySecretStore::default())), old.clone());
+        assert_eq!(store.get("server_a").unwrap().as_deref(), Some("thoth_rt_old"));
+        assert_eq!(old.get("server_a").unwrap().as_deref(), Some("thoth_rt_old"));
+    }
+
+    struct NoBrowser;
+    impl Browser for NoBrowser {
+        fn open(&self, _: &str) -> HostResult<()> {
+            Ok(())
+        }
+    }
+
+    fn remote_with(dir: &std::path::Path, servers: Value, secrets: Arc<MemorySecretStore>) -> Remote {
+        std::fs::write(dir.join(LIST_FILE), json!({ "version": 1, "servers": servers }).to_string()).unwrap();
+        Remote::new(Some(dir.to_path_buf()), secrets, Arc::new(NoBrowser))
+    }
+
+    #[test]
+    fn the_hosted_trial_saved_at_its_old_address_moves_to_the_new_one_and_stays_signed_in() {
+        let dir = tempfile::tempdir().unwrap();
+        let secrets = Arc::new(MemorySecretStore::default());
+        secrets.set("server_trial", "thoth_rt_0123456789abcdef").unwrap();
+        let remote = remote_with(dir.path(), json!([
+            { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "Thoth demo server", "auth": "browser",
+              "account": { "id": "u1", "displayName": "Ann" }, "providers": [],
+              "endpoints": { "token": "https://api.thoth.creaml4tt3.me/oauth/token", "revocation": "https://api.thoth.creaml4tt3.me/oauth/revoke" } },
+            { "id": "server_other", "url": "https://a.example.org", "label": "A", "auth": "token", "providers": [] }
+        ]), secrets.clone());
+
+        let list = remote.list();
+        // Same handle (the keychain entry is keyed by it), new address, still signed in as the same account.
+        assert_eq!(list[0]["id"], "server_trial");
+        assert_eq!(list[0]["url"], "https://api.thothnotes.com");
+        assert_eq!(list[0]["label"], "Thoth demo server");
+        assert_eq!(list[0]["auth"], "browser");
+        assert_eq!(list[0]["account"]["displayName"], "Ann");
+        assert_eq!(list[1]["url"], "https://a.example.org");
+        assert_eq!(secrets.get("server_trial").unwrap().as_deref(), Some("thoth_rt_0123456789abcdef"));
+        // The token and revocation endpoints moved with it, so refresh and sign-out still pass the same-origin check.
+        let record = remote.record("server_trial").unwrap();
+        assert_eq!(record.endpoint(|e| Some(&e.token)).unwrap().as_str(), "https://api.thothnotes.com/oauth/token");
+        assert_eq!(record.endpoint(|e| e.revocation.as_ref()).unwrap().as_str(), "https://api.thothnotes.com/oauth/revoke");
+        // Written back once: the next start reads the new address.
+        let saved = load(&dir.path().join(LIST_FILE));
+        assert_eq!(saved[0].url, "https://api.thothnotes.com");
+        assert_eq!(saved[0].endpoints.as_ref().unwrap().token, "https://api.thothnotes.com/oauth/token");
+    }
+
+    #[test]
+    fn a_label_that_was_only_the_old_host_name_becomes_the_new_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let remote = remote_with(dir.path(), json!([
+            { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "api.thoth.creaml4tt3.me", "auth": "signed-out", "providers": [] }
+        ]), Arc::default());
+        assert_eq!(remote.list()[0]["label"], "api.thothnotes.com");
+    }
+
+    #[test]
+    fn the_old_address_is_left_alone_when_the_new_one_is_saved_too() {
+        let dir = tempfile::tempdir().unwrap();
+        let servers = json!([
+            { "id": "server_old", "url": "https://api.thoth.creaml4tt3.me", "label": "Old", "auth": "browser", "providers": [],
+              "endpoints": { "token": "https://api.thoth.creaml4tt3.me/oauth/token" } },
+            { "id": "server_new", "url": "https://api.thothnotes.com", "label": "New", "auth": "signed-out", "providers": [] }
+        ]);
+        let remote = remote_with(dir.path(), servers, Arc::default());
+        // Two entries with one address would be one server listed twice; neither is changed.
+        let list = remote.list();
+        assert_eq!((list[0]["url"].as_str(), list[1]["url"].as_str()), (Some("https://api.thoth.creaml4tt3.me"), Some("https://api.thothnotes.com")));
+        assert!(remote.record("server_old").unwrap().endpoint(|e| Some(&e.token)).is_some());
     }
 }

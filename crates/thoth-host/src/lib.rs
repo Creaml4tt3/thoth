@@ -22,6 +22,7 @@
 pub mod agent;
 #[cfg(unix)]
 mod at;
+pub mod data_dir;
 pub mod error;
 mod handles;
 pub mod links;
@@ -39,7 +40,7 @@ pub mod watch;
 mod win;
 
 pub use error::{HostError, HostResult};
-pub use remote::{Browser, KEYCHAIN_SERVICE, MemorySecretStore, SecretStore};
+pub use remote::{Browser, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MemorySecretStore, MovingSecretStore, SecretStore};
 
 use agent::Agents;
 use links::{LinkOptions, LinkPreviews};
