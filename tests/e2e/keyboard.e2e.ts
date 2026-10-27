@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { welcomeDone } from "./welcome.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -29,6 +30,7 @@ test.beforeEach(async ({ page, context }) => {
   scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-")));
   vault = join(scratch, "Vault");
   await mkdir(vault);
+  await welcomeDone(vault);
   bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, pickSource: join(scratch, "source"), dataDir: join(scratch, "data") } });
   // No network: only the bridge origin is reachable.
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());

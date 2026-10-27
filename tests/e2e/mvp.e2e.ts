@@ -30,6 +30,7 @@ import { snapshotTree } from "../helpers/fs.ts";
 import { dirEntries, writeZip } from "../helpers/zip.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { welcomeDone } from "./welcome.ts";
 import { actAsBrowser, apiAs, buildWebClient, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { desktopOnlyIn } from "../../apps/web/test/bundle.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
@@ -166,6 +167,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     for (const name of Object.keys(vaults) as (keyof typeof vaults)[]) {
       vaults[name] = join(scratch, `vault-${name}`);
       await mkdir(vaults[name]);
+      await welcomeDone(vaults[name]);
     }
     context = await browser.newContext();
     // The page reaches only the bridge of the session that is running; the server is reached by the host.

@@ -21,6 +21,7 @@ import { newStableId } from "@thoth/domain";
 import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { welcomeDone } from "./welcome.ts";
 import { actAsBrowser, apiAs, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import type { Database } from "../../apps/server/src/db.ts";
@@ -71,6 +72,7 @@ test.describe("workspace servers", () => {
   test.beforeEach(async ({ page, context }) => {
     scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-ws-")));
     await mkdir(join(scratch, "Vault"));
+    await welcomeDone(join(scratch, "Vault"));
     opened = [];
     bridge = await startBridge({
       dist: built.dist,
