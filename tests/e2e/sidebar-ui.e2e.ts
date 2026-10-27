@@ -21,7 +21,8 @@ let vault: string;
 let bridge: Bridge;
 const SHOTS = process.env["SHOTS"] ?? join(REPO, "tests", ".tmp", "screens");
 const LONG = "A very long page title that certainly will not fit in the sidebar or in a tab";
-const DEEP = ["Research notes", "Field trips in the northern hills", "Second season", "Birds seen near the river mouth"];
+const DEEP_PAGE = "Birds seen near the river mouth";
+const DEEP = ["Research notes", "Field trips in the northern hills", "Second season", DEEP_PAGE] as const;
 
 test.beforeAll(async () => {
   built = await buildAll();
@@ -42,7 +43,7 @@ test.beforeEach(async ({ page, context }) => {
   await put(`${LONG}.md`, `# ${LONG}\n`);
   await put("Docs/One.md");
   await put("Docs/Two.md");
-  await put(`${DEEP.join("/")}.md`, `# ${DEEP.at(-1)}\n`);
+  await put(`${DEEP.join("/")}.md`, `# ${DEEP_PAGE}\n`);
   bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, pickSource: join(scratch, "source"), dataDir: join(scratch, "data") } });
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
@@ -214,11 +215,11 @@ test("text that is cut off shows in full in a tooltip, text that fits shows none
 
 test("a breadcrumb too long for the page scrolls sideways on its own row: it starts at the page's crumb, a wheel and a focused crumb move only that row", async ({ page }) => {
   for (const name of DEEP.slice(0, -1)) await page.getByRole("treeitem", { name, exact: true }).click();
-  await page.getByRole("treeitem", { name: DEEP.at(-1), exact: true }).click();
+  await page.getByRole("treeitem", { name: DEEP_PAGE, exact: true }).click();
   await page.setViewportSize({ width: 760, height: 700 });
   const trail = page.getByRole("navigation", { name: "Breadcrumb" });
   const current = trail.locator('[aria-current="page"]');
-  await expect(current).toHaveText(`${DEEP.at(-1)}.md`);
+  await expect(current).toHaveText(`${DEEP_PAGE}.md`);
   await settled(page);
   const row = () => trail.evaluate((el) => ({ scroll: el.scrollWidth - el.clientWidth, left: Math.round(el.scrollLeft), height: Math.round(el.getBoundingClientRect().height) }));
   const first = await row();
