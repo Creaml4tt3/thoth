@@ -1,5 +1,8 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+
+/** The gap kept between a menu and the window edge. */
+const MARGIN = 8;
 
 export interface MenuItem {
   id: string;
@@ -32,6 +35,27 @@ export function ContextMenu({ label, at, items, onClose }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const [place, setPlace] = useState<{ left: number; top: number; maxHeight?: number; origin: string } | null>(null);
+
+  // Before paint: open at the point, flip above / to the left when it would overflow, then keep it inside the window.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const viewW = document.documentElement.clientWidth || window.innerWidth;
+    const viewH = document.documentElement.clientHeight || window.innerHeight;
+    const size = el.getBoundingClientRect();
+    const cap = viewH - 2 * MARGIN;
+    const height = Math.min(size.height, cap);
+    const flipY = at.y + height > viewH - MARGIN && at.y - height >= MARGIN;
+    const flipX = at.x + size.width > viewW - MARGIN && at.x - size.width >= MARGIN;
+    const clamp = (v: number, size: number, view: number) => Math.max(MARGIN, Math.min(v, view - MARGIN - size));
+    setPlace({
+      left: flipX ? at.x - size.width : clamp(at.x, size.width, viewW),
+      top: flipY ? at.y - height : clamp(at.y, height, viewH),
+      maxHeight: size.height > cap ? cap : undefined,
+      origin: `${flipY ? "bottom" : "top"} ${flipX ? "right" : "left"}`,
+    });
+  }, [at.x, at.y]);
 
   useEffect(() => {
     box.current?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
@@ -60,8 +84,12 @@ export function ContextMenu({ label, at, items, onClose }: Props) {
     }
   };
 
+  const style: CSSProperties = place
+    ? { left: place.left, top: place.top, maxHeight: place.maxHeight, overflowY: place.maxHeight ? "auto" : undefined, transformOrigin: place.origin }
+    : { left: at.x, top: at.y }; // replaced before paint; not hidden, so the first item can take focus
+
   return createPortal(
-    <div ref={box} className="ctx-menu" role="menu" aria-label={label} style={{ left: at.x, top: at.y }} onKeyDown={onKeyDown}>
+    <div ref={box} className="ctx-menu" role="menu" aria-label={label} style={style} onKeyDown={onKeyDown}>
       {items.map((item) => (
         <button
           key={item.id}

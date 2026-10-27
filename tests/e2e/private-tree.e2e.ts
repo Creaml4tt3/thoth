@@ -152,3 +152,21 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await expect(page.getByRole("treeitem", { name: "Notes", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(rowAt(page, "Papers")).toBeFocused();
 });
+
+test("the row menu of the last row of a long tree in a short window opens fully inside the window", async ({ page }) => {
+  for (let i = 1; i <= 30; i++) await put(`Page ${String(i).padStart(2, "0")}.md`, `# Page ${i}\n`);
+  await page.setViewportSize({ width: 900, height: 420 });
+  await openVault(page);
+  const last = row(page, "Plan"); // "Plan" sorts after "Page NN"
+  await last.scrollIntoViewIfNeeded();
+  await last.click({ button: "right" });
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  const box = (await menu.boundingBox())!;
+  const view = page.viewportSize()!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height);
+  expect(box.x + box.width).toBeLessThanOrEqual(view.width);
+  await expect(menu.getByRole("menuitem").first()).toBeFocused();
+});
