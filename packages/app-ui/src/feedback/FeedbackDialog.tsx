@@ -219,6 +219,7 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", onClo
               type="email"
               inputMode="email"
               autoComplete="email"
+              spellCheck={false}
               className="input"
               value={email}
               disabled={busy}
