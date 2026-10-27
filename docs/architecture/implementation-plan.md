@@ -1245,6 +1245,12 @@ still marked `REVIEW` until the owner has seen it.
   notification does the same for the folder's first page. Desktop and web.
 - Home (ADR-0029): a Home tab with recent pages and favorites, opened by the brand row, a tab-bar button, Alt+Shift+H
   and "Go home"; a new tab shows it; a window with nothing to restore opens on it.
+  Status (2026-10-28), owner's follow-up (ADR-0029 amendment, Proposed): on the desktop every one of those entry
+  points is "Back to Private Spaces". It writes pending edits and closes the Private Space in this window (it stays
+  open, with a banner, if an edit can't be written), then shows the picker with that space first in Recent. Its tabs
+  come back when it is opened again. The desktop has no Home tab any more (a saved one is dropped, and a new tab is
+  empty); the web keeps Home as it was. Not yet checked by a person in a real window: leaving with a second window
+  open on the same Private Space.
 - Show in Finder / File Explorer / Files on Private Space pages and folders: `vault.reveal` takes an optional `path`,
   checked by the host (inside the root, no `..`, no symlink, not `.thoth/`, must exist) and revealed selected (macOS
   `open -R`, Windows `explorer /select,`, Linux the containing folder).

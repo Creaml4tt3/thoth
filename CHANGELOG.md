@@ -12,6 +12,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Changed
 
+- On the desktop, the logo, the tab bar’s house, Alt/Option+Shift+H and “Back to Private Spaces” in the command palette take you back to the Private Space picker, after saving your edits; the space you left is first in Recent and opens again with its tabs. This replaces the Home tab on the desktop; a new tab is now empty. The web app keeps its Home tab.
 - Share: a link you made on this device is listed with its address and a Copy button, and the dialog shows the exact date and time a new link would stop working.
 - A breadcrumb too long for the page now scrolls sideways on one line, starting at the page itself, instead of cutting its parts short.
 

@@ -55,3 +55,39 @@ person opens goes into the vault or to a server.
 ## Open questions
 
 - Whether signing out should clear the web's recent list as it clears the tabs (it does not now, matching favorites).
+
+## Amendment (2026-10-28): on the desktop, Home is the Private Space picker — Proposed
+
+The owner wants the logo to take people back to the "Meet Thoth" picker (choose or create a Private Space, with the
+Recent list), not to a Home tab. Decisions, made for the owner:
+
+1. **One action behind every Home entry point on the desktop:** the logo (the mark and "Thoth" at the top of the
+   sidebar), the house at the start of the tab bar, Alt/Option+Shift+H (the shortcut id stays `home.open`) and the
+   palette. They are named for what they do: "Back to Private Spaces" / "กลับไปที่ Private Space" (the logo:
+   "Thoth, back to Private Spaces", so its name starts with the word shown). The icon stays a house. The palette
+   command is its own action (`leaveSpace`, id `space.leave`) so the web's "Go home" is untouched.
+2. **Nothing is lost:** leaving runs the same step as Settings' Switch Private Space, `Session.switchVault`, which
+   writes every pending edit first (`flushAll`). It now answers whether it left: when an edit could not be written (a
+   conflict, an error) the Private Space stays open, and the shell says so in its banner ("Your edits could not be
+   saved yet, so this Private Space stays open. Check the open page, then try again.") next to whatever the editor shows (the conflict dialog).
+3. **This window only:** the window closes its Private Space and shows the picker; other windows on it are left as
+   they are. A window the app opened forgets it is on that Private Space (as before). Tabs are saved per Private
+   Space and window on every change, so picking the same space again brings its tabs back.
+4. **The picker lists the space just left first**, ahead of the host's order (the host orders by last opened, which
+   another window may have changed), and focus starts on its main button.
+5. **No Home tab on the desktop.** A saved layout (or the tabs a new window is opened with) that holds a Home tab
+   opens without it (`parseDesktopLayout`); a layout of only Home opens on the first page. Rule 3 no longer applies
+   on the desktop: a window with nothing to restore opens the first page by path, as before Home, and
+   `AppOptions.startOnHome` is gone. A new tab shows an empty view ("New tab", and how to open a page) instead of
+   Home's lists; Favorites stay in the sidebar. The desktop's recent-pages list (rule 6–7, `thoth.desktop.recent.*`)
+   is removed with the view that showed it; old keys are left in `localStorage`, unread.
+6. **The web keeps rules 1–8 as they are.** The shared pieces (`HOME`, the Home view, the recent store, the tab bar's
+   house, "Go home") stay in `packages/app-ui` for it; the tab bar takes an optional `homeLabel`.
+7. The first-run tour's step on the house and the logo now explains going back to Private Spaces.
+8. The picker's small muted text (the hint, the Recent heading, the paths) uses the secondary ink: the tertiary was
+   4.3:1 on Night, below WCAG AA for 12px text. Seen by the new axe check on the picker.
+
+Consequences: Home on the desktop is now a way out of a Private Space, one click from any window; the desktop loses
+the quick list of recent pages (search and Favorites remain). Open question: whether a new tab on the desktop should
+list something again (recent pages, favorites) once the owner has used this.
+
