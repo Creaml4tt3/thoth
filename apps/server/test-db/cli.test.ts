@@ -120,4 +120,44 @@ describe("admin CLI", () => {
     expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(["user.created", "workspace.created", "member.set", "token.created", "token.revoked"]));
     expect(JSON.stringify(rows)).not.toMatch(/thoth_pat_/);
   });
+
+  it("feedback list and feedback export --json show what users sent, newest first, --since filters, escapes stay escaped (ADR-0033)", async () => {
+    const client = (await import("pg")).default;
+    const c = new client.Client({ connectionString: database.url });
+    await c.connect();
+    const hash = "a".repeat(64);
+    await c.query(
+      `INSERT INTO feedback (id, created_at, kind, message, email, context, ip_hash) VALUES
+       ('0190f2a0-0000-7000-8000-000000000001', now() - interval '3 days', 'idea', 'Old idea', NULL, NULL, $1),
+       ('0190f2a0-0000-7000-8000-000000000002', now() - interval '1 hour', 'problem', E'It broke\\n\\u001b[31mred\\u009b', 'ada@example.org', '{"client":"desktop","version":"0.4.0"}', $1)`,
+      [hash],
+    );
+    await c.end();
+
+    const list = await cli(["feedback", "list"]);
+    expect(list.code).toBe(0);
+    expect(list.stdout.indexOf("It broke")).toBeLessThan(list.stdout.indexOf("Old idea"));
+    expect(list.stdout).toContain("problem  ada@example.org  anonymous  client=desktop version=0.4.0");
+    // A terminal escape typed by a stranger is shown, not run.
+    expect(list.stdout).not.toMatch(/[\u001b\u009b]/);
+    expect(list.stdout).toContain("\\u001b[31mred\\u009b");
+    expect(list.stdout).not.toContain(hash);
+
+    const recent = await cli(["feedback", "list", "--since", "1d"]);
+    expect(recent.stdout).toContain("It broke");
+    expect(recent.stdout).not.toContain("Old idea");
+
+    const exported = await cli(["feedback", "export", "--json", "--since", "2000-01-01"]);
+    expect(exported.code).toBe(0);
+    expect(exported.stdout).not.toMatch(/[\u001b\u009b]/);
+    const rows = JSON.parse(exported.stdout) as { kind: string; message: string; email: string | null; context: unknown; accountId: string | null; createdAt: string }[];
+    expect(rows.map((r) => r.kind)).toEqual(["problem", "idea"]);
+    expect(rows[0]).toMatchObject({ message: "It broke\n\u001b[31mred\u009b", email: "ada@example.org", context: { client: "desktop", version: "0.4.0" }, accountId: null });
+    expect(JSON.stringify(rows)).not.toContain(hash);
+
+    expect((await cli(["feedback"])).code).toBe(2);
+    expect((await cli(["feedback", "export"])).code).toBe(2);
+    expect((await cli(["feedback", "list", "--since", "last tuesday"])).code).toBe(2);
+    expect((await cli(["maintenance", "extra"])).code).toBe(2);
+  });
 });

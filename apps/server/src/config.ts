@@ -113,7 +113,7 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"];
 
 /** ADR-0024: invite pages and joins are rate limited per client IP on every server unless the operator says otherwise. */
 export const INVITE_DEFAULTS = { opensPerIp: 60, acceptsPerIp: 20 } as const;
@@ -381,6 +381,7 @@ function publicUrlFrom(env: NodeJS.ProcessEnv, options: { strict: boolean }): st
  *   INVITE_OPENS_PER_IP, INVITE_ACCEPTS_PER_IP   invite pages opened and joins per RATE_LIMIT_WINDOW_SECONDS (default 60 and 20; "unlimited" = off)
  *   WORKSPACE_MANAGEMENT  on (default) | off: creating, renaming, deleting and restoring workspaces from the API (ADR-0025)
  *   MAX_WORKSPACE_CREATIONS_PER_DAY   workspaces one account may create per UTC day through the API (trial 10; unset = no limit)
+ *   FEEDBACK      on (default) | off: POST /api/v1/feedback from the apps and the website (ADR-0033, capability feedback)
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -408,6 +409,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   // ADR-0025: workspaces are created, renamed and deleted from the clients on every server unless the operator says otherwise.
   const workspacesEnabled = oneOf(env, "WORKSPACE_MANAGEMENT", ["on", "off"], "on") === "on";
   // ADR-0024: invite links are on by default on every server; an operator can switch them off.
+  // ADR-0033: feedback from users is on by default on every server; an operator can switch it off.
+  const feedbackEnabled = oneOf(env, "FEEDBACK", ["on", "off"], "on") === "on";
   const invitesEnabled = oneOf(env, "INVITE_LINKS", ["on", "off"], "on") === "on";
   const invite: InviteConfig = {
     maxLinksPerWorkspace: limitFrom(env, "MAX_INVITE_LINKS_PER_WORKSPACE", trial?.maxInviteLinksPerWorkspace, 1_000_000),
@@ -440,7 +443,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     rateLimit,
     trustProxy: boolFrom(env, "TRUST_PROXY", false),
     cronSecret,
-    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share") && (invitesEnabled || c !== "invite-links") && (workspacesEnabled || c !== "workspace-management")),
+    capabilities: DEFAULT_CAPABILITIES.filter((c) => (eventsEnabled || c !== "events.sse") && (shareEnabled || c !== "public-share") && (invitesEnabled || c !== "invite-links") && (workspacesEnabled || c !== "workspace-management") && (feedbackEnabled || c !== "feedback")),
     serverName: serverNameFrom(env),
     signIn: signInFrom(env, trial),
     publicUrl: publicUrlFrom(env, { strict: false }),

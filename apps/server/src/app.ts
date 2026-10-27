@@ -16,6 +16,7 @@ import { registerMemberRoutes } from "./routes/members.ts";
 import { registerWorkspaceRoutes } from "./routes/workspaces.ts";
 import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
+import { registerFeedbackRoutes } from "./routes/feedback.ts";
 import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
 import type { CapabilityId } from "@thoth/workspace-protocol";
 
@@ -143,6 +144,13 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
     const route = path.slice(API_BASE_PATH.length);
     if (limitedByIp) await enforce(`ip:${clientIp(request.headers, request.socket.remoteAddress, config.trustProxy)}`, rateLimit.perIp!);
     if (route === "/capabilities") return;
+    // ADR-0033: feedback needs no sign-in, but keeps the account of a valid credential (an invalid one is ignored).
+    if (route === "/feedback") {
+      if (!capabilities.has("feedback")) throw new ApiError("capability_not_supported", "capability feedback is not supported");
+      request.principal = await deps.authenticator.authenticate({ headers: request.headers });
+      if (request.principal && limitedByAccount) await enforce(`acct:${request.principal.id}`, rateLimit.perAccount!);
+      return;
+    }
     const gate = CAPABILITY_ROUTES.find((c) => c.test(request.method, route));
     request.principal = null;
     // Authenticate first: an unauthenticated caller learns nothing, not even which capabilities exist.
@@ -207,6 +215,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerShareRoutes(app, deps);
   registerMemberRoutes(app, deps);
   registerWorkspaceRoutes(app, deps);
+  registerFeedbackRoutes(app, deps);
   const invitePages = registerInvitePages(app, deps);
   registerMaintenanceRoutes(app, deps);
   invitePages.useBroker(registerSignInRoutes(app, deps, { inviteSignedIn: invitePages.signedIn }));
