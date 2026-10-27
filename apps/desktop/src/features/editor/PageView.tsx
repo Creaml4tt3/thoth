@@ -4,13 +4,23 @@ import { PageFrame } from "@thoth/app-ui/editor/PageFrame.tsx";
 import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
+import { PRIVATE_SECTION } from "../shell/sections.ts";
 import { Backlinks } from "./Backlinks.tsx";
 import { loadLinkLookup, vaultPageStore } from "./vault-store.ts";
 import { vaultPageMedia } from "./vault-media.ts";
 
+/** Focuses what `find` returns once it is on screen (the sidebar opens a folder a moment after it is asked to), and scrolls it into view. */
+function focusWhenShown(find: () => HTMLElement | null, tries = 40): void {
+  const el = find();
+  if (el && !el.closest("[hidden]")) {
+    el.focus();
+    el.scrollIntoView?.({ block: "nearest" });
+  } else if (tries > 0) setTimeout(() => focusWhenShown(find, tries - 1), 30);
+}
+
 /** A page of the Private Space: a Markdown file in the vault. */
 export function PageView({ path }: { path: string }) {
-  const { vault, connection, revision, openPage, refresh, notifications } = useSession();
+  const { vault, connection, revision, openPage, openFolder, refresh, notifications } = useSession();
   const strings = useDesktopStrings();
   const t = strings.page;
   const store = useMemo(() => vaultPageStore(vault, path), [vault, path]);
@@ -30,7 +40,17 @@ export function PageView({ path }: { path: string }) {
       store={store}
       media={media}
       modeKey={{ space: connection.root, page: path }}
-      crumbs={{ badge: <span className="badge badge-private">{strings.shell.local}</span>, parts: path.split("/") }}
+      crumbs={{
+        badge: <span className="badge badge-private">{strings.shell.local}</span>,
+        parts: path.split("/"),
+        // A folder crumb opens that folder in the sidebar and moves focus to its row; the badge goes to the section.
+        onCrumb: (index) => {
+          const folder = path.split("/").slice(0, index + 1).join("/");
+          openFolder(folder, { openFirstPage: false });
+          focusWhenShown(() => [...document.querySelectorAll<HTMLElement>(".private-tree [data-tree-id]")].find((el) => el.dataset["treeId"] === folder) ?? null);
+        },
+        onBadge: () => focusWhenShown(() => document.querySelector<HTMLElement>(`[data-section="${PRIVATE_SECTION}"] .sec-toggle`)),
+      }}
       checkTick={revision}
       onWritten={onWritten}
       loadLinks={loadLinks}

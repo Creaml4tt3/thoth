@@ -118,6 +118,11 @@
 .crumb-trail ol { display: contents; margin: 0; padding: 0; }
 .crumb-trail li + li::before { content: "/"; color: var(--thoth-ink-faint); flex: none; }
 .crumb-current { color: var(--thoth-ink-secondary); }
+/* A folder crumb or the badge as a button: still reads as the trail's text, underlined on hover. */
+.crumb-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; min-height: 24px; border-radius: var(--thoth-radius-xs); }
+.crumb-btn.crumb-text { display: block; line-height: 24px; }
+.crumb-btn:hover { color: var(--thoth-ink-secondary); text-decoration: underline; text-underline-offset: 3px; }
+.crumb-btn:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .save-status { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; transition: color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .save-status[data-state="error"] { color: var(--thoth-danger); }
 

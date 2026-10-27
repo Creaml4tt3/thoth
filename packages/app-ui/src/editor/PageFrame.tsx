@@ -41,20 +41,37 @@ function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: 
   );
 }
 
-function Breadcrumbs({ badge, parts, status, children }: { badge: ReactNode; parts: string[]; status: SaveStatus; children?: ReactNode }) {
+function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, children }: PageFrameProps["crumbs"] & { status: SaveStatus; children?: ReactNode }) {
   const t = useStrings().editor;
   return (
     <header className="crumbs">
       <nav aria-label={t.breadcrumb} className="crumb-trail">
         <ol>
-          <li>{badge}</li>
-          {parts.map((part, i) => (
-            <li key={i} {...(i === parts.length - 1 ? { "aria-current": "page" as const, className: "crumb-current" } : {})}>
-              <span className="crumb-text" {...tipIfClipped(part)}>
-                {part}
-              </span>
-            </li>
-          ))}
+          <li>
+            {onBadge ? (
+              <button type="button" className="crumb-btn crumb-badge" onClick={onBadge}>
+                {badge}
+              </button>
+            ) : (
+              badge
+            )}
+          </li>
+          {parts.map((part, i) => {
+            const last = i === parts.length - 1;
+            return (
+              <li key={i} {...(last ? { "aria-current": "page" as const, className: "crumb-current" } : {})}>
+                {onCrumb && !last ? (
+                  <button type="button" className="crumb-btn crumb-text" onClick={() => onCrumb(i)} {...tipIfClipped(part)}>
+                    {part}
+                  </button>
+                ) : (
+                  <span className="crumb-text" {...tipIfClipped(part)}>
+                    {part}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </nav>
       <div className="crumb-tools">
@@ -73,7 +90,11 @@ export interface PageFrameProps {
   store: PageStore;
   /** Remembers the editor mode per page: `{ space, page }`. */
   modeKey: { space: string; page: string };
-  crumbs: { badge: ReactNode; parts: string[] };
+  /**
+   * Where the page is. With `onCrumb`, every part but the last (the page) is a button that gets its index; with
+   * `onBadge`, the badge is one too. Absent: plain text.
+   */
+  crumbs: { badge: ReactNode; parts: string[]; onCrumb?: (index: number) => void; onBadge?: () => void };
   /** Changes whenever the stored page may have changed (index revision, change feed). */
   checkTick: number;
   onWritten(): void;
@@ -216,7 +237,7 @@ export function PageFrame(props: PageFrameProps) {
 
   return (
     <section className="page-view" aria-label={props.label}>
-      <Breadcrumbs badge={props.crumbs.badge} parts={props.crumbs.parts} status={state.save}>
+      <Breadcrumbs {...props.crumbs} status={state.save}>
         {props.actions}
         <ModeSwitch mode={mode} disabled={!canSwitch} onChange={switchMode} />
       </Breadcrumbs>

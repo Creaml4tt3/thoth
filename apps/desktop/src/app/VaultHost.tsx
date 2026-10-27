@@ -257,14 +257,16 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   );
 
   const openFolder = useCallback(
-    (folder: string) =>
+    (folder: string, { openFirstPage = true }: { openFirstPage?: boolean } = {}) => {
+      if (!openFirstPage) return setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
       void flushAll().then(async (ok) => {
         if (!ok) return;
         setReveal((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
         const prefix = folder === "" ? "" : `${folder}/`;
         const first = (await vault.listPages()).find((p) => p.path.startsWith(prefix));
         if (first) tabs.open({ kind: "page", path: first.path });
-      }),
+      });
+    },
     [flushAll, vault, tabs],
   );
 

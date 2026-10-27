@@ -102,6 +102,27 @@ describe("node views", () => {
     expect(within(crumbs).getByText("Target Page.md").closest("li")!.getAttribute("aria-current")).toBe("page");
   });
 
+  it("a folder crumb shows that folder in the sidebar and focuses its row; the badge focuses the section", async () => {
+    const { app, box } = await openRich();
+    await app.user.click(box.querySelector<HTMLElement>("a.wikilink")!);
+    const crumbs = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    const tree = screen.getByRole("tree", { name: "Pages in this Private Space" });
+    // Close the folder first, so the crumb has to open it.
+    const folder = within(tree).getByRole("treeitem", { name: "Folder" });
+    await app.user.click(folder);
+    expect(folder.getAttribute("aria-expanded")).toBe("false");
+    expect(within(crumbs).queryByRole("button", { name: "Target Page.md" })).toBeNull(); // the page itself stays text
+    await app.user.click(within(crumbs).getByRole("button", { name: "Folder" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(tree).getByRole("treeitem", { name: "Folder" })));
+    await waitFor(() => expect(within(tree).getByRole("treeitem", { name: "Folder" }).getAttribute("aria-expanded")).toBe("true"));
+    expect(screen.getByRole("heading", { level: 1, name: "Target Page" })).toBeTruthy(); // the open page stays open
+
+    within(crumbs).getByRole("button", { name: "Local" }).focus();
+    await app.user.keyboard("{Enter}");
+    await waitFor(() => expect(document.activeElement?.closest("[data-section]")?.getAttribute("data-section")).toBe("private"));
+    expect(document.activeElement?.classList.contains("sec-toggle")).toBe(true);
+  });
+
   it("opening a page full of preserved blocks and saving makes no write", async () => {
     const { app, guard } = await openRich();
     await app.user.keyboard("{Meta>}s{/Meta}");

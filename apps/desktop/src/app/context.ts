@@ -77,8 +77,11 @@ export interface Session {
    * window does not run may then be reopened here; with other windows open it may be theirs, so it is shown read-only.
    */
   alone: boolean;
-  /** Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"). */
-  openFolder(path: string): void;
+  /**
+   * Expands a folder in the sidebar and opens its first page (e.g. "Open imported folder"); with `openFirstPage: false`
+   * it only expands it (a breadcrumb: the open page stays).
+   */
+  openFolder(path: string, options?: { openFirstPage?: boolean }): void;
   reveal: { path: string; nonce: number } | null;
   /** The open page registers how to write its pending edits; returns the unregister function. */
   registerFlush(flush: () => Promise<boolean>): () => void;
