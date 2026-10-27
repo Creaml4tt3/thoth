@@ -112,9 +112,14 @@ test.describe("public share links (ADR-0023)", () => {
     const upload = await fetch(`${serverUrl}/api/v1/workspaces/${ws.id}/attachments?fileName=sunrise.png`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "image/png" }, body: new Uint8Array(picture(640, 280)) });
     expect(upload.status).toBe(201);
     const imageId = ((await upload.json()) as { id: string }).id;
+    // An SVG with a script in it: shown as a picture, and opened on its own the script still does not run.
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80" viewBox="0 0 200 80"><style>rect{fill:#e8590c}</style><rect width="200" height="80" rx="12"/><script>document.documentElement.setAttribute("data-ran","1")</script></svg>';
+    const svgUpload = await fetch(`${serverUrl}/api/v1/workspaces/${ws.id}/attachments?fileName=badge.svg`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "image/svg+xml" }, body: svg });
+    expect(svgUpload.status).toBe(201);
+    const svgId = ((await svgUpload.json()) as { id: string }).id;
     const rootId = newStableId(Date.now());
     const childId = newStableId(Date.now() + 1);
-    const markdown = `# Field notes\n\nWhat we saw on the **north shore** this week.\n\n![Sunrise over the bay](thoth:attachment/${imageId})\n\n- [x] Count the ibises\n- [ ] Map the nests\n\n> Bring a second pair of boots.\n\nMore in [[thoth:page/${childId}|the nest survey]].\n`;
+    const markdown = `# Field notes\n\nWhat we saw on the **north shore** this week.\n\n![Sunrise over the bay](thoth:attachment/${imageId})\n\n![Orange badge](thoth:attachment/${svgId})\n\n- [x] Count the ibises\n- [ ] Map the nests\n\n> Bring a second pair of boots.\n\nMore in [[thoth:page/${childId}|the nest survey]].\n`;
     for (const [id, title, md, parentId] of [
       [rootId, "Field notes", markdown, null],
       [childId, "Nest survey", "# Nest survey\n\nTwelve nests, three new.\n", rootId],
@@ -163,17 +168,30 @@ test.describe("public share links (ADR-0023)", () => {
     await expect(img).toBeVisible();
     await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(640);
     expect(await view.evaluate(() => document.scripts.length)).toBe(0);
+    const badge = view.getByRole("img", { name: "Orange badge" });
+    await expect(badge).toBeVisible();
+    await expect.poll(() => badge.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(200);
     expect(await view.locator("meta[name=robots]").getAttribute("content")).toBe("noindex, nofollow");
     expect(await view.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain("Inter Variable");
     expect(await serious(view)).toEqual([]);
     expect(blocked).toEqual([]);
     await view.screenshot({ path: join(SHOTS, "page-light.png"), fullPage: true });
+    const svgUrl = `${new URL(url).origin}${await badge.getAttribute("src")}`;
 
     // The sub-page is reachable through the link, and from it the way back.
     await view.getByRole("link", { name: "the nest survey" }).click();
     await expect(view.getByRole("heading", { level: 1, name: "Nest survey" })).toBeVisible();
     await expect(view.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Field notes" })).toBeVisible();
     expect(await serious(view)).toEqual([]);
+    // The SVG opened on its own: the picture, its own styles, and no script run.
+    const direct = await visitor.newPage();
+    const svgResponse = await direct.goto(svgUrl);
+    expect(svgResponse!.headers()["content-type"]).toBe("image/svg+xml");
+    expect(svgResponse!.headers()["content-security-policy"]).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    await expect(direct.locator("rect")).toHaveCount(1);
+    expect(await direct.evaluate(() => document.documentElement.getAttribute("data-ran"))).toBeNull();
+    expect(await direct.locator("rect").evaluate((el) => getComputedStyle(el).fill)).toBe("rgb(232, 89, 12)");
+    await direct.close();
     await visitor.close();
 
     // Dark, and phone width, light and dark.

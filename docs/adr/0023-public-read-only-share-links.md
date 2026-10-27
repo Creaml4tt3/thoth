@@ -55,7 +55,7 @@ The owner approved rules 1 to 5 on 2026-10-25. Rules 6 to 8 are how they are bui
    - Links to pages of the shared subtree go to their share address. `thoth:` links and wikilinks outside it become
      plain text. External links get `rel="noopener noreferrer nofollow"`.
    - Attachments are served under the token with their stored type and a safe `Content-Disposition`. SVG is never
-     inline (download only).
+     inline (download only). (Amended 2026-10-28: SVG is shown through `<img>`, with a no-script CSP; see below.)
    - Light and dark follow `prefers-color-scheme`, with the brand's tokens and fonts served by the server. The page
      is readable on a phone.
 6. **Tokens.**
@@ -130,6 +130,22 @@ The owner approved rules 1 to 5 on 2026-10-25. Rules 6 to 8 are how they are bui
 - **Export-restricted workspaces** (confirmed by the owner, 2026-10-26). Creating a link in a workspace with
   ADR-0009's export restriction is refused (403 `export_restricted`), and existing links stop working if the
   restriction is switched on later. A public link takes content out of the workspace, which the restriction forbids.
+
+## Amendment (2026-10-28): SVG pictures are shown — Proposed
+
+Rule 5 said "SVG is never inline (download only)", because an SVG can carry script. On a share page an SVG picture
+showed as a download link, which the owner reported as a bug. The protection that rule gave is kept by other means:
+
+- The share page shows an SVG attachment through `<img src>`, like a raster image. A browser runs no script in an SVG
+  loaded as an image and loads nothing outside it. The page's own CSP already allows it (`img-src 'self'`).
+- The SVG response is `Content-Type: image/svg+xml` (the stored type, matched exactly), `Content-Disposition: inline`,
+  `X-Content-Type-Options: nosniff`, and its own CSP: `default-src 'none'; style-src 'unsafe-inline'; sandbox`. Opened
+  on its own, the file runs no script (`sandbox` without `allow-scripts`, and `script-src` falls back to `'none'`),
+  has an opaque origin, and loads nothing; only its inline styles apply. The other headers (`no-store`, `noindex`,
+  `Cross-Origin-Resource-Policy: same-origin`, `no-referrer`) are the same as for every attachment.
+- A type that only looks like SVG (`IMAGE/SVG+XML`, a parameter, `text/xml`) is still a download.
+- Tests: the page renders `<img>` for an SVG; the SVG response has these headers; in the e2e, an SVG with a script is
+  shown on the page, and opened directly its script does not run.
 
 ## Open questions
 

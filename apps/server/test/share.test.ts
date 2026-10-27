@@ -14,7 +14,7 @@ vi.mock("node:crypto", async (importOriginal) => {
 const crypto = await import("node:crypto");
 const { generateShareToken, hashShareToken, shareTokenMatches, SHARE_TOKEN_PATTERN } = await import("../src/share/tokens.ts");
 const { renderShareMarkdown } = await import("../src/share/render.ts");
-const { contentDisposition, inlineImageType } = await import("../src/share/files.ts");
+const { contentDisposition, fileHeaders, inlineImageType } = await import("../src/share/files.ts");
 const { loadConfig, ConfigError } = await import("../src/config.ts");
 
 const BASE = { DATABASE_URL: "postgres://u:p@localhost:5432/db" };
@@ -57,7 +57,7 @@ describe("the share renderer", () => {
   const PDF = "0190d6a2-0c1a-7c3e-8d1f-0000000000a3";
   const ctx = {
     page: (id: string) => (id === PAGE ? { href: "/s/T/p/" + id, title: "Inside" } : null),
-    attachment: (id: string) => ({ [IMG]: { href: `/s/T/a/${IMG}`, inline: true, name: "pic.png" }, [SVG]: { href: `/s/T/a/${SVG}`, inline: false, name: "x.svg" }, [PDF]: { href: `/s/T/a/${PDF}`, inline: false, name: "doc.pdf" } })[id] ?? null,
+    attachment: (id: string) => ({ [IMG]: { href: `/s/T/a/${IMG}`, inline: true, name: "pic.png" }, [SVG]: { href: `/s/T/a/${SVG}`, inline: true, name: "x.svg" }, [PDF]: { href: `/s/T/a/${PDF}`, inline: false, name: "doc.pdf" } })[id] ?? null,
   };
   const render = (md: string) => renderShareMarkdown(md, ctx).html;
 
@@ -85,10 +85,11 @@ describe("the share renderer", () => {
     expect(render(`[[thoth:page/${OUT}|Secret]] [[thoth:page/${OUT}]] [x](thoth:page/${OUT}) [[Some page]] [[Some page|shown]] ![[thoth:page/${OUT}]]`)).toBe("<p>Secret a page that is not shared x Some page shown a page that is not shared</p>\n");
   });
 
-  it("shows inline pictures, links SVG and other files for download, and never loads an outside image", () => {
+  it("shows inline pictures (SVG too, in an <img>, where it runs no script), links other files for download, and never loads an outside image", () => {
     expect(render(`![a "pic"](thoth:attachment/${IMG})`)).toBe(`<p><img src="/s/T/a/${IMG}" alt="a &quot;pic&quot;"></p>\n`);
     expect(render(`![[thoth:attachment/${IMG}|100]]`)).toBe(`<p><img src="/s/T/a/${IMG}" alt="pic.png"></p>\n`);
-    expect(render(`![](thoth:attachment/${SVG}) ![[thoth:attachment/${PDF}|doc.pdf]]`)).toBe(`<p><a href="/s/T/a/${SVG}" download>x.svg</a> <a href="/s/T/a/${PDF}" download>doc.pdf</a></p>\n`);
+    expect(render(`![](thoth:attachment/${SVG}) ![[thoth:attachment/${PDF}|doc.pdf]]`)).toBe(`<p><img src="/s/T/a/${SVG}" alt=""> <a href="/s/T/a/${PDF}" download>doc.pdf</a></p>\n`);
+    expect(render(`![[thoth:attachment/${SVG}]]`)).toBe(`<p><img src="/s/T/a/${SVG}" alt="x.svg"></p>\n`);
     expect(render("![tracker](https://evil.example/p.gif)")).toBe('<p><a href="https://evil.example/p.gif" rel="noopener noreferrer nofollow">tracker</a></p>\n');
     expect(render(`![gone](thoth:attachment/0190d6a2-0c1a-7c3e-8d1f-0000000000ff)`)).toBe("<p>gone</p>\n");
   });
@@ -117,9 +118,21 @@ describe("the share renderer", () => {
 });
 
 describe("attachment headers", () => {
-  it("serves only raster images inline, never SVG", () => {
-    for (const t of ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]) expect(inlineImageType(t), t).toBe(true);
-    for (const t of ["image/svg+xml", "text/html", "application/pdf", "image/png; x", "IMAGE/SVG+XML", "application/octet-stream"]) expect(inlineImageType(t), t).toBe(false);
+  it("serves raster images and SVG inline, nothing else", () => {
+    for (const t of ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/svg+xml"]) expect(inlineImageType(t), t).toBe(true);
+    for (const t of ["text/html", "application/pdf", "image/png; x", "IMAGE/SVG+XML", "image/svg+xml; charset=utf-8", "text/xml", "application/octet-stream"]) expect(inlineImageType(t), t).toBe(false);
+  });
+
+  it("sends an SVG as itself with a CSP that runs no script and loads nothing, even opened on its own", () => {
+    const svg = fileHeaders("image/svg+xml");
+    expect(svg["content-type"]).toBe("image/svg+xml");
+    expect(svg["x-content-type-options"]).toBe("nosniff");
+    expect(svg["content-security-policy"]).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    const csp = svg["content-security-policy"]!.split(";").map((d) => d.trim());
+    expect(csp).toContain("sandbox"); // no allow-scripts: no script runs, and the file has an opaque origin
+    expect(csp.some((d) => /script-src|img-src|connect-src|font-src/.test(d))).toBe(false); // all fall back to 'none'
+    expect(fileHeaders("image/png")["content-security-policy"]).toBe("sandbox; default-src 'none'");
+    expect(fileHeaders("application/pdf")["content-type"]).toBe("application/pdf");
   });
 
   it("writes a Content-Disposition that cannot break out of its quotes or the header", () => {

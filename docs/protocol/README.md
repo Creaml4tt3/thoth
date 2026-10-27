@@ -534,8 +534,9 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. They show no workspace
   IDs, member names or emails, and no titles of pages outside the subtree. Raw HTML in the
   Markdown is never passed through.
-- Attachments keep their stored `Content-Type`. Only raster images are inline; SVG and
-  everything else download.
+- Attachments keep their stored `Content-Type`. Raster images and SVG are inline (SVG with
+  the CSP `default-src 'none'; style-src 'unsafe-inline'; sandbox`, ADR-0023 amendment);
+  everything else downloads.
 
 ### Members (capability `members`, ADR-0024)
 

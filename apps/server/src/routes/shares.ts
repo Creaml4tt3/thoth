@@ -10,8 +10,8 @@ import { limitFrom, loadPage, parsePageId } from "../pages.ts";
 import { quotaExceeded } from "../quota.ts";
 import { clientIp, hit } from "../ratelimit.ts";
 import { shareAsset } from "../share/assets.ts";
-import { contentDisposition, inlineImageType } from "../share/files.ts";
-import { NOT_FOUND_HTML, SHARE_FILE_HEADERS, SHARE_HEADERS, TOO_MANY_HTML, sharedPageHtml } from "../share/html.ts";
+import { contentDisposition, fileHeaders, inlineImageType } from "../share/files.ts";
+import { NOT_FOUND_HTML, SHARE_HEADERS, TOO_MANY_HTML, sharedPageHtml } from "../share/html.ts";
 import { renderShareMarkdown, type RenderContext } from "../share/render.ts";
 import { pagesMentioning, resolveShareLink, sharedAttachments, sharedMarkdown, sharedSubtree, type ActiveShareLink, type SharedNode } from "../share/resolve.ts";
 import { SHARE_TOKEN_PATTERN, generateShareToken, hashShareToken, shareTokenMatches } from "../share/tokens.ts";
@@ -227,9 +227,8 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
     const blob = row ? await blobs.open(row.hash) : null;
     if (!row || !blob) return notFound(request, reply);
     reply.code(200);
-    for (const [name, value] of Object.entries(SHARE_FILE_HEADERS)) reply.header(name, value);
+    for (const [name, value] of Object.entries(fileHeaders(row.mime_type))) reply.header(name, value);
     reply
-      .header("content-type", row.mime_type)
       .header("content-length", String(blob.size))
       .header("content-disposition", contentDisposition(inlineImageType(row.mime_type) ? "inline" : "attachment", row.file_name));
     return reply.send(blob.stream);

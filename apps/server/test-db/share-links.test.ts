@@ -363,15 +363,17 @@ const x = "<script>";
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("never serves SVG inline: it is a download link, sent as an attachment", async () => {
+  it("shows an SVG as a picture (<img>), sent inline as image/svg+xml with a CSP that runs no script", async () => {
     const { text } = await view(env, `/s/${link.token}`);
-    expect(text).not.toContain(`<img src="/s/${link.token}/a/${vector}"`);
-    expect(text).toContain(`<a href="/s/${link.token}/a/${vector}" download>drawing.svg</a>`);
+    expect(text).toContain(`<img src="/s/${link.token}/a/${vector}" alt="drawing.svg">`);
+    expect(text).not.toContain(`<a href="/s/${link.token}/a/${vector}" download>`);
     const res = await view(env, `/s/${link.token}/a/${vector}`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/svg+xml");
-    expect(res.headers.get("content-disposition")).toBe(`attachment; filename="drawing.svg"; filename*=UTF-8''drawing.svg`);
-    expect(res.headers.get("content-security-policy")).toBe("sandbox; default-src 'none'");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-disposition")).toBe(`inline; filename="drawing.svg"; filename*=UTF-8''drawing.svg`);
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    expect(res.headers.get("cross-origin-resource-policy")).toBe("same-origin");
   });
 
   it("serves only attachments the shared pages use: an unused one, or one only a page outside uses, is the same 404", async () => {

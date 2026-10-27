@@ -21,7 +21,7 @@ export interface SharedPageRef {
 
 export interface SharedAttachmentRef {
   href: string;
-  /** A raster image the browser may show inline; anything else is offered as a download. */
+  /** An image the browser may show inline (raster or SVG, in an `<img>`); anything else is offered as a download. */
   inline: boolean;
   name: string;
 }

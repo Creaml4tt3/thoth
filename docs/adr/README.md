@@ -32,7 +32,7 @@ trade-off.
 | [0020](0020-links-from-pasted-urls-and-link-previews.md) | Links from pasted URLs and link previews | Accepted 2026-10-26 |
 | [0021](0021-connected-apps-read-only-mcp-server.md) | Connected apps: a read-only MCP server | Accepted 2026-10-26 |
 | [0022](0022-update-notice.md) | Update notice: a popup when a new desktop version is out | Accepted 2026-10-26 |
-| [0023](0023-public-read-only-share-links.md) | Public read-only share links for workspace pages | Accepted 2026-10-25 |
+| [0023](0023-public-read-only-share-links.md) | Public read-only share links for workspace pages | Accepted 2026-10-25; SVG pictures amendment Proposed 2026-10-28 |
 | [0024](0024-workspace-members-and-invite-links.md) | Workspace members and invite links | Accepted 2026-10-26 |
 | [0025](0025-several-workspaces-per-account.md) | Several workspaces per account: create, rename, delete, restore | Accepted 2026-10-26 |
 | [0026](0026-blog-and-changelog-on-the-website.md) | A blog and a changelog on the website | Proposed 2026-10-26 |
