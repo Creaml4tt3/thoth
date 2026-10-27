@@ -105,6 +105,8 @@ export interface PageSession {
   resolveConflict(choice: ConflictChoice): Promise<void>;
   /** Saves pending edits before leaving the page. False means "stay": a conflict or an error needs the user. */
   flush(): Promise<boolean>;
+  /** The text the page last read or wrote (in a conflict: the editor's frozen version); null before it loaded. */
+  known(): string | null;
   dispose(): void;
 }
 
@@ -338,6 +340,7 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
       const outcome = await save(snapshot);
       return outcome === "saved" || outcome === "unchanged" || outcome === "skipped";
     },
+    known: () => state.conflict?.mine ?? base?.source ?? null,
     dispose() {
       disposed = true;
       clearTimer();

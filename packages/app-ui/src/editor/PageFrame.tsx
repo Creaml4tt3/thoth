@@ -16,6 +16,8 @@ import { usePageHost } from "./host.ts";
 import type { PageStore, SaveStatus } from "./page-session.ts";
 import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode } from "./mode.ts";
 import { PlainEditor } from "./plain/PlainEditor.tsx";
+import { pageKey } from "./session-pool.ts";
+import { usePaneActive } from "../tabs/pane.ts";
 
 function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: boolean; onChange(mode: EditorMode): void }) {
   const t = useStrings().editor;
@@ -157,7 +159,9 @@ export function PageFrame(props: PageFrameProps) {
       }),
     [t, client, links, pickImage],
   );
-  const { session, state } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten });
+  // One session per page per window (ADR-0030): an editor of the same page in the other pane shares it.
+  const { session, state, member, owner } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten }, pageKey(store, modeKey.space, modeKey.page));
+  const paneActive = usePaneActive();
 
   // Wikilink chips resolve through the index; refresh them when it changes.
   useEffect(() => {
@@ -180,13 +184,16 @@ export function PageFrame(props: PageFrameProps) {
   const conflictOpen = state.conflict !== null;
   const notify = useRef(props.onConflict);
   notify.current = props.onConflict;
+  // With the page in both panes, one of them tells (the owner), so nothing is said twice.
+  const tells = useRef(owner);
+  tells.current = owner;
   useEffect(() => {
-    if (conflictOpen) notify.current?.({ kind: "shown" });
+    if (conflictOpen && tells.current) notify.current?.({ kind: "shown" });
   }, [conflictOpen]);
   const saved = useRef(props.onSaved);
   saved.current = props.onSaved;
   useEffect(() => {
-    if (state.save === "saved") saved.current?.();
+    if (state.save === "saved" && tells.current) saved.current?.();
   }, [state.save]);
 
   const canSwitch = state.phase === "ready" && !state.conflict;
@@ -212,6 +219,8 @@ export function PageFrame(props: PageFrameProps) {
   }, [mode]);
 
   useEffect(() => {
+    // The mode key acts on the page of the active pane only (ADR-0030).
+    if (!paneActive) return;
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "e") {
         event.preventDefault();
@@ -220,20 +229,23 @@ export function PageFrame(props: PageFrameProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, switchMode]);
+  }, [mode, switchMode, paneActive]);
 
   // The command palette reaches the open page through these: switch the mode, style the selection.
   useEffect(
     () =>
-      registerEditorActions({
-        toggleMode: () => switchMode(mode === "blocks" ? "plain" : "blocks"),
-        canFormat: () => mode === "blocks" && canSwitch && (handle.current?.canFormat?.() ?? false),
-        format: (command) => handle.current?.format?.(command) ?? false,
-      }),
-    [mode, canSwitch, switchMode],
+      paneActive
+        ? registerEditorActions({
+            toggleMode: () => switchMode(mode === "blocks" ? "plain" : "blocks"),
+            canFormat: () => mode === "blocks" && canSwitch && (handle.current?.canFormat?.() ?? false),
+            format: (command) => handle.current?.format?.(command) ?? false,
+          })
+        : undefined,
+    [mode, canSwitch, switchMode, paneActive],
   );
 
-  const editorProps = { ctx, handleRef: handle, onEdit: () => session?.noteEdited(), onSaveShortcut: () => void session?.save() };
+  // `edited` also tells the session; `focused` brings the other pane's last edit here before anything is typed.
+  const editorProps = { ctx, handleRef: handle, onEdit: () => member?.edited(), onSaveShortcut: () => void session?.save() };
 
   return (
     <section className="page-view" aria-label={props.label}>
@@ -284,13 +296,13 @@ export function PageFrame(props: PageFrameProps) {
               )}
             </>
           )}
-          <div hidden={state.phase !== "ready"} data-editor-mode={mode}>
+          <div hidden={state.phase !== "ready"} data-editor-mode={mode} onFocus={() => member?.focused()}>
             {mode === "blocks" ? <PageEditor key="blocks" {...editorProps} /> : <PlainEditor key="plain" {...editorProps} />}
           </div>
           {state.phase === "ready" && props.footer}
         </div>
       </div>
-      {state.conflict && session && (
+      {state.conflict && session && owner && (
         <ConflictDialog
           name={props.label}
           where={store.kind === "workspace" ? "server" : "disk"}
