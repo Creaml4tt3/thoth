@@ -254,8 +254,8 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
         await transport.call("watch.stop", { vault });
       };
     },
-    async reveal() {
-      await transport.call("vault.reveal", { vault });
+    async reveal(path) {
+      await transport.call("vault.reveal", path === undefined ? { vault } : { vault, path });
     },
     isShared: () => transport.call("vault.shared", { vault }),
     close() {

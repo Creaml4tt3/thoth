@@ -23,7 +23,7 @@ impl Browser for Nothing {
     }
 }
 impl FileManager for Nothing {
-    fn reveal(&self, _: &Path) -> HostResult<()> {
+    fn reveal(&self, _: &Path, _: Option<&Path>) -> HostResult<()> {
         Ok(())
     }
 }

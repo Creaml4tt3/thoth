@@ -76,8 +76,12 @@ export interface Commands {
   /** `shared`: another handle (another window) already has this folder open (ADR-0019); that window ran recovery. */
   "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string; shared: boolean } };
   "vault.close": { args: { vault: string }; result: null };
-  /** Shows the open vault's folder in the system file manager. By handle only: the webview cannot name a path. */
-  "vault.reveal": { args: { vault: string }; result: null };
+  /**
+   * Shows the open vault's folder in the system file manager, or with `path` (vault-relative) that file or folder in it,
+   * selected where the system can. By handle: the host checks `path` itself (inside the root, no `..`, no symlink, not
+   * in `.thoth/`, and it must exist).
+   */
+  "vault.reveal": { args: { vault: string; path?: string }; result: null };
   /** True while another handle (another window) has this vault's folder open (ADR-0019). */
   "vault.shared": { args: { vault: string }; result: boolean };
 

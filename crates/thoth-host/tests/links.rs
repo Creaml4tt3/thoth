@@ -523,7 +523,7 @@ impl Browser for Opened {
 
 struct NoFiles;
 impl FileManager for NoFiles {
-    fn reveal(&self, _: &std::path::Path) -> HostResult<()> {
+    fn reveal(&self, _: &std::path::Path, _: Option<&std::path::Path>) -> HostResult<()> {
         Ok(())
     }
 }

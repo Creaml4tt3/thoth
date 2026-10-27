@@ -135,23 +135,58 @@ impl Browser for SystemBrowser {
     }
 }
 
-/// Shows a vault folder in Finder, File Explorer or the Linux file manager. The host passes only the canonical root
-/// of an open vault; it goes to the launcher as one argument (no shell). An absolute path starts with `/` or a
-/// drive letter, so the launcher cannot read it as an option.
+/// Shows a vault folder in Finder, File Explorer or the Linux file manager, or an entry in it selected. The host
+/// passes only the canonical root of an open vault, and an entry it has checked under that root (`vault.reveal`); the
+/// path goes to the launcher as one argument (no shell). An absolute path starts with `/` or a drive letter, so the
+/// launcher cannot read it as an option.
+///
+/// An entry: macOS `open -R` (Finder, selected); Windows `explorer.exe /select,"<path>"`; Linux opens the folder that
+/// holds it, as selecting is not portable.
 struct SystemFileManager;
 
 impl SystemFileManager {
-    fn command(root: &std::path::Path) -> HostResult<std::process::Command> {
-        if !root.is_absolute() || root.as_os_str().to_string_lossy().chars().any(char::is_control) {
-            return Err(HostError::bad_argument("Only an open Private Space folder can be shown"));
+    fn command(root: &std::path::Path, entry: Option<&std::path::Path>) -> HostResult<std::process::Command> {
+        let shown = entry.unwrap_or(root);
+        let plain = |p: &std::path::Path| p.is_absolute() && !p.as_os_str().to_string_lossy().chars().any(char::is_control);
+        if !plain(root) || !plain(shown) || !shown.starts_with(root) {
+            return Err(HostError::bad_argument("Only an open Private Space folder, or something in it, can be shown"));
         }
         #[cfg(target_os = "macos")]
-        let mut command = std::process::Command::new("/usr/bin/open");
+        let command = {
+            let mut command = std::process::Command::new("/usr/bin/open");
+            if entry.is_some() {
+                command.arg("-R");
+            }
+            command.arg(shown);
+            command
+        };
         #[cfg(target_os = "windows")]
-        let mut command = std::process::Command::new(windows_tool("explorer.exe"));
+        let command = {
+            let mut command = std::process::Command::new(windows_tool("explorer.exe"));
+            match entry {
+                // As written, not re-quoted: Explorer reads `/select,"<path>"` and nothing else reliably. A Windows
+                // path cannot hold `"`, and control characters were refused above.
+                Some(path) => {
+                    use std::os::windows::process::CommandExt;
+                    let mut select = std::ffi::OsString::from("/select,\"");
+                    select.push(path);
+                    select.push("\"");
+                    command.raw_arg(select);
+                }
+                None => {
+                    command.arg(root);
+                }
+            }
+            command
+        };
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let mut command = std::process::Command::new("xdg-open");
-        command.arg(root);
+        let command = {
+            let mut command = std::process::Command::new("xdg-open");
+            // A folder opens as itself; a file, by the folder it is in (the file manager cannot be told to select it).
+            let folder = if shown.is_dir() { shown } else { shown.parent().unwrap_or(root) };
+            command.arg(folder);
+            command
+        };
         Ok(command)
     }
 }
@@ -164,8 +199,8 @@ fn windows_tool(relative: &str) -> PathBuf {
 }
 
 impl FileManager for SystemFileManager {
-    fn reveal(&self, root: &std::path::Path) -> HostResult<()> {
-        let mut command = Self::command(root)?;
+    fn reveal(&self, root: &std::path::Path, entry: Option<&std::path::Path>) -> HostResult<()> {
+        let mut command = Self::command(root, entry)?;
         command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
         let mut child = command.spawn().map_err(|_| HostError::internal("Could not open the file manager"))?;
         std::thread::spawn(move || child.wait());
@@ -747,18 +782,32 @@ mod tests {
     fn file_manager_gets_the_folder_as_one_argument() {
         // Builds the command only: nothing here may launch a file manager.
         for bad in ["relative/folder", "/tmp/a\nb"] {
-            assert_eq!(SystemFileManager::command(std::path::Path::new(bad)).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
+            assert_eq!(SystemFileManager::command(std::path::Path::new(bad), None).unwrap_err().code, "BAD_ARGUMENT", "{bad:?}");
         }
         #[cfg(not(windows))]
         let root = std::path::Path::new("/tmp/-a Calculator; rm -rf ~");
         #[cfg(windows)]
         let root = std::path::Path::new(r"C:\tmp\-a Calculator & del x");
-        let command = SystemFileManager::command(root).unwrap();
+        let command = SystemFileManager::command(root, None).unwrap();
         assert_eq!(command.get_args().collect::<Vec<_>>(), vec![root.as_os_str()]);
         #[cfg(target_os = "macos")]
         assert_eq!(command.get_program(), "/usr/bin/open");
         #[cfg(target_os = "windows")]
         assert!(std::path::Path::new(command.get_program()).is_absolute());
+
+        // An entry must be inside the root, absolute and plain; nothing else is built.
+        let outside = std::path::Path::new(if cfg!(windows) { r"C:\elsewhere\x.md" } else { "/elsewhere/x.md" });
+        assert_eq!(SystemFileManager::command(root, Some(outside)).unwrap_err().code, "BAD_ARGUMENT");
+        assert_eq!(SystemFileManager::command(root, Some(&root.join("a\nb.md"))).unwrap_err().code, "BAD_ARGUMENT");
+        // macOS selects it in Finder; Linux opens the folder that holds a file (nothing on disk here, so: its parent).
+        let entry = root.join("Notes").join("Plan.md");
+        let command = SystemFileManager::command(root, Some(&entry)).unwrap();
+        #[cfg(target_os = "macos")]
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![std::ffi::OsStr::new("-R"), entry.as_os_str()]);
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![root.join("Notes").as_os_str()]);
+        #[cfg(target_os = "windows")]
+        let _ = command;
     }
 
     #[test]

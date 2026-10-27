@@ -59,6 +59,7 @@ export const en = {
     titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
     unsavedChanges: "The open page has changes that could not be saved yet.",
     settings: "Settings",
+    revealFailed: (detail: string) => `Could not show it in the file manager: ${detail}`,
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
   },
 

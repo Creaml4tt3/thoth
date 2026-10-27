@@ -26,6 +26,7 @@ import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
+import { currentOs } from "../settings/path.ts";
 
 /** Every page below a folder, at any depth. */
 const pagesIn = (node: TreeNode): string[] => (node.kind === "page" ? [node.path] : node.children.flatMap(pagesIn));
@@ -61,13 +62,14 @@ interface Props {
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
 export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder, onTransfer }: Props) {
-  const { vault, openPage, flushAll, refresh, tabs, servers, openSettings } = useSession();
+  const { vault, connection, openPage, flushAll, refresh, tabs, servers, openSettings } = useSession();
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const canSend = directory.servers.some((s) => s.info.auth !== "signed-out" && (s.workspaces?.some((w) => roleCan(w.role, "write")) ?? false));
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
   const importFrom = useDesktopStrings().settings.importFrom;
+  const revealName = useDesktopStrings().settings.reveal[currentOs()];
   const favorites = useFavorites();
   const tf = useStrings().favorites;
   /** `path` is null for the menu of the empty area (the top level). */
@@ -308,7 +310,18 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
       ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
+      // The host checks the path itself (inside the folder, no symlink, not .thoth/) and shows it selected.
+      ...(connection.reveal ? [{ id: "reveal", label: revealName, onSelect: () => void revealEntry(node.path) }] : []),
     ];
+  };
+
+  const revealEntry = async (path: string) => {
+    setError(null);
+    try {
+      await connection.reveal?.(path);
+    } catch (failure) {
+      setError(t.revealFailed(failure instanceof Error ? failure.message : String(failure)));
+    }
   };
 
   /** Copy or move a page, or a folder's pages (the folder travels too), to a workspace: the dialog picks which one. */

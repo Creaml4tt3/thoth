@@ -26,7 +26,7 @@ impl Browser for NoBrowser {
 }
 struct NoFiles;
 impl FileManager for NoFiles {
-    fn reveal(&self, _: &Path) -> HostResult<()> {
+    fn reveal(&self, _: &Path, _: Option<&Path>) -> HostResult<()> {
         Ok(())
     }
 }

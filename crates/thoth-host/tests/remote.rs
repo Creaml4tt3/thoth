@@ -21,7 +21,7 @@ impl Picker for NoPicker {
 
 struct NoFileManager;
 impl FileManager for NoFileManager {
-    fn reveal(&self, _: &std::path::Path) -> HostResult<()> {
+    fn reveal(&self, _: &std::path::Path, _: Option<&std::path::Path>) -> HostResult<()> {
         Ok(())
     }
 }

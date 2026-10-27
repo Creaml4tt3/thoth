@@ -95,10 +95,12 @@ pub trait Picker: Send + Sync {
     }
 }
 
-/// Shows an open vault's folder in the system file manager (Finder, File Explorer, Files). The desktop shell
-/// launches it; the harness and tests record the path. `root` is always the canonical root of an open vault.
+/// Shows an open vault's folder in the system file manager (Finder, File Explorer, Files), or an entry in it selected.
+/// The desktop shell launches it; the harness and tests record the paths. `root` is always the canonical root of an
+/// open vault; `entry`, when given, is `root` joined with a vault-relative path the host has checked: an existing file
+/// or folder inside the root, reached without following a symlink, and not in `.thoth/`.
 pub trait FileManager: Send + Sync {
-    fn reveal(&self, root: &Path) -> HostResult<()>;
+    fn reveal(&self, root: &Path, entry: Option<&Path>) -> HostResult<()>;
 }
 
 /// Receives host events (`vault.changed` with its JSON payload).
@@ -232,10 +234,18 @@ impl Host {
                 let entry = self.vault(args)?;
                 json(json!(self.shared_with_others(&entry.root, &entry.owner)))
             }
-            // Names a vault by its handle, never a path: only a folder the user opened can be shown.
+            // Names a vault by its handle, never a path: only a folder the user opened can be shown, and in it only an
+            // entry its own path checks accept (`revealable`).
             "vault.reveal" => {
                 let entry = self.vault(args)?;
-                self.config.file_manager.reveal(&entry.root)?;
+                match args.get("path") {
+                    None | Some(Value::Null) => self.config.file_manager.reveal(&entry.root, None)?,
+                    Some(Value::String(path)) => {
+                        let target = revealable(&entry, path)?;
+                        self.config.file_manager.reveal(&entry.root, Some(&target))?;
+                    }
+                    Some(_) => return Err(HostError::bad_argument("path must be a string")),
+                }
                 null()
             }
             "fs.stat" => json(self.vault(args)?.fs.stat(str_arg(args, "path")?)?),
@@ -828,6 +838,22 @@ fn hex_digest(bytes: &[u8]) -> String {
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The absolute path of `raw` in the vault, for the file manager: a vault-relative path (no `..`, no absolute path, no
+/// backslash), not in `.thoth/`, that names an existing file or folder. The confined file layer looks it up (`openat`
+/// on Unix, the NT layer on Windows), so a symlinked folder on the way or a symlink at the end is refused.
+fn revealable(entry: &VaultEntry, raw: &str) -> HostResult<PathBuf> {
+    let segments = paths::vault_segments(raw, false)?;
+    if segments.first().is_some_and(|first| paths::is_reserved_first_segment(first)) {
+        return Err(HostError::not_allowed(format!("{raw} is managed by Thoth and is not shown")));
+    }
+    match entry.fs.stat(raw)?.get("kind").and_then(Value::as_str) {
+        Some("file" | "directory") => Ok(segments.iter().fold(entry.root.clone(), |path, segment| path.join(segment))),
+        Some("symlink") => Err(HostError::unsafe_path(raw, "symlink")),
+        Some(_) => Err(HostError::not_allowed(format!("{raw} is not a file or folder"))),
+        None => Err(HostError::new("ENOENT", format!("ENOENT: no such file or directory, reveal '{raw}'"))),
+    }
 }
 
 fn str_arg<'a>(args: &'a Value, key: &str) -> HostResult<&'a str> {

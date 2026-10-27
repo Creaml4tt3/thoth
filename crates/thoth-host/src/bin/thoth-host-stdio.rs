@@ -68,14 +68,19 @@ impl Browser for EventBrowser {
     }
 }
 
-/// Reports `vault.reveal` as a `vault.revealed` event instead of opening a file manager.
+/// Reports `vault.reveal` as a `vault.revealed` event instead of opening a file manager: `{ root }`, and `entry` when an
+/// entry in it was asked for.
 struct EventFileManager {
     emit: Arc<dyn Fn(Value) + Send + Sync>,
 }
 
 impl FileManager for EventFileManager {
-    fn reveal(&self, root: &std::path::Path) -> HostResult<()> {
-        (self.emit)(json!({ "event": "vault.revealed", "payload": { "root": root.to_string_lossy() } }));
+    fn reveal(&self, root: &std::path::Path, entry: Option<&std::path::Path>) -> HostResult<()> {
+        let mut payload = json!({ "root": root.to_string_lossy() });
+        if let Some(entry) = entry {
+            payload["entry"] = json!(entry.to_string_lossy());
+        }
+        (self.emit)(json!({ "event": "vault.revealed", "payload": payload }));
         Ok(())
     }
 }
