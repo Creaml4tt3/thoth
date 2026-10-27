@@ -8,6 +8,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fireEvent } from "@testing-library/react";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
@@ -159,6 +160,61 @@ describe("workspace → Private Space", () => {
     await waitFor(() => expect(within(dialog).getByRole("alert").textContent).toContain("does not allow copying or moving its pages out"));
     expect((within(dialog).getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(true);
     expect(servers.calls.some((c) => c.path.endsWith("/transfers"))).toBe(false);
+  });
+});
+
+describe("from the right-click menu", () => {
+  const menuOf = async (tree: HTMLElement, name: string) => {
+    fireEvent.contextMenu(await within(tree).findByRole("treeitem", { name }));
+    return screen.findByRole("menu", { name: `Actions for ${name}` });
+  };
+  const viewerTeam = (servers: FakeServers) => {
+    const server = servers.connect(TEAM);
+    return { ws: servers.addWorkspace(server, { name: "Studio", role: "viewer" }), server };
+  };
+
+  it("a Private Space page and a folder copy or move to a workspace through the transfer dialog", async () => {
+    await seed(root, { "Box/One.md": "# One\n", "Box/Two.md": "# Two\n" });
+    const { app } = await start(team());
+    const tree = screen.getByRole("tree", { name: "Pages in this Private Space" });
+    let menu = await menuOf(tree, "Plan");
+    expect(within(menu).getByRole("menuitem", { name: "Move to workspace…" })).toBeTruthy();
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Copy to workspace…" }));
+    expect(await screen.findByRole("dialog", { name: "Copy 1 page to a workspace" })).toBeTruthy();
+    await app.user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    menu = await menuOf(tree, "Box");
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Move to workspace…" }));
+    expect(await screen.findByRole("dialog", { name: "Move 2 pages to a workspace" })).toBeTruthy();
+  });
+
+  it("a Private Space menu has no workspace items when no workspace can be written to", async () => {
+    await start(viewerTeam);
+    const menu = await menuOf(screen.getByRole("tree", { name: "Pages in this Private Space" }), "Plan");
+    expect(within(menu).queryByRole("menuitem", { name: /to workspace/ })).toBeNull();
+  });
+
+  it("a workspace page copies or moves to the Private Space for an owner", async () => {
+    const { app, servers, ws } = await start(team());
+    servers.writeAsOther(ws, { title: "Roadmap", markdown: "# Roadmap\n" });
+    const list = screen.getByRole("tree", { name: /^Workspaces on / });
+    await app.user.click(within(list).getByRole("treeitem", { name: /^Studio/ }));
+    const menu = await menuOf(list, "Roadmap");
+    expect(within(menu).getByRole("menuitem", { name: "Copy to Private Space…" })).toBeTruthy();
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Move to Private Space…" }));
+    expect(await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" })).toBeTruthy();
+  });
+
+  it("a viewer's workspace page menu offers Copy to Private Space… but not Move", async () => {
+    const { app, servers, ws } = await start(viewerTeam);
+    servers.writeAsOther(ws, { title: "Roadmap", markdown: "# Roadmap\n" });
+    const list = screen.getByRole("tree", { name: /^Workspaces on / });
+    await app.user.click(within(list).getByRole("treeitem", { name: /^Studio/ }));
+    const menu = await menuOf(list, "Roadmap");
+    expect(within(menu).queryByRole("menuitem", { name: "Move to Private Space…" })).toBeNull();
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Copy to Private Space…" }));
+    expect(await screen.findByRole("dialog", { name: "Copy “Roadmap” to your Private Space" })).toBeTruthy();
   });
 });
 

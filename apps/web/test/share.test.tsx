@@ -39,6 +39,12 @@ async function palette(browser: FakeBrowser, what: string) {
 }
 
 describe("sharing a page", () => {
+  it("the page menu has no Private Space items on the web", async () => {
+    await signedIn();
+    const menu = await menuFor("Field notes");
+    expect(within(menu).queryByRole("menuitem", { name: /Private Space/ })).toBeNull();
+  });
+
   it("has a Share… button in the open page's header that opens the dialog, hidden for a viewer", async () => {
     const browser = await signedIn();
     await browser.user.click(await screen.findByRole("treeitem", { name: "Field notes" }));

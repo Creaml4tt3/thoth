@@ -223,7 +223,7 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
             </div>
           </div>
         )}
-        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} />
+        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} onTransfer={onTransfer} />
       </>
     ),
   };
@@ -237,7 +237,7 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
           children: <FavoritesList items={favorites.items} onOpen={favorites.open} onMove={favorites.move} onRemove={favorites.remove} scroller={() => document.querySelector<HTMLElement>(".sidebar .tree-wrap")} />,
         }
       : null;
-  const serverSections = useServerSections(currentRemote);
+  const serverSections = useServerSections(currentRemote, onTransfer);
   const agentsSection = useAgentsSection(currentRun);
 
   return (

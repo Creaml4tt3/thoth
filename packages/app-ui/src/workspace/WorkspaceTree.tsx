@@ -178,6 +178,11 @@ export interface WorkspaceSectionProps {
    * only asks for the transfer dialog; dragging within the workspace is unchanged.
    */
   spaceDrops?: boolean;
+  /**
+   * "Copy to Private Space…" and "Move to Private Space…" in a page's menu (the desktop app; the web has no Private
+   * Space): what the page would carry in a drag, for the same transfer dialog. Move needs write here.
+   */
+  onToPrivate?(drag: SpaceDrag, mode: "copy" | "move"): void;
 }
 
 const isThisWorkspace = (server: string, workspace: string) => (request: MoveToRequest): request is Extract<MoveToRequest, { kind: "workspace" }> =>
@@ -205,7 +210,7 @@ function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: s
  * editors and owners, offers New page and New folder, rename (F2, context menu), and drag and drop, Alt+Shift+Up/Down
  * and "Move to…" to reorder and nest pages. Shared by the desktop sidebar and the web client.
  */
-export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false }: WorkspaceSectionProps) {
+export function WorkspaceSection({ directory, server, serverLabel, workspace, current, openPage, onPageCreated, flush, spaceDrops = false, onToPrivate }: WorkspaceSectionProps) {
   const t = useStrings().workspace;
   const tt = useStrings().tree;
   const tm = useStrings().members;
@@ -411,7 +416,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     server,
     workspace: workspace.id,
     canWrite,
-    hasMenu: canWrite || favorites !== null,
+    hasMenu: canWrite || favorites !== null || onToPrivate !== undefined,
     ordered,
     current,
     open,
@@ -482,7 +487,16 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       favorites && favorites.can(ref) && tree?.kinds[id]?.folder !== true
         ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }]
         : [];
-    if (!canWrite) return star;
+    // Like the page header's Copy here / Move here: the dialog explains an export restriction or a missing capability.
+    const drag = onToPrivate ? carry(id) : null;
+    const toPrivate: MenuItem[] =
+      onToPrivate && drag
+        ? [
+            { id: "copy-to-private", label: tt.across.copyTo(tt.across.privateSpace), onSelect: () => onToPrivate(drag, "copy") },
+            ...(canWrite ? [{ id: "move-to-private", label: tt.across.moveTo(tt.across.privateSpace), onSelect: () => onToPrivate(drag, "move") }] : []),
+          ]
+        : [];
+    if (!canWrite) return [...star, ...toPrivate];
     return [
       ...star,
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(id) },
@@ -491,6 +505,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: !ordered || i <= 0, onSelect: () => reorder(id, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
+      ...toPrivate,
       ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
     ];
   };

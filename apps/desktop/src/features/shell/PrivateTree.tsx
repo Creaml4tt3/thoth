@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
 import { basename, dirname, stripExtension } from "@thoth/domain";
+import { roleCan } from "@thoth/workspace-protocol";
 import type { OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
@@ -23,6 +24,7 @@ import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
 import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
+import type { TransferTarget } from "../transfer/TransferDialog.tsx";
 
 /** Every page below a folder, at any depth. */
 const pagesIn = (node: TreeNode): string[] => (node.kind === "page" ? [node.path] : node.children.flatMap(pagesIn));
@@ -52,11 +54,15 @@ interface Props {
   selection: Selection;
   /** The order record changed (reorder or move). */
   onOrder(order: OrderRecord): void;
+  /** Opens the copy/move dialog (it writes pending edits first); the menu offers it while a workspace can be written to. */
+  onTransfer?(target: TransferTarget): void;
 }
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
-export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder }: Props) {
+export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder, onTransfer }: Props) {
   const { vault, openPage, flushAll, refresh, tabs, servers } = useSession();
+  const directory = useSyncExternalStore(servers.subscribe, servers.getState);
+  const canSend = directory.servers.some((s) => s.info.auth !== "signed-out" && (s.workspaces?.some((w) => roleCan(w.role, "write")) ?? false));
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
@@ -299,6 +305,18 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
+      ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
+    ];
+  };
+
+  /** Copy or move a page, or a folder's pages (the folder travels too), to a workspace: the dialog picks which one. */
+  const sendItems = (node: TreeNode, send: (target: TransferTarget) => void): MenuItem[] => {
+    const paths = pagesIn(node);
+    if (paths.length === 0) return [];
+    const base = node.kind === "folder" ? { base: dirname(node.path) } : {};
+    return [
+      { id: "copy-to-workspace", label: ts.copyTo, onSelect: () => send({ direction: "to_workspace", paths, mode: "copy", ...base }) },
+      { id: "move-to-workspace", label: ts.moveTo, onSelect: () => send({ direction: "to_workspace", paths, mode: "move", ...base }) },
     ];
   };
 

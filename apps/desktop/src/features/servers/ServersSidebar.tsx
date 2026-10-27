@@ -7,13 +7,22 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { serverSection } from "../shell/sections.ts";
 import type { SidebarSection } from "../shell/SidebarSections.tsx";
+import { transferTargetFor } from "../shell/space-drop.ts";
+import type { TransferTarget } from "../transfer/TransferDialog.tsx";
+import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
+
+/** A workspace page's menu, Copy / Move to Private Space…: the dialog a drop on the Private Space's top level opens. */
+function toPrivate(drag: SpaceDrag, mode: "copy" | "move", send: (target: TransferTarget) => void) {
+  const target = transferTargetFor({ drag, to: { kind: "private", folder: "" }, mode });
+  if (target) send(target);
+}
 
 /**
  * One sidebar section per known server (`server:<id>`, placed by `SidebarSections`): its workspaces when signed in, a
  * Sign in link when not. With `workspace-management` (ADR-0025) its header has "New workspace on …", and under the
  * workspaces the count near the limit and "Recently deleted".
  */
-export function useServerSections(current: WorkspacePageRef | null): SidebarSection[] {
+export function useServerSections(current: WorkspacePageRef | null, onTransfer?: (target: TransferTarget) => void): SidebarSection[] {
   const { servers, openSettings, openWorkspacePage, flushAll } = useSession();
   const t = useDesktopStrings().servers;
   const state = useSyncExternalStore(servers.subscribe, servers.getState);
@@ -42,7 +51,7 @@ export function useServerSections(current: WorkspacePageRef | null): SidebarSect
           ) : (
             <TreeList label={t.workspacesOn(entry.info.label)}>
               {entry.workspaces.map((workspace) => (
-                <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} spaceDrops />
+                <WorkspaceSection key={workspace.id} directory={servers} server={entry.info.id} serverLabel={entry.info.label} workspace={workspace} current={current} openPage={openWorkspacePage} flush={flushAll} spaceDrops {...(onTransfer ? { onToPrivate: (drag, mode) => toPrivate(drag, mode, onTransfer) } : {})} />
               ))}
             </TreeList>
           )}
