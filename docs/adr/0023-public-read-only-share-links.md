@@ -62,7 +62,7 @@ The owner approved rules 1 to 5 on 2026-10-25. Rules 6 to 8 are how they are bui
    - A token is 24 bytes (192 bits) from the operating system's CSPRNG, base64url (32 characters).
    - Only its SHA-256 is stored, and the check is constant time (`timingSafeEqual`).
    - The token appears once, in the create response. `createShareLink` therefore does not honour `Idempotency-Key`,
-     because a stored replay would keep it. A listed link cannot be copied again; the user makes a new one.
+     because a stored replay would keep it. A listed link cannot be copied again; the user makes a new one. (Amended 2026-10-28: the device that made a link remembers its address; see below.)
    - Request logs show `/s/[token]`.
 7. **One answer for every failure.**
    - These all get the same 404, with the same body and headers: an unknown, malformed, expired or revoked token, a
@@ -146,6 +146,24 @@ showed as a download link, which the owner reported as a bug. The protection tha
 - A type that only looks like SVG (`IMAGE/SVG+XML`, a parameter, `text/xml`) is still a download.
 - Tests: the page renders `<img>` for an SVG; the SVG response has these headers; in the e2e, an SVG with a script is
   shown on the page, and opened directly its script does not run.
+
+## Amendment (2026-10-28): the device that made a link remembers its address (owner's option A)
+
+The owner asked for active links to show their address with a Copy button. The server still stores only the token's
+hash and never returns an address after creation (rule 6 is unchanged; a server-side reversible copy, option B, was
+declined because a database and key leak would open every live link).
+
+- The client that creates a link keeps its address in that device's storage (`thoth.shareLinks.v1`, a map from the
+  link's ID to its `https` address, at most 500, the oldest dropped first; `packages/app-ui/src/workspace/share-remembered.ts`).
+  On the desktop that is the webview's storage in the app data folder; on the web, the browser's local storage.
+- The Share dialog lists such a link with its address and a Copy button. Links made on another device, in another
+  browser, or before this version have no address to show, as before.
+- Revoking a link forgets its address. An address of a link that expired stays until it is revoked or pushed out;
+  the dialog lists only active links, so it is never shown.
+- Risk: anyone with access to the person's user account on that device can read the addresses, as they could read the
+  person's browser history or clipboard. The addresses are public read-only links by design.
+- The dialog also says the exact moment the chosen expiry would end (now + 7, 30 or 90 days, in the person's zone),
+  before the link is made. The protocol's presets are unchanged.
 
 ## Open questions
 

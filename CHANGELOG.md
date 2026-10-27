@@ -12,6 +12,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Changed
 
+- Share: a link you made on this device is listed with its address and a Copy button, and the dialog shows the exact date and time a new link would stop working.
 - A breadcrumb too long for the page now scrolls sideways on one line, starting at the page itself, instead of cutting its parts short.
 
 ### Fixed

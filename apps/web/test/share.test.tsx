@@ -72,7 +72,7 @@ describe("sharing a page", () => {
     expect(field.value).toBe(`${SERVER}/s/${link.token}`);
     expect(field.readOnly).toBe(true);
     expect(link.expiresAt).toBe(new Date(Date.parse(link.createdAt) + 30 * 86_400_000).toISOString());
-    expect(within(dialog).getByText(/shown only this once/)).toBeTruthy();
+    expect(within(dialog).getByText(/This device keeps the link/)).toBeTruthy();
 
     await browser.user.click(within(dialog).getByRole("button", { name: "Copy link" }));
     expect(await navigator.clipboard.readText()).toBe(`${SERVER}/s/${link.token}`);

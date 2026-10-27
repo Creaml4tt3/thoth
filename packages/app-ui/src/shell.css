@@ -184,8 +184,9 @@ div.tree-empty > p { margin: 0 0 6px; }
 .share-heading { font: 600 14px / 20px var(--thoth-font-sans); }
 .share-active { display: grid; gap: var(--thoth-space-2); }
 .share-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.share-link { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); padding: 6px 0; border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); }
-.share-link > span { min-width: 0; color: var(--thoth-ink-secondary); }
+.share-link { display: flex; flex-direction: column; gap: var(--thoth-space-2); padding: 6px 0; border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); }
+.share-link-row { display: flex; align-items: center; justify-content: space-between; gap: var(--thoth-space-3); }
+.share-link-row > span { min-width: 0; color: var(--thoth-ink-secondary); }
 @media (max-width: 520px) { .share-copy { flex-direction: column; align-items: stretch; } }
 
 /* "Members…" (ADR-0024): the member list with roles, the inline confirmation, and the invite-link part. */

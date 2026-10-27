@@ -5,6 +5,8 @@ import type { WorkspaceClient } from "@thoth/workspace-client";
 import { shellRoot } from "../order/ContextMenu.tsx";
 import { useStrings } from "../strings/index.ts";
 import { Button } from "../ui/Button.tsx";
+import { IconButton } from "../ui/IconButton.tsx";
+import { forgetLink, rememberLink, rememberedUrl } from "./share-remembered.ts";
 import { copyText } from "../ui/clipboard.ts";
 import { Modal } from "../ui/Modal.tsx";
 
@@ -24,9 +26,10 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 
 /**
  * "Share…" on a workspace page (ADR-0023): make a public read-only link with an expiry, copy it, see the page's
- * active links and revoke them. The address is in the create response only (the server keeps a hash), so it is shown
- * once, right after it is made; the list names links by when they were made and the moment they stop working (the
- * server stops a link at that exact time, so the time is shown, in the person's own zone).
+ * active links and revoke them. The address is in the create response only (the server keeps a hash); this device
+ * remembers the address of each link it makes (`share-remembered.ts`), so the list shows and copies those again. The
+ * list names links by when they were made and the moment they stop working (the server stops a link at that exact
+ * time, so the time is shown, in the person's own zone), and the chosen expiry says the moment it would end.
  */
 export function ShareDialog({ client, workspace, page, title, onClose }: Props) {
   const strings = useStrings();
@@ -75,6 +78,7 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
     try {
       const link = await client.createShareLink(workspace, page, expiry);
       if (!live.current) return;
+      rememberLink(link.id, link.url);
       setCreated(link);
       await reload();
     } catch (e) {
@@ -84,13 +88,12 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
     }
   };
 
-  const copy = async () => {
-    if (!created) return;
+  const copy = async (url: string, fallback?: HTMLInputElement | null) => {
     try {
-      await copyText(created.url);
+      await copyText(url);
       setSaid(t.copied);
     } catch {
-      field.current?.select();
+      fallback?.select();
       setSaid(t.copyFailed);
     }
   };
@@ -99,6 +102,7 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
     setError(null);
     try {
       await client.revokeShareLink(workspace, link.id);
+      forgetLink(link.id);
       if (!live.current) return;
       if (created?.id === link.id) setCreated(null);
       setSaid(t.revoked);
@@ -109,6 +113,8 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
   };
 
   const choiceLabel = (choice: ShareExpiry) => (choice === null ? t.never : t.days(choice));
+  // The server counts from the moment it makes the link, so this is the end to within the time the request takes.
+  const ends = expiry === null ? t.endsNever : t.ends(moment.format(new Date(Date.now() + expiry * 86_400_000)));
 
   return createPortal(
     <Modal title={t.title(title)} onClose={onClose}>
@@ -130,6 +136,9 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
               </label>
             ))}
           </div>
+          <p className="share-note" data-testid="share-ends">
+            {ends}
+          </p>
         </fieldset>
         <div className="move-actions">
           <Button variant="primary" type="submit" disabled={busy}>
@@ -144,7 +153,7 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
           </label>
           <div className="share-copy">
             <input id={ids.url} ref={field} className="input mono" readOnly value={created.url} aria-describedby={ids.once} onFocus={(event) => event.currentTarget.select()} />
-            <Button variant="primary" onClick={() => void copy()}>
+            <Button variant="primary" onClick={() => void copy(created.url, field.current)}>
               {t.copy}
             </Button>
           </div>
@@ -173,14 +182,23 @@ export function ShareDialog({ client, workspace, page, title, onClose }: Props) 
           <ul className="share-links" aria-labelledby={ids.active}>
             {links.map((link) => {
               const made = moment.format(new Date(link.createdAt));
+              const url = rememberedUrl(link.id);
               return (
                 <li key={link.id} className="share-link">
-                  <span>
-                    {t.created(made)} · {link.expiresAt === null ? t.neverExpires : t.expires(moment.format(new Date(link.expiresAt)))}
-                  </span>
-                  <Button small variant="quiet" aria-label={t.revokeLabel(made)} onClick={() => void revoke(link)}>
-                    {t.revoke}
-                  </Button>
+                  <div className="share-link-row">
+                    <span>
+                      {t.created(made)} · {link.expiresAt === null ? t.neverExpires : t.expires(moment.format(new Date(link.expiresAt)))}
+                    </span>
+                    <Button small variant="quiet" aria-label={t.revokeLabel(made)} onClick={() => void revoke(link)}>
+                      {t.revoke}
+                    </Button>
+                  </div>
+                  {url !== undefined && (
+                    <div className="share-copy">
+                      <input className="input mono" readOnly value={url} aria-label={t.linkLabel(made)} onFocus={(event) => event.currentTarget.select()} />
+                      <IconButton icon="copy" label={t.copyLabel(made)} onClick={(event) => void copy(url, event.currentTarget.previousElementSibling as HTMLInputElement | null)} />
+                    </div>
+                  )}
                 </li>
               );
             })}
