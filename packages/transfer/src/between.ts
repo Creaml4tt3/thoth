@@ -29,7 +29,7 @@ import { codeOf, isRefusal, messageOf, TransferInterrupted, TransferRefused } fr
 import { isFolderMarkdown } from "./folders.ts";
 import { applyRewrites, attachmentIdsIn, classifyBetween, emptySummary, summarize, type ClassifiedReference } from "./links.ts";
 import { isTerminal, listRecords, loadRecord, saveRecord, RECORD_VERSION, type AttachmentItem, type LinkSummary, type OperationRecord, type PageItem, type RecordStore } from "./record.ts";
-import type { Availability, Problem, RecoveryReport, ServerAccess, Warning, WorkspaceSummary } from "./engine.ts";
+import type { Availability, Preview, Problem, RecoveryReport, ServerAccess, Warning, WorkspaceSummary } from "./engine.ts";
 
 const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
 const RETENTION_DAYS = 30;
@@ -186,7 +186,8 @@ export class BetweenWorkspaces {
 
   // ------------------------------------------------------------------ runs
 
-  async start(preview: BetweenPreview): Promise<OperationRecord> {
+  async start(preview: Preview): Promise<OperationRecord> {
+    if (preview.direction !== "between_workspaces") throw new TransferRefused("not_startable", "Only transfers between workspaces start here.");
     if (!preview.canStart || !preview.workspace || !preview.source.workspace) throw new TransferRefused("not_startable", "This transfer cannot start; see the preview.");
     const to = this.options.server(preview.server.id);
     const from = this.options.server(preview.source.server.id);
