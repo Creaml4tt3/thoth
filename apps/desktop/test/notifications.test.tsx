@@ -247,7 +247,7 @@ describe("imports", () => {
     const platform = createNodePlatform({ vault: root });
     platform.pickedSource = FIXTURE;
     const app = await openApp(root, { notifier, openImportSource: open }, platform);
-    await app.user.click(await screen.findByRole("button", { name: /import from notion or obsidian/i }));
+    await app.user.click(await screen.findByText(/import from notion or obsidian/i, { selector: "button" }));
     await app.user.click(await screen.findByRole("radio", { name: /obsidian/i }));
     await app.user.click(screen.getByRole("button", { name: "Continue" }));
     await app.user.click(screen.getByRole("button", { name: /i have it ready/i }));

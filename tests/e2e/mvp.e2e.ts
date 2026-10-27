@@ -132,7 +132,7 @@ async function expandFolder(path: string): Promise<void> {
 
 /** Every step of the import wizard, from the start screen or Settings, to its report. */
 async function importThroughWizard(system: "notion" | "obsidian", pick: "zip" | "folder", destination: string): Promise<Locator> {
-  await page.getByRole("button", { name: /import from notion or obsidian/i }).click();
+  await page.getByRole("button", { name: /import from notion or obsidian/i }).filter({ hasText: /import/i }).click();
   await page.getByRole("radio", { name: new RegExp(system, "i") }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: /i have it ready/i }).click();

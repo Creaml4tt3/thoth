@@ -119,7 +119,7 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
     await page.getByRole("button", { name: /start import/i }).click();
   };
 
-  await page.getByRole("button", { name: /import from notion or obsidian/i }).click();
+  await page.getByRole("button", { name: /import from notion or obsidian/i }).filter({ hasText: /import/i }).click();
   await runWizardToStart("Imports/First");
   const report = page.getByTestId("import-report");
   await expect(report.getByText("Import complete")).toBeVisible({ timeout: 60_000 });
@@ -128,7 +128,7 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
 
   // Second import: cancel mid-run, then resume from "Unfinished imports".
   await page.getByRole("button", { name: "Settings" }).click();
-  await page.getByRole("button", { name: /import from notion or obsidian/i }).click();
+  await page.getByRole("button", { name: /import from notion or obsidian/i }).filter({ hasText: /import/i }).click();
   // The first file landing in the destination (only the run phase writes there) is held, so the import is
   // provably still running when Cancel is clicked; without this a fast machine could finish first.
   let held: ReturnType<Bridge["holdNext"]> | undefined;
@@ -140,7 +140,7 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
   await report.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("button", { name: "Settings" }).click();
-  await page.getByRole("button", { name: /import from notion or obsidian/i }).click();
+  await page.getByRole("button", { name: /import from notion or obsidian/i }).filter({ hasText: /import/i }).click();
   await expect(page.getByText("Unfinished imports")).toBeVisible();
   await page.getByRole("button", { name: /resume import of/i }).first().click();
   await expect(report.getByText("Import complete")).toBeVisible({ timeout: 60_000 });

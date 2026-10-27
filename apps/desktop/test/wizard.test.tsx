@@ -54,7 +54,7 @@ describe("import wizard", () => {
     const app = await openApp(root, { openImportSource: nodeOpenImportSource }, platform);
 
     // Empty Private Space: onboarding offers the import.
-    await app.user.click(await screen.findByRole("button", { name: /import from notion or obsidian/i }));
+    await app.user.click(await screen.findByText(/import from notion or obsidian/i, { selector: "button" }));
     await walkToPreview(app);
 
     const contents = screen.getByRole("group", { name: "Import contents" });
@@ -111,7 +111,7 @@ describe("import wizard", () => {
     const app = await openApp(root, { openImportSource: gate.open }, platform);
 
     await app.user.click(await screen.findByRole("button", { name: "Settings" }));
-    await app.user.click(await screen.findByRole("button", { name: /import from notion or obsidian/i }));
+    await app.user.click(await screen.findByText(/import from notion or obsidian/i, { selector: "button" }));
     await walkToPreview(app);
     await app.user.click(screen.getByRole("button", { name: "Continue" }));
     await app.user.click(screen.getByRole("button", { name: "Continue" }));
@@ -126,7 +126,7 @@ describe("import wizard", () => {
     await app.user.click(within(report).getByRole("button", { name: "Close" }));
 
     // The job is listed as interrupted, with a Resume action.
-    await app.user.click(await screen.findByRole("button", { name: /import from notion or obsidian/i }));
+    await app.user.click(await screen.findByText(/import from notion or obsidian/i, { selector: "button" }));
     expect(await screen.findByText("Unfinished imports")).toBeTruthy();
     expect(screen.getByText("Cancelled")).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: /resume import of/i }));
