@@ -88,7 +88,8 @@ test.describe("transfers", () => {
     const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
 
     await signInWithToken(page, token);
-    // The shell opens the first page (Notes) and expands its folder; selecting then starts with it.
+    // The shell opens on Home (ADR-0029): open the folder, then Notes; selecting then starts with it.
+    await tree.getByRole("treeitem", { name: "Projects" }).click();
     await tree.getByRole("treeitem", { name: "Notes" }).click();
     await expect(tree.getByRole("treeitem", { name: "Notes" })).toHaveAttribute("aria-current", "page");
 
@@ -163,6 +164,7 @@ test.describe("transfers", () => {
     const vault = join(scratch, "Vault");
     const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
     await signInWithToken(page, token);
+    await tree.getByRole("treeitem", { name: "Projects" }).click();
     await tree.getByRole("treeitem", { name: "Plan" }).click();
 
     // Move Plan out; its identity (thoth_id) goes with it.

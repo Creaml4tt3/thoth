@@ -50,7 +50,7 @@ async function press(page: Page, name: RegExp | string) {
 async function openVault(page: Page) {
   await press(page, /choose or create a private space/i);
   await press(page, /start writing/i);
-  await expect(page.getByRole("heading", { name: "Nothing open" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible(); // Home (ADR-0029)
 }
 
 async function newPage(page: Page, name: string) {
