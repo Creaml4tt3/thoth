@@ -13,6 +13,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 ### Added
 
 - Copy or move pages between two workspaces, on one server or two: from a page’s menu, its header or the command palette, or by dragging it onto the other workspace. Sub-pages, attachments and links between the pages go with them, and a move deletes the originals only after the other workspace has every page.
+- A new, empty Private Space starts with Welcome pages that show every kind of block and link and the main shortcuts, then a short tour of the basic tools you can skip (and see again from Settings).
 
 ### Fixed
 

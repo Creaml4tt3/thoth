@@ -1267,6 +1267,16 @@ still marked `REVIEW` until the owner has seen it.
   `apps/desktop/test/split-view.test.tsx`; `apps/web/test/split-view.test.tsx`; `tests/e2e/split-view.e2e.ts`.
 - Not checked in a real window: the Tauri webview's drag and F6 (checked in Chromium through the bridge).
 
+### First run (ADR-0032, 2026-10-27), built, waiting for review
+
+- A new, empty Private Space gets the Welcome pages on "Start writing" (English or Thai, as the UI): every block kind,
+  every kind of link, the main shortcuts per platform; written once (`.thoth/onboarding/welcome.json`), never over a
+  file, and the Welcome page opens.
+- A skippable tour of up to seven controls, by keyboard or pointer; again from Settings and the palette.
+- Evidence: `apps/desktop/test/welcome.test.ts`, `first-run.test.tsx`; `packages/app-ui/test/place.test.ts`;
+  `tests/e2e/first-run.e2e.ts`.
+- Not checked in a real window: the tour in the Tauri webview (checked in Chromium through the bridge).
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and
