@@ -18,7 +18,7 @@ import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { useFavorites } from "../favorites/context.ts";
-import { hasOtherWritableWorkspace } from "../transfer/elsewhere.ts";
+import { hasOtherWritableWorkspace } from "../transfer/targets.ts";
 import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type WorkspaceTreeItem } from "./tree.ts";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";

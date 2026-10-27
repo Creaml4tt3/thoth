@@ -292,6 +292,9 @@ importers:
       '@thoth/platform':
         specifier: workspace:*
         version: link:../../packages/platform
+      '@thoth/transfer':
+        specifier: workspace:*
+        version: link:../../packages/transfer
       '@thoth/ui':
         specifier: workspace:*
         version: link:../../packages/ui

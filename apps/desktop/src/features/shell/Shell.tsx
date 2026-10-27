@@ -33,7 +33,7 @@ import { remoteGone, remoteTitle } from "@thoth/app-ui/tabs/remote.ts";
 import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { buildCommands, type Command, type CommandActions } from "@thoth/app-ui/keyboard/commands.ts";
-import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/elsewhere.ts";
+import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";

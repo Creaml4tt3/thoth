@@ -61,6 +61,12 @@ import { workspaceRow } from "@thoth/app-ui/home/rows.ts";
 import { tip } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
+import { onSpaceDrop, type SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
+import { TransferDialog, type TransferTarget } from "@thoth/app-ui/transfer/TransferDialog.tsx";
+import { createTransferService, serverAccess } from "@thoth/app-ui/transfer/service.ts";
+import { betweenTarget, betweenTargetFor, hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
+import { transferEvent } from "@thoth/app-ui/transfer/notify.ts";
+import { BetweenWorkspaces, storageRecords } from "@thoth/transfer";
 
 /** The recent pages of an account in this browser (ADR-0029): this prefix and the account's id. */
 export const RECENT_KEY_PREFIX = "thoth.web.recent.";
@@ -80,7 +86,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const entry = state.servers.find((s) => s.info.id === SERVER_ID);
   const workspaces = entry?.workspaces ?? null;
-  type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "rename"; page: string; workspace: string; title: string } | null;
+  type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "rename"; page: string; workspace: string; title: string } | { kind: "transfer"; target: TransferTarget } | null;
   const [dialog, setDialog] = useState<Dialog>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -175,6 +181,39 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   strings.current = t;
   const notifications = useMemo(() => createNotificationCenter({ strings: () => strings.current.notifications, now: () => env.now() }), [env]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Copy and move between workspaces (ADR-0006, amendment of 2026-10-27). There is no Private Space here, so the
+  // records of unfinished transfers are kept in this browser's storage (no page text, no credential), for this visit
+  // when there is none.
+  const transfers = useMemo(() => {
+    const memory = new Map<string, string>();
+    const storage = env.localStorage ?? { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => void memory.set(k, v) };
+    return createTransferService((onProgress) => new BetweenWorkspaces({ records: storageRecords(storage), server: serverAccess(directory), now: () => new Date(env.now()), onProgress }), {
+      onSettled: (record, interrupted) => {
+        const event = transferEvent(record, interrupted);
+        if (event) notifications.push(event);
+      },
+    });
+  }, [env, directory, notifications]);
+  useEffect(() => {
+    if (workspaces !== null) void transfers.recover();
+  }, [transfers, workspaces !== null]);
+  // Unsaved edits are written first, so the transfer copies what is on screen.
+  const transfer = (next: TransferTarget) => void flushAll().then((ok) => ok && setDialog({ kind: "transfer", target: next }));
+  const transferRef = useRef(transfer);
+  transferRef.current = transfer;
+  useEffect(
+    () =>
+      onSpaceDrop((drop) => {
+        const next = betweenTargetFor(drop);
+        if (next) transferRef.current(next);
+      }),
+    [],
+  );
+  const toWorkspace = (drag: SpaceDrag, mode: "copy" | "move") => {
+    const next = betweenTarget(drag, mode);
+    if (next) transfer(next);
+  };
+
   // A page goes to its tab, or opens in a new one: the page on screen stays where it is.
   const openNotification = useCallback((to: NotificationTarget) => {
     if (to.kind === "workspacePage") tabs.openOrFocus({ kind: "workspace", server: to.server, workspace: to.workspace, page: to.page });
@@ -258,6 +297,12 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
           moveTo: () => requestMoveTo({ kind: "workspace", ...current }),
           reorder: (delta: -1 | 1) => requestReorder({ kind: "workspace", ...current }, delta),
           ...(hasCapability(capabilities, "public-share") ? { sharePage: () => requestShare(current) } : {}),
+        }
+      : {}),
+    ...(current && here && hasOtherWritableWorkspace(state, current)
+      ? {
+          copyToWorkspace: () => transfer({ direction: "between_workspaces", server: current.server, workspace: current.workspace, pageId: current.page, title: remoteTitle(state, current) ?? "", mode: "copy" }),
+          ...(canWriteHere ? { moveToWorkspace: () => transfer({ direction: "between_workspaces", server: current.server, workspace: current.workspace, pageId: current.page, title: remoteTitle(state, current) ?? "", mode: "move" }) } : {}),
         }
       : {}),
     ...(current && here && hasCapability(capabilities, "members") ? { members: { workspace: here.name, run: () => requestMembers({ server: current.server, workspace: current.workspace }) } } : {}),
@@ -352,6 +397,9 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             <span className="page-actions">
               <FavoriteButton target={{ kind: "workspace", ...current }} />
               <ShareButton directory={directory} target={current} />
+              {hasOtherWritableWorkspace(state, current) && (
+                <IconButton icon="to-workspace" label={t.transfer.toOther} onClick={() => transfer({ direction: "between_workspaces", server: current.server, workspace: current.workspace, pageId: current.page, title: remoteTitle(state, current) ?? "", mode: "copy" })} />
+              )}
             </span>
           }
           signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
@@ -449,6 +497,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                     current={current}
                     openPage={openPage}
                     flush={flushAll}
+                    spaceDrops
+                    onToWorkspace={toWorkspace}
                     onPageCreated={() => track({ name: "page_create" }, target)}
                   />
                 ))}
@@ -543,6 +593,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             onSearched={() => track({ name: "search" }, target)}
           />
         )}
+        {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} servers={directory} transfers={transfers} openWorkspacePage={(ref) => openPage(ref)} />}
         {dialog?.kind === "shortcuts" && <ShortcutsDialog client="web" platform={platform} onClose={() => setDialog(null)} />}
         {dialog?.kind === "rename" && (
           <RenameDialog

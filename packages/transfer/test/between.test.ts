@@ -12,17 +12,10 @@ import { clientFor, livePages, thothIdOf, world, type World } from "./support.ts
 const TEAM: FakeServerConfig = { url: "https://team.example", name: "Team" };
 const OTHER: FakeServerConfig = { url: "https://other.example", name: "Other" };
 
-function memoryStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length"> {
+/** Only what the web client's storage offers (`WebEnv.localStorage`). */
+function memoryStorage(): Pick<Storage, "getItem" | "setItem"> {
   const map = new Map<string, string>();
-  return {
-    getItem: (k) => map.get(k) ?? null,
-    setItem: (k, v) => void map.set(k, v),
-    removeItem: (k) => void map.delete(k),
-    key: (i) => [...map.keys()][i] ?? null,
-    get length() {
-      return map.size;
-    },
-  };
+  return { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v) };
 }
 
 interface Two {

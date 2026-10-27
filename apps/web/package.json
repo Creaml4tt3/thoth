@@ -14,6 +14,7 @@
     "@fontsource-variable/noto-sans-thai": "5.2.8",
     "@thoth/app-ui": "workspace:*",
     "@thoth/platform": "workspace:*",
+    "@thoth/transfer": "workspace:*",
     "@thoth/ui": "workspace:*",
     "@thoth/workspace-client": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",

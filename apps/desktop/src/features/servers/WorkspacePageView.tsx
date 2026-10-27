@@ -7,7 +7,7 @@ import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { workspaceKey, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
 import { ShareButton } from "@thoth/app-ui/workspace/ShareButton.tsx";
-import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/elsewhere.ts";
+import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";

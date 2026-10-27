@@ -3,6 +3,7 @@
 @import "@thoth/app-ui/shell.css";
 @import "@thoth/app-ui/editor.css";
 @import "@thoth/app-ui/plain.css";
+@import "@thoth/app-ui/transfer/transfer.css";
 
 .boot { min-height: 100%; display: grid; place-content: center; justify-items: center; gap: var(--thoth-space-3); color: var(--thoth-ink-secondary); text-align: center; padding: var(--thoth-space-6); }
 

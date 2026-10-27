@@ -29,28 +29,40 @@ export interface RecordStore {
   projectOperation?(row: { id: string; kind: string; state: string; updatedAt: number }): Promise<void>;
 }
 
-/** A `RecordStore` over a `Storage` (the web client's localStorage): one key per record, under `prefix`. */
-export function storageRecords(storage: Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">, prefix = "thoth.transfers/"): RecordStore {
+/**
+ * A `RecordStore` over a `Storage` (the web client's localStorage): one key per record under `prefix`, and one key
+ * listing them (so only `getItem` and `setItem` are needed).
+ */
+export function storageRecords(storage: Pick<Storage, "getItem" | "setItem"> & Partial<Pick<Storage, "removeItem">>, prefix = "thoth.transfers/"): RecordStore {
+  const indexKey = `${prefix}index`;
+  const index = (): string[] => {
+    try {
+      const value: unknown = JSON.parse(storage.getItem(indexKey) ?? "[]");
+      return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+    } catch {
+      return [];
+    }
+  };
   return {
     async writeRecord(path, value) {
       storage.setItem(prefix + path, JSON.stringify(value));
+      const paths = index();
+      if (!paths.includes(path)) storage.setItem(indexKey, JSON.stringify([...paths, path]));
     },
     async readRecord(path) {
       const text = storage.getItem(prefix + path);
-      return text === null ? undefined : (JSON.parse(text) as unknown);
+      return text === null || text === "" ? undefined : (JSON.parse(text) as unknown);
     },
     async listRecords(dir) {
-      const names: string[] = [];
-      for (let i = 0; i < storage.length; i++) {
-        const key = storage.key(i);
-        if (!key?.startsWith(`${prefix}${dir}/`)) continue;
-        const name = key.slice(prefix.length + dir.length + 1);
-        if (!name.includes("/") && name.endsWith(".json")) names.push(name);
-      }
-      return names.sort();
+      return index()
+        .filter((path) => path.startsWith(`${dir}/`) && !path.slice(dir.length + 1).includes("/") && path.endsWith(".json"))
+        .map((path) => path.slice(dir.length + 1))
+        .sort();
     },
     async removeRecord(path) {
-      storage.removeItem(prefix + path);
+      if (storage.removeItem) storage.removeItem(prefix + path);
+      else storage.setItem(prefix + path, "");
+      storage.setItem(indexKey, JSON.stringify(index().filter((p) => p !== path)));
     },
   };
 }
