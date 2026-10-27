@@ -124,7 +124,7 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
   return {
     url,
     token,
-    initScript: `window.__THOTH_PLATFORM__ = async () => (await import("/__bridge__.js")).createHttpPlatform(${JSON.stringify(url)}, ${JSON.stringify(token)});`,
+    initScript: `window.__THOTH_PLATFORM__ = async () => (await import(${JSON.stringify(`${url}/__bridge__.js`)})).createHttpPlatform(${JSON.stringify(url)}, ${JSON.stringify(token)});`,
     holdNext(command, when = () => true) {
       let arrive!: () => void;
       let release!: () => void;
