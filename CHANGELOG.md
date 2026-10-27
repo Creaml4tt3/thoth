@@ -8,13 +8,20 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
-## [Unreleased]
+## [0.2.1] - 2026-10-28
 
 ### Added
 
 - Copy or move pages between two workspaces, on one server or two: from a page’s menu, its header or the command palette, or by dragging it onto the other workspace. Sub-pages, attachments and links between the pages go with them, and a move deletes the originals only after the other workspace has every page.
 - A new, empty Private Space starts with Welcome pages that show every kind of block and link and the main shortcuts, then a short tour of the basic tools you can skip (and see again from Settings).
 - Send feedback: report a problem, suggest an idea or ask a question from Settings or the command palette in the app, or from the new Support page on the website.
+- Split view: two panes side by side, each with its own tabs, on the desktop and the web. Drag a tab to the right edge, or choose Split right (Cmd/Ctrl+Alt/Option+\).
+- A Home tab with your recent pages and favorites, opened by the logo, the tab bar’s Home button or Alt/Option+Shift+H.
+- Hide the whole sidebar with Cmd/Ctrl+\ or its button for more room to write; Thoth remembers it for each Private Space.
+- Show in Finder or File Explorer for a page or folder in your Private Space.
+- An Import button in the sidebar and the command palette, and breadcrumbs above a page that you can click.
+- Copy or move between spaces from the right-click menu, and a Share… button in a workspace page’s header.
+- Settings lists its sections beside the page.
 
 ### Changed
 
@@ -26,6 +33,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 ### Fixed
 
 - On Windows, an Obsidian vault or Private Space on a USB stick, SD card or other FAT32 or exFAT drive opens again, instead of “The parameter is incorrect”.
+- Right-click menus stay inside the window.
+- A drag cancelled with Escape no longer opens the tab or folds the section when you let go.
+- The highlight and selected rows are easier to see, in light and dark.
 
 ## [0.2.0] - 2026-10-26
 
@@ -121,7 +131,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...HEAD
+[0.2.1]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Creaml4tt3/thoth/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/Creaml4tt3/thoth/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Creaml4tt3/thoth/compare/v0.1.1...v0.1.2
