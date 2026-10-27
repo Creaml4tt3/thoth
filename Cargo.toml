@@ -42,6 +42,8 @@ sha2 = "=0.10.9"
 # The OS keychain, desktop shell only. Platform-native stores only: macOS Keychain, Windows Credential
 # Manager, Linux kernel keyutils. No Secret Service/D-Bus, no OpenSSL.
 keyring = { version = "=3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
+# The app data folder's parent, as Tauri's `app_data_dir` finds it (ADR-0031). The version Tauri already locks.
+dirs = "=7.0.0"
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"

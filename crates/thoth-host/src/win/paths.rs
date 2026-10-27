@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn root_policy_refuses_dangerous_roots() {
         let home = Path::new(r"C:\Users\alice");
-        let data = Path::new(r"C:\Users\alice\AppData\Roaming\io.github.creaml4tt3.thoth");
+        let data = Path::new(r"C:\Users\alice\AppData\Roaming\com.thothnotes.desktop");
         for bad in [
             r"C:\",
             r"D:\",
@@ -192,7 +192,7 @@ mod tests {
             r"D:\System Volume Information",
             r"C:\Users\alice\AppData\Roaming\Other",
             r"C:\Users\alice\AppData\Local\Temp",
-            r"C:\Users\alice\AppData\Roaming\io.github.creaml4tt3.thoth\vault",
+            r"C:\Users\alice\AppData\Roaming\com.thothnotes.desktop\vault",
             r"relative\x",
         ] {
             assert!(check_root_policy(Path::new(bad), Some(home), Some(data)).is_err(), "{bad}");

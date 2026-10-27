@@ -4,13 +4,18 @@ Hosts the platform ports for the webview (ADR-0008, option (a)). The React UI in
 `apps/desktop` runs the TypeScript domain code; this crate exposes
 `thoth_host::Host::call` (`crates/thoth-host`) as Tauri commands.
 
-- **Bundle identifier `io.github.creaml4tt3.thoth`** (owner decision
-  2026-10-22; replaces the provisional `app.thoth.desktop`). It names the app
-  data directory (`~/Library/Application Support/<identifier>/`, which holds the
-  recent vaults list). Changing it again later is possible, but the app then
-  starts with an empty recent list unless a migration copies the old file, and
-  macOS treats it as a new app (permission prompts, signing). Do not end it in
-  `.app` (Tauri warns: it clashes with the macOS bundle extension).
+- **Bundle identifier `com.thothnotes.desktop`** (ADR-0031, 2026-10-27; was
+  `io.github.creaml4tt3.thoth` from 0.1.0 to 0.2.0). It names the app data
+  folder (`~/Library/Application Support/<identifier>/`, `%APPDATA%\<identifier>`,
+  `~/.local/share/<identifier>`) and the keychain service. At start, before the
+  builder, `run` moves the old identifier's folder to the new one once
+  (`thoth_host::data_dir::move_legacy`), and secrets under the old keychain
+  service move on first read (`MovingSecretStore`). Webview storage (tabs,
+  sidebar order) is not moved. `bundle.publisher` (`github`) and
+  `bundle.windows.wix.upgradeCode` are pinned to the values 0.2.0 was built
+  with, so the Windows installers upgrade it in place. Do not end the
+  identifier in `.app` (Tauri warns: it clashes with the macOS bundle
+  extension).
 - Commands: each contract command `a.b` in `packages/platform/src/ipc.ts` is the
   Tauri command `a_b`. Events are emitted as `vault:changed`.
 - Capabilities (`capabilities/main.json`): only Thoth's commands plus

@@ -641,7 +641,7 @@ test("a long answer with long links never pushes the bubble sideways, and links 
   test.setTimeout(120_000);
   const b = await openBubble(page);
   await pickOnly(page, ["Plan"]);
-  const work = "file:///Users/a/Library/Application%20Support/io.github.creaml4tt3.thoth/agent-runs/run_5b11accfe44550c4eeeb9c2bcfbce1c1/work";
+  const work = "file:///Users/a/Library/Application%20Support/com.thothnotes.desktop/agent-runs/run_5b11accfe44550c4eeeb9c2bcfbce1c1/work";
   const long = `https://example.org/${"a".repeat(260)}`;
   await writeAndStart(page, `Can you make an image to put together with this content, and place it right under the heading of the page please?\n@answer I made an original SVG illustration and embedded it beneath the heading in [Plan.md](${work}/Notes/Plan.md).\\n\\nThe file: [bird-uric-acid.svg](${work}/Notes/bird-uric-acid.svg)\\n\\nSource: ${long}\n`);
   const text = b.getByTestId("agent-answer");

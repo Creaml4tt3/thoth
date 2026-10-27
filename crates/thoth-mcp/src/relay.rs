@@ -30,7 +30,7 @@ impl Failure {
 
 /// The app's usual socket, in its app data folder (the same folder Tauri's `app_data_dir` gives the app).
 pub fn default_socket() -> Option<PathBuf> {
-    const APP: &str = "io.github.creaml4tt3.thoth";
+    const APP: &str = "com.thothnotes.desktop";
     let home = std::env::var_os("HOME").map(PathBuf::from).filter(|h| h.is_absolute());
     let data = if cfg!(target_os = "macos") {
         home.map(|h| h.join("Library").join("Application Support"))

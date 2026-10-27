@@ -32,7 +32,7 @@ use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use thoth_host::updates::UpdateOptions;
-use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, Picker, SecretStore};
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MovingSecretStore, Picker, SecretStore};
 
 /// Where the update notice reads `latest.json` and where "Download" goes (ADR-0022). Fixed when the app is built:
 /// `build.rs` reads `THOTH_UPDATE_URL` and `THOTH_DOWNLOADS_PAGE_URL` for a self-built copy; an empty address turns the
@@ -75,18 +75,30 @@ impl Picker for DialogPicker {
 }
 
 /// Workspace-server secrets in the OS keychain (macOS Keychain, Windows Credential Manager, Linux keyutils),
-/// service `io.github.creaml4tt3.thoth`, account = the server's handle. Errors never include the secret.
-struct KeychainStore;
+/// service = the bundle identifier (`KEYCHAIN_SERVICE`), account = the server's handle. Errors never include the
+/// secret. The app reads through `MovingSecretStore`, which moves a secret kept under the old identifier
+/// (`LEGACY_KEYCHAIN_SERVICE`, ADR-0031) the first time it is read.
+struct KeychainStore {
+    service: &'static str,
+}
 
 impl KeychainStore {
-    fn entry(server: &str) -> HostResult<keyring::Entry> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, server).map_err(|_| HostError::internal("The system keychain is not available"))
+    fn current() -> Self {
+        Self { service: KEYCHAIN_SERVICE }
+    }
+
+    fn legacy() -> Self {
+        Self { service: LEGACY_KEYCHAIN_SERVICE }
+    }
+
+    fn entry(&self, server: &str) -> HostResult<keyring::Entry> {
+        keyring::Entry::new(self.service, server).map_err(|_| HostError::internal("The system keychain is not available"))
     }
 }
 
 impl SecretStore for KeychainStore {
     fn get(&self, server: &str) -> HostResult<Option<String>> {
-        match Self::entry(server)?.get_password() {
+        match self.entry(server)?.get_password() {
             Ok(secret) => Ok(Some(secret)),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(_) => Err(HostError::internal("Could not read from the system keychain")),
@@ -94,11 +106,11 @@ impl SecretStore for KeychainStore {
     }
 
     fn set(&self, server: &str, secret: &str) -> HostResult<()> {
-        Self::entry(server)?.set_password(secret).map_err(|_| HostError::internal("Could not write to the system keychain"))
+        self.entry(server)?.set_password(secret).map_err(|_| HostError::internal("Could not write to the system keychain"))
     }
 
     fn delete(&self, server: &str) -> HostResult<()> {
-        match Self::entry(server)?.delete_credential() {
+        match self.entry(server)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => Err(HostError::internal("Could not delete from the system keychain")),
         }
@@ -520,8 +532,20 @@ fn quit<R: tauri::Runtime>(app: &AppHandle<R>) {
     }
 }
 
+/// Moves the app data folder of the old identifier to this one's, once (ADR-0031). The same folder Tauri's
+/// `app_data_dir` gives (`dirs::data_dir()` joined with the identifier; this app sets no directory override). A failed
+/// move is not fatal: the app starts with a new folder and the old one stays on disk.
+fn move_legacy_data_dir(identifier: &str) {
+    if let Some(data) = dirs::data_dir() {
+        let _ = thoth_host::data_dir::move_legacy(&data.join(thoth_host::data_dir::LEGACY_IDENTIFIER), &data.join(identifier));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Before the builder: the config's window (and on Linux its webview folder, the data folder) is made before `setup`.
+    move_legacy_data_dir(&context.config().identifier);
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(app_menu).on_menu_event(|app, event| {
@@ -552,7 +576,7 @@ pub fn run() {
                     };
                 }),
                 disable_hardlink: false,
-                secrets: Arc::new(KeychainStore),
+                secrets: Arc::new(MovingSecretStore::new(Arc::new(KeychainStore::current()), Arc::new(KeychainStore::legacy()))),
                 browser: Arc::new(SystemBrowser),
                 file_manager: Arc::new(SystemFileManager),
                 // Agent CLIs are found on PATH and in the usual install folders, never in a folder the webview names.
@@ -595,7 +619,7 @@ pub fn run() {
             }
             _ => {}
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("failed to build the Thoth app")
         .run(|_app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
@@ -761,7 +785,7 @@ mod tests {
             assert!(address.is_empty() || address.starts_with("https://"), "{address}");
         }
         if option_env!("THOTH_UPDATE_URL").is_none() {
-            assert_eq!(UPDATE_URL, "https://download.thoth.creaml4tt3.me/latest.json");
+            assert_eq!(UPDATE_URL, "https://download.thothnotes.com/latest.json");
         }
         // Nothing at run time changes it: no flag, no environment variable, no argument from the webview.
         let source = include_str!("lib.rs");
@@ -819,6 +843,40 @@ mod tests {
         assert!(!csp.contains("https:") && !csp.contains("*") && !csp.contains("unsafe-eval"));
         let script = csp.split(';').find(|d| d.trim().starts_with("script-src")).unwrap();
         assert_eq!(script.trim(), "script-src 'self'");
+    }
+
+    #[test]
+    fn the_identifier_names_the_keychain_service_and_the_old_one_is_still_read() {
+        // ADR-0031: the keychain service is the bundle identifier; secrets under the old one are moved on first read.
+        let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(conf["identifier"], "com.thothnotes.desktop");
+        assert_eq!(conf["identifier"], KEYCHAIN_SERVICE);
+        assert_eq!(thoth_host::LEGACY_KEYCHAIN_SERVICE, thoth_host::data_dir::LEGACY_IDENTIFIER);
+        assert_eq!(KeychainStore::current().service, KEYCHAIN_SERVICE);
+        assert_eq!(KeychainStore::legacy().service, "io.github.creaml4tt3.thoth");
+    }
+
+    #[test]
+    fn windows_installers_keep_the_values_0_2_0_was_built_with() {
+        // ADR-0031: the MSI upgrade code was derived from the product name (`Thoth.exe.app.x64`, UUID v5 in the DNS
+        // namespace), and the publisher from the identifier's second part (`github`), which names the registry key
+        // where both installers remember the install folder. Pinned, so 0.2.1 upgrades 0.2.0 in place.
+        let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(conf["productName"], "Thoth");
+        assert_eq!(conf["bundle"]["windows"]["wix"]["upgradeCode"], "86c59b04-326e-5a3d-a791-dc519a7a35af");
+        assert_eq!(conf["bundle"]["publisher"], "github");
+    }
+
+    #[test]
+    fn the_old_data_folder_is_moved_before_the_app_opens_anything() {
+        // The move runs in `run` before the builder: Tauri makes the config's windows (and on Linux the webview's
+        // folder, which is the data folder) before `setup`, and the host opens the folder in `setup`.
+        let source = include_str!("lib.rs");
+        let code = source.split("#[cfg(test)]").next().unwrap();
+        let run = &code[code.find("pub fn run()").unwrap()..];
+        let moved = run.find("move_legacy_data_dir(").unwrap();
+        assert!(moved < run.find("tauri::Builder::default()").unwrap());
+        assert!(run.contains(".build(context)"));
     }
 
     #[test]
