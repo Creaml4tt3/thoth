@@ -120,8 +120,8 @@ async function typeAtEnd(page: Page, text: string) {
 test("with the keyboard only: create, rename, move, format, switch tab, change theme, open Settings, and come back to the same tabs", async ({ page }) => {
   await press(page, /choose or create a private space/i);
   await press(page, /start writing/i);
-  await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible(); // Home (ADR-0029)
-  expect(await tabNames(page)).toEqual(["Home"]);
+  await expect(page.getByRole("heading", { level: 1, name: "New tab" })).toBeVisible(); // an empty Private Space: a new tab
+  expect(await tabNames(page)).toEqual(["New tab"]);
 
   // 1. Create two pages: one in a folder (so there is somewhere to move to), then the one we work on.
   await newPage(page, "Archive/Old");

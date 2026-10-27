@@ -1,13 +1,13 @@
 /**
- * Getting around on the real desktop UI (Chromium, real Rust host, the e2e bridge): Home at start (ADR-0029), the
- * whole sidebar hidden and shown, and Show in Finder for a page or folder through the host's own path checks. Each view
+ * Getting around on the real desktop UI (Chromium, real Rust host, the e2e bridge): the logo back to the Private Space
+ * picker and in again with the same tabs (ADR-0029, amendment of 2026-10-28), a new tab, the whole sidebar hidden and shown, and Show in Finder for a page or folder through the host's own path checks. Each view
  * passes the accessibility check in light and dark, and is pictured.
  *
  * SHOTS=<dir> changes where the pictures go (default tests/.tmp/batch2, which git ignores).
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { REPO } from "../ports/harness.ts";
@@ -108,28 +108,48 @@ test("Show in Finder on a page and a folder asks the host for that entry, under 
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`Home, the hidden sidebar and the tree's menu pass the accessibility check and are shown in ${scheme}`, async ({ page }) => {
+  test(`the logo goes back to the picker and the Private Space comes back as it was; the picker, a new tab, the hidden sidebar and the tree's menu pass the accessibility check and are shown in ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    // Home at start, then with pages opened and a favorite.
-    await expect(current(page)).toHaveText("Home");
     await mkdir(SHOTS, { recursive: true });
+    // Nothing was open: the first page. Beta in a second tab, with an edit not yet written.
+    await expect(current(page)).toHaveText("Alpha");
+    await row(page, "Beta").click({ modifiers: ["ControlOrMeta"] });
+    await expect(current(page)).toHaveText("Beta");
+    const editor = page.getByRole("textbox", { name: /page content/i });
+    await editor.click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Written before leaving.");
+
+    // The logo: the edit is written, and the picker lists this Private Space first.
+    await page.locator("aside.sidebar").getByRole("button", { name: "Thoth, back to Private Spaces" }).click();
+    const choose = page.getByRole("button", { name: /choose or create a private space/i });
+    await expect(choose).toBeFocused();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    expect(await readFile(join(vault, "Beta.md"), "utf8")).toContain("Written before leaving.");
+    const recent = page.getByRole("region", { name: "Recent" }).getByRole("button");
+    await expect(recent.first()).toContainText("Vault");
     await settled(page);
-    expect(await axe(page, ".tab-panel")).toEqual([]);
-    await page.screenshot({ path: join(SHOTS, `home-empty-${scheme}.png`) });
-    await row(page, "Projects").click();
-    for (const name of ["Alpha", "Plan", "Beta"]) {
-      await row(page, name).click();
-      await expect(current(page)).toHaveText(name);
-    }
-    await page.getByRole("button", { name: "Favorite" }).click();
-    await page.getByRole("button", { name: "Home", exact: true }).click();
-    await expect(page.getByTestId("home").getByRole("list", { name: "Recent" }).getByRole("button")).toHaveCount(3);
+    expect(await axe(page)).toEqual([]);
+    await page.screenshot({ path: join(SHOTS, `picker-after-leaving-${scheme}.png`) });
+
+    // In again: the same tabs, Beta current, with the edit.
+    await recent.first().click();
+    await expect.poll(() => page.getByRole("tab").allTextContents()).toEqual(["Alpha", "Beta"]);
+    await expect(current(page)).toHaveText("Beta");
+    await expect(editor).toContainText("Written before leaving.");
+
+    // A new tab is empty and says how to open a page.
+    await page.keyboard.press("ControlOrMeta+t");
+    await expect(page.getByRole("heading", { level: 1, name: "New tab" })).toBeVisible();
     await page.mouse.move(1100, 700);
     await settled(page);
     expect(await axe(page, ".tab-panel", ".tabstrip", ".ws")).toEqual([]);
-    await page.screenshot({ path: join(SHOTS, `home-${scheme}.png`) });
+    await page.screenshot({ path: join(SHOTS, `new-tab-${scheme}.png`) });
+    await page.locator("aside.sidebar .ws-home").focus();
+    await page.screenshot({ path: join(SHOTS, `logo-focus-${scheme}.png`), clip: { x: 0, y: 0, width: 600, height: 60 } });
 
-    // The sidebar hidden: the Show button and Home at the start of the tab bar.
+    // The sidebar hidden: the Show button and the house (back to Private Spaces) at the start of the tab bar.
     await page.keyboard.press("ControlOrMeta+Backslash");
     await expect(page.getByRole("button", { name: "Show sidebar" })).toBeVisible();
     await page.mouse.move(600, 600);
@@ -142,6 +162,7 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.getByRole("complementary", { name: "Sidebar" })).toBeVisible();
 
     // The tree's menu with Show in Finder.
+    await row(page, "Projects").click();
     await row(page, "Plan").click({ button: "right" });
     await expect(page.getByRole("menu")).toBeVisible();
     await settled(page);

@@ -143,7 +143,7 @@ test("the tour, by keyboard from the first step to Done, light and dark; then it
     await shoot(page, `tour-${step}`);
     await page.keyboard.press("Enter");
   }
-  expect(titles.slice(0, 6)).toEqual(["Your pages", "New page, new folder, import", "Search and commands", "Write in blocks", "Tabs", "Home"]);
+  expect(titles.slice(0, 6)).toEqual(["Your pages", "New page, new folder, import", "Search and commands", "Write in blocks", "Tabs", "Private Spaces"]);
   await expect(tour(page)).toHaveCount(0);
   await expect(page.locator("[data-tour-anchor]")).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("thoth.desktop.tour"))).toBe("finished");

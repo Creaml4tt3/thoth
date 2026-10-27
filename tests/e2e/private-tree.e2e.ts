@@ -62,7 +62,7 @@ const current = (page: Page) => page.getByRole("tab", { selected: true });
 
 test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a folder that starts in rename", async ({ page }) => {
   await openVault(page);
-  await expect(current(page)).toHaveText("Home"); // a Private Space opens on Home (ADR-0029)
+  await expect(current(page)).not.toHaveText("New tab"); // nothing was open: the first page
   await row(page, "Plan").focus();
   await page.keyboard.press("Enter");
   await expect(current(page)).toHaveText("Plan");

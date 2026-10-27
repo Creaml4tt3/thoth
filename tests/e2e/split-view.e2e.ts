@@ -63,7 +63,7 @@ async function open(page: Page) {
   await page.setViewportSize({ width: 1400, height: 820 });
   await page.goto(bridge.url);
   await page.getByRole("button", { name: /choose or create a private space/i }).click();
-  await expect(page.getByRole("tab", { selected: true })).toHaveText("Home");
+  await expect(page.getByRole("tab", { selected: true })).toHaveText("Alpha"); // nothing was open: the first page
   await row(page, "Alpha").click();
   await row(page, "Beta").click({ modifiers: ["ControlOrMeta"] });
   await expect.poll(() => names(page, "Open pages")).toEqual(["Alpha", "Beta"]);

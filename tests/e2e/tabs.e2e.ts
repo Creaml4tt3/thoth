@@ -59,8 +59,6 @@ async function open(page: Page) {
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
   await page.getByRole("button", { name: /choose or create a private space/i }).click();
-  // A Private Space opens on Home (ADR-0029); these tests start on Alpha.
-  await expect(current(page)).toHaveText("Home");
   await row(page, "Alpha").click();
   await expect(current(page)).toHaveText("Alpha");
 }
