@@ -1399,3 +1399,9 @@ regression tests (`pnpm check`: 92 tests):
    Region Singapore and contact `creaml4tt3@gmail.com` confirmed the same day.
 7. ~~Product name.~~ Decided 2026-10-22: **Thoth**. Buying a domain is still
    open; moving to it is a configuration change (ADR-0014).
+Status note (2026-10-27): **copy and move between two workspaces** (ADR-0006 amendment of 2026-10-27, Proposed).
+- Two protocol transfers with the client in between (`BetweenWorkspaces` in `packages/transfer`). No server change.
+- Entry points: a page's menu, its header, the palette, and a drag onto another workspace's tree. Desktop and web
+  client share one `TransferDialog` (`@thoth/app-ui/transfer`). The web keeps its records in browser storage.
+- Tests: `between.test.ts`, `workspace-transfer.test.tsx` (desktop and web), `cross-space-dnd.test.tsx`,
+  `space-drag.test.ts`, `workspace-transfer.e2e.ts`.

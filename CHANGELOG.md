@@ -10,6 +10,10 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ## [Unreleased]
 
+### Added
+
+- Copy or move pages between two workspaces, on one server or two: from a page’s menu, its header or the command palette, or by dragging it onto the other workspace. Sub-pages, attachments and links between the pages go with them, and a move deletes the originals only after the other workspace has every page.
+
 ### Fixed
 
 - On Windows, an Obsidian vault or Private Space on a USB stick, SD card or other FAT32 or exFAT drive opens again, instead of “The parameter is incorrect”.

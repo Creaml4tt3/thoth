@@ -174,3 +174,87 @@ Pinned by `packages/app-ui/test/space-drag.test.ts`, `packages/app-ui/test/space
 `apps/desktop/test/cross-space-dnd.test.tsx` and `tests/e2e/cross-space-dnd.e2e.ts`. The menu transfers were
 checked again end to end in `tests/e2e/transfer.e2e.ts`: copy, move, move back, a conflict copy, a taken name, and
 the export-restricted refusal. No bugs were found.
+
+## Amendment (2026-10-27): between two workspaces — Proposed
+
+People can copy or move pages from one workspace to another, on one server or on two. The rules stay the same.
+
+1. **No new server API.** A transfer between workspaces is the two transfers servers already have, with this
+   client in between:
+   - at the source, `from_workspace`, which pins one revision per page and is refused for an export-restricted
+     workspace;
+   - at the destination, `to_workspace`, which stages invisibly and commits all pages or none.
+
+   An operation ID is global on a server, and both ends can be the same server, so the two have their own IDs.
+   The record's `id` is the destination's transfer. `source.operationId` is the source's. Each is the
+   idempotency key at its own server.
+2. **States.** The record uses the same states (`direction: between_workspaces`, `source: { server, workspace,
+   operationId, known }`):
+   - `validate`: both servers list `transfers`. The person has read on the source (write for a move) and write
+     at the destination. There is no export restriction.
+   - `stage`: create the transfer at the source. The pinned revisions are read back and their hashes checked.
+   - `transfer`: copy each attachment those revisions link to. It is downloaded, then uploaded with a key made
+     from both ends, the attachment and its hash, so a retry, even by a new operation, replays. Then the links
+     are rewritten, the hash of every payload is recorded, and the transfer is created at the destination.
+   - `verify`: the destination's echo matches the plan.
+   - `commit_destination`: commit, then read every created revision back.
+   - `finalize_source`: commit at the source with the verified revisions. For a move, the source server deletes
+     each page only while it is still the pinned revision (compare-and-swap).
+
+   Before the destination commit, a stop or a refusal rolls back both ends: each staged transfer is aborted. A 409
+   from the destination's abort means it did commit, and the operation goes forward instead. After the commit, it
+   only goes forward. A failure in between leaves the source intact, and the record says what is where: every page
+   committed and verified at the destination, the source transfer not yet committed. Try again finishes it.
+
+   A page edited at the source after it was pinned is kept (`cleanup_pending`, `revision_conflict`). If one page
+   cannot be verified at the destination, a move keeps every original (`kept_with_others`) and discards the
+   source transfer.
+3. **Identity and links.** Every page gets a new ID at the destination, for copy and move alike. A server never
+   reuses a page ID, and on one server the deleted original still holds its ID. A `thoth_id` in a page's
+   frontmatter is set to the new ID.
+
+   Links work this way:
+   - `thoth:page/<id>` and `thoth:attachment/<id>` links to pages and attachments that travel are rewritten
+     through the mapping (`classifyBetween`);
+   - links to anything else stay as written and are flagged (`left_at_source`);
+   - path and title links resolve in neither workspace and are kept (`unresolved`).
+4. **What travels.** The selected pages and every page below them, parents first. A dragged folder carries its
+   subtree, and a page from the menu, header or palette takes its sub-pages too. The attachments they link to are
+   copied when both servers list `attachments`; otherwise the preview warns.
+
+   A title already used by a page directly under the destination parent becomes "Title 2", "Title 3" and so on.
+   Nothing is overwritten: every page is new. The preview shows:
+   - who can see the pages at the destination;
+   - where they come from;
+   - the pages, the attachment count and the link classes;
+   - "Nothing has been written to … yet."
+5. **Entry points.** All of them open the same `TransferDialog`, which moved to `@thoth/app-ui/transfer` so the
+   desktop and the web client share it:
+   - a workspace page's menu: "Copy to another workspace…", and "Move to another workspace…" for writers;
+   - the page header's "Copy or move to another workspace…";
+   - the palette's "Copy/Move page to another workspace…";
+   - dragging a page onto another workspace's tree. `crossDirection` now answers `between_workspaces`.
+
+   These are offered only while another workspace takes pages. In the dialog, the source workspace is never a
+   destination, and a choice of the same workspace is a problem (`same_workspace`). A drop is refused, with the
+   reason on the pointer, when the destination is only viewed or has no `transfers`, or when the source is
+   export-restricted or signed out (`betweenRefusal`). The server stays the authority. The run checks again,
+   and the source server refuses an export-restricted workspace itself.
+6. **Records and notifications.** On the desktop the record lives with the others in `.thoth/operations/`.
+   `TransferEngine` hands these records to `BetweenWorkspaces` for start, resume, abort and recovery.
+
+   The web client has no Private Space, so its records live in the browser's storage (`storageRecords`, one key
+   per record and an index). Like every record, they hold no page text and no credential. Pending moves and
+   notifications (ADR-0018) work as for the other kinds: a finished transfer opens the copy, and an unfinished
+   one opens the original at the source.
+
+Gaps:
+- The web client signs in to one server, so on the web this works between that server's workspaces.
+- A transfer interrupted in a browser tab is recovered the next time the client opens in that browser.
+- Uploaded attachments of a rolled-back attempt stay unreferenced at the destination, as with Private → Workspace.
+
+Pinned by `packages/transfer/test/between.test.ts` (copy and move on two servers and on one, export restriction
+with the preview bypassed, viewers, links, a failure after the copy, a crash at every boundary,
+`TransferEngine` recovery), `apps/desktop/test/workspace-transfer.test.tsx`, `apps/desktop/test/cross-space-dnd.test.tsx`,
+`apps/web/test/workspace-transfer.test.tsx`, `packages/app-ui/test/space-drag.test.ts` and
+`tests/e2e/workspace-transfer.e2e.ts`.
