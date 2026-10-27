@@ -205,12 +205,12 @@ describe("workspace tree: order", () => {
     const { app, group } = await workspace(trio);
     fireEvent.contextMenu(item(group, "Beta"));
     const menu = await screen.findByRole("menu", { name: "Actions for Beta" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "New page inside", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "New page inside", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Copy to Private Space…", "Move to Private Space…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: /Move to/ }));
     expect(await screen.findByRole("dialog", { name: "Move “Beta” to…" })).toBeTruthy();
   });
 
-  it("a viewer can neither rename nor move; their row menu only stars the page (ADR-0027)", async () => {
+  it("a viewer can neither rename nor move; their row menu only stars the page (ADR-0027) and copies it to the Private Space", async () => {
     const { app, servers, group } = await workspace(trio, { role: "viewer" });
     const beta = item(group, "Beta");
     expect(beta.getAttribute("draggable")).toBeNull();
@@ -219,7 +219,7 @@ describe("workspace tree: order", () => {
     await app.user.keyboard(ALT_SHIFT("ArrowUp"));
     fireEvent.contextMenu(beta);
     expect(screen.queryByRole("textbox", { name: /Rename/ })).toBeNull();
-    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites"]);
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "Copy to Private Space…"]);
     expect(moves(servers)).toHaveLength(0);
     expect(names(group)).toEqual(["Alpha", "Beta", "Gamma"]);
   });
@@ -624,6 +624,8 @@ describe("in Thai", () => {
       `${sharedTh.tree.moveUp}⌥⇧↑`,
       `${sharedTh.tree.moveDown}⌥⇧↓`,
       sharedTh.tree.moveTo,
+      sharedTh.tree.across.copyTo(sharedTh.tree.across.privateSpace),
+      sharedTh.tree.across.moveTo(sharedTh.tree.across.privateSpace),
     ]);
     await app.user.keyboard("{Escape}");
 
