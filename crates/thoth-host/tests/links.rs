@@ -585,7 +585,7 @@ fn the_shipped_desktop_shell_never_turns_the_switch_on() {
 // ------------------------------------------------------------------------------------------- the update notice
 
 fn latest(version: &str) -> String {
-    format!(r#"{{"version":"{version}","date":"2026-11-02","base":"https://download.thoth.creaml4tt3.me/v{version}/","files":[],"extra":{{"ignored":true}}}}"#)
+    format!(r#"{{"version":"{version}","date":"2026-11-02","base":"https://download.thothnotes.com/v{version}/","files":[],"extra":{{"ignored":true}}}}"#)
 }
 
 fn serve_latest(server: &Server, body: &str) {
@@ -643,9 +643,9 @@ fn tells_of_a_newer_version_with_where_to_get_it() {
 #[test]
 fn gives_the_release_notes_link_when_latest_json_has_one() {
     let server = Server::start();
-    serve_latest(&server, r#"{"version":"0.2.0","notes":"https://thoth.creaml4tt3.me/changes#0.2.0"}"#);
+    serve_latest(&server, r#"{"version":"0.2.0","notes":"https://thothnotes.com/changes#0.2.0"}"#);
     let answer = updates("0.1.3", &server.url("/latest.json"), true, &Clock::new(), None).check(false);
-    assert_eq!(answer["update"]["notesUrl"], "https://thoth.creaml4tt3.me/changes#0.2.0");
+    assert_eq!(answer["update"]["notesUrl"], "https://thothnotes.com/changes#0.2.0");
 }
 
 #[test]

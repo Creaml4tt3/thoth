@@ -14,7 +14,7 @@
  */
 
 /** The website; the changelog page and the posts are published there. */
-export const SITE_ORIGIN = "https://thoth.creaml4tt3.me";
+export const SITE_ORIGIN = "https://thothnotes.com";
 
 export const SECTION_NAMES = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"] as const;
 export type SectionName = (typeof SECTION_NAMES)[number];

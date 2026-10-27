@@ -1,5 +1,5 @@
 # Builds the desktop installers and publishes them to Cloudflare R2 (bucket `thoth-downloads`, served at
-# https://download.thoth.creaml4tt3.me/). Runs on a `v*` tag or by hand. See docs/deploy/release.md.
+# https://download.thothnotes.com/). Runs on a `v*` tag or by hand. See docs/deploy/release.md.
 #
 #   v0.1.0/Thoth_0.1.0_universal.dmg            macOS, Apple silicon and Intel
 #   v0.1.0/Thoth_0.1.0_x64-setup.exe, ..._x64_en-US.msi   Windows x64 (NSIS and MSI)

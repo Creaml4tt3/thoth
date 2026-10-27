@@ -69,7 +69,7 @@ describe("the changelog format", () => {
     expect(versionAnchor("0.1.3")).toBe("v0-1-3");
     expect(versionAnchor("0.2.0-beta.1")).toBe("v0-2-0-beta-1");
     expect(postSlug("0.1.3")).toBe("thoth-0-1-3");
-    expect(changelogUrl("0.1.3")).toBe("https://thoth.creaml4tt3.me/changelog/#v0-1-3");
+    expect(changelogUrl("0.1.3")).toBe("https://thothnotes.com/changelog/#v0-1-3");
   });
 });
 
@@ -84,7 +84,7 @@ describe("release notes for a GitHub release", () => {
 
 - A bug.
 
-[Read the post](https://thoth.creaml4tt3.me/blog/thoth-0-2-0/) · [Changelog](https://thoth.creaml4tt3.me/changelog/#v0-2-0) · [Download](https://thoth.creaml4tt3.me/#download)
+[Read the post](https://thothnotes.com/blog/thoth-0-2-0/) · [Changelog](https://thothnotes.com/changelog/#v0-2-0) · [Download](https://thothnotes.com/#download)
 `);
     // No post yet: no link to one.
     expect(releaseNotes(SAMPLE, "0.1.0", { post: false })).not.toContain("/blog/");
@@ -99,8 +99,8 @@ describe("release notes for a GitHub release", () => {
   it("the script prints the notes of a real version, linking its published post", () => {
     const out = execFileSync(process.execPath, [join(REPO, "scripts", "release-notes.ts"), "v0.1.3"], { encoding: "utf8" });
     expect(out).toMatch(/^### Added\n\n- The desktop app for Windows x64/);
-    expect(out).toContain("(https://thoth.creaml4tt3.me/blog/thoth-0-1-3/)");
-    expect(out).toContain("(https://thoth.creaml4tt3.me/changelog/#v0-1-3)");
+    expect(out).toContain("(https://thothnotes.com/blog/thoth-0-1-3/)");
+    expect(out).toContain("(https://thothnotes.com/changelog/#v0-1-3)");
     expect(() => execFileSync(process.execPath, [join(REPO, "scripts", "release-notes.ts"), "9.9.9"], { stdio: "pipe" })).toThrow();
   });
 });

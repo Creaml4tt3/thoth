@@ -15,8 +15,8 @@ import { cleanup, openApp, screen, waitFor, within, type Harness } from "./suppo
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 
-const DOWNLOADS = "https://thoth.creaml4tt3.me/#download";
-const NOTES = "https://thoth.creaml4tt3.me/changes#0.2.0";
+const DOWNLOADS = "https://thothnotes.com/#download";
+const NOTES = "https://thothnotes.com/changes#0.2.0";
 
 function newer(over: Partial<Extract<UpdateCheck, { state: "available" }>["update"]> = {}): UpdateCheck {
   return { state: "available", checkedAt: 1_900_000_000, update: { version: "0.2.0", date: "2026-11-02", downloadUrl: DOWNLOADS, notesUrl: NOTES, skipped: false, ...over } };

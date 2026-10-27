@@ -41,7 +41,7 @@ describe("web client production build", () => {
     expect(directives["form-action"]).toEqual(["'self'", SERVER]);
     // The server address is the one fixed at build time; the trial's default does not leak into this build.
     expect(code.some((c) => c.text.includes(SERVER))).toBe(true);
-    expect(code.some((c) => c.text.includes("api.thoth.creaml4tt3.me"))).toBe(false);
+    expect(code.some((c) => c.text.includes("api.thothnotes.com"))).toBe(false);
     // Without a GA4 ID no analytics script is referenced.
     expect(html).not.toContain("analytics.js");
   }, 120_000);

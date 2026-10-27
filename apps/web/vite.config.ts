@@ -2,7 +2,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
 /** The trial server (ADR-0015). A build for another server sets VITE_DEFAULT_SERVER. */
-export const DEFAULT_SERVER = "https://api.thoth.creaml4tt3.me";
+export const DEFAULT_SERVER = "https://api.thothnotes.com";
 
 /** The server's origin, refusing anything that is not an https origin (plain http only on a loopback host). */
 export function serverOrigin(raw: string): string {

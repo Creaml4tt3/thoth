@@ -12,9 +12,9 @@
 
 Last updated: 26 October 2026
 
-1. **What this is.** The Thoth website at `thoth.creaml4tt3.me`, the web
-   version at `thoth.creaml4tt3.me/app`, and the Thoth demo server at
-   `api.thoth.creaml4tt3.me` are a free, non-commercial way to try the
+1. **What this is.** The Thoth website at `thothnotes.com`, the web
+   version at `thothnotes.com/app`, and the Thoth demo server at
+   `api.thothnotes.com` are a free, non-commercial way to try the
    open-source Thoth project. They are run by Creaml4tt3, an individual in
    Thailand ("the operator"). The demo is for trying Thoth, not for important
    or sensitive data.
@@ -57,7 +57,7 @@ Last updated: 26 October 2026
    limited, such as liability for fraud, wilful misconduct or gross
    negligence.
 10. **Privacy.** How personal data is handled is described in the privacy
-    notice at `thoth.creaml4tt3.me/privacy/`.
+    notice at `thothnotes.com/privacy/`.
 11. **Changes.** These terms may change. The operator will post changes on this
     page and update the date above. Using the service after a change means you
     accept the new terms.

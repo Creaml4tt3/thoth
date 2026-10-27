@@ -15,8 +15,8 @@ Last updated: 24 October 2026
 ## Who we are
 
 Creaml4tt3, an individual in Thailand, runs the Thoth website at
-`thoth.creaml4tt3.me`, the web version of Thoth at `thoth.creaml4tt3.me/app`,
-and the Thoth demo server at `api.thoth.creaml4tt3.me`. For the personal data
+`thothnotes.com`, the web version of Thoth at `thothnotes.com/app`,
+and the Thoth demo server at `api.thothnotes.com`. For the personal data
 described here, Creaml4tt3 is the data controller under Thailand's Personal
 Data Protection Act B.E. 2562 (2019) ("PDPA").
 

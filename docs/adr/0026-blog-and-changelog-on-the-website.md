@@ -24,7 +24,7 @@ when `latest.json` has `notes` (ADR-0022), but nothing wrote one.
 3. **Release notes.** `node scripts/release-notes.ts <version>` prints the version's sections plus links to its post
    (when published), its changelog anchor and the downloads. The release workflow's `github-release` job, for tags
    only and the only job with `contents: write`, creates or edits the GitHub release with that body.
-   `publish-downloads.ts` writes `notes: https://thoth.creaml4tt3.me/changelog/#v<x-y-z>` into `latest.json`.
+   `publish-downloads.ts` writes `notes: https://thothnotes.com/changelog/#v<x-y-z>` into `latest.json`.
 4. **Posts.** Markdown with strict frontmatter under `apps/site/src/content/blog/{en,th}/<slug>.md`, rendered by
    the site's Markdown renderer (no raw HTML; editor comments dropped). Slug `thoth-<x-y-z>`; picture
    `/blog/images/<slug>.png` (1200×630, also the Open Graph image). Every released version has a published post in

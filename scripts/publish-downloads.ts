@@ -1,6 +1,6 @@
 /**
  * `node scripts/publish-downloads.ts <dir>`: uploads the desktop installers in <dir> to Cloudflare R2
- * (bucket `thoth-downloads`, https://download.thoth.creaml4tt3.me/), for .github/workflows/release-desktop.yml.
+ * (bucket `thoth-downloads`, https://download.thothnotes.com/), for .github/workflows/release-desktop.yml.
  *
  *   v<version>/<installer>   each file, immutable (cached for a year)
  *   v<version>/SHA256SUMS    `sha256sum -c` format
@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { changelogUrl } from "./changelog.ts";
 
 export const BUCKET = "thoth-downloads";
-export const PUBLIC_BASE = "https://download.thoth.creaml4tt3.me/";
+export const PUBLIC_BASE = "https://download.thothnotes.com/";
 
 export interface ReleaseFile {
   platform: "macos" | "windows" | "linux";
@@ -35,7 +35,7 @@ export interface Release {
   version: string;
   date: string;
   base: string;
-  /** The release notes: `https://thoth.creaml4tt3.me/changelog/#v0-1-3`. */
+  /** The release notes: `https://thothnotes.com/changelog/#v0-1-3`. */
   notes: string;
   files: ReleaseFile[];
 }

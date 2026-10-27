@@ -7,7 +7,7 @@
 
 ## Context
 
-Phase 2c builds the website at `thoth.creaml4tt3.me`: a landing page and the
+Phase 2c builds the website at `thothnotes.com`: a landing page and the
 web client at `/app`. ADR-0013 rule 3 said the web client "connects to any
 Thoth server the user names and defaults to the trial server". The owner
 decided on 2026-10-24:

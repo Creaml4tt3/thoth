@@ -18,9 +18,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use url::Url;
 
 /// Where the newest release is named (served by the same R2 bucket as the installers, `docs/deploy/release.md`).
-pub const DEFAULT_URL: &str = "https://download.thoth.creaml4tt3.me/latest.json";
+pub const DEFAULT_URL: &str = "https://download.thothnotes.com/latest.json";
 /// Where "Download" goes: the website's download section, which has the installers and how to open them.
-pub const DEFAULT_DOWNLOADS_PAGE: &str = "https://thoth.creaml4tt3.me/#download";
+pub const DEFAULT_DOWNLOADS_PAGE: &str = "https://thothnotes.com/#download";
 /// Most of `latest.json` read; a longer answer is refused.
 pub const MAX_BYTES: usize = 64 * 1024;
 /// The least time between two requests while the app stays open. A restart is not held to it: each start checks once.
@@ -464,7 +464,7 @@ mod tests {
     fn reads_the_latest_json_the_release_workflow_writes() {
         // The shape scripts/publish-downloads.ts writes: version, date, base and the files with their sizes and sums.
         let real = br#"{
-          "version": "0.1.3", "date": "2026-10-25", "base": "https://download.thoth.creaml4tt3.me/v0.1.3/",
+          "version": "0.1.3", "date": "2026-10-25", "base": "https://download.thothnotes.com/v0.1.3/",
           "files": [{ "platform": "macos", "kind": "dmg", "arch": "universal", "file": "Thoth_0.1.3_universal.dmg", "bytes": 12270577, "sha256": "40c8" }]
         }"#;
         let latest = parse_latest(real).unwrap();
@@ -475,8 +475,8 @@ mod tests {
 
     #[test]
     fn reads_the_optional_release_notes_link() {
-        let latest = parse_latest(br#"{"version":"0.2.0","notes":"https://thoth.creaml4tt3.me/changes#0.2.0"}"#).unwrap();
-        assert_eq!(latest.notes.as_deref(), Some("https://thoth.creaml4tt3.me/changes#0.2.0"));
+        let latest = parse_latest(br#"{"version":"0.2.0","notes":"https://thothnotes.com/changes#0.2.0"}"#).unwrap();
+        assert_eq!(latest.notes.as_deref(), Some("https://thothnotes.com/changes#0.2.0"));
         assert_eq!(latest.date, None);
     }
 

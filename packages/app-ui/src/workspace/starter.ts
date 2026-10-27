@@ -3,8 +3,8 @@
  * (owner, 2026-10-24). It is only a suggestion. Thoth never contacts it until
  * the user adds it, and any other server can be added by its address.
  *
- * When the demo moves to its own domain, change `url` here too
- * (docs/deploy/trial.md, "Moving to a bought domain").
+ * When the demo moves to another domain, change `url` here too
+ * (docs/deploy/trial.md, "Moving domains"; ADR-0031).
  */
 export interface StarterServer {
   /** The server's origin, as `server.add` normalizes it. */
@@ -15,7 +15,7 @@ export interface StarterServer {
 }
 
 export const STARTER_SERVER: StarterServer = {
-  url: "https://api.thoth.creaml4tt3.me",
+  url: "https://api.thothnotes.com",
   name: "Thoth demo server",
   caution: "A free demo for trying Thoth, with limits. Accounts unused for 90 days are deleted, and the demo may be reset, so keep anything important in your Private Space.",
 };

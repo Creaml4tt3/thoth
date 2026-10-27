@@ -39,7 +39,7 @@ There is no dynamic registration. Two public clients exist:
 | `client_id` | Redirect URIs accepted | Refresh token goes to |
 | --- | --- | --- |
 | `thoth-desktop` | `http://127.0.0.1:<any port>/callback` and `http://[::1]:<any port>/callback` (RFC 8252 §7.3: any port; `localhost` is not accepted) | the response body (the app keeps it in the OS keychain) |
-| `thoth-web` | exactly one of `WEB_REDIRECT_URIS` (e.g. `https://thoth.creaml4tt3.me/app/callback`); not available when unset | an `HttpOnly` cookie, never the body |
+| `thoth-web` | exactly one of `WEB_REDIRECT_URIS` (e.g. `https://thothnotes.com/app/callback`); not available when unset | an `HttpOnly` cookie, never the body |
 
 Redirect URIs are compared as exact strings after the rules above. No
 wildcards, no prefix matching, no fragments.
@@ -236,7 +236,7 @@ The token's session is revoked. Always `200`, also for unknown tokens. For
 
 | Variable | Meaning |
 | --- | --- |
-| `PUBLIC_URL` | The server's public origin, e.g. `https://api.thoth.creaml4tt3.me`. Required when any provider is set. |
+| `PUBLIC_URL` | The server's public origin, e.g. `https://api.thothnotes.com`. Required when any provider is set. |
 | `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET` | Google (issuer `https://accounts.google.com`). |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_NAME` | Any other OIDC issuer (Keycloak, Authentik…), provider ID `oidc`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth App. |

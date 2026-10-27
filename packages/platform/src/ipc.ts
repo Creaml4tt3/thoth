@@ -328,7 +328,7 @@ export interface LinkPreview {
 export interface ServerInfo {
   /** Opaque handle chosen by the host. */
   id: string;
-  /** Normalized origin, e.g. `https://api.thoth.creaml4tt3.me` or `http://127.0.0.1:8080`. */
+  /** Normalized origin, e.g. `https://api.thothnotes.com` or `http://127.0.0.1:8080`. */
   url: string;
   /** `capabilities.server.name` without control characters, trimmed, at most 64 characters; else the host name (no port). */
   label: string;

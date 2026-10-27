@@ -1,6 +1,6 @@
 /**
  * The update notice in the real desktop UI (ADR-0022; Chromium, the real Rust host through the dev bridge). A local
- * server stands in for `https://download.thoth.creaml4tt3.me/latest.json`: the harness runs with `--update-url` and the
+ * server stands in for `https://download.thothnotes.com/latest.json`: the harness runs with `--update-url` and the
  * test-only loopback switch (which the app cannot turn on), and the page itself can reach nothing but the bridge, so the
  * one request for `latest.json` is the host's.
  *
@@ -26,9 +26,9 @@ import { buildAll } from "./setup.ts";
 const SHOTS = join(REPO, "tests", ".tmp", "update");
 /** The fixed time the host's update clock starts at (Unix seconds), and a day and an hour later. */
 const T0 = 1_900_000_000;
-const DOWNLOADS = "https://thoth.creaml4tt3.me/#download";
-const NOTES = "https://thoth.creaml4tt3.me/changes#9.9.9";
-const LATEST = { version: "9.9.9", date: "2026-11-02", base: "https://download.thoth.creaml4tt3.me/v9.9.9/", files: [], notes: NOTES, extra: { ignored: true } };
+const DOWNLOADS = "https://thothnotes.com/#download";
+const NOTES = "https://thothnotes.com/changes#9.9.9";
+const LATEST = { version: "9.9.9", date: "2026-11-02", base: "https://download.thothnotes.com/v9.9.9/", files: [], notes: NOTES, extra: { ignored: true } };
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
