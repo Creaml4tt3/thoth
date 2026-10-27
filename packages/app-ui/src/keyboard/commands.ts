@@ -51,6 +51,8 @@ export interface CommandActions {
   favorite?: { on: boolean; run(): void };
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
+  /** Import from Notion or Obsidian (the desktop only): Settings, Import & Export, with the wizard started. */
+  importPages?(): void;
   /** The Thoth assistant (the desktop only): its prompt bubble, its size, and its settings. */
   askAssistant?(): void;
   toggleAssistantSize?(): void;
@@ -112,6 +114,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.favorite) add("page.favorite", a.favorite.on ? strings.favorites.remove : strings.favorites.add, a.favorite.run, { ...key("page.favorite"), keywords: "favourite favorite star bookmark pin sidebar" });
   for (const theme of THEMES) add(`theme.${theme}`, t.theme(strings.theme[theme]), () => a.theme.set(theme), { keywords: `appearance colour mode ${theme === "dark" ? "night" : ""}`.trim() });
   add("settings.open", t.settings, a.openSettings, { ...key("settings.open"), keywords: "preferences" });
+  if (a.importPages) add("import.open", t.importPages, a.importPages, { keywords: "notion obsidian import bring markdown zip export" });
   if (a.askAssistant) add("assistant.ask", t.ask, a.askAssistant, { ...key("assistant.ask"), keywords: "agent ai claude codex assistant mascot ibis prompt" });
   if (a.toggleAssistantSize) add("assistant.size", t.assistantSize, a.toggleAssistantSize, { ...key("assistant.size"), keywords: "mascot compact full small big" });
   if (a.openAssistantSettings) add("assistant.settings", t.assistantSettings, a.openAssistantSettings, { keywords: "agent hub ai claude codex history usage permissions mascot preferences" });

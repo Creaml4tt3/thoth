@@ -465,6 +465,7 @@ export const en = {
       assistantSize: "Shrink or expand the assistant",
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
+      importPages: "Import from Notion or Obsidian…",
       newTab: "New tab",
       closeTab: "Close tab",
       nextTab: "Next tab",

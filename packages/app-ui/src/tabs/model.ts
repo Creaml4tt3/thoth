@@ -21,7 +21,7 @@ export type TabTarget =
   | { kind: "page"; path: string }
   /** A page of a workspace on a server. */
   | { kind: "workspace"; server: string; workspace: string; page: string }
-  | { kind: "settings"; section?: "servers" | "agents" }
+  | { kind: "settings"; section?: "servers" | "agents" | "import" }
   /** A session of the assistant: one conversation, by its first run's UUIDv7 (desktop only; the web client drops it). */
   | { kind: "agent-run"; run: string }
   /** A new, empty tab. */
@@ -289,7 +289,7 @@ function targetFromStored(value: unknown): TabTarget | null {
     case "ws":
       return text(v["server"]) && text(v["workspace"]) && text(v["page"]) ? { kind: "workspace", server: v["server"], workspace: v["workspace"], page: v["page"] } : null;
     case "settings":
-      return v["section"] === "servers" || v["section"] === "agents" ? { kind: "settings", section: v["section"] } : { kind: "settings" };
+      return v["section"] === "servers" || v["section"] === "agents" || v["section"] === "import" ? { kind: "settings", section: v["section"] } : { kind: "settings" };
     case "run":
       return typeof v["run"] === "string" && isStableId(v["run"]) ? { kind: "agent-run", run: v["run"] } : null;
     // The old single review tab ({ k: "agents" }) showed the current run; no run is current at start, so it is dropped.

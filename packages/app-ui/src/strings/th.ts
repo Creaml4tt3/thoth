@@ -427,6 +427,7 @@ export const th: Strings = {
       assistantSize: "ย่อหรือขยายผู้ช่วย",
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
+      importPages: "นำเข้าจาก Notion หรือ Obsidian…", // REVIEW
       newTab: "แท็บใหม่",
       closeTab: "ปิดแท็บ",
       nextTab: "แท็บถัดไป",

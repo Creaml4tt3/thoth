@@ -294,6 +294,11 @@ describe("storage", () => {
     expect(activeIndex(back)).toBe(1);
   });
 
+  it("restores Settings opened at Import & Export", () => {
+    const back = parseTabs(serializeTabs(initialTabs([{ kind: "settings", section: "import" }])))!;
+    expect(back.tabs[0]!.target).toEqual({ kind: "settings", section: "import" });
+  });
+
   it("keeps only ids for workspace pages: no title, no text, nothing but the three ids", () => {
     const text = serializeTabs(initialTabs([ws("page-id-1", "workspace-id-1")]));
     expect(JSON.parse(text)).toEqual({ v: 1, active: 0, tabs: [{ k: "ws", server: "s", workspace: "workspace-id-1", page: "page-id-1" }] });

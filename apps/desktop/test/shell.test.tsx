@@ -103,6 +103,46 @@ describe("settings", () => {
   });
 });
 
+describe("Import from Notion or Obsidian", () => {
+  const wizardStarted = async () => {
+    const title = await screen.findByRole("heading", { name: "Choose a source" });
+    await waitFor(() => expect(document.activeElement).toBe(title));
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
+  };
+
+  it("the sidebar button opens Settings at Import & Export with the wizard started, again after it was closed", async () => {
+    const app = await openApp(root);
+    await screen.findByRole("tree");
+    const button = screen.getByRole("button", { name: "Import from Notion or Obsidian" });
+    expect(button.closest(".side-actions")).toBeTruthy();
+    await app.user.click(button);
+    await wizardStarted();
+    await app.user.click(within(screen.getByRole("region", { name: "Import" })).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Choose a source" })).toBeNull());
+    await app.user.click(button);
+    await wizardStarted();
+  });
+
+  it("is a palette command", async () => {
+    const app = await openApp(root);
+    await screen.findByRole("tree");
+    await app.user.keyboard("{Control>}k{/Control}");
+    const search = await screen.findByRole("dialog", { name: "Search" });
+    await app.user.keyboard("> import");
+    await app.user.click(within(search).getByRole("option", { name: /^Import from Notion or Obsidian…/ }));
+    await wizardStarted();
+  });
+
+  it("is offered in an empty Private Space's tree", async () => {
+    root = await dirs.dir();
+    const app = await openApp(root);
+    await app.user.click(await screen.findByRole("button", { name: /start writing/i }));
+    const empty = (await screen.findByText("No pages yet.")).closest(".tree-empty")!;
+    await app.user.click(within(empty as HTMLElement).getByRole("button", { name: "Import from Notion or Obsidian" }));
+    await wizardStarted();
+  });
+});
+
 describe("tree and paths", () => {
   it("groups pages by folder with folders first", () => {
     const page = (path: string) => ({ id: path, path, title: path.split("/").pop()!.replace(/\.md$/, ""), contentHash: "", size: 0, mtimeMs: 0, aliases: [], tags: [] });

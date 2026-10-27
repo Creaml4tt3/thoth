@@ -53,7 +53,7 @@ export interface Session {
   /** Opens a page in the current tab, or in a new one (`newTab`: Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter). */
   openPage(path: string, options?: OpenOptions): void;
   /** Opens Settings as a tab (one only), optionally scrolled to a section. */
-  openSettings(section?: "servers" | "agents"): void;
+  openSettings(section?: "servers" | "agents" | "import"): void;
   /** The window's tabs (ADR-0016 rule 5). */
   tabs: TabsController;
   /** Workspace servers: the host holds the credentials; this is the app's view of them. */

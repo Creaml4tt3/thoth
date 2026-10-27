@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { STRINGS, useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
@@ -19,7 +19,7 @@ import { currentOs, displayPath } from "./path.ts";
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
 /** Settings: vault location, workspace servers, the assistant, notifications, language, editor mode, Rebuild index, and Import & Export. */
-export function SettingsView({ section = "top" }: { section?: "top" | "servers" | "agents" }) {
+export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import"; request?: object }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder, platform } = useSession();
   const previews = usePageHost().links;
   const t = useDesktopStrings().settings;
@@ -31,6 +31,14 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
   const [importing, setImporting] = useState(false);
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
   const [revealError, setRevealError] = useState<string | null>(null);
+  const importSection = useRef<HTMLElement>(null);
+  // Opened at Import & Export (the sidebar's Import button, the palette): the wizard starts and takes focus itself.
+  // `request` is the tab's target, new on every open, so asking again after closing the wizard starts it again.
+  useEffect(() => {
+    if (section !== "import") return;
+    setImporting(true);
+    importSection.current?.scrollIntoView?.({ block: "start" });
+  }, [section, request]);
 
   const rebuildIndex = async () => {
     setRebuild({ state: "running" });
@@ -168,7 +176,7 @@ export function SettingsView({ section = "top" }: { section?: "top" | "servers" 
           )}
         </section>
 
-        <section aria-labelledby="set-import" className="set-section">
+        <section ref={importSection} aria-labelledby="set-import" className="set-section">
           <h2 id="set-import">{t.importExport}</h2>
           {importing ? (
             <ImportWizard

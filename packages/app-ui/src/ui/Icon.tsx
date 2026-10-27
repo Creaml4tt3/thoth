@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A five-pointed star: a favorite (ADR-0027). Filled by CSS when pressed (`.icon-star-fill`). */
@@ -127,6 +127,13 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     <>
       <path d="M12 15V3.5M7.5 8L12 3.5 16.5 8" />
       <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </>
+  ),
+  // An arrow coming down into a tray: "bring pages in".
+  import: (
+    <>
+      <path d="M12 3.5V15M7.5 10.5L12 15l4.5-4.5" />
+      <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
     </>
   ),
 };

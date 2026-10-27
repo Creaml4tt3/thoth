@@ -88,6 +88,7 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
   const ttree = useStrings().tree;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
+  const importFrom = useDesktopStrings().settings.importFrom;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
@@ -257,6 +258,7 @@ export function Sidebar({ favorites, pages, current, currentRemote = null, curre
       <div className="side-actions">
         <IconButton icon="page-plus" label={t.newPage} shortcut="page.new" onClick={onNewPage} />
         <IconButton icon="folder-plus" label={t.newFolder} shortcut="folder.new" onClick={onNewFolder} />
+        <IconButton icon="import" label={importFrom} onClick={() => openSettings("import")} />
         <span className="side-end">
           <NotificationBell center={notifications} open={notificationsOpen} onOpenChange={onNotificationsOpen} onOpenTarget={openNotification} />
           <IconButton icon="gear" label={t.settings} shortcut="settings.open" onClick={() => openSettings()} />

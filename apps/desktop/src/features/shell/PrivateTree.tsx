@@ -16,6 +16,7 @@ import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
 import { useFavorites } from "@thoth/app-ui/favorites/context.ts";
@@ -60,12 +61,13 @@ interface Props {
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
 export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder, onTransfer }: Props) {
-  const { vault, openPage, flushAll, refresh, tabs, servers } = useSession();
+  const { vault, openPage, flushAll, refresh, tabs, servers, openSettings } = useSession();
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const canSend = directory.servers.some((s) => s.info.auth !== "signed-out" && (s.workspaces?.some((w) => roleCan(w.role, "write")) ?? false));
   const t = useDesktopStrings().shell;
   const tt = useStrings().tree;
   const ts = useDesktopStrings().transfer;
+  const importFrom = useDesktopStrings().settings.importFrom;
   const favorites = useFavorites();
   const tf = useStrings().favorites;
   /** `path` is null for the menu of the empty area (the top level). */
@@ -476,7 +478,12 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       }}
     >
       {tree.length === 0 ? (
-        <p className="muted tree-empty">{t.noPages}</p>
+        <div className="muted tree-empty">
+          <p>{t.noPages}</p>
+          <Button variant="ghost" small onClick={() => openSettings("import")}>
+            {importFrom}
+          </Button>
+        </div>
       ) : (
         <TreeList label={t.pagesInSpace} multiselectable={selection.active}>
           {tree.map((node, i) => row(node, 0, i + 1, tree.length))}

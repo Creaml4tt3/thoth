@@ -251,6 +251,7 @@ export function Shell() {
     ...(favoriteHere && favorites.api.can(favoriteHere) ? { favorite: { on: favorites.api.has(favoriteHere), run: toggleFavorite } } : {}),
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
+    importPages: () => openSettings("import"),
     ...(assistant
       ? { askAssistant: () => assistant.ask(), toggleAssistantSize: () => assistant.toggleSize(), openAssistantSettings: () => openSettings("agents") }
       : {}),
@@ -385,7 +386,7 @@ export function Shell() {
         <RecoveryNotice />
         <TabPanel id={tabs.active.id}>
           {target.kind === "settings" ? (
-            <SettingsView section={target.section ?? "top"} />
+            <SettingsView section={target.section ?? "top"} request={target} />
           ) : target.kind === "agent-run" ? (
             <AgentSessionView key={`${tabs.active.id}\n${target.run}`} run={target.run} />
           ) : target.kind === "workspace" ? (
