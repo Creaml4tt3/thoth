@@ -100,8 +100,9 @@ test("import an Obsidian ZIP through the wizard, cancel a second import and resu
     }
   };
   await walk(fixture, "");
-  // Enough padding attachments that the run takes long enough to cancel.
-  for (let i = 0; i < 400; i++) entries.push({ name: `My Vault/padding/blob-${i}.bin`, data: new Uint8Array(64 * 1024).fill(i % 251) });
+  // Padding attachments, so files are still left to import (and to resume) after the cancelled run's first one. The
+  // cancel itself does not race the import: the run is held on its first write below until Cancel is clicked.
+  for (let i = 0; i < 40; i++) entries.push({ name: `My Vault/padding/blob-${i}.bin`, data: new Uint8Array(64 * 1024).fill(i % 251) });
   await writeZip(join(scratch, "source"), entries);
   const sourceBefore = await readFile(join(scratch, "source"));
 

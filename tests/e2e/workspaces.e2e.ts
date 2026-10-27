@@ -10,16 +10,13 @@
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import type { Server } from "node:http";
 import { join } from "node:path";
 import { REPO } from "../ports/harness.ts";
-import { freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
+import { freePort, buildWebClient, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
-const WEB = join(REPO, "apps", "web");
-const DIST = join(WEB, "dist");
 const SHOTS = join(REPO, "tests", ".tmp", "workspaces");
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
 
@@ -63,8 +60,7 @@ test.describe("several workspaces per account (ADR-0025)", () => {
     siteUrl = `http://127.0.0.1:${sitePort}`;
     const apiPort = await freePort();
     serverUrl = `http://127.0.0.1:${apiPort}`;
-    execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: WEB, stdio: "inherit", env: { ...process.env, VITE_DEFAULT_SERVER: serverUrl } });
-    site = await serveWebClient(DIST, sitePort);
+    site = await serveWebClient(await buildWebClient({ VITE_DEFAULT_SERVER: serverUrl }), sitePort);
     ref = await startReferenceServer({
       issuer: true,
       port: apiPort,

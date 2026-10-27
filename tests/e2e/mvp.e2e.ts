@@ -17,7 +17,6 @@
  *   that is what those steps are about.
  */
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,7 +30,7 @@ import { snapshotTree } from "../helpers/fs.ts";
 import { dirEntries, writeZip } from "../helpers/zip.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
-import { actAsBrowser, apiAs, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
+import { actAsBrowser, apiAs, buildWebClient, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { desktopOnlyIn } from "../../apps/web/test/bundle.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
@@ -150,8 +149,6 @@ async function importThroughWizard(system: "notion" | "obsidian", pick: "zip" | 
 const NOTION_FIXTURE = join(REPO, "tests/fixtures/notion-export");
 const OBSIDIAN_FIXTURE = join(REPO, "tests/fixtures/obsidian-vault");
 const HANDBOOK = "Notion/Thoth Handbook";
-const WEB = join(REPO, "apps/web");
-const WEB_DIST = join(WEB, "dist");
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -576,9 +573,9 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     const filesBefore = await userFiles();
 
     // The web client's production bundle has no filesystem, Tauri, process or agent code.
-    execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: WEB, stdio: "inherit", env: { ...process.env, VITE_DEFAULT_SERVER: ref.url, VITE_GA4_ID: "" } });
-    expect(desktopOnlyIn(WEB_DIST)).toEqual({});
-    const site = await serveWebClient(WEB_DIST, sitePort);
+    const webDist = await buildWebClient({ VITE_DEFAULT_SERVER: ref.url, VITE_GA4_ID: "" });
+    expect(desktopOnlyIn(webDist)).toEqual({});
+    const site = await serveWebClient(webDist, sitePort);
     const outside = await browser.newContext();
     await outside.route((url) => url.hostname !== "127.0.0.1", (route) => route.abort());
     try {

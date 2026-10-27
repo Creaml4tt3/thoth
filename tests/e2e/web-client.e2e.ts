@@ -9,21 +9,16 @@
  * no request leaves 127.0.0.1.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import type { Server } from "node:http";
-import { join } from "node:path";
-import { REPO } from "../ports/harness.ts";
 import { newStableId } from "@thoth/domain";
 import { startDrag } from "./drag.ts";
 import { settled } from "./settled.ts";
-import { apiAs, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
+import { apiAs, freePort, buildWebClient, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
-const WEB = join(REPO, "apps", "web");
-const DIST = join(WEB, "dist");
 const TOKEN = /thoth_(at|rt|pat)_/;
 
 let ref: ReferenceServer;
@@ -52,8 +47,7 @@ test.describe("web client", () => {
     const apiPort = await freePort();
     serverUrl = `http://127.0.0.1:${apiPort}`;
     // The client's address for its server is fixed at build time.
-    execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: WEB, stdio: "inherit", env: { ...process.env, VITE_DEFAULT_SERVER: serverUrl } });
-    site = await serveWebClient(DIST, sitePort);
+    site = await serveWebClient(await buildWebClient({ VITE_DEFAULT_SERVER: serverUrl }), sitePort);
 
     ref = await startReferenceServer({
       issuer: true,

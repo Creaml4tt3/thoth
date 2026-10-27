@@ -10,20 +10,17 @@
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import type { Server } from "node:http";
 import { join } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 import { newStableId } from "@thoth/domain";
 import { REPO } from "../ports/harness.ts";
-import { apiAs, freePort, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
+import { apiAs, freePort, buildWebClient, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
-const WEB = join(REPO, "apps", "web");
-const DIST = join(WEB, "dist");
 const SHOTS = join(REPO, "tests", ".tmp", "share");
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
 
@@ -76,8 +73,7 @@ test.describe("public share links (ADR-0023)", () => {
     siteUrl = `http://127.0.0.1:${sitePort}`;
     const apiPort = await freePort();
     serverUrl = `http://127.0.0.1:${apiPort}`;
-    execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn"], { cwd: WEB, stdio: "inherit", env: { ...process.env, VITE_DEFAULT_SERVER: serverUrl } });
-    site = await serveWebClient(DIST, sitePort);
+    site = await serveWebClient(await buildWebClient({ VITE_DEFAULT_SERVER: serverUrl }), sitePort);
     ref = await startReferenceServer({
       issuer: true,
       port: apiPort,

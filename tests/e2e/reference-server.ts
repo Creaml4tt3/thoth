@@ -4,7 +4,11 @@
  * to talk to it as someone else (a personal access token over plain HTTP) and to play the system browser during a
  * desktop sign-in. Shared by workspace-server.e2e.ts, transfer.e2e.ts, web-client.e2e.ts and mvp.e2e.ts.
  */
-import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { rmSync } from "node:fs";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { REPO } from "../ports/harness.ts";
 import { createServer, type Server } from "node:http";
 import { createServer as netServer } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
@@ -128,7 +132,18 @@ export async function actAsBrowser(start: string): Promise<void> {
 
 const STATIC_TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 
-/** A built web client (`apps/web/dist`) under /app/, with the SPA fallback a static host gives it (/app/callback serves index.html). */
+/**
+ * Builds the web client for one test file, into a folder of its own: the server address is fixed at build time, so
+ * files that ran side by side and shared `apps/web/dist` could serve each other's build (another server's address).
+ */
+export async function buildWebClient(env: Record<string, string>): Promise<string> {
+  const out = await mkdtemp(join(tmpdir(), "thoth-web-e2e-"));
+  execFileSync("pnpm", ["exec", "vite", "build", "--logLevel", "warn", "--outDir", out, "--emptyOutDir"], { cwd: join(REPO, "apps", "web"), stdio: "inherit", env: { ...process.env, ...env } });
+  process.once("exit", () => rmSync(out, { recursive: true, force: true }));
+  return out;
+}
+
+/** A built web client (`buildWebClient`) under /app/, with the SPA fallback a static host gives it (/app/callback serves index.html). */
 export async function serveWebClient(dist: string, port: number): Promise<Server> {
   const http = createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://x").pathname;

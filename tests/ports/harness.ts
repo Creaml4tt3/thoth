@@ -30,7 +30,8 @@ let built: Promise<string> | undefined;
  */
 export function buildHarness(): Promise<string> {
   built ??= (async () => {
-    execFileSync("cargo", ["build", "-p", "thoth-host", "--bin", "thoth-host-stdio"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
+    // The e2e global setup has just built it; its workers skip cargo (each call waited on the others' lock).
+    if (process.env.THOTH_HARNESS_BUILT !== "1") execFileSync("cargo", ["build", "-p", "thoth-host", "--bin", "thoth-host-stdio"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
     const dir = await mkdtemp(join(tmpdir(), "thoth-harness-bin-"));
     const binary = join(dir, `thoth-host-stdio${EXE}`);
     await copyFile(BUILT, binary);

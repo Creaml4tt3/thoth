@@ -14,7 +14,8 @@ import type { Page } from "@playwright/test";
 export async function settled(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const finite = () => document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
+    // Scroll-driven animations (the website's moon drift) follow the scroll position and never finish on their own.
+    const finite = () => document.getAnimations().filter((animation) => animation.timeline === document.timeline && animation.effect?.getComputedTiming().iterations !== Infinity);
     for (let pass = 0; pass < 20; pass++) {
       const running = finite();
       await Promise.all(running.map((animation) => animation.finished.catch(() => undefined)));
