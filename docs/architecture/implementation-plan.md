@@ -1206,6 +1206,25 @@ The owner used the app in Thai and accepted every string that was marked `REVIEW
 changelog and the posts); the markers are removed. Changes to the wording will come from the owner. New Thai is
 still marked `REVIEW` until the owner has seen it.
 
+### Batch 1 quick fixes (2026-10-27), built, waiting for review
+
+- Right-click menus measure themselves before paint, flip above / left of the point, stay 8 px inside the window and
+  scroll when taller than it (`ContextMenu`, every tree, tab and section menu).
+- A Share… button in a workspace page's header (desktop and web), shown exactly when the tree offers Share….
+- Stronger highlight and selected-row wash: dark 0.28 alpha (was 0.14), light `#FFDFC7` (was `#FFE8D6`); every text
+  colour, the accent ink and the focus ring stay at AA, the share page copies the values.
+- Copy / Move to workspace… on Private Space pages and folders, Copy / Move to Private Space… on workspace pages (Move
+  for writers only); both open the existing transfer dialog. The web tree has no such items.
+- An Import button in the sidebar, the empty tree and the palette: Settings opens at a new `import` section and starts
+  the wizard.
+- Folder crumbs on Private Space pages show the folder in the sidebar (the open page stays) and focus its row; the
+  Local badge focuses the section header. Workspace pages keep only their title.
+- Settings has a sticky list of its sections (above them in a narrow window), on the desktop and the web.
+- Evidence: `packages/app-ui/test/context-menu.test.tsx`, `contrast.test.ts`, `settings-layout.test.tsx`,
+  `tabs-model.test.ts`; `apps/desktop/test/share.test.tsx`, `transfer.test.tsx`, `shell.test.tsx`,
+  `editor-views.test.tsx`; `apps/web/test/share.test.tsx`, `tabs.test.tsx`; `tests/e2e/private-tree.e2e.ts`.
+- Not done: a native reader for the new Thai marked `REVIEW`.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and
