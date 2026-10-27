@@ -314,6 +314,45 @@ test("the window never scrolls as a whole, even on the long Settings page: only 
   expect(await page.locator(".tabstrip").evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
 });
 
+test("Settings: a link to one of the last (short) sections scrolls only the settings area; the shell stays put and the list's first item stays in view", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 600 });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  await expect(nav.getByRole("link", { name: "Help and feedback" })).toBeVisible();
+  const first = nav.getByRole("link").first();
+  for (const name of ["Search index", "Import & Export", "Help and feedback"]) {
+    await nav.getByRole("link", { name }).click();
+    await settled(page);
+    await page.waitForTimeout(1100); // past the smooth scroll and the held mark
+    const ancestors = await page.locator(".settings-scroll").evaluate((el) => {
+      const out: { at: string; top: number; left: number }[] = [];
+      for (let p = el.parentElement; p; p = p.parentElement) out.push({ at: p.className || p.tagName, top: p.scrollTop, left: p.scrollLeft });
+      return out.filter((a) => a.top !== 0 || a.left !== 0);
+    });
+    expect(ancestors, name).toEqual([]);
+    expect(await page.evaluate(() => window.scrollY), name).toBe(0);
+    await expect(first, name).toBeInViewport();
+    expect(await first.evaluate((el) => el.getBoundingClientRect().top), name).toBeGreaterThanOrEqual(0);
+    await expect(nav.getByRole("link", { name }), name).toHaveAttribute("aria-current", "true");
+    await expect(page.locator(".tabstrip").first(), name).toBeInViewport();
+  }
+  // Any other scrollIntoView in the shell cannot move its clipped ancestors either.
+  const moved = await page.locator(".settings-scroll").evaluate((el) => {
+    const last = el.querySelector(".settings-nav li:last-child a")!.getAttribute("href")!.slice(1);
+    document.getElementById(last)!.closest("section")!.scrollIntoView({ block: "start" });
+    const out: string[] = [];
+    for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollTop || p.scrollLeft) out.push(p.className || p.tagName);
+    return out;
+  });
+  expect(moved).toEqual([]);
+  // The keyboard path does the same.
+  await nav.getByRole("link", { name: "Search index" }).focus();
+  await page.keyboard.press("Enter");
+  await settled(page);
+  expect(await page.locator(".shell").evaluate((el) => [el.scrollTop, (el.querySelector(".main") as HTMLElement).scrollTop])).toEqual([0, 0]);
+  await expect(first).toBeInViewport();
+});
+
 test("a section's drag grip is hidden and takes no room until the pointer is over its header; the name does not move", async ({ page }) => {
   const section = page.locator('.side-section[data-section="private"]');
   const header = section.locator(":scope > .sec");

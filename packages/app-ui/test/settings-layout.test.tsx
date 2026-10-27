@@ -28,6 +28,7 @@ beforeEach(() => {
   observed = [];
   vi.stubGlobal("IntersectionObserver", FakeObserver);
   Element.prototype.scrollIntoView = vi.fn();
+  Element.prototype.scrollTo = vi.fn() as unknown as Element["scrollTo"];
 });
 afterEach(() => {
   cleanup();
@@ -75,7 +76,9 @@ describe("SettingsLayout", () => {
     const heading = document.getElementById("s-b")!;
     expect(document.activeElement).toBe(heading);
     expect(heading.getAttribute("tabindex")).toBe("-1");
-    expect(heading.closest("section")!.scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" }); // no matchMedia: reduced motion
+    const scroller = document.querySelector(".settings-scroll")!;
+    expect(scroller.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" }); // no matchMedia: reduced motion
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
   });
 
@@ -83,7 +86,39 @@ describe("SettingsLayout", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
     render(<Fixture />);
     fireEvent.click(screen.getByRole("link", { name: "Alpha" }));
-    expect(document.getElementById("s-a")!.closest("section")!.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(document.querySelector(".settings-scroll")!.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+  });
+
+  it("scrolls only its own area, to the section's top less its scroll margin, never an ancestor (the WebKit trap)", () => {
+    const { container } = render(
+      <div className="pane">
+        <Fixture extra />
+      </div>,
+    );
+    const scroller = container.querySelector<HTMLElement>(".settings-scroll")!;
+    const section = document.getElementById("s-c")!.closest("section")!;
+    scroller.scrollTop = 40;
+    scroller.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
+    section.getBoundingClientRect = () => ({ top: 700 }) as DOMRect;
+    section.style.scrollMarginTop = "16px";
+    fireEvent.click(screen.getByRole("link", { name: "Gamma" }));
+    expect(scroller.scrollTo).toHaveBeenCalledWith({ top: 700 - 100 + 40 - 16, behavior: "auto" });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    expect(vi.mocked(Element.prototype.scrollTo).mock.contexts.every((c) => c === scroller)).toBe(true);
+    expect(screen.getByRole("link", { name: "Gamma" }).getAttribute("aria-current")).toBe("true");
+    // The keyboard path: Enter on a focused link is a click, so it scrolls the same way.
+    fireEvent.click(screen.getByRole("link", { name: "Beta" }), { detail: 0 });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("keeps the chosen section marked (a short last one cannot reach the top) until the person scrolls", () => {
+    render(<Fixture extra />);
+    fireEvent.click(screen.getByRole("link", { name: "Gamma" }));
+    show(["s-b", "s-c"]);
+    expect(screen.getByRole("link", { name: "Gamma" }).getAttribute("aria-current")).toBe("true");
+    fireEvent.wheel(document.querySelector(".settings-scroll")!);
+    show(["s-b"]);
+    expect(screen.getByRole("link", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
   });
 
   it("marks the first section in view as current", () => {

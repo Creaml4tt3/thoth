@@ -7,6 +7,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { BUDGET_CHOICES_USD, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { MascotSettings } from "../mascot/MascotSettings.tsx";
@@ -288,7 +289,8 @@ function Body({ agents, focus }: { agents: AgentsService; focus: boolean }) {
     if (!agents.getState().status && !agents.getState().checking) void agents.detect();
   }, [agents]);
   useEffect(() => {
-    if (focus) document.getElementById("set-agents")?.scrollIntoView({ block: "start" });
+    const heading = document.getElementById("set-agents");
+    if (focus && heading) scrollToSection(heading.closest("section") ?? heading);
   }, [focus]);
   return (
     <section aria-labelledby="set-agents" className="set-section agents" data-testid="assistant-settings">

@@ -11,7 +11,7 @@ import { ConnectedAppsSettings } from "../connected-apps/ConnectedAppsSettings.t
 import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
-import { SettingsLayout } from "@thoth/app-ui/ui/SettingsLayout.tsx";
+import { SettingsLayout, scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -40,7 +40,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   useEffect(() => {
     if (section !== "import") return;
     setImporting(true);
-    importSection.current?.scrollIntoView?.({ block: "start" });
+    if (importSection.current) scrollToSection(importSection.current);
   }, [section, request]);
 
   const rebuildIndex = async () => {

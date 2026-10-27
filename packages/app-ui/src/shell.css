@@ -64,7 +64,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tree-collapse > ul { min-height: 0; overflow: hidden; }
 .side-actions { display: flex; align-items: center; gap: 4px; padding: 8px 4px 0; border-top: 1px solid var(--thoth-border); margin-top: 4px; }
 .side-end { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
-.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Clipped like the shell: an element with `overflow: hidden` can still be scrolled by a script or a scrollIntoView. */
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; overflow: clip; }
 .banner { margin: 8px 16px; }
 .empty { display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--thoth-ink-secondary); text-align: center; }
 .empty h1 { font: var(--thoth-text-h3); color: var(--thoth-ink-primary); }
@@ -262,7 +263,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tab-drag-image { position: fixed; z-index: 50; display: grid; gap: 2px; max-width: 240px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tab-drag-label { overflow: hidden; text-overflow: ellipsis; }
 .tab-drag-hint { color: var(--thoth-ink-secondary); font: var(--thoth-text-small); }
-.tab-panel { position: relative; flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.tab-panel { position: relative; flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; overflow: clip; }
 .tab-panel > * { min-height: 0; }
 
 /* Split view (ADR-0030, tabs/Panes.tsx): one or two panes side by side, each a tab bar over its current tab. The left
@@ -271,7 +272,7 @@ div.tree-empty > p { margin: 0 0 6px; }
    The inactive pane's current tab has a quiet top line, so the active one is the one in accent. */
 .panes { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 .panes[data-split] { --thoth-pane-left: clamp(min(320px, 50%), calc(var(--thoth-pane-ratio, 0.5) * 100%), max(100% - 320px, 50%)); grid-template-columns: minmax(0, var(--thoth-pane-left)) minmax(0, 1fr); }
-.pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; overflow: clip; }
 .panes[data-split] .pane + .pane { border-inline-start: 1px solid var(--thoth-border); }
 .panes[data-split] .pane:not([data-active-pane]) .tab[data-selected] { border-top-color: var(--thoth-border-strong); }
 .pane-resizer { position: absolute; z-index: 5; top: 0; bottom: 0; inset-inline-start: calc(var(--thoth-pane-left) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }

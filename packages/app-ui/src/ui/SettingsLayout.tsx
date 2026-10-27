@@ -9,6 +9,19 @@ export interface SettingsSectionLink {
 }
 
 /**
+ * Scrolls the page area around `target` (its `.page-scroll`) so the target's top, less its scroll margin, is at the top.
+ * Only that area moves: `scrollIntoView` also scrolls every clipped ancestor once the area is at its end (a short last
+ * section), and on WebKit without `overflow: clip` nothing could scroll the shell back.
+ */
+export function scrollToSection(target: HTMLElement, behavior: ScrollBehavior = "auto") {
+  const box = target.closest<HTMLElement>(".page-scroll");
+  if (!box) return;
+  const margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+  const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - margin;
+  box.scrollTo?.({ top: Math.max(0, top), behavior }); // `?.`: jsdom has no Element.scrollTo
+}
+
+/**
  * Settings as one long page with a list of its sections beside it (above it in a narrow window). A link scrolls to
  * its section (at once under reduced motion) and moves focus to the heading; the section in view is marked
  * `aria-current`. Sections whose heading is not on the page (a feature this build lacks) are left out of the list.
@@ -18,8 +31,12 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
   const content = useRef<HTMLDivElement>(null);
   const [present, setPresent] = useState<readonly string[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  /** Until when the section in view does not replace the one a link chose. */
-  const held = useRef(0);
+  /** A link chose a section: the one in view does not replace it until the person scrolls (a short last section never
+   * reaches the top, so the one above it stays in view). */
+  const held = useRef(false);
+  const release = () => {
+    held.current = false;
+  };
   const wanted = sections.map((s) => s.id).join("\n");
 
   // Which headings are on the page; some sections show up later (they load their state first).
@@ -52,8 +69,7 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
           else visible.delete(id);
         }
         const first = order.find((id) => visible.has(id));
-        // While a link's scroll is under way the sections it passes are not the one asked for.
-        if (first && Date.now() >= held.current) setActive(first);
+        if (first && !held.current) setActive(first);
       },
       { root: scroller, rootMargin: "0px 0px -50% 0px" },
     );
@@ -68,16 +84,18 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
     event.preventDefault();
     const heading = content.current?.querySelector<HTMLElement>(`[id="${id}"]`);
     if (!heading) return;
-    (heading.closest("section") ?? heading).scrollIntoView({ behavior: motionOff() ? "auto" : "smooth", block: "start" });
+    scrollToSection(heading.closest("section") ?? heading, motionOff() ? "auto" : "smooth");
     if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
-    held.current = Date.now() + (motionOff() ? 100 : 1000); // shortcut: a fixed wait for the smooth scroll; `scrollend` where it is everywhere
+    held.current = true;
     setActive(id);
   };
 
   const current = active !== null && present.includes(active) ? active : (present[0] ?? null);
   return (
-    <div className="page-scroll settings-scroll">
+    // What the person does to scroll (wheel, touch, keys, the scrollbar) gives the mark back to the section in view; the
+    // keydown and pointerdown of a link's own Enter or click come before its click, which holds the mark again.
+    <div className="page-scroll settings-scroll" onWheel={release} onTouchMove={release} onKeyDown={release} onPointerDown={release}>
       <div className="settings-layout">
         <nav className="settings-nav" aria-label={t}>
           <ul>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ServerInfo } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
 import { JoinInvite } from "@thoth/app-ui/workspace/JoinInvite.tsx";
@@ -246,7 +247,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
   };
 
   useEffect(() => {
-    if (focus) section.current?.scrollIntoView({ block: "start" });
+    if (focus && section.current) scrollToSection(section.current);
   }, [focus]);
 
   const add = async (event: React.FormEvent) => {
