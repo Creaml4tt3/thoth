@@ -106,6 +106,27 @@
 .page-view { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
+/* Settings (ui/SettingsLayout.tsx): the list of sections beside the page, sticky while it scrolls; above the sections
+   when the page column would be squeezed (180px list + gap + the content width). */
+.settings-scroll { container-type: inline-size; }
+.settings-layout { display: grid; grid-template-columns: 180px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-8); justify-content: center; align-items: start; }
+.settings-layout > .page-col { margin: 0; min-width: 0; }
+.settings-layout .settings > section { scroll-margin-top: var(--thoth-space-4); }
+.settings-nav { position: sticky; top: 0; padding-top: var(--thoth-space-4); }
+.settings-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.settings-nav a { display: flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); text-decoration: none; font: var(--thoth-text-ui); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.settings-nav a:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.settings-nav a[aria-current="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.settings-nav a:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+@container (max-width: 940px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--thoth-space-4); }
+  .settings-layout > .page-col, .settings-nav { width: 100%; max-width: var(--thoth-content-width); margin: 0 auto; }
+  .settings-nav { position: static; padding-top: 0; }
+  .settings-nav ul { display: flex; flex-wrap: wrap; gap: 4px; }
+}
+@media (forced-colors: active) {
+  .settings-nav a[aria-current="true"] { outline: 2px solid Highlight; }
+}
 .page-title { font: var(--thoth-text-h1); letter-spacing: var(--thoth-tracking-heading); margin: var(--thoth-space-4) 0 var(--thoth-space-1); overflow-wrap: anywhere; }
 .page-props { display: flex; gap: 14px; flex-wrap: wrap; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-4); }
 .page-props b { font-weight: 450; color: var(--thoth-ink-secondary); }

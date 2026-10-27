@@ -101,6 +101,22 @@ describe("settings", () => {
     await waitFor(() => expect(screen.getByText(/Index rebuilt \(2 pages read\)/)).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Import & Export" })).toBeTruthy();
   });
+
+  it("lists its sections beside the page; a link moves focus to that section's heading", async () => {
+    const app = await openApp(root);
+    await screen.findByRole("tree");
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const nav = await screen.findByRole("navigation", { name: "Settings sections" });
+    const links = within(nav).getAllByRole("link").map((a) => a.textContent);
+    expect(links[0]).toBe("Private Space");
+    expect(links.slice(-5)).toEqual(["Language", "Theme", "Editor", "Search index", "Import & Export"]);
+    expect(links).toContain("Servers");
+    // Every link goes to a heading on the page.
+    for (const a of within(nav).getAllByRole("link")) expect(document.querySelector(a.getAttribute("href")!)?.tagName).toBe("H2");
+    await app.user.click(within(nav).getByRole("link", { name: "Theme" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 2, name: "Theme" }));
+    expect(within(nav).getByRole("link", { name: "Theme" }).getAttribute("aria-current")).toBe("true");
+  });
 });
 
 describe("Import from Notion or Obsidian", () => {

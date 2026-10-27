@@ -93,6 +93,8 @@ describe("opening pages in tabs", () => {
     const panel = screen.getByRole("tabpanel");
     expect(within(panel).getByRole("combobox", { name: "Theme" })).toBeTruthy();
     expect(within(panel).getByRole("combobox", { name: "Language" })).toBeTruthy();
+    const nav = within(panel).getByRole("navigation", { name: "Settings sections" });
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Appearance", "Keyboard", "Account"]);
     await browser.user.keyboard("{Alt>}[Comma]{/Alt}");
     expect(tabNames()).toEqual(["Alpha", "Settings"]);
   });

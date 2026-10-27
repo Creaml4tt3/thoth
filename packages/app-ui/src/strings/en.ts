@@ -420,6 +420,9 @@ export const en = {
     bytes: (n: number) => plural(n, "byte"),
   },
 
+  /** The list of sections beside Settings. */
+  settingsNav: "Settings sections",
+
   /** The theme choice (Settings on the desktop, the account area on the web). */
   theme: { label: "Theme", light: "Light", dark: "Dark", system: "System" },
 
