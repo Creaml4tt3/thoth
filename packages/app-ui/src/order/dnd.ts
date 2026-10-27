@@ -18,7 +18,7 @@
  * `space-drag.ts`). That only asks for the transfer dialog; within one tree everything works as described above.
  */
 import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type HTMLAttributes } from "react";
-import { SPACE_DRAG_TYPE, beginSpaceDrag, clearSpaceHover, currentSpaceDrag, dropAcrossSpaces, encodeSpaceDrag, endSpaceDrag, modeAtDrop, setSpaceHover, type SpaceDestination, type SpaceDrag } from "./space-drag.ts";
+import { SPACE_DRAG_TYPE, beginSpaceDrag, clearSpaceHover, currentSpaceDrag, dropAcrossSpaces, encodeSpaceDrag, endSpaceDrag, modeAtDrop, setSpaceHover, useSpaceHoverOwner, type SpaceDestination, type SpaceDrag } from "./space-drag.ts";
 
 /** Where a drag from the other space would land over a row, and what the pointer says. */
 export interface AcrossTarget {
@@ -114,6 +114,17 @@ export function useTreeDnd(options: TreeDndOptions): TreeDnd {
     if (hover.current) clearTimeout(hover.current.timer);
     hover.current = null;
   }, []);
+  // A drag from another space lit a row here, and now another place holds the drop (another workspace's tree, a
+  // refusal there, the Private Space header) or none does: the light goes, even when this row's dragleave came with
+  // the pointer still inside it (stale coordinates) or not at all.
+  const hoverOwner = useSpaceHoverOwner();
+  useEffect(() => {
+    if (drag.current !== null || via.current === null) return;
+    if (hoverOwner !== null && hoverOwner.startsWith(`${owner}\n`)) return;
+    via.current = null;
+    clearHover();
+    setDrop(null);
+  }, [hoverOwner, owner, clearHover]);
   const clearActive = useCallback(() => {
     if (active.current) clearTimeout(active.current);
     active.current = null;

@@ -237,6 +237,12 @@ export function useSpaceHover(): SpaceHover | null {
 }
 
 /** Whether the drop would land at `to` right now (for a target that is not a tree row, such as the Private Space header). */
+/** Which place holds the pointer's drop now (its `owner`), or null; changes only when that place does. */
+export function useSpaceHoverOwner(): string | null {
+  const read = () => hover?.owner ?? null;
+  return useSyncExternalStore(subscribeHover, read, read);
+}
+
 export function useSpaceHoverAt(matches: (to: SpaceDestination) => boolean): boolean {
   const read = () => {
     const h = hover;

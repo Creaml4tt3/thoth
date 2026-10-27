@@ -54,6 +54,23 @@ function Trees({ drops, enabled = true }: { drops: [string, string, DropZone][];
   );
 }
 
+/** A second workspace's tree, where this person is a viewer: every drop is refused. */
+function Other() {
+  const tree = useTreeDnd({
+    enabled: false,
+    canContain: () => true,
+    canOrder: true,
+    canDrop: () => true,
+    onDrop: () => undefined,
+    across: (): AcrossTarget => ({ highlight: null, to: null, text: "You are a viewer in V" }),
+  });
+  return (
+    <button data-testid="viewer" {...tree.rowProps("viewer")}>
+      <span className="tree-label">viewer</span>
+    </button>
+  );
+}
+
 function transfer() {
   const store = new Map<string, string>();
   return { setData: vi.fn((type: string, value: string) => void store.set(type, value)), getData: (type: string) => store.get(type) ?? "", effectAllowed: "", dropEffect: "", setDragImage: vi.fn(), store };
@@ -120,6 +137,23 @@ describe("useTreeDnd across spaces", () => {
     at(screen.getByTestId("refuse"), "drop", data);
     off();
     expect(drops).toEqual([]);
+  });
+
+  it("a row lit in one workspace goes dark when the pointer is over another workspace, even if its leave was missed", () => {
+    render(
+      <>
+        <Trees drops={[]} />
+        <Other />
+      </>,
+    );
+    const data = transfer();
+    fireEvent.dragStart(screen.getByTestId("a"), { dataTransfer: data });
+    at(screen.getByTestId("p"), "dragOver", data);
+    expect(screen.getByTestId("p").getAttribute("data-drop")).toBe("inside");
+    // No dragleave for p (the browser sent it with the pointer still inside, or not at all): the other workspace refuses.
+    at(screen.getByTestId("viewer"), "dragOver", data);
+    expect(document.querySelector("[data-drop]")).toBeNull();
+    expect(currentSpaceHover()).toMatchObject({ text: "You are a viewer in V", to: null });
   });
 
   it("leaving the target row clears its light and the badge", () => {
