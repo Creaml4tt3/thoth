@@ -431,6 +431,7 @@ export const th: Strings = {
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
       goHome: "ไปหน้าแรก", // REVIEW
+      showTour: "แสดงทัวร์", // REVIEW
       hideSidebar: "ซ่อนแถบด้านข้าง",
       showSidebar: "แสดงแถบด้านข้าง",
       importPages: "นำเข้าจาก Notion หรือ Obsidian…", // REVIEW

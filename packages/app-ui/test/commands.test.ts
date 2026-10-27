@@ -334,3 +334,17 @@ describe("Favorites and pinned tabs (ADR-0027)", () => {
     expect(find(buildCommands(actions, en, "desktop", "other"), "tab.pin")).toBeUndefined();
   });
 });
+
+describe("Show the tour", () => {
+  it("is offered where the app has the tour (the desktop), and found by its words in English and Thai", () => {
+    const { actions, log } = spies();
+    expect(find(buildCommands(actions, en, "web", "mac"), "tour.show")).toBeUndefined();
+    const withTour = { ...actions, showTour: vi.fn(() => void log.push("tour")) };
+    const list = buildCommands(withTour, en, "desktop", "mac");
+    expect(filterCommands("> tour", list).map((c) => c.id)).toEqual(["tour.show"]);
+    expect(filterCommands("> getting started", list).map((c) => c.id)).toContain("tour.show");
+    find(list, "tour.show")!.run();
+    expect(log).toEqual(["tour"]);
+    expect(find(buildCommands(withTour, th, "desktop", "mac"), "tour.show")?.title).toBe("แสดงทัวร์");
+  });
+});

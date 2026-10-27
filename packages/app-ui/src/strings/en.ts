@@ -471,6 +471,8 @@ export const en = {
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
       goHome: "Go home",
+      /** Desktop only: the first-run tour (ADR-0032), again. */
+      showTour: "Show the tour",
       hideSidebar: "Hide sidebar",
       showSidebar: "Show sidebar",
       importPages: "Import from Notion or Obsidian…",
