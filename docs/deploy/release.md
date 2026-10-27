@@ -1,7 +1,7 @@
 # Releasing the desktop app
 
 The installers are built by GitHub Actions (`.github/workflows/release-desktop.yml`) and served from
-Cloudflare R2: bucket `thoth-downloads`, public at `https://download.thoth.creaml4tt3.me/`.
+Cloudflare R2: bucket `thoth-downloads`, public at `https://download.thothnotes.com/`.
 
 | Platform | Files | Built on |
 | --- | --- | --- |
@@ -16,6 +16,13 @@ The desktop app reads `latest.json` to tell people a new version is out (ADR-002
 or installed by the app). It needs `version` (semver); `date` and an optional `notes` (an `https` link to the release
 notes, shown as "What's new") are read when present. Keep `latest.json` served as `application/json` and under 64 KB.
 A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empty: no notice).
+
+**Keep the old host on the bucket.** Installed 0.2.0 apps (and older) read
+`https://download.thoth.creaml4tt3.me/latest.json`; 0.2.1 and later read `https://download.thothnotes.com/latest.json`
+(ADR-0031). Both hostnames are custom domains of the same `thoth-downloads` bucket, so one `latest.json` serves both.
+Leave `download.thoth.creaml4tt3.me` connected until most installs are past 0.2.x; removing it earlier means those
+installs never hear of a new version. `publish-downloads.ts` writes the new host into `latest.json` and the
+downloads page; nothing needs to change on the old one.
 
 ## One-time setup
 
@@ -44,7 +51,7 @@ A self-built copy looks elsewhere through `THOTH_UPDATE_URL` at build time (empt
    build and those tests pass. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
    without a tag; untick "Upload to R2" to build only. On a tag, the `github-release` job then creates (or edits)
    the GitHub release with `scripts/release-notes.ts` as its body, and `latest.json` carries
-   `notes: https://thoth.creaml4tt3.me/changelog/#v<x-y-z>` for the app's "What's new" link.
+   `notes: https://thothnotes.com/changelog/#v<x-y-z>` for the app's "What's new" link.
 3. Copy the published `latest.json` into the website's download manifest
    (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website, with the new post, the
    changelog entry and the feeds.

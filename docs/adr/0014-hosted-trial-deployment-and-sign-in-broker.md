@@ -1,7 +1,8 @@
 # ADR-0014: Hosted trial deployment (Vercel + Neon) and the sign-in broker
 
 - **Status:** Accepted (owner decisions 2026-10-22: Vercel or Cloudflare
-  hosting, `thoth.creaml4tt3.me` until a domain is bought, Neon or another free
+  hosting, `thoth.creaml4tt3.me` until a domain is bought (bought 2026-10-27:
+  `thothnotes.com`, ADR-0031), Neon or another free
   PostgreSQL, the trial limits below, Google then GitHub sign-in; region
   Singapore and contact `creaml4tt3@gmail.com` confirmed the same day). The
   account cap in rule 5 stays adjustable after real usage.
@@ -15,7 +16,8 @@ ADR-0013 left hosting, the trial limits and the first sign-in providers open.
 The owner decided:
 
 1. Host on **Vercel or Cloudflare**. Start on the subdomain
-   **`thoth.creaml4tt3.me`**, then move to a bought domain.
+   **`thoth.creaml4tt3.me`**, then move to a bought domain (done 2026-10-27:
+   `thothnotes.com`, ADR-0031).
 2. Trial limits: **1 workspace per account, up to 10 members, 200 pages and
    20 MB of files per workspace**. Revisions kept 30 days, and accounts inactive
    for 90 days deleted, as proposed in ADR-0013.
@@ -65,9 +67,11 @@ documentation. Re-check them before launch, because free plans change.
 
 1. **Topology.** The site and the API share a registrable domain, so a
    `SameSite` cookie works between them.
-   - **Website** (`apps/web`, static) at `https://thoth.creaml4tt3.me`, on
+   - **Website** (`apps/web`, static) at `https://thothnotes.com` (was
+     `https://thoth.creaml4tt3.me` until ADR-0031), on
      Vercel or Cloudflare Pages; either works because the site is static files.
-   - **API** (the reference server) at `https://api.thoth.creaml4tt3.me`, as a
+   - **API** (the reference server) at `https://api.thothnotes.com` (was
+     `https://api.thoth.creaml4tt3.me`, still served), as a
      Vercel Function.
    - **Database:** a Neon free project in the region nearest the API function.
 
@@ -117,7 +121,7 @@ documentation. Re-check them before launch, because free plans change.
    - **Clients sign in to the Thoth server.** Desktop and web clients use the
      Authorization Code flow with PKCE (S256) against the Thoth server's own
      sign-in endpoints. Desktop uses a loopback redirect (RFC 8252); web uses
-     `https://thoth.creaml4tt3.me/app/callback`.
+     `https://thothnotes.com/app/callback`.
    - **The server then sends the user on to the provider.** It runs its own
      Authorization Code + PKCE + `state` (and `nonce` for OIDC) with the
      provider and receives the result on its own redirect URI. The client's

@@ -1290,6 +1290,16 @@ still marked `REVIEW` until the owner has seen it.
   `tests/e2e/feedback.e2e.ts`.
 - Not checked in a real window: the Tauri webview (checked in Chromium through the bridge).
 
+### thothnotes.com and `com.thothnotes.desktop` (ADR-0031, 2026-10-27), built, waiting for review
+
+- Every address moved to `thothnotes.com` (`/app/`, `api.`, `download.`); the old hosts stay up outside the repo.
+- The desktop identifier is `com.thothnotes.desktop`. Once, at start: the old app data folder is moved
+  (`thoth_host::data_dir`), keychain secrets move on first read (`MovingSecretStore`), a hosted trial saved at
+  `api.thoth.creaml4tt3.me` is shown at `api.thothnotes.com` with the same handle and sign-in (`remote::move_trial`),
+  and Settings → Connected apps asks people with apps set up to copy the setup again. Webview storage starts fresh.
+- Windows: `bundle.publisher` and `bundle.windows.wix.upgradeCode` pinned to 0.2.0's derived values.
+- Not checked in a real window: the folder move and keychain move on a real 0.2.0 install, and a Windows upgrade.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and
@@ -1407,21 +1417,22 @@ regression tests (`pnpm check`: 92 tests):
    2026-10-22 (import-formats.md §1.0). Multi-part exports, images, toggles and
    title truncation are still unconfirmed.
 4. ~~Bundle identifier.~~ Decided 2026-10-22: `io.github.creaml4tt3.thoth`
-   (no owned domain yet; the product name may still change, see
-   `apps/desktop/src-tauri/README.md` for what a later change costs).
+   (no owned domain yet). Changed 2026-10-27 to `com.thothnotes.desktop`
+   with the domain (ADR-0031, Proposed).
 5. ~~Logo and accent.~~ Decided 2026-10-22: Moon Ibis mark, lunar orange accent.
    The first SVG was a hand-drawn approximation that did not match concept A;
    on 2026-10-22 it was replaced by a trace of concept A itself
    (`design/concepts/logo-directions-sheet.png`), and the app icons were
    regenerated.
 6. ~~Trial hosting, limits, sign-in providers.~~ Decided 2026-10-22 (ADR-0014):
-   - hosting on Vercel + Neon at `thoth.creaml4tt3.me` / `api.thoth.creaml4tt3.me`;
+   - hosting on Vercel + Neon at `thoth.creaml4tt3.me` / `api.thoth.creaml4tt3.me`,
+     moved to `thothnotes.com` / `api.thothnotes.com` on 2026-10-27 (ADR-0031);
    - limits of 1 workspace, 10 members, 200 pages and 20 MB per workspace;
    - Google first, then GitHub.
 
    Region Singapore and contact `creaml4tt3@gmail.com` confirmed the same day.
-7. ~~Product name.~~ Decided 2026-10-22: **Thoth**. Buying a domain is still
-   open; moving to it is a configuration change (ADR-0014).
+7. ~~Product name.~~ Decided 2026-10-22: **Thoth**. Domain bought 2026-10-27:
+   `thothnotes.com` (ADR-0031).
 Status note (2026-10-27): **copy and move between two workspaces** (ADR-0006 amendment of 2026-10-27, Proposed).
 - Two protocol transfers with the client in between (`BetweenWorkspaces` in `packages/transfer`). No server change.
 - Entry points: a page's menu, its header, the palette, and a drag onto another workspace's tree. Desktop and web

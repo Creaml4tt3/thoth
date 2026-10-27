@@ -8,8 +8,8 @@ Domains used below (change them when you buy your own domain):
 
 | What | Address |
 | --- | --- |
-| Website (`apps/site`, with `apps/web` at `/app/`) | `https://thoth.creaml4tt3.me` |
-| API (`apps/server`) | `https://api.thoth.creaml4tt3.me` |
+| Website (`apps/site`, with `apps/web` at `/app/`) | `https://thothnotes.com` |
+| API (`apps/server`) | `https://api.thothnotes.com` |
 
 > Status (2026-10-24): every step is done and live. The Neon project is
 > `thoth`; the Vercel projects `thoth-api` and `thoth-site` are connected to
@@ -93,17 +93,26 @@ Free-plan facts to keep in mind:
 - The database sleeps after 5 minutes idle, so the first request after a quiet
   period takes a moment longer.
 
-## 2. DNS for `creaml4tt3.me`
+## 2. DNS for `thothnotes.com`
 
-At your DNS provider, add a CNAME record for each host:
+At your DNS provider, add a record for each host (ADR-0031):
 
 | Name | Type | Value |
 | --- | --- | --- |
-| `thoth` | CNAME | the target Vercel (or Cloudflare Pages) shows when you add the domain |
-| `api.thoth` | CNAME | the target Vercel shows when you add the domain to the API project |
+| `@` (the apex, `thothnotes.com`) | A / ALIAS | the target Vercel shows when you add the domain |
+| `www` | CNAME | the target Vercel shows; in Vercel, redirect it to `thothnotes.com` |
+| `api` | CNAME | the target Vercel shows when you add the domain to the API project |
+| `download` | CNAME | the R2 custom domain (docs/deploy/release.md) |
 
 Keep the website and the API under the same parent domain. Two `*.vercel.app`
 names do not work for sign-in cookies.
+
+The old hosts stay up (ADR-0031): `thoth.creaml4tt3.me` answers with a 301 to
+`https://thothnotes.com` (a Vercel redirect, not a second deployment), and
+`api.thoth.creaml4tt3.me` stays on the API project, because installed apps
+have it saved as a server. Add it to the API project's domains and keep it in
+`CORS_ORIGINS` only if a page on the old host still calls the API (the
+redirect means none does).
 
 ## 3. API project on Vercel
 
@@ -125,7 +134,7 @@ names do not work for sign-in cookies.
    `503 service_unavailable` and tries again on the next request.
 2. The function region is `sin1`, next to the Neon region (Singapore). It is
    set by the build.
-3. Add the domain `api.thoth.creaml4tt3.me`.
+3. Add the domain `api.thothnotes.com`.
 4. Environment variables (Production). Enter the values in the Vercel
    dashboard only:
 
@@ -135,11 +144,11 @@ names do not work for sign-in cookies.
    | `THOTH_PROFILE` | `trial` (sets the limits, the 300-account cap, rate limits and `EVENTS=off`) |
    | `MIGRATE_ON_START` | `false` |
    | `TRUST_PROXY` | `true` (Vercel sets the client IP header) |
-   | `CORS_ORIGINS` | `https://thoth.creaml4tt3.me` |
+   | `CORS_ORIGINS` | `https://thothnotes.com` |
    | `CRON_SECRET` | a long random value, e.g. from `openssl rand -base64 32`; Vercel Cron sends it automatically |
-   | `PUBLIC_URL` | `https://api.thoth.creaml4tt3.me` (the sign-in redirect addresses are built from it) |
+   | `PUBLIC_URL` | `https://api.thothnotes.com` (the sign-in redirect addresses are built from it) |
    | `SERVER_NAME` | `Thoth demo server` (the name the desktop app and web client show; the same as the starter server's name) |
-   | `WEB_REDIRECT_URIS` | `https://thoth.creaml4tt3.me/app/callback` |
+   | `WEB_REDIRECT_URIS` | `https://thothnotes.com/app/callback` |
 
    Public share links (ADR-0023) are on in the trial with no extra variable.
    `THOTH_PROFILE=trial` sets these defaults, and each one can be overridden:
@@ -152,7 +161,7 @@ names do not work for sign-in cookies.
    | `SHARE_VIEWS_PER_IP` | `120` | Requests to any shared page per client IP per window. Needs `TRUST_PROXY=true` behind Vercel |
 
    Share addresses are built from `PUBLIC_URL`
-   (`https://api.thoth.creaml4tt3.me/s/<token>`). The pages are served by the
+   (`https://api.thothnotes.com/s/<token>`). The pages are served by the
    same function as the API.
 
    Members and invite links (ADR-0024) are on in the trial with no extra
@@ -167,11 +176,11 @@ names do not work for sign-in cookies.
    | `INVITE_OPENS_PER_IP` | `60` | Invite pages opened per client IP per window (every server, not only the trial). Needs `TRUST_PROXY=true` behind Vercel |
    | `INVITE_ACCEPTS_PER_IP` | `20` | Joins per client IP per window, counted before the token is looked up |
 
-   Invite addresses are `https://api.thoth.creaml4tt3.me/i/<token>`. "Sign in
+   Invite addresses are `https://api.thothnotes.com/i/<token>`. "Sign in
    to join" uses the Google and GitHub providers already registered: the
    callback addresses (`/auth/callback/google`, `/auth/callback/github`) do not
    change. After joining, "Open in Thoth" goes to the web client, derived from
-   `WEB_REDIRECT_URIS` (`https://thoth.creaml4tt3.me/app/`).
+   `WEB_REDIRECT_URIS` (`https://thothnotes.com/app/`).
 
    Several workspaces per account (ADR-0025) are on in the trial. The trial
    profile now lets an account own **3** workspaces (it was 1). Deleted
@@ -194,11 +203,11 @@ names do not work for sign-in cookies.
    - app name;
    - support email;
    - links to the published privacy notice and terms (`docs/legal/`);
-   - authorized domain `creaml4tt3.me`.
+   - authorized domain `thothnotes.com`.
 2. **Audience**: External. Scopes: `openid`, `email`, `profile` only. These are
    non-sensitive, so no Google verification review is needed.
 3. **Clients → Create client → Web application**, with:
-   - Authorized redirect URI: `https://api.thoth.creaml4tt3.me/auth/callback/google`
+   - Authorized redirect URI: `https://api.thothnotes.com/auth/callback/google`
    - No JavaScript origins needed: the browser never talks to Google directly.
 4. Put the client ID and client secret into the API project's environment
    variables: `OIDC_GOOGLE_CLIENT_ID`, `OIDC_GOOGLE_CLIENT_SECRET`.
@@ -207,15 +216,15 @@ names do not work for sign-in cookies.
 ## 5. GitHub sign-in (second provider)
 
 1. GitHub → Settings → Developer settings → **OAuth Apps → New OAuth App**, with:
-   - Homepage URL: `https://thoth.creaml4tt3.me`
-   - Authorization callback URL: `https://api.thoth.creaml4tt3.me/auth/callback/github`
+   - Homepage URL: `https://thothnotes.com`
+   - Authorization callback URL: `https://api.thothnotes.com/auth/callback/github`
 2. Generate a client secret and put both values into the API project's
    environment variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
 3. The server asks only for `read:user` and `user:email`.
 
 ## 6. Website project
 
-The website at `thoth.creaml4tt3.me` is **one static deployment** made of two
+The website at `thothnotes.com` is **one static deployment** made of two
 builds (ADR-0015):
 
 | Path | Built from | Output |
@@ -250,14 +259,14 @@ runs `pnpm build:website`. To deploy from your computer instead (from
      `/app/assets/`, 30 days for `/media/`, 5 minutes for `/analytics.js`
      (its name is fixed, so the web client can include it);
    - a rewrite of `/app/*` to `/app/index.html` for the web client's routes.
-2. Add the domain `thoth.creaml4tt3.me`.
+2. Add the domain `thothnotes.com`.
 3. Environment variables (Production), in the Vercel dashboard only:
 
    | Variable | Value |
    | --- | --- |
-   | `SITE_URL` | `https://thoth.creaml4tt3.me` (the default; canonical URLs, `hreflang`, the sitemap and JSON-LD use it) |
+   | `SITE_URL` | `https://thothnotes.com` (the default; canonical URLs, `hreflang`, the sitemap and JSON-LD use it) |
    | `VITE_GA4_ID` | the GA4 measurement ID (`G-…`). Leave unset for no analytics code at all |
-   | `VITE_DEFAULT_SERVER` | `https://api.thoth.creaml4tt3.me` (read by the web client's build) |
+   | `VITE_DEFAULT_SERVER` | `https://api.thothnotes.com` (read by the web client's build) |
 
 4. In Google Analytics (property settings):
    - **Data retention**: 2 months, to match the privacy notice;
@@ -267,7 +276,7 @@ runs `pnpm build:website`. To deploy from your computer instead (from
    - `/`, `/th/`, `/privacy/` and `/app/` load;
    - before you choose in the cookie banner, the browser's network panel shows
      no request to Google;
-   - `https://thoth.creaml4tt3.me/sitemap.xml` and `/robots.txt` load. Submit
+   - `https://thothnotes.com/sitemap.xml` and `/robots.txt` load. Submit
      the sitemap in Google Search Console.
 
 The web client connects only to this trial server (owner, 2026-10-24): its
@@ -298,22 +307,25 @@ Servers), with a short caution. The address is in
       `/terms/`, `/th/privacy/` and `/th/terms/`.
 - [ ] An abuse contact address works.
 - [ ] The Google app is published; the branding links work.
-- [ ] `GET https://api.thoth.creaml4tt3.me/api/v1/capabilities` shows the trial limits.
+- [ ] `GET https://api.thothnotes.com/api/v1/capabilities` shows the trial limits.
 - [ ] A test account hits the page limit and gets a clear message.
 - [ ] Neon usage (compute-hours, storage) and Vercel usage are checked weekly
       for the first month.
 
-## Moving to a bought domain later
+## Moving domains (done once: `thoth.creaml4tt3.me` → `thothnotes.com`, ADR-0031)
 
 1. Add the new domains in Vercel (or Pages) and DNS.
 2. Update `PUBLIC_URL`, `CORS_ORIGINS`, `WEB_REDIRECT_URIS`, the Google
    redirect URI, the GitHub callback URL, the website's default server, and
    the desktop starter server (`packages/app-ui/src/workspace/starter.ts`).
-3. Keep the old website domain redirecting for a while.
+3. Keep the old website domain redirecting (301) for a while.
 4. Keep the old API domain **serving** (an alias of the same project), not
    redirecting, until desktop users have updated. The desktop app never follows
    a redirect (so a token cannot leak), and it remembers a server by its
    address, so an API redirect would cut existing installs off.
 
-Signed-in users sign in once more: cookies belong to the old domain. Desktop
-users add the new address and remove the old one.
+Web users sign in once more: cookies belong to the old domain. From 0.2.1 the
+desktop app shows a demo server saved at `https://api.thoth.creaml4tt3.me` as
+`https://api.thothnotes.com`, with the same sign-in
+(`crates/thoth-host/src/remote/mod.rs`, `move_trial`). A server saved at any
+other old address is the user's to add again.

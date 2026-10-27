@@ -10,7 +10,7 @@
 ## Context
 
 The desktop app is installed by hand from the website (`docs/deploy/release.md`: R2 behind
-`https://download.thoth.creaml4tt3.me/`, `latest.json` at the root naming the newest release, one `v<version>/` folder
+`https://download.thothnotes.com/`, `latest.json` at the root naming the newest release, one `v<version>/` folder
 per release). Nothing tells a person that a newer version exists.
 
 Constraints:
@@ -25,10 +25,11 @@ Constraints:
 1. **A notice, not an installer.** No Tauri updater plugin, no signing keys, no download or install by the app. The
    popup says a new version is out and offers "Download" (opens the downloads page in the system browser through the
    host), "What's new" (the release notes link, only if `latest.json` has one), "Later" and "Skip this version".
-2. **Where it looks.** The host fetches one fixed address, `https://download.thoth.creaml4tt3.me/latest.json`,
+2. **Where it looks.** The host fetches one fixed address, `https://download.thothnotes.com/latest.json` (0.2.0 and
+   earlier: `https://download.thoth.creaml4tt3.me/latest.json`, the same bucket; ADR-0031),
    compiled in. A self-built copy may set another at build time: `apps/desktop/src-tauri/build.rs` reads
    `THOTH_UPDATE_URL` (and `THOTH_DOWNLOADS_PAGE_URL` for where "Download" goes; default
-   `https://thoth.creaml4tt3.me/#download`); the value must be `https` or empty, and empty turns the notice off. Nothing
+   `https://thothnotes.com/#download`); the value must be `https` or empty, and empty turns the notice off. Nothing
    at run time changes it: not the webview, not a flag, not the environment (a test holds this).
    - **Fetch rules**, the link-preview fetcher (ADR-0020) with these settings: https only (redirects too), a public
      address after DNS that is the address connected to, no cookies, credentials, `Referer` or proxy, a fixed
@@ -80,7 +81,7 @@ Constraints:
 
 - Positive: people learn a release exists without an updater, signing keys or any code being installed for them.
 - Positive: the only new network path reuses the audited fetcher; the person can turn it off completely.
-- Negative: at every start, and every 24 h while open, an installation tells `download.thoth.creaml4tt3.me` its IP
+- Negative: at every start, and every 24 h while open, an installation tells `download.thothnotes.com` its IP
   address and version number (the `User-Agent`). Settings says so. Someone who restarts often sends more requests
   than once a day; each is one small GET.
 - Positive: "Later" lasts until the next start or the next day's check, whichever comes first.

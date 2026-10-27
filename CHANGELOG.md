@@ -4,7 +4,7 @@ All notable changes to the Thoth desktop app, the web app and the server are lis
 follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The website’s changelog page (https://thoth.creaml4tt3.me/changelog/) and each GitHub release’s notes are made from
+The website’s changelog page (https://thothnotes.com/changelog/) and each GitHub release’s notes are made from
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
@@ -15,6 +15,13 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Copy or move pages between two workspaces, on one server or two: from a page’s menu, its header or the command palette, or by dragging it onto the other workspace. Sub-pages, attachments and links between the pages go with them, and a move deletes the originals only after the other workspace has every page.
 - A new, empty Private Space starts with Welcome pages that show every kind of block and link and the main shortcuts, then a short tour of the basic tools you can skip (and see again from Settings).
 - Send feedback: report a problem, suggest an idea or ask a question from Settings or the command palette in the app, or from the new Support page on the website.
+
+### Changed
+
+- Thoth’s website, web app, demo server and downloads moved to thothnotes.com. The old addresses keep working and lead there.
+- The desktop app has a new app ID, com.thothnotes.desktop. It moves your recent Private Spaces, settings, sign-ins and assistant history over by itself, once.
+- Because of the new app ID, on macOS and Windows open tabs and the sidebar’s order start fresh once, and macOS asks again for notifications and to open the app.
+- Connected apps: apps you set up before this version stop connecting. Copy the setup again from Settings → Connected apps.
 
 ### Fixed
 
@@ -111,7 +118,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Type [[ to link to another page, in both editors.
 - Import a Notion export or an Obsidian vault, as a folder or a ZIP, with a report of anything that could not come across.
 - Connect to a Thoth server and open its shared workspaces, with owner, editor and viewer roles and a conflict check on every save.
-- The web app at thoth.creaml4tt3.me/app/, which opens workspaces on the free demo server.
+- The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
 [Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.0...HEAD
