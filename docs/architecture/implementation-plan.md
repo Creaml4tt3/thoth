@@ -1187,6 +1187,16 @@ The owner asked on 2026-10-26 for several workspaces per account, 3 on the trial
 - Not done (owner): Search Console and Bing Webmaster Tools, the `SAME_AS` profiles, the `INDEXNOW_KEY` variable on
   Vercel, off-site posts; `docs/legal/terms*.md` still say 1 workspace per account (a legal text change).
 
+### Blog layout "Folio" (ADR-0026 amendment, 2026-10-27), built, waiting for review
+
+- `/blog/` and the posts: the head (or a post's details) and a version list sticky on the left, large pictures on the
+  right (the newest wide, the rest in two offset columns, one link a card, in date order); one column and a compact
+  version row on phones. `<picture>` is a block (its `<source>` no longer takes a grid cell); Thai titles break only
+  at their spaces (`.phrase`). Dark only.
+- Evidence: `apps/site/test/blog.test.ts` (markup, order, version links, details), `tests/e2e/site.e2e.ts` ("Folio
+  on a wide screen", "Folio on narrow windows" at 320 to 900 px and a 720 px "200% zoom", "Thai headings keep their
+  words whole").
+
 ### Favorites and pinned tabs (ADR-0027, 2026-10-26), built, waiting for review
 
 - Favorites: a star in the page header, the tree and tab menus, the palette and Cmd/Ctrl+D (Alt+Shift+D on the web);

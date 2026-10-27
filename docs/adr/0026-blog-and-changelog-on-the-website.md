@@ -94,6 +94,31 @@ app, and some maintainer text in public files.
 
 Consequence: the comparison needs re-checking when Notion or Obsidian change; its note says when it was checked.
 
+## Amendment (2026-10-27): the Folio layout for the blog and its posts
+
+Proposed. The owner picked direction C ("Folio") of three mockups; it replaces the legal pages' narrow column on
+`/blog/` and the posts. The changelog page and the home page's newest post keep their layout.
+
+1. **Index.** The heading, the answer-first summary, the Changelog and feed links and a version list (number and
+   date, each a link to its card's anchor, `#v0-2-0`) stay on the left, `position: sticky` inside the page grid: it
+   stops at the end of the posts and never covers the footer, and is sticky only when the window is at least 961 px
+   wide and 760 px tall (a sticky column taller than the window would hide its own end). On the right: the newest
+   post wide, then the rest as large pictures in two columns, the right column set lower by a margin.
+2. **Order.** The page and the keyboard meet the posts newest first, left then right, row by row; the offset is only
+   a margin. Each card is one link: the heading's link stretches over the card, and the card draws the focus ring.
+3. **Post.** The wide picture first, then the breadcrumb, a details list (version, published, author, reading time)
+   and the version list on the left; the text, the release links and the older/newer links on the right. The version
+   list links every post and marks this one with `aria-current="page"`.
+4. **Narrow windows.** At 960 px and below one column, nothing sticky; at 640 px and below the version list is a
+   compact row of version numbers (the dates stay for screen readers) above the posts or the text.
+5. **`<picture>` is a block.** It had `display: contents`, so its `<source>` took a grid cell and the picture dropped
+   under the words.
+6. **Thai titles keep their words whole.** Chromium's line breaker split titles inside words ("ผู้|ช่วย",
+   "แอปเด|สก์ท็อป"), and `word-break: keep-all` changed nothing for Thai (measured, Chromium 156). Each space-separated
+   phrase of a Thai title is an inline block (`.phrase`), so titles break only at their spaces; the text is unchanged
+   (search, copy, JSON-LD and feeds read the same words). A phrase wider than the line still wraps inside it.
+7. **Dark only.** The mockups' light theme is not built: it would change the whole site; a later decision.
+
 ## Spec references
 
 ADR-0015 (website), ADR-0022 (update notice, `notes`), docs/deploy/release.md.
