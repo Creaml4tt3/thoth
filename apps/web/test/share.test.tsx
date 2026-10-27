@@ -39,6 +39,18 @@ async function palette(browser: FakeBrowser, what: string) {
 }
 
 describe("sharing a page", () => {
+  it("has a Share… button in the open page's header that opens the dialog, hidden for a viewer", async () => {
+    const browser = await signedIn();
+    await browser.user.click(await screen.findByRole("treeitem", { name: "Field notes" }));
+    await browser.user.click(await screen.findByRole("button", { name: "Share…" }));
+    expect(await screen.findByRole("dialog", { name: "Share “Field notes”" })).toBeTruthy();
+    cleanup();
+    const viewer = await signedIn({ role: "viewer" });
+    await viewer.user.click(await screen.findByRole("treeitem", { name: "Field notes" }));
+    await screen.findByRole("button", { name: "Favorite" });
+    expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
+  });
+
   it("creates a 30-day link by default, shows its address once, copies it, and lists it", async () => {
     const browser = await signedIn();
     const dialog = await openShare(browser);

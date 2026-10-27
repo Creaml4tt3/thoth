@@ -6,6 +6,7 @@ import { Notice } from "@thoth/app-ui/ui/Notice.tsx";
 import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { workspaceKey, type WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import { WorkspacePage } from "@thoth/app-ui/workspace/WorkspacePage.tsx";
+import { ShareButton } from "@thoth/app-ui/workspace/ShareButton.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -35,6 +36,7 @@ export function WorkspacePageView({ target, onTransfer }: { target: WorkspacePag
     workspace && !signedOut ? (
       <span className="page-actions">
         <FavoriteButton target={{ kind: "workspace", server: target.server, workspace: target.workspace, page: target.page }} />
+        <ShareButton directory={servers} target={target} />
         {onTransfer && (
           <>
         <IconButton icon="copy" label={tt.copyHere} onClick={() => onTransfer({ direction: "from_workspace", server: target.server, workspace: target.workspace, pageId: target.page, title, mode: "copy" })} />

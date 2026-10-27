@@ -40,4 +40,3 @@
 .xfer-pending { animation: thoth-rise-in var(--thoth-dur-base) var(--thoth-ease-out); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2); border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); font: var(--thoth-text-small); }
 .xfer-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .xfer-pending li { display: flex; justify-content: space-between; gap: var(--thoth-space-2); align-items: center; }
-.page-actions { display: flex; gap: 4px; }

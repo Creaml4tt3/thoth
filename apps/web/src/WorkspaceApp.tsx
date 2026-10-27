@@ -5,6 +5,7 @@ import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
+import { ShareButton } from "@thoth/app-ui/workspace/ShareButton.tsx";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
 import { requestWorkspaceAdmin } from "@thoth/app-ui/workspace/workspace-admin-request.ts";
 import { ServerWorkspaceActions, ServerWorkspacesFooter } from "@thoth/app-ui/workspace/ServerWorkspaces.tsx";
@@ -428,7 +429,12 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
                 modeSpace={env.server}
                 openPage={openPage}
                 goneNotice={<Notice title={t.workspace.missingTitle} detail={t.workspace.missingDetail} />}
-                actions={<FavoriteButton target={{ kind: "workspace", ...current }} />}
+                actions={
+                  <span className="page-actions">
+                    <FavoriteButton target={{ kind: "workspace", ...current }} />
+                    <ShareButton directory={directory} target={current} />
+                  </span>
+                }
                 signedOutNotice={<Notice title={t.web.signInAgain} detail={t.web.sessionEnded} />}
                 onOpened={() => track({ name: "page_open" }, target)}
                 onSaved={() => track({ name: "page_save" }, target)}

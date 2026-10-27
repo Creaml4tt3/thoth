@@ -74,6 +74,29 @@ describe("Share… on the desktop", () => {
     expect(await screen.findByRole("dialog", { name: "Share “Roadmap”" })).toBeTruthy();
   });
 
+  it("has a Share… button in the page header that opens the same dialog", async () => {
+    const { app, group } = await workspace();
+    await app.user.click(within(group).getByRole("treeitem", { name: "Roadmap" }));
+    const button = await screen.findByRole("button", { name: "Share…" });
+    expect(button.getAttribute("data-tip")).toBe("Share…");
+    await app.user.click(button);
+    expect(await screen.findByRole("dialog", { name: "Share “Roadmap”" })).toBeTruthy();
+  });
+
+  it("has no header Share… button without public-share", async () => {
+    const plain = await workspace({ capabilities: ["search", "page-order", "page-kind"] });
+    await plain.app.user.click(within(plain.group).getByRole("treeitem", { name: "Roadmap" }));
+    await screen.findByRole("button", { name: "Favorite" });
+    expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
+  });
+
+  it("has no header Share… button for a viewer", async () => {
+    const viewer = await workspace({ role: "viewer" });
+    await viewer.app.user.click(within(viewer.group).getByRole("treeitem", { name: "Roadmap" }));
+    await screen.findByRole("button", { name: "Favorite" });
+    expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
+  });
+
   it("is hidden when the server lacks public-share", async () => {
     const plain = await workspace({ capabilities: ["search", "page-order", "page-kind"] });
     fireEvent.contextMenu(within(plain.group).getByRole("treeitem", { name: "Roadmap" }));
