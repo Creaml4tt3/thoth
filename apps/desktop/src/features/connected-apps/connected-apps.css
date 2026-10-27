@@ -3,6 +3,10 @@
 .connected-apps .small { font: var(--thoth-text-small); }
 /* Small hints need the stronger grey for contrast (as in Settings → Notifications). */
 .connected-apps .muted, .mcp-prompt .muted { color: var(--thoth-ink-secondary); }
+/* The one-time "copy the setup again" notice (ADR-0031). */
+.mcp-setup-moved { display: grid; gap: var(--thoth-space-1); margin-top: var(--thoth-space-2); }
+.mcp-setup-moved p { margin: 0; }
+.mcp-setup-moved .set-actions { margin-top: var(--thoth-space-1); }
 .mcp-spaces { border: 0; margin: var(--thoth-space-2) 0 0; padding: 0; display: grid; gap: var(--thoth-space-1); min-width: 0; }
 .mcp-spaces > legend { padding: 0; margin-bottom: var(--thoth-space-1); font: var(--thoth-text-ui); font-weight: 600; }
 .mcp-space { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: var(--thoth-space-2); align-items: baseline; padding: 4px 0; cursor: pointer; }

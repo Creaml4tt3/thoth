@@ -9,6 +9,31 @@ import { folderName } from "./names.ts";
 import "./connected-apps.css";
 
 /**
+ * The one-time "copy the setup again" notice (ADR-0031): the identifier change moved the socket the setup names, so an
+ * app set up before stops connecting. Webview storage starts empty after that change, so the notice shows to whoever
+ * has apps on record when first looking here, until they dismiss it or copy the setup. Someone with no apps the first
+ * time they look is marked as having seen it: any app they set up later uses the setup shown now.
+ */
+export const SETUP_NOTICE_KEY = "thoth.desktop.connectedApps.setupNoticeSeen";
+
+function storage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null; // storage can be disabled; the notice then shows each time until dismissed
+  }
+}
+
+const noticeSeen = () => storage()?.getItem(SETUP_NOTICE_KEY) === "1";
+function markNoticeSeen() {
+  try {
+    storage()?.setItem(SETUP_NOTICE_KEY, "1");
+  } catch {
+    // full or disabled storage: shown again next time
+  }
+}
+
+/**
  * Settings → Connected apps (ADR-0021): the switch (off by default), which Private Spaces apps may read (each ticked
  * on purpose), the apps that connected with the user's Allow or Deny, the setup to paste into an app, and the request
  * log. An app's name is the one it gave; the section says so.
@@ -21,6 +46,7 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
   const [failure, setFailure] = useState<string | null>(null);
   const [copy, setCopy] = useState<"idle" | "done" | "failed">("idle");
   const [log, setLog] = useState<ConnectedAppsLogEntry[] | null>(null);
+  const [notice, setNotice] = useState<boolean | null>(null);
 
   const reload = useCallback(() => connectedApps.settings().then(setSettings, () => undefined), [connectedApps]);
   useEffect(() => {
@@ -35,6 +61,18 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
       stop?.();
     };
   }, [connectedApps, platform, reload]);
+
+  // Decided once, from the first settings seen.
+  useEffect(() => {
+    if (!settings || notice !== null) return;
+    const show = !noticeSeen() && settings.apps.length > 0;
+    if (!show) markNoticeSeen();
+    setNotice(show);
+  }, [settings, notice]);
+  const dismissNotice = () => {
+    markNoticeSeen();
+    setNotice(false);
+  };
 
   const change = async (run: () => Promise<Settings>) => {
     setFailure(null);
@@ -67,6 +105,7 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
     try {
       await copyText(setup);
       setCopy("done");
+      dismissNotice();
     } catch {
       setCopy("failed");
     }
@@ -88,6 +127,19 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
           {t.enableHint}
         </small>
       </div>
+      {notice && setup && (
+        <div role="note" aria-labelledby="mcp-setup-moved" className="alert alert-warning mcp-setup-moved">
+          <p id="mcp-setup-moved">
+            <strong>{t.setupMoved.title}</strong>
+          </p>
+          <p>{t.setupMoved.body}</p>
+          <div className="set-actions">
+            <Button variant="ghost" small onClick={dismissNotice}>
+              {t.setupMoved.dismiss}
+            </Button>
+          </div>
+        </div>
+      )}
       {settings.enabled && !settings.listening && settings.error && (
         <p role="alert" className="alert alert-danger">
           {t.notListening(settings.error)}

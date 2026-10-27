@@ -13,7 +13,7 @@ import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { setLangPreference } from "../src/strings/index.ts";
 
 const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
-const SOCKET = "/Users/someone/Library/Application Support/io.github.creaml4tt3.thoth/mcp/thoth.sock";
+const SOCKET = "/Users/someone/Library/Application Support/com.thothnotes.desktop/mcp/thoth.sock";
 
 class FakeConnectedApps implements ConnectedApps {
   state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], setup: { command: SIDECAR, args: ["--socket", SOCKET] } };
@@ -168,6 +168,49 @@ describe("Settings → Connected apps", () => {
     expect(within(rows[0]!).getByText("Plan.md")).toBeTruthy();
     expect(within(rows[1]!).getByText("Refused: not allowed")).toBeTruthy();
     expect(section.getByText(/never what a page says/)).toBeTruthy();
+  });
+
+  describe("after the app's identifier changed (ADR-0031)", () => {
+    const decided = [{ name: "Claude", allowed: true, decidedAt: "2026-10-25T08:00:00Z" }];
+    const notice = (section: ReturnType<typeof within>) => section.queryByRole("note", { name: "Copy the setup again" });
+
+    it("tells someone who set up apps before to copy the setup again, once", async () => {
+      apps.state = { ...apps.state, enabled: true, listening: true, apps: decided };
+      let app = await open();
+      let section = await openSettings(app);
+      const shown = notice(section);
+      expect(shown?.textContent).toMatch(/apps you set up before.*stop connecting.*copy the setup below/i);
+      await app.user.click(within(shown!).getByRole("button", { name: "Got it" }));
+      await waitFor(() => expect(notice(section)).toBeNull());
+      // Not again, in this window or the next.
+      cleanup();
+      app = await open();
+      section = await openSettings(app);
+      expect(notice(section)).toBeNull();
+    });
+
+    it("copying the setup counts as having seen it", async () => {
+      apps.state = { ...apps.state, enabled: true, listening: true, apps: decided };
+      const app = await open();
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn(async () => undefined) } });
+      const section = await openSettings(app);
+      expect(notice(section)).not.toBeNull();
+      await app.user.click(section.getByRole("button", { name: "Copy the setup" }));
+      await waitFor(() => expect(notice(section)).toBeNull());
+    });
+
+    it("is never shown to someone with no apps set up the first time they look", async () => {
+      let app = await open();
+      let section = await openSettings(app);
+      expect(notice(section)).toBeNull();
+      // An app connected later used the setup shown now: it is not told to copy it again.
+      cleanup();
+      apps.state = { ...apps.state, enabled: true, listening: true, apps: decided };
+      app = await open();
+      section = await openSettings(app);
+      expect(section.getByRole("listitem", { name: "Claude" })).toBeTruthy();
+      expect(notice(section)).toBeNull();
+    });
   });
 
   it("says when Connected apps cannot be used on this computer", async () => {

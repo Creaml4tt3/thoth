@@ -153,3 +153,40 @@ test("switch on, allow an app, and it searches and reads through thoth-mcp; the 
   // The vault holds only what it held: nothing of Connected apps is written there.
   expect((await readdir(vault)).sort()).toEqual([".thoth", "Inbox.md", "Plan.md"]);
 });
+
+test("after the identifier change, someone with apps set up is told once to copy the setup again (ADR-0031)", async ({ page, context }) => {
+  // The settings a 0.2.0 install left in its data folder, moved over at start: an app was allowed before.
+  await bridge.close();
+  await mkdir(join(data, "mcp"), { recursive: true, mode: 0o700 });
+  await writeFile(join(data, "mcp", "settings.json"), JSON.stringify({ version: 1, enabled: true, spaces: [], apps: [{ name: "Claude Desktop", allowed: true, decidedAt: "2026-10-25T08:00:00Z" }] }));
+  bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, dataDir: data } });
+  await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
+  await page.addInitScript(bridge.initScript);
+  await page.goto(bridge.url);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  const section = page.getByTestId("connected-apps-settings");
+  const notice = section.getByRole("note", { name: "Copy the setup again" });
+  await expect(notice).toContainText("stop connecting");
+  await expect(section.getByRole("listitem", { name: "Claude Desktop" })).toContainText("Allowed");
+  await expectAccessible(page, '[data-testid="connected-apps-settings"]');
+  await shoot(page, notice, "setup-moved");
+  // Keyboard: the dismiss button is reachable and works with Enter.
+  await notice.getByRole("button", { name: "Got it" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(notice).toBeHidden();
+  // Not again after a reload (the page may come back on the Private Space, or ask for it).
+  await page.reload();
+  const choose = page.getByRole("button", { name: /choose or create a private space/i });
+  const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
+  await expect(choose.or(tree)).toBeVisible();
+  if (await choose.isVisible()) await choose.click();
+  await expect(tree).toBeVisible();
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await expect(section.getByRole("listitem", { name: "Claude Desktop" })).toBeVisible();
+  await expect(section.getByRole("note")).toHaveCount(0);
+});
