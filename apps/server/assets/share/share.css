@@ -35,7 +35,7 @@
   --thoth-bg: #ffffff;
   --thoth-bg-sidebar: #f9f9f8;
   --thoth-moon: #e8590c;
-  --thoth-moon-soft: #ffe8d6;
+  --thoth-moon-soft: #ffdfc7;
   --thoth-link: #0b6bcb;
   --thoth-accent: #c2410c;
   --thoth-text-gray: #5c5853;
@@ -55,7 +55,7 @@
     --thoth-bg: #0a0a0a;
     --thoth-bg-sidebar: #111112;
     --thoth-moon: #ff7a2f;
-    --thoth-moon-soft: rgb(255 122 47 / 0.18);
+    --thoth-moon-soft: rgb(255 122 47 / 0.28);
     --thoth-link: #5aa9ff;
     --thoth-accent: #ff7a2f;
     --thoth-text-gray: #a8a29b;

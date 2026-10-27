@@ -74,6 +74,22 @@ describe.each(Object.entries(themes))("accent contrast, %s theme", (_name, t) =>
     expect(ratio(accent, bg(surface))).toBeGreaterThanOrEqual(3);
   });
 
+  // The text highlight and the selected row must read as a colour, not blend into the page: 1.25:1 against paper,
+  // 1.5:1 against near-black (a dark wash needs more to be seen). Measured against the page, the lighter surface in
+  // light and the darker one in dark, so the sidebar (closer to the wash) is not the easier case.
+  it.each(["--thoth-accent-soft", "--thoth-moon-soft"])("%s stands out from the page", (name) => {
+    const page = bg("--thoth-bg");
+    const dark = luminance(page) < 0.5;
+    expect(ratio(over(token(name), page), page)).toBeGreaterThanOrEqual(dark ? 1.5 : 1.25);
+  });
+
+  it.each(surfaces)("primary text and moon-ink on the highlight over %s are at least 4.5:1", (surface) => {
+    const wash = over(token("--thoth-moon-soft"), bg(surface));
+    const ink = parse(t["--thoth-ink"]!.split(" ").length === 3 ? `rgb(${t["--thoth-ink"]} / 0.94)` : t["--thoth-ink"]!);
+    expect(ratio(over(ink, bg(surface)), wash)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(bg("--thoth-moon-ink"), wash)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("focus ring on the selected item's wash is at least 3:1", () => {
     for (const surface of surfaces) expect(ratio(accent, over(token("--thoth-accent-soft"), bg(surface)))).toBeGreaterThanOrEqual(3);
   });
@@ -86,6 +102,13 @@ describe("accent role tokens", () => {
     expect(scope["--thoth-drop-indicator"]).toBe("var(--thoth-accent)");
     expect(scope["--thoth-tab-active-bg"]).toBe("var(--thoth-bg)");
     expect(scope["--thoth-tab-active-ink"]).toBe("var(--thoth-ink-primary)");
+  });
+
+  it("the public share page copies the app's highlight, light and dark", () => {
+    const share = readFileSync(new URL("../../../apps/server/assets/share/share.css", import.meta.url), "utf8");
+    const darkCopy = block(share.slice(share.indexOf("@media (prefers-color-scheme: dark)")), ":root {");
+    expect(block(share, ":root {")["--thoth-moon-soft"]?.toUpperCase()).toBe(light["--thoth-moon-soft"]!.toUpperCase());
+    expect(darkCopy["--thoth-moon-soft"]).toBe(night["--thoth-moon-soft"]);
   });
 
   it("System in a dark OS uses the same accent values as Dark", () => {

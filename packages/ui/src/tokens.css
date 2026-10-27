@@ -38,7 +38,7 @@
 
   /* Accent: Moon — warm lunar orange, used for focus, selection, the active agent */
   --thoth-moon: #E8590C;
-  --thoth-moon-soft: #FFE8D6;
+  --thoth-moon-soft: #FFDFC7;
   --thoth-moon-ink: #8A3200;
   --thoth-link: #0B6BCB;
 
@@ -46,7 +46,7 @@
      focus ring at 3:1 on paper. Tested in packages/app-ui/test/contrast.test.ts. */
   --thoth-accent: #C2410C;            /* primary buttons, focus rings, links, active-tab line */
   --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
-  --thoth-accent-soft: #FFE8D6;       /* selected tree item */
+  --thoth-accent-soft: #FFDFC7;       /* selected tree item */
   --thoth-accent-ink: #8A3200;        /* text on --thoth-accent-soft */
 
   /* Semantic */
@@ -127,12 +127,12 @@
   --thoth-border-strong: rgb(255 255 255 / 0.14);
   --thoth-moon: #FF7A2F;
   --thoth-private: var(--thoth-stone-400); /* the light theme's stone is 2.3:1 on the dark badge */
-  --thoth-moon-soft: rgb(255 122 47 / 0.14);
+  --thoth-moon-soft: rgb(255 122 47 / 0.28);
   --thoth-moon-ink: #FFB386;
   --thoth-link: #5AA9FF;
   --thoth-accent: #FF7A2F;
   --thoth-on-accent: #0A0A0A;
-  --thoth-accent-soft: rgb(255 122 47 / 0.14);
+  --thoth-accent-soft: rgb(255 122 47 / 0.28);
   --thoth-accent-ink: #FFB386;
   --thoth-text-gray: #A8A29B;
   --thoth-text-brown: #CE9A78;
@@ -158,12 +158,12 @@
     --thoth-border-strong: rgb(255 255 255 / 0.14);
     --thoth-moon: #FF7A2F;
     --thoth-private: var(--thoth-stone-400);
-    --thoth-moon-soft: rgb(255 122 47 / 0.14);
+    --thoth-moon-soft: rgb(255 122 47 / 0.28);
     --thoth-moon-ink: #FFB386;
     --thoth-link: #5AA9FF;
     --thoth-accent: #FF7A2F;
     --thoth-on-accent: #0A0A0A;
-    --thoth-accent-soft: rgb(255 122 47 / 0.14);
+    --thoth-accent-soft: rgb(255 122 47 / 0.28);
     --thoth-accent-ink: #FFB386;
     --thoth-text-gray: #A8A29B;
     --thoth-text-brown: #CE9A78;
