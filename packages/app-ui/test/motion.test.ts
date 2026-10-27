@@ -234,7 +234,7 @@ describe("what animates, and how", () => {
         const allowed =
           CHEAP.has(property) ||
           (property === "grid-template-rows" && d.rule.selector === ".tree-collapse") ||
-          (property === "grid-template-columns" && d.rule.selector === ".shell") || (property === "width" && d.rule.selector.includes("::-webkit-progress-value"));
+          (property === "grid-template-columns" && d.rule.selector === ".shell[data-sidebar-moving]") || (property === "width" && d.rule.selector.includes("::-webkit-progress-value"));
         if (!allowed) bad.push(`${where(d)}: ${property}`);
       }
     }

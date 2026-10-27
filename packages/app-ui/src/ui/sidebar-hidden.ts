@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 const listeners = new Set<() => void>();
+const MOVE_MS = 400;
 
 export function requestShowSidebar(): void {
   for (const listener of [...listeners]) listener();
@@ -26,6 +27,8 @@ export function onShowSidebarRequest(listener: () => void): () => void {
 
 export interface SidebarHidden {
   hidden: boolean;
+  /** True for a moment after it was hidden or shown: the shell's column moves only then, never while it is resized. */
+  moving: boolean;
   setHidden(hidden: boolean): void;
   toggle(): void;
   /** The sidebar element, the Hide button in it and the Show button in the tab bar (for focus). */
@@ -36,6 +39,7 @@ export interface SidebarHidden {
 
 export function useSidebarHidden({ initial, save }: { initial(): boolean; save(hidden: boolean): void }): SidebarHidden {
   const [hidden, setState] = useState(initial);
+  const [moving, setMoving] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const hideRef = useRef<HTMLButtonElement | null>(null);
   const showRef = useRef<HTMLButtonElement | null>(null);
@@ -53,6 +57,7 @@ export function useSidebarHidden({ initial, save }: { initial(): boolean; save(h
     else if (!next && (active === null || active === document.body || active === showRef.current)) refocus.current = hideRef;
     latest.current = next;
     setState(next);
+    setMoving(true);
     saveRef.current(next);
   }, []);
   const toggle = useCallback(() => setHidden(!latest.current), [setHidden]);
@@ -65,5 +70,12 @@ export function useSidebarHidden({ initial, save }: { initial(): boolean; save(h
 
   useEffect(() => onShowSidebarRequest(() => setHidden(false)), [setHidden]);
 
-  return { hidden, setHidden, toggle, sidebarRef, hideRef, showRef };
+  // Longer than the slowest transition token, so the move is never cut short.
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setTimeout(() => setMoving(false), MOVE_MS);
+    return () => clearTimeout(timer);
+  }, [moving, hidden]);
+
+  return { hidden, moving, setHidden, toggle, sidebarRef, hideRef, showRef };
 }

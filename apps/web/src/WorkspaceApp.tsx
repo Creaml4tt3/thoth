@@ -336,7 +336,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     <HintContext value={hints}>
     <FavoritesContext value={favoritesApi}>
     <PageHostContext.Provider value={pageHost}>
-      <div className="shell web-shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined}>
+      <div className="shell web-shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
         <aside ref={side.sidebarRef} className="sidebar" aria-label={t.web.sidebar} inert={side.hidden} aria-hidden={side.hidden || undefined}>
           <div className="ws">
             <button type="button" className="ws-home" aria-label={t.home.brand} aria-keyshortcuts={homeKeys?.aria} {...tip(t.home.title, homeKeys?.keys)} onClick={goHome}>

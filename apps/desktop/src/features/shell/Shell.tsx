@@ -398,7 +398,7 @@ export function Shell() {
   return (
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
-    <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined}>
+    <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
       <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={goHome} />
       <main className="main">
         <TabBar
