@@ -50,7 +50,8 @@ test.beforeEach(async () => {
   asked = [];
   opened = [];
   latest = createServer((req, res) => {
-    asked.push(`${req.method} ${req.url} ${req.headers["user-agent"]}`);
+    // Only the host's requests count: tools on the machine probe new local ports with a bare `GET /`.
+    if (req.url !== "/") asked.push(`${req.method} ${req.url} ${req.headers["user-agent"]}`);
     if (req.url === "/latest.json") res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(LATEST));
     else res.writeHead(404).end();
   });

@@ -111,7 +111,9 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
       const file = normalize(join(options.dist, url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname)));
       const safe = file.startsWith(options.dist + sep) ? file : join(options.dist, "index.html");
       // A window's page starting to load (a reload, a restart on the same origin): its old handles go, as in the shell.
-      if (safe.endsWith(`${sep}index.html`)) await releaseWindow(url.searchParams.get("window") ?? "main");
+      // Only a browser's navigation counts: tools on the machine probe new local ports with a bare `GET /`, which would
+      // otherwise close the open Private Space under the test.
+      if (safe.endsWith(`${sep}index.html`) && req.headers["sec-fetch-mode"] === "navigate") await releaseWindow(url.searchParams.get("window") ?? "main");
       const data = await readFile(safe).catch(() => readFile(join(options.dist, "index.html")));
       res.writeHead(200, { "content-type": TYPES[extname(safe)] ?? "application/octet-stream" }).end(data);
     })().catch((error: unknown) => res.writeHead(500).end(String(error)));

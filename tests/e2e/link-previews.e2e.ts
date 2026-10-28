@@ -75,7 +75,8 @@ test.beforeAll(async () => {
 test.beforeEach(async ({ page, context }) => {
   served = [];
   pages = createServer((req, res) => {
-    served.push(req.url ?? "");
+    // Only the host's requests count: tools on the machine probe new local ports with a bare `GET /`.
+    if (req.url !== "/") served.push(req.url ?? "");
     if (req.url === "/article") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(ARTICLE);
     } else if (req.url === "/cover.png") {
