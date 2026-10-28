@@ -1317,6 +1317,18 @@ still marked `REVIEW` until the owner has seen it.
 - Share page: SVG pictures through `<img>`, the file inline with a no-script CSP (ADR-0023 amendment, Proposed).
 - Breadcrumbs scroll sideways on one row, starting at the page's crumb.
 
+### In-app updates (ADR-0034, 2026-10-28), built, waiting for review
+
+- The Tauri updater plugin's Rust API behind the host's `update.install|cancel|status|restart`; no plugin permission
+  for the webview. Update → progress (Cancel) → Restart now or Later, in the popup, the notification list and
+  Settings → Updates, with a Download fallback for every failure.
+- `latest.json` gets the updater's `platforms`; the 0.2.2 reader still reads it (`tests/old_notice.rs`). The release
+  stops on the placeholder key, a missing private key or an installer without its signed update.
+- **Before the 0.2.3 tag:** the real public key in `tauri.conf.json` (`plugins.updater.pubkey`).
+- Evidence: `crates/thoth-host/tests/in_app_updates.rs`, `old_notice.rs`; `apps/desktop/test/update-install.test.ts`,
+  `updates.test.tsx`; `tests/release/publish-downloads.test.ts`; `tests/e2e/in-app-updates.e2e.ts`.
+- Not checked: a real update from one installed version to the next on macOS, Windows or Linux.
+
 ## 4. Deviations and clarifications (none change a locked decision)
 
 1. **Durable sync metadata outside SQLite.** `external_locations` and

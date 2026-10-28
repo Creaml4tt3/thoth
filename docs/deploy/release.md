@@ -31,6 +31,7 @@ downloads page; nothing needs to change on the old one.
 2. **GitHub secrets**, in the repository's `downloads` environment (Settings → Environments → downloads):
    `R2_ACCOUNT_ID` (the Cloudflare account ID), `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` (from the token).
    Enter them in GitHub only, never in a chat, a file or a terminal log.
+3. **The update signing key** (in-app updates, ADR-0034): see "Signing in-app updates" below.
 
 ## Releasing a version
 
@@ -113,6 +114,29 @@ Not covered by CI: Windows on ARM (only x64 is built), FAT/exFAT and network vol
 and deletes fall back to the classic, non-POSIX semantics there), and OneDrive folders (Windows shows cloud
 placeholders to apps as plain files, so they should work; if a placeholder is exposed as a reparse point, the host
 refuses it like any other).
+
+## Signing in-app updates
+
+In-app updates (ADR-0034) install only files signed with Thoth's updater key (minisign, not a Developer ID). Once:
+
+1. `pnpm --filter @thoth/desktop tauri signer generate -w ~/.tauri/thoth-updater.key`, with a password.
+2. Repository secrets (Settings → Secrets → Actions; the `build` job has no environment):
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/thoth-updater.key` and
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (type the password).
+3. The contents of `~/.tauri/thoth-updater.key.pub` go into `apps/desktop/src-tauri/tauri.conf.json` as
+   `plugins.updater.pubkey`. A release stops while it is still `THOTH_UPDATER_PUBKEY_PLACEHOLDER`, or while the private
+   key secret is missing.
+4. **Back up the private key file and its password** (a password manager). If either is lost, installed apps can never
+   update in the app again: a new key means a new public key in the app, and everyone installs that version by hand
+   once. Never paste either into a chat, a file in the repo or a log.
+
+Each release then uploads, next to the installers, the signed update files (`*.sig`, and the Mac app archive
+`Thoth_<version>_universal.app.tar.gz`), and `latest.json` lists them under `platforms`. The website lists only the
+installers.
+
+To try an update locally: build two debug versions with `THOTH_UPDATE_URL=http://127.0.0.1:<port>/latest.json`, signed
+with a throwaway key (never committed), and serve the newer one's files and `latest.json` from that port. A release
+build refuses an `http` address.
 
 ## Signing (not yet)
 

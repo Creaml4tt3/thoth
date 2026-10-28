@@ -31,7 +31,7 @@ trade-off.
 | [0019](0019-tab-order-and-windows.md) | Tab order and windows | Accepted 2026-10-26; amendment (live tab preview, tab width, sidebar sections) Proposed 2026-10-26 |
 | [0020](0020-links-from-pasted-urls-and-link-previews.md) | Links from pasted URLs and link previews | Accepted 2026-10-26 |
 | [0021](0021-connected-apps-read-only-mcp-server.md) | Connected apps: a read-only MCP server | Accepted 2026-10-26 |
-| [0022](0022-update-notice.md) | Update notice: a popup when a new desktop version is out | Accepted 2026-10-26 |
+| [0022](0022-update-notice.md) | Update notice: a popup when a new desktop version is out | Accepted 2026-10-26; rule 1 superseded by 0034 |
 | [0023](0023-public-read-only-share-links.md) | Public read-only share links for workspace pages | Accepted 2026-10-25; SVG pictures amendment Proposed 2026-10-28 |
 | [0024](0024-workspace-members-and-invite-links.md) | Workspace members and invite links | Accepted 2026-10-26 |
 | [0025](0025-several-workspaces-per-account.md) | Several workspaces per account: create, rename, delete, restore | Accepted 2026-10-26 |
@@ -43,6 +43,7 @@ trade-off.
 | [0031](0031-thothnotes-domain-and-bundle-identifier.md) | thothnotes.com, and the bundle identifier com.thothnotes.desktop | Proposed 2026-10-27 |
 | [0032](0032-first-run-welcome-pages-and-tour.md) | First run: Welcome pages and a tour of the basic tools | Proposed 2026-10-27 |
 | [0033](0033-feedback-from-users.md) | Feedback from users, in the apps and on the website | Proposed 2026-10-27 |
+| [0034](0034-in-app-updates.md) | In-app updates: signed, downloaded when the person clicks Update | Proposed 2026-10-28 |
 
 Template: [0000-template.md](0000-template.md).
 

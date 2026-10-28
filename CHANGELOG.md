@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- The desktop app can update itself: click Update in the new-version popup, and Thoth downloads the new version, checks that Thoth signed it, installs it and asks before restarting. Turn it off in Settings → Updates to keep the Download button. From 0.2.2 or older, install this version by hand once. Not for .deb installs on Linux.
+
 ## [0.2.2] - 2026-10-28
 
 ### Changed

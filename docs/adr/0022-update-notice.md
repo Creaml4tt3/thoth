@@ -1,6 +1,6 @@
 # ADR-0022: Update notice
 
-- **Status:** Accepted (owner, 2026-10-26)
+- **Status:** Accepted (owner, 2026-10-26); rule 1 superseded by ADR-0034 (in-app updates, from 0.2.3)
 - **Date:** 2026-10-26
 - **Deciders:** project owner (the request); rules 1 to 5 were decided by the orchestrator for the owner. The details
   marked "(this ADR)" were decided while implementing them.
@@ -76,6 +76,12 @@ Constraints:
 6. **Host commands**, each granted to the webview by name (no plugin): `update.check({ force? })` and
    `update.settings({ notify?, skip? })`. "Download" and "What's new" use the existing `link.open`. A host created
    without `Host::with_updates` (the harness without `--update-url`, existing tests) has no notice and never asks.
+
+## Amendment (2026-10-28): in-app updates
+
+Rule 1 is superseded by ADR-0034: from 0.2.3 the app can download, verify and install an update when the person
+clicks Update, through the Tauri updater plugin's Rust API in the host. Everything else here still holds; Download
+stays wherever in-app updates are off or unsupported.
 
 ## Consequences
 
