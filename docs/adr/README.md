@@ -43,7 +43,7 @@ trade-off.
 | [0031](0031-thothnotes-domain-and-bundle-identifier.md) | thothnotes.com, and the bundle identifier com.thothnotes.desktop | Proposed 2026-10-27 |
 | [0032](0032-first-run-welcome-pages-and-tour.md) | First run: Welcome pages and a tour of the basic tools | Proposed 2026-10-27 |
 | [0033](0033-feedback-from-users.md) | Feedback from users, in the apps and on the website | Proposed 2026-10-27 |
-| [0034](0034-in-app-updates.md) | In-app updates: signed, downloaded when the person clicks Update | Proposed 2026-10-28 |
+| [0034](0034-in-app-updates.md) | In-app updates: signed, downloaded when the person clicks Update | Accepted 2026-10-28 |
 
 Template: [0000-template.md](0000-template.md).
 

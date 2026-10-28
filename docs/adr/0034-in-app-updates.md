@@ -1,6 +1,6 @@
 # ADR-0034: In-app updates
 
-- **Status:** Proposed
+- **Status:** Accepted (owner, 2026-10-28)
 - **Date:** 2026-10-28
 - **Deciders:** owner (rules 1 to 4); implementation agent and orchestrator (the rest, marked "(this ADR)")
 - **Supersedes:** ADR-0022 rule 1 ("a notice, not an installer"). The rest of ADR-0022 (when it checks, the fetch rules,

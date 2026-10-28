@@ -1317,7 +1317,7 @@ still marked `REVIEW` until the owner has seen it.
 - Share page: SVG pictures through `<img>`, the file inline with a no-script CSP (ADR-0023 amendment, Proposed).
 - Breadcrumbs scroll sideways on one row, starting at the page's crumb.
 
-### In-app updates (ADR-0034, 2026-10-28), built, waiting for review
+### In-app updates (ADR-0034, 2026-10-28), accepted, shipped in 0.2.3
 
 - The Tauri updater plugin's Rust API behind the host's `update.install|cancel|status|restart`; no plugin permission
   for the webview. Update → progress (Cancel) → Restart now or Later, in the popup, the notification list and
