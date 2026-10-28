@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.2.5] - 2026-10-29
+
+### Added
+
+- Download as Markdown: a button in the page header and an item in a page’s right-click menu save the page as a .md file named after it, in your Private Space and in workspaces. On the desktop you choose where it goes; on the web your browser downloads it. Pictures stay as links. Not offered in workspaces that do not let pages be copied out.
+
 ## [0.2.4] - 2026-10-29
 
 ### Added
@@ -161,6 +167,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.2.5]: https://github.com/Creaml4tt3/thoth/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/Creaml4tt3/thoth/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/Creaml4tt3/thoth/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Creaml4tt3/thoth/compare/v0.2.1...v0.2.2
