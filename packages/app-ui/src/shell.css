@@ -174,7 +174,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .ctx-item:disabled { color: var(--thoth-ink-faint); cursor: default; }
 .ctx-danger:not(:disabled) { color: var(--thoth-danger); }
 .ctx-sep { margin-top: 4px; box-shadow: 0 -5px 0 -4px var(--thoth-border); }
-.ctx-item[role="menuitemradio"]::before { content: ""; width: 6px; height: 6px; margin-right: -8px; border-radius: 50%; flex: none; order: -1; }
+.ctx-item[role="menuitemradio"] { justify-content: flex-start; gap: 8px; }
+.ctx-item[role="menuitemradio"]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .ctx-item[aria-checked="true"]::before { background: var(--thoth-accent); }
 .color-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .color-choice { all: unset; box-sizing: border-box; display: flex; gap: 8px; align-items: center; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); border: 1px solid var(--thoth-border); cursor: pointer; font: var(--thoth-text-ui); }
