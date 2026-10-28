@@ -199,9 +199,9 @@ export const en = {
     /** Said once, politely, when the popup appears (it takes no focus). */
     announce: (version: string) => `A new version of Thoth, ${version}, is out.`,
     openFailed: "Could not open your browser.",
-    general: "General",
+    general: "Updates",
     notify: "Tell me when a new version is out",
-    notifyHint: "When it opens, and once a day while it stays open, Thoth asks download.thothnotes.com which version is newest, with nothing but its own version number. Nothing is downloaded or installed for you. Off means no request at all.",
+    notifyHint: "When it opens, and once a day while it stays open, Thoth asks download.thothnotes.com which version is newest, with nothing but its own version number. Off means no request at all.",
     current: (version: string) => `You have Thoth ${version}.`,
     checkNow: "Check now",
     checking: "Checking…",
@@ -209,6 +209,42 @@ export const en = {
     available: (version: string) => `Thoth ${version} is out.`,
     failed: "Could not check. Try again later.",
     off: "Turn on “Tell me when a new version is out” to check.",
+
+    // In-app updates (ADR-0034).
+    bodyInApp: (date: string | undefined) => `${date ? `Released ${date}. ` : ""}Update downloads it, checks that Thoth signed it, and installs it. You choose when to restart.`,
+    update: "Update",
+    install: "Download and install updates in the app",
+    installHint: "Only when you click Update: Thoth downloads the new version from download.thothnotes.com, checks its signature, and installs it. Off: Download opens the downloads page instead.",
+    downloadingTitle: (version: string) => `Updating to Thoth ${version}`,
+    downloading: "Downloading…",
+    progressLabel: "Download progress",
+    /** `received` and `total` in bytes; `total` may be unknown. */
+    progress: (received: number, total: number | undefined) => {
+      const mb = (n: number) => `${(n / 1_048_576).toFixed(1)} MB`;
+      return total ? `${Math.floor((received / total) * 100)}% (${mb(received)} of ${mb(total)})` : mb(received);
+    },
+    cancel: "Cancel",
+    readyTitle: (version: string) => `Thoth ${version} is ready`,
+    readyInstalled: "It is installed. Restart Thoth to use it. Your changes are saved first.",
+    readyOnRestart: "It installs when Thoth restarts; Thoth closes for a moment. Your changes are saved first.",
+    restartNow: "Restart now",
+    restarting: "Restarting…",
+    saveFailed: "Some changes could not be saved, so Thoth did not restart. Check the page for the problem, then try again.",
+    tryAgain: "Try again",
+    busy: (runs: number) => `${runs === 1 ? "An assistant is" : `${runs} assistants are`} still working. Restarting stops ${runs === 1 ? "it" : "them"}.`,
+    restartAnyway: "Restart anyway",
+    failedTitle: (version: string) => `Thoth ${version} was not installed`,
+    failedReason: {
+      offline: "Thoth could not download the update. Check your connection and try again, or download it from the website.",
+      verify: "The update could not be verified as signed by Thoth, so nothing was installed. Download it from the website instead.",
+      disk: "There is not enough space on the disk for the update. Free some space and try again, or download it from the website.",
+      cancelled: "The update was cancelled. Nothing was installed.",
+      failed: "The update could not be installed. Download it from the website instead.",
+    } as Record<"offline" | "verify" | "disk" | "cancelled" | "failed", string>,
+    /** Said politely at the start, each quarter, and the end of a download (never for every chunk). */
+    announceProgress: (version: string, percent: number) => `Downloading Thoth ${version}: ${percent}%`,
+    announceReady: (version: string) => `Thoth ${version} is ready. Restart to use it.`,
+    announceFailed: (version: string) => `Thoth ${version} was not installed.`,
   },
 
   /** Settings → Connected apps, and the question when an app connects (ADR-0021). */

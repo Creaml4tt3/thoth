@@ -176,9 +176,9 @@ export const th: DesktopStrings = {
     skip: "ข้ามเวอร์ชันนี้",
     announce: (version) => `Thoth เวอร์ชันใหม่ ${version} ออกแล้ว`,
     openFailed: "เปิดเบราว์เซอร์ไม่ได้",
-    general: "ทั่วไป",
+    general: "การอัปเดต", // REVIEW
     notify: "แจ้งฉันเมื่อมีเวอร์ชันใหม่",
-    notifyHint: "เมื่อเปิดแอป และวันละครั้งระหว่างที่ยังเปิดอยู่ Thoth จะถามที่ download.thothnotes.com ว่าเวอร์ชันล่าสุดคืออะไร โดยส่งไปเพียงหมายเลขเวอร์ชันของตัวเองเท่านั้น ไม่มีการดาวน์โหลดหรือติดตั้งให้เอง ถ้าปิดไว้ จะไม่มีการส่งคำขอเลย",
+    notifyHint: "เมื่อเปิดแอป และวันละครั้งระหว่างที่ยังเปิดอยู่ Thoth จะถามที่ download.thothnotes.com ว่าเวอร์ชันล่าสุดคืออะไร โดยส่งไปเพียงหมายเลขเวอร์ชันของตัวเองเท่านั้น ถ้าปิดไว้ จะไม่มีการส่งคำขอเลย",
     current: (version) => `คุณใช้ Thoth ${version}`,
     checkNow: "ตรวจสอบเดี๋ยวนี้",
     checking: "กำลังตรวจสอบ…",
@@ -186,6 +186,40 @@ export const th: DesktopStrings = {
     available: (version) => `Thoth ${version} ออกแล้ว`,
     failed: "ตรวจสอบไม่ได้ ลองใหม่ภายหลัง",
     off: "เปิด “แจ้งฉันเมื่อมีเวอร์ชันใหม่” เพื่อตรวจสอบ",
+
+    // In-app updates (ADR-0034). REVIEW: every string below needs a native reader.
+    bodyInApp: (date) => `${date ? `เผยแพร่เมื่อ ${date} ` : ""}ปุ่มอัปเดตจะดาวน์โหลด ตรวจว่า Thoth เป็นผู้ลงนาม แล้วติดตั้งให้ คุณเลือกได้ว่าจะรีสตาร์ตเมื่อไร`, // REVIEW
+    update: "อัปเดต", // REVIEW
+    install: "ดาวน์โหลดและติดตั้งอัปเดตในแอป", // REVIEW
+    installHint: "เฉพาะเมื่อคุณกดอัปเดต: Thoth จะดาวน์โหลดเวอร์ชันใหม่จาก download.thothnotes.com ตรวจลายเซ็น แล้วติดตั้งให้ ถ้าปิดไว้ ปุ่มดาวน์โหลดจะเปิดหน้าดาวน์โหลดแทน", // REVIEW
+    downloadingTitle: (version) => `กำลังอัปเดตเป็น Thoth ${version}`, // REVIEW
+    downloading: "กำลังดาวน์โหลด…", // REVIEW
+    progressLabel: "ความคืบหน้าการดาวน์โหลด", // REVIEW
+    progress: (received, total) => {
+      const mb = (n: number) => `${(n / 1_048_576).toFixed(1)} MB`;
+      return total ? `${Math.floor((received / total) * 100)}% (${mb(received)} จาก ${mb(total)})` : mb(received); // REVIEW
+    },
+    cancel: "ยกเลิก",
+    readyTitle: (version) => `Thoth ${version} พร้อมแล้ว`, // REVIEW
+    readyInstalled: "ติดตั้งแล้ว รีสตาร์ต Thoth เพื่อใช้งาน การแก้ไขของคุณจะถูกบันทึกก่อน", // REVIEW
+    readyOnRestart: "จะติดตั้งเมื่อ Thoth รีสตาร์ต Thoth จะปิดไปครู่หนึ่ง การแก้ไขของคุณจะถูกบันทึกก่อน", // REVIEW
+    restartNow: "รีสตาร์ตเดี๋ยวนี้", // REVIEW
+    restarting: "กำลังรีสตาร์ต…", // REVIEW
+    saveFailed: "บันทึกการแก้ไขบางส่วนไม่ได้ Thoth จึงยังไม่รีสตาร์ต ตรวจดูปัญหาในหน้านั้นแล้วลองใหม่", // REVIEW
+    tryAgain: "ลองอีกครั้ง",
+    busy: (runs) => `ผู้ช่วย ${runs} รายการยังทำงานอยู่ การรีสตาร์ตจะหยุดงานนั้น`, // REVIEW
+    restartAnyway: "รีสตาร์ตเลย", // REVIEW
+    failedTitle: (version) => `ไม่ได้ติดตั้ง Thoth ${version}`, // REVIEW
+    failedReason: {
+      offline: "Thoth ดาวน์โหลดอัปเดตไม่ได้ ตรวจการเชื่อมต่อแล้วลองใหม่ หรือดาวน์โหลดจากเว็บไซต์", // REVIEW
+      verify: "ยืนยันไม่ได้ว่าอัปเดตนี้ลงนามโดย Thoth จึงไม่ได้ติดตั้งอะไรเลย ดาวน์โหลดจากเว็บไซต์แทน", // REVIEW
+      disk: "พื้นที่ดิสก์ไม่พอสำหรับอัปเดต ลบไฟล์ที่ไม่ใช้แล้วลองใหม่ หรือดาวน์โหลดจากเว็บไซต์", // REVIEW
+      cancelled: "ยกเลิกอัปเดตแล้ว ไม่ได้ติดตั้งอะไร", // REVIEW
+      failed: "ติดตั้งอัปเดตไม่ได้ ดาวน์โหลดจากเว็บไซต์แทน", // REVIEW
+    },
+    announceProgress: (version, percent) => `กำลังดาวน์โหลด Thoth ${version}: ${percent}%`, // REVIEW
+    announceReady: (version) => `Thoth ${version} พร้อมแล้ว รีสตาร์ตเพื่อใช้งาน`, // REVIEW
+    announceFailed: (version) => `ไม่ได้ติดตั้ง Thoth ${version}`, // REVIEW
   },
 
   // Settings → Connected apps and the question when an app connects (ADR-0021). "Private Space" and "MCP" stay in English, as elsewhere.

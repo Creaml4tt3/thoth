@@ -9,3 +9,15 @@
 /* Settings → General (UpdateSettings.tsx). */
 .update-settings .set-actions { align-items: center; }
 .update-settings .muted { color: var(--thoth-ink-secondary); }
+
+/* In-app updates (InstallPanel.tsx, ADR-0034): the progress bar and the states after Update, in the popup and Settings. */
+.update-install { display: grid; gap: var(--thoth-space-2); }
+.update-install p { margin: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); display: grid; gap: var(--thoth-space-1); }
+.update-install .update-problem { color: var(--thoth-ink-primary); }
+.update-progress { inline-size: 100%; block-size: 6px; appearance: none; border: 0; border-radius: 999px; overflow: hidden; background: var(--thoth-bg-active); accent-color: var(--thoth-accent); }
+.update-progress::-webkit-progress-bar { background: var(--thoth-bg-active); border-radius: 999px; }
+.update-progress::-webkit-progress-value { background: var(--thoth-accent); border-radius: 999px; transition: inline-size var(--thoth-dur-base) var(--thoth-ease-out); }
+.update-progress::-moz-progress-bar { background: var(--thoth-accent); border-radius: 999px; }
+.update-progress-text { font-variant-numeric: tabular-nums; }
+.update-settings .update-install { margin-top: var(--thoth-space-2); }
+@media (prefers-reduced-motion: reduce) { .update-progress::-webkit-progress-value { transition: none; } }

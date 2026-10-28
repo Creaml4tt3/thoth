@@ -2,11 +2,11 @@
 /**
  * The update notice on the desktop (ADR-0022): a small dialog in the corner when the host says a newer version is out;
  * nothing for the same or an older one; "Skip this version" remembered; "Later"; "Download" and "What's new" through the
- * host; Settings → General (the switch and "Check now"); and an entry in the notification list that is never a system
+ * host; Settings → Updates (the switches and "Check now"); and an entry in the notification list that is never a system
  * notification. The host is a fake that answers like `update.check`; the host's own rules are tested in Rust.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { UpdateCheck, UpdateSettings, Updates, Links } from "@thoth/platform";
+import type { InstallState, RestartAnswer, UpdateCheck, UpdateSettings, Updates, Links } from "@thoth/platform";
 import type { SystemNotification, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
 import { DEFAULT_OPTIONS } from "../src/app/App.tsx";
 import { NOTIFICATION_PREFS_KEY } from "../src/features/notifications/prefs.ts";
@@ -23,12 +23,47 @@ function newer(over: Partial<Extract<UpdateCheck, { state: "available" }>["updat
 }
 const CURRENT: UpdateCheck = { state: "current", checkedAt: 1_900_000_000 };
 
-/** Answers like the host's `update.check` and `update.settings`, and keeps the calls. */
+/** Answers like the host's `update.*` commands (the notice and in-app updates), and keeps the calls. */
 class FakeUpdates implements Updates {
   checks: { force: boolean }[] = [];
   answer: UpdateCheck = CURRENT;
   notify = true;
   skipped: string | null = null;
+  /** In-app updates (ADR-0034): off unless a test says this copy can update itself. */
+  canInstall = false;
+  install_ = true;
+  state: InstallState = { phase: "idle" };
+  restartAnswer: RestartAnswer = { state: "restarting" };
+  calls: string[] = [];
+  listeners = new Set<(s: InstallState) => void>();
+  emit(state: InstallState) {
+    this.state = state;
+    for (const l of this.listeners) l(state);
+  }
+  async setInstall(on: boolean) {
+    this.install_ = on;
+    return this.settingsNow();
+  }
+  async install() {
+    this.calls.push("install");
+    this.state = { phase: "downloading", received: 0 };
+    return this.state;
+  }
+  async cancel() {
+    this.calls.push("cancel");
+    return this.state;
+  }
+  async status() {
+    return this.state;
+  }
+  async restart(options?: { evenIfRunning?: boolean }) {
+    this.calls.push(options?.evenIfRunning ? "restart anyway" : "restart");
+    return options?.evenIfRunning ? ({ state: "restarting" } as const) : this.restartAnswer;
+  }
+  async onProgress(listener: (s: InstallState) => void) {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
+  }
   async check(options?: { force?: boolean }): Promise<UpdateCheck> {
     this.checks.push({ force: options?.force === true });
     if (!this.notify) return { state: "off" };
@@ -37,7 +72,7 @@ class FakeUpdates implements Updates {
     return a.state === "available" && a.update.version === this.skipped ? { ...a, update: { ...a.update, skipped: true } } : a;
   }
   private settingsNow(): UpdateSettings {
-    return { available: true, current: "0.1.3", notify: this.notify, skipped: this.skipped, lastChecked: null };
+    return { available: true, current: "0.1.3", notify: this.notify, install: this.install_, canInstall: this.canInstall, skipped: this.skipped, lastChecked: null };
   }
   async settings() {
     return this.settingsNow();
@@ -251,7 +286,7 @@ describe("the notification list", () => {
   });
 });
 
-describe("Settings → General", () => {
+describe("Settings → Updates", () => {
   async function openSettings(app: Harness) {
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
     return screen.findByRole("switch", { name: "Tell me when a new version is out" });
@@ -261,7 +296,7 @@ describe("Settings → General", () => {
     const app = await start();
     const toggle = (await openSettings(app)) as HTMLInputElement;
     await waitFor(() => expect(toggle.checked).toBe(true));
-    expect(screen.getByRole("heading", { name: "General" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Updates" })).toBeTruthy();
     expect(screen.getByText("You have Thoth 0.1.3.")).toBeTruthy();
     await app.user.click(toggle);
     await waitFor(() => expect(updates.notify).toBe(false));
@@ -320,5 +355,153 @@ describe("in Thai", () => {
     for (const name of ["ดาวน์โหลด", "มีอะไรใหม่", "ไว้ทีหลัง", "ข้ามเวอร์ชันนี้"]) expect(within(dialog).getByRole("button", { name })).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: "การตั้งค่า" }));
     expect(await screen.findByRole("switch", { name: "แจ้งฉันเมื่อมีเวอร์ชันใหม่" })).toBeTruthy();
+  });
+});
+
+describe("in-app updates (ADR-0034)", () => {
+  const inApp = (over: Partial<Extract<UpdateCheck, { state: "available" }>["update"]> = {}) => newer({ inApp: true, ...over });
+  const live = () => screen.getByTestId("update-live").textContent;
+
+  it("Update takes the place of Download, downloads only when clicked, and shows progress with Cancel", async () => {
+    updates.canInstall = true;
+    updates.answer = inApp();
+    const app = await start();
+    const dialog = await findPopup();
+    expect(within(dialog).queryByRole("button", { name: "Download" })).toBeNull();
+    expect(within(dialog).getByText(/checks that Thoth signed it/)).toBeTruthy();
+    expect(updates.calls).toEqual([]);
+    await app.user.click(within(dialog).getByRole("button", { name: "Update" }));
+    expect(updates.calls).toEqual(["install"]);
+    const updating = await screen.findByRole("dialog", { name: "Updating to Thoth 0.2.0" });
+    updates.emit({ phase: "downloading", received: 3_670_016, total: 14_680_064 });
+    await waitFor(() => expect(within(updating).getByText("25% (3.5 MB of 14.0 MB)")).toBeTruthy());
+    const bar = within(updating).getByRole("progressbar", { name: "Download progress" }) as HTMLProgressElement;
+    expect([bar.value, bar.max]).toEqual([3_670_016, 14_680_064]);
+    // Milestones only: a quarter is said, the chunks between are not.
+    expect(live()).toBe("Downloading Thoth 0.2.0: 25%");
+    updates.emit({ phase: "downloading", received: 4_000_000, total: 14_680_064 });
+    await waitFor(() => expect(within(updating).getByText(/^27%/)).toBeTruthy());
+    expect(live()).toBe("Downloading Thoth 0.2.0: 25%");
+    await app.user.click(within(updating).getByRole("button", { name: "Cancel" }));
+    expect(updates.calls).toEqual(["install", "cancel"]);
+    updates.emit({ phase: "failed", reason: "cancelled" });
+    const failed = await screen.findByRole("dialog", { name: "Thoth 0.2.0 was not installed" });
+    expect(within(failed).getByText("The update was cancelled. Nothing was installed.")).toBeTruthy();
+    await app.user.click(within(failed).getByRole("button", { name: "Try again" }));
+    expect(updates.calls).toEqual(["install", "cancel", "install"]);
+  });
+
+  it("asks before restarting: Restart now or Later, and Restart now writes the edits first", async () => {
+    updates.canInstall = true;
+    updates.answer = inApp();
+    const app = await start();
+    await app.user.click(within(await findPopup()).getByRole("button", { name: "Update" }));
+    updates.emit({ phase: "ready", version: "0.2.0", installed: true });
+    const ready = await screen.findByRole("dialog", { name: "Thoth 0.2.0 is ready" });
+    expect(live()).toBe("Thoth 0.2.0 is ready. Restart to use it.");
+    expect(within(ready).getByText(/Restart Thoth to use it/)).toBeTruthy();
+    // Later keeps it for later; the list's entry brings it back in the same state.
+    await app.user.click(within(ready).getByRole("button", { name: "Later" }));
+    expect(screen.queryByRole("dialog", { name: "Thoth 0.2.0 is ready" })).toBeNull();
+    expect(updates.calls).toEqual(["install"]);
+    await app.user.click(bell());
+    await app.user.click(within(screen.getByRole("dialog", { name: "Notifications" })).getByRole("button", { name: /Thoth 0\.2\.0 is out/ }));
+    const again = await screen.findByRole("dialog", { name: "Thoth 0.2.0 is ready" });
+    await app.user.click(within(again).getByRole("button", { name: "Restart now" }));
+    await waitFor(() => expect(updates.calls).toEqual(["install", "restart"]));
+    await screen.findByText("Restarting…", { selector: ".update-install p" });
+  });
+
+  it("says when an assistant is working, and lets the person restart anyway", async () => {
+    updates.canInstall = true;
+    updates.answer = inApp();
+    updates.restartAnswer = { state: "busy", runs: 1 };
+    const app = await start();
+    await app.user.click(within(await findPopup()).getByRole("button", { name: "Update" }));
+    updates.emit({ phase: "ready", version: "0.2.0", installed: false });
+    const ready = await screen.findByRole("dialog", { name: "Thoth 0.2.0 is ready" });
+    expect(within(ready).getByText(/installs when Thoth restarts/)).toBeTruthy();
+    await app.user.click(within(ready).getByRole("button", { name: "Restart now" }));
+    await waitFor(() => expect(within(ready).getByText("An assistant is still working. Restarting stops it.")).toBeTruthy());
+    await app.user.click(within(ready).getByRole("button", { name: "Restart anyway" }));
+    expect(updates.calls).toEqual(["install", "restart", "restart anyway"]);
+  });
+
+  it("each failure says what happened and keeps the Download button", async () => {
+    updates.canInstall = true;
+    updates.answer = inApp();
+    const app = await start();
+    await app.user.click(within(await findPopup()).getByRole("button", { name: "Update" }));
+    const said: Record<string, RegExp> = { offline: /Check your connection/, verify: /could not be verified as signed by Thoth/, disk: /not enough space/, failed: /could not be installed/ };
+    for (const reason of ["offline", "verify", "disk", "failed"] as const) {
+      updates.emit({ phase: "failed", reason });
+      const failed = await screen.findByRole("dialog", { name: "Thoth 0.2.0 was not installed" });
+      await waitFor(() => expect(within(failed).getByText(said[reason]!)).toBeTruthy());
+      expect(within(failed).getByRole("button", { name: "Download" })).toBeTruthy();
+      // A bad signature is not worth trying again.
+      expect(within(failed).queryByRole("button", { name: "Try again" }) === null).toBe(reason === "verify");
+      updates.emit({ phase: "downloading", received: 0 });
+    }
+    updates.emit({ phase: "failed", reason: "verify" });
+    await app.user.click(within(await screen.findByRole("dialog", { name: "Thoth 0.2.0 was not installed" })).getByRole("button", { name: "Download" }));
+    expect(links.opened).toEqual([DOWNLOADS]);
+  });
+
+  it("with the switch off, or where the host cannot update, the popup keeps Download", async () => {
+    updates.answer = newer({ inApp: false });
+    const app = await start();
+    const dialog = await findPopup();
+    expect(within(dialog).getByRole("button", { name: "Download" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Update" })).toBeNull();
+    await app.user.click(within(dialog).getByRole("button", { name: "Download" }));
+    expect(links.opened).toEqual([DOWNLOADS]);
+    expect(updates.calls).toEqual([]);
+  });
+
+  it("Settings shows the switch only where this copy can update itself, and it tells the host", async () => {
+    const app = await start();
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await screen.findByRole("switch", { name: "Tell me when a new version is out" });
+    expect(screen.queryByRole("switch", { name: "Download and install updates in the app" })).toBeNull();
+    cleanup();
+
+    updates.canInstall = true;
+    const again = await start();
+    await again.user.click(screen.getByRole("button", { name: "Settings" }));
+    const toggle = (await screen.findByRole("switch", { name: "Download and install updates in the app" })) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await again.user.click(toggle);
+    await waitFor(() => expect(updates.install_).toBe(false));
+    expect(toggle.checked).toBe(false);
+  });
+
+  it("Settings follows the update too", async () => {
+    updates.canInstall = true;
+    updates.answer = inApp();
+    const app = await start();
+    await findPopup();
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const general = await screen.findByRole("region", { name: "Updates" });
+    await app.user.click(within(general).getByRole("button", { name: "Check now" }));
+    await app.user.click(await within(general).findByRole("button", { name: "Update" }));
+    updates.emit({ phase: "downloading", received: 1_048_576, total: 2_097_152 });
+    await waitFor(() => expect(within(general).getByRole("progressbar", { name: "Download progress" })).toBeTruthy());
+    updates.emit({ phase: "ready", version: "0.2.0", installed: true });
+    await app.user.click(await within(general).findByRole("button", { name: "Restart now" }));
+    await waitFor(() => expect(updates.calls).toEqual(["install", "restart"]));
+  });
+
+  it("in Thai", async () => {
+    setLangPreference("th");
+    updates.canInstall = true;
+    updates.answer = inApp();
+    const app = await start();
+    const dialog = await screen.findByRole("dialog", { name: "Thoth 0.2.0 ออกแล้ว" });
+    await app.user.click(within(dialog).getByRole("button", { name: "อัปเดต" }));
+    updates.emit({ phase: "ready", version: "0.2.0", installed: true });
+    const ready = await screen.findByRole("dialog", { name: "Thoth 0.2.0 พร้อมแล้ว" });
+    expect(within(ready).getByRole("button", { name: "รีสตาร์ตเดี๋ยวนี้" })).toBeTruthy();
+    await app.user.click(screen.getByRole("button", { name: "การตั้งค่า" }));
+    expect(await screen.findByRole("switch", { name: "ดาวน์โหลดและติดตั้งอัปเดตในแอป" })).toBeTruthy();
   });
 });

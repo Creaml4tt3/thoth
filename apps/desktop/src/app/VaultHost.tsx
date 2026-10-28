@@ -177,9 +177,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
             onOffer: (offer) => {
               if (notificationPrefs.get().kinds.update) notifications.push({ kind: "update", version: offer.version });
             },
+            // "Restart now" into an update (ADR-0034) writes this window's edits first, as leaving a Private Space does.
+            flush: flushAll,
           })
         : null,
-    [platform, options.updateDelayMs, options.updateIntervalMs, notificationPrefs, notifications],
+    [platform, options.updateDelayMs, options.updateIntervalMs, notificationPrefs, notifications, flushAll],
   );
   useEffect(() => updates?.start(), [updates]);
 
