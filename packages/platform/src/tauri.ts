@@ -11,8 +11,8 @@
  * call. The app may pass those functions instead via `createTauriPlatform(api)`.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps } from "./remote.ts";
+import type { CommandName, Commands, InstallState, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
 
 /** Header carrying the JSON arguments when the body is raw bytes. */
 export const ARGS_HEADER = "x-thoth-args";
@@ -24,6 +24,8 @@ export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
 /** Connected apps (ADR-0021): a request for one window to answer, and the apps waiting for Allow or Deny. */
 export const MCP_REQUEST_EVENT = "thoth:mcp-request";
 export const MCP_PENDING_EVENT = "thoth:mcp-pending";
+/** In-app updates (ADR-0034): the host's `update.progress`. */
+export const UPDATE_PROGRESS_EVENT = "thoth:update-progress";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<unknown>;
 export type TauriListen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
@@ -152,5 +154,12 @@ export function tauriConnectedApps(transport: Transport, api: TauriApi = interna
 
 export function createTauriPlatform(api?: TauriApi): Platform {
   const transport = new TauriTransport(api);
-  return { ...createRemotePlatform(transport, "tauri"), windows: tauriWindows(api), connectedApps: tauriConnectedApps(transport, api) };
+  const bound = api ?? internalsApi();
+  const updates = remoteUpdates(transport, {
+    async onProgress(listener) {
+      const unlisten = await bound.listen<InstallState>(UPDATE_PROGRESS_EVENT, (e) => listener(e.payload));
+      return () => void unlisten();
+    },
+  });
+  return { ...createRemotePlatform(transport, "tauri"), updates, windows: tauriWindows(api), connectedApps: tauriConnectedApps(transport, api) };
 }

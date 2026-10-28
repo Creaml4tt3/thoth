@@ -87,6 +87,31 @@ describe("TauriTransport", () => {
     expect(host).toContain(`"update.check", "update.settings",`);
   });
 
+  it("sends Update, Cancel and Restart to the host's in-app update commands, and hears its progress (ADR-0034)", async () => {
+    const { api, calls } = fakeApi((command) => (command === "update_restart" ? { state: "busy", runs: 1 } : { phase: "idle" }));
+    const updates = createTauriPlatform(api).updates!;
+    await updates.install();
+    await updates.cancel();
+    expect(await updates.status()).toEqual({ phase: "idle" });
+    expect(await updates.restart()).toEqual({ state: "busy", runs: 1 });
+    await updates.restart({ evenIfRunning: true });
+    await updates.setInstall(false);
+    const heard: unknown[] = [];
+    await updates.onProgress((state) => heard.push(state));
+    expect(calls.map((c) => [c[0], c[1]])).toEqual([
+      ["update_install", { args: {} }],
+      ["update_cancel", { args: {} }],
+      ["update_status", { args: {} }],
+      ["update_restart", { args: {} }],
+      ["update_restart", { args: { evenIfRunning: true } }],
+      ["update_settings", { args: { install: false } }],
+      ["listen", "thoth:update-progress"],
+    ]);
+    expect(heard).toHaveLength(1);
+    const shell = readFileSync(join(import.meta.dirname, "../../apps/desktop/src-tauri/src/lib.rs"), "utf8");
+    expect(shell).toContain(`UPDATE_PROGRESS_EVENT: &str = "thoth:update-progress"`);
+  });
+
   it("binds to window.__TAURI_INTERNALS__ like @tauri-apps/api", async () => {
     const invoked: unknown[][] = [];
     const api = internalsApi({

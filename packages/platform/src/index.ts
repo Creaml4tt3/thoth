@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, LinkPreview, McpAnswer, McpRequest, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -74,6 +74,16 @@ export interface Updates {
   setNotify(on: boolean): Promise<UpdateSettings>;
   /** "Skip this version": no notice for it or any older one. */
   skip(version: string): Promise<UpdateSettings>;
+  /** "Download and install updates in the app" on or off (ADR-0034). */
+  setInstall(on: boolean): Promise<UpdateSettings>;
+  /** Update: the host downloads, checks the signature and installs (ADR-0034). */
+  install(): Promise<InstallState>;
+  cancel(): Promise<InstallState>;
+  status(): Promise<InstallState>;
+  /** "Restart now", after this window wrote its edits. */
+  restart(options?: { evenIfRunning?: boolean }): Promise<RestartAnswer>;
+  /** The host's `update.progress` events. */
+  onProgress(listener: (state: InstallState) => void): Promise<() => void>;
 }
 
 /** Connected apps (ADR-0021): the user's settings, and the requests the host sends a window to answer. */

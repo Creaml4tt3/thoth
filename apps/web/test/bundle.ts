@@ -16,6 +16,12 @@ export const DESKTOP_ONLY = [
   "update_check",
   "update.settings",
   "update_settings",
+  // In-app updates (ADR-0034) are the desktop host's too.
+  "update.install",
+  "update_install",
+  "update.restart",
+  "update_restart",
+  "update.progress",
   "latest.json",
   "@tauri-apps",
   "plugin:fs",

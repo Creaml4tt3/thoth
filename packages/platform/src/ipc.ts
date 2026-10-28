@@ -205,7 +205,19 @@ export interface Commands {
    */
   "update.check": { args: { force?: boolean }; result: UpdateCheck };
   /** The person's choice for the notice, after applying `notify` (on or off) and `skip` (a version to skip; `null` forgets it). */
-  "update.settings": { args: { notify?: boolean; skip?: string | null }; result: UpdateSettings };
+  "update.settings": { args: { notify?: boolean; install?: boolean; skip?: string | null }; result: UpdateSettings };
+  // ---- In-app updates (ADR-0034). Desktop only: the host downloads, checks the signature and installs, after Update.
+  /** Update was clicked: starts the download (or joins the one going). Progress comes as `update.progress` events. */
+  "update.install": { args: Record<string, never>; result: InstallState };
+  /** Cancel: stops the download going, if one is. */
+  "update.cancel": { args: Record<string, never>; result: InstallState };
+  /** The update of the running app, the same for every window. */
+  "update.status": { args: Record<string, never>; result: InstallState };
+  /**
+   * "Restart now", once this window has written its edits: the other windows write theirs and close, then the app
+   * starts the new version. `busy` (nothing happens) while assistant runs are going, unless `evenIfRunning`.
+   */
+  "update.restart": { args: { evenIfRunning?: boolean }; result: RestartAnswer };
   // ---- Connected apps (ADR-0021). Desktop only: other apps read shared Private Spaces through `thoth-mcp`.
   "mcp.settings": { args: Record<string, never>; result: ConnectedAppsSettings };
   /**
@@ -235,7 +247,25 @@ export interface UpdateInfo {
   notesUrl?: string;
   /** The person chose "Skip this version" for this version or a newer one. */
   skipped: boolean;
+  /** Update downloads and installs it in the app (ADR-0034). False: Download opens the downloads page, as before. */
+  inApp?: boolean;
 }
+
+/** Why an update did not install (ADR-0034). Each keeps the Download button. */
+export type InstallFailure = "offline" | "verify" | "disk" | "cancelled" | "failed";
+
+/**
+ * The update of the running app (ADR-0034). `ready.installed`: in place, a restart starts it (macOS, the AppImage);
+ * false: the installer runs at restart (Windows).
+ */
+export type InstallState =
+  | { phase: "idle" }
+  | { phase: "downloading"; received: number; total?: number }
+  | { phase: "ready"; version: string; installed: boolean }
+  | { phase: "failed"; reason: InstallFailure }
+  | { phase: "restarting" };
+
+export type RestartAnswer = { state: "restarting" } | { state: "busy"; runs: number };
 
 /**
  * What `update.check` found. `unavailable`: this build has no update notice. `off`: the person turned it off. `waiting`:
@@ -254,6 +284,10 @@ export interface UpdateSettings {
   current: string;
   /** "Tell me when a new version is out"; on by default. Off means no request at all. */
   notify: boolean;
+  /** "Download and install updates in the app" (ADR-0034); on by default. */
+  install?: boolean;
+  /** Whether this copy can update itself (the switch shows only then). */
+  canInstall?: boolean;
   /** The version the person skipped, if any. */
   skipped: string | null;
   /** When the last request was made (Unix seconds), if one was. */

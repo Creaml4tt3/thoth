@@ -313,12 +313,19 @@ export function remoteLinks(transport: Transport): Links {
   };
 }
 
-export function remoteUpdates(transport: Transport): Updates {
+/** The update notice and in-app updates; `onProgress` comes from the platform's own event channel (none: never). */
+export function remoteUpdates(transport: Transport, events: Pick<Updates, "onProgress"> = { onProgress: async () => () => undefined }): Updates {
   return {
     check: (options) => transport.call("update.check", options?.force ? { force: true } : {}),
     settings: () => transport.call("update.settings", {}),
     setNotify: (on) => transport.call("update.settings", { notify: on }),
     skip: (version) => transport.call("update.settings", { skip: version }),
+    setInstall: (on) => transport.call("update.settings", { install: on }),
+    install: () => transport.call("update.install", {}),
+    cancel: () => transport.call("update.cancel", {}),
+    status: () => transport.call("update.status", {}),
+    restart: (options) => transport.call("update.restart", options?.evenIfRunning ? { evenIfRunning: true } : {}),
+    onProgress: (listener) => events.onProgress(listener),
   };
 }
 

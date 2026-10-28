@@ -5,8 +5,8 @@
  * browser can drive the real UI against the real Rust host.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps } from "./remote.ts";
+import type { CommandName, Commands, InstallState, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
 
 export class HttpTransport implements Transport {
   private readonly base: string;
@@ -71,11 +71,10 @@ function bridgeWindows(): Windows {
   };
 }
 
-/**
- * Connected apps (ADR-0021) for the bridge: the `mcp.*` commands, and the host's `mcp.request` and `mcp.pending` events
- * as named events on the bridge's event stream.
- */
-function bridgeConnectedApps(transport: HttpTransport, base: string, token: string): ConnectedApps {
+/** Host events as named events on the bridge's event stream (Connected apps, in-app updates). */
+type BridgeEvents = <T>(event: string, listener: (payload: T) => void) => Promise<() => void>;
+
+function bridgeEvents(base: string, token: string): BridgeEvents {
   // One stream for every listener of this page: browsers allow only a few connections per host, and two windows'
   // streams must not use up the ones their commands need.
   let source: EventSource | null = null;
@@ -94,6 +93,11 @@ function bridgeConnectedApps(transport: HttpTransport, base: string, token: stri
       }
     };
   };
+  return on;
+}
+
+/** Connected apps (ADR-0021) for the bridge: the `mcp.*` commands, and the host's `mcp.request` and `mcp.pending` events. */
+function bridgeConnectedApps(transport: HttpTransport, on: BridgeEvents): ConnectedApps {
   return remoteConnectedApps(transport, {
     onRequest: (listener) => on<McpRequest>("mcp.request", listener),
     onPending: (listener) => on<{ apps: string[] }>("mcp.pending", (payload) => listener(payload.apps)),
@@ -102,5 +106,12 @@ function bridgeConnectedApps(transport: HttpTransport, base: string, token: stri
 
 export function createHttpPlatform(base: string, token: string): Platform {
   const transport = new HttpTransport(base, token);
-  return { ...createRemotePlatform(transport, "bridge"), windows: bridgeWindows(), connectedApps: bridgeConnectedApps(transport, base, token) };
+  const on = bridgeEvents(base, token);
+  return {
+    ...createRemotePlatform(transport, "bridge"),
+    // In-app updates (ADR-0034): the host's `update.progress`.
+    updates: remoteUpdates(transport, { onProgress: (listener) => on<InstallState>("update.progress", listener) }),
+    windows: bridgeWindows(),
+    connectedApps: bridgeConnectedApps(transport, on),
+  };
 }

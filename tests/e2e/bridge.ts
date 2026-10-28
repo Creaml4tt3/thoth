@@ -49,7 +49,7 @@ export async function startBridge(options: { dist: string; bridgeDir: string; ho
   const transport = new StdioTransport({
     ...options.host,
     onHostEvent: (event, payload) => {
-      if (event === "mcp.request" || event === "mcp.pending") for (const res of streams) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+      if (event === "mcp.request" || event === "mcp.pending" || event === "update.progress") for (const res of streams) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
       options.host.onHostEvent?.(event, payload);
     },
   });
