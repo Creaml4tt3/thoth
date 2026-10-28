@@ -1,0 +1,70 @@
+{
+  "version": "0.2.3",
+  "date": "2026-11-02",
+  "base": "https://download.thothnotes.com/v0.2.3/",
+  "notes": "https://thothnotes.com/changelog/#v0-2-3",
+  "files": [
+    {
+      "platform": "linux",
+      "kind": "appimage",
+      "arch": "x64",
+      "file": "Thoth_0.2.3_amd64.AppImage",
+      "bytes": 26,
+      "sha256": "759bc7c5fd862be5752a917cfb4d2708ab2b8ae08c6b7b5374657da4732ace7b"
+    },
+    {
+      "platform": "linux",
+      "kind": "deb",
+      "arch": "x64",
+      "file": "Thoth_0.2.3_amd64.deb",
+      "bytes": 21,
+      "sha256": "3ccbfbfe83f8b76a6a0ef6e0dccf38a2a3f52431a2e204edd7b8363ab4258ec7"
+    },
+    {
+      "platform": "macos",
+      "kind": "dmg",
+      "arch": "universal",
+      "file": "Thoth_0.2.3_universal.dmg",
+      "bytes": 25,
+      "sha256": "b6afe7c98e6447386b244f3fbb3ed3f0bc42027fc7cba4b74444afa3e6909a55"
+    },
+    {
+      "platform": "windows",
+      "kind": "exe",
+      "arch": "x64",
+      "file": "Thoth_0.2.3_x64-setup.exe",
+      "bytes": 25,
+      "sha256": "c3119d98e57ae2e1cade0de75bcb8d80df3d597d65bf905d73a5d6c08471e637"
+    },
+    {
+      "platform": "windows",
+      "kind": "msi",
+      "arch": "x64",
+      "file": "Thoth_0.2.3_x64_en-US.msi",
+      "bytes": 25,
+      "sha256": "c129b3a01b0e3a236d2c7d011b2532efffded6d2c3da410219d9c7059cbbc8ea"
+    }
+  ],
+  "platforms": {
+    "linux-x86_64-appimage": {
+      "url": "https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_amd64.AppImage",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVGhvdGhfMC4yLjNfYW1kNjQuQXBwSW1hZ2UKdHJ1c3RlZCBjb21tZW50OiB0aW1lc3RhbXA6MQlmaWxlOlRob3RoXzAuMi4zX2FtZDY0LkFwcEltYWdlCkFBQUEK"
+    },
+    "darwin-aarch64": {
+      "url": "https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_universal.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVGhvdGhfMC4yLjNfdW5pdmVyc2FsLmFwcC50YXIuZ3oKdHJ1c3RlZCBjb21tZW50OiB0aW1lc3RhbXA6MQlmaWxlOlRob3RoXzAuMi4zX3VuaXZlcnNhbC5hcHAudGFyLmd6CkFBQUEK"
+    },
+    "darwin-x86_64": {
+      "url": "https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_universal.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVGhvdGhfMC4yLjNfdW5pdmVyc2FsLmFwcC50YXIuZ3oKdHJ1c3RlZCBjb21tZW50OiB0aW1lc3RhbXA6MQlmaWxlOlRob3RoXzAuMi4zX3VuaXZlcnNhbC5hcHAudGFyLmd6CkFBQUEK"
+    },
+    "windows-x86_64-nsis": {
+      "url": "https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_x64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVGhvdGhfMC4yLjNfeDY0LXNldHVwLmV4ZQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxCWZpbGU6VGhvdGhfMC4yLjNfeDY0LXNldHVwLmV4ZQpBQUFBCg=="
+    },
+    "windows-x86_64-msi": {
+      "url": "https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_x64_en-US.msi",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVGhvdGhfMC4yLjNfeDY0X2VuLVVTLm1zaQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxCWZpbGU6VGhvdGhfMC4yLjNfeDY0X2VuLVVTLm1zaQpBQUFBCg=="
+    }
+  }
+}
