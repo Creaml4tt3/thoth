@@ -20,6 +20,7 @@ let scratch: string;
 let vault: string;
 let bridge: Bridge;
 const revealed: unknown[] = [];
+const trashed: unknown[] = [];
 const SHOTS = process.env["SHOTS"] ?? join(REPO, "tests", ".tmp", "batch2");
 
 test.beforeAll(async () => {
@@ -33,6 +34,7 @@ const put = async (path: string, text = `# ${path.replace(/^.*\//, "").replace(/
 
 test.beforeEach(async ({ page, context }) => {
   revealed.length = 0;
+  trashed.length = 0;
   scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-around-")));
   vault = join(scratch, "Vault");
   await mkdir(vault);
@@ -40,7 +42,7 @@ test.beforeEach(async ({ page, context }) => {
   bridge = await startBridge({
     dist: built.dist,
     bridgeDir: built.bridgeDir,
-    host: { binary: built.binary, pickVault: vault, dataDir: join(scratch, "data"), onHostEvent: (event, payload) => event === "vault.revealed" && revealed.push(payload) },
+    host: { binary: built.binary, pickVault: vault, dataDir: join(scratch, "data"), onHostEvent: (event, payload) => (event === "vault.revealed" ? revealed.push(payload) : event === "vault.trashed" && trashed.push(payload)) },
   });
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
@@ -107,6 +109,25 @@ test("Show in Finder on a page and a folder asks the host for that entry, under 
   expect(revealed[1]).toEqual({ root: vault, entry: join(vault, "Projects", "Plan.md") });
 });
 
+test("Delete… on a page and a folder asks first, then the host moves that entry to the Trash", async ({ page }) => {
+  await row(page, "Beta").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete “Beta”?" });
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  expect(await axe(page, ".modal")).toEqual([]);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  expect(trashed).toEqual([]);
+
+  await row(page, "Projects").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete…" }).click();
+  await expect(page.getByRole("dialog", { name: "Delete “Projects”?" })).toContainText("including 2 pages");
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect.poll(() => trashed).toEqual([{ root: vault, entry: join(vault, "Projects") }]);
+  await expect(row(page, "Projects")).toHaveCount(0);
+  await expect(row(page, "Beta")).toBeVisible();
+});
+
 for (const scheme of ["light", "dark"] as const) {
   test(`the logo goes back to the picker and the Private Space comes back as it was; the picker, a new tab, the hidden sidebar and the tree's menu pass the accessibility check and are shown in ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
@@ -139,9 +160,10 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(current(page)).toHaveText("Beta");
     await expect(editor).toContainText("Written before leaving.");
 
-    // A new tab is empty and says how to open a page.
+    // A new tab lists the recent pages and favorites (ADR-0029, amendment of 2026-10-29).
     await page.keyboard.press("ControlOrMeta+t");
-    await expect(page.getByRole("heading", { level: 1, name: "New tab" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Recent" }).locator(".home-row-title")).toHaveText(["Beta", "Alpha"]);
     await page.mouse.move(1100, 700);
     await settled(page);
     expect(await axe(page, ".tab-panel", ".tabstrip", ".ws")).toEqual([]);

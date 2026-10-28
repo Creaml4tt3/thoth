@@ -63,13 +63,13 @@ export const en = {
     leave: "Back to Private Spaces",
     leaveBrand: "Thoth, back to Private Spaces",
     leaveFailed: "Your edits could not be saved yet, so this Private Space stays open. Check the open page, then try again.",
-    /** A new tab: nothing is open in it yet. */
-    newTabHint: (keys: string) => `Open a page from the sidebar, or search with ${keys}.`,
     /** Said after a rename when the page changed meanwhile, so the title inside it was left alone. */
     titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
     unsavedChanges: "The open page has changes that could not be saved yet.",
     settings: "Settings",
     revealFailed: (detail: string) => `Could not show it in the file manager: ${detail}`,
+    /** What the system calls its Trash, after "the": a deleted page or folder goes there. */
+    trashName: { mac: "Trash", windows: "Recycle Bin", linux: "Trash" } satisfies Record<Os, string>,
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
   },
 

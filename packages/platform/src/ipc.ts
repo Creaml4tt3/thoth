@@ -82,6 +82,8 @@ export interface Commands {
    * in `.thoth/`, and it must exist).
    */
   "vault.reveal": { args: { vault: string; path?: string }; result: null };
+  /** Moves a page or folder of the open vault (`path`, vault-relative, checked as for `vault.reveal`) to the system Trash. */
+  "vault.trash": { args: { vault: string; path: string }; result: null };
   /** True while another handle (another window) has this vault's folder open (ADR-0019). */
   "vault.shared": { args: { vault: string }; result: boolean };
 

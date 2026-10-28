@@ -42,7 +42,7 @@ describe("Share… on the desktop", () => {
     const { app, ws, group } = await workspace();
     fireEvent.contextMenu(within(group).getByRole("treeitem", { name: "Roadmap" }));
     const menu = await screen.findByRole("menu", { name: "Actions for Roadmap" });
-    expect(within(menu).getAllByRole("menuitem").at(-1)!.textContent).toBe("Share…");
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent).slice(-2)).toEqual(["Share…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "Share…" }));
     const dialog = await screen.findByRole("dialog", { name: "Share “Roadmap”" });
 

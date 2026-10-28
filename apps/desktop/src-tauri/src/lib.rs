@@ -371,6 +371,13 @@ impl FileManager for SystemFileManager {
         std::thread::spawn(move || child.wait());
         Ok(())
     }
+
+    fn trash(&self, root: &std::path::Path, entry: &std::path::Path) -> HostResult<()> {
+        if entry == root || !entry.is_absolute() || !entry.starts_with(root) {
+            return Err(HostError::bad_argument("Only something inside an open Private Space can be deleted"));
+        }
+        trash::delete(entry).map_err(|e| HostError::internal(format!("Could not move it to the Trash: {e}")))
+    }
 }
 
 /// Decodes `%XX` escapes (the header carries `encodeURIComponent(JSON.stringify(args))`).

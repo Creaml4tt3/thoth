@@ -56,26 +56,13 @@ import { FavoritesContext, type FavoriteRef } from "@thoth/app-ui/favorites/cont
 import { isPinned } from "@thoth/app-ui/tabs/model.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useFavoritesController } from "../favorites/useFavoritesController.ts";
-import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
+import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
+import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
+import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
+import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
+import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
 
 const noSubscribe = () => () => undefined;
-
-/** A new tab (ADR-0029, amendment of 2026-10-28): nothing open yet, and how to open something. */
-function NewTabView() {
-  const title = useStrings().tabs.blank;
-  const hint = useDesktopStrings().shell.newTabHint;
-  const keys = useShortcutHint("palette.open");
-  return (
-    <div className="home">
-      <div className="home-inner">
-        <div className="home-head">
-          <h1>{title}</h1>
-          <p>{hint(keys?.keys ?? "")}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
@@ -104,7 +91,7 @@ function RecoveryNotice() {
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault } = useSession();
+  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
   const t = useDesktopStrings().shell;
   const sessionTitle = useDesktopStrings().agents.session.tab;
   // Session tabs are named by their run's task.
@@ -142,6 +129,8 @@ export function Shell() {
   // Home is the Private Space picker (ADR-0029, amendment of 2026-10-28): edits are written first; one that cannot be
   // keeps this Private Space open.
   const leave = () => void switchVault().then((ok) => ok || setProblem(t.leaveFailed));
+  // A new tab shows the recent pages and favorites (ADR-0029); the page of the current tab is recorded as it opens.
+  const recent = useRecentPages(recentStore, tabs.active);
   /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
   const [tabNotice, setTabNotice] = useState<{ text: string; seq: number } | null>(null);
   const everyTab = allTabs(tabs.layout);
@@ -362,8 +351,39 @@ export function Shell() {
     const known = new Set(pages.map((p) => p.path));
     prune((tab) => (tab.kind === "page" ? !known.has(tab.path) : tab.kind === "workspace" ? remoteGone(directory, tab) : false));
   }, [pages, directory, prune]);
-  // Titles of background workspace tabs come from their trees, so those trees load.
-  const wanted = everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : []));
+  // Recent pages that are gone drop out by the same rules, each kind on its own list's change: a page list from before a
+  // rename must not drop the entry the rename just moved. The current tab's page stays, as its tab does.
+  const shownPath = useRef<string | null>(null);
+  shownPath.current = path;
+  useEffect(() => {
+    if (!pages) return;
+    const known = new Set(pages.map((p) => p.path));
+    recentStore.prune((ref) => ref.kind === "private" && ref.path !== shownPath.current && !known.has(ref.path));
+  }, [pages, recentStore]);
+  useEffect(() => recentStore.prune((ref) => ref.kind === "workspace" && remoteGone(directory, ref)), [directory, recentStore]);
+
+  const shownRecent = recent.slice(0, RECENT_SHOWN);
+  const pending = strings.tabs.loading;
+  const homeRecent: HomeRow[] = shownRecent.map(({ ref }) => {
+    const how = (o: { newTab: boolean }) => (o.newTab ? { newTab: true } : undefined);
+    if (ref.kind === "private") {
+      const folder = folderOf(ref.path);
+      return { id: `p:${ref.path}`, title: pages?.find((p) => p.path === ref.path)?.title ?? stripExtension(basename(ref.path)), space: t.local, local: true, ...(folder ? { folder } : {}), open: (o) => openPage(ref.path, how(o)) };
+    }
+    const target = { server: ref.server, workspace: ref.workspace, page: ref.page };
+    return { id: `w:${ref.server}\n${ref.workspace}\n${ref.page}`, ...workspaceRow(directory, target, { untitled: tt.untitled, pending }), open: (o) => openWorkspacePage(target, how(o)) };
+  });
+  const homeFavorites: HomeRow[] = favorites.items.map((item) => {
+    const ref = workspaceRefOf(item.key);
+    const folder = ref ? workspaceRow(directory, ref, { untitled: tt.untitled, pending }).folder : item.detail ? folderOf(item.detail) : undefined;
+    return { id: item.key, title: item.title, space: item.hint ?? "", ...(ref ? {} : { local: true }), ...(folder ? { folder } : {}), ...(item.unavailable ? { unavailable: true } : {}), open: (o) => favorites.open(item.key, o) };
+  });
+
+  // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
+  const wanted = [
+    ...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
+    ...shownRecent.flatMap(({ ref }) => (ref.kind === "workspace" ? [`${ref.server}\n${ref.workspace}`] : [])),
+  ];
   const wantedKey = [...new Set(wanted)].join("\u0000");
   useEffect(() => {
     for (const key of wantedKey ? wantedKey.split("\u0000") : []) {
@@ -395,7 +415,7 @@ export function Shell() {
     ) : shown.kind === "page" ? (
       <PageView key={`${id}\n${shown.path}`} path={shown.path} />
     ) : (
-      <NewTabView />
+      <HomeView recent={homeRecent} favorites={homeFavorites} />
     );
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.

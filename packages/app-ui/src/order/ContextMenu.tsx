@@ -10,6 +10,8 @@ export interface MenuItem {
   /** Shown after the label, for example "F2". */
   hint?: string;
   disabled?: boolean;
+  /** Destroys something (Delete…): shown in the danger colour. */
+  danger?: boolean;
   onSelect(): void;
 }
 
@@ -95,7 +97,7 @@ export function ContextMenu({ label, at, items, onClose }: Props) {
           key={item.id}
           type="button"
           role="menuitem"
-          className="ctx-item"
+          className={item.danger ? "ctx-item ctx-danger" : "ctx-item"}
           disabled={item.disabled}
           onClick={() => {
             onClose(false);

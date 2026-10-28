@@ -200,6 +200,19 @@ export const th: Strings = {
       invalid: "ชื่อห้ามมี / หรือ \\",
       exists: "มีสิ่งที่ใช้ชื่อนี้อยู่แล้ว",
     },
+    delete: "ลบ…", // REVIEW
+    deleteDialog: {
+      title: (name) => `ลบ “${name}” ใช่ไหม`, // REVIEW
+      privatePage: (trash) => `หน้านี้จะย้ายไปที่${trash} คุณนำกลับมาจากที่นั่นได้`, // REVIEW
+      privateFolder: (pages, trash) => `โฟลเดอร์นี้และทุกอย่างข้างใน${pages > 0 ? ` รวมถึง ${count(pages)} หน้า` : ""} จะย้ายไปที่${trash} คุณนำกลับมาจากที่นั่นได้`, // REVIEW
+      workspacePage: (others) => (others > 0 ? `หน้านี้และอีก ${count(others)} หน้าข้างในจะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้` : "หน้านี้จะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้"), // REVIEW
+      workspaceFolder: (others) => (others > 0 ? `โฟลเดอร์นี้และอีก ${count(others)} หน้าข้างในจะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้` : "โฟลเดอร์นี้จะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้"), // REVIEW
+      delete: "ลบ", // REVIEW
+      deleting: "กำลังลบ…", // REVIEW
+      cancel: "ยกเลิก",
+    },
+    deleted: (name) => `ลบ ${name} แล้ว`, // REVIEW
+    deleteFailed: (detail) => `ลบไม่ได้: ${detail}`, // REVIEW
     moveDialog: {
       title: (name) => `ย้าย “${name}” ไปที่…`,
       destination: "ย้ายเข้าไปใน",

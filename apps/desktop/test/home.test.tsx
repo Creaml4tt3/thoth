@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 // Home on the desktop is the Private Space picker (ADR-0029, amendment of 2026-10-28): the logo, the tab bar's house,
 // Alt/Option+Shift+H and the palette close this Private Space in this window, after writing its edits, and the picker
-// lists it first. Opened again, it has its tabs. There is no Home tab: a saved one is dropped, and a new tab is empty.
+// lists it first. Opened again, it has its tabs. There is no Home tab: a saved one is dropped. A new tab
+// shows the recent pages and favorites (ADR-0029).
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, caretAtEnd, editorBox, openApp, paragraph, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
@@ -133,11 +136,34 @@ describe("no Home tab on the desktop", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
   });
 
-  it("a new tab is empty and says how to open a page", async () => {
+  it("a new tab lists the pages opened last, newest first, with their space and folder, and the favorites", async () => {
     const app = await start();
+    await app.user.click(await row("Beta"));
+    await waitFor(() => expect(current()).toBe("Beta"));
+    await app.user.click(await screen.findByRole("button", { name: "Favorite" }));
     await app.user.keyboard("{Control>}t{/Control}");
-    await waitFor(() => expect(tabNames()).toEqual(["Alpha", "New tab"]));
-    expect(screen.queryByTestId("home")).toBeNull();
-    expect(await screen.findByRole("heading", { level: 1, name: "New tab" })).toBeTruthy();
+    await waitFor(() => expect(tabNames()).toEqual(["Beta", "New tab"]));
+    const view = await screen.findByTestId("home");
+    expect(within(view).getByRole("heading", { level: 1, name: "Welcome back" })).toBeTruthy();
+    const titles = (name: string) => [...(within(view).getByRole("list", { name }).querySelectorAll(".home-row-title"))].map((el) => el.textContent);
+    await waitFor(() => expect(titles("Recent")).toEqual(["Beta", "Alpha"]));
+    expect(within(within(view).getByRole("list", { name: "Recent" })).getAllByRole("button")[0]!.textContent).toContain("Local");
+    await waitFor(() => expect(titles("Favorites")).toEqual(["Beta"]));
+    // Kept per Private Space in localStorage, by path.
+    expect(localStorage.getItem(`thoth.desktop.recent.${root}`)).toContain('"path":"Beta.md"');
+    await app.user.click(within(within(view).getByRole("list", { name: "Recent" })).getByRole("button", { name: /^Alpha/ }));
+    await waitFor(() => expect(tabNames()).toEqual(["Beta", "Alpha"]));
+  });
+
+  it("a new tab drops a recent page that is gone", async () => {
+    const app = await start();
+    await app.user.click(await row("Beta"));
+    await waitFor(() => expect(current()).toBe("Beta"));
+    await rm(join(root, "Alpha.md"));
+    app.platform.emit({ paths: ["Alpha.md"] });
+    await waitFor(async () => expect(within(await screen.findByRole("tree", { name: "Pages in this Private Space" })).queryByRole("treeitem", { name: "Alpha" })).toBeNull());
+    await app.user.keyboard("{Control>}t{/Control}");
+    const view = await screen.findByTestId("home");
+    await waitFor(() => expect([...(within(view).getByRole("list", { name: "Recent" }).querySelectorAll(".home-row-title"))].map((el) => el.textContent)).toEqual(["Beta"]));
   });
 });

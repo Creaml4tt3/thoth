@@ -30,6 +30,8 @@ export interface VaultConnection {
    * selected (on Linux, the folder that holds it). Absent where there is no file manager to open.
    */
   reveal?(path?: string): Promise<void>;
+  /** Deletes a page or folder (vault-relative) by moving it to the system Trash, where it can be put back from. */
+  trash?(path: string): Promise<void>;
   close(): Promise<void>;
 }
 

@@ -91,7 +91,7 @@ impl Browser for EventBrowser {
 }
 
 /// Reports `vault.reveal` as a `vault.revealed` event instead of opening a file manager: `{ root }`, and `entry` when an
-/// entry in it was asked for.
+/// entry in it was asked for. `vault.trash` removes the entry and reports `vault.trashed`.
 struct EventFileManager {
     emit: Arc<dyn Fn(Value) + Send + Sync>,
 }
@@ -103,6 +103,14 @@ impl FileManager for EventFileManager {
             payload["entry"] = json!(entry.to_string_lossy());
         }
         (self.emit)(json!({ "event": "vault.revealed", "payload": payload }));
+        Ok(())
+    }
+
+    /// Removes the entry and reports it as a `vault.trashed` event `{ root, entry }` (no system Trash in tests).
+    fn trash(&self, root: &std::path::Path, entry: &std::path::Path) -> HostResult<()> {
+        let removed = if entry.is_dir() { std::fs::remove_dir_all(entry) } else { std::fs::remove_file(entry) };
+        removed.map_err(|e| HostError::internal(format!("Could not remove {}: {e}", entry.display())))?;
+        (self.emit)(json!({ "event": "vault.trashed", "payload": { "root": root.to_string_lossy(), "entry": entry.to_string_lossy() } }));
         Ok(())
     }
 }

@@ -230,6 +230,25 @@ export const en = {
       invalid: "A name cannot contain / or \\.",
       exists: "Something with that name is already there.",
     },
+    /** "Delete…" in a tree's menu, and the question it asks first. */
+    delete: "Delete…",
+    deleteDialog: {
+      title: (name: string) => `Delete “${name}”?`,
+      /** The Private Space: the system Trash keeps it. `trash` is its name on this computer. */
+      privatePage: (trash: string) => `This page moves to the ${trash}. You can put it back from there.`,
+      privateFolder: (pages: number, trash: string) =>
+        `This folder and everything in it${pages > 0 ? `, including ${plural(pages, "page")},` : ""} move to the ${trash}. You can put them back from there.`,
+      /** A workspace: gone for every member. */
+      workspacePage: (others: number) =>
+        others > 0 ? `This page and the ${plural(others, "page")} inside it are deleted for everyone in this workspace.` : "This page is deleted for everyone in this workspace.",
+      workspaceFolder: (others: number) =>
+        others > 0 ? `This folder and the ${plural(others, "page")} inside it are deleted for everyone in this workspace.` : "This folder is deleted for everyone in this workspace.",
+      delete: "Delete",
+      deleting: "Deleting…",
+      cancel: "Cancel",
+    },
+    deleted: (name: string) => `Deleted ${name}`,
+    deleteFailed: (detail: string) => `Could not delete: ${detail}`,
     moveDialog: {
       title: (name: string) => `Move “${name}” to…`,
       destination: "Move into",

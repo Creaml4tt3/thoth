@@ -540,6 +540,29 @@ export class ServerDirectory {
     }
   }
 
+  /**
+   * Deletes a page and every page under it, deepest first, so a failure part-way never leaves a child at the top level
+   * (the server deletes one page at a time and keeps the others). Each delete names the revision the tree has, so a
+   * page someone changed meanwhile is a `RevisionConflict` and stays. Gone from the tree at once.
+   */
+  async deletePage(server: string, workspace: string, pageId: string): Promise<void> {
+    const key = workspaceKey(server, workspace);
+    const nodes = this.state.trees[key]?.nodes ?? [];
+    if (!nodes.some((n) => n.id === pageId)) throw new Error("That page is not in the tree");
+    const order = [pageId];
+    for (let i = 0; i < order.length; i++) for (const n of nodes) if (n.parentId === order[i]) order.push(n.id);
+    for (const id of order.reverse()) {
+      const node = nodes.find((n) => n.id === id)!;
+      try {
+        await this.client(server).deletePage(workspace, id, node.revisionId);
+      } catch (error) {
+        if (!(error instanceof ProblemError && error.code === "not_found")) throw error; // already gone: nothing to do
+      }
+      const tree = this.state.trees[key];
+      if (tree) this.patchTree(key, { nodes: tree.nodes.filter((n) => n.id !== id) });
+    }
+  }
+
   /** Changing the parent without `page-order`: a write of the page's own text with a new `parentId`. */
   private async reparent(server: string, workspace: string, pageId: string, parentId: string | null): Promise<void> {
     const client = this.client(server);

@@ -133,7 +133,7 @@ describe("rename a page with F2", () => {
     const app = await start();
     fireEvent.contextMenu(await rowEl("Beta"));
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: /^Rename/ }));
     const field = (await screen.findByRole("textbox", { name: "Rename Beta" })) as HTMLInputElement;
     expect(field.value).toBe("Beta");
@@ -306,7 +306,7 @@ describe("New folder", () => {
     const app = await start();
     fireEvent.contextMenu(await rowEl("Docs"));
     const menu = await screen.findByRole("menu", { name: "Actions for Docs" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "New folder inside" }));
     const field = await naming("Untitled folder");
     expect((await stat(join(root, "Docs/Untitled folder"))).isDirectory()).toBe(true);
@@ -404,6 +404,6 @@ describe("in Thai", () => {
 
     fireEvent.contextMenu(within(tree).getByRole("treeitem", { name: "Docs" }));
     const menu = await screen.findByRole("menu", { name: sharedTh.tree.menuLabel("Docs") });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([`${sharedTh.tree.rename}F2`, sharedTh.tree.newFolderInside, `${sharedTh.tree.moveUp}⌥⇧↑`, `${sharedTh.tree.moveDown}⌥⇧↓`, sharedTh.tree.moveTo]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([`${sharedTh.tree.rename}F2`, sharedTh.tree.newFolderInside, `${sharedTh.tree.moveUp}⌥⇧↑`, `${sharedTh.tree.moveDown}⌥⇧↓`, sharedTh.tree.moveTo, sharedTh.tree.delete]);
   });
 });

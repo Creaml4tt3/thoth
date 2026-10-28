@@ -17,6 +17,8 @@ import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/ord
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { DeleteDialog } from "@thoth/app-ui/order/DeleteDialog.tsx";
+import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
 import { useFavorites } from "@thoth/app-ui/favorites/context.ts";
@@ -70,6 +72,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const ts = useDesktopStrings().transfer;
   const importFrom = useDesktopStrings().settings.importFrom;
   const revealName = useDesktopStrings().settings.reveal[currentOs()];
+  const trashName = t.trashName[currentOs()];
   const favorites = useFavorites();
   const tf = useStrings().favorites;
   /** `path` is null for the menu of the empty area (the top level). */
@@ -78,6 +81,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   /** Where the entry being renamed is after a successful rename: focus goes there. */
   const renamedTo = useRef<string | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [said, setSaid] = useState("");
   const [error, setError] = useState<string | null>(null);
   // Changes run one after another, each on the tree as the one before left it (a key held down repeats quickly).
@@ -312,8 +316,29 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
       // The host checks the path itself (inside the folder, no symlink, not .thoth/) and shows it selected.
       ...(connection.reveal ? [{ id: "reveal", label: revealName, onSelect: () => void revealEntry(node.path) }] : []),
+      ...(connection.trash ? [{ id: "delete", label: tt.delete, danger: true, onSelect: () => setDeleting(node.path) }] : []),
     ];
   };
+
+  /**
+   * Moves a page or folder to the system Trash (the host checks the path as for "Show in"). Edits are written first;
+   * the tabs on it close, and the tree, Recent and Favorites drop it once the page list is read again.
+   */
+  const deleteEntry = (path: string): Promise<string | null> =>
+    enqueue(async () => {
+      setError(null);
+      if (!(await flushAll())) return t.unsavedChanges;
+      const name = label(path);
+      try {
+        await connection.trash!(path);
+      } catch (failure) {
+        return tt.deleteFailed(failure instanceof Error ? failure.message : String(failure));
+      }
+      for (const tab of allTabs(tabs.layout)) if (tab.target.kind === "page" && (tab.target.path === path || tab.target.path.startsWith(`${path}/`))) tabs.close(tab.id);
+      await refresh();
+      setSaid(tt.deleted(name));
+      return null;
+    });
 
   const revealEntry = async (path: string) => {
     setError(null);
@@ -478,6 +503,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
 
   const { draggable: _draggable, onDragStart: _onDragStart, ...topDrop } = dnd.rowProps(TOP);
   const movingNode = moving ? find(moving) : undefined;
+  const deletingNode = deleting ? find(deleting) : undefined;
   const menuNode = menu?.path != null ? find(menu.path) : undefined;
 
   return (
@@ -526,6 +552,18 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           onClose={(restoreFocus) => {
             setMenu(null);
             if (restoreFocus) focusTreeItemSoon(menuNode.path);
+          }}
+        />
+      )}
+      {deletingNode && (
+        <DeleteDialog
+          name={label(deletingNode.path)}
+          body={deletingNode.kind === "folder" ? tt.deleteDialog.privateFolder(pagesIn(deletingNode).length, trashName) : tt.deleteDialog.privatePage(trashName)}
+          onDelete={() => deleteEntry(deletingNode.path)}
+          onClose={() => {
+            setDeleting(null);
+            // Back to the row when it stayed; else to its folder, or the first row.
+            focusTreeItemSoon(find(deletingNode.path) ? deletingNode.path : dirname(deletingNode.path) || (latest.current[0]?.path ?? ""));
           }}
         />
       )}

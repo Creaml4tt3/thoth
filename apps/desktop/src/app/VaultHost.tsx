@@ -27,6 +27,11 @@ import { MAIN_WINDOW } from "./windows.ts";
 import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
+import { createRecentStore } from "@thoth/app-ui/home/recent.ts";
+import type { TabsController } from "@thoth/app-ui/tabs/useTabs.ts";
+
+/** The recent pages of a Private Space (ADR-0029): this prefix and its folder. */
+export const RECENT_KEY_PREFIX = "thoth.desktop.recent.";
 
 interface Props {
   platform: Platform;
@@ -69,11 +74,24 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   }, [flushOnClose, flushAll]);
 
   // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
-  const tabs = useTabs({
+  const pageTabs = useTabs({
     initial: () => (startTabs !== null ? parseDesktopLayout(startTabs) : null) ?? loadTabs(connection.root, windowId),
     flush: flushAll,
     save: (layout) => saveTabs(connection.root, layout, windowId),
   });
+  // Recent pages (ADR-0029), shown in a new tab: per Private Space, in localStorage, shared by its windows. A page that
+  // moves keeps its entry the way it keeps its tabs, so every rename and move that remaps the tabs remaps it too.
+  const recent = useMemo(() => createRecentStore(() => globalThis.localStorage ?? null, `${RECENT_KEY_PREFIX}${connection.root}`), [connection.root]);
+  const tabs = useMemo<TabsController>(
+    () => ({
+      ...pageTabs,
+      remapPaths: (from, to) => {
+        pageTabs.remapPaths(from, to);
+        recent.remap(from, to);
+      },
+    }),
+    [pageTabs, recent],
+  );
   const started = useRef(onStarted);
   useEffect(() => started.current?.(), []);
 
@@ -358,6 +376,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       reveal,
       registerFlush,
       flushAll,
+      recent,
       switchVault: () =>
         flushAll().then((ok) => {
           if (!ok) return false;
@@ -369,7 +388,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       watchError,
       windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, recent, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
   );
 
   return (

@@ -61,7 +61,7 @@ use watch::Watcher;
 
 /// Every command name in the contract (`Commands` in ipc.ts).
 pub const COMMANDS: &[&str] = &[
-    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal", "vault.shared",
+    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal", "vault.shared", "vault.trash",
     "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
     "sql.exec", "sql.run", "sql.all", "sql.get",
     "watch.start", "watch.stop",
@@ -105,6 +105,11 @@ pub trait Picker: Send + Sync {
 /// or folder inside the root, reached without following a symlink, and not in `.thoth/`.
 pub trait FileManager: Send + Sync {
     fn reveal(&self, root: &Path, entry: Option<&Path>) -> HostResult<()>;
+    /// Moves `entry` (checked as for `reveal`, and never the root) to the system Trash, where it can be put back from.
+    /// Refused where there is none.
+    fn trash(&self, _root: &Path, _entry: &Path) -> HostResult<()> {
+        Err(HostError::not_allowed("There is no Trash here"))
+    }
 }
 
 /// Receives host events (`vault.changed` with its JSON payload).
@@ -252,6 +257,14 @@ impl Host {
                     }
                     Some(_) => return Err(HostError::bad_argument("path must be a string")),
                 }
+                null()
+            }
+            // Deleting a page or folder of the Private Space: to the system Trash, where it can be put back from. By
+            // handle, with the same checks as `vault.reveal`.
+            "vault.trash" => {
+                let entry = self.vault(args)?;
+                let target = revealable(&entry, str_arg(args, "path")?)?;
+                self.config.file_manager.trash(&entry.root, &target)?;
                 null()
             }
             "fs.stat" => json(self.vault(args)?.fs.stat(str_arg(args, "path")?)?),

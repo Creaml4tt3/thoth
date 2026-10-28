@@ -27,6 +27,8 @@ export interface NodePlatform extends Platform {
   watchers(): number;
   /** Connections handed out so far. */
   connections: VaultConnection[];
+  /** What `trash` was asked to delete, vault-relative (it removes them: there is no Trash in tests). */
+  trashed: string[];
   /** Folders another (unrendered) window has open: connections to them are `shared`. */
   sharedWith: string[];
   /** In-memory workspace servers (no server known by default). */
@@ -94,6 +96,7 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     imagePicks: 0,
     recent: options.recent ?? [],
     connections,
+    trashed: [],
     sharedWith: [],
     servers: options.servers ?? new FakeServers(),
     ...(options.agents ? { agents: new NodeAgentHost({ ...options.agents, excludeRoots: () => connections.map((c) => c.root) }) } : {}),
@@ -121,6 +124,10 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
         isShared: async () => !closed && others() > 0,
         fs,
         sql,
+        async trash(path) {
+          platform.trashed.push(path);
+          await fs.remove(path);
+        },
         async watch(listener) {
           listeners.add(listener);
           return async () => void listeners.delete(listener);

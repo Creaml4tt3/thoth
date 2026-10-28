@@ -8,6 +8,7 @@ import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameDialog } from "../order/RenameDialog.tsx";
+import { DeleteDialog } from "../order/DeleteDialog.tsx";
 import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
@@ -238,6 +239,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [menu, setMenu] = useState<{ id: string; at: { x: number; y: number } } | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   /** ADR-0025: the owner's Rename… and Delete… of this workspace. */
   const [admin, setAdmin] = useState<"rename" | "delete" | null>(null);
@@ -529,7 +531,16 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       ...toPrivate,
       ...toWorkspace,
       ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
+      { id: "delete", label: tt.delete, danger: true, onSelect: () => setDeleting(id) },
     ];
+  };
+
+  /** How many pages are under `id`, at any depth: the question says they go too. */
+  const pagesUnder = (id: string): number => {
+    const all = nodes ?? [];
+    const found = [id];
+    for (let i = 0; i < found.length; i++) for (const n of all) if (n.parentId === found[i]) found.push(n.id);
+    return found.length - 1;
   };
 
   // The workspace row takes drops ("to the top level") but is not itself draggable.
@@ -711,6 +722,20 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             }
           }}
           onClose={() => setAdmin(null)}
+        />
+      )}
+      {deleting && canWrite && (
+        <DeleteDialog
+          name={titleOf(deleting)}
+          body={(tree?.kinds[deleting]?.folder ? tt.deleteDialog.workspaceFolder : tt.deleteDialog.workspacePage)(pagesUnder(deleting))}
+          onDelete={async () => {
+            const name = titleOf(deleting);
+            const ok = await enqueue(() => run(() => directory.deletePage(server, workspace.id, deleting), tt.deleteFailed));
+            if (!ok) return lastError.current;
+            setSaid(tt.deleted(name));
+            return null;
+          }}
+          onClose={() => setDeleting(null)}
         />
       )}
       {sharing && canShare && <ShareDialog client={directory.client(server)} workspace={workspace.id} page={sharing} title={titleOf(sharing)} onClose={() => setSharing(null)} />}

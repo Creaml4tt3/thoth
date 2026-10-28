@@ -18,6 +18,7 @@
     "allow-vault-close",
     "allow-vault-reveal",
     "allow-vault-shared",
+    "allow-vault-trash",
     "allow-window-open",
     "allow-window-close",
     "allow-fs-stat",

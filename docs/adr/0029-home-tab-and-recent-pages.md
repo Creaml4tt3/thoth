@@ -91,3 +91,14 @@ Consequences: Home on the desktop is now a way out of a Private Space, one click
 the quick list of recent pages (search and Favorites remain). Open question: whether a new tab on the desktop should
 list something again (recent pages, favorites) once the owner has used this.
 
+## Amendment (2026-10-29): a new tab on the desktop lists recent pages and favorites again
+
+The owner answered the open question above: yes. Decisions:
+
+1. **A new tab shows the Home view** (the greeting, Recent and Favorites, rule 2) instead of the empty view of
+   2026-10-28 rule 5. It stays a `blank` tab named "New tab"; there is still no Home tab on the desktop, and the logo,
+   the house, Alt/Option+Shift+H and the palette still go back to the picker.
+2. **The recent pages come back as before (rules 6–7):** per Private Space under `thoth.desktop.recent.<root>`, so
+   what was kept before 0.2.2 shows again; they follow renames and moves with the tabs and drop pages that are gone.
+3. A window with nothing to restore still opens the first page by path (2026-10-28 rule 5).
+

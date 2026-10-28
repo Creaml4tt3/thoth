@@ -44,11 +44,11 @@ export const th: DesktopStrings = {
     leave: "กลับไปที่ Private Space", // REVIEW
     leaveBrand: "Thoth กลับไปที่ Private Space", // REVIEW
     leaveFailed: "ยังบันทึกการแก้ไขไม่ได้ จึงยังเปิด Private Space นี้ไว้ ตรวจสอบหน้าที่เปิดอยู่ แล้วลองอีกครั้ง", // REVIEW
-    newTabHint: (keys) => `เปิดหน้าจากแถบด้านข้าง หรือค้นหาด้วย ${keys}`, // REVIEW
     titleNotUpdated: (name) => `เปลี่ยนชื่อเป็น ${name} แล้ว แต่ไม่ได้อัปเดตชื่อภายในหน้า เพราะหน้านี้มีการเปลี่ยนแปลง`,
     unsavedChanges: "หน้าที่เปิดอยู่มีการเปลี่ยนแปลงที่ยังบันทึกไม่ได้",
     settings: "การตั้งค่า",
     revealFailed: (detail) => `แสดงในตัวจัดการไฟล์ไม่ได้: ${detail}`, // REVIEW
+    trashName: { mac: "ถังขยะ", windows: "ถังรีไซเคิล", linux: "ถังขยะ" }, // REVIEW
     watchError: (detail) => `การเปลี่ยนแปลงจากนอก Thoth อาจไม่แสดงขึ้นมาเอง: ${detail}`,
   },
 

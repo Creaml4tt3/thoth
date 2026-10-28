@@ -257,6 +257,9 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
     async reveal(path) {
       await transport.call("vault.reveal", path === undefined ? { vault } : { vault, path });
     },
+    async trash(path) {
+      await transport.call("vault.trash", { vault, path });
+    },
     isShared: () => transport.call("vault.shared", { vault }),
     close() {
       closed ??= transport.call("vault.close", { vault }).then(() => undefined);

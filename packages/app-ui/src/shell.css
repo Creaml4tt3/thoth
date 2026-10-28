@@ -161,6 +161,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-moon-soft); }
 .ctx-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .ctx-item:disabled { color: var(--thoth-ink-faint); cursor: default; }
+.ctx-danger:not(:disabled) { color: var(--thoth-danger); }
 .move-list { padding: 4px; }
 .move-list option { padding: 4px 8px; }
 .move-actions { display: flex; gap: var(--thoth-space-3); justify-content: flex-end; align-items: center; }
