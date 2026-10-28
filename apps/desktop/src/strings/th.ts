@@ -40,9 +40,18 @@ export const th: DesktopStrings = {
     newFolder: "โฟลเดอร์ใหม่",
     untitledFolder: "โฟลเดอร์ไม่มีชื่อ",
     folderCreated: (name) => `สร้างโฟลเดอร์ ${name} แล้ว`,
+    untitledPage: "ไม่มีชื่อ",
+    pageCreated: (name) => `สร้างหน้า ${name} แล้ว`, // REVIEW
     windowFailed: (reason) => `ย้ายแท็บไปหน้าต่างใหม่ไม่ได้: ${reason}`,
     leave: "กลับไปที่ Private Space", // REVIEW
-    leaveBrand: "Thoth กลับไปที่ Private Space", // REVIEW
+    switcher: {
+      label: (space) => `Thoth, Private Space ${space}: สลับพื้นที่`, // REVIEW
+      tip: "สลับ Private Space หรือเวิร์กสเปซ", // REVIEW
+      menu: "สลับพื้นที่", // REVIEW
+      openFolder: "เปิดโฟลเดอร์…", // REVIEW
+      workspaceOn: (workspace, server) => `${workspace} · ${server}`,
+      all: "Private Space ทั้งหมด", // REVIEW
+    },
     leaveFailed: "ยังบันทึกการแก้ไขไม่ได้ จึงยังเปิด Private Space นี้ไว้ ตรวจสอบหน้าที่เปิดอยู่ แล้วลองอีกครั้ง", // REVIEW
     titleNotUpdated: (name) => `เปลี่ยนชื่อเป็น ${name} แล้ว แต่ไม่ได้อัปเดตชื่อภายในหน้า เพราะหน้านี้มีการเปลี่ยนแปลง`,
     unsavedChanges: "หน้าที่เปิดอยู่มีการเปลี่ยนแปลงที่ยังบันทึกไม่ได้",
@@ -52,18 +61,6 @@ export const th: DesktopStrings = {
     watchError: (detail) => `การเปลี่ยนแปลงจากนอก Thoth อาจไม่แสดงขึ้นมาเอง: ${detail}`,
   },
 
-  newPage: {
-    title: "หน้าใหม่",
-    name: "ชื่อ (ใช้ / เพื่อใส่ในโฟลเดอร์ เช่น Projects/Plan)",
-    cancel: "ยกเลิก",
-    create: "สร้าง",
-    exists: "มีหน้าชื่อนี้อยู่แล้ว",
-    errors: {
-      empty: "ตั้งชื่อหน้าก่อน",
-      invalid: "ใช้ชื่อนี้เป็นตำแหน่งของหน้าไม่ได้",
-      reserved: "โฟลเดอร์ .thoth สงวนไว้ให้ Thoth ใช้",
-    },
-  },
 
   search: {
     title: "ค้นหา",

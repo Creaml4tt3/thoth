@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "@thoth/domain";
-import { ConflictError, emptyOrder, entryNameProblem, ORDER_PATH, orderChildren, readOrder, renameInOrder, writeOrder, type Vault } from "../src/index.ts";
+import { colorInOrder, ConflictError, emptyOrder, OrderRecordSchema, entryNameProblem, ORDER_PATH, orderChildren, readOrder, renameInOrder, writeOrder, type Vault } from "../src/index.ts";
 import { openNodeVault } from "../src/node/index.ts";
 
 let root: string;
@@ -219,5 +219,16 @@ describe("order record", () => {
     expect(folder.folders["A"]).toBeUndefined();
     // The input is not changed.
     expect(record.folders["A"]).toEqual(["x.md", "y.md"]);
+  });
+
+  it("keeps folder colors through renames and moves, and clears a folder's with the folders in it (0.2.6)", () => {
+    const record = { version: 1 as const, folders: {}, colors: { A: "green", "A/Sub": "red", B: "blue" } };
+    expect(renameInOrder(record, [{ from: "A", to: "B/A" }]).colors).toEqual({ "B/A": "green", "B/A/Sub": "red", B: "blue" });
+    expect(renameInOrder({ version: 1, folders: {} }, [{ from: "a.md", to: "b.md" }])).toEqual({ version: 1, folders: {} });
+    expect(colorInOrder(record, "B", "purple").colors).toEqual({ A: "green", "A/Sub": "red", B: "purple" });
+    expect(colorInOrder(record, "A", null).colors).toEqual({ B: "blue" });
+    expect(colorInOrder({ version: 1, folders: {}, colors: { A: "green" } }, "A", null)).toEqual({ version: 1, folders: {} });
+    // Older records, without colors, still read.
+    expect(OrderRecordSchema.safeParse({ version: 1, folders: { "": ["a.md"] } }).success).toBe(true);
   });
 });

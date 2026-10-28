@@ -123,12 +123,11 @@ describe("the palette", () => {
 });
 
 describe("commands", () => {
-  it("New page opens the new page dialog, and the page is created", async () => {
+  it("New page creates Untitled, opens it and starts the rename in the tree", async () => {
     const app = await start();
     await run(app, "new page");
-    const dialog = await screen.findByRole("dialog", { name: "New page" });
-    await app.user.type(within(dialog).getByRole("textbox"), "Made by command");
-    await app.user.keyboard("{Enter}");
+    await screen.findByRole("textbox", { name: "Rename Untitled" });
+    await app.user.keyboard("Made by command{Enter}");
     await waitFor(async () => expect(await app.read("Made by command.md")).toMatch(/^---\nthoth_id: .+\n---\n# Made by command\n$/));
     await waitFor(() => expect(current()).toBe("Made by command"));
   });

@@ -14,7 +14,8 @@ import type { ServerInfo, Servers } from "@thoth/platform";
 import { ProblemError, RevisionConflict, WorkspaceClient, type Send } from "@thoth/workspace-client";
 import { PAGE_TITLE_MAX, type ChangeEntry, type DeletedWorkspace, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { placeAt } from "../order/fractional.ts";
-import { folderMarkdown, isFolderMarkdown } from "./folders.ts";
+import type { TextColor } from "@thoth/editor";
+import { folderColorOf, folderMarkdown, isFolderMarkdown, withFolderColor } from "./folders.ts";
 import { childrenOf, isWithin } from "./tree.ts";
 import { renameInMarkdown } from "./workspace-store.ts";
 
@@ -39,7 +40,7 @@ export interface TreeState {
    * capability (ADR-0017) it comes from the tree and the change feed. Without it the tree has no page kind, so it is
    * read from each page's Markdown once per revision.
    */
-  kinds: Record<string, { revisionId: string; folder: boolean }>;
+  kinds: Record<string, { revisionId: string; folder: boolean; color?: TextColor | null }>;
 }
 
 export interface DirectoryState {
@@ -68,9 +69,17 @@ export const workspaceKey = (server: string, workspace: string): string => `${se
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const EMPTY_TREE: TreeState = { nodes: [], cursor: null, loading: true, error: null, ticks: {}, kinds: {} };
-/** The folder flags of a tree whose server lists `page-kind`: `kind` is the server's word, unknown counts as a page. */
-function kindsOf(nodes: readonly TreeNode[]): TreeState["kinds"] {
-  return Object.fromEntries(nodes.map((n) => [n.id, { revisionId: n.revisionId, folder: n.kind === "folder" }]));
+/**
+ * The folder flags of a tree whose server lists `page-kind`: `kind` is the server's word, unknown counts as a page. A
+ * folder's color is kept from `known` while its revision is the same (it was read from that revision's text).
+ */
+function kindsOf(nodes: readonly TreeNode[], known: TreeState["kinds"] = {}): TreeState["kinds"] {
+  return Object.fromEntries(
+    nodes.map((n) => {
+      const color = known[n.id]?.revisionId === n.revisionId ? known[n.id]?.color : undefined;
+      return [n.id, { revisionId: n.revisionId, folder: n.kind === "folder", ...(color !== undefined ? { color } : {}) }];
+    }),
+  );
 }
 
 /** How many pages are read at once to find out which are folders (servers without `page-kind`). */
@@ -422,7 +431,7 @@ export class ServerDirectory {
       // The capability decides how folders are found, so it must be known before the tree is read.
       await this.loadCapabilities(server);
       const tree = await this.client(server).getTree(workspace);
-      this.patchTree(key, { nodes: tree.nodes, cursor: tree.changeCursor, loading: false, error: null, ...(this.hasPageKinds(server) ? { kinds: kindsOf(tree.nodes) } : {}) });
+      this.patchTree(key, { nodes: tree.nodes, cursor: tree.changeCursor, loading: false, error: null, ...(this.hasPageKinds(server) ? { kinds: kindsOf(tree.nodes, this.state.trees[key]?.kinds) } : {}) });
       void this.resolveKinds(server, workspace);
     } catch (error) {
       this.patchTree(key, { loading: false, error: message(error) });
@@ -445,7 +454,7 @@ export class ServerDirectory {
     };
     const rest = tree.nodes.filter((n) => n.id !== page.id);
     // We hold the Markdown we just wrote, so a page of ours is known at once, with or without `page-kind`.
-    const kinds = { ...tree.kinds, [page.id]: { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown) } };
+    const kinds = { ...tree.kinds, [page.id]: { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown), color: folderColorOf(page.markdown) } };
     this.patchTree(key, { nodes: [...rest, node], kinds });
   }
 
@@ -490,6 +499,18 @@ export class ServerDirectory {
     this.notePageSaved(server, written);
     this.bumpTick(workspaceKey(server, workspace), pageId);
     return written;
+  }
+
+  /**
+   * A folder's label color (0.2.6), kept in the folder page's own frontmatter (`thoth_color`), so every member sees
+   * it. A new revision on top of the one just read: a folder someone changed meanwhile is a `RevisionConflict`.
+   */
+  async setFolderColor(server: string, workspace: string, pageId: string, color: TextColor | null): Promise<void> {
+    const client = this.client(server);
+    const page = await client.getPage(workspace, pageId);
+    if (folderColorOf(page.markdown) === color) return;
+    const written = await client.putPage(workspace, pageId, { title: page.metadata.title, markdown: withFolderColor(page.markdown, color) }, page.revision.id);
+    this.notePageSaved(server, written);
   }
 
   private patchNode(key: string, node: TreeNode): void {
@@ -578,26 +599,35 @@ export class ServerDirectory {
    * already known. Failures are ignored: such a page is drawn as a page until the next change reaches it.
    */
   private async resolveKinds(server: string, workspace: string): Promise<void> {
-    // `page-kind` (ADR-0017): the server already said which pages are folders. Reading pages for it is the fallback.
-    if (this.hasPageKinds(server)) return;
     const key = workspaceKey(server, workspace);
     const tree = this.state.trees[key];
     if (!tree) return;
-    const queue = tree.nodes.filter((n) => tree.kinds[n.id]?.revisionId !== n.revisionId && !this.kindWork.has(`${key}\n${n.id}`));
+    // `page-kind` (ADR-0017): the server already said which pages are folders, so only folders are read, for their
+    // label color (it is in the folder page's text, which the tree does not carry). Without it every page is read.
+    const withKinds = this.hasPageKinds(server);
+    const unknown = withKinds
+      ? (n: TreeNode) => tree.kinds[n.id]?.folder === true && (tree.kinds[n.id]?.color === undefined || tree.kinds[n.id]?.revisionId !== n.revisionId)
+      : (n: TreeNode) => tree.kinds[n.id]?.revisionId !== n.revisionId;
+    const queue = tree.nodes.filter((n) => unknown(n) && !this.kindWork.has(`${key}\n${n.id}`));
     if (queue.length === 0) return;
     for (const n of queue) this.kindWork.add(`${key}\n${n.id}`);
     let found: TreeState["kinds"] = {};
     const flush = () => {
       if (Object.keys(found).length === 0) return;
       const now = this.state.trees[key];
-      if (now) this.patchTree(key, { kinds: { ...now.kinds, ...found } });
+      // A read that the feed overtook (the page has a newer revision now) is dropped; the newer one is read next.
+      const current = new Map(now?.nodes.map((n) => [n.id, n.revisionId]));
+      const fresh = Object.fromEntries(Object.entries(found).filter(([id, kind]) => current.get(id) === kind.revisionId));
+      if (now) this.patchTree(key, { kinds: { ...now.kinds, ...fresh } });
       found = {};
     };
     const worker = async () => {
       for (let n = queue.shift(); n; n = queue.shift()) {
         try {
           const page = await this.client(server).getPage(workspace, n.id);
-          found[n.id] = { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown) };
+          // A newer revision than the tree's waits for the feed, which brings its kind (with `page-kind`) and a new read.
+          if (withKinds && page.revision.id !== n.revisionId) continue;
+          found[n.id] = { revisionId: page.revision.id, folder: isFolderMarkdown(page.markdown), color: folderColorOf(page.markdown) };
           if (Object.keys(found).length >= 8) flush();
         } catch {
           // drawn as a page for now
@@ -635,6 +665,7 @@ export class ServerDirectory {
         });
         if (withKinds) {
           const kind = entry.pageKind !== undefined ? entry.pageKind : (old?.kind ?? null);
+          // A folder's color is in its text: `resolveKinds` reads it again for the new revision (no color until then).
           kinds[entry.pageId] = { revisionId: entry.revisionId ?? old?.revisionId ?? "", folder: kind === "folder" };
         }
       } else continue; // unknown kinds are ignored

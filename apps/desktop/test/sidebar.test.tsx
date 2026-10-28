@@ -41,10 +41,10 @@ describe("sidebar icon buttons", () => {
     }
   });
 
-  it("New page still opens its dialog", async () => {
+  it("New page creates Untitled and starts its rename in the tree", async () => {
     const app = await openApp(root);
     await app.user.click(await screen.findByRole("button", { name: "New page" }));
-    expect(await screen.findByRole("dialog", { name: "New page" })).toBeTruthy();
+    expect(await screen.findByRole("textbox", { name: "Rename Untitled" })).toBeTruthy();
   });
 });
 

@@ -4,7 +4,6 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { PageView } from "../editor/PageView.tsx";
 import { SettingsView } from "../settings/SettingsView.tsx";
-import { NewPageDialog } from "./NewPageDialog.tsx";
 import { SearchPalette } from "./SearchPalette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
@@ -43,7 +42,7 @@ import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
 import { requestWorkspaceAdmin } from "@thoth/app-ui/workspace/workspace-admin-request.ts";
-import { requestNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
+import { requestNewFolder, requestNewPage } from "@thoth/app-ui/order/new-folder-request.ts";
 import { requestReorder } from "@thoth/app-ui/order/reorder-request.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useTheme } from "@thoth/app-ui/ui/theme.ts";
@@ -64,7 +63,7 @@ import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
 
 const noSubscribe = () => () => undefined;
 
-type Dialog = { kind: "search" } | { kind: "new" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
+type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
 /** What startup recovery did, said once (ADR-0006 §7: an interrupted transfer is never silent). */
 function RecoveryNotice() {
@@ -129,6 +128,8 @@ export function Shell() {
   // Home is the Private Space picker (ADR-0029, amendment of 2026-10-28): edits are written first; one that cannot be
   // keeps this Private Space open.
   const leave = () => void switchVault().then((ok) => ok || setProblem(t.leaveFailed));
+  /** Another Private Space from the switcher (0.2.6): edits written first, as for `leave`. */
+  const switchTo = (root: string) => void switchVault(root).then((ok) => ok || setProblem(t.leaveFailed));
   // A new tab shows the recent pages and favorites (ADR-0029); the page of the current tab is recorded as it opens.
   const recent = useRecentPages(recentStore, tabs.active);
   /** Said in the tab bar (Cmd/Ctrl+W on a pinned tab); a new `seq` says it again. */
@@ -232,7 +233,7 @@ export function Shell() {
     focusPaneTab(next);
   };
   const makeActions = (): CommandActions => ({
-    newPage: () => setDialog({ kind: "new" }),
+    newPage: () => requestNewPage(),
     // The Private Space, like New page; with a workspace page open, "New folder in <workspace>" is offered as well.
     newFolder: { run: () => requestNewFolder() },
     ...(here && canWriteHere && hereWorkspace
@@ -322,7 +323,7 @@ export function Shell() {
     "shortcuts.open": toggleShortcuts,
     "theme.cycle": cycle,
     "settings.open": () => openSettings(),
-    "page.new": () => setDialog({ kind: "new" }),
+    "page.new": () => requestNewPage(),
     "folder.new": () => requestNewFolder(),
     "tab.new": () => tabs.newTab(),
     "tab.close": closeTab,
@@ -436,7 +437,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
-      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => setDialog({ kind: "new" })} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} />
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} />
       <main className="main">
         <Panes
           tabs={tabs}
@@ -502,7 +503,6 @@ export function Shell() {
         {favorites.said}
       </div>
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
-      {dialog?.kind === "new" && <NewPageDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
       {dialog?.kind === "feedback" && <DesktopFeedbackDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}

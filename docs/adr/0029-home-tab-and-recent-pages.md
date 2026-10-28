@@ -102,3 +102,15 @@ The owner answered the open question above: yes. Decisions:
    what was kept before 0.2.2 shows again; they follow renames and moves with the tabs and drop pages that are gone.
 3. A window with nothing to restore still opens the first page by path (2026-10-28 rule 5).
 
+
+## Amendment (2026-10-29, 0.2.6): the logo opens a space switcher
+
+The owner wants moving between Private Spaces and workspaces to be simpler and more compact (ADR-0037). The logo row
+now reads "Thoth · <this Private Space> ▾" and opens a short menu instead of leaving at once. The menu lists:
+
+- the recent Private Spaces, with this one checked; picking one opens it in this window, with edits written first;
+- Open folder…, the system folder picker;
+- the workspaces;
+- **All Private Spaces**, which goes to the picker, as the logo did under 2026-10-28 rule 1.
+
+The house, Alt/Option+Shift+H and the palette still go straight to the picker.

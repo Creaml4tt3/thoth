@@ -41,6 +41,8 @@ export interface SidebarSection {
   drop?: Pick<HTMLAttributes<HTMLElement>, "onDragEnter" | "onDragOver" | "onDragLeave" | "onDrop">;
   /** The header is lit as the place a drop would land. */
   dropLit?: boolean;
+  /** Put first in the header's menu, before moving the section (0.2.6: New page and New folder). */
+  items?: MenuItem[];
   children: ReactNode;
 }
 
@@ -154,8 +156,10 @@ export function SidebarSections({ root, sections }: { root: string; sections: re
     const at = order.indexOf(id);
     const def = shortcutById("section.move");
     const keys = def ? chordsFor(def, "desktop").map((c) => formatChordShort(c, platform)) : [];
+    const own = byId.get(id)?.items ?? [];
     return [
-      { id: "up", label: t.moveSectionUp, ...(keys[0] ? { hint: keys[0] } : {}), disabled: at <= 0, onSelect: () => (move(id, at - 1), focusSoon(id, menu?.from ?? "grip")) },
+      ...own,
+      { id: "up", label: t.moveSectionUp, ...(own.length > 0 ? { separator: true } : {}), ...(keys[0] ? { hint: keys[0] } : {}), disabled: at <= 0, onSelect: () => (move(id, at - 1), focusSoon(id, menu?.from ?? "grip")) },
       { id: "down", label: t.moveSectionDown, ...(keys[1] ? { hint: keys[1] } : {}), disabled: at >= order.length - 1, onSelect: () => (move(id, at + 1), focusSoon(id, menu?.from ?? "grip")) },
     ];
   };

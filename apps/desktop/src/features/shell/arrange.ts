@@ -4,7 +4,7 @@
  * follows links (`Vault.move`); the record then drops the item from its old folder and lists it in the new one.
  */
 import { basename } from "@thoth/domain";
-import { readOrder, renameInOrder, writeOrder, type MoveReport, type OrderRecord, type Vault } from "@thoth/local-store";
+import { colorInOrder, readOrder, renameInOrder, writeOrder, type MoveReport, type OrderRecord, type Vault } from "@thoth/local-store";
 
 /** `siblings` (a folder's display order without `name`) with `name` inserted at `index`, which is clamped. */
 export function placeName(siblings: readonly string[], name: string, index: number): string[] {
@@ -18,7 +18,7 @@ const join = (folder: string, name: string) => (folder === "" ? name : `${folder
 /** Sets a folder's recorded order to its display order with `name` at `index`. Returns the record written. */
 export async function reorderInFolder(vault: Pick<Vault, "readRecord" | "writeRecord">, folder: string, name: string, siblings: readonly string[], index: number): Promise<OrderRecord> {
   const record = await readOrder(vault);
-  const next: OrderRecord = { version: 1, folders: { ...record.folders, [folder]: placeName(siblings, name, index) } };
+  const next: OrderRecord = { ...record, folders: { ...record.folders, [folder]: placeName(siblings, name, index) } };
   await writeOrder(vault, next);
   return next;
 }
@@ -40,7 +40,18 @@ export async function moveIntoFolder(vault: Vault, from: string, folder: string,
   const to = join(folder, name);
   const report = await vault.move(from, to);
   const moved = renameInOrder(await readOrder(vault), report.moved);
-  const order: OrderRecord = { version: 1, folders: { ...moved.folders, [folder]: placeName(siblings, name, index) } };
+  const order: OrderRecord = { ...moved, folders: { ...moved.folders, [folder]: placeName(siblings, name, index) } };
   await writeOrder(vault, order);
   return { to, report, order };
+}
+
+/**
+ * Sets a folder's label color, or removes it (null) together with the colors of the folders inside it (a folder that
+ * went to the Trash). Nothing is written when nothing changes. Returns the record as it is now.
+ */
+export async function colorFolder(vault: Pick<Vault, "readRecord" | "writeRecord">, folder: string, color: string | null): Promise<OrderRecord> {
+  const record = await readOrder(vault);
+  const next = colorInOrder(record, folder, color);
+  if (JSON.stringify(next) !== JSON.stringify(record)) await writeOrder(vault, next);
+  return next;
 }

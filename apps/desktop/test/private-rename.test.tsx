@@ -133,7 +133,7 @@ describe("rename a page with F2", () => {
     const app = await start();
     fireEvent.contextMenu(await rowEl("Beta"));
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add to Favorites", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Add to Favorites", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: /^Rename/ }));
     const field = (await screen.findByRole("textbox", { name: "Rename Beta" })) as HTMLInputElement;
     expect(field.value).toBe("Beta");
@@ -306,7 +306,7 @@ describe("New folder", () => {
     const app = await start();
     fireEvent.contextMenu(await rowEl("Docs"));
     const menu = await screen.findByRole("menu", { name: "Actions for Docs" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New page inside", "New folder inside", "Color…", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "New folder inside" }));
     const field = await naming("Untitled folder");
     expect((await stat(join(root, "Docs/Untitled folder"))).isDirectory()).toBe(true);
@@ -329,13 +329,13 @@ describe("New folder", () => {
     expect(area.className).toContain("private-tree");
     fireEvent.contextMenu(area);
     const menu = await screen.findByRole("menu", { name: "Pages in this Private Space" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["New folder"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["New page", "New folder"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "New folder" }));
     await naming("Untitled folder");
     expect(await exists("Untitled folder")).toBe(true);
   });
 
-  it("Ctrl/Cmd+Shift+N creates it in the folder the tree has focus in (the page's folder for a page), else at the top level", async () => {
+  it("Ctrl/Cmd+Shift+N creates it in the folder the tree has focus in (the page's folder for a page), else in the folder last clicked, else at the top level", async () => {
     const app = await start();
     const chord = "{Control>}{Shift>}n{/Shift}{/Control}";
     (await rowEl("Docs")).focus();
@@ -351,6 +351,15 @@ describe("New folder", () => {
     expect(await exists("Docs/Untitled folder 2")).toBe(true); // next to Notes.md, in Docs
     await app.user.keyboard("{Escape}");
 
+    // Focus elsewhere: the folder last clicked (Notes is in Docs) still takes it.
+    (document.activeElement as HTMLElement | null)?.blur();
+    await app.user.keyboard(chord);
+    await naming("Untitled folder 3");
+    expect(await exists("Docs/Untitled folder 3")).toBe(true);
+    await app.user.keyboard("{Escape}");
+
+    // A click beside the rows: the top level again.
+    await app.user.click(document.querySelector(".private-tree")!);
     (document.activeElement as HTMLElement | null)?.blur();
     await app.user.keyboard(chord);
     await naming("Untitled folder");
@@ -404,6 +413,6 @@ describe("in Thai", () => {
 
     fireEvent.contextMenu(within(tree).getByRole("treeitem", { name: "Docs" }));
     const menu = await screen.findByRole("menu", { name: sharedTh.tree.menuLabel("Docs") });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([`${sharedTh.tree.rename}F2`, sharedTh.tree.newFolderInside, `${sharedTh.tree.moveUp}⌥⇧↑`, `${sharedTh.tree.moveDown}⌥⇧↓`, sharedTh.tree.moveTo, sharedTh.tree.delete]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([`${sharedTh.tree.rename}F2`, sharedTh.tree.newPageInside, sharedTh.tree.newFolderInside, sharedTh.tree.color, `${sharedTh.tree.moveUp}⌥⇧↑`, `${sharedTh.tree.moveDown}⌥⇧↓`, sharedTh.tree.moveTo, sharedTh.tree.delete]);
   });
 });

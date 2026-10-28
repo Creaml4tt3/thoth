@@ -17,6 +17,7 @@ import { writeZip } from "../helpers/zip.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { welcomeDone } from "./welcome.ts";
+import { newPrivatePage } from "./new-page.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -54,10 +55,7 @@ async function editor(page: Page) {
 
 test("create a note offline, edit it, edit it externally, resolve the conflict", async ({ page }) => {
   await page.getByRole("button", { name: /start writing/i }).click();
-  await page.getByRole("button", { name: "New page" }).click();
-  const dialog = page.getByRole("dialog", { name: "New page" });
-  await dialog.getByRole("textbox").fill("Journal/Today");
-  await dialog.getByRole("button", { name: "Create" }).click();
+  await newPrivatePage(page, "Today", "Journal");
 
   const box = await editor(page);
   await box.click();

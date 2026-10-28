@@ -15,6 +15,8 @@ export const OrderRecordSchema = z.object({
   version: z.literal(1),
   /** Folder vault path ("" is the root) → child names (file names with extension, folder names) in order. */
   folders: z.record(z.string(), z.array(z.string())),
+  /** Folder vault path → its label color (a text color name, checked where it is shown). Optional, so older records still read. */
+  colors: z.record(z.string(), z.string()).optional(),
 });
 export type OrderRecord = z.infer<typeof OrderRecordSchema>;
 
@@ -58,6 +60,7 @@ export function orderChildren<T>(folder: string, children: readonly T[], name: (
  */
 export function renameInOrder(record: OrderRecord, moves: readonly { from: string; to: string }[]): OrderRecord {
   const folders: Record<string, string[]> = Object.fromEntries(Object.entries(record.folders).map(([k, v]) => [k, [...v]]));
+  const colors: Record<string, string> = { ...record.colors };
   for (const { from, to } of moves) {
     const fromDir = dirname(from);
     const list = folders[fromDir];
@@ -72,6 +75,22 @@ export function renameInOrder(record: OrderRecord, moves: readonly { from: strin
         folders[to + key.slice(from.length)] = moved;
       }
     }
+    // A moved or renamed folder keeps its color, and so do the folders in it.
+    for (const key of Object.keys(colors)) {
+      if (key === from || key.startsWith(`${from}/`)) {
+        const color = colors[key]!;
+        delete colors[key];
+        colors[to + key.slice(from.length)] = color;
+      }
+    }
   }
-  return { version: 1, folders };
+  return { version: 1, folders, ...(Object.keys(colors).length > 0 ? { colors } : {}) };
+}
+
+/** The record with `folder`'s color set, or removed (null) with the colors of every folder inside it. */
+export function colorInOrder(record: OrderRecord, folder: string, color: string | null): OrderRecord {
+  const colors = Object.fromEntries(Object.entries(record.colors ?? {}).filter(([k]) => k !== folder && !(color === null && k.startsWith(`${folder}/`))));
+  if (color !== null) colors[folder] = color;
+  const { colors: _old, ...rest } = record;
+  return Object.keys(colors).length > 0 ? { ...rest, colors } : rest;
 }

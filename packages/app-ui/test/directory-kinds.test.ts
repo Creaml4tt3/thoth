@@ -34,13 +34,19 @@ function seed(servers: FakeServers, ws: FakeWorkspace) {
 }
 
 const pageReads = (servers: FakeServers) => servers.calls.filter((c) => c.method === "GET" && /\/pages\/[^/]+$/.test(c.path));
+/** Reads of ordinary pages. With `page-kind` only folder pages are read, once per revision, for their label color (0.2.6). */
+const pageReadsBesides = (servers: FakeServers, directory: ServerDirectory, server: string, ws: FakeWorkspace) => {
+  const kinds = directory.getState().trees[workspaceKey(server, ws.id)]!.kinds;
+  return pageReads(servers).filter((c) => kinds[c.path.split("/").pop()!]?.folder !== true);
+};
+const seedIds = (directory: ServerDirectory, server: string, ws: FakeWorkspace, title: string) => directory.getState().trees[workspaceKey(server, ws.id)]!.nodes.find((n) => n.title === title)!.id;
 const folders = (directory: ServerDirectory, server: string, ws: FakeWorkspace) => {
   const tree = directory.getState().trees[workspaceKey(server, ws.id)]!;
   return Object.fromEntries(tree.nodes.map((n) => [n.title, tree.kinds[n.id]?.folder === true]));
 };
 
 describe("folders with the page-kind capability (ADR-0017)", () => {
-  it("draws folders from the tree's kind and reads no page to find them", async () => {
+  it("draws folders from the tree's kind and reads no ordinary page to find them", async () => {
     const { servers, server, ws, directory } = await setup();
     seed(servers, ws);
     await directory.loadWorkspaces(server);
@@ -50,7 +56,12 @@ describe("folders with the page-kind capability (ADR-0017)", () => {
     // The kinds are there as soon as the tree is, not after a round of reads.
     expect(directory.getState().trees[workspaceKey(server, ws.id)]!.loading).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(pageReads(servers)).toEqual([]);
+    expect(pageReadsBesides(servers, directory, server, ws)).toEqual([]);
+    // Each folder is read once, for its color, and its revision is not read again.
+    expect(pageReads(servers)).toHaveLength(2);
+    await directory.loadTree(server, ws.id);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(pageReads(servers)).toHaveLength(2);
     expect(servers.calls.some((c) => c.path.endsWith("/tree"))).toBe(true);
   });
 
@@ -59,10 +70,10 @@ describe("folders with the page-kind capability (ADR-0017)", () => {
     seed(servers, ws);
     await directory.loadTree(server, ws.id);
     expect(folders(directory, server, ws)).toMatchObject({ Research: true, Plan: false });
-    expect(pageReads(servers)).toEqual([]);
+    expect(pageReadsBesides(servers, directory, server, ws)).toEqual([]);
   });
 
-  it("follows the change feed: a page that becomes a folder, a new folder and a deleted one, with no page read", async () => {
+  it("follows the change feed: a page that becomes a folder, a new folder and a deleted one, with no ordinary page read", async () => {
     const { servers, server, ws, directory } = await setup();
     const { plain, inner } = seed(servers, ws);
     await directory.loadTree(server, ws.id);
@@ -72,10 +83,13 @@ describe("folders with the page-kind capability (ADR-0017)", () => {
     await directory.pollWorkspace(server, ws.id);
     expect(folders(directory, server, ws)).toEqual({ Research: true, Plan: true, Broken: false, Mention: false, Archive: true });
     // And back: removing the marker makes it a page again.
+    // Only folders are read (for their color, ADR-0035): never the pages Broken or Mention.
+    const read = new Set(pageReads(servers).map((c) => c.path.split("/").pop()));
+    for (const page of ["Broken", "Mention"]) expect(read.has(seedIds(directory, server, ws, page))).toBe(false);
+    expect(read.has(seedIds(directory, server, ws, "Archive"))).toBe(true);
     servers.writeAsOther(ws, { id: plain.id, title: "Plan", markdown: "# Plan\n" });
     await directory.pollWorkspace(server, ws.id);
     expect(folders(directory, server, ws)["Plan"]).toBe(false);
-    expect(pageReads(servers)).toEqual([]);
   });
 
   it("a folder we create is known at once, and a rename reads only the page being renamed", async () => {
@@ -97,7 +111,7 @@ describe("folders with the page-kind capability (ADR-0017)", () => {
     await directory.movePage(server, ws.id, top.id, { parentId: null, index: 5 });
     await directory.movePage(server, ws.id, plain.id, { parentId: null, index: 0 });
     expect(folders(directory, server, ws)).toMatchObject({ Research: true, Plan: false });
-    expect(pageReads(servers)).toEqual([]);
+    expect(pageReadsBesides(servers, directory, server, ws)).toEqual([]);
   });
 
   it("treats an unknown kind (null) as a page and does not go looking for it", async () => {
@@ -114,7 +128,7 @@ describe("folders with the page-kind capability (ADR-0017)", () => {
     };
     await directory.loadTree(server, ws.id);
     expect(Object.values(folders(directory, server, ws)).every((folder) => !folder)).toBe(true);
-    expect(pageReads(servers)).toEqual([]);
+    expect(pageReadsBesides(servers, directory, server, ws)).toEqual([]);
   });
 });
 

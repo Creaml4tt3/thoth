@@ -39,7 +39,7 @@ interface Props {
   vault: Vault;
   options: AppOptions;
   intro: boolean;
-  switchVault(): void;
+  switchVault(next?: string): void;
   /** Which window this is (ADR-0019): "main", or the id of a window the app opened. */
   windowId?: string;
   /** The tabs this window was opened with (stored form), instead of its saved ones; once. */
@@ -380,12 +380,12 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       registerFlush,
       flushAll,
       recent,
-      switchVault: () =>
+      switchVault: (next?: string) =>
         flushAll().then((ok) => {
           if (!ok) return false;
           // A window the app opened leaves this Private Space: it is not brought back on it.
           if (windowId !== MAIN_WINDOW) forgetWindow(windowId);
-          switchVault();
+          switchVault(next);
           return true;
         }),
       watchError,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
 import { basename, dirname, stripExtension } from "@thoth/domain";
 import { roleCan } from "@thoth/workspace-protocol";
-import type { OrderRecord } from "@thoth/local-store";
+import { ConflictError, type OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
 import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
@@ -9,6 +9,9 @@ import { Disclosure, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx"
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
 import { clearNewFolder, usePendingNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
+import { ColorDialog } from "@thoth/app-ui/order/ColorDialog.tsx";
+import { isTextColor, type TextColor } from "@thoth/editor";
+import { formatChordShort, currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { RenameInput, RenameRejected } from "@thoth/app-ui/order/RenameInput.tsx";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "@thoth/app-ui/order/reorder-request.ts";
 import { TreeGroup } from "@thoth/app-ui/order/TreeGroup.tsx";
@@ -24,7 +27,7 @@ import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs
 import { useSession } from "../../app/context.ts";
 import { useFavorites } from "@thoth/app-ui/favorites/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
-import { moveIntoFolder, reorderInFolder } from "./arrange.ts";
+import { colorFolder, moveIntoFolder, reorderInFolder } from "./arrange.ts";
 import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
@@ -57,14 +60,19 @@ interface Props {
   /** Folders whose path changed (a folder was moved): their open state follows. */
   remapFolders(from: string, to: string): void;
   selection: Selection;
-  /** The order record changed (reorder or move). */
+  /** The order record changed (reorder, move or a folder's color). */
   onOrder(order: OrderRecord): void;
+  /** Folder vault path → label color, from the order record (0.2.6). */
+  colors?: Readonly<Record<string, string>>;
+  /** The folder New page and New folder go into (the last one clicked; "" is the top level), and setting it. */
+  target?: string;
+  setTarget?(folder: string): void;
   /** Opens the copy/move dialog (it writes pending edits first); the menu offers it while a workspace can be written to. */
   onTransfer?(target: TransferTarget): void;
 }
 
 /** The Private Space tree: folders and pages, in the order people gave them; drag and drop, keys and "Move to…". */
-export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder, onTransfer }: Props) {
+export function PrivateTree({ tree, current, open, setFolder, remapFolders, selection, onOrder, onTransfer, colors = {}, target: targetFolder = "", setTarget }: Props) {
   const { vault, connection, openPage, flushAll, refresh, tabs, servers, openSettings } = useSession();
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const canSend = directory.servers.some((s) => s.info.auth !== "signed-out" && (s.workspaces?.some((w) => roleCan(w.role, "write")) ?? false));
@@ -83,6 +91,12 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const renamedTo = useRef<string | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [coloring, setColoring] = useState<string | null>(null);
+  const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
+  const colorOf = (path: string): TextColor | null => {
+    const color = colors[path];
+    return isTextColor(color) ? color : null;
+  };
   const { download, said: downloadSaid } = useDownload();
   const td = useStrings().download;
   const [said, setSaid] = useState("");
@@ -214,21 +228,67 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       }
     });
 
-  /** The folder a "New folder" without a place goes into: the one the tree has focus in, else the top level. */
+  /**
+   * Creates a page "Untitled" (or "Untitled 2"…) in `parent` ("" is the top level), opens it and puts its name into
+   * rename in the tree, like a new folder (0.2.6).
+   */
+  const newPage = (parent: string) =>
+    enqueue(async () => {
+      setError(null);
+      try {
+        const base = parent === "" ? "" : `${parent}/`;
+        let path = "";
+        for (let n = 1; n < 1000 && path === ""; n++) {
+          const name = n === 1 ? t.untitledPage : `${t.untitledPage} ${n}`;
+          try {
+            await vault.createPage(`${base}${name}.md`, `# ${name}\n`);
+            path = `${base}${name}.md`;
+          } catch (failure) {
+            if (!(failure instanceof ConflictError)) throw failure;
+          }
+        }
+        if (path === "") throw new Error(t.untitledPage);
+        if (parent !== "") setFolder(parent, true);
+        await refresh();
+        openPage(path);
+        setRenaming(path);
+        setSaid(t.pageCreated(stripExtension(basename(path))));
+      } catch (failure) {
+        setError(tt.newPageFailed(failure instanceof Error ? failure.message : String(failure)));
+      }
+    });
+
+  /**
+   * Where a "New page" or "New folder" without a place goes: the folder of the row that has focus (a folder, or a
+   * page's folder), else the target folder (the last one clicked, 0.2.6) while it is still there, else the top level.
+   */
   const contextFolder = (): string => {
-    const id = document.activeElement?.closest<HTMLElement>("[data-tree-id]")?.dataset["treeId"];
+    const id = document.activeElement?.closest<HTMLElement>(".private-tree [data-tree-id]")?.dataset["treeId"];
     const node = id !== undefined ? find(id) : undefined;
-    return node ? (node.kind === "folder" ? node.path : dirname(node.path)) : "";
+    if (node) return node.kind === "folder" ? node.path : dirname(node.path);
+    return targetFolder !== "" && find(targetFolder)?.kind === "folder" ? targetFolder : "";
   };
 
-  // "New folder" asked for from code (the shortcut, the command palette, the sidebar button).
+  // "New folder" or "New page" asked for from code (the shortcut, the command palette, the sidebar buttons).
   const folderRequest = usePendingNewFolder();
   useEffect(() => {
     if (!folderRequest) return;
     clearNewFolder();
-    void newFolder(folderRequest.parent ?? contextFolder());
-    // `newFolder` reads the current tree; the request is what triggers this.
+    const parent = folderRequest.parent ?? contextFolder();
+    void (folderRequest.kind === "page" ? newPage(parent) : newFolder(parent));
+    // `newFolder` and `newPage` read the current tree; the request is what triggers this.
   }, [folderRequest]);
+
+  /** Sets or clears a folder's label color, kept in `.thoth/order.json` (0.2.6). */
+  const colorEntry = (path: string, color: TextColor | null): Promise<string | null> =>
+    enqueue(async () => {
+      try {
+        onOrder(await colorFolder(vault, path, color));
+        return null;
+      } catch (failure) {
+        return tt.colorFailed(failure instanceof Error ? failure.message : String(failure));
+      }
+    });
 
   const reorder = (node: TreeNode, delta: -1 | 1) =>
     void enqueue(async () => {
@@ -310,9 +370,16 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     const i = list.findIndex((n) => n.path === node.path);
     const ref = { kind: "private" as const, path: node.path };
     return [
+      ...(node.kind === "page" ? [{ id: "open-tab", label: tt.openNewTab, hint: newTabKeys, onSelect: () => openPage(node.path, { newTab: true }) }] : []),
       ...(node.kind === "page" && favorites ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }] : []),
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(node.path) },
-      ...(node.kind === "folder" ? [{ id: "new-folder", label: tt.newFolderInside, onSelect: () => void newFolder(node.path) }] : []),
+      ...(node.kind === "folder"
+        ? [
+            { id: "new-page", label: tt.newPageInside, onSelect: () => void newPage(node.path) },
+            { id: "new-folder", label: tt.newFolderInside, onSelect: () => void newFolder(node.path) },
+            { id: "color", label: tt.color, onSelect: () => setColoring(node.path) },
+          ]
+        : []),
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
@@ -339,6 +406,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         return tt.deleteFailed(failure instanceof Error ? failure.message : String(failure));
       }
       for (const tab of allTabs(tabs.layout)) if (tab.target.kind === "page" && (tab.target.path === path || tab.target.path.startsWith(`${path}/`))) tabs.close(tab.id);
+      // A folder in the Trash takes its colors with it; the next folder of that name starts plain.
+      if (Object.keys(colors).some((k) => k === path || k.startsWith(`${path}/`))) await colorFolder(vault, path, null).then(onOrder, () => undefined);
+      if (targetFolder === path || targetFolder.startsWith(`${path}/`)) setTarget?.(dirname(path));
       await refresh();
       setSaid(tt.deleted(name));
       return null;
@@ -412,7 +482,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         <li role="none" key={`folder:${node.path}`}>
           <div role="treeitem" aria-expanded={open_} className="tree-item tree-folder tree-renaming" data-kind="folder" style={indent} {...common}>
             <Disclosure open={open_} />
-            <FolderIcon open={open_} />
+            <FolderIcon open={open_} color={colorOf(node.path)} />
             {field}
           </div>
           {open_ && (
@@ -449,7 +519,10 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             data-kind="page"
             data-dragging={dnd.dragging === node.path || undefined}
             style={indent}
-            onClick={(event) => openPage(node.path, clickOpens(event))}
+            onClick={(event) => {
+              setTarget?.(dirname(node.path));
+              openPage(node.path, clickOpens(event));
+            }}
             onAuxClick={(event) => {
               if (!isMiddleClick(event)) return;
               event.preventDefault();
@@ -489,13 +562,17 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           style={indent}
           title={`${tt.folder} · ${tt.itemCount(node.children.length)}`}
           {...tipIfClipped(node.name)}
-          onClick={() => setFolder(node.path)}
+          data-target={targetFolder === node.path || undefined}
+          onClick={() => {
+            setFolder(node.path);
+            setTarget?.(node.path);
+          }}
           onKeyDown={keys}
           onContextMenu={onContextMenu}
           {...dnd.rowProps(node.path)}
         >
           <Disclosure open={expanded} />
-          <FolderIcon open={expanded} />
+          <FolderIcon open={expanded} color={colorOf(node.path)} />
           <span className="tree-label">{node.name}</span>
         </button>
         <TreeGroup open={expanded} count={node.children.length}>
@@ -513,6 +590,10 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   return (
     <div
       className="private-tree"
+      onClick={(event) => {
+        // A click beside the rows: New page and New folder go to the top level again.
+        if (!(event.target as Element).closest("[data-tree-id], button, input, label")) setTarget?.("");
+      }}
       onContextMenu={(event) => {
         // A row has already opened its own menu; this is the empty area around the rows.
         if (event.defaultPrevented) return;
@@ -547,7 +628,15 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         </p>
       )}
       {menu && menu.path === null && (
-        <ContextMenu label={t.pagesInSpace} at={menu.at} items={[{ id: "new-folder", label: t.newFolder, onSelect: () => void newFolder("") }]} onClose={() => setMenu(null)} />
+        <ContextMenu
+          label={t.pagesInSpace}
+          at={menu.at}
+          items={[
+            { id: "new-page", label: tt.newPage, onSelect: () => void newPage("") },
+            { id: "new-folder", label: t.newFolder, onSelect: () => void newFolder("") },
+          ]}
+          onClose={() => setMenu(null)}
+        />
       )}
       {menu && menuNode && (
         <ContextMenu
@@ -569,6 +658,18 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             setDeleting(null);
             // Back to the row when it stayed; else to its folder, or the first row.
             focusTreeItemSoon(find(deletingNode.path) ? deletingNode.path : dirname(deletingNode.path) || (latest.current[0]?.path ?? ""));
+          }}
+        />
+      )}
+      {coloring && find(coloring) && (
+        <ColorDialog
+          name={label(coloring)}
+          current={colorOf(coloring)}
+          onPick={(color) => colorEntry(coloring, color)}
+          onClose={() => {
+            const path = coloring;
+            setColoring(null);
+            focusTreeItemSoon(path);
           }}
         />
       )}

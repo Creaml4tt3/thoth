@@ -29,9 +29,9 @@ export function Disclosure({ open, hidden, onToggle }: { open: boolean; hidden?:
 }
 
 /** A folder: closed, or open with its lid tilted. Both shapes are drawn and cross-fade (`.tree-icon-folder` in shell.css). */
-export function FolderIcon({ open }: { open: boolean }) {
+export function FolderIcon({ open, color }: { open: boolean; color?: string | null | undefined }) {
   return (
-    <span className="tree-icon tree-icon-folder" data-open={open || undefined} aria-hidden="true">
+    <span className="tree-icon tree-icon-folder" data-open={open || undefined} data-color={color ?? undefined} aria-hidden="true">
       <svg className="folder-closed" width="16" height="16" viewBox="0 0 16 16">
         <path d="M2 4.2a1 1 0 0 1 1-1h3l1.4 1.6H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" {...STROKE} />
       </svg>

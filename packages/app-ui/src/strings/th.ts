@@ -169,6 +169,17 @@ export const th: Strings = {
     menuLabel: (title) => `การทำงานของ ${title}`,
     newPageInside: "หน้าใหม่ข้างใน",
     newFolderInside: "โฟลเดอร์ใหม่ข้างใน",
+    newPage: "หน้าใหม่",
+    openNewTab: "เปิดในแท็บใหม่",
+    color: "สี…", // REVIEW
+    colorDialog: {
+      title: (name) => `สีของ “${name}”`, // REVIEW
+      label: "สีโฟลเดอร์", // REVIEW
+      none: "ไม่มี", // REVIEW
+      cancel: "ยกเลิก",
+    },
+    colorFailed: (detail) => `เปลี่ยนสีไม่ได้: ${detail}`, // REVIEW
+    newPageFailed: (detail) => `สร้างหน้าไม่ได้: ${detail}`, // REVIEW
     moveUp: "เลื่อนขึ้น",
     moveDown: "เลื่อนลง",
     moveTo: "ย้ายไปที่…",

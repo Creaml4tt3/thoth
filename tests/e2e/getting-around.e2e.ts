@@ -153,8 +153,14 @@ for (const scheme of ["light", "dark"] as const) {
     await page.keyboard.press("Enter");
     await page.keyboard.type("Written before leaving.");
 
-    // The logo: the edit is written, and the picker lists this Private Space first.
-    await page.locator("aside.sidebar").getByRole("button", { name: "Thoth, back to Private Spaces" }).click();
+    // The logo's menu (0.2.6), All Private Spaces: the edit is written, and the picker lists this Private Space first.
+    await page.locator("aside.sidebar").getByRole("button", { name: /^Thoth, Private Space/ }).click();
+    const switcher = page.getByRole("menu", { name: "Switch space" });
+    await expect(switcher.getByRole("menuitemradio", { name: "Vault" })).toHaveAttribute("aria-checked", "true");
+    await settled(page);
+    expect(await axe(page, ".ctx-menu")).toEqual([]);
+    await page.screenshot({ path: join(SHOTS, `switcher-${scheme}.png`), clip: { x: 0, y: 0, width: 420, height: 320 } });
+    await switcher.getByRole("menuitem", { name: /^All Private Spaces/ }).click();
     const choose = page.getByRole("button", { name: /choose or create a private space/i });
     await expect(choose).toBeFocused();
     await expect(page.getByRole("tablist")).toHaveCount(0);

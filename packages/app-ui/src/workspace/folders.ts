@@ -4,7 +4,8 @@
  * (`folderMarkdown`, `isFolderMarkdown`), kept here because the shared UI has no filesystem and so no dependency
  * on the transfer package.
  */
-import { parseFrontmatter } from "@thoth/content";
+import { parseFrontmatter, updateFrontmatter } from "@thoth/content";
+import { isTextColor, type TextColor } from "@thoth/editor";
 
 export const FOLDER_KIND = "folder";
 
@@ -17,4 +18,16 @@ export function isFolderMarkdown(markdown: string): boolean {
 /** The whole Markdown of a new folder page: its identity and kind, no text of its own. */
 export function folderMarkdown(id: string): string {
   return `---\nthoth_id: ${id}\nthoth_kind: ${FOLDER_KIND}\n---\n`;
+}
+
+/** A folder page's label color: frontmatter `thoth_color`, one of the text colors; anything else is no color. */
+export function folderColorOf(markdown: string): TextColor | null {
+  const parsed = parseFrontmatter(markdown);
+  const color = parsed.error === undefined ? parsed.data["thoth_color"] : undefined;
+  return isTextColor(color) ? color : null;
+}
+
+/** `markdown` with its label color set, or removed (null). Throws on frontmatter that cannot be edited safely. */
+export function withFolderColor(markdown: string, color: TextColor | null): string {
+  return updateFrontmatter(markdown, { thoth_color: color ?? undefined });
 }

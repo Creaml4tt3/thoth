@@ -54,6 +54,9 @@ export const en = {
     /** The name a new folder starts with; a number follows when it is taken ("Untitled folder 2"). */
     untitledFolder: "Untitled folder",
     folderCreated: (name: string) => `Created the folder ${name}`,
+    /** The name a new page starts with (0.2.6); a number follows when it is taken ("Untitled 2"). */
+    untitledPage: "Untitled",
+    pageCreated: (name: string) => `Created the page ${name}`,
     /** A tab could not be moved to a new window (ADR-0019); the tab stays. */
     windowFailed: (reason: string) => `The tab could not be moved to a new window: ${reason}`,
     /**
@@ -61,7 +64,15 @@ export const en = {
      * the palette close this Private Space in this window and show the picker. The logo's name starts with its word.
      */
     leave: "Back to Private Spaces",
-    leaveBrand: "Thoth, back to Private Spaces",
+    /** The logo row (0.2.6): a menu to move between Private Spaces and workspaces. */
+    switcher: {
+      label: (space: string) => `Thoth, Private Space ${space}: switch spaces`,
+      tip: "Switch Private Space or workspace",
+      menu: "Switch space",
+      openFolder: "Open folder…",
+      workspaceOn: (workspace: string, server: string) => `${workspace} · ${server}`,
+      all: "All Private Spaces",
+    },
     leaveFailed: "Your edits could not be saved yet, so this Private Space stays open. Check the open page, then try again.",
     /** Said after a rename when the page changed meanwhile, so the title inside it was left alone. */
     titleNotUpdated: (name: string) => `Renamed to ${name}. The title inside the page was not updated because the page changed.`,
@@ -73,18 +84,6 @@ export const en = {
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
   },
 
-  newPage: {
-    title: "New page",
-    name: "Name (use / for a folder, for example Projects/Plan)",
-    cancel: "Cancel",
-    create: "Create",
-    exists: "A page with that name already exists.",
-    errors: {
-      empty: "Give the page a name.",
-      invalid: "That name is not a valid page path.",
-      reserved: "The .thoth folder is reserved for Thoth.",
-    },
-  },
 
   search: {
     title: "Search",

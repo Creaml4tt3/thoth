@@ -8,6 +8,15 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Right-click the Private Space's header, a folder or the empty area of the tree for New page and New folder. Right-click a page for Open in new tab.
+- New page and New folder go into the folder you clicked last, shown in the sidebar. A new page is called Untitled and its name is ready to type, like a new folder.
+- Color… in a folder's right-click menu: eight label colors for folders. In a workspace, everyone sees the color.
+- Click Thoth at the top of the sidebar to switch to a recent Private Space or a workspace in one step. All Private Spaces is still there.
+
 ## [0.2.5] - 2026-10-29
 
 ### Added

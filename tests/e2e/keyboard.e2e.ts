@@ -76,14 +76,26 @@ async function command(page: Page, text: string) {
   await expect(palette).toBeHidden();
 }
 
-/** Cmd/Ctrl+N and a name: a new page. */
-async function newPage(page: Page, name: string) {
+/**
+ * A new page by keyboard (0.2.6): Cmd/Ctrl+Shift+N makes a folder in rename when `folder` is given, and Cmd/Ctrl+N with
+ * that folder's row focused makes "Untitled" in it and starts the rename, which takes the name.
+ */
+async function newPage(page: Page, name: string, folder?: string) {
+  if (folder) {
+    await page.keyboard.press("ControlOrMeta+Shift+n");
+    await expect(page.getByRole("textbox", { name: /^Rename Untitled folder/ })).toBeFocused();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type(folder);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("treeitem", { name: folder, exact: true })).toBeFocused();
+  }
   await page.keyboard.press("ControlOrMeta+n");
-  const dialog = page.getByRole("dialog", { name: "New page" });
-  await expect(dialog).toBeVisible();
+  const field = page.getByRole("textbox", { name: /^Rename Untitled/ });
+  await expect(field).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type(name);
   await page.keyboard.press("Enter");
-  await expect(dialog).toBeHidden();
+  await expect(field).toBeHidden();
 }
 
 const current = (page: Page) => page.getByRole("tab", { selected: true });
@@ -123,12 +135,20 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible(); // an empty Private Space: a new tab
   expect(await tabNames(page)).toEqual(["New tab"]);
 
-  // 1. Create two pages: one in a folder (so there is somewhere to move to), then the one we work on.
-  await newPage(page, "Archive/Old");
-  await expect(current(page)).toHaveText("Old");
+  // 1. Create two pages: one in a folder (so there is somewhere to move to), then the one we work on. The new folder's
+  //    row has focus after its rename, so the page made next goes in it (0.2.6); Plan, made before, is at the top.
   await newPage(page, "Plan");
   await expect(current(page)).toHaveText("Plan");
   expect(await tabNames(page)).toEqual(["Plan"]); // a page opens in the current tab
+  await newPage(page, "Old", "Archive");
+  await expect(current(page)).toHaveText("Old");
+  // Back to Plan from the palette: the rest works on it.
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("Plan");
+  await expect(page.getByRole("option", { name: /^Plan/ }).first()).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(current(page)).toHaveText("Plan");
+  expect(await tabNames(page)).toEqual(["Plan"]);
   const created = await read("Plan.md");
   expect(created).toMatch(/^---\nthoth_id: [0-9a-f-]{36}\n---\n# Plan\n$/);
   expect(await read("Archive/Old.md")).toMatch(/^---\nthoth_id: [0-9a-f-]{36}\n---\n# Old\n$/);

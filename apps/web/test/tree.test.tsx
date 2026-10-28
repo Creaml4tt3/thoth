@@ -78,14 +78,14 @@ describe("folders and the page-kind capability (ADR-0017)", () => {
     return { server, group };
   }
 
-  it("draws the folder with its icon and item count without downloading any page", async () => {
+  it("draws the folder with its icon and item count, downloading only the folder (for its color), once", async () => {
     const { server, group } = await withFolder();
     const row = await within(group).findByRole("treeitem", { name: "Research" });
     expect(row.getAttribute("data-kind")).toBe("folder");
     expect(row.getAttribute("title")).toBe("Folder · 2 items");
     expect(within(group).getByRole("treeitem", { name: "Plan" }).getAttribute("data-kind")).toBe("page");
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(pageDownloads(server)).toEqual([]);
+    expect(pageDownloads(server)).toHaveLength(1);
   });
 
   it("without the capability the folder is still found, by reading the pages", async () => {

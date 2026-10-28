@@ -9,6 +9,8 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameDialog } from "../order/RenameDialog.tsx";
 import { DeleteDialog } from "../order/DeleteDialog.tsx";
+import { ColorDialog } from "../order/ColorDialog.tsx";
+import { currentPlatform, formatChordShort } from "../keyboard/shortcuts.ts";
 import { DownloadStatus, readWorkspaceMarkdown, useDownload, workspaceCanDownload } from "../download/DownloadButton.tsx";
 import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
@@ -53,6 +55,13 @@ interface Ctx {
   dnd: TreeDnd;
   openMenu(id: string, at: { x: number; y: number }): void;
   reorder(id: string, delta: -1 | 1): void;
+  /** The folder New page and New folder go into (the last one clicked, 0.2.6); null is the top level. */
+  target: string | null;
+  setTarget(id: string | null): void;
+  /** A folder's label color, from its page's frontmatter. */
+  colorOf(id: string): string | null;
+  /** The nearest folder holding a page (null: none, the top level). */
+  parentOf(id: string): string | null;
 }
 
 interface PageItemProps {
@@ -86,7 +95,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
   const label = (
     <>
       {expandable ? <Disclosure open={expanded} onToggle={() => ctx.toggle(item.id)} /> : <Disclosure open={false} hidden />}
-      {item.folder ? <FolderIcon open={expanded} /> : <PageIcon />}
+      {item.folder ? <FolderIcon open={expanded} color={ctx.colorOf(item.id)} /> : <PageIcon />}
       <span className="tree-label">{item.title}</span>
     </>
   );
@@ -123,6 +132,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
         {...common}
         className="tree-item"
         data-kind={item.folder ? "folder" : "page"}
+        data-target={(item.folder && ctx.target === item.id) || undefined}
         data-dragging={ctx.dnd.dragging === item.id || undefined}
         style={indent}
         title={item.folder ? `${t.folder} · ${t.itemCount(item.children.length)}` : undefined}
@@ -141,6 +151,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
           ctx.openMenu(item.id, { x: event.clientX, y: event.clientY });
         }}
         onClick={(event) => {
+          ctx.setTarget(item.folder ? item.id : (ctx.parentOf(item.id) ?? null));
           if (item.folder) return ctx.toggle(item.id, !expanded);
           if (hasChildren) ctx.toggle(item.id, true);
           ctx.openPage({ server, workspace, page: item.id }, clickOpens(event));
@@ -242,6 +253,9 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [moving, setMoving] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [coloring, setColoring] = useState<string | null>(null);
+  const [target, setTarget] = useState<string | null>(null);
+  const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
   const { download, said: downloadSaid } = useDownload();
   const [membersOpen, setMembersOpen] = useState(false);
   /** ADR-0025: the owner's Rename… and Delete… of this workspace. */
@@ -453,6 +467,10 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     dnd,
     openMenu: (id, at) => setMenu({ id, at }),
     reorder,
+    target: target !== null && tree?.kinds[target]?.folder === true && nodes?.some((n) => n.id === target) ? target : null,
+    setTarget,
+    colorOf: (id) => tree?.kinds[id]?.color ?? null,
+    parentOf: (id) => workspaceAncestors(nodes ?? [], id).find((a) => tree?.kinds[a]?.folder === true) ?? null,
   };
 
   // "Move to…" asked for from code (the command palette).
@@ -527,12 +545,16 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       download && tree?.kinds[id]?.folder !== true && workspaceCanDownload(state, { server, workspace: workspace.id })
         ? [{ id: "download", label: td.menu, onSelect: () => void download(titleOf(id), () => readWorkspaceMarkdown(directory, { server, workspace: workspace.id, page: id })) }]
         : [];
-    if (!canWrite) return [...star, ...toPrivate, ...toWorkspace, ...save];
+    const folder = tree?.kinds[id]?.folder === true;
+    const open: MenuItem[] = folder ? [] : [{ id: "open-tab", label: tt.openNewTab, hint: newTabKeys, onSelect: () => openPage({ server, workspace: workspace.id, page: id }, { newTab: true }) }];
+    if (!canWrite) return [...open, ...star, ...toPrivate, ...toWorkspace, ...save];
     return [
+      ...open,
       ...star,
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(id) },
       { id: "new-page", label: tt.newPageInside, onSelect: () => void create("page", id) },
       { id: "new-folder", label: tt.newFolderInside, onSelect: () => void create("folder", id) },
+      ...(folder ? [{ id: "color", label: tt.color, onSelect: () => setColoring(id) }] : []),
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: !ordered || i <= 0, onSelect: () => reorder(id, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
@@ -566,8 +588,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       : []),
     ...(canWrite
       ? [
-          { id: "new-page", label: t.newPage, onSelect: () => void create("page", null) },
-          { id: "new-folder", label: tt.newFolder, onSelect: () => void create("folder", null) },
+          { id: "new-page", label: t.newPage, onSelect: () => void create("page", ctx.target) },
+          { id: "new-folder", label: tt.newFolder, onSelect: () => void create("folder", ctx.target) },
         ]
       : []),
   ];
@@ -610,8 +632,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
         {canMembers && <IconButton icon="people" className="tree-add" label={tm.button(workspace.name)} onClick={() => setMembersOpen(true)} />}
         {canWrite && (
           <>
-            <IconButton icon="folder-plus" className="tree-add" label={tt.newFolderIn(workspace.name)} disabled={creating} onClick={() => void create("folder", null)} />
-            <IconButton icon="page-plus" className="tree-add" label={t.newPageIn(workspace.name)} disabled={creating} onClick={() => void create("page", null)} />
+            <IconButton icon="folder-plus" className="tree-add" label={tt.newFolderIn(ctx.target ? titleOf(ctx.target) : workspace.name)} disabled={creating} onClick={() => void create("folder", ctx.target)} />
+            <IconButton icon="page-plus" className="tree-add" label={t.newPageIn(ctx.target ? titleOf(ctx.target) : workspace.name)} disabled={creating} onClick={() => void create("page", ctx.target)} />
           </>
         )}
       </div>
@@ -746,6 +768,21 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             return null;
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+      {coloring && canWrite && (
+        <ColorDialog
+          name={titleOf(coloring)}
+          current={tree?.kinds[coloring]?.color ?? null}
+          onPick={async (color) => {
+            const ok = await enqueue(() => run(() => directory.setFolderColor(server, workspace.id, coloring, color), tt.colorFailed));
+            return ok ? null : lastError.current;
+          }}
+          onClose={() => {
+            const id = coloring;
+            setColoring(null);
+            focusTreeItemSoon(id);
+          }}
         />
       )}
       {sharing && canShare && <ShareDialog client={directory.client(server)} workspace={workspace.id} page={sharing} title={titleOf(sharing)} onClose={() => setSharing(null)} />}

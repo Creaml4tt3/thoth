@@ -100,9 +100,10 @@ export interface Session {
   updates: UpdateService | null;
   /**
    * Closes this Private Space in this window, after writing its edits, and shows the picker (ADR-0029, amendment of
-   * 2026-10-28). False when an edit could not be written: nothing closes.
+   * 2026-10-28), or opens `next` instead (a Private Space from the switcher, 0.2.6). False when an edit could not be
+   * written: nothing closes.
    */
-  switchVault(): Promise<boolean>;
+  switchVault(next?: string): Promise<boolean>;
   /** Set when the filesystem watcher could not start; saving still works. */
   watchError: string | null;
   /** Which window this is (ADR-0019): "main", or the id of a window the app opened (`platform.windows`). */

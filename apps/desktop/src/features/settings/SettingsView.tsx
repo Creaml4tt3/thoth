@@ -102,7 +102,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
               {t.reveal[currentOs()]}
             </Button>
           )}
-          <Button variant="ghost" small onClick={switchVault}>
+          <Button variant="ghost" small onClick={() => void switchVault()}>
             {t.switchSpace}
           </Button>
         </div>

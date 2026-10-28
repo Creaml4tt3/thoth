@@ -17,6 +17,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
 import { welcomeDone } from "./welcome.ts";
+import { newPrivatePage } from "./new-page.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -56,12 +57,8 @@ async function openVault(page: Page) {
 }
 
 async function newPage(page: Page, name: string) {
-  await page.keyboard.press("ControlOrMeta+n");
-  const dialog = page.getByRole("dialog", { name: "New page" });
-  await expect(dialog).toBeVisible();
-  await page.keyboard.type(name);
-  await page.keyboard.press("Enter");
-  await expect(dialog).toBeHidden();
+  const parts = name.split("/");
+  await newPrivatePage(page, parts.pop()!, parts[0]);
 }
 
 /** The names of the animations and transitions still running on elements matching `selector` right now (a finished one holds nothing). */
@@ -343,9 +340,10 @@ for (const scheme of ["light", "dark"] as const) {
       await frames("02-palette-out", [0, 60, 140]);
 
       // A dialog with actions.
-      await page.keyboard.press("ControlOrMeta+n");
-      await expect(page.getByRole("dialog", { name: "New page" })).toBeVisible();
-      await frames("03-new-page-in", [0, 60, 200]);
+      await page.locator(".private-tree").getByRole("treeitem", { name: "Archive" }).click({ button: "right" });
+      await page.getByRole("menuitem", { name: "Color…" }).click();
+      await expect(page.getByRole("dialog", { name: "Color for “Archive”" })).toBeVisible();
+      await frames("03-color-dialog-in", [0, 60, 200]);
       await page.keyboard.press("Escape");
       await settled(page);
 

@@ -150,15 +150,20 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     };
   }, [windows]);
 
-  const switchVault = useCallback(() => {
-    const current = hostRef.current;
-    hostRef.current = null;
-    setHost(null);
-    if (current) {
-      setLeft(current.connection.root);
-      void closeHost(current);
-    }
-  }, []);
+  /** Leaves this Private Space: to the picker, or straight into `next` (the switcher, 0.2.6). */
+  const switchVault = useCallback(
+    (next?: string) => {
+      const current = hostRef.current;
+      hostRef.current = null;
+      setHost(null);
+      if (current) {
+        setLeft(current.connection.root);
+        void closeHost(current);
+      }
+      if (next) void openRoot(next);
+    },
+    [openRoot],
+  );
 
   useEffect(
     () => () => {

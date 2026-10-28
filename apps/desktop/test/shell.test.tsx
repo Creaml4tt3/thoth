@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildTree } from "../src/features/shell/tree.ts";
-import { pagePathFromInput } from "../src/features/shell/NewPageDialog.tsx";
 import { displayPath } from "../src/features/settings/path.ts";
 import { createUnavailablePlatform, selectPlatform } from "../src/platform/select.ts";
 import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
@@ -52,26 +51,34 @@ describe("onboarding", () => {
 });
 
 describe("shell", () => {
-  it("creates a new page in a folder and opens it", async () => {
+  it("New page makes Untitled in the folder last clicked, opens it and starts the rename; the name is kept", async () => {
+    await seed(root, { "Projects/Old.md": "# Old\n" });
     const app = await openApp(root);
-    await screen.findByRole("tree");
+    const tree = await screen.findByRole("tree");
+    await app.user.click(within(tree).getByRole("treeitem", { name: "Projects" }));
+    expect(within(tree).getByRole("treeitem", { name: "Projects" }).hasAttribute("data-target")).toBe(true);
     await app.user.click(screen.getByRole("button", { name: "New page" }));
-    const dialog = screen.getByRole("dialog", { name: "New page" });
-    await app.user.type(within(dialog).getByRole("textbox"), "Projects/Plan");
-    await app.user.click(within(dialog).getByRole("button", { name: "Create" }));
-    await waitFor(async () => expect(await app.read("Projects/Plan.md")).toMatch(/^---\nthoth_id: .+\n---\n# Plan\n$/));
-    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Plan" })).toBeTruthy());
-    expect(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Projects" })).toBeTruthy();
+    const field = await screen.findByRole("textbox", { name: "Rename Untitled" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    await waitFor(async () => expect(await app.read("Projects/Untitled.md")).toMatch(/^---\nthoth_id: .+\n---\n# Untitled\n$/));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Untitled" })).toBeTruthy());
+    await app.user.keyboard("Plan{Enter}");
+    await waitFor(async () => expect(await app.read("Projects/Plan.md")).toMatch(/# Plan\n$/));
+    expect(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Plan" })).toBeTruthy();
   });
 
-  it("refuses to overwrite an existing page when creating", async () => {
+  it("New page never overwrites a page: a taken name gets a number; a click beside the rows goes back to the top level", async () => {
+    await seed(root, { "Untitled.md": "# Untitled\n", "Projects/Old.md": "# Old\n" });
     const app = await openApp(root);
-    await screen.findByRole("tree");
+    const tree = await screen.findByRole("tree");
+    await app.user.click(within(tree).getByRole("treeitem", { name: "Projects" }));
+    await app.user.click(tree.closest(".private-tree")!);
+    expect(within(tree).getByRole("treeitem", { name: "Projects" }).hasAttribute("data-target")).toBe(false);
     await app.user.click(screen.getByRole("button", { name: "New page" }));
-    const dialog = screen.getByRole("dialog", { name: "New page" });
-    await app.user.type(within(dialog).getByRole("textbox"), "Alpha");
-    await app.user.click(within(dialog).getByRole("button", { name: "Create" }));
-    expect((await screen.findByRole("alert")).textContent).toMatch(/already exists/);
+    await screen.findByRole("textbox", { name: "Rename Untitled 2" });
+    await app.user.keyboard("{Escape}");
+    expect(await app.read("Untitled.md")).toBe("# Untitled\n");
+    expect(await app.read("Untitled 2.md")).toMatch(/# Untitled 2\n$/);
     expect(await app.read("Alpha.md")).toBe(ALPHA);
   });
 
@@ -171,13 +178,6 @@ describe("tree and paths", () => {
     expect(folder.kind === "folder" && folder.children.map((n) => `${n.kind}:${n.path}`)).toEqual(["folder:A/B", "page:A/x.md"]);
   });
 
-  it("turns names into safe page paths", () => {
-    expect(pagePathFromInput("Notes/Idea")).toBe("Notes/Idea.md");
-    expect(pagePathFromInput("x.md")).toBe("x.md");
-    expect(() => pagePathFromInput("   ")).toThrow();
-    expect(() => pagePathFromInput("../escape")).toThrow();
-    expect(() => pagePathFromInput(".thoth/x")).toThrow();
-  });
 });
 
 describe("platform selection", () => {

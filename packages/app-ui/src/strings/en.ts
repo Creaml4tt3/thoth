@@ -195,6 +195,19 @@ export const en = {
     menuLabel: (title: string) => `Actions for ${title}`,
     newPageInside: "New page inside",
     newFolderInside: "New folder inside",
+    /** A page or folder at the top level, from a section's or the empty area's menu. */
+    newPage: "New page",
+    openNewTab: "Open in new tab",
+    /** A folder's label color (0.2.6). */
+    color: "Color…",
+    colorDialog: {
+      title: (name: string) => `Color for “${name}”`,
+      label: "Folder color",
+      none: "None",
+      cancel: "Cancel",
+    },
+    colorFailed: (detail: string) => `Could not change the color: ${detail}`,
+    newPageFailed: (detail: string) => `Could not create the page: ${detail}`,
     moveUp: "Move up",
     moveDown: "Move down",
     moveTo: "Move to…",

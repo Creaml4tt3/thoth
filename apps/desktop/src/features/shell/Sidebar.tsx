@@ -4,10 +4,8 @@ import { emptyOrder, readOrder, type OrderRecord } from "@thoth/local-store";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
-import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
-import { tip } from "@thoth/app-ui/ui/Tooltip.tsx";
-import { useShortcutHint } from "@thoth/app-ui/keyboard/hints.ts";
 import { useAcrossDropZone } from "@thoth/app-ui/order/dnd.ts";
+import { requestNewFolder, requestNewPage } from "@thoth/app-ui/order/new-folder-request.ts";
 import { onSpaceDrop, useSpaceHoverAt } from "@thoth/app-ui/order/space-drag.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
@@ -17,6 +15,7 @@ import { ancestorFolders, buildTree } from "./tree.ts";
 import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { useServerSections } from "../servers/ServersSidebar.tsx";
 import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
+import { SpaceSwitcher } from "./SpaceSwitcher.tsx";
 import { FAVORITES_SECTION, PRIVATE_SECTION } from "./sections.ts";
 import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
 import type { FavoritesController } from "../favorites/useFavoritesController.ts";
@@ -38,16 +37,19 @@ interface Props {
   /** The run of the current tab, if it is an assistant session. */
   currentRun?: string | null;
   onSearch(): void;
+  /** Creates a page in the Private Space, in the target folder (the last one clicked, 0.2.6), else at the top level. */
   onNewPage(): void;
-  /** Creates a folder in the Private Space (inside the folder the tree has focus in, else at the top level). */
+  /** Creates a folder the same way. */
   onNewFolder(): void;
   /** Opens the copy/move dialog for the selected pages. */
   onTransfer(target: TransferTarget): void;
   /** Whether the notification list under the bell is open (the palette opens it too). */
   notificationsOpen: boolean;
   onNotificationsOpen(open: boolean): void;
-  /** Back to the Private Space picker (ADR-0029, amendment of 2026-10-28): the logo is its button. */
+  /** Back to the Private Space picker (ADR-0029, amendment of 2026-10-28): "All Private Spaces" in the switcher. */
   onHome(): void;
+  /** Opens another Private Space in this window, from the switcher (0.2.6). */
+  onSwitch(root: string): void;
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -89,14 +91,13 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome }: Props) {
+export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
   const importFrom = useDesktopStrings().settings.importFrom;
-  const homeKeys = useShortcutHint("home.open");
   const hideLabel = useStrings().sidebar.hide;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
@@ -114,6 +115,8 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   }, [vault, pages]);
   const tree = useMemo(() => buildTree(pages, { folders: emptyFolders, order }), [pages, emptyFolders, order]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
+  /** The folder New page and New folder go into: the last folder clicked, or the folder of the last page clicked (0.2.6). */
+  const [target, setTarget] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
 
@@ -203,6 +206,11 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
     name: connection.label,
     label: t.privateSection(connection.label),
     title: connection.root,
+    // A right click on the header (0.2.6): a page or folder at the top level.
+    items: [
+      { id: "new-page", label: ttree.newPage, onSelect: () => requestNewPage({ parent: "" }) },
+      { id: "new-folder", label: ttree.newFolder, onSelect: () => requestNewFolder({ parent: "" }) },
+    ],
     drop: rootDrop,
     dropLit: rootLit,
     actions: (
@@ -233,7 +241,22 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
             </div>
           </div>
         )}
-        <PrivateTree tree={tree} current={current} open={open} setFolder={setFolder} remapFolders={remapFolders} selection={selection} onOrder={setOrder} onTransfer={onTransfer} />
+        <PrivateTree
+          tree={tree}
+          current={current}
+          open={open}
+          setFolder={setFolder}
+          remapFolders={(from, to) => {
+            remapFolders(from, to);
+            setTarget((t) => (t === from || t.startsWith(`${from}/`) ? to + t.slice(from.length) : t));
+          }}
+          selection={selection}
+          onOrder={setOrder}
+          onTransfer={onTransfer}
+          colors={order.colors ?? {}}
+          target={target}
+          setTarget={setTarget}
+        />
       </>
     ),
   };
@@ -253,10 +276,7 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   return (
     <aside ref={hidden.sidebarRef} className="sidebar" aria-label={t.sidebar} inert={hidden.hidden} aria-hidden={hidden.hidden || undefined}>
       <div className="ws">
-        <button type="button" className="ws-home" aria-label={t.leaveBrand} aria-keyshortcuts={homeKeys?.aria} {...tip(t.leave, homeKeys?.keys)} onClick={onHome}>
-          <Mark size={18} />
-          <span className="ws-name">Thoth</span>
-        </button>
+        <SpaceSwitcher onHome={onHome} onSwitch={onSwitch} />
         <IconButton ref={hidden.hideRef} icon="sidebar" label={hideLabel} shortcut="sidebar.toggle" onClick={() => hidden.setHidden(true)} />
       </div>
       <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">

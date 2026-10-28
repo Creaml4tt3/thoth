@@ -35,6 +35,7 @@ import { actAsBrowser, apiAs, buildWebClient, freePort, serveWebClient, startRef
 import { desktopOnlyIn } from "../../apps/web/test/bundle.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
+import { newPrivatePage } from "./new-page.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let ref: ReferenceServer;
@@ -192,10 +193,8 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await page.getByRole("button", { name: /start writing/i }).click();
 
     const create = async (name: string, line: string) => {
-      await page.getByRole("button", { name: "New page" }).click();
-      const dialog = page.getByRole("dialog", { name: "New page" });
-      await dialog.getByRole("textbox").fill(name);
-      await dialog.getByRole("button", { name: "Create" }).click();
+      const parts = name.split("/");
+      await newPrivatePage(page, parts.pop()!, parts[0]);
       const box = await editor(page);
       await caretAtEnd(box, name.split("/").pop()!);
       await page.keyboard.press("Enter");

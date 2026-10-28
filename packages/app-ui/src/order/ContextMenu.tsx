@@ -12,6 +12,10 @@ export interface MenuItem {
   disabled?: boolean;
   /** Destroys something (Delete…): shown in the danger colour. */
   danger?: boolean;
+  /** One of a set where one is current (the space switcher): a `menuitemradio`, checked or not. */
+  checked?: boolean;
+  /** A line above it, starting a new group. */
+  separator?: boolean;
   onSelect(): void;
 }
 
@@ -96,8 +100,9 @@ export function ContextMenu({ label, at, items, onClose }: Props) {
         <button
           key={item.id}
           type="button"
-          role="menuitem"
-          className={item.danger ? "ctx-item ctx-danger" : "ctx-item"}
+          role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+          aria-checked={item.checked}
+          className={`ctx-item${item.danger ? " ctx-danger" : ""}${item.separator ? " ctx-sep" : ""}`}
           disabled={item.disabled}
           onClick={() => {
             onClose(false);
