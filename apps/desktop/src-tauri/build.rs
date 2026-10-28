@@ -19,6 +19,9 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "link_preview", "link_preview_clear", "link_open",
     // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict and no network.
     "update_check", "update_settings",
+    // In-app updates (ADR-0034): the host downloads, checks and installs through the updater plugin's Rust API; the
+    // webview gets these four commands and progress events, and no plugin permission.
+    "update_install", "update_cancel", "update_status", "update_restart",
     // Connected apps (ADR-0021): the settings, the Allow or Deny, a window's answer and the log; thoth-mcp's socket is
     // the host's own.
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
@@ -27,11 +30,14 @@ pub const TAURI_COMMANDS: &[&str] = &[
 ];
 
 /// An address from the environment, for the app's build (ADR-0022): `https`, or empty (no update notice); never a
-/// line break, which could add a build directive.
+/// line break, which could add a build directive. A debug build may read `latest.json` from `http://127.0.0.1:…`, for a
+/// local test of in-app updates (ADR-0034); a release build never.
 fn address(name: &str) {
     println!("cargo:rerun-if-env-changed={name}");
     let Ok(value) = std::env::var(name) else { return };
-    assert!(value.is_empty() || (value.starts_with("https://") && !value.chars().any(|c| c.is_control() || c.is_whitespace())), "{name} must be empty or an https address");
+    let debug = std::env::var("PROFILE").as_deref() == Ok("debug");
+    let local = debug && name == "THOTH_UPDATE_URL" && value.starts_with("http://127.0.0.1:");
+    assert!(value.is_empty() || ((value.starts_with("https://") || local) && !value.chars().any(|c| c.is_control() || c.is_whitespace())), "{name} must be empty or an https address");
     println!("cargo:rustc-env={name}={value}");
 }
 

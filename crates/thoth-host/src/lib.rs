@@ -196,7 +196,8 @@ impl Host {
     /// (`link_preview_loopback`) applies to it too, so a test can serve `latest.json` from a local server.
     #[must_use]
     pub fn with_updates(mut self, mut options: UpdateOptions) -> Self {
-        options.allow_loopback = self.config.link_preview_loopback;
+        // The desktop shell may set it for a local test of a debug build (ADR-0034); the harness's switch adds to it.
+        options.allow_loopback |= self.config.link_preview_loopback;
         options.events = Some(self.config.events.clone());
         self.updates = Updates::new(self.config.data_dir.clone(), options);
         self

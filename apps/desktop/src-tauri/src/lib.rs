@@ -31,7 +31,8 @@ use std::time::Duration;
 use tauri::ipc::{Invoke, InvokeBody, InvokeError, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
-use thoth_host::updates::UpdateOptions;
+use thoth_host::install::{Failure, Fetched, Installer, NoInstaller};
+use thoth_host::updates::{UpdateOptions, Version};
 use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MovingSecretStore, Picker, SecretStore};
 
 /// Where the update notice reads `latest.json` and where "Download" goes (ADR-0022). Fixed when the app is built:
@@ -46,12 +47,164 @@ const DOWNLOADS_PAGE_URL: &str = match option_env!("THOTH_DOWNLOADS_PAGE_URL") {
     None => thoth_host::updates::DEFAULT_DOWNLOADS_PAGE,
 };
 
+/// A local test of in-app updates (ADR-0034, docs/deploy/release.md): a debug build whose `THOTH_UPDATE_URL` is
+/// `http://127.0.0.1:…` may read `latest.json` and the update from there. Never in a release build: build.rs refuses an
+/// `http` address unless the profile is debug, and the updater refuses `http` in a release build too.
+const LOCAL_UPDATE_TEST: bool = cfg!(debug_assertions) && starts_with(UPDATE_URL, "http://127.0.0.1:");
+
+const fn starts_with(text: &str, prefix: &str) -> bool {
+    let (text, prefix) = (text.as_bytes(), prefix.as_bytes());
+    if text.len() < prefix.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < prefix.len() {
+        if text[i] != prefix[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// Whether this copy of the app can replace itself (ADR-0034), from how it was bundled (Tauri marks the binary when it
+/// bundles it), where it runs from and, on Linux, whether it runs as an AppImage. A .deb (or .rpm) install would need
+/// root and a password prompt from the updater, so it keeps the notice; so does a build that is not bundled.
+fn updates_in_app(bundle: Option<tauri::utils::config::BundleType>, exe: &std::path::Path, appimage: bool, os: &str) -> bool {
+    use tauri::utils::config::BundleType;
+    match (os, bundle) {
+        // On macOS Tauri reports `App` for anything; the app must be in its bundle, and not run by macOS from a
+        // read-only copy (App Translocation, a Thoth.app opened where it was downloaded).
+        ("macos", Some(BundleType::App)) => {
+            let path = exe.to_string_lossy();
+            path.contains(".app/Contents/MacOS/") && !path.contains("/AppTranslocation/")
+        }
+        ("windows", Some(BundleType::Nsis | BundleType::Msi)) => true,
+        ("linux", Some(BundleType::AppImage)) => appimage,
+        _ => false,
+    }
+}
+
+/// The update file must come from where `latest.json` is: the same scheme, host and port, no credentials.
+fn same_origin(url: &tauri::Url, endpoint: &tauri::Url) -> bool {
+    url.scheme() == endpoint.scheme() && url.host_str() == endpoint.host_str() && url.port_or_known_default() == endpoint.port_or_known_default() && url.username().is_empty() && url.password().is_none()
+}
+
+/// What the popup says about an updater error (the error itself is not shown: it could echo a server).
+fn failure_of(error: &tauri_plugin_updater::Error) -> Failure {
+    use tauri_plugin_updater::Error as E;
+    match error {
+        E::Reqwest(_) | E::Network(_) => Failure::Offline,
+        E::Minisign(_) | E::Base64(_) | E::SignatureUtf8(_) | E::SignedVersionMismatch { .. } | E::MissingSignedVersion => Failure::Verify,
+        E::Io(e) if e.kind() == std::io::ErrorKind::StorageFull => Failure::Disk,
+        _ => Failure::Failed,
+    }
+}
+
+/// In-app updates through the Tauri updater plugin's Rust API (ADR-0034). The webview never reaches the plugin: the
+/// host's `update.*` commands call this. It reads the same `latest.json` as the notice, with no proxy, no redirect and
+/// https only; it takes the update file only from that address's origin; the plugin checks the signature against the
+/// public key in tauri.conf.json before anything is installed.
+struct PluginInstaller {
+    app: AppHandle,
+    endpoint: tauri::Url,
+    /// Windows: the downloaded installer, run at restart (it closes the app to replace it).
+    pending: Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>,
+}
+
+impl PluginInstaller {
+    fn updater(&self) -> Result<tauri_plugin_updater::Updater, Failure> {
+        use tauri_plugin_updater::UpdaterExt;
+        self.app
+            .updater_builder()
+            .endpoints(vec![self.endpoint.clone()])
+            .map_err(|_| Failure::Failed)?
+            .no_proxy()
+            // The notice's rule (ADR-0022): newer, and never a pre-release to a stable build.
+            .version_comparator(|current, release| {
+                let (Some(current), Some(latest)) = (Version::parse(&current.to_string()), Version::parse(&release.version.to_string())) else { return false };
+                thoth_host::updates::is_offered(&current, &latest)
+            })
+            .configure_client(|client| client.https_only(!LOCAL_UPDATE_TEST).redirect(reqwest::redirect::Policy::none()).connect_timeout(Duration::from_secs(10)).read_timeout(Duration::from_secs(30)))
+            .build()
+            .map_err(|e| failure_of(&e))
+    }
+
+    /// After every window has written its edits and closed, as the app exits: Windows runs the downloaded installer
+    /// (passive; it closes what is left and starts the new version), elsewhere the new version, already in place, starts.
+    fn finish(&self, app: &AppHandle) {
+        if let Some((update, bytes)) = locked(&self.pending).take() {
+            // Exits the process once the installer has started.
+            let _ = update.install(bytes);
+        }
+        tauri::process::restart(&app.env());
+    }
+}
+
+impl Installer for PluginInstaller {
+    fn supported(&self) -> bool {
+        let exe = std::env::current_exe().unwrap_or_default();
+        #[cfg(target_os = "linux")]
+        let appimage = self.app.env().appimage.is_some();
+        #[cfg(not(target_os = "linux"))]
+        let appimage = false;
+        updates_in_app(tauri::utils::platform::bundle_type(), &exe, appimage, std::env::consts::OS)
+    }
+
+    fn fetch(&self, progress: &mut dyn FnMut(u64, Option<u64>), cancel: &AtomicBool) -> Result<Fetched, Failure> {
+        let updater = self.updater()?;
+        let endpoint = self.endpoint.clone();
+        let (tx, rx) = std::sync::mpsc::channel::<(usize, Option<u64>)>();
+        let task = tauri::async_runtime::spawn(async move {
+            let update = updater.check().await.map_err(|e| failure_of(&e))?.ok_or(Failure::Failed)?;
+            if !same_origin(&update.download_url, &endpoint) {
+                return Err(Failure::Verify);
+            }
+            // The plugin checks the signature once the whole file is in, before it returns it.
+            let bytes = update.download(move |chunk, total| { let _ = tx.send((chunk, total)); }, || ()).await.map_err(|e| failure_of(&e))?;
+            Ok((update, bytes))
+        });
+        let mut received = 0u64;
+        loop {
+            if cancel.load(Ordering::SeqCst) {
+                task.abort();
+                return Err(Failure::Cancelled);
+            }
+            match rx.recv_timeout(Duration::from_millis(100)) {
+                Ok((chunk, total)) => {
+                    received += chunk as u64;
+                    progress(received, total);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        let (update, bytes) = tauri::async_runtime::block_on(task).map_err(|_| Failure::Failed)??;
+        let version = update.version.clone();
+        if cfg!(windows) {
+            *locked(&self.pending) = Some((update, bytes));
+            return Ok(Fetched { version, installed: false });
+        }
+        update.install(&bytes).map_err(|e| failure_of(&e))?;
+        Ok(Fetched { version, installed: true })
+    }
+
+    fn restart(&self) -> HostResult<()> {
+        // As Quit: every window writes its edits and closes; the app then exits, and `finish` runs (RunEvent::Exit).
+        RESTARTING.store(true, Ordering::SeqCst);
+        let app = self.app.clone();
+        self.app.run_on_main_thread(move || quit(&app)).map_err(|_| HostError::internal("The app could not restart"))
+    }
+}
+
 pub const ARGS_HEADER: &str = "x-thoth-args";
 pub const VAULT_CHANGED_EVENT: &str = "vault:changed";
 /// Connected apps (ADR-0021): an app's request for the window that holds its Private Space, and the apps waiting for
 /// Allow or Deny (the host's `mcp.request` and `mcp.pending`).
 pub const MCP_REQUEST_EVENT: &str = "thoth:mcp-request";
 pub const MCP_PENDING_EVENT: &str = "thoth:mcp-pending";
+/// In-app updates (ADR-0034): the host's `update.progress`, to every window.
+pub const UPDATE_PROGRESS_EVENT: &str = "thoth:update-progress";
 
 /// Native dialogs, shown by the host so that only paths the user chose enter the allow-list.
 struct DialogPicker {
@@ -472,6 +625,9 @@ static HOST: OnceLock<Arc<Host>> = OnceLock::new();
 static EXITING: AtomicBool = AtomicBool::new(false);
 /// Windows asked to close (their close button, or Quit) that have not closed yet.
 static CLOSING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+/// Set by "Restart now" (ADR-0034): when the app exits, it starts the new version (`PluginInstaller::finish`).
+static RESTARTING: AtomicBool = AtomicBool::new(false);
+static INSTALLER: OnceLock<Arc<PluginInstaller>> = OnceLock::new();
 /// Releases still ending in the background: the app waits for them before it exits, so no agent run outlives it.
 static RELEASING: Mutex<Vec<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(Vec::new());
 
@@ -518,9 +674,9 @@ fn ask_to_close<R: tauri::Runtime>(app: &AppHandle<R>, label: &str) {
     });
 }
 
-/// Quit (Cmd+Q on macOS): every window writes its edits and closes, as with its close button; the app exits when the
-/// last one has gone. The windows open now are not forgotten: they come back with the Private Space.
-#[cfg(target_os = "macos")]
+/// Quit (Cmd+Q on macOS), and a restart into an update (ADR-0034): every window writes its edits and closes, as with its
+/// close button; the app exits when the last one has gone. The windows open now are not forgotten: they come back with
+/// the Private Space.
 fn quit<R: tauri::Runtime>(app: &AppHandle<R>) {
     EXITING.store(true, Ordering::SeqCst);
     let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
@@ -557,7 +713,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // System notifications (ADR-0018): the webview may only check and ask for the permission and show one.
         .plugin(tauri_plugin_notification::init())
+        // In-app updates (ADR-0034): used from the host through its Rust API; the webview is granted none of it.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // In-app updates read the same address as the notice; a build without one has neither.
+            let installer: Arc<dyn Installer> = match tauri::Url::parse(UPDATE_URL) {
+                Ok(endpoint) => {
+                    let plugin = Arc::new(PluginInstaller { app: app.handle().clone(), endpoint, pending: Mutex::new(None) });
+                    let _ = INSTALLER.set(plugin.clone());
+                    plugin
+                }
+                Err(_) => Arc::new(NoInstaller),
+            };
             let handle = app.handle().clone();
             let emitter = handle.clone();
             let host = Host::new(HostConfig {
@@ -572,6 +739,7 @@ pub fn run() {
                             None => Ok(()),
                         },
                         thoth_host::mcp::PENDING_EVENT => emitter.emit(MCP_PENDING_EVENT, payload),
+                        thoth_host::install::PROGRESS_EVENT => emitter.emit(UPDATE_PROGRESS_EVENT, payload),
                         _ => emitter.emit(VAULT_CHANGED_EVENT, payload),
                     };
                 }),
@@ -584,7 +752,7 @@ pub fn run() {
                 // Link previews connect to public addresses only (ADR-0020); the loopback switch is for tests.
                 link_preview_loopback: false,
             })
-            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) });
+            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), allow_loopback: LOCAL_UPDATE_TEST, installer, ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) });
             let _ = HOST.set(Arc::new(host));
             Ok(())
         })
@@ -621,7 +789,7 @@ pub fn run() {
         })
         .build(context)
         .expect("failed to build the Thoth app")
-        .run(|_app, event| {
+        .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 EXITING.store(true, Ordering::SeqCst);
             }
@@ -633,6 +801,12 @@ pub fn run() {
                 }
                 if let Some(host) = HOST.get() {
                     host.shutdown();
+                }
+                // "Restart now" (ADR-0034): the windows have written their edits and closed, the runs have ended.
+                if RESTARTING.load(Ordering::SeqCst)
+                    && let Some(installer) = INSTALLER.get()
+                {
+                    installer.finish(app);
                 }
             }
         });
@@ -764,15 +938,14 @@ mod tests {
         for link in ["allow-link-preview", "allow-link-preview-clear", "allow-link-open"] {
             assert!(granted.contains(link), "{link}");
         }
-        // The update notice (ADR-0022) adds `update.check` and `update.settings`: a verdict and the person's choice, no
-        // download, no install, no updater plugin.
-        for update in ["allow-update-check", "allow-update-settings"] {
-            assert!(granted.contains(update), "{update}");
-        }
-        assert!(granted.iter().filter(|p| p.contains("update")).count() == 2);
+        // The update notice (ADR-0022) adds `update.check` and `update.settings`; in-app updates (ADR-0034) add
+        // `update.install`, `update.cancel`, `update.status` and `update.restart`, the host's own commands. The updater
+        // plugin is the shell's, through its Rust API: none of its permissions is granted to the webview.
+        let updates: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.contains("update")).collect();
+        assert_eq!(updates, BTreeSet::from(["allow-update-check", "allow-update-settings", "allow-update-install", "allow-update-cancel", "allow-update-status", "allow-update-restart"]));
         let text = include_str!("../capabilities/main.json");
-        assert!(!text.contains("updater"), "no updater plugin");
-        assert!(!include_str!("../Cargo.toml").contains("updater"));
+        assert!(!text.contains("updater"), "no updater plugin permission");
+        assert!(include_str!("../Cargo.toml").contains("tauri-plugin-updater"));
         // Connected apps (ADR-0021) add exactly their six commands and no plugin: the socket is the host's.
         let mcp: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.starts_with("allow-mcp-")).collect();
         assert_eq!(mcp, BTreeSet::from(["allow-mcp-settings", "allow-mcp-configure", "allow-mcp-decide", "allow-mcp-forget", "allow-mcp-answer", "allow-mcp-log"]));
@@ -782,7 +955,7 @@ mod tests {
     fn the_update_notice_looks_where_the_build_says_and_only_over_https() {
         // Compiled in (build.rs reads THOTH_UPDATE_URL for a self-built copy); empty turns the notice off.
         for address in [UPDATE_URL, DOWNLOADS_PAGE_URL] {
-            assert!(address.is_empty() || address.starts_with("https://"), "{address}");
+            assert!(address.is_empty() || address.starts_with("https://") || LOCAL_UPDATE_TEST, "{address}");
         }
         if option_env!("THOTH_UPDATE_URL").is_none() {
             assert_eq!(UPDATE_URL, "https://download.thothnotes.com/latest.json");
@@ -792,6 +965,77 @@ mod tests {
         let code = source.split("#[cfg(test)]").next().unwrap();
         assert!(!code.contains("var(\"THOTH") && !code.contains("var_os(\"THOTH") && !code.contains("env::args"));
         assert!(include_str!("../build.rs").contains("\"update_check\", \"update_settings\""));
+    }
+
+    #[test]
+    fn in_app_updates_only_where_the_bundle_can_replace_itself() {
+        use tauri::utils::config::BundleType;
+        let app = std::path::Path::new("/Applications/Thoth.app/Contents/MacOS/thoth-desktop");
+        let elsewhere = std::path::Path::new("/Users/a/thoth/target/release/thoth-desktop");
+        // macOS: the app in its bundle; not a build from the source tree, not a copy macOS runs from a read-only place.
+        assert!(updates_in_app(Some(BundleType::App), app, false, "macos"));
+        assert!(!updates_in_app(Some(BundleType::App), elsewhere, false, "macos"));
+        assert!(!updates_in_app(Some(BundleType::App), std::path::Path::new("/private/var/folders/x/AppTranslocation/1/d/Thoth.app/Contents/MacOS/thoth-desktop"), false, "macos"));
+        // Windows: whichever installer put it there updates it (NSIS by NSIS, MSI by the MSI).
+        assert!(updates_in_app(Some(BundleType::Nsis), elsewhere, false, "windows"));
+        assert!(updates_in_app(Some(BundleType::Msi), elsewhere, false, "windows"));
+        // Linux: the AppImage replaces itself; a .deb would need root and a password prompt, so it keeps the notice.
+        assert!(updates_in_app(Some(BundleType::AppImage), elsewhere, true, "linux"));
+        assert!(!updates_in_app(Some(BundleType::AppImage), elsewhere, false, "linux"));
+        assert!(!updates_in_app(Some(BundleType::Deb), elsewhere, false, "linux"));
+        assert!(!updates_in_app(Some(BundleType::Rpm), elsewhere, false, "linux"));
+        // Not bundled (cargo run, tauri dev): never.
+        assert!(!updates_in_app(None, app, false, "macos"));
+        assert!(!updates_in_app(None, elsewhere, false, "windows"));
+    }
+
+    #[test]
+    fn the_update_file_comes_from_where_latest_json_is_over_https() {
+        let endpoint = tauri::Url::parse("https://download.thothnotes.com/latest.json").unwrap();
+        let ok = |u: &str| same_origin(&tauri::Url::parse(u).unwrap(), &endpoint);
+        assert!(ok("https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_universal.app.tar.gz"));
+        for bad in ["http://download.thothnotes.com/v0.2.3/x", "https://download.thothnotes.com.evil.example/x", "https://evil.example/x", "https://download.thothnotes.com:8443/x", "https://user@download.thothnotes.com/x"] {
+            assert!(!ok(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn updater_errors_are_told_apart_for_the_popup() {
+        use tauri_plugin_updater::Error as E;
+        assert_eq!(failure_of(&E::Network("down".into())), Failure::Offline);
+        assert_eq!(failure_of(&E::SignatureUtf8("x".into())), Failure::Verify);
+        assert_eq!(failure_of(&E::SignedVersionMismatch { signed: "0.2.2".into(), announced: "0.2.3".into() }), Failure::Verify);
+        assert_eq!(failure_of(&E::MissingSignedVersion), Failure::Verify);
+        assert_eq!(failure_of(&E::Io(std::io::Error::from(std::io::ErrorKind::StorageFull))), Failure::Disk);
+        assert_eq!(failure_of(&E::Io(std::io::Error::from(std::io::ErrorKind::PermissionDenied))), Failure::Failed);
+        assert_eq!(failure_of(&E::TargetsNotFound(vec!["linux-x86_64-deb".into()])), Failure::Failed);
+        assert_eq!(failure_of(&E::InvalidUpdaterFormat), Failure::Failed);
+    }
+
+    #[test]
+    fn the_updater_is_configured_safely() {
+        let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        // Updater files are built (and signed: the build fails without the private key) with every release.
+        assert_eq!(conf["bundle"]["createUpdaterArtifacts"], true);
+        let updater = &conf["plugins"]["updater"];
+        // The public key the app checks every update with. The placeholder is replaced with the real key before the
+        // first release that has it; the release workflow refuses to build a tag with the placeholder.
+        let pubkey = updater["pubkey"].as_str().unwrap();
+        assert!(pubkey == "THOTH_UPDATER_PUBKEY_PLACEHOLDER" || pubkey.len() > 40, "{pubkey}");
+        assert_eq!(updater["endpoints"], json!(["https://download.thothnotes.com/latest.json"]));
+        assert_eq!(updater["windows"]["installMode"], "passive");
+        let text = include_str!("../tauri.conf.json");
+        for dangerous in ["dangerousInsecureTransportProtocol", "dangerousAcceptInvalidCerts", "dangerousAcceptInvalidHostnames", "allowDowngrades"] {
+            assert!(!text.contains(dangerous), "{dangerous}");
+        }
+        // The shell's updater uses the address compiled in, which is https in a release build (build.rs refuses http
+        // unless the profile is debug, and the updater itself refuses http in a release build).
+        assert!(include_str!("../build.rs").contains("PROFILE"));
+        if !cfg!(debug_assertions) {
+            assert!(UPDATE_URL.is_empty() || UPDATE_URL.starts_with("https://"));
+            assert!(!LOCAL_UPDATE_TEST);
+        }
+        assert_eq!(LOCAL_UPDATE_TEST, cfg!(debug_assertions) && UPDATE_URL.starts_with("http://127.0.0.1:"));
     }
 
     #[test]
