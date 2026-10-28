@@ -9,6 +9,7 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameDialog } from "../order/RenameDialog.tsx";
 import { DeleteDialog } from "../order/DeleteDialog.tsx";
+import { DownloadStatus, readWorkspaceMarkdown, useDownload, workspaceCanDownload } from "../download/DownloadButton.tsx";
 import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
@@ -225,6 +226,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const tm = useStrings().members;
   const tw = useStrings().workspaces;
   const tf = useStrings().favorites;
+  const td = useStrings().download;
   const favorites = useFavorites();
   const state = useSyncExternalStore(directory.subscribe, directory.getState);
   const key = workspaceKey(server, workspace.id);
@@ -240,6 +242,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [moving, setMoving] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const { download, said: downloadSaid } = useDownload();
   const [membersOpen, setMembersOpen] = useState(false);
   /** ADR-0025: the owner's Rename… and Delete… of this workspace. */
   const [admin, setAdmin] = useState<"rename" | "delete" | null>(null);
@@ -519,7 +522,12 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             ...(canWrite ? [{ id: "move-to-workspace", label: tx.moveToOther, onSelect: () => onToWorkspace(carried, "move") }] : []),
           ]
         : [];
-    if (!canWrite) return [...star, ...toPrivate, ...toWorkspace];
+    // Folders hold pages; only a page is downloaded, where the workspace lets its pages be copied out (ADR-0009).
+    const save: MenuItem[] =
+      download && tree?.kinds[id]?.folder !== true && workspaceCanDownload(state, { server, workspace: workspace.id })
+        ? [{ id: "download", label: td.menu, onSelect: () => void download(titleOf(id), () => readWorkspaceMarkdown(directory, { server, workspace: workspace.id, page: id })) }]
+        : [];
+    if (!canWrite) return [...star, ...toPrivate, ...toWorkspace, ...save];
     return [
       ...star,
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(id) },
@@ -531,6 +539,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       ...toPrivate,
       ...toWorkspace,
       ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
+      ...save,
       { id: "delete", label: tt.delete, danger: true, onSelect: () => setDeleting(id) },
     ];
   };
@@ -724,6 +733,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           onClose={() => setAdmin(null)}
         />
       )}
+      <DownloadStatus said={downloadSaid} />
       {deleting && canWrite && (
         <DeleteDialog
           name={titleOf(deleting)}

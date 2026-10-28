@@ -217,8 +217,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       ...(linkPreviews ? { links: linkPreviews } : {}),
       // Images (ADR-0028): the host's picker; the page gets the name and the bytes, never the path.
       ...(platform.pickImage ? { pickImage: () => platform.pickImage!() } : {}),
+      // Download as Markdown: the host's "Save as"; the page never learns where it went.
+      ...(platform.saveFile ? { saveFile: (name: string, text: string) => platform.saveFile!(name, new TextEncoder().encode(text)) } : {}),
+      flushAll,
     }),
-    [options.autosaveMs, options.now, registerFlush, linkPreviews, platform],
+    [options.autosaveMs, options.now, registerFlush, linkPreviews, platform, flushAll],
   );
   // Transfers: recovery of operations a crash interrupted runs once the server list is known (ADR-0006 §7).
   const transfers = useMemo(

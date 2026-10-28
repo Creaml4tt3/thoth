@@ -570,6 +570,13 @@ export const th: Strings = {
     updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้",
   },
 
+  download: {
+    button: "ดาวน์โหลดเป็น Markdown", // REVIEW
+    menu: "ดาวน์โหลดเป็น Markdown…", // REVIEW
+    saved: (name) => `บันทึก ${name} แล้ว`, // REVIEW
+    failed: (detail) => `ดาวน์โหลดไม่ได้: ${detail}`, // REVIEW
+  },
+
   favorites: {
     section: "รายการโปรด",
     list: "หน้าในรายการโปรด",

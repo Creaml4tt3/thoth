@@ -630,6 +630,14 @@ export const en = {
   },
 
   /** Favorites (ADR-0027): starred pages, at the top of the sidebar. */
+  /** Download as Markdown: a page's text as one .md file. */
+  download: {
+    button: "Download as Markdown",
+    menu: "Download as Markdown…",
+    saved: (name: string) => `Saved ${name}`,
+    failed: (detail: string) => `Could not download: ${detail}`,
+  },
+
   favorites: {
     section: "Favorites",
     list: "Favorite pages",

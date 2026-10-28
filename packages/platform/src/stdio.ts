@@ -17,6 +17,8 @@ export interface StdioTransportOptions {
   pickSource?: string;
   /** The image picker's answer (`--pick-image`, ADR-0028). */
   pickImage?: string;
+  /** The folder "Save as" saves into (`--pick-save`). */
+  pickSave?: string;
   dataDir?: string;
   /** Test hook: look for agent CLIs only in these folders (`--agent-search-dir`). */
   agentSearchDirs?: string[];
@@ -70,6 +72,7 @@ export class StdioTransport implements Transport {
     if (options.pickVault !== undefined) args.push("--pick-vault", options.pickVault);
     if (options.pickSource !== undefined) args.push("--pick-source", options.pickSource);
     if (options.pickImage !== undefined) args.push("--pick-image", options.pickImage);
+    if (options.pickSave !== undefined) args.push("--pick-save", options.pickSave);
     if (options.dataDir !== undefined) args.push("--data-dir", options.dataDir);
     for (const dir of options.agentSearchDirs ?? []) args.push("--agent-search-dir", dir);
     if (options.secretsFile !== undefined) args.push("--secrets-file", options.secretsFile);

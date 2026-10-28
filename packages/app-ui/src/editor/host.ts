@@ -18,6 +18,10 @@ export interface PageHost {
   links?: LinkPreviewService;
   /** Asks for an image file to add to a page (ADR-0028): the host's picker on the desktop, `<input type=file>` on the web. Null: cancelled. */
   pickImage?(): Promise<ImageFile | null>;
+  /** Download as Markdown: saves `text` as `name`. The host's "Save as" on the desktop, the browser's download on the web. False: cancelled. */
+  saveFile?(name: string, text: string): Promise<boolean>;
+  /** Writes every pending edit of the pages open in this window; false when one could not be written. */
+  flushAll?(): Promise<boolean>;
 }
 
 export const PageHostContext = createContext<PageHost | null>(null);

@@ -22,6 +22,8 @@ import { useShortcuts } from "@thoth/app-ui/keyboard/useShortcuts.ts";
 import { currentPlatform } from "@thoth/app-ui/keyboard/shortcuts.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { pickImageWithInput } from "@thoth/app-ui/editor/media.ts";
+import { downloadInBrowser } from "@thoth/app-ui/download/download.ts";
+import { WorkspaceDownloadButton } from "@thoth/app-ui/download/DownloadButton.tsx";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { createNotificationCenter, type NotificationTarget } from "@thoth/app-ui/notifications/core.ts";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
@@ -112,7 +114,10 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   }, []);
   const flushAll = useCallback(async () => (await Promise.all([...flushers.current].map((f) => f().catch(() => false)))).every(Boolean), []);
   // Images (ADR-0028): the browser's own file picker.
-  const pageHost = useMemo<PageHost>(() => ({ client: "web", autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush, pickImage: () => pickImageWithInput() }), [env, registerFlush]);
+  const pageHost = useMemo<PageHost>(
+    () => ({ client: "web", autosaveMs: env.autosaveMs, now: () => new Date(env.now()), registerFlush, flushAll, pickImage: () => pickImageWithInput(), saveFile: async (name, text) => downloadInBrowser(name, text) }),
+    [env, registerFlush, flushAll],
+  );
 
   // Tabs: restored per browser (ids only, no titles), saved on every change. Leaving the page on screen writes its edits first.
   const tabs = useTabs({ initial: () => loadTabs(env.localStorage), flush: flushAll, save: (layout) => saveTabs(env.localStorage, layout) });
@@ -407,6 +412,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             <span className="page-actions">
               <FavoriteButton target={{ kind: "workspace", ...current }} />
               <ShareButton directory={directory} target={current} />
+              <WorkspaceDownloadButton directory={directory} target={current} />
               {hasOtherWritableWorkspace(state, current) && (
                 <IconButton icon="to-workspace" label={t.transfer.toOther} onClick={() => transfer({ direction: "between_workspaces", server: current.server, workspace: current.workspace, pageId: current.page, title: remoteTitle(state, current) ?? "", mode: "copy" })} />
               )}

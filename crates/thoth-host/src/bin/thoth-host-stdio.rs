@@ -16,7 +16,7 @@
 //! `link.*` (link previews fetch from the network) and `update.*` (the update check does too).
 //!
 //! Flags: --allow-root <dir> (repeatable), --pick-vault <dir>,
-//! --pick-source <path>, --pick-image <path> (the image picker's answer, ADR-0028), --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
+//! --pick-source <path>, --pick-image <path> (the image picker's answer, ADR-0028), --pick-save <dir> (where "Save as" saves), --data-dir <dir>, --agent-search-dir <dir> (repeatable: look for agent CLIs only
 //! there, so tests run a fake `claude` and can make it missing), --secrets-file <path> (keep server secrets in
 //! that file instead of memory: it stands in for the system keychain, so a test can restart the host and still
 //! be signed in, as the desktop app is), --link-preview-loopback (link previews may fetch from loopback
@@ -46,6 +46,7 @@ struct FixedPicker {
     vault: Option<PathBuf>,
     source: Option<PathBuf>,
     image: Option<PathBuf>,
+    save: Option<PathBuf>,
 }
 
 impl Picker for FixedPicker {
@@ -57,6 +58,10 @@ impl Picker for FixedPicker {
     }
     fn pick_image(&self) -> Option<PathBuf> {
         self.image.clone()
+    }
+    /// `--pick-save <dir>`: saves into that folder under the suggested name.
+    fn pick_save(&self, name: &str) -> Option<PathBuf> {
+        self.save.as_ref().map(|dir| dir.join(name))
     }
 }
 
@@ -159,7 +164,7 @@ impl SecretStore for FileSecretStore {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS] [--update-installer ok|windows|slow|verify|offline|disk]");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--pick-save DIR] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS] [--update-installer ok|windows|slow|verify|offline|disk]");
     std::process::exit(2);
 }
 
@@ -168,6 +173,7 @@ fn main() {
     let mut vault = None;
     let mut source = None;
     let mut image = None;
+    let mut save = None;
     let mut data_dir = None;
     let mut agent_dirs: Option<Vec<PathBuf>> = None;
     let mut secrets_file = None;
@@ -188,6 +194,7 @@ fn main() {
             Some("--pick-vault") => vault = Some(value()),
             Some("--pick-source") => source = Some(value()),
             Some("--pick-image") => image = Some(value()),
+            Some("--pick-save") => save = Some(value()),
             Some("--data-dir") => data_dir = Some(value()),
             Some("--agent-search-dir") => agent_dirs.get_or_insert_with(Vec::new).push(value()),
             Some("--secrets-file") => secrets_file = Some(value()),
@@ -215,7 +222,7 @@ fn main() {
     let host = Host::new(HostConfig {
         data_dir,
         allow_roots,
-        picker: Arc::new(FixedPicker { vault, source, image }),
+        picker: Arc::new(FixedPicker { vault, source, image, save }),
         events: Arc::new(move |event, payload| event_emit(json!({ "event": event, "payload": payload }))),
         disable_hardlink: std::env::var_os("THOTH_TEST_DISABLE_HARDLINK").is_some_and(|v| v == "1"),
         secrets: match secrets_file {

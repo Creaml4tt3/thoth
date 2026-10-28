@@ -38,11 +38,12 @@ test.beforeEach(async ({ page, context }) => {
   scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-around-")));
   vault = join(scratch, "Vault");
   await mkdir(vault);
+  await mkdir(join(scratch, "Downloads"));
   for (const path of ["Alpha.md", "Beta.md", "Projects/Plan.md", "Projects/Roadmap.md"]) await put(path);
   bridge = await startBridge({
     dist: built.dist,
     bridgeDir: built.bridgeDir,
-    host: { binary: built.binary, pickVault: vault, dataDir: join(scratch, "data"), onHostEvent: (event, payload) => (event === "vault.revealed" ? revealed.push(payload) : event === "vault.trashed" && trashed.push(payload)) },
+    host: { binary: built.binary, pickVault: vault, pickSave: join(scratch, "Downloads"), dataDir: join(scratch, "data"), onHostEvent: (event, payload) => (event === "vault.revealed" ? revealed.push(payload) : event === "vault.trashed" && trashed.push(payload)) },
   });
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
@@ -126,6 +127,16 @@ test("Delete… on a page and a folder asks first, then the host moves that entr
   await expect.poll(() => trashed).toEqual([{ root: vault, entry: join(vault, "Projects") }]);
   await expect(row(page, "Projects")).toHaveCount(0);
   await expect(row(page, "Beta")).toBeVisible();
+});
+
+test("Download as Markdown saves the page's file where Save as points, from the header and the menu", async ({ page }) => {
+  await expect(current(page)).toHaveText("Alpha");
+  await page.getByRole("button", { name: "Download as Markdown" }).click();
+  await expect.poll(() => readFile(join(scratch, "Downloads", "Alpha.md"), "utf8").catch(() => "")).toBe(await readFile(join(vault, "Alpha.md"), "utf8"));
+  await row(page, "Projects").click();
+  await row(page, "Plan").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Download as Markdown…" }).click();
+  await expect.poll(() => readFile(join(scratch, "Downloads", "Plan.md"), "utf8").catch(() => "")).toBe("# Plan\n");
 });
 
 for (const scheme of ["light", "dark"] as const) {

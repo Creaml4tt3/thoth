@@ -68,6 +68,7 @@ pub const COMMANDS: &[&str] = &[
     "source.pick", "source.open", "source.list", "source.file.open", "source.file.read", "source.file.close",
     "source.temp.create", "source.temp.write", "source.close",
     "image.pick", "image.read",
+    "file.save",
     "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
     "api.call",
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
@@ -95,6 +96,11 @@ pub trait Picker: Send + Sync {
     fn pick_source(&self, directory: bool) -> Option<PathBuf>;
     /// An image file to add to a page (ADR-0028). None: cancelled, or no picker (the default).
     fn pick_image(&self) -> Option<PathBuf> {
+        None
+    }
+    /// Where to save a downloaded page (`file.save`): a "Save as" dialog that starts with `name`. None: cancelled, or no
+    /// dialog (the default).
+    fn pick_save(&self, _name: &str) -> Option<PathBuf> {
         None
     }
 }
@@ -227,7 +233,7 @@ impl Host {
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write");
+        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save");
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -386,6 +392,10 @@ impl Host {
             }
             "image.pick" => json(self.pick_image()?),
             "image.read" => Ok((Value::Null, Some(self.read_picked_image(str_arg(args, "image")?)?))),
+            "file.save" => {
+                let data = bytes.ok_or_else(|| HostError::bad_argument("file.save needs request bytes"))?;
+                json(json!(self.save_file(str_arg(args, "name")?, data)?))
+            }
             "server.list" => json(self.remote.list()),
             "server.add" => json(self.remote.add(str_arg(args, "url")?)?),
             "server.remove" => {
@@ -691,6 +701,19 @@ impl Host {
         Ok(json!({ "image": handle, "name": name, "size": meta.len() }))
     }
 
+    /// Downloading a page as Markdown: the person picks where in a "Save as" dialog, and only that file is written (the
+    /// webview names no path). `name` is a suggestion; it is cleaned to one `.md` file name. True when saved, false
+    /// when cancelled.
+    fn save_file(&self, name: &str, data: &[u8]) -> HostResult<bool> {
+        if data.len() > vault_fs::MAX_FILE_BYTES {
+            return Err(HostError::new("TOO_LARGE", "The file is too large"));
+        }
+        let Some(path) = self.config.picker.pick_save(&save_name(name)) else { return Ok(false) };
+        let shown = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        std::fs::write(&path, data).map_err(|e| HostError::io(&e, "write", &shown))?;
+        Ok(true)
+    }
+
     /// The bytes of a picked image; the handle is used up.
     fn read_picked_image(&self, handle: &str) -> HostResult<Vec<u8>> {
         let path = self.state().picked_images.remove(handle).ok_or_else(|| HostError::bad_handle("image"))?;
@@ -920,6 +943,15 @@ fn revealable(entry: &VaultEntry, raw: &str) -> HostResult<PathBuf> {
     }
 }
 
+/// A file name for the "Save as" dialog: no folder separators or characters a system refuses, at most 120 characters,
+/// ending in `.md`; "Untitled.md" when nothing is left.
+fn save_name(name: &str) -> String {
+    let cleaned: String = name.chars().map(|c| if c.is_control() || "/\\:*?\"<>|".contains(c) { ' ' } else { c }).collect();
+    let stem = cleaned.trim().trim_end_matches(".md").trim().trim_matches('.').trim();
+    let stem: String = stem.chars().take(120).collect();
+    format!("{}.md", if stem.is_empty() { "Untitled" } else { stem.trim_end() })
+}
+
 fn str_arg<'a>(args: &'a Value, key: &str) -> HostResult<&'a str> {
     args.get(key).and_then(Value::as_str).ok_or_else(|| HostError::bad_argument(format!("{key} must be a string")))
 }
@@ -935,4 +967,19 @@ fn bool_arg(args: &Value, key: &str) -> HostResult<bool> {
 /// A non-negative safe integer (≤ 2^53 - 1).
 fn u64_arg(args: &Value, key: &str) -> HostResult<u64> {
     args.get(key).and_then(Value::as_u64).filter(|n| *n < (1u64 << 53)).ok_or_else(|| HostError::bad_argument(format!("{key} must be a non-negative safe integer")))
+}
+
+#[cfg(test)]
+mod save_name_tests {
+    use super::save_name;
+
+    #[test]
+    fn makes_one_md_file_name() {
+        assert_eq!(save_name("Plan"), "Plan.md");
+        assert_eq!(save_name("Plan.md"), "Plan.md");
+        assert_eq!(save_name("../a/b:c*?"), "a b c.md");
+        assert_eq!(save_name("  "), "Untitled.md");
+        assert_eq!(save_name("..."), "Untitled.md");
+        assert_eq!(save_name(&"x".repeat(300)), format!("{}.md", "x".repeat(120)));
+    }
 }

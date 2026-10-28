@@ -364,5 +364,6 @@ export function createRemotePlatform(transport: Transport, kind: Platform["kind"
       if (!picked) return null;
       return { name: picked.name, bytes: await transport.call("image.read", { image: picked.image }) };
     },
+    saveFile: (name, bytes) => transport.call("file.save", { name }, bytes),
   };
 }

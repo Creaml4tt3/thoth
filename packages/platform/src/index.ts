@@ -50,6 +50,11 @@ export interface Platform {
    * where the host has none. The page never learns where the file was.
    */
   pickImage?(): Promise<{ name: string; bytes: Uint8Array } | null>;
+  /**
+   * Download as Markdown: a "Save as" dialog starting with `name`, then `bytes` written where the person chose. True when
+   * saved, false when cancelled. Absent where the host has none (the browser downloads instead).
+   */
+  saveFile?(name: string, bytes: Uint8Array): Promise<boolean>;
   /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
   readonly servers: Servers;
   /**

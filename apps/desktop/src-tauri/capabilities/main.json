@@ -45,6 +45,7 @@
     "allow-source-close",
     "allow-image-pick",
     "allow-image-read",
+    "allow-file-save",
     "allow-server-list",
     "allow-server-add",
     "allow-server-remove",

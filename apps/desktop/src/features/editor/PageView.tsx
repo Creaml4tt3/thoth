@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { basename, stripExtension } from "@thoth/domain";
 import { PageFrame } from "@thoth/app-ui/editor/PageFrame.tsx";
 import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
+import { DownloadButton } from "@thoth/app-ui/download/DownloadButton.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { PRIVATE_SECTION } from "../shell/sections.ts";
@@ -65,7 +66,13 @@ export function PageView({ path }: { path: string }) {
       readOnlyNote={t.readOnly}
       missing={{ title: t.goneTitle, detail: t.goneDetail(path) }}
       footer={<Backlinks path={path} />}
-      actions={<FavoriteButton target={{ kind: "private", path }} />}
+      actions={
+        <span className="page-actions">
+          <FavoriteButton target={{ kind: "private", path }} />
+          {/* Exactly the file on disk, as it is once pending edits are written. */}
+          <DownloadButton title={stripExtension(basename(path))} read={async () => (await vault.readPage(path)).source} />
+        </span>
+      }
     />
   );
 }

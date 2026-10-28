@@ -225,6 +225,10 @@ impl Picker for DialogPicker {
     fn pick_image(&self) -> Option<PathBuf> {
         self.app.dialog().file().set_title("Add an image").add_filter("Images", thoth_host::IMAGE_EXTENSIONS).blocking_pick_file()?.into_path().ok()
     }
+
+    fn pick_save(&self, name: &str) -> Option<PathBuf> {
+        self.app.dialog().file().set_title("Download as Markdown").set_file_name(name).add_filter("Markdown", &["md"]).blocking_save_file()?.into_path().ok()
+    }
 }
 
 /// Workspace-server secrets in the OS keychain (macOS Keychain, Windows Credential Manager, Linux keyutils),

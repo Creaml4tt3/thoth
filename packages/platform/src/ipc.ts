@@ -123,6 +123,11 @@ export interface Commands {
    */
   "image.pick": { args: Record<string, never>; result: { image: string; name: string; size: number } | null };
   "image.read": { args: { image: string }; result: Bytes };
+  /**
+   * Download as Markdown: a "Save as" dialog that starts with `name` (cleaned to one `.md` file name), then the request
+   * bytes are written there. True when saved, false when cancelled. The webview never names or learns the path.
+   */
+  "file.save": { args: { name: string }; result: boolean };
 
   // ---- Workspace servers (Phase 2b part 3). The host is the HTTP client: tokens never enter the webview.
   "server.list": { args: Record<string, never>; result: ServerInfo[] };

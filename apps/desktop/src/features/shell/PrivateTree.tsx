@@ -18,6 +18,7 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { DeleteDialog } from "@thoth/app-ui/order/DeleteDialog.tsx";
+import { DownloadStatus, useDownload } from "@thoth/app-ui/download/DownloadButton.tsx";
 import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
 import { useSession } from "../../app/context.ts";
@@ -82,6 +83,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const renamedTo = useRef<string | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const { download, said: downloadSaid } = useDownload();
+  const td = useStrings().download;
   const [said, setSaid] = useState("");
   const [error, setError] = useState<string | null>(null);
   // Changes run one after another, each on the tree as the one before left it (a key held down repeats quickly).
@@ -316,6 +319,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
       // The host checks the path itself (inside the folder, no symlink, not .thoth/) and shows it selected.
       ...(connection.reveal ? [{ id: "reveal", label: revealName, onSelect: () => void revealEntry(node.path) }] : []),
+      ...(download && node.kind === "page" ? [{ id: "download", label: td.menu, onSelect: () => void download(stripExtension(basename(node.path)), async () => (await vault.readPage(node.path)).source) }] : []),
       ...(connection.trash ? [{ id: "delete", label: tt.delete, danger: true, onSelect: () => setDeleting(node.path) }] : []),
     ];
   };
@@ -533,6 +537,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           )}
         </TreeList>
       )}
+      <DownloadStatus said={downloadSaid} />
       <div className="sr-only" aria-live="polite" aria-atomic="true" data-tree-said>
         {said}
       </div>
