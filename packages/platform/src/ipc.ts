@@ -212,12 +212,14 @@ export interface Commands {
   /** Cancel: stops the download going, if one is. */
   "update.cancel": { args: Record<string, never>; result: InstallState };
   /** The update of the running app, the same for every window. */
-  "update.status": { args: Record<string, never>; result: InstallState };
+  "update.status": { args: { reopen?: boolean }; result: InstallState & { reopen?: string | null } };
   /**
    * "Restart now", once this window has written its edits: the other windows write theirs and close, then the app
-   * starts the new version. `busy` (nothing happens) while assistant runs are going, unless `evenIfRunning`.
+   * starts the new version. `busy` (nothing happens) while assistant runs are going, unless `evenIfRunning`. `reopen`:
+   * the Private Space this window has open (a recent one), which the new version's first window opens again; it asks
+   * with `update.status({ reopen: true })`, once.
    */
-  "update.restart": { args: { evenIfRunning?: boolean }; result: RestartAnswer };
+  "update.restart": { args: { evenIfRunning?: boolean; reopen?: string }; result: RestartAnswer };
   // ---- Connected apps (ADR-0021). Desktop only: other apps read shared Private Spaces through `thoth-mcp`.
   "mcp.settings": { args: Record<string, never>; result: ConnectedAppsSettings };
   /**

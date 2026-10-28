@@ -80,8 +80,10 @@ export interface Updates {
   install(): Promise<InstallState>;
   cancel(): Promise<InstallState>;
   status(): Promise<InstallState>;
-  /** "Restart now", after this window wrote its edits. */
-  restart(options?: { evenIfRunning?: boolean }): Promise<RestartAnswer>;
+  /** After an update's restart: the Private Space to open again, once (null: none). */
+  takeReopen(): Promise<string | null>;
+  /** "Restart now", after this window wrote its edits; `reopen`: its Private Space, opened again after the restart. */
+  restart(options?: { evenIfRunning?: boolean; reopen?: string }): Promise<RestartAnswer>;
   /** The host's `update.progress` events. */
   onProgress(listener: (state: InstallState) => void): Promise<() => void>;
 }

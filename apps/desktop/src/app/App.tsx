@@ -112,6 +112,17 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     void openRoot(launch.root);
   }, [launch.root, openRoot]);
 
+  // After "Restart now" into an update (ADR-0034), the main window opens again the Private Space that was open.
+  const reopened = useRef(false);
+  useEffect(() => {
+    if (reopened.current || launch.id !== MAIN_WINDOW || launch.root !== null || !platform.updates) return;
+    reopened.current = true;
+    void platform.updates
+      .takeReopen()
+      .then((root) => (root ? openRoot(root) : undefined))
+      .catch(() => undefined);
+  }, [launch, platform, openRoot]);
+
   // The window's close button, or Quit (ADR-0019): write the open page's edits, then close, even the last window. The
   // shell closes a window that does not answer within a few seconds.
   const flushOnClose = useRef<() => Promise<boolean>>(async () => true);

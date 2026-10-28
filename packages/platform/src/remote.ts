@@ -324,7 +324,8 @@ export function remoteUpdates(transport: Transport, events: Pick<Updates, "onPro
     install: () => transport.call("update.install", {}),
     cancel: () => transport.call("update.cancel", {}),
     status: () => transport.call("update.status", {}),
-    restart: (options) => transport.call("update.restart", options?.evenIfRunning ? { evenIfRunning: true } : {}),
+    takeReopen: async () => (await transport.call("update.status", { reopen: true })).reopen ?? null,
+    restart: (options) => transport.call("update.restart", { ...(options?.evenIfRunning ? { evenIfRunning: true } : {}), ...(options?.reopen ? { reopen: options.reopen } : {}) }),
     onProgress: (listener) => events.onProgress(listener),
   };
 }

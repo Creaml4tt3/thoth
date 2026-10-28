@@ -82,6 +82,8 @@ pub const VAULT_CHANGED: &str = "vault.changed";
 const MAX_OPEN_VAULTS: usize = 64;
 const MAX_OPEN_SOURCES: usize = 64;
 const MAX_RECENT: usize = 20;
+/// The Private Space to open again after an update's restart (ADR-0034), in the app data folder; read once.
+const REOPEN_FILE: &str = "update-reopen.json";
 /// The largest image a page accepts (ADR-0028), and the image types it shows.
 pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"];
@@ -457,8 +459,8 @@ impl Host {
             // In-app updates (ADR-0034): only after the person clicked Update; progress comes as `update.progress`.
             "update.install" => json(self.updates.install()?),
             "update.cancel" => json(self.updates.cancel()),
-            "update.status" => json(self.updates.status()),
-            "update.restart" => json(self.updates.restart(bool_arg(args, "evenIfRunning")?, self.agents.running())?),
+            "update.status" => json(self.update_status(bool_arg(args, "reopen")?)),
+            "update.restart" => json(self.update_restart(args)?),
             // Connected apps (ADR-0021): the switch, the shared Private Spaces and each app's Allow or Deny, set by the
             // user in a window; `mcp.answer` is a window's answer to an app's request (`mcp.request` event).
             "mcp.settings" => json(self.mcp.settings()),
@@ -566,6 +568,46 @@ impl Host {
         let sink: watch::ChangeSink = Arc::new(move |paths, rescan| events(VAULT_CHANGED, json!({ "vault": vault, "paths": paths, "rescan": rescan })));
         *slot = Some(Watcher::start(&entry.root, sink)?);
         Ok(())
+    }
+
+    // ------------------------------------------------------- in-app updates (ADR-0034)
+
+    fn reopen_path(&self) -> Option<PathBuf> {
+        self.config.data_dir.as_ref().map(|d| d.join(REOPEN_FILE))
+    }
+
+    /// `update.restart`: `reopen` names the Private Space the asking window has open (one the person opened), which the
+    /// new version's first window opens again.
+    fn update_restart(&self, args: &Value) -> HostResult<Value> {
+        let reopen = match args.get("reopen") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(root)) if self.recent().contains(root) => Some(root.clone()),
+            Some(Value::String(_)) => return Err(HostError::not_allowed("Only a Private Space that was opened can be opened again")),
+            Some(_) => return Err(HostError::bad_argument("reopen must be a string")),
+        };
+        let answer = self.updates.restart(bool_arg(args, "evenIfRunning")?, self.agents.running())?;
+        if answer["state"] == "restarting"
+            && let (Some(root), Some(path)) = (reopen, self.reopen_path())
+        {
+            // Lost if it cannot be written: the new version then starts on the picker, as any start does.
+            let _ = std::fs::write(path, json!({ "root": root }).to_string());
+        }
+        Ok(answer)
+    }
+
+    /// `update.status`; with `reopen`, also the Private Space to open again after an update's restart, once.
+    fn update_status(&self, reopen: bool) -> Value {
+        let mut status = self.updates.status();
+        if reopen {
+            let root = self.reopen_path().and_then(|path| {
+                let text = std::fs::read_to_string(&path).ok();
+                let _ = std::fs::remove_file(&path);
+                let root = serde_json::from_str::<Value>(&text?).ok()?.get("root")?.as_str()?.to_owned();
+                self.recent().contains(&root).then_some(root)
+            });
+            status["reopen"] = root.map_or(Value::Null, Value::String);
+        }
+        status
     }
 
     // ------------------------------------------------------- recent list

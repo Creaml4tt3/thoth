@@ -42,7 +42,12 @@ class Host implements Updates {
   async status() {
     return this.state;
   }
-  async restart(options?: { evenIfRunning?: boolean }) {
+  async takeReopen() {
+    return null;
+  }
+  reopened: (string | undefined)[] = [];
+  async restart(options?: { evenIfRunning?: boolean; reopen?: string }) {
+    this.reopened.push(options?.reopen);
     this.calls.push(options?.evenIfRunning ? "restart anyway" : "restart");
     return options?.evenIfRunning ? { state: "restarting" as const } : this.restartAnswer;
   }
@@ -93,11 +98,16 @@ describe("the update service, in the app", () => {
 
   it("Restart now writes this window's edits first, then asks the host", async () => {
     const order: string[] = [];
-    const { host, service, stop } = await ready(async () => (order.push("flush"), true));
+    const host = new Host();
+    const service = createUpdateService(host, undefined, { delayMs: 0, intervalMs: 3_600_000, flush: async () => (order.push("flush"), true), root: "/Users/a/Notes" });
+    const stop = service.start();
+    await service.checkNow();
     host.emit({ phase: "ready", version: "0.2.4", installed: true });
     await service.restart();
     order.push(...host.calls);
     expect(order).toEqual(["flush", "restart"]);
+    // The new version opens this window's Private Space again.
+    expect(host.reopened).toEqual(["/Users/a/Notes"]);
     expect(service.getState().problem).toBeNull();
     stop();
   });

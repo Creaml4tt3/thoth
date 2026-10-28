@@ -8,7 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InstallState, RestartAnswer, UpdateCheck, UpdateSettings, Updates, Links } from "@thoth/platform";
 import type { SystemNotification, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
-import { DEFAULT_OPTIONS } from "../src/app/App.tsx";
+import { render } from "@testing-library/react";
+import { App, DEFAULT_OPTIONS } from "../src/app/App.tsx";
 import { NOTIFICATION_PREFS_KEY } from "../src/features/notifications/prefs.ts";
 import { setLangPreference } from "../src/strings/index.ts";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
@@ -56,7 +57,15 @@ class FakeUpdates implements Updates {
   async status() {
     return this.state;
   }
-  async restart(options?: { evenIfRunning?: boolean }) {
+  reopen: string | null = null;
+  reopenedWith: (string | undefined)[] = [];
+  async takeReopen() {
+    const root = this.reopen;
+    this.reopen = null;
+    return root;
+  }
+  async restart(options?: { evenIfRunning?: boolean; reopen?: string }) {
+    this.reopenedWith.push(options?.reopen);
     this.calls.push(options?.evenIfRunning ? "restart anyway" : "restart");
     return options?.evenIfRunning ? ({ state: "restarting" } as const) : this.restartAnswer;
   }
@@ -410,6 +419,16 @@ describe("in-app updates (ADR-0034)", () => {
     await app.user.click(within(again).getByRole("button", { name: "Restart now" }));
     await waitFor(() => expect(updates.calls).toEqual(["install", "restart"]));
     await screen.findByText("Restarting…", { selector: ".update-install p" });
+    expect(updates.reopenedWith).toEqual([root]);
+  });
+
+  it("after the restart, the main window opens the Private Space that was open", async () => {
+    updates.reopen = root;
+    const platform = createNodePlatform({ vault: root, updates, links });
+    // No click on the picker: the app opens it by itself.
+    render(<App platform={platform} options={{ ...DEFAULT_OPTIONS, notifier, updateDelayMs: 3_600_000 }} />);
+    await screen.findByRole("tree");
+    expect(updates.reopen).toBeNull();
   });
 
   it("says when an assistant is working, and lets the person restart anyway", async () => {

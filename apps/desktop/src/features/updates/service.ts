@@ -75,6 +75,8 @@ export interface UpdateServiceOptions {
   onOffer?(offer: UpdateOffer): void;
   /** Writes this window's edits before a restart; false (or a throw) means a save failed. */
   flush?(): Promise<boolean>;
+  /** The Private Space this window has open, opened again by the new version. */
+  root?: string;
 }
 
 /** What a "Check now" that found nothing new says. `waiting` cannot happen for it (it skips the wait). */
@@ -188,7 +190,7 @@ export function createUpdateService(updates: Updates, links: Links | undefined, 
       set({ problem: null });
       const saved = await (options.flush ?? (async () => true))().catch(() => false);
       if (!saved) return set({ problem: { kind: "save" } });
-      const answer = await updates.restart(restartOptions).catch(() => null);
+      const answer = await updates.restart({ ...restartOptions, ...(options.root ? { reopen: options.root } : {}) }).catch(() => null);
       if (answer === null) return follow({ phase: "failed", reason: "failed" });
       if (answer.state === "busy") return set({ problem: { kind: "busy", runs: answer.runs } });
       follow({ phase: "restarting" });

@@ -221,6 +221,26 @@ fn restart_needs_a_ready_update() {
     assert_eq!(call(&f, "update.status", json!({}))["phase"], "restarting");
 }
 
+#[test]
+fn the_private_space_open_at_restart_opens_again_once_after_it() {
+    let vault = tempfile::tempdir().unwrap();
+    let f = fixture(works());
+    let root = thoth_host::paths::canonicalize_path(vault.path()).unwrap().to_string_lossy().into_owned();
+    // Only a Private Space the person opened (one of the recent ones) is remembered.
+    std::fs::write(f.data.path().join("recent-vaults.json"), json!({ "roots": [root] }).to_string()).unwrap();
+    call(&f, "update.install", json!({}));
+    settled(&f);
+    assert_eq!(refused(&f, "update.restart", json!({ "reopen": "/somewhere/else" })), "NOT_ALLOWED");
+    assert_eq!(refused(&f, "update.restart", json!({ "reopen": 7 })), "BAD_ARGUMENT");
+    assert_eq!(f.installer.restarts(), 0);
+    call(&f, "update.restart", json!({ "reopen": root }));
+    // The new version starts: its first window asks once, and gets it; a second ask, or another window, gets nothing.
+    let next = fixture_in(f.data, works());
+    assert_eq!(call(&next, "update.status", json!({}))["reopen"], Value::Null, "only when asked for");
+    assert_eq!(call(&next, "update.status", json!({ "reopen": true }))["reopen"], json!(root));
+    assert_eq!(call(&next, "update.status", json!({ "reopen": true }))["reopen"], Value::Null);
+}
+
 #[cfg(not(windows))]
 #[test]
 fn restart_waits_for_the_person_while_an_assistant_run_is_going() {

@@ -179,9 +179,10 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
             },
             // "Restart now" into an update (ADR-0034) writes this window's edits first, as leaving a Private Space does.
             flush: flushAll,
+            root: connection.root,
           })
         : null,
-    [platform, options.updateDelayMs, options.updateIntervalMs, notificationPrefs, notifications, flushAll],
+    [platform, options.updateDelayMs, options.updateIntervalMs, notificationPrefs, notifications, flushAll, connection.root],
   );
   useEffect(() => updates?.start(), [updates]);
 
