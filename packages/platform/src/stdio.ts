@@ -35,6 +35,8 @@ export interface StdioTransportOptions {
   updateUrl?: string;
   updateCurrent?: string;
   updateNow?: number;
+  /** In-app updates (ADR-0034): the harness's scripted updater in place of the Tauri plugin (`--update-installer`). */
+  updateInstaller?: "ok" | "windows" | "slow" | "verify" | "offline" | "disk";
   env?: Record<string, string>;
   /**
    * Harness-only host events other than `vault.changed` (for example `browser.open`, where the test harness
@@ -75,6 +77,7 @@ export class StdioTransport implements Transport {
     if (options.updateUrl !== undefined) args.push("--update-url", options.updateUrl);
     if (options.updateCurrent !== undefined) args.push("--update-current", options.updateCurrent);
     if (options.updateNow !== undefined) args.push("--update-now", String(options.updateNow));
+    if (options.updateInstaller) args.push("--update-installer", options.updateInstaller);
     this.child = spawn(options.binary, args, { env: { ...process.env, ...options.env }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString("utf8")).slice(-4096);

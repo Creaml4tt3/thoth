@@ -51,51 +51,52 @@ function Popup({ service }: { service: UpdateService }) {
       <span className="sr-only" role="status" data-testid="update-live">
         {announcement || (offer ? t.announce(offer.version) : "")}
       </span>
-      {offer && install.phase !== "idle" && (
+      {offer && (
+        // One dialog for every state, so it does not appear anew (and animate again) as the update moves on.
         <section role="dialog" aria-modal="false" aria-labelledby={title} aria-describedby={body} className="update-notice" data-testid="update-notice">
-          <h2 id={title}>{installTitle(t, install, offer.version)}</h2>
-          <InstallPanel
-            service={service}
-            state={state}
-            messageId={body}
-            extra={
-              install.phase !== "restarting" && (
+          <h2 id={title}>{install.phase === "idle" ? t.popup(offer.version) : installTitle(t, install, offer.version)}</h2>
+          {install.phase === "idle" ? (
+            <>
+              <p id={body} className="muted">
+                {offer.inApp ? t.bodyInApp(offer.date) : t.body(offer.date)}
+              </p>
+              <div className="update-actions">
+                {offer.inApp ? (
+                  <Button variant="primary" small onClick={() => void service.update()}>
+                    {t.update}
+                  </Button>
+                ) : (
+                  <Button variant="primary" small onClick={() => void service.download()}>
+                    {t.download}
+                  </Button>
+                )}
+                {offer.notesUrl && (
+                  <Button variant="ghost" small onClick={() => void service.notes()}>
+                    {t.whatsNew}
+                  </Button>
+                )}
                 <Button variant="quiet" small onClick={() => service.later()}>
                   {t.later}
                 </Button>
-              )
-            }
-          />
-        </section>
-      )}
-      {offer && install.phase === "idle" && (
-        <section role="dialog" aria-modal="false" aria-labelledby={title} aria-describedby={body} className="update-notice" data-testid="update-notice">
-          <h2 id={title}>{t.popup(offer.version)}</h2>
-          <p id={body} className="muted">
-            {offer.inApp ? t.bodyInApp(offer.date) : t.body(offer.date)}
-          </p>
-          <div className="update-actions">
-            {offer.inApp ? (
-              <Button variant="primary" small onClick={() => void service.update()}>
-                {t.update}
-              </Button>
-            ) : (
-              <Button variant="primary" small onClick={() => void service.download()}>
-                {t.download}
-              </Button>
-            )}
-            {offer.notesUrl && (
-              <Button variant="ghost" small onClick={() => void service.notes()}>
-                {t.whatsNew}
-              </Button>
-            )}
-            <Button variant="quiet" small onClick={() => service.later()}>
-              {t.later}
-            </Button>
-            <Button variant="quiet" small onClick={() => void service.skip()}>
-              {t.skip}
-            </Button>
-          </div>
+                <Button variant="quiet" small onClick={() => void service.skip()}>
+                  {t.skip}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <InstallPanel
+              service={service}
+              state={state}
+              messageId={body}
+              extra={
+                install.phase !== "restarting" && (
+                  <Button variant="quiet" small onClick={() => service.later()}>
+                    {t.later}
+                  </Button>
+                )
+              }
+            />
+          )}
         </section>
       )}
     </>

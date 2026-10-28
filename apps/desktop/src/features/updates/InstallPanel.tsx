@@ -9,6 +9,7 @@ type Strings = ReturnType<typeof useDesktopStrings>["updates"];
 /** The heading for an update past "is out": updating, ready, or not installed. */
 export function installTitle(t: Strings, install: InstallState, version: string): string {
   if (install.phase === "ready") return t.readyTitle(install.version);
+  if (install.phase === "restarting") return t.readyTitle(version);
   if (install.phase === "failed") return t.failedTitle(version);
   return t.downloadingTitle(version);
 }
@@ -85,7 +86,6 @@ export function InstallPanel({ service, state, messageId, extra }: { service: Up
       {(actions || extra) && (
         <div className="update-actions">
           {actions}
-          {install.phase === "ready" && download}
           {extra}
         </div>
       )}

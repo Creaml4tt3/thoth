@@ -10,7 +10,7 @@
  *    nothing is shown, because the version was skipped. "Check now" in Settings still shows it.
  * 3. Turned off in Settings: no request at all, and "Check now" is disabled.
  *
- * It saves pictures of the popup and of Settings → General, light and dark, under tests/.tmp/update/ (git-ignored).
+ * It saves pictures of the popup and of Settings → Updates, light and dark, under tests/.tmp/update/ (git-ignored).
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
@@ -191,9 +191,9 @@ test("a popup right after the app opens for a newer version; Skip is remembered 
   expect(asked).toHaveLength(3);
   await popup(second.page).getByRole("button", { name: "Later" }).click();
 
-  // Settings → General, light and dark.
+  // Settings → Updates, light and dark.
   await second.page.emulateMedia({ reducedMotion: "reduce" });
-  const general = second.page.getByRole("region", { name: "General" });
+  const general = second.page.getByRole("region", { name: "Updates" });
   await expectAccessible(second.page, "section.update-settings");
   for (const dark of [false, true]) {
     await theme(second.page, dark);
