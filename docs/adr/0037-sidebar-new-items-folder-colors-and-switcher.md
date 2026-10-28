@@ -1,6 +1,6 @@
 # ADR-0037: New items from the trees' menus, the target folder, folder colors and the space switcher
 
-- **Status:** Proposed
+- **Status:** Accepted (owner, 2026-10-29)
 - **Date:** 2026-10-29
 - **Deciders:** owner (rules 1, 3, 4 and 5); implementation agent (the rest, marked "(this ADR)")
 - **Refines:** ADR-0016 (the trees), ADR-0017 (folder pages), ADR-0029 (Home; amendment of 2026-10-29, 0.2.6).
