@@ -3,7 +3,10 @@
  * (bucket `thoth-downloads`, https://download.thothnotes.com/), for .github/workflows/release-desktop.yml.
  *
  *   v<version>/<installer>   each file, immutable (cached for a year)
- *   v<version>/SHA256SUMS    `sha256sum -c` format
+ *   v<version>/SHA256SUMS    `sha256sum -c` format (the installers only)
+ *   v<version>/<file>.sig    in-app updates (ADR-0034): each update's signature, and the macOS app archive
+ *                            (`Thoth_<version>_universal.app.tar.gz`). latest.json's `platforms` names them, with the
+ *                            signatures' contents; an installer without its signed update stops the release.
  *   latest.json              the newest release; the website's download manifest has the same facts. Its `notes` is
  *                            the version's entry on the website's changelog page, the update popup's "What's new"
  *                            link (ADR-0022); CHANGELOG.md must have the version (scripts/release-notes.ts checks it).
@@ -31,6 +34,12 @@ export interface ReleaseFile {
   sha256: string;
 }
 
+/** One platform's signed update, as the Tauri updater reads it: the file's address and its `.sig` file's contents. */
+export interface UpdaterPlatform {
+  url: string;
+  signature: string;
+}
+
 export interface Release {
   version: string;
   date: string;
@@ -38,6 +47,41 @@ export interface Release {
   /** The release notes: `https://thothnotes.com/changelog/#v0-1-3`. */
   notes: string;
   files: ReleaseFile[];
+  /**
+   * In-app updates (ADR-0034), the Tauri updater's static format, in the same `latest.json`: the 0.2.x apps' notice
+   * ignores the field (crates/thoth-host/tests/old_notice.rs). Keyed `{os}-{arch}` or `{os}-{arch}-{installer}`.
+   */
+  platforms: Record<string, UpdaterPlatform>;
+}
+
+/**
+ * Which updater keys each installer serves, and the file the update is (for the .dmg, the app archive Tauri builds next
+ * to it). A .deb install is not updated in the app (ADR-0034): it has no key, so it keeps the notice.
+ */
+const UPDATERS: { kind: ReleaseFile["kind"]; keys: string[]; file(installer: string): string }[] = [
+  { kind: "dmg", keys: ["darwin-aarch64", "darwin-x86_64"], file: (dmg) => dmg.replace(/\.dmg$/, ".app.tar.gz") },
+  { kind: "exe", keys: ["windows-x86_64-nsis"], file: (f) => f },
+  { kind: "msi", keys: ["windows-x86_64-msi"], file: (f) => f },
+  { kind: "appimage", keys: ["linux-x86_64-appimage"], file: (f) => f },
+];
+
+/** A `.sig` file's contents: base64 of minisign's signature text. Anything else is refused. */
+function signature(text: string, name: string): string {
+  const value = text.trim();
+  const decoded = /^[A-Za-z0-9+/]+={0,2}$/.test(value) ? Buffer.from(value, "base64").toString("utf8") : "";
+  if (!decoded.startsWith("untrusted comment:") || !decoded.includes("\ntrusted comment:")) throw new Error(`${name} is not a signature`);
+  return value;
+}
+
+/** The files besides the installers that go up with a release: the app archive and every `.sig`. */
+export function updaterUploads(release: Release): string[] {
+  const files = new Set<string>();
+  for (const { url } of Object.values(release.platforms)) {
+    const name = url.slice(release.base.length);
+    if (!release.files.some((f) => f.file === name)) files.add(name);
+    files.add(`${name}.sig`);
+  }
+  return [...files].sort();
 }
 
 const KINDS: { test: RegExp; platform: ReleaseFile["platform"]; kind: ReleaseFile["kind"] }[] = [
@@ -71,7 +115,20 @@ export async function collect(dir: string, today: string): Promise<Release> {
     const bytes = await readFile(join(dir, name));
     files.push({ ...info, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
   }
-  return { version: version!, date: today, base: `${PUBLIC_BASE}v${version}/`, notes: changelogUrl(version!), files };
+  const base = `${PUBLIC_BASE}v${version}/`;
+  // Every installer that can update itself must come with its signed update: a release is never published unsigned.
+  const present = new Set(await readdir(dir));
+  const platforms: Record<string, UpdaterPlatform> = {};
+  for (const f of files) {
+    const updater = UPDATERS.find((u) => u.kind === f.kind);
+    if (!updater) continue;
+    const file = updater.file(f.file);
+    if (!present.has(file)) throw new Error(`${file} is missing: build with bundle.createUpdaterArtifacts`);
+    if (!present.has(`${file}.sig`)) throw new Error(`${file}.sig is missing: the update would be unsigned (TAURI_SIGNING_PRIVATE_KEY)`);
+    const signed = signature(await readFile(join(dir, `${file}.sig`), "utf8"), `${file}.sig`);
+    for (const key of updater.keys) platforms[key] = { url: base + file, signature: signed };
+  }
+  return { version: version!, date: today, base, notes: changelogUrl(version!), files, platforms };
 }
 
 export function sha256sums(release: Release): string {
@@ -111,6 +168,10 @@ async function main(): Promise<void> {
   for (const f of release.files) {
     // A released file never changes: a fix is a new version.
     put(join(dir, f.file), prefix + f.file, CONTENT_TYPES[f.kind], "public, max-age=31536000, immutable");
+  }
+  // The app archive and the signatures (ADR-0034), immutable like the installers.
+  for (const name of updaterUploads(release)) {
+    put(join(dir, name), prefix + name, name.endsWith(".sig") ? "text/plain; charset=utf-8" : "application/gzip", "public, max-age=31536000, immutable");
   }
   put(join(dir, "SHA256SUMS"), `${prefix}SHA256SUMS`, "text/plain; charset=utf-8", "public, max-age=31536000, immutable");
   // Uploaded last, so it never names a file that is not there yet.
