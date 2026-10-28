@@ -5,7 +5,14 @@
 #   v0.1.0/Thoth_0.1.0_x64-setup.exe, ..._x64_en-US.msi   Windows x64 (NSIS and MSI)
 #   v0.1.0/Thoth_0.1.0_amd64.AppImage, ..._amd64.deb      Linux
 #   v0.1.0/SHA256SUMS                          checksums of the files above
-#   latest.json                                the newest release (version, date, files, sizes, SHA-256)
+#   v0.1.0/*.sig, Thoth_0.1.0_universal.app.tar.gz   in-app updates (ADR-0034): each update's signature, the Mac archive
+#   latest.json                                the newest release (version, date, files, sizes, SHA-256) and the
+#                                              updater's `platforms` (each update's address and signature)
+#
+# In-app updates are signed with the key in the repository secrets TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (docs/deploy/release.md, "Signing in-app updates"). A release stops before it
+# builds if the app's public key is still the placeholder or the private key is missing, and publish-downloads.ts
+# refuses an installer without its signed update: nothing unsigned is published.
 #
 # The builds are not code-signed with a Developer ID yet: the macOS app is ad-hoc signed (tauri.conf.json
 # signingIdentity "-"), so it is a sealed bundle but Gatekeeper still asks the user to choose Open Anyway once;
@@ -45,7 +52,7 @@ jobs:
             os: macos-latest
             targets: aarch64-apple-darwin,x86_64-apple-darwin
             sidecar: universal-apple-darwin
-            args: --target universal-apple-darwin --bundles dmg
+            args: --target universal-apple-darwin --bundles app,dmg
             out: target/universal-apple-darwin/release/bundle
           # crates/thoth-host's Windows file layer (src/win) keeps every path inside the Private Space with
           # NtCreateFile relative to the vault's directory handle and refuses reparse points; see docs/deploy/release.md.
@@ -91,14 +98,38 @@ jobs:
       # thoth-mcp, the MCP server other apps start (ADR-0021), goes next to the app's program (Tauri externalBin).
       - name: Build thoth-mcp
         run: node scripts/build-mcp-sidecar.ts ${{ matrix.sidecar }}
+      - name: Signed updates only (ADR-0034)
+        if: github.event_name == 'push' || inputs.publish
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if grep -q THOTH_UPDATER_PUBKEY_PLACEHOLDER apps/desktop/src-tauri/tauri.conf.json; then
+            echo "::error::plugins.updater.pubkey in tauri.conf.json is still the placeholder: put the real public key there first"
+            exit 1
+          fi
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::the TAURI_SIGNING_PRIVATE_KEY repository secret is missing: updates would be unsigned"
+            exit 1
+          fi
       - name: Build installers
+        env:
+          # The updater files (bundle.createUpdaterArtifacts) are signed with it; the build fails without it.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm --filter @thoth/desktop tauri build --config src-tauri/tauri.sidecar.conf.json ${{ matrix.args }}
 
       - name: Collect installers
         shell: bash
         run: |
           mkdir -p dist-release
-          find "${{ matrix.out }}" -maxdepth 2 -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist-release/ \;
+          find "${{ matrix.out }}" -maxdepth 2 -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.exe.sig' -o -name '*.msi.sig' -o -name '*.AppImage.sig' \) -exec cp {} dist-release/ \;
+          # The Mac update is the app archive, named without its version by Tauri: given the release's name here.
+          if [ -f "${{ matrix.out }}/macos/Thoth.app.tar.gz" ]; then
+            version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+            cp "${{ matrix.out }}/macos/Thoth.app.tar.gz" "dist-release/Thoth_${version}_universal.app.tar.gz"
+            cp "${{ matrix.out }}/macos/Thoth.app.tar.gz.sig" "dist-release/Thoth_${version}_universal.app.tar.gz.sig"
+          fi
           ls -la dist-release
           test -n "$(ls dist-release)"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -111,3 +111,30 @@ describe("in-app updates (ADR-0034)", () => {
     expect(JSON.parse(JSON.stringify(release))).toEqual(fixture);
   });
 });
+
+describe("the release workflow signs updates (ADR-0034)", () => {
+  const workflow = () => readFile(join(import.meta.dirname, "..", "..", ".github", "workflows", "release-desktop.yml"), "utf8");
+
+  it("gives the build the signing key from repository secrets, on the build step only", async () => {
+    const text = await workflow();
+    const build = text.slice(text.indexOf("- name: Build installers"), text.indexOf("- name: Collect installers"));
+    expect(build).toContain("TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}");
+    expect(build).toContain("TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}");
+    expect(text.match(/secrets\.TAURI_SIGNING_PRIVATE_KEY\b/g)).toHaveLength(2); // the check and the build step
+  });
+
+  it("stops a release before building when the public key is the placeholder or the private key is missing", async () => {
+    const text = await workflow();
+    const guard = text.slice(text.indexOf("- name: Signed updates only"), text.indexOf("- name: Build installers"));
+    expect(guard).toMatch(/if: github\.event_name == 'push' \|\| inputs\.publish/);
+    expect(guard).toContain("THOTH_UPDATER_PUBKEY_PLACEHOLDER");
+    expect(guard).toContain('[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]');
+    expect(guard.match(/exit 1/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("collects the signatures and the macOS app archive with the installers", async () => {
+    const text = await workflow();
+    const collect = text.slice(text.indexOf("- name: Collect installers"), text.indexOf("- uses: actions/upload-artifact"));
+    for (const name of ["'*.exe.sig'", "'*.msi.sig'", "'*.AppImage.sig'", "Thoth.app.tar.gz", "_universal.app.tar.gz.sig"]) expect(collect).toContain(name);
+  });
+});
