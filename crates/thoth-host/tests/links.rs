@@ -637,7 +637,27 @@ fn tells_of_a_newer_version_with_where_to_get_it() {
     assert_eq!(update["downloadUrl"], thoth_host::updates::DEFAULT_DOWNLOADS_PAGE);
     assert_eq!(update["skipped"], false);
     assert!(update.get("notesUrl").is_none(), "{update}");
+    // No updater here: the popup keeps its Download button (ADR-0034).
+    assert_eq!(update["inApp"], false);
     assert_eq!(server.requests().len(), 1);
+}
+
+#[test]
+fn says_whether_the_popup_offers_update_in_the_app() {
+    let server = Server::start();
+    serve_latest(&server, &latest("0.2.0"));
+    let clock = Clock::new();
+    let with = |installer: thoth_host::install::ScriptedInstaller| {
+        let mut options = UpdateOptions::new("0.1.3", server.url("/latest.json"));
+        (options.allow_loopback, options.clock, options.installer) = (true, clock.at(), Arc::new(installer));
+        Updates::new(None, options)
+    };
+    let works = || thoth_host::install::ScriptedInstaller::new(Ok(thoth_host::install::Fetched { version: "0.2.0".into(), installed: true }));
+    assert_eq!(with(works()).check(true)["update"]["inApp"], true);
+    let off = with(works());
+    off.settings(&json!({ "install": false })).unwrap();
+    assert_eq!(off.check(true)["update"]["inApp"], false, "the person turned it off");
+    assert_eq!(with(thoth_host::install::ScriptedInstaller::unsupported()).check(true)["update"]["inApp"], false);
 }
 
 #[test]
@@ -915,7 +935,7 @@ fn the_update_commands_through_the_host() {
 #[test]
 fn the_shipped_shell_has_no_way_to_change_where_the_notice_looks() {
     let shell = include_str!("../../../apps/desktop/src-tauri/src/lib.rs");
-    assert!(!shell.contains("--update-url") && !shell.contains("--update-current") && !shell.contains("--update-now"));
+    assert!(!shell.contains("--update-url") && !shell.contains("--update-current") && !shell.contains("--update-now") && !shell.contains("--update-installer") && !shell.contains("ScriptedInstaller"));
     let harness = include_str!("../src/bin/thoth-host-stdio.rs");
     assert!(harness.contains("\"--update-url\""));
 }

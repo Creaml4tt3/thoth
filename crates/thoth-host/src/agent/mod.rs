@@ -408,6 +408,11 @@ impl Agents {
         Ok(())
     }
 
+    /// How many runs are going now (an update's restart asks the person first, ADR-0034).
+    pub fn running(&self) -> usize {
+        self.runs().values().filter(|r| r.lock().phase == Phase::Running).count()
+    }
+
     /// Events after `after` (their `seq`), waiting up to `wait_ms` for one. `done` once the exit event was read.
     pub fn events(&self, handle: &str, after: u64, wait_ms: u64) -> HostResult<Value> {
         let run = self.run(handle)?;

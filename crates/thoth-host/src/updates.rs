@@ -6,7 +6,11 @@
 //! after DNS that is the address connected to, no cookies or credentials, no proxy, a fixed `User-Agent`, 5 s in
 //! total, at most 64 KB, JSON only. Each start of the app checks once; while it stays open, a check happens at most
 //! once in 24 hours, counted across its windows. Never when the person turned the notice off.
+//!
+//! From 0.2.3 (ADR-0034) a copy that can replace itself also downloads and installs the new version, but only when the
+//! person clicks Update and only with "Download and install updates in the app" on (`crate::install`).
 use crate::error::{HostError, HostResult};
+use crate::install::{InApp, Installer, NoInstaller};
 use crate::links::Clock;
 use crate::links::fetch::{Fetcher, Lookup, SystemLookup, TIMEOUT, Want, mime};
 use serde_json::{Map, Value, json};
@@ -204,12 +208,16 @@ pub struct UpdateOptions {
     pub allow_loopback: bool,
     pub lookup: Arc<dyn Lookup>,
     pub clock: Clock,
+    /// What downloads and installs an update (ADR-0034); `NoInstaller` keeps the notice only.
+    pub installer: Arc<dyn Installer>,
+    /// Where `update.progress` goes (`Host::with_updates` sets the host's event sink).
+    pub events: Option<Arc<dyn Fn(&str, Value) + Send + Sync>>,
 }
 
 impl UpdateOptions {
     /// An update notice for `current` that looks at `url`.
     pub fn new(current: impl Into<String>, url: impl Into<String>) -> Self {
-        Self { current: current.into(), url: url.into(), downloads_page: DEFAULT_DOWNLOADS_PAGE.to_owned(), allow_loopback: false, lookup: Arc::new(SystemLookup), clock: Arc::new(SystemTime::now) }
+        Self { current: current.into(), url: url.into(), downloads_page: DEFAULT_DOWNLOADS_PAGE.to_owned(), allow_loopback: false, lookup: Arc::new(SystemLookup), clock: Arc::new(SystemTime::now), installer: Arc::new(NoInstaller), events: None }
     }
 
     /// No update notice: no request is ever made.
@@ -223,6 +231,8 @@ impl UpdateOptions {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct State {
     notify: bool,
+    /// "Download and install updates in the app" (ADR-0034); on by default.
+    install: bool,
     last_check: Option<u64>,
     skipped: Option<Version>,
     /// When this run of the app last asked. Only this holds back the next check; it is never written, so a new start
@@ -232,7 +242,7 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        Self { notify: true, last_check: None, skipped: None, asked_this_run: None }
+        Self { notify: true, install: true, last_check: None, skipped: None, asked_this_run: None }
     }
 }
 
@@ -241,6 +251,7 @@ impl State {
         let Ok(Value::Object(o)) = serde_json::from_slice::<Value>(bytes) else { return Self::default() };
         Self {
             notify: o.get("notify").and_then(Value::as_bool).unwrap_or(true),
+            install: o.get("install").and_then(Value::as_bool).unwrap_or(true),
             last_check: o.get("lastCheck").and_then(Value::as_u64),
             skipped: o.get("skipped").and_then(Value::as_str).and_then(Version::parse),
             asked_this_run: None,
@@ -248,7 +259,7 @@ impl State {
     }
 
     fn to_json(&self) -> Value {
-        json!({ "v": 1, "notify": self.notify, "lastCheck": self.last_check, "skipped": self.skipped.as_ref().map(ToString::to_string) })
+        json!({ "v": 1, "notify": self.notify, "install": self.install, "lastCheck": self.last_check, "skipped": self.skipped.as_ref().map(ToString::to_string) })
     }
 }
 
@@ -258,6 +269,7 @@ pub struct Updates {
     path: Option<PathBuf>,
     fetcher: Fetcher,
     state: Mutex<State>,
+    in_app: Arc<InApp>,
     /// One check at a time: a second window's check waits, then finds the first one's time recorded.
     checking: Mutex<()>,
 }
@@ -277,11 +289,17 @@ impl Updates {
         let state = path.as_ref().and_then(|p| std::fs::read(p).ok()).map_or_else(State::default, |bytes| State::read(&bytes));
         let fetcher = Fetcher { lookup: options.lookup.clone(), allow_loopback: options.allow_loopback };
         let current = Version::parse(&options.current);
-        Self { options, current, path, fetcher, state: Mutex::new(state), checking: Mutex::new(()) }
+        let in_app = InApp::new(options.installer.clone(), options.events.clone());
+        Self { options, current, path, fetcher, state: Mutex::new(state), in_app, checking: Mutex::new(()) }
     }
 
     fn enabled(&self) -> bool {
         !self.options.url.is_empty() && self.current.is_some()
+    }
+
+    /// Whether this copy can update itself in the app (the switch then shows in Settings).
+    fn can_install(&self) -> bool {
+        self.enabled() && self.in_app.supported()
     }
 
     fn save(&self, state: &State) {
@@ -295,19 +313,23 @@ impl Updates {
             "available": self.enabled(),
             "current": self.options.current,
             "notify": state.notify,
+            "install": state.install,
+            "canInstall": self.can_install(),
             "skipped": state.skipped.as_ref().map(ToString::to_string),
             "lastChecked": state.last_check,
         })
     }
 
-    /// `update.settings`: reads the person's choice, after applying `notify` (on or off) and `skip` (a version to skip;
-    /// `null` forgets it) when the arguments have them.
+    /// `update.settings`: reads the person's choice, after applying `notify` (on or off), `install` (in-app updates on
+    /// or off) and `skip` (a version to skip; `null` forgets it) when the arguments have them.
     pub fn settings(&self, args: &Value) -> HostResult<Value> {
-        let notify = match args.get("notify") {
-            None | Some(Value::Null) => None,
-            Some(Value::Bool(b)) => Some(*b),
-            Some(_) => return Err(HostError::bad_argument("notify must be a boolean")),
+        let flag = |name: &str| match args.get(name) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::Bool(b)) => Ok(Some(*b)),
+            Some(_) => Err(HostError::bad_argument(format!("{name} must be a boolean"))),
         };
+        let notify = flag("notify")?;
+        let install = flag("install")?;
         let skip = match args.get("skip") {
             None => None,
             Some(Value::Null) => Some(None),
@@ -315,9 +337,12 @@ impl Updates {
             Some(_) => return Err(HostError::bad_argument("skip must be a version or null")),
         };
         let mut state = locked(&self.state);
-        if notify.is_some() || skip.is_some() {
+        if notify.is_some() || install.is_some() || skip.is_some() {
             if let Some(notify) = notify {
                 state.notify = notify;
+            }
+            if let Some(install) = install {
+                state.install = install;
             }
             if let Some(skip) = skip {
                 state.skipped = skip;
@@ -338,14 +363,15 @@ impl Updates {
     ///   away.
     /// - `current`: nothing newer is offered.
     /// - `available`: `update` has `version`, `downloadUrl`, `skipped` (the person skipped this version or a newer
-    ///   one) and, when the file has them, `date` and `notesUrl`.
+    ///   one), `inApp` (Update installs it in the app, ADR-0034; otherwise Download opens the downloads page) and, when
+    ///   the file has them, `date` and `notesUrl`.
     pub fn check(&self, force: bool) -> Value {
         if !self.enabled() {
             return json!({ "state": "unavailable" });
         }
         let _one = locked(&self.checking);
         let now = secs((self.options.clock)());
-        let skipped = {
+        let (skipped, in_app) = {
             let mut state = locked(&self.state);
             if !state.notify {
                 return json!({ "state": "off" });
@@ -357,7 +383,7 @@ impl Updates {
             state.asked_this_run = Some(now);
             state.last_check = Some(now);
             self.save(&state);
-            state.skipped.clone()
+            (state.skipped.clone(), state.install && self.can_install())
         };
         let Some(current) = &self.current else { return json!({ "state": "unavailable" }) };
         let Some(latest) = self.fetch() else { return json!({ "state": "failed", "checkedAt": now }) };
@@ -374,7 +400,40 @@ impl Updates {
             update.insert("notesUrl".into(), Value::String(notes));
         }
         update.insert("skipped".into(), Value::Bool(skipped.is_some_and(|s| latest.version <= s)));
+        update.insert("inApp".into(), Value::Bool(in_app));
         json!({ "state": "available", "checkedAt": now, "update": update })
+    }
+
+    /// `update.install`: Update was clicked. Starts the download (or joins the one going) and answers its state; the
+    /// rest comes as `update.progress` events. Refused where the copy cannot update itself, the person turned in-app
+    /// updates off, or the notice is off (no request at all).
+    pub fn install(&self) -> HostResult<Value> {
+        let state = locked(&self.state);
+        if !self.can_install() {
+            return Err(HostError::not_allowed("This copy of Thoth cannot update itself: download the new version from the website"));
+        }
+        if !state.notify || !state.install {
+            return Err(HostError::not_allowed("Updates in the app are turned off in Settings"));
+        }
+        drop(state);
+        Ok(self.in_app.start())
+    }
+
+    /// `update.cancel`: stops the download going, if one is.
+    pub fn cancel(&self) -> Value {
+        self.in_app.cancel()
+    }
+
+    /// `update.status`: `idle`, `downloading` (`received`, `total` when known), `ready` (`version`, `installed`),
+    /// `failed` (`reason`: `offline`, `verify`, `disk`, `cancelled` or `failed`) or `restarting`.
+    pub fn status(&self) -> Value {
+        self.in_app.status()
+    }
+
+    /// `update.restart`: restarts into the ready update, or answers `busy` with the assistant runs going (`running`),
+    /// unless `even_if_running`.
+    pub fn restart(&self, even_if_running: bool, running: usize) -> HostResult<Value> {
+        self.in_app.restart(even_if_running, running)
     }
 
     /// The request: `None` for any failure (the reason would only echo what a server sent).

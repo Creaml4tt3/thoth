@@ -23,7 +23,10 @@
 //! addresses, so tests run a local page server; ADR-0020), --update-url <url> (turn the update notice on, reading
 //! `latest.json` from that address; an `http` address on loopback needs --link-preview-loopback), --update-current
 //! <version> (the app version it compares with, default 0.1.0) and --update-now <seconds> (its clock is fixed at that
-//! Unix time, so a test can let the 24 hours pass; ADR-0022). Env: THOTH_TEST_DISABLE_HARDLINK=1 makes no-replace rename take the
+//! Unix time, so a test can let the 24 hours pass; ADR-0022), --update-installer <script> (in-app updates, ADR-0034: a
+//! scripted updater instead of the Tauri plugin. `ok` and `windows` download in a few steps, then the update is in
+//! place or runs at restart; `slow` takes about 20 seconds, for Cancel; `verify`, `offline` and `disk` fail so; a restart
+//! is reported as an `update.restarted` event and nothing restarts). Env: THOTH_TEST_DISABLE_HARDLINK=1 makes no-replace rename take the
 //! exclusive-copy fallback.
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
@@ -33,6 +36,7 @@ use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
+use thoth_host::install::{Failure, Fetched, ScriptedInstaller};
 use thoth_host::updates::UpdateOptions;
 
 /// Longest request line accepted (1 GiB of base64 plus JSON overhead).
@@ -54,6 +58,24 @@ impl Picker for FixedPicker {
     fn pick_image(&self) -> Option<PathBuf> {
         self.image.clone()
     }
+}
+
+/// The harness's stand-in for the Tauri updater (ADR-0034), by name.
+fn scripted_installer(script: &str, emit: Arc<dyn Fn(Value) + Send + Sync>) -> ScriptedInstaller {
+    use std::time::Duration;
+    const SIZE: u64 = 14_000_000;
+    let fetched = |installed| Ok(Fetched { version: "9.9.9".into(), installed });
+    let steps = |n: u64| (1..=n).map(|i| (SIZE * i / n, Some(SIZE))).collect::<Vec<_>>();
+    let installer = match script {
+        "ok" => ScriptedInstaller::new(fetched(true)).chunks(&steps(8)).step(Duration::from_millis(150)),
+        "windows" => ScriptedInstaller::new(fetched(false)).chunks(&steps(8)).step(Duration::from_millis(150)),
+        "slow" => ScriptedInstaller::new(fetched(true)).chunks(&steps(200)).step(Duration::from_millis(100)),
+        "verify" => ScriptedInstaller::new(Err(Failure::Verify)).chunks(&steps(4)).step(Duration::from_millis(100)),
+        "offline" => ScriptedInstaller::new(Err(Failure::Offline)).chunks(&steps(2)).step(Duration::from_millis(100)),
+        "disk" => ScriptedInstaller::new(Err(Failure::Disk)).chunks(&steps(4)).step(Duration::from_millis(100)),
+        other => usage(&format!("unknown --update-installer {other}")),
+    };
+    installer.on_restart(move || emit(json!({ "event": "update.restarted", "payload": {} })))
 }
 
 /// Hands the sign-in URL to the test as a `browser.open` event instead of opening a browser.
@@ -129,7 +151,7 @@ impl SecretStore for FileSecretStore {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS]");
+    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS] [--update-installer ok|windows|slow|verify|offline|disk]");
     std::process::exit(2);
 }
 
@@ -145,6 +167,7 @@ fn main() {
     let mut update_url: Option<String> = None;
     let mut update_current = String::from("0.1.0");
     let mut update_now: Option<u64> = None;
+    let mut update_installer: Option<String> = None;
     let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
         if flag.to_str() == Some("--link-preview-loopback") {
@@ -162,6 +185,7 @@ fn main() {
             Some("--secrets-file") => secrets_file = Some(value()),
             Some("--update-url") => update_url = Some(value().to_string_lossy().into_owned()),
             Some("--update-current") => update_current = value().to_string_lossy().into_owned(),
+            Some("--update-installer") => update_installer = Some(value().to_string_lossy().into_owned()),
             Some("--update-now") => update_now = Some(value().to_string_lossy().parse().unwrap_or_else(|_| usage("--update-now takes seconds"))),
             _ => usage(&format!("unknown flag {flag:?}")),
         }
@@ -179,6 +203,7 @@ fn main() {
     let event_emit = emit.clone();
     let browser_emit = emit.clone();
     let reveal_emit = emit.clone();
+    let update_emit = emit.clone();
     let host = Host::new(HostConfig {
         data_dir,
         allow_roots,
@@ -198,6 +223,9 @@ fn main() {
     let host = Arc::new(match update_url {
         Some(url) => {
             let mut options = UpdateOptions::new(update_current, url);
+            if let Some(script) = update_installer {
+                options.installer = Arc::new(scripted_installer(&script, Arc::new(update_emit)));
+            }
             if let Some(now) = update_now {
                 options.clock = Arc::new(move || std::time::UNIX_EPOCH + std::time::Duration::from_secs(now));
             }

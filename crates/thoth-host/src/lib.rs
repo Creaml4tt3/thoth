@@ -32,6 +32,7 @@ pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
 pub mod source;
 pub mod sql;
+pub mod install;
 pub mod updates;
 #[cfg_attr(windows, path = "vault_fs_windows.rs")]
 pub mod vault_fs;
@@ -73,7 +74,7 @@ pub const COMMANDS: &[&str] = &[
     "agent.start", "agent.events", "agent.cancel", "agent.run.dispose", "agent.sweep",
     "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
     "link.preview", "link.preview.clear", "link.open",
-    "update.check", "update.settings",
+    "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
 ];
 
@@ -196,6 +197,7 @@ impl Host {
     #[must_use]
     pub fn with_updates(mut self, mut options: UpdateOptions) -> Self {
         options.allow_loopback = self.config.link_preview_loopback;
+        options.events = Some(self.config.events.clone());
         self.updates = Updates::new(self.config.data_dir.clone(), options);
         self
     }
@@ -451,6 +453,11 @@ impl Host {
             // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict, never a page.
             "update.check" => json(self.updates.check(bool_arg(args, "force")?)),
             "update.settings" => json(self.updates.settings(args)?),
+            // In-app updates (ADR-0034): only after the person clicked Update; progress comes as `update.progress`.
+            "update.install" => json(self.updates.install()?),
+            "update.cancel" => json(self.updates.cancel()),
+            "update.status" => json(self.updates.status()),
+            "update.restart" => json(self.updates.restart(bool_arg(args, "evenIfRunning")?, self.agents.running())?),
             // Connected apps (ADR-0021): the switch, the shared Private Spaces and each app's Allow or Deny, set by the
             // user in a window; `mcp.answer` is a window's answer to an app's request (`mcp.request` event).
             "mcp.settings" => json(self.mcp.settings()),
