@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Delete… in the right-click menu of pages and folders. Thoth asks first. In your Private Space they go to the Trash (the Recycle Bin on Windows), so you can put them back. In a workspace, a page and the pages inside it are deleted for everyone; viewers do not see it.
+
+### Changed
+
+- On the desktop, a new tab shows your recent pages and favorites again. The logo and the house still take you back to your Private Spaces.
+
 ## [0.2.3] - 2026-10-28
 
 ### Added
