@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useStrings } from "../strings/index.ts";
 import { motionOff } from "./presence.ts";
 
@@ -21,15 +21,40 @@ export function scrollToSection(target: HTMLElement, behavior: ScrollBehavior = 
   box.scrollTo?.({ top: Math.max(0, top), behavior }); // `?.`: jsdom has no Element.scrollTo
 }
 
+/** Lower case, without diacritics and extra spaces, so "Theme", "thème" and "THEME " all match. Thai has no case and keeps its marks. */
+export const searchable = (text: string): string => text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Whether every word of `query` is in `text` (both through `searchable`), in any order. */
+export function matchesQuery(text: string, query: string): boolean {
+  const words = searchable(query).split(" ").filter(Boolean);
+  const hay = searchable(text);
+  return words.every((w) => hay.includes(w));
+}
+
+/**
+ * The parts of a section the search looks at one by one: its direct children, except the heading (which matches the
+ * whole section) and a part that only groups others (a sub-section with its own `h3`, searched as one part).
+ */
+const PARTS = ":scope > :not(h2)";
+
 /**
  * Settings as one long page with a list of its sections beside it (above it in a narrow window). A link scrolls to
  * its section (at once under reduced motion) and moves focus to the heading; the section in view is marked
  * `aria-current`. Sections whose heading is not on the page (a feature this build lacks) are left out of the list.
+ *
+ * The search box above the list filters the page as it is: a section whose heading matches stays whole; otherwise
+ * only its parts whose text (labels, hints, options) matches stay, under the heading. Nothing to keep in sync: a new
+ * setting is searchable by being on the page. Escape clears it.
  */
 export function SettingsLayout({ sections, children }: { sections: readonly SettingsSectionLink[]; children: ReactNode }) {
-  const t = useStrings().settingsNav;
+  const strings = useStrings();
+  const t = strings.settingsNav;
+  const s = strings.settingsSearch;
   const content = useRef<HTMLDivElement>(null);
   const [present, setPresent] = useState<readonly string[]>([]);
+  const [query, setQuery] = useState("");
+  /** The sections with a match, in page order; null while the box is empty. */
+  const [found, setFound] = useState<readonly string[] | null>(null);
   const [active, setActive] = useState<string | null>(null);
   /** A link chose a section: the one in view does not replace it until the person scrolls (a short last section never
    * reaches the top, so the one above it stays in view). */
@@ -53,6 +78,52 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
     watch.observe(box, { childList: true, subtree: true });
     return () => watch.disconnect();
   }, [wanted]);
+
+  // Filters the page. Runs again when sections appear or change (MutationObserver), but ignores its own `hidden` edits.
+  useLayoutEffect(() => {
+    const box = content.current;
+    if (!box) return;
+    const apply = () => {
+      const hits: string[] = [];
+      for (const section of box.querySelectorAll<HTMLElement>(":scope > section")) {
+        const heading = section.querySelector<HTMLElement>(":scope > h2");
+        const parts = [...section.querySelectorAll<HTMLElement>(PARTS)];
+        if (!query.trim()) {
+          section.hidden = false;
+          for (const part of parts) part.hidden = false;
+          continue;
+        }
+        const whole = heading !== null && matchesQuery(heading.textContent ?? "", query);
+        let any = whole;
+        for (const part of parts) {
+          // A form control's chosen value is not text: options and labels are, so "dark" finds the theme.
+          const hit = whole || matchesQuery(`${part.textContent ?? ""} ${[...part.querySelectorAll("[aria-label],[title]")].map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""}`).join(" ")}`, query);
+          part.hidden = !hit;
+          any ||= hit;
+        }
+        section.hidden = !any;
+        if (any && heading?.id) hits.push(heading.id);
+      }
+      setFound((prev) => {
+        const next = query.trim() ? hits : null;
+        return prev?.join("\n") === next?.join("\n") ? prev : next;
+      });
+    };
+    apply();
+    const watch = new MutationObserver((records) => {
+      if (records.some((r) => r.type === "childList" || (r.type === "characterData"))) apply();
+    });
+    watch.observe(box, { childList: true, subtree: true, characterData: true });
+    return () => watch.disconnect();
+  }, [query]);
+
+  const onSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape" && query) {
+      event.preventDefault();
+      event.stopPropagation();
+      setQuery("");
+    }
+  };
 
   // The first section with a part in the upper half of the scroller is the one being read.
   useEffect(() => {
@@ -91,28 +162,45 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
     setActive(id);
   };
 
-  const current = active !== null && present.includes(active) ? active : (present[0] ?? null);
+  const listed = found === null ? present : present.filter((id) => found.includes(id));
+  const current = active !== null && listed.includes(active) ? active : (listed[0] ?? null);
   return (
     // What the person does to scroll (wheel, touch, keys, the scrollbar) gives the mark back to the section in view; the
     // keydown and pointerdown of a link's own Enter or click come before its click, which holds the mark again.
     <div className="page-scroll settings-scroll" onWheel={release} onTouchMove={release} onKeyDown={release} onPointerDown={release}>
       <div className="settings-layout">
-        <nav className="settings-nav" aria-label={t}>
-          <ul>
-            {sections
-              .filter((s) => present.includes(s.id))
-              .map((s) => (
-                <li key={s.id}>
-                  <a href={`#${s.id}`} aria-current={s.id === current ? "true" : undefined} onClick={(event) => go(event, s.id)}>
-                    {s.label}
-                  </a>
-                </li>
-              ))}
-          </ul>
-        </nav>
-        <div ref={content} className="page-col settings">
-          {children}
+        <div className="settings-side">
+          <input
+            type="search"
+            className="input settings-search"
+            placeholder={s.placeholder}
+            aria-label={s.label}
+            aria-controls="settings-content"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKey}
+          />
+          <nav className="settings-nav" aria-label={t}>
+            <ul>
+              {sections
+                .filter((x) => listed.includes(x.id))
+                .map((x) => (
+                  <li key={x.id}>
+                    <a href={`#${x.id}`} aria-current={x.id === current ? "true" : undefined} onClick={(event) => go(event, x.id)}>
+                      {x.label}
+                    </a>
+                  </li>
+                ))}
+            </ul>
+          </nav>
         </div>
+        <div ref={content} id="settings-content" className="page-col settings">
+          {children}
+          {found !== null && found.length === 0 && <p className="muted settings-none">{s.none(query.trim())}</p>}
+        </div>
+        <p role="status" className="sr-only">
+          {found === null ? "" : s.results(found.length)}
+        </p>
       </div>
     </div>
   );

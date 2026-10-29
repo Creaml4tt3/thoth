@@ -6,7 +6,7 @@
 .update-actions { display: flex; flex-wrap: wrap; gap: var(--thoth-space-1) var(--thoth-space-2); margin-top: var(--thoth-space-1); }
 @media (prefers-reduced-motion: reduce) { .update-notice { animation: none; } }
 
-/* Settings → General (UpdateSettings.tsx). */
+/* Settings → Updates (UpdateSettings.tsx). */
 .update-settings .set-actions { align-items: center; }
 .update-settings .muted { color: var(--thoth-ink-secondary); }
 

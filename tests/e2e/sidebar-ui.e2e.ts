@@ -366,7 +366,7 @@ test("Settings: a link to one of the last (short) sections scrolls only the sett
   const nav = page.getByRole("navigation", { name: "Settings sections" });
   await expect(nav.getByRole("link", { name: "Help and feedback" })).toBeVisible();
   const first = nav.getByRole("link").first();
-  for (const name of ["Search index", "Import & Export", "Help and feedback"]) {
+  for (const name of ["Connected apps", "Notifications", "Help and feedback"]) {
     await nav.getByRole("link", { name }).click();
     await settled(page);
     await page.waitForTimeout(1100); // past the smooth scroll and the held mark
@@ -398,11 +398,38 @@ test("Settings: a link to one of the last (short) sections scrolls only the sett
   }
   await page.emulateMedia({ colorScheme: "light" });
   // The keyboard path does the same.
-  await nav.getByRole("link", { name: "Search index" }).focus();
+  await nav.getByRole("link", { name: "Notifications" }).focus();
   await page.keyboard.press("Enter");
   await settled(page);
   expect(await page.locator(".shell").evaluate((el) => [el.scrollTop, (el.querySelector(".main") as HTMLElement).scrollTop])).toEqual([0, 0]);
   await expect(first).toBeInViewport();
+});
+
+test("Settings: the search box filters the page to the matching settings, in both themes, and Escape clears it", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 700 });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  await search.fill("rebuild");
+  await expect(nav.getByRole("link")).toHaveText(["Private Space"]);
+  await expect(page.getByRole("button", { name: "Rebuild index" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch Private Space" })).toBeHidden();
+  await search.fill("language");
+  await expect(nav.getByRole("link")).toHaveText(["Appearance"]);
+  await expect(page.getByRole("combobox", { name: "Language" })).toBeVisible();
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await settled(page);
+    await page.screenshot({ path: join(SHOTS, `settings-search-${scheme}.png`) });
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  expect((await new AxeBuilder({ page }).include(".settings-layout").analyze()).violations.map((v) => v.id)).toEqual([]);
+  await search.fill("qqqq");
+  await expect(page.getByText("No setting matches “qqqq”")).toBeVisible();
+  await search.press("Escape");
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("combobox", { name: "Theme" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch Private Space" })).toBeVisible();
 });
 
 test("a section's drag grip is hidden and takes no room until the pointer is over its header; the name does not move", async ({ page }) => {

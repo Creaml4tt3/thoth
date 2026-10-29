@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Search settings: type in the box above the list of sections to see only the settings that match, by name, hint or choice. Escape shows them all again.
+
+### Changed
+
+- Settings are in a clearer order, most used first: Appearance (theme and language together), Editor, Private Space (with its search index), Import notes, then servers, the assistant and the rest. The tour moved to Help and feedback.
+
 ## [0.2.7] - 2026-10-29
 
 ### Changed
@@ -186,6 +196,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.7...HEAD
 [0.2.7]: https://github.com/Creaml4tt3/thoth/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Creaml4tt3/thoth/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Creaml4tt3/thoth/compare/v0.2.4...v0.2.5

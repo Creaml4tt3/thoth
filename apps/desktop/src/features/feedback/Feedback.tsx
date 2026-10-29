@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { FeedbackContext } from "@thoth/workspace-protocol";
 import { FEEDBACK_EMAIL, FeedbackDialog, pickFeedbackServer, type FeedbackTarget } from "@thoth/app-ui/feedback/FeedbackDialog.tsx";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -38,8 +38,8 @@ export function DesktopFeedbackDialog({ onClose }: { onClose(): void }) {
   return <FeedbackDialog target={target} context={context} mail="copy" onClose={onClose} />;
 }
 
-/** Settings → Help and feedback. */
-export function FeedbackSettings() {
+/** Settings → Help and feedback; `children`: the desktop's other help (the tour), after sending feedback. */
+export function FeedbackSettings({ children }: { children?: ReactNode }) {
   const t = useDesktopStrings().helpFeedback;
   const [open, setOpen] = useState(false);
   return (
@@ -52,6 +52,7 @@ export function FeedbackSettings() {
         </Button>
         <span className="muted">{t.email(FEEDBACK_EMAIL)}</span>
       </div>
+      {children}
       {open && <DesktopFeedbackDialog onClose={() => setOpen(false)} />}
     </section>
   );

@@ -107,7 +107,7 @@ describe("settings", () => {
     expect(location.textContent).toBe(displayPath(root));
     await app.user.click(screen.getByRole("button", { name: "Rebuild index" }));
     await waitFor(() => expect(screen.getByText(/Index rebuilt \(2 pages read\)/)).toBeTruthy());
-    expect(screen.getByRole("heading", { name: "Import & Export" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Import notes" })).toBeTruthy();
   });
 
   it("lists its sections beside the page; a link moves focus to that section's heading", async () => {
@@ -116,14 +116,37 @@ describe("settings", () => {
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
     const nav = await screen.findByRole("navigation", { name: "Settings sections" });
     const links = within(nav).getAllByRole("link").map((a) => a.textContent);
-    expect(links[0]).toBe("Private Space");
-    expect(links.slice(-6)).toEqual(["Language", "Theme", "Editor", "Search index", "Import & Export", "Help and feedback"]);
-    expect(links).toContain("Servers");
+    // Most used first; the folder's own upkeep (the search index) and the tour are parts of their sections now.
+    expect(links.slice(0, 5)).toEqual(["Appearance", "Editor", "Private Space", "Import notes", "Servers"]);
+    expect(links.at(-1)).toBe("Help and feedback");
+    expect(links).not.toContain("Search index");
     // Every link goes to a heading on the page.
     for (const a of within(nav).getAllByRole("link")) expect(document.querySelector(a.getAttribute("href")!)?.tagName).toBe("H2");
-    await app.user.click(within(nav).getByRole("link", { name: "Theme" }));
-    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 2, name: "Theme" }));
-    expect(within(nav).getByRole("link", { name: "Theme" }).getAttribute("aria-current")).toBe("true");
+    await app.user.click(within(nav).getByRole("link", { name: "Editor" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 2, name: "Editor" }));
+    expect(within(nav).getByRole("link", { name: "Editor" }).getAttribute("aria-current")).toBe("true");
+  });
+});
+
+describe("searching settings", () => {
+  it("finds a setting by a word in its name, hint or choices, and Escape shows them all again", async () => {
+    const app = await openApp(root);
+    await screen.findByRole("tree");
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const search = await screen.findByRole("searchbox", { name: "Search settings" });
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    await app.user.type(search, "rebuild");
+    await waitFor(() => expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Private Space"]));
+    expect(screen.getByRole("button", { name: "Rebuild index" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Switch Private Space" })).toBeNull();
+    await app.user.clear(search);
+    await app.user.type(search, "dark");
+    await waitFor(() => expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Appearance"]));
+    expect(screen.getByRole("combobox", { name: "Theme" })).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Language" })).toBeNull();
+    await app.user.keyboard("{Escape}");
+    await waitFor(() => expect(within(nav).getAllByRole("link").length).toBeGreaterThan(5));
+    expect(screen.getByRole("combobox", { name: "Language" })).toBeTruthy();
   });
 });
 
@@ -134,7 +157,7 @@ describe("Import from Notion or Obsidian", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
   };
 
-  it("the sidebar button opens Settings at Import & Export with the wizard started, again after it was closed", async () => {
+  it("the sidebar button opens Settings at Import notes with the wizard started, again after it was closed", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     const button = screen.getByRole("button", { name: "Import from Notion or Obsidian" });

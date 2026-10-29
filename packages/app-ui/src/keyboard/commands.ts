@@ -54,7 +54,7 @@ export interface CommandActions {
   favorite?: { on: boolean; run(): void };
   theme: { current: Theme; set(theme: Theme): void };
   openSettings(): void;
-  /** Import from Notion or Obsidian (the desktop only): Settings, Import & Export, with the wizard started. */
+  /** Import from Notion or Obsidian (the desktop only): Settings, Import notes, with the wizard started. */
   importPages?(): void;
   /** The Thoth assistant (the desktop only): its prompt bubble, its size, and its settings. */
   askAssistant?(): void;

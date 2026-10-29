@@ -294,7 +294,7 @@ describe("storage", () => {
     expect(activeIndex(back)).toBe(1);
   });
 
-  it("restores Settings opened at Import & Export", () => {
+  it("restores Settings opened at Import notes", () => {
     const back = parseTabs(serializeTabs(initialTabs([{ kind: "settings", section: "import" }])))!;
     expect(back.tabs[0]!.target).toEqual({ kind: "settings", section: "import" });
   });

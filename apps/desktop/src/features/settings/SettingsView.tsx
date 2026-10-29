@@ -21,7 +21,10 @@ import { FeedbackSettings } from "../feedback/Feedback.tsx";
 
 type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages: number } | { state: "error"; message: string };
 
-/** Settings: vault location, workspace servers, the assistant, notifications, language, editor mode, Rebuild index, and Import & Export. */
+/**
+ * Settings, most used first: Appearance (theme, language), Editor, the Private Space (its folder and search index),
+ * Import, Servers, the assistant, Connected apps, Notifications, Updates, and Help and feedback (with the tour).
+ */
 export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import"; request?: object }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder, platform } = useSession();
   const previews = usePageHost().links;
@@ -35,7 +38,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
   const [revealError, setRevealError] = useState<string | null>(null);
   const importSection = useRef<HTMLElement>(null);
-  // Opened at Import & Export (the sidebar's Import button, the palette): the wizard starts and takes focus itself.
+  // Opened at Import notes (the sidebar's Import button, the palette): the wizard starts and takes focus itself.
   // `request` is the tab's target, new on every open, so asking again after closing the wizard starts it again.
   useEffect(() => {
     if (section !== "import") return;
@@ -67,18 +70,15 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   const d = useDesktopStrings();
   // Every section's heading id, in page order; the list leaves out those this build does not show.
   const sections = [
+    { id: "set-appearance", label: t.appearance },
+    { id: "set-editor", label: t.editor },
     { id: "set-vault", label: t.privateSpace },
-    { id: "set-tour", label: t.gettingStarted },
+    { id: "set-import", label: t.importExport },
     { id: "set-servers", label: d.servers.title },
     { id: "set-agents", label: d.agents.title },
+    { id: "set-connected-apps", label: d.connectedApps.title },
     { id: "set-notifications", label: d.notifications.title },
     { id: "set-general", label: d.updates.general },
-    { id: "set-connected-apps", label: d.connectedApps.title },
-    { id: "set-language", label: t.language },
-    { id: "set-theme", label: t.theme },
-    { id: "set-editor", label: t.editor },
-    { id: "set-index", label: t.index },
-    { id: "set-import", label: t.importExport },
     { id: "set-feedback", label: d.helpFeedback.title },
   ];
 
@@ -86,75 +86,27 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
     <SettingsLayout sections={sections}>
       <h1 className="page-title">{t.title}</h1>
 
-      <section aria-labelledby="set-vault" className="set-section">
-        <h2 id="set-vault">{t.privateSpace}</h2>
-        <p>
-          <b>{connection.label}</b> <span className="badge badge-private">{t.local}</span>
-        </p>
-        {/* Short and without the user's name (screenshots); the full path is the tooltip. */}
-        <p className="mono muted set-path" data-testid="vault-location" title={connection.root}>
-          {displayPath(connection.root)}
-        </p>
-        <p className="muted">{t.vaultNote}</p>
-        <div className="set-actions">
-          {reveal && (
-            <Button variant="ghost" small onClick={() => void showFolder()}>
-              {t.reveal[currentOs()]}
-            </Button>
-          )}
-          <Button variant="ghost" small onClick={() => void switchVault()}>
-            {t.switchSpace}
-          </Button>
-        </div>
-        {revealError && (
-          <p role="alert" className="alert alert-danger">
-            {revealError}
-          </p>
-        )}
-      </section>
-
-      <section aria-labelledby="set-tour" className="set-section">
-        <h2 id="set-tour">{t.gettingStarted}</h2>
-        <p className="muted">{t.tourNote}</p>
-        <div className="set-actions">
-          <Button variant="ghost" small onClick={requestTour}>
-            {t.showTour}
-          </Button>
-        </div>
-      </section>
-
-      <ServersSettings focus={section === "servers"} />
-
-      <AgentSettings focus={section === "agents"} />
-
-      <NotificationSettings />
-
-      <UpdateSettings />
-      {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
-
-      <section aria-labelledby="set-language" className="set-section">
-        <h2 id="set-language">{t.language}</h2>
+      <section aria-labelledby="set-appearance" className="set-section">
+        <h2 id="set-appearance">{t.appearance}</h2>
         <label className="field set-language">
-          <span>{t.languageHint}</span>
+          <span className="set-field-name">{t.theme}</span>
+          <span className="muted">{t.themeHint}</span>
+          <select className="input" value={theme} aria-label={t.theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])}>
+            {THEMES.map((choice) => (
+              <option key={choice} value={choice}>
+                {themeNames[choice]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field set-language">
+          <span className="set-field-name">{t.language}</span>
+          <span className="muted">{t.languageHint}</span>
           <select className="input" value={preference} aria-label={t.language} onChange={(e) => setPreference(e.target.value as LangPreference)}>
             {LANG_PREFERENCES.map((choice) => (
               // Each language is named in itself, so it can be found whatever the UI language is.
               <option key={choice} value={choice} lang={choice === "system" ? undefined : choice}>
                 {choice === "system" ? t.system : STRINGS[choice].name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
-
-      <section aria-labelledby="set-theme" className="set-section">
-        <h2 id="set-theme">{t.theme}</h2>
-        <label className="field set-language">
-          <span>{t.themeHint}</span>
-          <select className="input" value={theme} aria-label={t.theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])}>
-            {THEMES.map((choice) => (
-              <option key={choice} value={choice}>
-                {themeNames[choice]}
               </option>
             ))}
           </select>
@@ -188,22 +140,51 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         {platform.links && <LinkPreviewSettings links={platform.links} {...(previews ? { onCleared: () => previews.clear() } : {})} />}
       </section>
 
-      <section aria-labelledby="set-index" className="set-section">
-        <h2 id="set-index">{t.index}</h2>
-        <p className="muted">{t.indexNote}</p>
-        <div className="set-actions">
-          <Button variant="ghost" small disabled={rebuild.state === "running"} onClick={() => void rebuildIndex()}>
-            {rebuild.state === "running" ? t.rebuilding : t.rebuild}
-          </Button>
-          <span role="status" className="muted">
-            {rebuild.state === "done" ? t.rebuilt(rebuild.pages) : ""}
-          </span>
-        </div>
-        {rebuild.state === "error" && (
-          <p role="alert" className="alert alert-danger">
-            {rebuild.message}
+      <section aria-labelledby="set-vault" className="set-section">
+        <h2 id="set-vault">{t.privateSpace}</h2>
+        {/* One part for the search: the folder, its path and its buttons stay together. */}
+        <div className="set-group">
+          <p>
+            <b>{connection.label}</b> <span className="badge badge-private">{t.local}</span>
           </p>
-        )}
+          {/* Short and without the user's name (screenshots); the full path is the tooltip. */}
+          <p className="mono muted set-path" data-testid="vault-location" title={connection.root}>
+            {displayPath(connection.root)}
+          </p>
+          <p className="muted">{t.vaultNote}</p>
+          <div className="set-actions">
+            {reveal && (
+              <Button variant="ghost" small onClick={() => void showFolder()}>
+                {t.reveal[currentOs()]}
+              </Button>
+            )}
+            <Button variant="ghost" small onClick={() => void switchVault()}>
+              {t.switchSpace}
+            </Button>
+          </div>
+          {revealError && (
+            <p role="alert" className="alert alert-danger">
+              {revealError}
+            </p>
+          )}
+        </div>
+        <div className="set-sub">
+          <h3>{t.index}</h3>
+          <p className="muted">{t.indexNote}</p>
+          <div className="set-actions">
+            <Button variant="ghost" small disabled={rebuild.state === "running"} onClick={() => void rebuildIndex()}>
+              {rebuild.state === "running" ? t.rebuilding : t.rebuild}
+            </Button>
+            <span role="status" className="muted">
+              {rebuild.state === "done" ? t.rebuilt(rebuild.pages) : ""}
+            </span>
+          </div>
+          {rebuild.state === "error" && (
+            <p role="alert" className="alert alert-danger">
+              {rebuild.message}
+            </p>
+          )}
+        </div>
       </section>
 
       <section ref={importSection} aria-labelledby="set-import" className="set-section">
@@ -229,7 +210,27 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         )}
       </section>
 
-      <FeedbackSettings />
+      <ServersSettings focus={section === "servers"} />
+
+      <AgentSettings focus={section === "agents"} />
+
+      {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
+
+      <NotificationSettings />
+
+      <UpdateSettings />
+
+      <FeedbackSettings>
+        <div className="set-sub">
+          <h3>{t.gettingStarted}</h3>
+          <p className="muted">{t.tourNote}</p>
+          <div className="set-actions">
+            <Button variant="ghost" small onClick={requestTour}>
+              {t.showTour}
+            </Button>
+          </div>
+        </div>
+      </FeedbackSettings>
     </SettingsLayout>
   );
 }

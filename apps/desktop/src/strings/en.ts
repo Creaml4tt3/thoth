@@ -108,6 +108,7 @@ export const en = {
     vaultNote: "Pages are Markdown files in this folder. The index lives in .thoth inside it and can always be rebuilt.",
     reveal: { mac: "Show in Finder", windows: "Show in File Explorer", linux: "Show in Files" } satisfies Record<Os, string>,
     switchSpace: "Switch Private Space",
+    appearance: "Appearance",
     language: "Language",
     languageHint: "System follows your computer's language.",
     system: "System",
@@ -128,7 +129,7 @@ export const en = {
     rebuild: "Rebuild index",
     rebuilding: "Rebuilding…",
     rebuilt: (pages: number) => `Index rebuilt (${pages} pages read).`,
-    importExport: "Import & Export",
+    importExport: "Import notes",
     importNote: "Bring pages in from Notion or Obsidian. Your originals are only ever read.",
     importFrom: "Import from Notion or Obsidian",
     gettingStarted: "Getting started",
@@ -179,7 +180,7 @@ export const en = {
     click: "Clicking one brings Thoth to the front. What it is about is at the top of the list under the bell.",
   },
 
-  /** The update notice (ADR-0022): the popup in the corner, and Settings → General. */
+  /** The update notice (ADR-0022): the popup in the corner, and Settings → Updates. */
   /** Settings → Help and feedback (ADR-0033). */
   helpFeedback: {
     title: "Help and feedback",
@@ -845,7 +846,7 @@ export const en = {
       run: "Importing",
       report: "Report",
     } satisfies Record<Step, string>,
-    stepOf: (step: number, total: number) => `Import & Export · Step ${step} of ${total}`,
+    stepOf: (step: number, total: number) => `Import notes · Step ${step} of ${total}`,
     close: "Close",
     back: "Back",
     continue: "Continue",

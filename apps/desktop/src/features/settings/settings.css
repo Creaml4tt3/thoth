@@ -22,6 +22,11 @@
 .server-add { display: grid; grid-template-columns: 1fr auto; gap: var(--thoth-space-3); align-items: end; }
 .set-path { overflow-wrap: anywhere; }
 .set-language { max-width: 280px; }
+.field > .set-field-name { font: 600 15px / 1.4 var(--thoth-font-sans); color: var(--thoth-ink-primary); }
+/* A part of a section the settings search keeps or hides as one: a group of controls, or a sub-section with its h3. */
+.set-group, .set-sub { display: grid; gap: var(--thoth-space-2); }
+.set-sub { margin-top: var(--thoth-space-3); }
+.set-sub h3 { margin: 0; font: 600 15px / 1.4 var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
 /* An on/off setting: a switch (a checkbox with role="switch"), its label, and a hint under it. */
 .set-toggles { display: grid; gap: var(--thoth-space-3); }
 .set-toggle { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--thoth-space-3); row-gap: 2px; align-items: center; }

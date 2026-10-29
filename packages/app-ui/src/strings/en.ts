@@ -460,6 +460,13 @@ export const en = {
 
   /** The list of sections beside Settings. */
   settingsNav: "Settings sections",
+  /** The search box above that list: it filters the settings page as you type. */
+  settingsSearch: {
+    label: "Search settings",
+    placeholder: "Search settings",
+    none: (query: string) => `No setting matches “${query}”. Try another word, or clear the search with Escape.`,
+    results: (n: number) => (n === 0 ? "No settings found" : `${plural(n, "section")} found`),
+  },
 
   /** The theme choice (Settings on the desktop, the account area on the web). */
   theme: { label: "Theme", light: "Light", dark: "Dark", system: "System" },

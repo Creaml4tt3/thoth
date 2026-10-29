@@ -112,7 +112,11 @@
 .settings-layout { display: grid; grid-template-columns: 160px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-6); justify-content: center; align-items: start; }
 .settings-layout > .page-col { margin: 0; min-width: 0; }
 .settings-layout .settings > section { scroll-margin-top: var(--thoth-space-4); }
-.settings-nav { position: sticky; top: 0; padding-top: var(--thoth-space-4); }
+.settings-side { position: sticky; top: 0; padding-top: var(--thoth-space-4); display: grid; gap: var(--thoth-space-3); }
+.settings-search { width: 100%; min-width: 0; }
+/* The search hides what does not match; sections and parts set their own display, so `hidden` must win here. */
+.settings [hidden] { display: none !important; }
+.settings-none { padding: var(--thoth-space-6) 0; }
 .settings-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .settings-nav a { display: flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); text-decoration: none; font: var(--thoth-text-ui); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .settings-nav a:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
@@ -120,8 +124,8 @@
 .settings-nav a:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 @container (max-width: 784px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--thoth-space-4); }
-  .settings-layout > .page-col, .settings-nav { width: 100%; max-width: var(--thoth-content-width); margin: 0 auto; }
-  .settings-nav { position: static; padding-top: 0; }
+  .settings-layout > .page-col, .settings-side { width: 100%; max-width: var(--thoth-content-width); margin: 0 auto; }
+  .settings-side { position: static; padding-top: var(--thoth-space-2); }
   .settings-nav ul { display: flex; flex-wrap: wrap; gap: 4px; }
 }
 @media (forced-colors: active) {
