@@ -4,7 +4,7 @@
 และจำนวนรายการต้องตรงกับ CHANGELOG.md เสมอ (มีเทสต์ตรวจ) หัวข้อที่เป็นโครงสร้าง เช่น `[Unreleased]`, `Added`,
 `Changed` และ `Fixed` คงเป็นภาษาอังกฤษไว้ตามรูปแบบ Keep a Changelog ส่วนหน้าเว็บจะแสดงเป็นภาษาไทยให้เอง
 
-## [Unreleased]
+## [0.2.8] - 2026-10-30
 
 ### Added
 
@@ -192,7 +192,7 @@
 - เว็บแอปที่ thothnotes.com/app/ เปิดเวิร์กสเปซบนเซิร์ฟเวอร์ทดลองที่ใช้ฟรี
 - แอปมีทั้งภาษาอังกฤษและภาษาไทย ตามภาษาของระบบ และเลือกได้ใน การตั้งค่า → ภาษา
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.2.7...HEAD
+[0.2.8]: https://github.com/Creaml4tt3/thoth/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Creaml4tt3/thoth/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Creaml4tt3/thoth/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Creaml4tt3/thoth/compare/v0.2.4...v0.2.5
