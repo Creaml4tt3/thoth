@@ -24,3 +24,5 @@ tests/.tmp/
 
 # Local code index (CodeGraph)
 /.codegraph/
+# The server settings for compose.external.yaml: they hold secrets
+server.env

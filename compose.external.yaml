@@ -1,0 +1,35 @@
+# Thoth reference server alone, for a PostgreSQL and a sign-in provider you already run.
+#
+#   cp server.env.example server.env && chmod 600 server.env   # then fill it in; server.env is git-ignored
+#   podman compose -f compose.external.yaml up --build -d      # or: docker compose -f compose.external.yaml ...
+#
+# The server listens on http://127.0.0.1:${THOTH_PORT:-8080}; put your HTTPS reverse proxy in front of it.
+# Every setting is in apps/server/README.md. compose.yaml is the variant that also runs PostgreSQL.
+name: thoth-server
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Containerfile
+    image: localhost/thoth-server:dev
+    restart: unless-stopped
+    env_file: server.env
+    # Fixed by the image layout; server.env cannot move them.
+    environment:
+      BLOB_DIR: /data/blobs
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${THOTH_PORT:-8080}:8080"
+    volumes:
+      - blobs:/data/blobs
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/capabilities').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  blobs:

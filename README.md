@@ -83,7 +83,7 @@ too (Settings → Servers).
 ## Host your own server
 
 The server is the same one that runs the demo, without its limits: Node.js 24 and PostgreSQL, packaged as a
-container image with a Compose file. You need Podman or Docker.
+container image. The quickest start runs both with Podman or Docker:
 
 ```sh
 git clone https://github.com/Creaml4tt3/thoth && cd thoth
@@ -102,7 +102,25 @@ podman compose exec server node src/cli.ts create-token --user <user-id> --out /
 
 Then, in the desktop app, open **Settings → Servers → Add server** with the server's address and the token.
 
-For sign-in with Google, GitHub or any OpenID Connect provider, HTTPS, limits, CORS, rate limiting and backups, read
+### With your own PostgreSQL and sign-in provider
+
+If you already run PostgreSQL 14 or newer (managed or not) and an OpenID Connect provider (Keycloak, Authentik,
+Zitadel, Entra ID...), run only the server container:
+
+```sh
+cp server.env.example server.env && chmod 600 server.env   # fill in DATABASE_URL, PUBLIC_URL and OIDC_*; git-ignored
+podman compose -f compose.external.yaml up --build -d       # or: docker compose -f compose.external.yaml up --build -d
+```
+
+Register `https://<your PUBLIC_URL>/auth/callback/oidc` as the redirect URI at your provider, and put an HTTPS
+reverse proxy in front of `127.0.0.1:8080`. The server creates its tables on first start, so the database user needs
+the right to `CREATE EXTENSION pg_trgm` (or an administrator runs it once). People then add the server in the desktop
+app and sign in with your provider; no access tokens to hand out.
+
+Without containers it is a plain Node 24 app: `pnpm install --prod --filter @thoth/server...`, export the same
+variables, then `node apps/server/src/main.ts`.
+
+For Google or GitHub sign-in, HTTPS, limits, CORS, rate limiting and backups, read
 **[`apps/server/README.md`](apps/server/README.md)**. The hosted demo's own setup (Vercel and Neon) is in
 [`docs/deploy/trial.md`](docs/deploy/trial.md).
 

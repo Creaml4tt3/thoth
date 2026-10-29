@@ -336,6 +336,11 @@ podman compose up --build -d      # postgres + server; server on http://127.0.0.
 podman compose exec server node src/cli.ts create-user --name "Ada"
 ```
 
+**Your own PostgreSQL and sign-in provider.** `compose.external.yaml` runs the server alone and reads its settings
+from `server.env` (copy `server.env.example`; git-ignored, keep it `chmod 600`). The example covers `DATABASE_URL`,
+`PUBLIC_URL`, `TRUST_PROXY`, `OIDC_*` and the pooler, blob and web-client options. Without compose:
+`podman run --env-file server.env -e HOST=0.0.0.0 -p 127.0.0.1:8080:8080 -v thoth-blobs:/data/blobs localhost/thoth-server:dev`.
+
 `podman compose` is a thin wrapper that runs an external provider; on this machine it found
 `docker-compose` and works. If it reports that no compose provider is installed, either install one
 (`brew install docker-compose` or `podman-compose`) or use plain Podman:
