@@ -58,10 +58,13 @@ test("a Thai system gets the Thai UI with the bundled fonts, and Settings change
   await expect(page.locator("html")).toHaveAttribute("lang", "th");
   await page.getByRole("button", { name: "เลือกหรือสร้าง Private Space" }).click();
   await page.getByRole("button", { name: "เริ่มเขียน" }).click();
-  await page.getByRole("button", { name: "หน้าใหม่" }).click();
-  const dialog = page.getByRole("dialog", { name: "หน้าใหม่" });
-  await dialog.getByRole("textbox").fill("บันทึก");
-  await dialog.getByRole("button", { name: "สร้าง" }).click();
+  // Since 0.2.6 New page makes "ไม่มีชื่อ" (Untitled) and starts its rename in the tree.
+  await page.getByRole("button", { name: "หน้าใหม่", exact: true }).click();
+  const field = page.getByRole("textbox", { name: /^เปลี่ยนชื่อ ไม่มีชื่อ/ });
+  await expect(field).toBeFocused();
+  await field.fill("บันทึก");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("tab", { selected: true })).toHaveText("บันทึก");
   await expect(page.getByRole("group", { name: "โหมดแก้ไข" })).toBeVisible();
 
   // Both bundled faces are loaded from the app, for Latin and for Thai text, and nothing was fetched elsewhere.

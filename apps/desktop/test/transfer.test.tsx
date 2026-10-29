@@ -142,6 +142,8 @@ describe("workspace → Private Space", () => {
     await app.user.click(await within(list).findByRole("treeitem", { name: "Roadmap" }));
     await app.user.click(await screen.findByRole("button", { name: "Move to Private Space…" }));
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" });
+    // The Private Space's folders load after the dialog opens.
+    await within(dialog).findByRole("option", { name: /From team/ });
     await app.user.selectOptions(within(dialog).getByRole("combobox", { name: "Put the pages" }), "From team");
     await waitFor(() => expect(within(dialog).getByRole("region", { name: "Who can see it" }).textContent).toContain("Nothing has been written to your Private Space yet."));
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
