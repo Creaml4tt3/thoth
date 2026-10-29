@@ -55,7 +55,7 @@
 .image-insert-status.is-error { margin-top: var(--thoth-space-2); padding: 6px 12px; border-radius: var(--thoth-radius-md); background: color-mix(in srgb, var(--thoth-danger) 10%, transparent); color: var(--thoth-danger); font: var(--thoth-text-small); }
 .ProseMirror-selectednode { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: var(--thoth-radius-sm); }
 
-/* Wikilink chips: content uses Notion radii, not pills */
+/* Wikilink chips: content uses small radii, not pills */
 .wikilink { display: inline-block; padding: 0 6px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); text-decoration: none; cursor: pointer; line-height: 1.5; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wikilink:hover { background: var(--thoth-bg-active); }
 .wikilink[data-state="resolved"] { text-decoration: underline; text-decoration-color: var(--thoth-ink-faint); text-underline-offset: 3px; }

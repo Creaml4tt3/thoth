@@ -1,9 +1,10 @@
 /*
  * Thoth design tokens — "Ink & Moon" (design/DESIGN.md).
  *
- * Blend: Notion's calm, warm paper canvas and opacity-based ink ramp for
- * reading and writing; Grok Bot's near-black cinematic surfaces, pill
- * controls, and medium-weight tight display type for chrome and the Agent Hub.
+ * Paper and ink for reading and writing: a calm, warm canvas and text that
+ * steps down in opacity from one warm black. Night for chrome and the Agent
+ * Hub: near-black cinematic surfaces, pill controls, and medium-weight tight
+ * display type.
  * One accent — Moon (warm lunar orange) — used sparingly.
  */
 :root {
@@ -68,7 +69,7 @@
   --thoth-text-purple: #7040C8;
   --thoth-text-red: #BE2D28;
 
-  /* Shape — Notion radii in content, Grok pills for actions */
+  /* Shape — small radii in content, pills for actions */
   --thoth-radius-xs: 4px;
   --thoth-radius-sm: 6px;
   --thoth-radius-md: 8px;
@@ -116,7 +117,7 @@
   color-scheme: light;
 }
 
-/* Night — Grok Bot's near-black, warm-shifted so it pairs with paper. */
+/* Night — the night sky: near-black surfaces with warm ink, so it pairs with paper. */
 [data-theme="night"][data-theme] {
   --thoth-ink: 245 243 240;
   --thoth-bg: #0A0A0A;
