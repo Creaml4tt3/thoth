@@ -19,6 +19,7 @@ import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
 import { pasteLinksExtension } from "./paste-links.ts";
 import { linkCardsExtension } from "./link-cards.ts";
+import { webLinksExtension } from "./web-links.ts";
 import { slashTarget, turnInto } from "./block-ops.ts";
 import type { BlockKind } from "./block-kinds.ts";
 
@@ -93,6 +94,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     linkSuggestExtension(ctx),
     imageInsertExtension(ctx),
     pasteLinksExtension(ctx),
+    webLinksExtension(ctx),
     ...(links ? [linkCardsExtension({ ...ctx, links })] : []),
   ];
 }

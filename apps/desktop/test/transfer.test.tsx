@@ -6,6 +6,7 @@
  * stand behind the real UI.
  */
 import { writeFileSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent } from "@testing-library/react";
@@ -132,7 +133,8 @@ describe("Private Space → workspace", () => {
 });
 
 describe("workspace → Private Space", () => {
-  it("moves a workspace page into the Private Space; the server deletes it there", async () => {
+  it("moves a workspace page into a Private Space folder chosen from the list; the server deletes it there", async () => {
+    await mkdir(join(root, "From team"));
     const { app, servers, ws } = await start(team());
     servers.writeAsOther(ws, { title: "Roadmap", markdown: "# Roadmap\n\nไทย\n" });
     const list = screen.getByRole("tree", { name: /^Workspaces on / });
@@ -140,7 +142,7 @@ describe("workspace → Private Space", () => {
     await app.user.click(await within(list).findByRole("treeitem", { name: "Roadmap" }));
     await app.user.click(await screen.findByRole("button", { name: "Move to Private Space…" }));
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" });
-    await app.user.type(within(dialog).getByRole("textbox", { name: /Folder in your Private Space/ }), "From team");
+    await app.user.selectOptions(within(dialog).getByRole("combobox", { name: "Put the pages" }), "From team");
     await waitFor(() => expect(within(dialog).getByRole("region", { name: "Who can see it" }).textContent).toContain("Nothing has been written to your Private Space yet."));
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));

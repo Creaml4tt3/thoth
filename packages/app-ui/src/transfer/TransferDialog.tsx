@@ -129,6 +129,8 @@ export interface TransferDialogProps {
   openWorkspacePage(ref: WorkspacePageRef): void;
   /** Opens a Private Space page (the desktop). */
   openPage?(path: string): void;
+  /** The Private Space's folders, for where pages that come back go (the desktop). */
+  privateFolders?(): Promise<string[]>;
 }
 
 /** The destination the target asks for, when it names one. */
@@ -139,7 +141,7 @@ const askedDestination = (target: TransferTarget): (Destination & { parentId: st
       ? target.to
       : null;
 
-export function TransferDialog({ target, onClose, servers, transfers, openWorkspacePage, openPage }: TransferDialogProps) {
+export function TransferDialog({ target, onClose, servers, transfers, openWorkspacePage, openPage, privateFolders }: TransferDialogProps) {
   const t = useStrings().transfer;
   const all = useWorkspaces(servers);
   const toWorkspace = target.direction !== "from_workspace";
@@ -159,6 +161,20 @@ export function TransferDialog({ target, onClose, servers, transfers, openWorksp
     return want.parentId;
   });
   const [folder, setFolder] = useState(target.direction === "from_workspace" ? (target.folder ?? "") : "");
+  const [folders, setFolders] = useState<string[]>([]);
+  useEffect(() => {
+    if (toWorkspace || !privateFolders) return;
+    let live = true;
+    privateFolders().then(
+      (list) => live && setFolders(list),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [toWorkspace, privateFolders]);
+  // The asked folder is always a choice, also before the list has come.
+  const folderChoices = folder === "" || folders.includes(folder) ? folders : [...folders, folder].sort();
   const [attachments, setAttachments] = useState(true);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [checking, setChecking] = useState(false);
@@ -236,12 +252,13 @@ export function TransferDialog({ target, onClose, servers, transfers, openWorksp
     setRun({ id: run.id, record: done, interrupted: null, busy: false });
   };
 
+  const moveText = target.direction === "to_workspace" ? t.moveToWs : target.direction === "between_workspaces" ? t.moveBetween : t.moveFromWs;
   const title = target.direction === "to_workspace" ? t.titleTo(mode, target.paths.length) : target.direction === "between_workspaces" ? t.titleBetween(mode, target.title) : t.titleFrom(mode, target.title);
   const running = run.busy || (record !== null && !finished && !run.interrupted);
   const where = record ? (record.direction === "from_workspace" ? t.privateSpace : record.workspace.name) : "";
 
   return (
-    <Modal title={title} wide {...(running ? {} : { onClose })}>
+    <Modal title={title} {...(running ? {} : { onClose })}>
       <div className="xfer">
         {record === null && !run.busy ? (
           <>
@@ -290,24 +307,32 @@ export function TransferDialog({ target, onClose, servers, transfers, openWorksp
                 <legend className="label">{t.destination}</legend>
                 <label className="field">
                   <span>{t.folder}</span>
-                  <input data-autofocus className="input" value={folder} onChange={(e) => setFolder(e.target.value)} />
+                  <select data-autofocus className="input" value={folder} onChange={(e) => setFolder(e.target.value)}>
+                    <option value="">{t.topLevel}</option>
+                    {folderChoices.map((f) => (
+                      <option key={f} value={f}>
+                        {`${"  ".repeat(f.split("/").length - 1)}${t.under(f.split("/").pop()!)}`}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <p className="muted small">{t.folderHint}</p>
               </fieldset>
             )}
 
-            <fieldset className="mode-choices xfer-section">
+            <fieldset className="xfer-section">
               <legend className="label">{t.mode}</legend>
-              {(["copy", "move"] as const).map((m) => {
-                const text = m === "copy" ? t.copy : target.direction === "to_workspace" ? t.moveToWs : target.direction === "between_workspaces" ? t.moveBetween : t.moveFromWs;
-                return (
-                  <label key={m} className="mode-choice">
-                    <input type="radio" name="xfer-mode" checked={mode === m} onChange={() => setMode(m)} />
-                    <b>{text.title}</b>
-                    <span>{text.hint}</span>
+              <div className="xfer-modes">
+                {(["move", "copy"] as const).map((m) => (
+                  <label key={m} className="xfer-mode">
+                    <input type="radio" name="xfer-mode" checked={mode === m} onChange={() => setMode(m)} aria-describedby="xfer-mode-hint" />
+                    <span>{(m === "copy" ? t.copy : moveText).title}</span>
                   </label>
-                );
-              })}
+                ))}
+              </div>
+              <p id="xfer-mode-hint" className="muted small">
+                {(mode === "copy" ? t.copy : moveText).hint}
+              </p>
             </fieldset>
 
             {toWorkspace && (
@@ -388,67 +413,77 @@ function PreviewPanel({ preview, checking, error, t }: { preview: Preview | null
         <div className="xfer-section">
           <h3 className="label">{t.whoCanSee}</h3>
           <p>{ws.members ? t.visibleTo(ws.memberCount) : t.membersHidden(ws.memberCount)}</p>
-          {ws.members && ws.members.length > 1 && (
-            <ul className="xfer-members">
-              {ws.members.map((m) => (
-                <li key={m.userId}>
-                  <span>{m.displayName}</span> <span className="badge badge-muted">{t.roles[m.role]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="muted small">{t.you(t.roles[ws.role])}</p>
         </div>
       )}
 
-      {preview.pages.length > 0 && (
-        <div className="xfer-section">
-          <h3 className="label">{t.pagesHeading}</h3>
-          {preview.direction === "between_workspaces" && preview.source.workspace && <p className="muted small">{t.fromWorkspace(preview.source.workspace.name)}</p>}
-          <ul className="xfer-list">
-            {preview.direction === "to_workspace"
-              ? preview.pages.map((p) => (
-                  <li key={p.path} title={p.path}>
-                    {p.title} <span className="muted small">{p.path}</span>
-                  </li>
-                ))
-              : preview.pages.map((p) => <li key={p.pageId}>{p.title}</li>)}
-          </ul>
-          {preview.direction === "to_workspace" && preview.attachments.length > 0 && <p className="muted small">{t.attachmentsHeading(preview.attachments.length)}</p>}
-          {preview.direction === "between_workspaces" && preview.attachments.length > 0 && <p className="muted small">{t.attachmentsCopied(preview.attachments.length)}</p>}
-        </div>
-      )}
-
-      {preview.pages.length > 0 && (
-        <div className="xfer-section">
-          <h3 className="label">{t.linksHeading}</h3>
-          {total === 0 ? (
-            <p className="muted">{t.noLinks}</p>
-          ) : (
-            <ul className="xfer-links">
-              {order
-                .filter((k) => preview.links.counts[k] > 0)
-                .map((k) => (
-                  <li key={k} data-class={k}>
-                    <b>{preview.links.counts[k]}</b> {t.links[k]}
-                  </li>
-                ))}
-            </ul>
-          )}
-          {preview.links.flagged.length > 0 && (
-            <details className="xfer-flagged">
-              <summary>{t.flaggedTitle}</summary>
-              <ul>
-                {preview.links.flagged.slice(0, 50).map((f, i) => (
-                  <li key={i}>
-                    <code>{f.target}</code> <span className="muted small">{`${f.sourcePath}:${f.line}`}</span>
+      {/* Members, pages and links, folded so the dialog stays short (0.2.7); problems and warnings stay in view. */}
+      <details className="xfer-details">
+        <summary>{t.details}</summary>
+        {ws && (
+          <div className="xfer-section">
+            {ws.members && ws.members.length > 1 && (
+              <ul className="xfer-members">
+                {ws.members.map((m) => (
+                  <li key={m.userId}>
+                    <span>{m.displayName}</span> <span className="badge badge-muted">{t.roles[m.role]}</span>
                   </li>
                 ))}
               </ul>
+            )}
+            <p className="muted small">{t.you(t.roles[ws.role])}</p>
+          </div>
+        )}
+
+        {preview.pages.length > 0 && (
+          <div className="xfer-section">
+            <h3 className="label">{t.pagesHeading}</h3>
+            {preview.direction === "between_workspaces" && preview.source.workspace && <p className="muted small">{t.fromWorkspace(preview.source.workspace.name)}</p>}
+            <ul className="xfer-list">
+              {preview.direction === "to_workspace"
+                ? preview.pages.map((p) => (
+                    <li key={p.path} title={p.path}>
+                      {p.title} <span className="muted small">{p.path}</span>
+                    </li>
+                  ))
+                : preview.pages.map((p) => <li key={p.pageId}>{p.title}</li>)}
+            </ul>
+            {preview.direction === "to_workspace" && preview.attachments.length > 0 && <p className="muted small">{t.attachmentsHeading(preview.attachments.length)}</p>}
+            {preview.direction === "between_workspaces" && preview.attachments.length > 0 && <p className="muted small">{t.attachmentsCopied(preview.attachments.length)}</p>}
+          </div>
+        )}
+
+        {preview.pages.length > 0 && (
+          <div className="xfer-section">
+            <h3 className="label">{t.linksHeading}</h3>
+            {total === 0 ? (
+              <p className="muted">{t.noLinks}</p>
+            ) : (
+              <ul className="xfer-links">
+                {order
+                  .filter((k) => preview.links.counts[k] > 0)
+                  .map((k) => (
+                    <li key={k} data-class={k}>
+                      <b>{preview.links.counts[k]}</b> {t.links[k]}
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {preview.links.flagged.length > 0 && (
+              <details className="xfer-flagged">
+                <summary>{t.flaggedTitle}</summary>
+                <ul>
+                  {preview.links.flagged.slice(0, 50).map((f, i) => (
+                    <li key={i}>
+                      <code>{f.target}</code> <span className="muted small">{`${f.sourcePath}:${f.line}`}</span>
+                    </li>
+                  ))}
+                </ul>
             </details>
           )}
         </div>
       )}
+
+      </details>
 
       {preview.problems.length > 0 && (
         <ul className="xfer-problems" role="alert">

@@ -6,6 +6,7 @@ import type { NodeViewRenderer } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { EditorContext } from "./context.ts";
 import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
+import { linkHint, pageLinkOpens } from "./link-open.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -113,6 +114,15 @@ export const inlineRawView = (ctx: EditorContext): NodeViewRenderer => ({ node }
 
 const labelOf = (target: string, label: string | null, fragment: string | null): string => label ?? (fragment ? `${target}#${fragment}` : target);
 
+/** The app's tooltip on a link chip (`Tooltip.tsx`): where it goes, and how to open it when it can be opened. */
+export function setLinkTip(dom: HTMLElement, text: string, hint: string | null): void {
+  dom.removeAttribute("title");
+  if (text) dom.setAttribute("data-tip", text);
+  else dom.removeAttribute("data-tip");
+  if (hint) dom.setAttribute("data-tip-detail", hint);
+  else dom.removeAttribute("data-tip-detail");
+}
+
 /** `[[Target]]` as a chip. Clicking (or Enter on it) opens the resolved page. */
 export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: initial }) => {
   let node = initial;
@@ -127,16 +137,19 @@ export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: i
     dom.dataset["state"] = result.state;
     dom.dataset["target"] = result.state === "resolved" ? result.path : "";
     const t = ctx.strings;
-    dom.title = result.state === "resolved" ? result.path : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : t.linkUnresolved(target);
+    setLinkTip(dom, result.state === "resolved" ? result.path : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : t.linkUnresolved(target), result.state === "resolved" ? linkHint(t, "page") : null);
     dom.setAttribute("aria-label", `${dom.textContent} (${t.linkState[result.state]})`);
   };
   const open = (event: Event): void => {
     event.preventDefault();
     event.stopPropagation();
     const result = ctx.lookup().resolve(node.attrs["target"] as string);
-    if (result.state === "resolved") ctx.openPage(result.path);
+    if (result.state === "resolved") ctx.openPage(result.path, event instanceof MouseEvent ? pageLinkOpens(event) : undefined);
   };
   dom.addEventListener("click", open);
+  dom.addEventListener("auxclick", (event) => event.button === 1 && open(event));
+  // A middle-click on Linux pastes the selection where it lands; never in the document.
+  dom.addEventListener("mousedown", (event) => event.button === 1 && event.preventDefault());
   dom.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") open(event);
   });
@@ -151,7 +164,7 @@ export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: i
       paint();
       return true;
     },
-    stopEvent: (event) => event.type === "click" || event.type === "mousedown",
+    stopEvent: (event) => event.type === "click" || event.type === "auxclick" || event.type === "mousedown",
     destroy: () => void ctx.views.delete(handle),
   };
 };
@@ -169,13 +182,16 @@ export const embedView = (ctx: EditorContext): NodeViewRenderer => ({ node }) =>
     chip.textContent = `${ctx.strings.embed}${labelOf(target, node.attrs["label"] as string | null, node.attrs["fragment"] as string | null)}`;
     chip.dataset["state"] = result.state;
     chip.dataset["target"] = result.state === "resolved" ? result.path : "";
+    setLinkTip(chip, result.state === "resolved" ? result.path : "", result.state === "resolved" ? linkHint(ctx.strings, "page") : null);
   };
   const open = (event: Event): void => {
     event.preventDefault();
     const result = ctx.lookup().resolve(target);
-    if (result.state === "resolved") ctx.openPage(result.path);
+    if (result.state === "resolved") ctx.openPage(result.path, event instanceof MouseEvent ? pageLinkOpens(event) : undefined);
   };
   chip.addEventListener("click", open);
+  chip.addEventListener("auxclick", (event) => event.button === 1 && open(event));
+  chip.addEventListener("mousedown", (event) => event.button === 1 && event.preventDefault());
   chip.addEventListener("keydown", (event) => {
     if (event.key === "Enter") open(event);
   });

@@ -97,30 +97,30 @@ describe("useTreeDnd across spaces", () => {
     expect(currentSpaceDrag()).toBeNull();
   });
 
-  it("the other tree lights the target row inside, accepts the drop as a copy, and says so by the pointer", () => {
+  it("the other tree lights the target row inside, accepts the drop as a move, and says so by the pointer", () => {
     render(<Trees drops={[]} />);
     const data = transfer();
     fireEvent.dragStart(screen.getByTestId("a"), { dataTransfer: data });
     const over = at(screen.getByTestId("p"), "dragOver", data);
     expect(over.defaultPrevented).toBe(true);
-    expect(data.dropEffect).toBe("copy");
+    expect(data.dropEffect).toBe("move");
     expect(screen.getByTestId("p").getAttribute("data-drop")).toBe("inside");
-    expect(currentSpaceHover()).toMatchObject({ text: "Copy to W…", to: { kind: "workspace", parentId: "p" } });
+    expect(currentSpaceHover()).toMatchObject({ text: "Move to W…", to: { kind: "workspace", parentId: "p" } });
   });
 
-  it("Alt/Option makes it a move, at the hover and at the drop", () => {
+  it("Alt/Option makes it a copy, at the hover and at the drop", () => {
     const drops: SpaceDrop[] = [];
     const off = onSpaceDrop((d) => drops.push(d));
     render(<Trees drops={[]} />);
     const data = transfer();
     fireEvent.dragStart(screen.getByTestId("b"), { dataTransfer: data });
     at(screen.getByTestId("top"), "dragOver", data, { altKey: true });
-    expect(data.dropEffect).toBe("move");
-    expect(currentSpaceHover()?.text).toBe("Move to W…");
+    expect(data.dropEffect).toBe("copy");
+    expect(currentSpaceHover()?.text).toBe("Copy to W…");
     const drop = at(screen.getByTestId("top"), "drop", data, { altKey: true });
     off();
     expect(drop.defaultPrevented).toBe(true);
-    expect(drops).toEqual([{ drag: { from: LOCAL, row: "b", ids: ["b"], title: "b" }, to: { kind: "workspace", server: "s", workspace: "w", parentId: null }, mode: "move" }]);
+    expect(drops).toEqual([{ drag: { from: LOCAL, row: "b", ids: ["b"], title: "b" }, to: { kind: "workspace", server: "s", workspace: "w", parentId: null }, mode: "copy" }]);
     expect(screen.getByTestId("top").hasAttribute("data-drop")).toBe(false);
     expect(currentSpaceDrag()).toBeNull();
   });

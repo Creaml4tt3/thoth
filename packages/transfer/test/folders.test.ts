@@ -45,7 +45,7 @@ describe("transfers with folders", () => {
   let w: World;
   afterEach(() => w?.close());
 
-  it("Private → Workspace: folders become folder pages with the right parents; a move deletes the pages, not the folders", async () => {
+  it("Private → Workspace: folders become folder pages with the right parents; a move deletes the pages and the emptied folders", async () => {
     w = await world({ "Work/A/x.md": "# x\n", "Work/A/B/y.md": "# y\n", "Work/z.md": "# z\n" });
     const preview = await w.engine.previewToWorkspace({ server: w.server, workspace: w.ws.id, parentId: null, mode: "move", paths: ["Work/A/x.md", "Work/A/B/y.md", "Work/z.md"], attachments: false, base: "" });
     expect(preview.folders).toEqual(["Work", "Work/A", "Work/A/B"]);
@@ -61,11 +61,27 @@ describe("transfers with folders", () => {
     expect(byTitle.get("x")!.parentId).toBe(byTitle.get("A")!.id);
     expect(byTitle.get("y")!.parentId).toBe(byTitle.get("B")!.id);
     expect(byTitle.get("z")!.parentId).toBe(byTitle.get("Work")!.id);
-    // The pages left the vault; the folders stayed (now empty).
+    // The pages left the vault, and the folders with them.
     expect(await w.exists("Work/A/x.md")).toBe(false);
-    expect(await readdir(join(w.root, "Work/A"))).toEqual(["B"]);
+    expect(await readdir(w.root)).not.toContain("Work");
     // Folder pages are not mapped to vault pages.
     expect((await w.vault.listExternalLocations()).length).toBe(3);
+  });
+
+  it("Private → Workspace: a moved folder goes with its pages, empty sub-folders too; one holding a kept page stays", async () => {
+    w = await world({ "Work/x.md": "# x\n", "Work/y.md": "# y\n" });
+    await w.vault.createFolder("Work/Empty");
+    const sent = await w.engine.start(await w.engine.previewToWorkspace({ server: w.server, workspace: w.ws.id, parentId: null, mode: "move", paths: ["Work/x.md", "Work/y.md"], attachments: false, base: "" }));
+    expect(sent.state).toBe("done");
+    expect(await readdir(w.root)).not.toContain("Work");
+
+    await w.close();
+    w = await world({ "Work/x.md": "# x\n", "Work/y.md": "# y\n" });
+    const preview = await w.engine.previewToWorkspace({ server: w.server, workspace: w.ws.id, parentId: null, mode: "move", paths: ["Work/x.md", "Work/y.md"], attachments: false, base: "" });
+    const engine = await w.restart({ checkpoint: async (p) => (p === "after:commit" ? w.write("Work/y.md", "# y\n\nEdited meanwhile.\n") : undefined) });
+    const kept = await engine.start(preview);
+    expect(kept.state).toBe("destination_committed_source_cleanup_pending");
+    expect(await readdir(join(w.root, "Work"))).toEqual(["y.md"]);
   });
 
   it("Workspace → Private: a folder page becomes a vault folder holding its pages; a move deletes all three on the server", async () => {

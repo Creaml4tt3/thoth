@@ -33,6 +33,8 @@ export type TabTarget =
 /** How a page is opened: in the current tab (the default), or in a new one. */
 export interface OpenOptions {
   newTab?: boolean;
+  /** A new window of this Private Space showing only it (Shift+click a page link, 0.2.7); a new tab where there are no windows. */
+  newWindow?: boolean;
 }
 
 export interface Tab {

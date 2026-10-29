@@ -47,6 +47,7 @@ trade-off.
 | [0035](0035-delete-pages-and-folders.md) | Deleting pages and folders: the system Trash, and workspace pages for everyone | Proposed 2026-10-29 |
 | [0036](0036-download-a-page-as-markdown.md) | Download a page as Markdown: the host's Save as, the browser's download | Proposed 2026-10-29 |
 | [0037](0037-sidebar-new-items-folder-colors-and-switcher.md) | New items from the trees' menus, the target folder, folder colors and the space switcher | Accepted 2026-10-29 |
+| [0038](0038-moving-between-spaces-and-opening-links.md) | Moving pages between spaces, and opening links in a page | Proposed 2026-10-29 |
 
 Template: [0000-template.md](0000-template.md).
 

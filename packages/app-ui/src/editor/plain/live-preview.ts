@@ -14,6 +14,10 @@ import { isTextColor, parseWikiInner, type TextColor } from "@thoth/editor";
 import type { EditorContext } from "../context.ts";
 import type { LinkTarget } from "../links.ts";
 import { kindClass, kindIcon, kindLabel } from "../callout-kinds.ts";
+import { linkHint, pageLinkOpens, webLinkOpens } from "../link-open.ts";
+import { openWebLink } from "../web-links.ts";
+import { isPasteLinkHref } from "../paste-links.ts";
+import { setLinkTip } from "../node-views.ts";
 
 /** Dispatched when the link index changes, so chips re-resolve. */
 export const refreshLinks = StateEffect.define<null>();
@@ -46,10 +50,13 @@ class WikilinkChip extends WidgetType {
     const t = this.ctx.strings;
     chip.textContent = this.embed ? `${t.embed}${this.label}` : this.label;
     chip.setAttribute("role", "link");
-    chip.title = this.result.state === "resolved" ? this.result.path : this.result.state === "ambiguous" ? t.linkAmbiguous(this.result.candidates.join(", ")) : t.linkUnresolved(this.target);
+    const result = this.result;
+    setLinkTip(chip, result.state === "resolved" ? result.path : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : t.linkUnresolved(this.target), result.state === "resolved" ? linkHint(t, "page") : null);
+    // Left or middle button (0.2.7: Cmd/Ctrl or the middle button opens a new tab, Shift a new window).
     chip.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 && event.button !== 1) return;
       event.preventDefault();
-      if (this.result.state === "resolved") this.ctx.openPage(this.result.path);
+      if (result.state === "resolved") this.ctx.openPage(result.path, pageLinkOpens(event));
     });
     return chip;
   }
@@ -237,6 +244,16 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
     else style(open.to, node.from, "text-color", { "data-color": open.color! });
     for (const [from, to] of [[open.from, open.to], [node.from, node.to]] as const) if (!onActiveLine(from)) replace(from, to);
   };
+  // A web link carries its address, for Cmd/Ctrl+click, a middle-click and the tooltip (0.2.7, `link-open.ts`).
+  const webLink = (node: SyntaxNodeRef) => {
+    const url = node.name === "Link" ? node.node.getChild("URL") : node.name === "Autolink" ? node.node.getChild("URL") : node.node;
+    if (!url) return;
+    const raw = doc.sliceString(url.from, url.to);
+    const href = /^www\./i.test(raw) ? `https://${raw}` : raw;
+    if (!isPasteLinkHref(href)) return;
+    const text = node.name === "Link" ? { from: node.from + 1, to: (node.node.getChildren("LinkMark")[1]?.from ?? node.from + 1) } : { from: url.from, to: url.to };
+    style(text.from, text.to, "md-weblink", { "data-href": href, "data-tip": href, "data-tip-detail": linkHint(ctx.strings, "web") });
+  };
   // Markers shown as labels: lezer reads `[!kind]` as a link, whose brackets must not be hidden on their own.
   const markers: [number, number][] = [];
   const inMarker = (pos: number) => markers.some(([from, to]) => pos >= from && pos < to);
@@ -274,6 +291,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
           if (marks.length >= 2) style(marks[0]!.to, marks[marks.length - 1]!.from, "md-highlight");
         }
         if (name === "FencedCode" || name === "CodeBlock" || name === "Frontmatter") return false;
+        if (name === "Link" || name === "Autolink" || (name === "URL" && node.node.parent?.name !== "Link" && node.node.parent?.name !== "Image")) webLink(node);
         if (onActiveLine(node.from)) return;
 
         switch (name) {
@@ -353,5 +371,18 @@ export function livePreview(ctx: EditorContext): Extension {
     },
     { decorations: (v) => v.decorations },
   );
-  return [plugin, EditorView.contentAttributes.of({ "data-preview": "live" })];
+  const open = (event: MouseEvent): boolean => {
+    const link = webLinkOpens(event) && event.target instanceof Element ? event.target.closest<HTMLElement>("[data-href]") : null;
+    if (!link) return false;
+    event.preventDefault();
+    openWebLink(ctx, link.dataset["href"]!);
+    return true;
+  };
+  const clicks = EditorView.domEventHandlers({
+    // Before CodeMirror moves the cursor: a link opened with Cmd/Ctrl or the middle button leaves the text alone.
+    mousedown: (event) => (event.button === 1 || ((event.metaKey || event.ctrlKey) && !event.shiftKey)) && event.target instanceof Element && event.target.closest("[data-href]") !== null && (event.preventDefault(), true),
+    click: open,
+    auxclick: (event) => event.button === 1 && open(event),
+  });
+  return [plugin, clicks, EditorView.contentAttributes.of({ "data-preview": "live" })];
 }

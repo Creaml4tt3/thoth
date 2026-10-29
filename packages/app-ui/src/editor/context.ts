@@ -3,6 +3,7 @@ import type { LinkSuggester } from "./link-suggest.ts";
 import type { PageLinks } from "./link-previews.ts";
 import type { ImageFile, PageMedia } from "./media.ts";
 import { en, type EditorStrings } from "../strings/en.ts";
+import type { OpenOptions } from "../tabs/model.ts";
 
 /** Something a node view can ask to re-render when the link index changes. */
 export interface Refreshable {
@@ -14,7 +15,7 @@ export interface EditorContext {
   lookup(): LinkLookup;
   /** Pages to offer after `[[`, ranked for the open page. */
   suggester(): LinkSuggester;
-  openPage(path: string): void;
+  openPage(path: string, options?: OpenOptions): void;
   views: Set<Refreshable>;
   /** Text for the editors' menus and node views (fixed for the editor's lifetime). */
   strings: EditorStrings;
@@ -33,7 +34,7 @@ export interface EditorContext {
 export function createEditorContext(init: {
   lookup(): LinkLookup;
   suggester(): LinkSuggester;
-  openPage(path: string): void;
+  openPage(path: string, options?: OpenOptions): void;
   strings?: EditorStrings;
   client?: "desktop" | "web";
   links?: PageLinks;

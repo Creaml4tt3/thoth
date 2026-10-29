@@ -23,7 +23,8 @@ import { importEvent, transferEvent, watchAgentRuns } from "../features/notifica
 import { createUpdateService } from "../features/updates/service.ts";
 import { waitingReviews } from "../features/mascot/hooks.ts";
 import { createWindowPresence } from "../platform/notifier.ts";
-import { MAIN_WINDOW } from "./windows.ts";
+import { MAIN_WINDOW, newWindowId } from "./windows.ts";
+import { initialTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
 import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
@@ -351,7 +352,15 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         await vault.reconcile();
         bump();
       },
-      openPage: (path, options) => tabs.open({ kind: "page", path }, options),
+      openPage: (path, options) => {
+        if (!options?.newWindow || !windows) return tabs.open({ kind: "page", path }, options);
+        // A page link opened with Shift (0.2.7): a window of its own, as a browser does.
+        const id = newWindowId();
+        void windows
+          .open({ id, root: connection.root, tabs: serializeTabs(initialTabs([{ kind: "page", path }])) })
+          .then(() => rememberWindow(id, connection.root))
+          .catch(() => tabs.open({ kind: "page", path }, { newTab: true }));
+      },
       openSettings: (section) => tabs.open(section ? { kind: "settings", section } : { kind: "settings" }),
       tabs,
       servers,
@@ -391,7 +400,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       watchError,
       windowId,
     }),
-    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, recent, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone],
+    [platform, connection, vault, options, importService, revision, reveal, registerFlush, flushAll, recent, switchVault, watchError, bump, servers, transfers, agents, assistant, tabs, openFolder, notifications, notificationPrefs, openNotification, updates, windowId, alone, windows],
   );
 
   return (

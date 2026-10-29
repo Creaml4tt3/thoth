@@ -79,8 +79,8 @@ describe("the payload", () => {
 });
 
 describe("modeAtDrop", () => {
-  it("is Copy, or Move while Alt/Option is held", () => {
-    expect(modeAtDrop({ altKey: false })).toBe("copy");
-    expect(modeAtDrop({ altKey: true })).toBe("move");
+  it("is Move, or Copy while Alt/Option is held", () => {
+    expect(modeAtDrop({ altKey: false })).toBe("move");
+    expect(modeAtDrop({ altKey: true })).toBe("copy");
   });
 });

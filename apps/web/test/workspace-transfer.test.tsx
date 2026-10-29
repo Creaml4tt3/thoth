@@ -53,7 +53,7 @@ describe("between two workspaces in the web client", () => {
     expect(live(browser.notes)).toHaveLength(1);
   });
 
-  it("moves a page dragged onto the other workspace (Alt), through the dialog", async () => {
+  it("moves a page dragged onto the other workspace, through the dialog", async () => {
     const browser = await signedIn();
     const source = await openNotes(browser);
     const target = within(tree()).getByRole("treeitem", { name: /^Archive/ });
@@ -61,7 +61,6 @@ describe("between two workspaces in the web client", () => {
     const data = { setData: (k: string, v: string) => void store.set(k, v), getData: (k: string) => store.get(k) ?? "", effectAllowed: "", dropEffect: "", types: [] as string[] };
     const fire = (type: "dragEnter" | "dragOver" | "drop") => {
       const event = createEvent[type](target, { dataTransfer: data });
-      Object.defineProperty(event, "altKey", { value: true });
       fireEvent(target, event);
       return event;
     };

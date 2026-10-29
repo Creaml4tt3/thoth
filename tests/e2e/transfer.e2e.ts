@@ -58,6 +58,7 @@ test.describe("transfers", () => {
     scratch = await realpath(await mkdtemp(join(tmpdir(), "thoth-e2e-xfer-")));
     const vault = join(scratch, "Vault");
     await mkdir(join(vault, "Projects"), { recursive: true });
+    await mkdir(join(vault, "Inbox"), { recursive: true });
     await writeFile(join(vault, "Projects", "Plan.md"), "# Plan\n\nSee [[Notes]] and [[Nowhere]].\n");
     await writeFile(join(vault, "Projects", "Notes.md"), "# Notes\n\nBack to [[Plan]].\n");
     bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, dataDir: join(scratch, "data") } });
@@ -134,7 +135,7 @@ test.describe("transfers", () => {
     await page.getByRole("group", { name: "Pages in Studio" }).getByRole("treeitem", { name: "Plan" }).click();
     await page.getByRole("button", { name: "Move to Private Space…" }).click();
     const back = page.getByRole("dialog", { name: "Move “Plan” to your Private Space" });
-    await back.getByRole("textbox", { name: /Folder in your Private Space/ }).fill("Inbox");
+    await back.getByRole("combobox", { name: "Put the pages" }).selectOption("Inbox");
     await expect(back.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await back.getByRole("button", { name: "Move", exact: true }).click();
     await expect(back.getByRole("status")).toContainText("1 page was moved to your Private Space.", { timeout: 20_000 });
@@ -214,7 +215,7 @@ test.describe("transfers", () => {
     await remoteNotes.click();
     await page.getByRole("button", { name: "Copy to Private Space…" }).click();
     const copy = page.getByRole("dialog", { name: "Copy “Notes” to your Private Space" });
-    await copy.getByRole("textbox", { name: /Folder in your Private Space/ }).fill("Projects");
+    await copy.getByRole("combobox", { name: "Put the pages" }).selectOption("Projects");
     await expect(copy.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await copy.getByRole("button", { name: "Copy", exact: true }).click();
     await expect(copy.getByRole("status")).toContainText("copied to your Private Space", { timeout: 20_000 });

@@ -41,7 +41,7 @@ export type SpaceDestination = { kind: "private"; folder: string } | { kind: "wo
 export interface SpaceDrop {
   drag: SpaceDrag;
   to: SpaceDestination;
-  /** Copy, unless Alt/Option was held at the drop. */
+  /** Move, unless Alt/Option was held at the drop (a copy). */
   mode: "copy" | "move";
 }
 
@@ -124,8 +124,8 @@ export function refusalText(refusal: SpaceRefusal, access: WorkspaceAccess, s: S
   }
 }
 
-/** Copy, or Move while Alt/Option is held. */
-export const modeAtDrop = (event: { altKey: boolean }): "copy" | "move" => (event.altKey ? "move" : "copy");
+/** Move, or Copy while Alt/Option is held (0.2.7; it was the other way round before). */
+export const modeAtDrop = (event: { altKey: boolean }): "copy" | "move" => (event.altKey ? "copy" : "move");
 
 export function encodeSpaceDrag(drag: SpaceDrag): string {
   return JSON.stringify(drag);

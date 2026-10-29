@@ -129,7 +129,7 @@ to be confirmed:
    in one opens the `from_workspace` dialog. The dialog is prefilled with the pages, the workspace or folder, and
    the mode, and it still shows the preview (members, link classes, problems, warnings) and waits for the person to
    confirm. Copy is chosen unless Alt/Option is held at the drop; then Move is chosen, and the dialog's mode radio
-   shows it. Within one tree, drag and drop is unchanged. A workspace page dragged onto another workspace is not
+   shows it. (Since 0.2.7, ADR-0038: Move is chosen, and Alt/Option chooses Copy.) Within one tree, drag and drop is unchanged. A workspace page dragged onto another workspace is not
    accepted: there is no transfer between workspaces.
 2. **Where it lands.** The engine and protocol already take a destination parent page (`ToWorkspaceRequest.parentId`)
    and a vault folder (`FromWorkspaceRequest.folder`), so nothing in the protocol or the server changed.

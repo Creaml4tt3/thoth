@@ -3,7 +3,7 @@
  * (`drag.ts`) in the real desktop UI on the real Rust host, against the reference server on PostgreSQL.
  *
  * A drop across spaces opens the transfer dialog prefilled; only the dialog's confirmation transfers. A page dragged
- * onto a workspace arrives with its exact text and stays (copy) or leaves (move, Alt/Option); a folder travels as a
+ * onto a workspace arrives with its exact text and leaves (move) or, with Alt/Option, stays (copy); a folder travels as a
  * folder page with its pages, inside the page it was dropped on; a workspace page dropped on the Private Space lands
  * at its top level or in the folder under the pointer. A viewer workspace and an export-restricted source refuse with
  * no indicator and say why. A drag within a tree still only reorders. Screenshots, light and dark, go to
@@ -121,18 +121,20 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await rm(scratch, { recursive: true, force: true });
   });
 
-  test("a page dragged onto a workspace: dialog with preview, then the exact text on the server; Alt/Option moves", async ({ page }) => {
+  test("a page dragged onto a workspace: dialog with preview, then the exact text on the server; Alt/Option copies", async ({ page }) => {
     const s = await seedServer();
     await signInWithToken(page, s.token);
     await expect(workspaceRow(page, "Studio")).toBeVisible();
 
     // Copy: the workspace row lights, the pointer says what a drop would do, and the drop only opens the dialog.
     const copy = await startDrag(page, localTree(page).getByRole("treeitem", { name: "Diary", exact: true }));
+    await page.keyboard.down("Alt");
     await copy.over(workspaceRow(page, "Studio"), 0.5);
     await expectIndicator(page, ["Studio: inside"]);
     await expect(badge(page)).toHaveText("Copy to Studio…");
     await shot(page, "drag-to-workspace-light");
     await copy.drop();
+    await page.keyboard.up("Alt");
     const dialog = page.getByRole("dialog", { name: "Copy 1 page to a workspace" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("combobox", { name: "Workspace" })).toHaveValue(new RegExp(s.studio));
@@ -148,15 +150,13 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     expect(await markdownOf(s.token, s.studio, diary.id)).toBe(`---\nthoth_id: ${diary.id}\n---\n${DIARY}`);
     expect(await readFile(join(vault, "Diary.md"), "utf8")).toContain("Written here, ไทย too.");
 
-    // Move: Alt/Option held at the drop chooses Move in the dialog.
+    // Move: a plain drop chooses Move in the dialog (0.2.7).
     const notes = localTree(page).getByRole("treeitem", { name: "Notes", exact: true });
     if (!(await notes.isVisible())) await localTree(page).getByRole("treeitem", { name: "Projects" }).click();
     const move = await startDrag(page, notes);
-    await page.keyboard.down("Alt");
     await move.over(workspaceRow(page, "Studio"), 0.5);
     await expect(badge(page)).toHaveText("Move to Studio…");
     await move.drop();
-    await page.keyboard.up("Alt");
     const moving = page.getByRole("dialog", { name: "Move 1 page to a workspace" });
     await expect(moving.getByRole("radio", { name: /^Move/ })).toBeChecked();
     await moving.getByRole("button", { name: "Move", exact: true }).click();
@@ -178,10 +178,12 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
 
     // The folder Projects onto the page Board: the parent is chosen in the dialog.
     const folder = await startDrag(page, localTree(page).getByRole("treeitem", { name: "Projects" }));
+    await page.keyboard.down("Alt");
     await folder.over(pagesIn(page, "Studio").getByRole("treeitem", { name: "Board" }), 0.5);
     await expectIndicator(page, ["Board: inside"]);
     await shot(page, "drag-to-workspace-dark");
     await folder.drop();
+    await page.keyboard.up("Alt");
     const dialog = page.getByRole("dialog", { name: "Copy 2 pages to a workspace" });
     await expect(dialog.getByRole("combobox", { name: "Put the pages" })).toHaveValue(board);
     await expect(dialog.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has left this computer yet.");
@@ -196,13 +198,15 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
 
     // Roadmap onto the Private Space header: its top level.
     const out = await startDrag(page, pagesIn(page, "Studio").getByRole("treeitem", { name: "Roadmap" }));
+    await page.keyboard.down("Alt");
     await out.over(header(page), 0.5);
     await expect(header(page)).toHaveAttribute("data-drop", "inside");
     await expect(badge(page)).toHaveText("Copy to Private Space…");
     await shot(page, "drag-to-private-dark");
     await out.drop();
+    await page.keyboard.up("Alt");
     const back = page.getByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    await expect(back.getByRole("textbox", { name: /Folder in your Private Space/ })).toHaveValue("");
+    await expect(back.getByRole("combobox", { name: "Put the pages" })).toHaveValue("");
     await expect(back.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await shot(page, "dialog-to-private-dark");
     await back.getByRole("button", { name: "Copy", exact: true }).click();
@@ -214,12 +218,14 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     // Roadmap again, onto the folder Projects in light: the folder is the destination.
     await page.emulateMedia({ colorScheme: "light" });
     const into = await startDrag(page, pagesIn(page, "Studio").getByRole("treeitem", { name: "Roadmap" }));
+    await page.keyboard.down("Alt");
     await into.over(localTree(page).getByRole("treeitem", { name: "Projects" }), 0.5);
     await expectIndicator(page, ["Projects: inside"]);
     await shot(page, "drag-to-private-light");
     await into.drop();
+    await page.keyboard.up("Alt");
     const again = page.getByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    await expect(again.getByRole("textbox", { name: /Folder in your Private Space/ })).toHaveValue("Projects");
+    await expect(again.getByRole("combobox", { name: "Put the pages" })).toHaveValue("Projects");
     await shot(page, "dialog-to-private-light");
     await again.getByRole("button", { name: "Copy", exact: true }).click();
     await expect(again.getByRole("status")).toContainText("copied to your Private Space", { timeout: 20_000 });

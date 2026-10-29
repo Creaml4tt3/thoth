@@ -1,7 +1,7 @@
 /**
  * Copy and move between two workspaces (ADR-0006, amendment of 2026-10-27) in the real desktop UI on the real Rust
  * host, against the reference server on PostgreSQL: copy by a page's menu, move by dragging onto the other workspace
- * (Alt/Option), and a refused drop that says why. The pages arrive with the destination's own IDs and the links
+ * (a plain drop; Alt/Option would copy), and a refused drop that says why. The pages arrive with the destination's own IDs and the links
  * between them rewritten; a move deletes the originals only after the destination has them. Screenshots, light and
  * dark, go to tests/.tmp/workspace-transfer/.
  */
@@ -144,19 +144,17 @@ test.describe("copy and move between two workspaces", () => {
     expect((await serverTree(s.token, s.studio)).map((n) => n.title).sort()).toEqual(["Milestones", "Roadmap"]);
   });
 
-  test("move by dragging onto the other workspace with Alt/Option: the originals leave only after the copy is there", async ({ page }) => {
+  test("move by dragging onto the other workspace: the originals leave only after the copy is there", async ({ page }) => {
     const s = await seedServer();
     await page.emulateMedia({ colorScheme: "dark" });
     await signInWithToken(page, s.token);
     await workspaceRow(page, "Studio").click();
     const drag = await startDrag(page, pagesIn(page, "Studio").getByRole("treeitem", { name: "Roadmap" }));
-    await page.keyboard.down("Alt");
     await drag.over(workspaceRow(page, "Archive"), 0.5);
     await expectIndicator(page, ["Archive: inside"]);
     await expect(badge(page)).toHaveText("Move to Archive…");
     await shot(page, "drag-move-dark");
     await drag.drop();
-    await page.keyboard.up("Alt");
     const dialog = page.getByRole("dialog", { name: "Move “Roadmap” to another workspace" });
     await expect(dialog.getByRole("radio", { name: /^Move/ })).toBeChecked();
     await expect(dialog.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to Archive yet.");

@@ -18,6 +18,7 @@ import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode }
 import { PlainEditor } from "./plain/PlainEditor.tsx";
 import { pageKey } from "./session-pool.ts";
 import { usePaneActive } from "../tabs/pane.ts";
+import type { OpenOptions } from "../tabs/model.ts";
 
 function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: boolean; onChange(mode: EditorMode): void }) {
   const t = useStrings().editor;
@@ -133,8 +134,8 @@ export interface PageFrameProps {
   /** Wikilink resolution; null leaves every link unresolved. */
   loadLinks: (() => Promise<{ lookup: LinkLookup; suggester: LinkSuggester }>) | null;
   linkTick: number;
-  /** Wikilinks open through here. */
-  openLink(path: string): void;
+  /** Wikilinks open through here; `options` from the click (a new tab or window, 0.2.7). */
+  openLink(path: string, options?: OpenOptions): void;
   /** Opens the copy that Keep both made. */
   openCopy(ref: string): void;
   readOnlyNote: string;
@@ -178,7 +179,7 @@ export function PageFrame(props: PageFrameProps) {
       createEditorContext({
         lookup: () => lookup.current,
         suggester: () => suggester.current,
-        openPage: (p) => open.current(p),
+        openPage: (p, o) => open.current(p, o),
         strings: t,
         client,
         media: () => media.current,

@@ -60,3 +60,5 @@
 .mode-option:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--thoth-bg-active); }
 .mode-option[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
 .plain-editor .wikilink[data-state="resolved"] { color: var(--thoth-link); }
+/* A web link in Plain mode (0.2.7): Cmd/Ctrl+click or a middle-click opens it; the tooltip says so. */
+.plain-editor .md-weblink { color: var(--thoth-link); text-decoration: underline; text-decoration-color: var(--thoth-ink-faint); text-underline-offset: 3px; }

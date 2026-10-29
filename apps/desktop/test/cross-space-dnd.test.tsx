@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * Drag and drop between the Private Space tree and a workspace tree (ADR-0006, amendment of 2026-10-26). A drop
- * across spaces opens the transfer dialog prefilled (direction, pages, workspace or folder, Copy or with Alt/Option
- * Move); the dialog still previews and waits for the person. Refused targets show no indicator and say why. Within
+ * across spaces opens the transfer dialog prefilled (direction, pages, workspace or folder, Move or with Alt/Option
+ * Copy; 0.2.7); the dialog still previews and waits for the person. Refused targets show no indicator and say why. Within
  * one tree a drag works as before.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -106,9 +106,9 @@ const workspaceSelect = (dialog: HTMLElement) => within(dialog).getByRole("combo
 const radio = (dialog: HTMLElement, name: string) => within(dialog).getByRole("radio", { name: new RegExp(`^${name}`) }) as HTMLInputElement;
 
 describe("Private Space → workspace by drag and drop", () => {
-  it("a page dropped on a workspace row opens the dialog for that workspace, Copy chosen; it copies only after confirming", async () => {
+  it("a page dropped on a workspace row opens the dialog for that workspace, Copy chosen with Alt/Option; it copies only after confirming", async () => {
     const { app, servers, ws, local, list } = await start();
-    const drag = hold(row(local, "Plan"), row(list, /^Studio/));
+    const drag = hold(row(local, "Plan"), row(list, /^Studio/), { alt: true });
     expect(drag.accepted).toBe(true);
     expect(drag.effect).toBe("copy");
     expect(row(list, /^Studio/).getAttribute("data-drop")).toBe("inside");
@@ -135,7 +135,7 @@ describe("Private Space → workspace by drag and drop", () => {
   it("with Alt/Option held over a workspace page, it lands inside that page and Move is chosen", async () => {
     const { app, ws, board, local, list } = await start();
     const group = await expand(app, list);
-    const drag = hold(row(local, "Diary"), row(group, "Board"), { alt: true });
+    const drag = hold(row(local, "Diary"), row(group, "Board"));
     expect(drag.effect).toBe("move");
     expect(row(group, "Board").getAttribute("data-drop")).toBe("inside");
     expect(badge()?.textContent).toBe("Move to Studio…");
@@ -153,7 +153,7 @@ describe("Private Space → workspace by drag and drop", () => {
 
   it("a folder travels as a folder page with its pages", async () => {
     const { app, ws, local, list } = await start();
-    hold(row(local, "Projects"), row(list, /^Studio/)).drop();
+    hold(row(local, "Projects"), row(list, /^Studio/), { alt: true }).drop();
     const dialog = await screen.findByRole("dialog", { name: "Copy 2 pages to a workspace" });
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Copy" }));
@@ -170,7 +170,7 @@ describe("Private Space → workspace by drag and drop", () => {
     await app.user.click(within(local).getByRole("checkbox", { name: "Select Plan" }));
     await app.user.click(within(local).getByRole("checkbox", { name: "Select Diary" }));
     const plan = within(local).getByRole("checkbox", { name: "Select Plan" }).closest("label")!;
-    hold(plan, row(list, /^Studio/)).drop();
+    hold(plan, row(list, /^Studio/), { alt: true }).drop();
     expect(await screen.findByRole("dialog", { name: "Copy 2 pages to a workspace" })).toBeTruthy();
   });
 
@@ -198,13 +198,13 @@ describe("workspace → Private Space by drag and drop", () => {
   it("a workspace page dropped on the Private Space header opens the dialog for its top level", async () => {
     const { app, roadmap, local, list } = await start();
     const group = await expand(app, list);
-    const drag = hold(row(group, "Roadmap"), header());
+    const drag = hold(row(group, "Roadmap"), header(), { alt: true });
     expect(drag.accepted).toBe(true);
     expect(header().getAttribute("data-drop")).toBe("inside");
     expect(badge()?.textContent).toBe("Copy to Private Space…");
     drag.drop();
     const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    expect((within(dialog).getByRole("textbox", { name: /Folder in your Private Space/ }) as HTMLInputElement).value).toBe("");
+    expect((within(dialog).getByRole("combobox", { name: "Put the pages" }) as HTMLSelectElement).value).toBe("");
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(within(dialog).getByRole("status").textContent).toContain("copied to your Private Space"), { timeout: 10_000 });
@@ -219,7 +219,7 @@ describe("workspace → Private Space by drag and drop", () => {
     await app.user.click(row(local, "Projects"));
     const spec = await within(local).findByRole("treeitem", { name: "Spec" });
     // Over a page in the folder: the folder row is lit, not the page.
-    const drag = hold(row(group, "Roadmap"), spec, { alt: true });
+    const drag = hold(row(group, "Roadmap"), spec);
     expect(drag.accepted).toBe(true);
     expect(drag.effect).toBe("move");
     expect(row(local, "Projects").getAttribute("data-drop")).toBe("inside");
@@ -227,7 +227,7 @@ describe("workspace → Private Space by drag and drop", () => {
     expect(badge()?.textContent).toBe("Move to Private Space…");
     drag.drop();
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" });
-    expect((within(dialog).getByRole("textbox", { name: /Folder in your Private Space/ }) as HTMLInputElement).value).toBe("Projects");
+    expect((within(dialog).getByRole("combobox", { name: "Put the pages" }) as HTMLSelectElement).value).toBe("Projects");
     expect(radio(dialog, "Move").checked).toBe(true);
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
@@ -262,7 +262,7 @@ describe("workspace → another workspace by drag and drop (amendment of 2026-10
     const { app, servers, ws, archive, roadmap, list } = await start();
     servers.writeAsOther(ws, { title: "Milestones", markdown: "# Milestones\n", parentId: roadmap.id });
     const group = await expand(app, list);
-    const drag = hold(row(group, "Roadmap"), row(list, /^Archive/), { alt: true });
+    const drag = hold(row(group, "Roadmap"), row(list, /^Archive/));
     expect(drag.accepted).toBe(true);
     expect(drag.effect).toBe("move");
     expect(row(list, /^Archive/).getAttribute("data-drop")).toBe("inside");
@@ -290,7 +290,7 @@ describe("workspace → another workspace by drag and drop (amendment of 2026-10
     const group = await expand(app, list);
     await app.user.click(row(list, /^Archive/));
     const target = await within(list).findByRole("treeitem", { name: "Shelf" });
-    hold(row(group, "Roadmap"), target).drop();
+    hold(row(group, "Roadmap"), target, { alt: true }).drop();
     const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to another workspace" });
     await waitFor(() => expect(parentSelect(dialog).value).toBe(shelf.id));
   });

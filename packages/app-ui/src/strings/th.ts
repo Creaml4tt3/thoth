@@ -43,6 +43,8 @@ export const th: Strings = {
     preservedTitle: "เก็บไว้ตามต้นฉบับ",
     linkAmbiguous: (candidates) => `ตรงกับหลายหน้า: ${candidates}`,
     linkUnresolved: (target) => `ยังไม่มีหน้าชื่อ "${target}"`,
+    linkOpenPage: (mod) => `คลิกเพื่อเปิด · ${mod}+คลิก: แท็บใหม่ · Shift+คลิก: หน้าต่างใหม่`, // REVIEW
+    linkOpenWeb: (mod) => `${mod}+คลิกเพื่อเปิด`, // REVIEW
     linkState: { resolved: "เปิดหน้า", ambiguous: "ลิงก์ที่ตรงกับหลายหน้า", unresolved: "ลิงก์ที่ยังไม่มีหน้า" },
     embed: "ฝัง · ",
     done: "เสร็จแล้ว",
@@ -667,7 +669,7 @@ export const th: Strings = {
     parent: "วางหน้าไว้",
     topLevel: "ที่ระดับบนสุด",
     under: (title) => `ข้างใน “${title}”`,
-    folder: "โฟลเดอร์ใน Private Space (เว้นว่างไว้เพื่อวางที่ระดับบนสุด)",
+    folder: "วางหน้าไว้ที่", // REVIEW
     folderHint: "หน้าที่เคยย้ายออกไปจาก Private Space นี้จะกลับไปที่เดิม ถ้าที่นั้นยังว่างอยู่",
     mode: "ต้นฉบับจะเป็นอย่างไร",
     copy: { title: "คัดลอก", hint: "ต้นฉบับอยู่ที่เดิม สำเนาจะมีตัวตนของตัวเอง" },
@@ -697,6 +699,7 @@ export const th: Strings = {
     },
     linksIn: "มองจากฝั่งเวิร์กสเปซ",
     flaggedTitle: "ลิงก์ที่จะใช้ไม่ได้ที่ปลายทาง",
+    details: "รายละเอียด: สมาชิก หน้า และลิงก์", // REVIEW
     noLinks: "หน้าเหล่านี้ไม่มีลิงก์",
     nothingLeaves: "ยังไม่มีอะไรออกจากคอมพิวเตอร์เครื่องนี้",
     nothingLeavesFrom: "ยังไม่มีอะไรถูกเขียนลงใน Private Space",

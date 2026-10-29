@@ -925,7 +925,7 @@ export class TransferEngine {
         continue;
       }
       if (item.state !== "committed") continue;
-      if (item.folder) continue; // a moved folder stays in the vault (it may be empty now); nothing is deleted for it
+      if (item.folder) continue; // removed below, once its pages are gone
       let next: PageItem;
       await this.point(`before:delete:${i}`);
       try {
@@ -942,6 +942,10 @@ export class TransferEngine {
       await this.point(`after:delete:${i}`);
       record = await this.save(withItem(record, i, next), `deleted:${i}`);
     }
+    // A moved folder leaves with its pages: innermost first, and only while empty (a kept page, or anything put in it
+    // since, keeps it). Empty sub-folders inside go with it; they never travel (ADR-0006, amendment of 2026-10-26).
+    const folders = record.items.filter((i) => i.folder && i.state === "committed").sort((a, b) => b.sourcePath.length - a.sourcePath.length);
+    for (const item of folders) await this.vault.removeEmptyFolder(item.sourcePath).catch(() => undefined);
     const pending = record.items.some((i) => i.state === "cleanup_pending");
     return this.save({ ...record, state: pending ? "destination_committed_source_cleanup_pending" : "done", error: null });
   }

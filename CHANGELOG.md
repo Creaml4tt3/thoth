@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- Moving pages between your Private Space and a workspace: a shorter dialog, with the details folded away and a list of your folders instead of a typed path. Dragging to another space now moves; hold Alt/Option to copy. A moved folder no longer stays behind empty.
+
+### Added
+
+- Open links with Cmd/Ctrl+click or a middle-click: a page link in a new tab, a web link in your browser. Shift+click opens a page link in a new window. Hover a link to see how.
+
 ## [0.2.6] - 2026-10-29
 
 ### Added

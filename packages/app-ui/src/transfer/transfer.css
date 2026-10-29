@@ -40,3 +40,12 @@
 .xfer-pending { animation: thoth-rise-in var(--thoth-dur-base) var(--thoth-ease-out); display: grid; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); margin: var(--thoth-space-2); border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); font: var(--thoth-text-small); }
 .xfer-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .xfer-pending li { display: flex; justify-content: space-between; gap: var(--thoth-space-2); align-items: center; }
+
+/* Copy or move (0.2.7): two compact choices side by side; the chosen one's hint is the line under them. */
+.xfer-modes { display: flex; flex-wrap: wrap; gap: var(--thoth-space-2); }
+.xfer-mode { display: flex; align-items: center; gap: var(--thoth-space-2); padding: 6px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.xfer-mode:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); }
+.xfer-mode input { accent-color: var(--thoth-accent); margin: 0; }
+.xfer-details { display: grid; gap: var(--thoth-space-4); }
+.xfer-details > summary { cursor: pointer; color: var(--thoth-ink-secondary); font: var(--thoth-text-small); }
+.xfer-details[open] > summary { margin-bottom: var(--thoth-space-2); }
