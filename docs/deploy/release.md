@@ -35,15 +35,17 @@ downloads page; nothing needs to change on the old one.
 
 ## Releasing a version
 
-0. **Changelog and post, before the tag** (ADR-0026; the website build and the release job fail without them):
+A release spans two repositories (ADR-0039): this one holds the changelog, the versions, the tag and the build; the
+website's private repository (`Creaml4tt3/thoth-site`) holds the post, its picture and the downloads list.
+
+0. **Changelog, before the tag** (ADR-0026; the release job fails without it):
    - In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - yyyy-mm-dd`, keep only what ships, add a new
      `[Unreleased]` only when there is something in it (the parser refuses an empty section), and update the compare links at the bottom.
      Entries are user-facing, one line each, under Added, Changed or Fixed; links only as absolute `https` URLs.
    - Do the same in `CHANGELOG.th.md`: same versions, dates, sections and number of entries (a test checks).
-   - Publish the version's post in both languages, `apps/site/src/content/blog/{en,th}/thoth-<x-y-z>.md`: set
-     `date`, remove `draft: true`, check every line against the build being released. Its picture goes to
-     `apps/site/public/blog/images/thoth-<x-y-z>.png` (1200×630).
-   - Check the notes: `node scripts/release-notes.ts vx.y.z` prints what the GitHub release will say.
+   - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`).
+   - Check the notes: `node scripts/release-notes.ts vx.y.z --no-post` prints what the GitHub release will say
+     (without `--no-post`, the post link appears once the website serves the post).
 1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json` and
    `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`). The publish step
    refuses installers whose version differs from `tauri.conf.json`.
@@ -57,27 +59,14 @@ downloads page; nothing needs to change on the old one.
    Faster builds: a tag's run can only use the Rust caches saved on `main`, and only a run on `main` saves them. When
    `Cargo.lock` or the Rust version changed, first warm them: `gh workflow run release-desktop.yml --ref main -f
    publish=false` (it builds and tests, uploads nothing), then tag once it has finished.
-3. Copy the published `latest.json` into the website's download manifest
-   (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website, with the new post, the
-   changelog entry and the feeds.
-4. **Tell search engines (IndexNow), after Vercel has deployed.** One-time setup: make a key (8 to 128 letters,
-   digits or dashes, for example `uuidgen | tr -d '\n'`), and add it to the Vercel project as the environment
-   variable `INDEXNOW_KEY` (Production). The build then publishes `/<key>.txt`, which is how the engines check the
-   site is yours ([IndexNow protocol](https://www.indexnow.org/documentation), "Option 1"). Never commit the key.
-   Each release, once the deploy is live:
-
-   ```sh
-   INDEXNOW_KEY='<the key>' node apps/site/scripts/indexnow.ts --dry-run   # checks the key file, counts the URLs
-   INDEXNOW_KEY='<the key>' node apps/site/scripts/indexnow.ts             # one POST to api.indexnow.org
-   ```
-
-   It sends every URL of the live `sitemap.xml`; 200 or 202 is success. IndexNow engines (Bing, Yandex and others)
-   share submissions with each other; Google does not use IndexNow, so it relies on the sitemap in Search Console.
-   Do not run it more than once per deploy (429 means too often).
-5. **New post pictures:** after adding `apps/site/public/blog/images/<slug>.png`, run
-   `pnpm --filter @thoth/site webp` (needs `cwebp`) and commit the `.webp` next to it; the pages serve the WebP
-   and keep the PNG for Open Graph. If a post was edited after its date, set `updated:` in both languages.
-6. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
+3. **The website**, in its repository, once the workflow has passed: publish the post, copy the published
+   `latest.json` into its download manifest, and push; Vercel deploys the website with the new post, the
+   changelog entry (read from this repository's `main`) and the feeds. Then tell search engines (IndexNow); the
+   steps are in the website's `RELEASING.md`.
+4. **Link the post from the GitHub release:** once the post is live, run the `github-release` job again
+   (Actions → the tag's run → Re-run jobs → "GitHub release notes", or `gh run rerun <run id> --job <job id>`). It
+   edits the release, and the notes now link the post.
+5. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
    edit v0.1.3 --notes-file notes.md`.
 
 ## Windows
@@ -153,7 +142,6 @@ the same workflow through Tauri's signing environment variables.
 
 ## Cost
 
-GitHub Actions minutes on a private repository count macOS at 10× and Windows at 2× (the free plan has 2,000
-minutes a month). The first release took about 9 minutes each for macOS and Linux, so about 100 billed
-minutes while the repository is private. Public repositories build for free.
+GitHub Actions builds this public repository for free (ADR-0039). While it was private, macOS minutes counted 10×
+and Windows 2× against the free plan's 2,000 a month.
 R2 has no charge for downloads (egress); storage is free up to 10 GB a month.

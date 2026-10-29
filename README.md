@@ -15,7 +15,6 @@ AI agents run on CLI tools you already have.
 ```text
 apps/
   desktop/            React UI (Vite) and src-tauri/, the Tauri 2 shell
-  site/               Landing site: static HTML in English and Thai (pnpm build:website)
 crates/
   thoth-host/         Rust host: scoped VaultFs/SqlDriver/SourceHost, watcher, stdio test harness
 packages/

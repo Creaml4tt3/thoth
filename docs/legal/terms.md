@@ -6,7 +6,7 @@
 > hosted demo; the Thoth software is licensed separately under Apache-2.0 (see
 > `LICENSE`). Keep the Thai version (`terms.th.md`) in step.
 >
-> `apps/site` publishes this file at `/terms/` and the Thai version at
+> The website (ADR-0039) publishes this file at `/terms/` and the Thai version at
 > `/th/terms/`, without this block and without HTML comments.
 <!-- repo-only:end -->
 

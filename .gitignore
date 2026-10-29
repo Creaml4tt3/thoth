@@ -7,8 +7,11 @@ coverage/
 .DS_Store
 # Test scratch output
 tests/.tmp/
-# Showcase video intermediates (design/video/README.md)
+# Local scratch (pictures, briefs)
 .tmp/
+# Local environment files and Vercel links: they hold tokens
+.env*.local
+.vercel/
 # Local AI agent skills, steering and worktrees (large, per-developer; never commit)
 .claude/skills/
 .claude/worktrees/

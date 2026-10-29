@@ -5,7 +5,7 @@
 > it. It describes what the code does (ADR-0013, ADR-0014, ADR-0015); if the
 > code changes, update this notice and its Thai version (`privacy.th.md`).
 >
-> `apps/site` publishes this file at `/privacy/` and the Thai version at
+> The website (ADR-0039) publishes this file at `/privacy/` and the Thai version at
 > `/th/privacy/`. The site leaves out this block (between the `repo-only`
 > markers) and every HTML comment, so owner notes in comments stay in the repo.
 <!-- repo-only:end -->

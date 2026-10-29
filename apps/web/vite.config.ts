@@ -15,7 +15,7 @@ export function serverOrigin(raw: string): string {
 }
 
 /**
- * With a GA4 ID, includes the site's `/analytics.js` (consent banner + GA4, apps/site/src/client/analytics.ts), so
+ * With a GA4 ID, includes the site's `/analytics.js` (consent banner + GA4, from the website's repository, ADR-0039), so
  * one consent choice covers the site and the web client. Without one, no analytics script is referenced.
  */
 function analytics(ga4Id: string | undefined): Plugin {

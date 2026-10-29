@@ -10,14 +10,12 @@
     "apps/server/test-db/**/*.ts",
     "tests/**/*.ts",
     "protocol/conformance/**/*.ts",
-    "design/video/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": [
     "**/node_modules/**",
     "tests/fixtures/**",
     "apps/desktop/**",
-    "apps/site/**",
     "apps/web/**",
     "packages/app-ui/**"
   ]

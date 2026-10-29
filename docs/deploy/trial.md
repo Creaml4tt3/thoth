@@ -8,7 +8,7 @@ Domains used below (change them when you buy your own domain):
 
 | What | Address |
 | --- | --- |
-| Website (`apps/site`, with `apps/web` at `/app/`) | `https://thothnotes.com` |
+| Website (the private `thoth-site` repository, with `apps/web` at `/app/`; ADR-0039) | `https://thothnotes.com` |
 | API (`apps/server`) | `https://api.thothnotes.com` |
 
 > Status (2026-10-24): every step is done and live. The Neon project is
@@ -225,48 +225,33 @@ redirect means none does).
 ## 6. Website project
 
 The website at `thothnotes.com` is **one static deployment** made of two
-builds (ADR-0015):
+builds (ADR-0015): the pages, blog and changelog from the website's own private
+repository (`Creaml4tt3/thoth-site`, ADR-0039), and the web client from
+`apps/web` in this repository, served at `/app/`.
 
-| Path | Built from | Output |
-| --- | --- | --- |
-| `/`, `/th/`, `/privacy/`, `/terms/`, `/th/privacy/`, `/th/terms/`, `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`, `/analytics.js` | `apps/site` | `apps/site/dist` |
-| `/app/` | `apps/web` (Vite `base: "/app/"`) | `apps/web/dist`, copied to `apps/site/dist/app` |
-| `/media/` (showcase video, poster, captions) | rendered into `apps/site/public/media/` | copied by the site build |
+The website's build clones this repository and reads from it:
+- `CHANGELOG.md` and `CHANGELOG.th.md`, through `scripts/changelog.ts`;
+- the privacy and terms pages in `docs/legal/`;
+- `design/brand/` and `@thoth/ui` (`packages/ui`);
+- `apps/web`, which it builds into its `/app/`.
 
-`pnpm build:website` (`scripts/build-website.ts`) builds the site, builds
-`apps/web` when it exists, and copies `apps/web/dist` into
-`apps/site/dist/app`. Without `apps/web` it builds the site alone.
+Its Vercel project (`thoth-site`), its headers, its Content Security Policy and
+its environment variables are described in that repository.
 
-The project is connected to the repository with root directory `apps/site`
-and deploys on every push to `main`. `apps/site/vercel.json` installs only the
-site and the web client (`--filter @thoth/site... --filter @thoth/web...`) and
-runs `pnpm build:website`. To deploy from your computer instead (from
-`apps/site`): `vercel link --project thoth-site`, `vercel pull
---environment=production`, `vercel build --prod`, `vercel deploy --prebuilt
---prod`.
-
-1. Create a second Vercel project from this repository with **root directory
-   `apps/site`**. `apps/site/vercel.json` sets the install and build commands
-   (both run from the repository root), the output directory `dist`, and:
-   - security headers on every path (HSTS, `nosniff`, referrer and permissions
-     policy);
-   - the site's Content Security Policy as a header, including
-     `frame-ancestors 'none'`, which browsers ignore in a meta tag. `/app/` is
-     left out so the web client can send its own CSP (its `connect-src` needs
-     the trial API);
-   - `X-Robots-Tag: noindex` on `/app/` (`robots.txt` also disallows it);
-   - a one-year immutable cache for hashed files in `/assets/` and
-     `/app/assets/`, 30 days for `/media/`, 5 minutes for `/analytics.js`
-     (its name is fixed, so the web client can include it);
-   - a rewrite of `/app/*` to `/app/index.html` for the web client's routes.
+1. Create the website's Vercel project from the website's repository. Besides the pages, it serves `/app/` and must:
+   - leave `/app/` out of the site's Content Security Policy, so the web client
+     sends its own (its `connect-src` needs the trial API);
+   - send `X-Robots-Tag: noindex` on `/app/` (`robots.txt` also disallows it);
+   - rewrite `/app/*` to `/app/index.html` for the web client's routes.
 2. Add the domain `thothnotes.com`.
 3. Environment variables (Production), in the Vercel dashboard only:
 
    | Variable | Value |
    | --- | --- |
-   | `SITE_URL` | `https://thothnotes.com` (the default; canonical URLs, `hreflang`, the sitemap and JSON-LD use it) |
    | `VITE_GA4_ID` | the GA4 measurement ID (`G-…`). Leave unset for no analytics code at all |
    | `VITE_DEFAULT_SERVER` | `https://api.thothnotes.com` (read by the web client's build) |
+
+   The website's own variables are listed in its repository.
 
 4. In Google Analytics (property settings):
    - **Data retention**: 2 months, to match the privacy notice;

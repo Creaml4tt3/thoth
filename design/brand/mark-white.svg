@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Thoth">
   <title>Thoth</title>
-  <!-- Moon Ibis (concept A in design/concepts/logo-directions-sheet.png, traced): the lunar disc with the ibis head, neck and decurved beak cut out as negative space; the beak tapers to a sharp point on the rim. -->
+  <!-- Moon Ibis (concept A of the logo directions, traced): the lunar disc with the ibis head, neck and decurved beak cut out as negative space; the beak tapers to a sharp point on the rim. -->
   <defs>
     <mask id="thoth-moon-ibis">
       <circle cx="256" cy="256" r="224" fill="#fff"/>

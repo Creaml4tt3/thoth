@@ -1,5 +1,5 @@
 /**
- * CHANGELOG.md (Keep a Changelog 1.1.0): parsed for the website's changelog page (apps/site), the GitHub release
+ * CHANGELOG.md (Keep a Changelog 1.1.0): parsed for the website's changelog page (its own repository, ADR-0039), the GitHub release
  * notes (`scripts/release-notes.ts`) and the `notes` link in `latest.json` (`scripts/publish-downloads.ts`).
  *
  * The format, strictly:
