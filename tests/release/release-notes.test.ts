@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { changelogUrl, parseChangelog, postSlug, releaseNotes, versionAnchor } from "../../scripts/changelog.ts";
+import { postPublished } from "../../scripts/release-notes.ts";
 import { REPO } from "../ports/harness.ts";
 
 const read = (path: string) => readFileSync(join(REPO, path), "utf8");
@@ -96,10 +97,19 @@ describe("release notes for a GitHub release", () => {
     expect(() => releaseNotes(SAMPLE, "Unreleased", { post: false })).toThrow();
   });
 
-  it("the script prints the notes of a real version, linking its published post", () => {
-    const out = execFileSync(process.execPath, [join(REPO, "scripts", "release-notes.ts"), "v0.1.3"], { encoding: "utf8" });
+  it("link the post only when the website serves it (ADR-0039: the posts live in the site's own repository)", async () => {
+    const asked: string[] = [];
+    const answer = (status: number) => (async (url: string | URL | Request) => (asked.push(String(url)), new Response(null, { status }))) as typeof fetch;
+    expect(await postPublished("0.2.6", answer(200))).toBe(true);
+    expect(asked).toEqual(["https://thothnotes.com/blog/thoth-0-2-6/"]);
+    expect(await postPublished("v0.2.6", answer(404))).toBe(false);
+    expect(await postPublished("0.2.6", (async () => Promise.reject(new TypeError("offline"))) as typeof fetch)).toBe(false);
+  });
+
+  it("the script prints the notes of a real version; --no-post leaves the post out without asking the website", () => {
+    const out = execFileSync(process.execPath, [join(REPO, "scripts", "release-notes.ts"), "v0.1.3", "--no-post"], { encoding: "utf8" });
     expect(out).toMatch(/^### Added\n\n- The desktop app for Windows x64/);
-    expect(out).toContain("(https://thothnotes.com/blog/thoth-0-1-3/)");
+    expect(out).not.toContain("/blog/");
     expect(out).toContain("(https://thothnotes.com/changelog/#v0-1-3)");
     expect(() => execFileSync(process.execPath, [join(REPO, "scripts", "release-notes.ts"), "9.9.9"], { stdio: "pipe" })).toThrow();
   });
