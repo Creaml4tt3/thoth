@@ -21,6 +21,10 @@
 # Before anything is published, the Windows host tests run (`test-windows`): the native host's Windows file
 # layer and Agent Hub process control (cargo test), and the shared port contract against it (Vitest).
 #
+# Caches: a tag's run may read only its own caches and those of `main`, so a cache saved by a tag is never used again.
+# The Rust caches are saved on `main` only (a run by hand, publish off: `gh workflow run release-desktop.yml --ref main
+# -f publish=false`), and every release restores them; without one, a release builds everything from scratch.
+#
 # Actions are pinned to commit SHAs of releases at least three weeks old.
 name: Release desktop
 
@@ -93,6 +97,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ matrix.name }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - run: pnpm install --frozen-lockfile
       # thoth-mcp, the MCP server other apps start (ADR-0021), goes next to the app's program (Tauri externalBin).
@@ -160,6 +165,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: windows-test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: pnpm install --frozen-lockfile
       - name: Host tests (file layer, Agent Hub, servers)
         run: cargo test -p thoth-host -p thoth-mcp

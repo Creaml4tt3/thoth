@@ -53,6 +53,10 @@ downloads page; nothing needs to change on the old one.
    without a tag; untick "Upload to R2" to build only. On a tag, the `github-release` job then creates (or edits)
    the GitHub release with `scripts/release-notes.ts` as its body, and `latest.json` carries
    `notes: https://thothnotes.com/changelog/#v<x-y-z>` for the app's "What's new" link.
+
+   Faster builds: a tag's run can only use the Rust caches saved on `main`, and only a run on `main` saves them. When
+   `Cargo.lock` or the Rust version changed, first warm them: `gh workflow run release-desktop.yml --ref main -f
+   publish=false` (it builds and tests, uploads nothing), then tag once it has finished.
 3. Copy the published `latest.json` into the website's download manifest
    (`apps/site/src/content/downloads.ts`), commit and push: Vercel deploys the website, with the new post, the
    changelog entry and the feeds.
