@@ -55,6 +55,9 @@ website's private repository (`Creaml4tt3/thoth-site`) holds the post, its pictu
    without a tag; untick "Upload to R2" to build only. On a tag, the `github-release` job then creates (or edits)
    the GitHub release with `scripts/release-notes.ts` as its body, and `latest.json` carries
    `notes: https://thothnotes.com/changelog/#v<x-y-z>` for the app's "What's new" link.
+   The same tag runs `server-image.yml`, which pushes the server image `ghcr.io/creaml4tt3/thoth-server` (`x.y.z`,
+   `x.y`, and `latest` unless the tag is a pre-release) for amd64 and arm64. Self-hosters pull it
+   (`docs/deploy/self-host.md`). For an older tag: `gh workflow run server-image.yml -f tag=vx.y.z`.
 
    Faster builds: a tag's run can only use the Rust caches saved on `main`, and only a run on `main` saves them. When
    `Cargo.lock` or the Rust version changed, first warm them: `gh workflow run release-desktop.yml --ref main -f

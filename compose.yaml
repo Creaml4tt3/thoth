@@ -1,7 +1,7 @@
-# Thoth reference server with PostgreSQL.
+# Thoth reference server with PostgreSQL. No checkout needed: download this file and run it.
 #
 #   export THOTH_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=')"   # any strong password; not stored in this repo
-#   podman compose up --build -d
+#   docker compose up -d          # or: podman compose up -d. From a checkout, `up --build -d` builds it instead.
 #
 # The server listens on http://127.0.0.1:${THOTH_PORT:-8080}. Create a user, workspace and token with the
 # admin CLI (see apps/server/README.md). Nothing secret is committed: the password comes from the environment.
@@ -26,10 +26,11 @@ services:
     # Not published: only the server reaches the database.
 
   server:
+    # The published image; THOTH_VERSION pins a release (0.2.7, or 0.2 for its newest fix). `up --build` builds this checkout instead.
+    image: ${THOTH_IMAGE:-ghcr.io/creaml4tt3/thoth-server:${THOTH_VERSION:-latest}}
     build:
       context: .
       dockerfile: apps/server/Containerfile
-    image: localhost/thoth-server:dev
     restart: unless-stopped
     depends_on:
       postgres:

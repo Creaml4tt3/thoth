@@ -13,6 +13,8 @@
   <a href="https://thothnotes.com/blog/">Blog</a>
 </p>
 
+<p align="center"><b>English</b> · <a href="README.th.md">ภาษาไทย</a></p>
+
 <p align="center">
   <a href="https://github.com/Creaml4tt3/thoth/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Creaml4tt3/thoth?label=release"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
@@ -82,51 +84,32 @@ too (Settings → Servers).
 
 ## Host your own server
 
-The server is the same one that runs the demo, without its limits: Node.js 24 and PostgreSQL, packaged as a
-container image. The quickest start runs both with Podman or Docker:
+The server is the same one that runs the demo, without its limits: one container (Node.js 24) and PostgreSQL 14 or
+newer. Images for `linux/amd64` and `linux/arm64` are on `ghcr.io/creaml4tt3/thoth-server`. Docker and Podman both
+work, and no checkout is needed:
 
 ```sh
-git clone https://github.com/Creaml4tt3/thoth && cd thoth
-export THOTH_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=')"   # keep it somewhere safe; it is not stored in the repo
-podman compose up --build -d          # or: docker compose up --build -d
+mkdir thoth && cd thoth
+curl -fsSLO https://raw.githubusercontent.com/Creaml4tt3/thoth/main/compose.yaml
+printf 'THOTH_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env && chmod 600 .env   # keep it: the database is created with it
+docker compose up -d                                   # or: podman compose up -d
+docker compose exec server node src/cli.ts create-user --name "Ada"                 # prints the user ID
+docker compose exec server node src/cli.ts create-workspace --name "Team"           # prints the workspace ID
+docker compose exec server node src/cli.ts add-member --workspace <workspace-id> --user <user-id> --role owner
+docker compose exec server node src/cli.ts create-token --user <user-id> --out /data/ada.token
 ```
 
-The server listens on `http://127.0.0.1:8080`. Create a user, a workspace and an access token with the admin CLI:
+The server listens on `http://127.0.0.1:8080`. In the desktop app, open **Settings → Servers → Add server** with
+its address and the token (`docker compose cp server:/data/ada.token .`).
 
-```sh
-podman compose exec server node src/cli.ts create-user --name "Ada"                 # prints the user ID
-podman compose exec server node src/cli.ts create-workspace --name "Team"           # prints the workspace ID
-podman compose exec server node src/cli.ts add-member --workspace <workspace-id> --user <user-id> --role owner
-podman compose exec server node src/cli.ts create-token --user <user-id> --out /data/ada.token
-```
+**Already have PostgreSQL and a sign-in provider** (Keycloak, Authentik, Zitadel, Entra ID, Google, GitHub)? Use
+[`compose.external.yaml`](compose.external.yaml) with a `server.env` from [`server.env.example`](server.env.example):
+the server alone, and people sign in with their own accounts.
 
-Then, in the desktop app, open **Settings → Servers → Add server** with the server's address and the token.
-
-### With your own PostgreSQL and sign-in provider
-
-If you already run PostgreSQL 14 or newer (managed or not) and an OpenID Connect provider (Keycloak, Authentik,
-Zitadel, Entra ID...), run only the server container:
-
-```sh
-cp server.env.example server.env && chmod 600 server.env   # fill in DATABASE_URL, PUBLIC_URL and OIDC_*; git-ignored
-podman compose -f compose.external.yaml up --build -d       # or: docker compose -f compose.external.yaml up --build -d
-```
-
-Register `https://<your PUBLIC_URL>/auth/callback/oidc` as the redirect URI at your provider, and put an HTTPS
-reverse proxy in front of `127.0.0.1:8080`. The server creates its tables on first start, so the database user needs
-the right to `CREATE EXTENSION pg_trgm` (or an administrator runs it once). People then add the server in the desktop
-app and sign in with your provider; no access tokens to hand out.
-
-Without containers it is a plain Node 24 app: `pnpm install --prod --filter @thoth/server...`, export the same
-variables, then `node apps/server/src/main.ts`.
-
-For Google or GitHub sign-in, HTTPS, limits, CORS, rate limiting and backups, read
-**[`apps/server/README.md`](apps/server/README.md)**. The hosted demo's own setup (Vercel and Neon) is in
+**[The self-hosting guide](docs/deploy/self-host.md)** covers both setups step by step, plus HTTPS (Caddy, nginx),
+scheduled maintenance, backups and restore, upgrades and pinning a version, and a web client for your server. Every
+setting is in [`apps/server/README.md`](apps/server/README.md); the hosted demo's own setup (Vercel and Neon) is in
 [`docs/deploy/trial.md`](docs/deploy/trial.md).
-
-The web client is built for one server, fixed when it is built:
-`VITE_DEFAULT_SERVER=https://api.example.org pnpm --filter @thoth/web build` writes it to `apps/web/dist`, to serve
-under `/app/` (see [`docs/deploy/trial.md`](docs/deploy/trial.md), "Website project").
 
 ## Build from source
 

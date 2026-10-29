@@ -28,7 +28,7 @@ You need Podman running (`podman machine start`). From the repository root:
 ```sh
 # A database password that exists only in this shell; it is never written to the repo.
 export THOTH_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=')"
-podman compose up --build -d
+podman compose up --build -d    # builds this checkout; docs/deploy/self-host.md pulls the published image instead
 curl http://127.0.0.1:8080/api/v1/capabilities     # proves the server is up
 ```
 

@@ -32,7 +32,8 @@ async function freePort(): Promise<number> {
   });
 }
 
-const composeEnv = (port: number) => ({ ...process.env, THOTH_DB_PASSWORD: password, THOTH_PORT: String(port) });
+// THOTH_IMAGE: the image built from this checkout below, never the published one.
+const composeEnv = (port: number) => ({ ...process.env, THOTH_DB_PASSWORD: password, THOTH_PORT: String(port), THOTH_IMAGE: "localhost/thoth-server:dev" });
 
 async function podman(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<string> {
   const { stdout } = await run("podman", args, { env, cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
