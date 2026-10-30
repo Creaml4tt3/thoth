@@ -23,6 +23,7 @@ pub mod agent;
 #[cfg(unix)]
 mod at;
 pub mod data_dir;
+pub mod diagnostics;
 pub mod error;
 mod handles;
 pub mod links;
