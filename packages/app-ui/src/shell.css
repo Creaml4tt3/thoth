@@ -399,4 +399,5 @@ div.tree-empty > p { margin: 0 0 6px; }
 .field-error { margin: 0; padding-inline-start: 8px; border-inline-start: 3px solid var(--thoth-danger); font: var(--thoth-text-small); color: var(--thoth-ink-primary); }
 .input[aria-invalid="true"] { border-color: var(--thoth-danger); }
 .feedback-log { margin: 4px 0 0; max-height: 12rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8em; color: var(--thoth-ink-secondary); }
+.feedback-form [role="status"]:empty { margin: 0; }
 .feedback-mail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }

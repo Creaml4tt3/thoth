@@ -273,26 +273,26 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", diagn
           )}
           {diagnostics && (
             <>
-              <label className="ws-check">
-                <input type="checkbox" name="include-log" checked={withLog} disabled={busy} onChange={(e) => tickLog(e.target.checked)} />
-                <span>{t.includeLog}</span>
-              </label>
-              {withLog && (
+              {/* One grid item, so the status line takes no gap of the form's while it is empty. */}
+              <div>
+                <label className="ws-check">
+                  <input type="checkbox" name="include-log" checked={withLog} disabled={busy} onChange={(e) => tickLog(e.target.checked)} />
+                  <span>{t.includeLog}</span>
+                </label>
+                {/* Mounted, empty, before the box is ticked, so "Reading the app log…" is a change a screen reader announces.
+                    The preview stays outside it, so its lines are never read out. */}
+                <p role="status" className="ws-check-hint share-note">
+                  {!withLog ? "" : log.state === "loading" ? t.logLoading : log.state === "failed" ? t.logFailed : log.state === "loaded" && log.lines.length === 0 ? t.noLog : ""}
+                </p>
+              </div>
+              {sentLog && (
                 <div className="ws-check-hint feedback-details">
-                  {/* Announced while the box is ticked; the preview stays outside, so its lines are never read out. */}
-                  <p role="status" className="share-note">
-                    {log.state === "loading" ? t.logLoading : log.state === "failed" ? t.logFailed : log.state === "loaded" && log.lines.length === 0 ? t.noLog : ""}
+                  <p id={id.logHint} className="share-note">
+                    {t.logHint}
                   </p>
-                  {sentLog && (
-                    <>
-                      <p id={id.logHint} className="share-note">
-                        {t.logHint}
-                      </p>
-                      <pre tabIndex={0} className="mono feedback-log" aria-describedby={id.logHint}>
-                        {sentLog.join("\n")}
-                      </pre>
-                    </>
-                  )}
+                  <pre tabIndex={0} className="mono feedback-log" aria-describedby={id.logHint}>
+                    {sentLog.join("\n")}
+                  </pre>
                 </div>
               )}
             </>

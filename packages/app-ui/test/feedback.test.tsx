@@ -221,8 +221,12 @@ describe("Include recent app log (ADR-0040)", () => {
     let resolve!: (lines: string[]) => void;
     const { user } = withLog(() => new Promise((r) => (resolve = r)));
     await write(user);
+    // The status line is there, empty, before the tick, so the loading text is announced as a change.
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("");
     await user.click(screen.getByRole("checkbox", { name: LOG }));
-    expect(screen.getByRole("status").textContent).toBe("Reading the app log…");
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status.textContent).toBe("Reading the app log…");
     expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
     resolve(LINES);
     await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
