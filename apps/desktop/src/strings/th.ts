@@ -163,6 +163,10 @@ export const th: DesktopStrings = {
     intro: "เจอปัญหา มีไอเดีย หรือมีคำถาม ส่งมาได้จากที่นี่ จะส่งเฉพาะสิ่งที่คุณพิมพ์ และเวอร์ชันของแอปกับระบบหากคุณเปิดไว้", // REVIEW
     send: "ส่งความคิดเห็น…", // REVIEW
     email: (address: string) => `หรือเขียนถึง ${address}`, // REVIEW
+    saveDiagnostics: "บันทึกข้อมูลวินิจฉัย…", // REVIEW
+    diagnosticsSaved: "บันทึกแล้ว", // REVIEW
+    diagnosticsNotSaved: "ไม่ได้บันทึก", // REVIEW
+    diagnosticsFailed: "บันทึกข้อมูลวินิจฉัยไม่สำเร็จ", // REVIEW
   },
 
   updates: {

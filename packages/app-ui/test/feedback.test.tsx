@@ -129,3 +129,93 @@ it("waits for the server lookup before offering Send", async () => {
   resolve(sender().target);
   await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeTruthy());
 });
+
+describe("Include recent app log (ADR-0040)", () => {
+  const LINES = ["2026-10-30T10:00:00Z INFO thoth: started", "2026-10-30T10:00:01Z WARN host: command failed code=io"];
+  const LOG = "Include recent app log";
+  function withLog(diagnostics: () => Promise<string[]>, impl?: (input: FeedbackRequest) => Promise<void>) {
+    const { target, send } = sender(impl);
+    const user = userEvent.setup();
+    render(<FeedbackDialog target={() => Promise.resolve(target)} context={CONTEXT} diagnostics={diagnostics} onClose={() => undefined} />);
+    return { user, send };
+  }
+  const write = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByText("Sent to Thoth demo server.");
+    await user.type(screen.getByRole("textbox", { name: "Your message" }), "It froze.");
+  };
+
+  it("log_box_absent_without_diagnostics_prop", async () => {
+    setup(sender().target);
+    await screen.findByText("Sent to Thoth demo server.");
+    expect(screen.queryByRole("checkbox", { name: LOG })).toBeNull();
+    expect(screen.queryByText(/app log/)).toBeNull();
+  });
+
+  it("log_box_off_by_default_and_nothing_sent", async () => {
+    const diagnostics = vi.fn(() => Promise.resolve(LINES));
+    const { user, send } = withLog(diagnostics);
+    await write(user);
+    expect(checked(screen.getByRole("checkbox", { name: LOG }))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0]).not.toHaveProperty("diagnostics");
+    expect(diagnostics).not.toHaveBeenCalled();
+  });
+
+  it("ticking_shows_exact_lines_then_sends_them", async () => {
+    const diagnostics = vi.fn(() => Promise.resolve(LINES));
+    const { user, send } = withLog(diagnostics);
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    const pre = await waitFor(() => {
+      const el = document.querySelector("pre");
+      expect(el).toBeTruthy();
+      return el!;
+    });
+    expect(pre.textContent).toBe(LINES.join("\n"));
+    expect(pre.tabIndex).toBe(0);
+    expect(description(pre)).toBe("This is everything that will be sent. Page text, titles and file paths are removed.");
+    // Unticking and ticking again does not ask the host again.
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    expect(diagnostics).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(send.mock.calls[0]![0].diagnostics).toEqual({ log: LINES });
+  });
+
+  it("empty_log_shows_no_log_yet_and_sends_nothing", async () => {
+    const { user, send } = withLog(() => Promise.resolve([]));
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    expect(await screen.findByText("No log yet.")).toBeTruthy();
+    expect(document.querySelector("pre")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Thank you. Your message was sent.");
+    expect(send.mock.calls[0]![0]).not.toHaveProperty("diagnostics");
+  });
+
+  it("collect_failure_shows_message_and_still_sends_feedback", async () => {
+    const { user, send } = withLog(() => Promise.reject(new Error("host gone")));
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    expect(await screen.findByText("The app log could not be read. You can still send your message without it.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Thank you. Your message was sent.");
+    expect(send.mock.calls[0]![0]).not.toHaveProperty("diagnostics");
+  });
+
+  it("old_server_refusing_log_says_untick", async () => {
+    const { user, send } = withLog(() => Promise.resolve(LINES), () => Promise.reject(new ProblemError(problem("validation_failed", { detail: "Unrecognized key: diagnostics" }))));
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    await waitFor(() => expect(document.querySelector("pre")).toBeTruthy());
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("This server doesn't accept the app log yet. Untick “Include recent app log” and send again.");
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the log in the privacy note only where there is one", async () => {
+    withLog(() => Promise.resolve(LINES));
+    expect(await screen.findByText(/and, if you include it, the app log shown above\./)).toBeTruthy();
+  });
+});

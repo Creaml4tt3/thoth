@@ -47,10 +47,13 @@ interface Props {
   context: FeedbackContext;
   /** The email fallback: a `mailto:` link (the web), or the address with a Copy button where links to mail cannot open (the desktop webview, ADR-0020). */
   mail?: "link" | "copy";
+  /** The newest lines of the app's redacted local log (ADR-0040), read only once "Include recent app log" is ticked. Absent (the web): no such box. */
+  diagnostics?: () => Promise<string[]>;
   onClose(): void;
 }
 
 type Field = "message" | "email";
+type Log = { state: "idle" } | { state: "loading" } | { state: "failed" } | { state: "loaded"; lines: string[] };
 type Phase = { state: "looking" } | { state: "none" } | { state: "ready"; target: FeedbackTarget } | { state: "sent" };
 
 /**
@@ -58,18 +61,21 @@ type Phase = { state: "looking" } | { state: "none" } | { state: "ready"; target
  * by default; what it adds is on screen). Errors sit under their fields and the first one takes the focus; the result
  * is announced. The email link is always there.
  */
-export function FeedbackDialog({ target, context, mail: mailKind = "link", onClose }: Props) {
+export function FeedbackDialog({ target, context, mail: mailKind = "link", diagnostics, onClose }: Props) {
   const t = useStrings().feedback;
   const [phase, setPhase] = useState<Phase>({ state: "looking" });
   const [kind, setKind] = useState<FeedbackKind>("problem");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [include, setInclude] = useState(true);
+  // Off on every open (ADR-0040): the log is read only when ticked, then kept for the life of the dialog.
+  const [withLog, setWithLog] = useState(false);
+  const [log, setLog] = useState<Log>({ state: "idle" });
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const id = { message: useId(), email: useId(), messageHint: useId(), emailHint: useId(), messageError: useId(), emailError: useId(), details: useId() };
+  const id = { message: useId(), email: useId(), messageHint: useId(), emailHint: useId(), messageError: useId(), emailError: useId(), details: useId(), logHint: useId() };
   const refs = { message: useRef<HTMLTextAreaElement>(null), email: useRef<HTMLInputElement>(null) };
   const live = useRef(true);
   useEffect(() => {
@@ -90,8 +96,20 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", onClo
     if (phase.state === "sent") closeAfter.current?.focus();
   }, [phase.state]);
 
+  const tickLog = (on: boolean) => {
+    setWithLog(on);
+    if (!on || !diagnostics || log.state !== "idle") return;
+    setLog({ state: "loading" });
+    diagnostics().then(
+      (lines) => live.current && setLog({ state: "loaded", lines }),
+      () => live.current && setLog({ state: "failed" }),
+    );
+  };
+  // The schema needs at least one line: an empty or unread log is simply not sent.
+  const sentLog = withLog && log.state === "loaded" && log.lines.length > 0 ? log.lines : null;
+
   const submit = async (to: FeedbackTarget) => {
-    const input: FeedbackRequest = { kind, message, ...(email.trim() === "" ? {} : { email: email.trim() }), ...(include ? { context } : {}) };
+    const input: FeedbackRequest = { kind, message, ...(email.trim() === "" ? {} : { email: email.trim() }), ...(include ? { context } : {}), ...(sentLog ? { diagnostics: { log: sentLog } } : {}) };
     const next: Partial<Record<Field, string>> = {};
     if (message.trim() === "") next.message = t.errors.message;
     else if (message.length > FEEDBACK_MESSAGE_MAX) next.message = t.errors.messageLong(FEEDBACK_MESSAGE_MAX);
@@ -108,7 +126,8 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", onClo
       if (live.current) setPhase({ state: "sent" });
     } catch (e) {
       if (!live.current) return;
-      setFailure(e instanceof ProblemError && e.code === "rate_limited" ? t.busy : t.failed(e instanceof Error ? e.message : String(e)));
+      // An older server's strict schema refuses `diagnostics` with a 400; say what to do rather than retry without it.
+      setFailure(e instanceof ProblemError && e.code === "rate_limited" ? t.busy : e instanceof ProblemError && e.status === 400 && input.diagnostics ? t.logRefused : t.failed(e instanceof Error ? e.message : String(e)));
     } finally {
       if (live.current) setBusy(false);
     }
@@ -250,7 +269,32 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", onClo
               </ul>
             </div>
           )}
-          <p className="share-note">{t.privacy}</p>
+          {diagnostics && (
+            <>
+              <label className="ws-check">
+                <input type="checkbox" name="include-log" checked={withLog} disabled={busy} onChange={(e) => tickLog(e.target.checked)} />
+                <span>{t.includeLog}</span>
+              </label>
+              {withLog && (
+                <div className="ws-check-hint feedback-details">
+                  {log.state === "loading" && <p className="share-note">{t.logLoading}</p>}
+                  {log.state === "failed" && <p className="share-note">{t.logFailed}</p>}
+                  {log.state === "loaded" && log.lines.length === 0 && <p className="share-note">{t.noLog}</p>}
+                  {sentLog && (
+                    <>
+                      <p id={id.logHint} className="share-note">
+                        {t.logHint}
+                      </p>
+                      <pre tabIndex={0} className="mono feedback-log" aria-describedby={id.logHint}>
+                        {sentLog.join("\n")}
+                      </pre>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          <p className="share-note">{diagnostics ? t.privacyLog : t.privacy}</p>
           <p className="share-note">{t.sendingTo(phase.target.label)}</p>
           {failure !== null && (
             <div role="alert" className="alert alert-danger">

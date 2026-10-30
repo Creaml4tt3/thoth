@@ -187,6 +187,10 @@ export const en = {
     intro: "Found a problem, have an idea or a question? Send it from here. Only what you type is sent, and the app version and system if you leave that on.",
     send: "Send feedback…",
     email: (address: string) => `Or write to ${address}`,
+    saveDiagnostics: "Save diagnostics…",
+    diagnosticsSaved: "Saved.",
+    diagnosticsNotSaved: "Not saved.",
+    diagnosticsFailed: "The diagnostics could not be saved.",
   },
 
   updates: {

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import type { DiagnosticsBundle } from "@thoth/platform";
 import type { FeedbackContext } from "@thoth/workspace-protocol";
 import { FEEDBACK_EMAIL, FeedbackDialog, pickFeedbackServer, type FeedbackTarget } from "@thoth/app-ui/feedback/FeedbackDialog.tsx";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -18,30 +19,58 @@ export function DesktopFeedbackDialog({ onClose }: { onClose(): void }) {
   const { servers, options, platform } = useSession();
   const lang = useStrings().lang;
   const [version, setVersion] = useState<string | undefined>(undefined);
+  const [arch, setArch] = useState<string | undefined>(undefined);
   useEffect(() => {
     let live = true;
     platform.updates
       ?.settings()
       .then((s) => live && setVersion(s.current))
       .catch(() => undefined);
+    // Only the arch is used here; the log lines are read again, and shown, once the person ticks the box.
+    platform.diagnostics
+      ?.collect()
+      .then((b) => live && typeof b.arch === "string" && b.arch !== "" && b.arch.length <= 20 && setArch(b.arch))
+      .catch(() => undefined);
     return () => {
       live = false;
     };
   }, [platform]);
 
-  const context: FeedbackContext = { client: "desktop", ...(version ? { version } : {}), os: OS_NAMES[currentOs()], language: lang };
+  const context: FeedbackContext = { client: "desktop", ...(version ? { version } : {}), os: OS_NAMES[currentOs()], ...(arch ? { arch } : {}), language: lang };
   const target = async (): Promise<FeedbackTarget | null> => {
     const entry = await pickFeedbackServer(servers.getState().servers, (id) => servers.capabilitiesOf(id), options.starterServer?.url ?? null);
     return entry ? { label: entry.info.label, send: (input) => servers.client(entry.info.id).sendFeedback(input) } : null;
   };
   // The webview cannot open mailto: links (the host's link.open takes web links only, ADR-0020): copy the address.
-  return <FeedbackDialog target={target} context={context} mail="copy" onClose={onClose} />;
+  const diagnostics = platform.diagnostics;
+  return <FeedbackDialog target={target} context={context} mail="copy" {...(diagnostics ? { diagnostics: () => diagnostics.collect().then((b) => b.log) } : {})} onClose={onClose} />;
+}
+
+/** `thoth-diagnostics.md`: the header, then the log in a fence longer than any backtick run in it, so no line can close it. */
+export function diagnosticsMarkdown(b: DiagnosticsBundle, now: Date): string {
+  const head = `# Thoth diagnostics\n\n- Version: ${b.version}\n- OS: ${b.os}\n- Arch: ${b.arch}\n- Date: ${now.toISOString()}\n\n`;
+  if (b.log.length === 0) return `${head}No log yet.\n`;
+  const fence = "`".repeat(Math.max(3, ...b.log.map((l) => Math.max(0, ...(l.match(/`+/g) ?? []).map((r) => r.length)))) + 1);
+  return `${head}${fence}\n${b.log.join("\n")}\n${fence}\n`;
 }
 
 /** Settings → Help and feedback; `children`: the desktop's other help (the tour), after sending feedback. */
 export function FeedbackSettings({ children }: { children?: ReactNode }) {
   const t = useDesktopStrings().helpFeedback;
+  const { platform } = useSession();
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState<"busy" | "saved" | "cancelled" | "failed" | null>(null);
+  const { diagnostics, saveFile } = platform;
+  const save = async () => {
+    if (!diagnostics || !saveFile) return;
+    setSaved("busy");
+    try {
+      const ok = await saveFile.call(platform, "thoth-diagnostics.md", new TextEncoder().encode(diagnosticsMarkdown(await diagnostics.collect(), new Date())));
+      setSaved(ok ? "saved" : "cancelled");
+    } catch {
+      setSaved("failed");
+    }
+  };
   return (
     <section aria-labelledby="set-feedback" className="set-section">
       <h2 id="set-feedback">{t.title}</h2>
@@ -52,6 +81,21 @@ export function FeedbackSettings({ children }: { children?: ReactNode }) {
         </Button>
         <span className="muted">{t.email(FEEDBACK_EMAIL)}</span>
       </div>
+      {diagnostics && saveFile && (
+        <div className="set-actions">
+          <Button variant="ghost" small disabled={saved === "busy"} onClick={() => void save()}>
+            {t.saveDiagnostics}
+          </Button>
+          <span role="status" className="muted">
+            {saved === "saved" ? t.diagnosticsSaved : saved === "cancelled" ? t.diagnosticsNotSaved : ""}
+          </span>
+        </div>
+      )}
+      {saved === "failed" && (
+        <p role="alert" className="alert alert-danger">
+          {t.diagnosticsFailed}
+        </p>
+      )}
       {children}
       {open && <DesktopFeedbackDialog onClose={() => setOpen(false)} />}
     </section>

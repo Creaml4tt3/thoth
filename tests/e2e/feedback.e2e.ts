@@ -106,6 +106,11 @@ test.describe("Send feedback in the desktop app (ADR-0033)", () => {
     await expect(dialog.getByRole("textbox", { name: "Your message" })).toHaveAttribute("aria-invalid", "true");
     expect(await rows(ref)).toEqual([]);
 
+    // The app log (ADR-0040): off on open; the bridge keeps no log, so ticking it says so and the message still goes.
+    const logBox = dialog.getByRole("checkbox", { name: "Include recent app log" });
+    await expect(logBox).not.toBeChecked();
+    await logBox.check();
+    await expect(dialog.getByText("No log yet.")).toBeVisible();
     await dialog.getByRole("textbox", { name: "Your message" }).fill("The sidebar froze after a drag.");
     await dialog.getByRole("button", { name: "Send" }).click();
     await expect(dialog.getByRole("status")).toHaveText("Thank you. Your message was sent.");
