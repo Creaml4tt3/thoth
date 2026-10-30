@@ -55,7 +55,8 @@ tauri-plugin-notification = "=2.5.1"
 # 2026-10-07 (at least three weeks old), for tauri ^2.12. No system proxy (as the host's own requests), rustls only.
 tauri-plugin-updater = { version = "=2.13.2", default-features = false, features = ["rustls-tls"] }
 # A small, redacted, rotating local log for bug reports (ADR-0040), desktop shell only, through its Rust API (no JS
-# permission is granted). Exact pin, released 2026-09-26 (at least three weeks old).
+# permission is granted). Exact pin, released 2026-09-26 (at least three weeks old). Brings fern, and num_threads (the
+# plugin's required time/local-offset); its Android-only crates aren't built on desktop.
 tauri-plugin-log = "=2.10.0"
 # Deleting a page or folder of the Private Space moves it to the system Trash (Finder, Recycle Bin, freedesktop), desktop
 # shell only. Exact pin, released 2026-09-13 (at least three weeks old).

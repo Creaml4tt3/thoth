@@ -731,16 +731,16 @@ fn install_panic_hook() {
 }
 
 /// The local log (ADR-0040): one small rotating `thoth.log` in the OS log folder, UTC, Info and up (other crates Warn).
-fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+/// Used from the host only: the plugin is never registered, so the webview has no `log` command (and no `log:` permission).
+fn attach_log(app: &AppHandle) -> bool {
     use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
     let mut builder = tauri_plugin_log::Builder::new()
         .clear_targets()
         .target(Target::new(TargetKind::LogDir { file_name: Some("thoth".into()) }))
         .max_file_size(1_000_000)
         .rotation_strategy(RotationStrategy::KeepSome(2))
-        .timezone_strategy(TimezoneStrategy::UseUtc)
         .level(log::LevelFilter::Info)
-        // Replaces the plugin's default format, so the time is written here.
+        // Replaces the plugin's default format, so the time (UTC) is written here.
         .format(|out, message, record| {
             let now = TimezoneStrategy::UseUtc.get_now();
             out.finish(format_args!(
@@ -754,10 +754,15 @@ fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
                 log_line(record.level(), record.target(), &message.to_string())
             ))
         });
-    for noisy in ["tao", "wry", "reqwest", "hyper", "rustls", "tauri"] {
+    // fern matches a target or its `::` modules only: `tauri` does not cover `tauri_runtime_wry`.
+    for noisy in ["tao", "wry", "reqwest", "hyper", "hyper_util", "rustls", "tauri", "tauri_runtime_wry", "tauri_plugin_updater"] {
         builder = builder.level_for(noisy, log::LevelFilter::Warn);
     }
-    builder.build()
+    // `split`, not `.plugin(builder.build())`: a log that can't be opened must never stop the app from starting.
+    match builder.split(app) {
+        Ok((_plugin, max_level, logger)) => tauri_plugin_log::attach_logger(max_level, logger).is_ok(),
+        Err(_) => false,
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -773,14 +778,14 @@ pub fn run() {
         }
     });
     builder
-        // First, so the other plugins' setup is logged. Used from the host only; the webview is granted no `log:` permission.
-        .plugin(log_plugin())
         .plugin(tauri_plugin_dialog::init())
         // System notifications (ADR-0018): the webview may only check and ask for the permission and show one.
         .plugin(tauri_plugin_notification::init())
         // In-app updates (ADR-0034): used from the host through its Rust API; the webview is granted none of it.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // Without a log (folder not writable), the app starts all the same.
+            attach_log(app.handle());
             install_panic_hook();
             log::info!("start {} {} {}", app.package_info().version, std::env::consts::OS, std::env::consts::ARCH);
             // In-app updates read the same address as the notice; a build without one has neither.
