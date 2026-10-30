@@ -65,7 +65,7 @@ export function FeedbackSettings({ children }: { children?: ReactNode }) {
     if (!diagnostics || !saveFile) return;
     setSaved("busy");
     try {
-      const ok = await saveFile.call(platform, "thoth-diagnostics.md", new TextEncoder().encode(diagnosticsMarkdown(await diagnostics.collect(), new Date())));
+      const ok = await saveFile("thoth-diagnostics.md", new TextEncoder().encode(diagnosticsMarkdown(await diagnostics.collect(), new Date())));
       setSaved(ok ? "saved" : "cancelled");
     } catch {
       setSaved("failed");

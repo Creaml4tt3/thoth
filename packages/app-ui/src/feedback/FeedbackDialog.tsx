@@ -98,7 +98,9 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", diagn
 
   const tickLog = (on: boolean) => {
     setWithLog(on);
-    if (!on || !diagnostics || log.state !== "idle") return;
+    // Unticking after a failed read lets the next tick try again.
+    if (!on && log.state === "failed") setLog({ state: "idle" });
+    if (!on || !diagnostics || (log.state !== "idle" && log.state !== "failed")) return;
     setLog({ state: "loading" });
     diagnostics().then(
       (lines) => live.current && setLog({ state: "loaded", lines }),
@@ -277,9 +279,10 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", diagn
               </label>
               {withLog && (
                 <div className="ws-check-hint feedback-details">
-                  {log.state === "loading" && <p className="share-note">{t.logLoading}</p>}
-                  {log.state === "failed" && <p className="share-note">{t.logFailed}</p>}
-                  {log.state === "loaded" && log.lines.length === 0 && <p className="share-note">{t.noLog}</p>}
+                  {/* Announced while the box is ticked; the preview stays outside, so its lines are never read out. */}
+                  <p role="status" className="share-note">
+                    {log.state === "loading" ? t.logLoading : log.state === "failed" ? t.logFailed : log.state === "loaded" && log.lines.length === 0 ? t.noLog : ""}
+                  </p>
                   {sentLog && (
                     <>
                       <p id={id.logHint} className="share-note">
@@ -306,7 +309,7 @@ export function FeedbackDialog({ target, context, mail: mailKind = "link", diagn
             <Button variant="quiet" onClick={onClose}>
               {t.cancel}
             </Button>
-            <Button variant="primary" type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy || (withLog && log.state === "loading")}>
               {busy ? t.sending : t.send}
             </Button>
           </div>

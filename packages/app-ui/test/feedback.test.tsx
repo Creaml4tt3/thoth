@@ -188,6 +188,7 @@ describe("Include recent app log (ADR-0040)", () => {
     await write(user);
     await user.click(screen.getByRole("checkbox", { name: LOG }));
     expect(await screen.findByText("No log yet.")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("No log yet.");
     expect(document.querySelector("pre")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("Thank you. Your message was sent.");
@@ -202,6 +203,29 @@ describe("Include recent app log (ADR-0040)", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("Thank you. Your message was sent.");
     expect(send.mock.calls[0]![0]).not.toHaveProperty("diagnostics");
+  });
+
+  it("a failed read is retried by unticking and ticking again", async () => {
+    const diagnostics = vi.fn<() => Promise<string[]>>().mockRejectedValueOnce(new Error("host gone")).mockResolvedValueOnce(LINES);
+    const { user } = withLog(diagnostics);
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    await screen.findByText(/The app log could not be read/);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    await waitFor(() => expect(document.querySelector("pre")?.textContent).toBe(LINES.join("\n")));
+    expect(diagnostics).toHaveBeenCalledTimes(2);
+  });
+
+  it("Send waits while the ticked log is loading", async () => {
+    let resolve!: (lines: string[]) => void;
+    const { user } = withLog(() => new Promise((r) => (resolve = r)));
+    await write(user);
+    await user.click(screen.getByRole("checkbox", { name: LOG }));
+    expect(screen.getByRole("status").textContent).toBe("Reading the app log…");
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+    resolve(LINES);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it("old_server_refusing_log_says_untick", async () => {
