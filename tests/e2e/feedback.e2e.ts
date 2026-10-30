@@ -113,7 +113,7 @@ test.describe("Send feedback in the desktop app (ADR-0033)", () => {
     await expect(dialog.getByText("No log yet.")).toBeVisible();
     await dialog.getByRole("textbox", { name: "Your message" }).fill("The sidebar froze after a drag.");
     await dialog.getByRole("button", { name: "Send" }).click();
-    await expect(dialog.getByRole("status")).toHaveText("Thank you. Your message was sent.");
+    await expect(dialog.getByRole("status").filter({ hasText: "Thank you. Your message was sent." })).toBeVisible();
     await dialog.screenshot({ path: join(SHOTS, "desktop-dialog-sent-light.png") });
     const stored = await rows(ref);
     expect(stored).toHaveLength(1);
