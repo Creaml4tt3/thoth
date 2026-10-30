@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Report a Problem can include the recent app log. The app keeps a small log on your computer (errors and app events, never page text, titles or file paths), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings, Help and feedback, also has Save diagnostics… to save the same log to a file.
+
+### Changed
+
+- Feedback can include your processor type (for example aarch64 or x86_64) along with the app version and system, shown on screen before you send.
+
 ## [0.2.8] - 2026-10-30
 
 ### Added

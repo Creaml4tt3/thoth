@@ -10,7 +10,7 @@
 > markers) and every HTML comment, so owner notes in comments stay in the repo.
 <!-- repo-only:end -->
 
-Last updated: 27 October 2026
+Last updated: 30 October 2026
 
 ## Who we are
 
@@ -29,7 +29,9 @@ not cover:
 
 - **The Thoth desktop app.** Your Private Space stays on your own computer.
   The app sends nothing anywhere unless you connect it to a server, and it has
-  no analytics.
+  no analytics. It keeps a small log on your computer (errors and app events,
+  never page text, titles or file paths; about 3 MB at most). The log is sent
+  only if you include it in a problem report, after you have seen it.
 - **Servers run by other people.** If you connect to a Thoth server that
   someone else hosts, that person is responsible for your data on it.
 
@@ -42,6 +44,7 @@ not cover:
 | Sign-in sessions (stored only as hashes) | Created when you sign in | To keep you signed in | Performing our agreement with you |
 | IP address and request counts | Each request to the demo server | Rate limiting and preventing abuse | Our legitimate interest in keeping the service secure |
 | Server logs: time, method, path without query, status code, request ID | Each request to the demo server | Running and fixing the service | Our legitimate interest in running the service |
+| Feedback you send from the website, the web version or the desktop app: your message, the kind, and, only if you give or include them, your email address, the app version, operating system, processor type and language, and the recent app log (from the desktop app, only if you tick "Include recent app log", after you have seen it; it has no page text, titles or file paths) | You, when you send it; the demo server only receives it if the app sends it there | To read and answer problems, ideas and questions, and to fix bugs | Your consent, by sending it |
 | Website and web version analytics (see below) | Your browser, only if you accept analytics | Learning which pages and features people use, so we can improve them | Your consent |
 
 We do not store passwords. You sign in at Google or GitHub: we never receive
