@@ -4317,6 +4317,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
+ "log",
  "notify",
  "notify-debouncer-full",
  "rusqlite",

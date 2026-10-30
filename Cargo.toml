@@ -11,6 +11,7 @@ publish = false
 thoth-host = { path = "crates/thoth-host" }
 base64 = "0.22"
 getrandom = "0.3"
+log = "0.4"
 notify = "8"
 notify-debouncer-full = "0.5"
 rusqlite = { version = "0.37", features = ["bundled", "hooks", "limits"] }

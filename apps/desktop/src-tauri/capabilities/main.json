@@ -84,6 +84,8 @@
     "allow-mcp-decide",
     "allow-mcp-forget",
     "allow-mcp-answer",
-    "allow-mcp-log"
+    "allow-mcp-log",
+    "allow-diag-report",
+    "allow-diag-collect"
   ]
 }

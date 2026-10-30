@@ -55,6 +55,7 @@ use source::{OpenFile, Source};
 use sql::Sql;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use updates::{UpdateOptions, Updates};
 use vault_fs::VaultFs;
@@ -78,6 +79,7 @@ pub const COMMANDS: &[&str] = &[
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
+    "diag.report", "diag.collect",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -90,6 +92,12 @@ const REOPEN_FILE: &str = "update-reopen.json";
 pub const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"];
 const MAX_PICKED_IMAGES: usize = 16;
+/// The most webview error reports one Host logs (`diag.report`); later ones are accepted and dropped.
+const MAX_REPORTS: usize = 50;
+/// A reported message or stack is cut to this many characters before it is formatted, so a huge one costs little.
+const MAX_REPORT_CHARS: usize = 4096;
+/// A reported stack keeps its first lines only.
+const MAX_STACK_LINES: usize = 5;
 
 /// Native pickers. The desktop shell shows dialogs; the harness returns fixed paths.
 pub trait Picker: Send + Sync {
@@ -181,6 +189,12 @@ pub struct Host {
     links: LinkPreviews,
     updates: Updates,
     mcp: mcp::Relay,
+    /// Where the app's log files are (`diag.collect`); `None`: no log.
+    log_dir: Option<PathBuf>,
+    /// The running version, from the update options; "" until `with_updates`.
+    version: String,
+    /// Webview error reports logged so far (`diag.report`), per Host, which is per app run in the desktop shell.
+    reported: AtomicUsize,
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
@@ -202,7 +216,7 @@ impl Host {
         };
         let mcp = mcp::Relay::new(config.data_dir.as_ref().map(|d| d.join(mcp::DIR)), config.events.clone(), open, mcp::McpOptions::default());
         let updates = Updates::new(config.data_dir.clone(), UpdateOptions::off());
-        Self { config, home, allow_roots, state, remote, agents, links, updates, mcp, replace: Mutex::new(()) }
+        Self { config, home, allow_roots, state, remote, agents, links, updates, mcp, log_dir: None, version: String::new(), reported: AtomicUsize::new(0), replace: Mutex::new(()) }
     }
 
     /// Turns the update notice on (ADR-0022): `options` name the running version and where `latest.json` is. A host
@@ -213,8 +227,36 @@ impl Host {
         // The desktop shell may set it for a local test of a debug build (ADR-0034); the harness's switch adds to it.
         options.allow_loopback |= self.config.link_preview_loopback;
         options.events = Some(self.config.events.clone());
+        self.version = options.current.clone();
         self.updates = Updates::new(self.config.data_dir.clone(), options);
         self
+    }
+
+    /// Where `diag.collect` reads the app's log from (0.3.0); `None` (the default) means there is no log.
+    #[must_use]
+    pub fn with_log_dir(mut self, dir: Option<PathBuf>) -> Self {
+        self.log_dir = dir;
+        self
+    }
+
+    /// `diag.report`: the webview's uncaught error, into the local log (never redacted here: the logger's formatter
+    /// does that for every record).
+    fn report(&self, args: &Value) -> HostResult<()> {
+        let kind = str_arg(args, "kind")?;
+        if !matches!(kind, "error" | "rejection") {
+            return Err(HostError::bad_argument("kind must be \"error\" or \"rejection\""));
+        }
+        let cut = |s: &str| s.chars().take(MAX_REPORT_CHARS).collect::<String>();
+        let message = cut(str_arg(args, "message")?);
+        let stack = match args.get("stack") {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(s)) => cut(s).lines().take(MAX_STACK_LINES).collect::<Vec<_>>().join(" | "),
+            Some(_) => return Err(HostError::bad_argument("stack must be a string")),
+        };
+        if self.reported.fetch_add(1, Ordering::Relaxed) < MAX_REPORTS {
+            log::error!(target: "webview", "{kind}: {message}{}{stack}", if stack.is_empty() { "" } else { " | " });
+        }
+        Ok(())
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -506,6 +548,15 @@ impl Host {
                 null()
             }
             "mcp.log" => json(self.mcp.log()),
+            // Problem reports (ADR-0040): the webview's errors into the local log, and the redacted log back.
+            "diag.report" => {
+                self.report(args)?;
+                null()
+            }
+            "diag.collect" => {
+                let log = self.log_dir.as_deref().map_or_else(Vec::new, |d| diagnostics::tail(d, diagnostics::TAIL_LINES, diagnostics::TAIL_BYTES));
+                json(json!({ "version": self.version, "os": std::env::consts::OS, "arch": std::env::consts::ARCH, "log": log }))
+            }
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }
     }
