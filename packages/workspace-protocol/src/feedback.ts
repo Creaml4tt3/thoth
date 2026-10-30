@@ -35,10 +35,8 @@ export const FeedbackContextSchema = z.strictObject({
     .max(40)
     .regex(/^[0-9A-Za-z][0-9A-Za-z.+-]*$/, "Expected a version like 0.4.0")
     .optional(),
-  /** The operating system, for example `macOS 15.1` or `Windows`. */
+  /** The operating system, for example `macOS 15.1`, `Windows` or, from the desktop app, `macOS (aarch64)`. */
   os: shortText(60).optional(),
-  /** The processor architecture, for example `aarch64` or `x86_64`. */
-  arch: shortText(20).optional(),
   /** The interface language, a BCP 47 tag such as `en` or `th`. */
   language: z
     .string()

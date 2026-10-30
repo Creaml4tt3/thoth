@@ -135,14 +135,16 @@ describe("Save diagnostics (ADR-0040)", () => {
     expect(within(section).queryByRole("button", { name: "Save diagnostics…" })).toBeNull();
   });
 
-  it("the dialog offers the log box, off, and adds the arch to the details", async () => {
+  it("the dialog offers the log box, off, and adds the arch to the os in the details", async () => {
     const platform = createNodePlatform({ vault: root, servers: new FakeServers() });
     platform.servers.connect(TEAM);
     Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log: [] }) } });
     const app = await openApp(root, {}, platform);
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
     const dialog = await openFromSettings(app);
-    await within(dialog).findByText("arch: aarch64");
+    // In `os`, not a key of its own: an older server's strict context would refuse `arch` (ADR-0040).
+    await within(dialog).findByText(/^os: (macOS|Windows|Linux) \(aarch64\)$/);
+    expect(within(dialog).queryByText(/^arch:/)).toBeNull();
     expect((within(dialog).getByRole("checkbox", { name: "Include recent app log" }) as HTMLInputElement).checked).toBe(false);
   });
 });

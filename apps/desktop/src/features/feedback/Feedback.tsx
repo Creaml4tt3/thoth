@@ -36,7 +36,8 @@ export function DesktopFeedbackDialog({ onClose }: { onClose(): void }) {
     };
   }, [platform]);
 
-  const context: FeedbackContext = { client: "desktop", ...(version ? { version } : {}), os: OS_NAMES[currentOs()], ...(arch ? { arch } : {}), language: lang };
+  // The arch rides in `os` (ADR-0040): a feedback server older than 0.3.0 has a strict context and refuses new keys.
+  const context: FeedbackContext = { client: "desktop", ...(version ? { version } : {}), os: arch ? `${OS_NAMES[currentOs()]} (${arch})` : OS_NAMES[currentOs()], language: lang };
   const target = async (): Promise<FeedbackTarget | null> => {
     const entry = await pickFeedbackServer(servers.getState().servers, (id) => servers.capabilitiesOf(id), options.starterServer?.url ?? null);
     return entry ? { label: entry.info.label, send: (input) => servers.client(entry.info.id).sendFeedback(input) } : null;

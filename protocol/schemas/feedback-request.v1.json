@@ -45,12 +45,6 @@
           "maxLength": 60,
           "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
         },
-        "arch": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 20,
-          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
-        },
         "language": {
           "type": "string",
           "maxLength": 35,

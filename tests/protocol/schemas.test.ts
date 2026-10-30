@@ -22,6 +22,7 @@ import {
   problem,
   CursorSchema,
   FEEDBACK_LOG_LINES,
+  FeedbackContextSchema,
   FeedbackDiagnosticsSchema,
   FeedbackRequestSchema,
 } from "@thoth/workspace-protocol";
@@ -274,9 +275,9 @@ describe("feedback request (ADR-0033)", () => {
       { kind: "idea" },
     ]) expect(FeedbackRequestSchema.safeParse(bad).success, JSON.stringify(bad).slice(0, 80)).toBe(false);
   });
-  it("takes an optional app log of at most 200 printable lines of 500 characters, and an arch", () => {
+  it("takes an optional app log of at most 200 printable lines of 500 characters", () => {
     const line = "2026-10-30T10:00:00Z INFO host started";
-    expect(FeedbackRequestSchema.safeParse({ ...ok, diagnostics: { log: [line] }, context: { client: "desktop", arch: "aarch64" } }).success).toBe(true);
+    expect(FeedbackRequestSchema.safeParse({ ...ok, diagnostics: { log: [line] }, context: { client: "desktop" } }).success).toBe(true);
     expect(FeedbackRequestSchema.safeParse({ ...ok, diagnostics: { log: Array(FEEDBACK_LOG_LINES).fill("x".repeat(500)) } }).success).toBe(true);
     for (const bad of [
       { log: [] },
@@ -287,7 +288,13 @@ describe("feedback request (ADR-0033)", () => {
       { log: [line], extra: 1 },
       {},
     ]) expect(FeedbackDiagnosticsSchema.safeParse(bad).success, JSON.stringify(bad).slice(0, 60)).toBe(false);
-    expect(FeedbackRequestSchema.safeParse({ ...ok, context: { client: "desktop", arch: "x".repeat(21) } }).success).toBe(false);
+  });
+  it("takes the 0.3.0 desktop context, with the arch in os, and no separate arch (older servers refuse new keys)", () => {
+    const context = { client: "desktop", version: "0.3.0", os: "macOS (aarch64)", language: "en" };
+    expect(FeedbackContextSchema.safeParse(context).success).toBe(true);
+    expect(FeedbackRequestSchema.safeParse({ ...ok, context }).success).toBe(true);
+    expect(FeedbackContextSchema.safeParse({ ...context, os: `Windows (${"x".repeat(20)})` }).success).toBe(true);
+    expect(FeedbackContextSchema.safeParse({ client: "desktop", arch: "aarch64" }).success).toBe(false);
   });
   it("is strict: page text, titles or file names cannot ride along", () => {
     expect(FeedbackRequestSchema.safeParse({ ...ok, pageTitle: "Secret plan" }).success).toBe(false);
