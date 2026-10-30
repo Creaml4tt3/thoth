@@ -27,7 +27,11 @@ impl FileManager for Nothing {
 }
 
 fn host() -> Host {
-    Host::new(HostConfig {
+    Host::new(config())
+}
+
+fn config() -> HostConfig {
+    HostConfig {
         data_dir: None,
         allow_roots: vec![],
         picker: Arc::new(Nothing),
@@ -38,7 +42,7 @@ fn host() -> Host {
         file_manager: Arc::new(Nothing),
         agent_search_dirs: None,
         link_preview_loopback: false,
-    })
+    }
 }
 
 /// Counts the records aimed at `webview`. `log::set_logger` works once per process, so one is shared.
@@ -121,4 +125,30 @@ fn report_caps_at_50() {
         assert_eq!(host.call("diag.report", &args, None).unwrap().0, Value::Null);
     }
     assert_eq!(COUNTER.0.load(Ordering::SeqCst) - before, 50);
+}
+
+#[test]
+fn settings_switch_off_empties_the_log_and_is_kept() {
+    let _serial = logging();
+    let data = tempfile::tempdir().unwrap();
+    let logs = tempfile::tempdir().unwrap();
+    std::fs::write(logs.path().join("thoth.log"), "ERROR host: fs.write failed: EACCES\n").unwrap();
+    std::fs::write(logs.path().join("thoth_2026-10-30_10-00-00.log"), "older\n").unwrap();
+    std::fs::write(logs.path().join("other.log"), "not ours\n").unwrap();
+    let host = Host::new(HostConfig { data_dir: Some(data.path().to_owned()), ..config() }).with_log_dir(Some(logs.path().to_owned()));
+
+    assert_eq!(host.call("diag.settings", &json!({}), None).unwrap().0, json!({ "enabled": true }));
+    assert_eq!(host.call("diag.settings", &json!({ "enabled": "no" }), None).unwrap_err().code, "BAD_ARGUMENT");
+    assert_eq!(host.call("diag.settings", &json!({ "enabled": false }), None).unwrap().0, json!({ "enabled": false }));
+    assert!(!thoth_host::diagnostics::log_enabled());
+    // Emptied, not deleted (the logger holds it open), the rotated file gone, another app's log left alone.
+    assert_eq!(std::fs::read(logs.path().join("thoth.log")).unwrap(), b"");
+    assert!(!logs.path().join("thoth_2026-10-30_10-00-00.log").exists());
+    assert!(logs.path().join("other.log").exists());
+    assert_eq!(collect(&host)["log"], json!([]));
+    // The next start reads the choice back; no file means on.
+    assert!(!thoth_host::diagnostics::load_switch(Some(data.path())));
+    assert!(thoth_host::diagnostics::load_switch(Some(&data.path().join("missing"))));
+    assert_eq!(host.call("diag.settings", &json!({ "enabled": true }), None).unwrap().0, json!({ "enabled": true }));
+    assert!(thoth_host::diagnostics::load_switch(Some(data.path())));
 }

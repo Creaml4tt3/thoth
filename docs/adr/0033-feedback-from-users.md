@@ -81,6 +81,6 @@ webview), ADR-0014 (the demo server is contacted only when added), ADR-0015 (sit
 
 ## Open questions
 
-- Retention: how long feedback is kept, and whether `maintenance` should purge old rows. Blocks nothing.
+- Retention: answered by ADR-0040 rule 18, `maintenance` deletes feedback after 90 days.
 - Whether the privacy notice should name feedback explicitly (what is kept, for how long). Needs the owner.
 - A reply flow (answering from the CLI by email) is out of scope.

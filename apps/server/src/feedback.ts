@@ -17,6 +17,15 @@ export const FEEDBACK_LIMITS = {
   day: { limit: 30, windowSeconds: 86_400 },
 } as const;
 
+/** Feedback, with any app log sent with it, is deleted by maintenance this many days after it arrived (ADR-0040). */
+export const FEEDBACK_RETENTION_DAYS = 90;
+
+/** Deletes feedback older than `FEEDBACK_RETENTION_DAYS`; returns how many rows went. */
+export async function purgeFeedback(db: Queryable): Promise<number> {
+  const { rowCount } = await db.query("DELETE FROM feedback WHERE created_at < now() - make_interval(days => $1)", [FEEDBACK_RETENTION_DAYS]);
+  return rowCount ?? 0;
+}
+
 const salts = new WeakMap<object, Promise<string>>();
 
 function saltOf(db: Queryable): Promise<string> {

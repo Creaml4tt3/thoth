@@ -80,6 +80,9 @@ export interface Diagnostics {
   report(e: { kind: "error" | "rejection"; message: string; stack?: string }): Promise<void>;
   /** The version, the system and the newest lines of the redacted log. */
   collect(): Promise<DiagnosticsBundle>;
+  /** Whether the app keeps its local log; `setEnabled(false)` also deletes what it holds. */
+  enabled(): Promise<boolean>;
+  setEnabled(on: boolean): Promise<boolean>;
 }
 
 /** What the host does for the update notice (ADR-0022): it asks `latest.json` and keeps the person's choice. */

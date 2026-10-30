@@ -191,6 +191,8 @@ export const en = {
     diagnosticsSaved: "Saved.",
     diagnosticsNotSaved: "Not saved.",
     diagnosticsFailed: "The diagnostics could not be saved.",
+    keepLog: "Keep an app log on this computer",
+    keepLogHint: "A small log of errors, kept only here, which you can include in a problem report. Turning it off deletes it.",
   },
 
   updates: {

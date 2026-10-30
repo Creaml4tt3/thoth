@@ -49,7 +49,7 @@ trade-off.
 | [0037](0037-sidebar-new-items-folder-colors-and-switcher.md) | New items from the trees' menus, the target folder, folder colors and the space switcher | Accepted 2026-10-29 |
 | [0038](0038-moving-between-spaces-and-opening-links.md) | Moving pages between spaces, and opening links in a page | Proposed 2026-10-29 |
 | [0039](0039-public-code-repository-and-private-website.md) | A public code repository, and the website in a private one | Proposed 2026-10-29 |
-| [0040](0040-local-log-and-problem-reports.md) | A local log, and problem reports with it | Proposed 2026-10-30 |
+| [0040](0040-local-log-and-problem-reports.md) | A local log, and problem reports with it | Accepted 2026-10-31 |
 
 Template: [0000-template.md](0000-template.md).
 

@@ -41,7 +41,7 @@ Commands:
   revoke-token --token-id <id>
   maintenance                                               purge workspaces deleted more than 30 days ago, prune old revisions
                                                             (REVISION_RETENTION_DAYS), expired idempotency records, rate-limit
-                                                            rows and sign-in rows; prints what was removed
+                                                            rows, sign-in rows and feedback older than 90 days; prints what was removed
   feedback list [--since <when>]                            feedback from users (ADR-0033), newest first; <when> is a date
                                                             (2026-10-27, or an ISO time) or an age (7d, 12h)
   feedback export --json [--since <when>]                   the same as a JSON array on stdout

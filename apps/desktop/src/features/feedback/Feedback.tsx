@@ -62,6 +62,17 @@ export function FeedbackSettings({ children }: { children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<"busy" | "saved" | "cancelled" | "failed" | null>(null);
   const { diagnostics, saveFile } = platform;
+  const [logOn, setLogOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    diagnostics
+      ?.enabled()
+      .then((on) => live && setLogOn(on))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [diagnostics]);
   const save = async () => {
     if (!diagnostics || !saveFile) return;
     setSaved("busy");
@@ -82,6 +93,22 @@ export function FeedbackSettings({ children }: { children?: ReactNode }) {
         </Button>
         <span className="muted">{t.email(FEEDBACK_EMAIL)}</span>
       </div>
+      {diagnostics && logOn !== null && (
+        <div className="set-toggle">
+          <input
+            id="diag-log"
+            type="checkbox"
+            role="switch"
+            checked={logOn}
+            aria-describedby="diag-log-hint"
+            onChange={(e) => void diagnostics.setEnabled(e.target.checked).then(setLogOn, () => undefined)}
+          />
+          <label htmlFor="diag-log">{t.keepLog}</label>
+          <small id="diag-log-hint" className="muted">
+            {t.keepLogHint}
+          </small>
+        </div>
+      )}
       {diagnostics && saveFile && (
         <div className="set-actions">
           <Button variant="ghost" small disabled={saved === "busy"} onClick={() => void save()}>

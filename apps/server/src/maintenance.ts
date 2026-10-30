@@ -1,5 +1,6 @@
 import { timingSafeEqual, createHash } from "node:crypto";
 import type { Database } from "./db.ts";
+import { purgeFeedback } from "./feedback.ts";
 import { purgeIdempotencyRecords } from "./idempotency.ts";
 import { purgeRateLimits } from "./ratelimit.ts";
 import { purgeSignIn } from "./signin/sessions.ts";
@@ -14,6 +15,8 @@ export interface MaintenanceResult {
   signInRowsDeleted: number;
   /** Workspaces deleted more than 30 days ago, purged with their pages, revisions and attachments (ADR-0025). */
   workspacesPurged: number;
+  /** Feedback older than 90 days, with its app log (ADR-0040). */
+  feedbackDeleted: number;
 }
 
 /**
@@ -53,6 +56,7 @@ export async function runMaintenance(db: Database, options: { revisionRetentionD
     idempotencyRecordsDeleted: await purgeIdempotencyRecords(db),
     rateLimitRowsDeleted: await purgeRateLimits(db),
     signInRowsDeleted: await purgeSignIn(db),
+    feedbackDeleted: await purgeFeedback(db),
   };
 }
 

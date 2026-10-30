@@ -764,6 +764,8 @@ fn attach_log(app: &AppHandle) -> bool {
         .max_file_size(1_000_000)
         .rotation_strategy(RotationStrategy::KeepSome(2))
         .level(log::LevelFilter::Info)
+        // Settings can turn the log off: every record is dropped while it is.
+        .filter(|_| thoth_host::diagnostics::log_enabled())
         // Replaces the plugin's default format, so the time (UTC) is written here.
         .format(|out, message, record| {
             let now = TimezoneStrategy::UseUtc.get_now();
@@ -808,6 +810,8 @@ pub fn run() {
         // In-app updates (ADR-0034): used from the host through its Rust API; the webview is granted none of it.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // The person's choice first, so a log turned off gets no line, not even this start.
+            thoth_host::diagnostics::load_switch(app.path().app_data_dir().ok().as_deref());
             // Without a log (folder not writable), the app starts all the same.
             attach_log(app.handle());
             install_panic_hook();

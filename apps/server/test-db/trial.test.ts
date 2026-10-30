@@ -422,7 +422,7 @@ describe("maintenance", () => {
     }
     const ok = await callCron(`Bearer ${secret}`);
     expect(ok.status).toBe(200);
-    expect(Object.keys(ok.json).sort()).toEqual(["idempotencyRecordsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted", "workspacesPurged"]);
+    expect(Object.keys(ok.json).sort()).toEqual(["feedbackDeleted", "idempotencyRecordsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted", "workspacesPurged"]);
     expect((await fetch(`${env.url}/internal/maintenance`, { method: "POST", headers: { authorization: `Bearer ${secret}` } })).status).toBe(405);
     await env.restart({ logStream }); // startup logs too
     responses.push(JSON.stringify(await callCron(`Bearer ${secret}`)));
