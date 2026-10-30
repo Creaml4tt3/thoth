@@ -12,11 +12,11 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Added
 
-- Report a Problem can include the recent app log. The app keeps a small log on your computer (errors and app events; it is built to leave out page text and titles, and it masks file paths, links and email addresses), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings, Help and feedback, also has Save diagnostics… to save the same log to a file.
+- "Send feedback…" can include the recent app log. The app keeps a small log on your computer (errors and app events; it is built to leave out page text and titles, and it masks file paths, links and email addresses), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings → Help and feedback also has "Save diagnostics…" to save the same log to a file.
 
 ### Changed
 
-- Feedback can include your processor type (for example aarch64 or x86_64) along with the app version and system, shown on screen before you send.
+- Feedback from the desktop app can include your processor type (for example aarch64 or x86_64) with the system, as in "macOS (aarch64)", along with the app version, shown on screen before you send.
 
 ## [0.2.8] - 2026-10-30
 

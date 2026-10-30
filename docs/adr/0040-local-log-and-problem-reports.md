@@ -32,7 +32,11 @@ service would break all three at once.
    - turns control characters into spaces;
    - keeps a URL's scheme, host and port and replaces the rest with `<redacted>`, with any user info, so a share or
      invite link's secret in its path is gone (`https://api.thothnotes.com/s/AbC123xyz?x=1` becomes
-     `https://api.thothnotes.com/<redacted>`);
+     `https://api.thothnotes.com/<redacted>`). The one exception is the app's own origin (`tauri://localhost`,
+     `http://tauri.localhost`, `https://tauri.localhost`, host matched exactly, no user info or port), which serves
+     only the app's bundled scripts: its path and `:line:col` are kept, so a webview stack still says where it
+     failed, and its query or fragment is still replaced (`tauri://localhost/x?token=abc` becomes
+     `tauri://localhost/x?<redacted>`);
    - replaces the value after a secret key (`bearer`, `token`, `secret`, `password`, `passwd`, `authorization`,
      `cookie`, `api_key`, `apikey`, any case, `-` read as `_`, also inside a longer name such as `refresh_token`);
      `Authorization` and `Cookie` run to the end of the line;
@@ -47,9 +51,11 @@ service would break all three at once.
    such as `Secret plan.md` (no `/` in it) or a sentence is private. The host's own calls log **codes only**: a failing
    host command logs its `command` and `code`, never its message, and no host code logs a page, a title, a file name or
    a search word. But a panic payload and a webview error message are free text from other code, and `redact` only
-   partly cleans them: it masks paths, links, emails and secrets, and it can leave a bare title or file name. That is
-   why the person sees every line before it is sent (rule 9), and why the privacy notice says the log is built to
-   leave out page text and titles, not that it never holds them. Over-redacting is the intended failure.
+   partly cleans them: it masks paths, links, emails and secrets, and it can leave a bare title or file name. A
+   webview error message can also carry page text: an editor error, for example, can quote up to about 50 characters
+   of the content it failed on. That is why the person sees every line before it is sent (rule 9), which stays the
+   guarantee, and why the privacy notice says the log is built to leave out page text and titles, not that it never
+   holds them. Over-redacting is the intended failure.
 5. **The 500-character bound is on the message.** The line on disk also has a timestamp, the level and the target,
    about 60 characters more. `tail` redacts again and clips each line to 500 characters, so what a report carries is
    never longer.
@@ -68,14 +74,15 @@ service would break all three at once.
 9. **The report dialog** (the one of ADR-0033, `FeedbackDialog.tsx`; the desktop app only). A box, "Include recent app
    log", **off on every open**. Ticking it reads the log and shows every line that will be sent; while it loads, Send
    waits, and a failed read can be retried by unticking and ticking again. Loading, failure and "No log yet" are
-   announced to screen readers. The web client has no such box. The desktop app also adds `arch` (the processor type,
-   such as `aarch64`) to the context that "Include the app version and system" already sends, shown on screen like
-   the other values.
+   announced to screen readers. The web client has no such box. The desktop app also adds the processor type (the
+   arch, such as `aarch64`) to the context that "Include the app version and system" already sends, inside `os`
+   (`macOS (aarch64)`), shown on screen like the other values. It rides in `os`, not a key of its own, so that older
+   servers keep accepting feedback (rule 13).
 10. **Save diagnostics…** (Settings, "Help and feedback"): saves the same redacted log as `thoth-diagnostics.md`
     through the host's save dialog, for a person who would rather attach it to an email than send it. The file says
     "No log yet" when there is none, and its fence is longer than any backtick run in the log.
-11. **The protocol grows by two optional members of the request body**, both strict: `context.arch` (1 to 20
-    printable characters) and `diagnostics` `{ log }`, 1 to 200 lines of 1 to 500 printable characters. The same
+11. **The protocol grows by one optional member of the request body**, strict: `diagnostics` `{ log }`, 1 to 200
+    lines of 1 to 500 printable characters. `context` is unchanged; the arch goes in `os` (rule 9). The same
     schema is in `protocol/openapi.yaml` and `protocol/schemas`. A server without the `feedback` capability is
     unchanged, and the capability name is the same.
 12. **Server storage:** migration `014_feedback_diagnostics.sql` adds one nullable `diagnostics jsonb` column. It is
@@ -83,8 +90,11 @@ service would break all three at once.
     (`MIGRATE_ON_START=false`) before deploying a build that stores it. `feedback list` and `feedback export --json`
     show it, with control characters escaped like the message.
 13. **An older server answers 400 to `diagnostics`**, because ADR-0033's body is strict and refuses unknown members.
-    Self-hosters lag releases. The dialog does not retry on its own: when a send that included the log fails with a
-    400, it says "This server doesn't accept the app log yet. Untick “Include recent app log” and send again." and the
+    Self-hosters lag releases. The same strictness is why the arch rides in `os` rather than in a new `context.arch`:
+    a new context key would make every default send from the desktop app fail on an older server, even with the log
+    box unticked, while `os` (up to 60 characters) was always accepted, so older servers keep accepting feedback. Only
+    a send with the log ticked can meet the 400. The dialog does not retry on its own: when a send that included the
+    log fails with a 400, it says "This server doesn't accept the app log yet. Untick “Include recent app log” and send again." and the
     person decides.
 14. **No new network path.** The log goes nowhere unless the person ticks the box and sends, and then only to the
     server ADR-0033 rule 9 picks, through the host (`api.call`). The webview still has no network.
@@ -131,22 +141,24 @@ service would break all three at once.
 ## Measurements
 
 Measured on one Mac only (Mac16,12, Apple M4, macOS 15.8.1), on release builds of the Tauri app: the baseline is the
-commit before this work (1dfa579), the final is the branch with the local log, `diag.*` and Report a Problem. Cold
-start is the median of 5 launches to a visible window, taken 3 times; the figures below are the median of those 3 runs.
+commit before this work (1dfa579), the final is the branch with the local log, `diag.*` and the log box in "Send
+feedback…". Cold start in the table is the median of 15 launches of each build, interleaved one after the other; the
+other figures are the median of 3 runs.
 
 | Metric | Baseline | Final | Difference |
 | --- | --- | --- | --- |
 | App size | 18416 KB | 18748 KB | +332 KB (+1.8%) |
 | `.dmg` size | 7668 KB | 7804 KB | +136 KB (+1.8%) |
-| Cold start to window | 0.244 s | 0.344 s | within noise, see below |
+| Cold start to window (15 interleaved launches) | 0.217 s | 0.218 s | none |
 | Idle CPU (host process, 10 s) | 0.00 % | 0.00 % | none |
 | Idle RSS (host process) | 88.7 MB | 88.6 MB | none |
 | Save, median of 1000 x 20 KB `fs.write` | 4257 us | 4922 us | within noise, see below |
 
-Noise, which is larger than any difference here: cold start ran 0.227 to 0.354 s for the baseline and 0.248 to 0.361 s
-for the final in the same session (0.294 to 0.41 s on an earlier day). Interleaving 15 launches of each build one after
-the other gave a median of 0.217 s for the baseline and 0.218 s for the final, so the log file's open at start costs
-nothing that shows. The save median ran 4023 to 4929 us for the baseline and 4194 to 4935 us for the final, and the
+Noise, which is larger than any difference here: cold start was first taken as the median of 5 launches, 3 times,
+which gave 0.244 s for the baseline and 0.344 s for the final (median of the 3 runs), but single runs ran 0.227 to
+0.354 s for the baseline and 0.248 to 0.361 s for the final in the same session (0.294 to 0.41 s on an earlier day).
+Interleaving 15 launches of each build one after the other (the table) gave a median of 0.217 s for the baseline and
+0.218 s for the final, so the log file's open at start costs nothing that shows. The save median ran 4023 to 4929 us for the baseline and 4194 to 4935 us for the final, and the
 save does not touch the log. The baseline column is a rebuild of 1dfa579 measured in the same session as the final;
 the first baseline, taken a day earlier by the first measurement, was cold start 0.376 s, idle RSS 68.2 MB and save
 median 4044 us, and the machine's idle RSS had moved by about 20 MB since then for both builds.
