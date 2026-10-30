@@ -87,8 +87,9 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     if !matches!(c.get(host_end), Some('/' | '\\' | '?' | '#')) {
         return Some(host_end);
     }
-    out.push_str("/<redacted>");
-    if c[i..colon].iter().collect::<String>().eq_ignore_ascii_case("file") {
+    let scheme = c[i..colon].iter().collect::<String>().to_ascii_lowercase();
+    if scheme == "file" {
+        out.push_str("/<redacted>");
         return Some(path_end(c, host_end, false));
     }
     let mut depth = 0usize;
@@ -102,7 +103,38 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         }
         end += 1;
     }
+    let host = host.iter().collect::<String>().to_ascii_lowercase();
+    let own = user_info_end.is_none() && matches!((scheme.as_str(), host.as_str()), ("tauri", "localhost") | ("http" | "https", "tauri.localhost"));
+    if !(own && app_location(&c[host_end..end], out)) {
+        out.push_str("/<redacted>");
+    }
     Some(end)
+}
+
+/// The rest of a URL on the app's own origin (its bundled scripts, in a webview stack): keeps the path and a trailing
+/// `:line:col`, and replaces a query or fragment with `<redacted>`. `false`, writing nothing, when the path holds
+/// anything but `[A-Za-z0-9._/-]`, so the caller falls back to the usual rule.
+fn app_location(rest: &[char], out: &mut String) -> bool {
+    let mut loc = rest.len();
+    for _ in 0..2 {
+        let digits = rest[..loc].iter().rev().take_while(|ch| ch.is_ascii_digit()).count();
+        if digits == 0 || loc < digits + 1 || rest[loc - digits - 1] != ':' {
+            break;
+        }
+        loc -= digits + 1;
+    }
+    let path_len = rest[..loc].iter().position(|&ch| matches!(ch, '?' | '#')).unwrap_or(loc);
+    let path = &rest[..path_len];
+    if path.first().is_some_and(|&ch| ch != '/') || !path.iter().all(|&ch| ch.is_ascii_alphanumeric() || "._/-".contains(ch)) {
+        return false;
+    }
+    out.extend(path);
+    if path_len < loc {
+        out.push(rest[path_len]);
+        out.push_str("<redacted>");
+    }
+    out.extend(&rest[loc..]);
+    true
 }
 
 /// A key from `KEYS`, a separator (`:`, `=` or spaces, after an optional closing quote) and its value; writes the key
@@ -349,6 +381,25 @@ mod tests {
     }
 
     #[test]
+    fn keeps_webview_stack_locations_on_the_apps_own_origin_only() {
+        assert_eq!(redact("foo@tauri://localhost/assets/index-abc.js:12:345"), "foo@tauri://localhost/assets/index-abc.js:12:345");
+        assert_eq!(redact("at f (http://tauri.localhost/assets/x.js:1:2)"), "at f (http://tauri.localhost/assets/x.js:1:2)");
+        assert_eq!(redact("https://tauri.localhost/assets/x.js:1:2"), "https://tauri.localhost/assets/x.js:1:2");
+        // The host must match exactly: a look-alike, a port or user info gets the usual rule.
+        assert_eq!(redact("https://tauri.localhost.evil.com/a/b"), "https://tauri.localhost.evil.com/<redacted>");
+        assert_eq!(redact("http://evil.tauri.localhost/a/b"), "http://evil.tauri.localhost/<redacted>");
+        assert_eq!(redact("tauri://localhost:9/a/b"), "tauri://localhost:9/<redacted>");
+        assert_eq!(redact("tauri://me@localhost/a/b"), "tauri://<redacted>@localhost/<redacted>");
+        assert_eq!(redact("https://localhost/a/b"), "https://localhost/<redacted>");
+        // Only the path and `:line:col` are kept; a query or fragment is not.
+        assert_eq!(redact("tauri://localhost/x?token=abc"), "tauri://localhost/x?<redacted>");
+        assert_eq!(redact("tauri://localhost/x.js?v=1:3:4"), "tauri://localhost/x.js?<redacted>:3:4");
+        assert_eq!(redact("tauri://localhost/x#My Notes"), "tauri://localhost/x#<redacted> Notes");
+        // A path the app would not serve (an email, a space-free name with other characters) gets the usual rule.
+        assert_eq!(redact("tauri://localhost/a@b.co/x"), "tauri://localhost/<redacted>");
+    }
+
+    #[test]
     fn url_host_ends_where_a_host_cannot_go_on() {
         assert_eq!(redact("url=https://api.x.com,token=abc123"), "url=https://api.x.com,token=<redacted>");
         assert_eq!(redact("https://h;password=x"), "https://h;password=<redacted>");
@@ -442,6 +493,11 @@ mod tests {
             "postgres://me:pa!ss@db.local:5432/thoth",
             "redis://:p_w~x@h:6379",
             "file:///Users/a/My Big plan.md",
+            "foo@tauri://localhost/assets/index-abc.js:12:345",
+            "at f (http://tauri.localhost/assets/x.js:1:2)",
+            "tauri://localhost/x?token=abc",
+            "tauri://localhost/x.js?v=1:3:4#y",
+            "https://tauri.localhost.evil.com/a/b",
             "panicked at src/lib.rs:42:5: boom",
             "[/Users/a/x.md] y",
             "mail a.b@c.co now",
