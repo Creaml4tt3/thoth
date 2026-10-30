@@ -22,6 +22,11 @@ export const DESKTOP_ONLY = [
   "update.restart",
   "update_restart",
   "update.progress",
+  // Problem reports (ADR-0040): the local log is the desktop host's.
+  "diag.report",
+  "diag_report",
+  "diag.collect",
+  "diag_collect",
   "latest.json",
   "@tauri-apps",
   "plugin:fs",

@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -70,6 +70,16 @@ export interface Platform {
   readonly updates?: Updates;
   /** Other apps reading shared Private Spaces over MCP (ADR-0021). Only the desktop host has it; absent: no such setting. */
   readonly connectedApps?: ConnectedApps;
+  /** The app's local log for problem reports (ADR-0040). Only the desktop host has it; absent: no log, nothing reported. */
+  readonly diagnostics?: Diagnostics;
+}
+
+/** What the host does for problem reports (ADR-0040): it keeps a small redacted log on this computer and hands it over on request. */
+export interface Diagnostics {
+  /** An uncaught error of this window, for the host's log (it redacts, shortens and caps it). */
+  report(e: { kind: "error" | "rejection"; message: string; stack?: string }): Promise<void>;
+  /** The version, the system and the newest lines of the redacted log. */
+  collect(): Promise<DiagnosticsBundle>;
 }
 
 /** What the host does for the update notice (ADR-0022): it asks `latest.json` and keeps the person's choice. */

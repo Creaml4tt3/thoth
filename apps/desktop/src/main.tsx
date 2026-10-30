@@ -6,6 +6,7 @@ import { App } from "./app/App.tsx";
 import { readLaunch } from "./app/windows.ts";
 import { selectPlatform } from "./platform/select.ts";
 import { selectNotifier } from "./platform/notifier.ts";
+import { createErrorReporter } from "./platform/errors.ts";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Missing #root");
@@ -25,6 +26,15 @@ window.addEventListener("drop", (event) => {
 
 selectPlatform()
   // A window the app opened says which it is, and what it shows, in its address (ADR-0019).
+  .then((platform) => {
+    // Uncaught errors go to the host's local log, never anywhere else (ADR-0040).
+    if (platform.diagnostics) {
+      const report = createErrorReporter(platform.diagnostics.report);
+      window.addEventListener("error", report);
+      window.addEventListener("unhandledrejection", report);
+    }
+    return platform;
+  })
   .then((platform) => createRoot(container).render(<App platform={platform} launch={readLaunch(window.location.search)} options={{ notifier: selectNotifier() }} />))
   .catch((error: unknown) => {
     container.textContent = `Thoth could not start: ${error instanceof Error ? error.message : String(error)}`;

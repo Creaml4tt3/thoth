@@ -6,7 +6,7 @@
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { ConnectedApps, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
+import type { ConnectedApps, Diagnostics, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -316,6 +316,13 @@ export function remoteLinks(transport: Transport): Links {
   };
 }
 
+export function remoteDiagnostics(transport: Transport): Diagnostics {
+  return {
+    report: async (e) => void (await transport.call("diag.report", e)),
+    collect: () => transport.call("diag.collect", {}),
+  };
+}
+
 /** The update notice and in-app updates; `onProgress` comes from the platform's own event channel (none: never). */
 export function remoteUpdates(transport: Transport, events: Pick<Updates, "onProgress"> = { onProgress: async () => () => undefined }): Updates {
   return {
@@ -353,6 +360,7 @@ export function createRemotePlatform(transport: Transport, kind: Platform["kind"
     agents: remoteAgents(transport),
     links: remoteLinks(transport),
     updates: remoteUpdates(transport),
+    diagnostics: remoteDiagnostics(transport),
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),
