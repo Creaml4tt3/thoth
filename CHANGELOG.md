@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.3.0] - 2026-10-31
+
+### Added
+
+- "Send feedback…" can include the recent app log. The app keeps a small log on your computer (errors and app events; it is built to leave out page text and titles, and it masks file paths, links and email addresses), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings → Help and feedback also has "Save diagnostics…" to save the same log to a file.
+
+### Changed
+
+- Feedback from the desktop app can include your processor type (for example aarch64 or x86_64) with the system, as in "macOS (aarch64)", along with the app version, shown on screen before you send.
+
 ## [0.2.8] - 2026-10-30
 
 ### Added
@@ -196,6 +206,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.3.0]: https://github.com/Creaml4tt3/thoth/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/Creaml4tt3/thoth/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Creaml4tt3/thoth/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Creaml4tt3/thoth/compare/v0.2.5...v0.2.6

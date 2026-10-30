@@ -56,12 +56,13 @@ export async function enforceFeedbackLimits(db: Queryable, ipHash: string, accou
 
 export async function storeFeedback(db: Queryable, input: FeedbackRequest, who: { accountId: string | null; ipHash: string }): Promise<string> {
   const id = newStableId();
-  await db.query("INSERT INTO feedback (id, kind, message, email, context, account_id, ip_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)", [
+  await db.query("INSERT INTO feedback (id, kind, message, email, context, diagnostics, account_id, ip_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", [
     id,
     input.kind,
     input.message,
     input.email ?? null,
     input.context ? JSON.stringify(input.context) : null,
+    input.diagnostics ? JSON.stringify(input.diagnostics) : null,
     who.accountId,
     who.ipHash,
   ]);
@@ -75,15 +76,16 @@ export interface FeedbackRow {
   message: string;
   email: string | null;
   context: Record<string, string> | null;
+  diagnostics: { log: string[] } | null;
   accountId: string | null;
 }
 
 /** Newest first, optionally only those at or after `since`. The address hash is not part of the listing. */
 export async function listFeedback(db: Queryable, options: { since?: Date; limit?: number } = {}): Promise<FeedbackRow[]> {
-  const { rows } = await db.query<{ id: string; created_at: Date; kind: string; message: string; email: string | null; context: Record<string, string> | null; account_id: string | null }>(
-    `SELECT id, created_at, kind, message, email, context, account_id FROM feedback
+  const { rows } = await db.query<{ id: string; created_at: Date; kind: string; message: string; email: string | null; context: Record<string, string> | null; diagnostics: { log: string[] } | null; account_id: string | null }>(
+    `SELECT id, created_at, kind, message, email, context, diagnostics, account_id FROM feedback
       WHERE ($1::timestamptz IS NULL OR created_at >= $1) ORDER BY created_at DESC, id DESC LIMIT $2`,
     [options.since ?? null, options.limit ?? 1_000_000],
   );
-  return rows.map((r) => ({ id: r.id, createdAt: r.created_at.toISOString(), kind: r.kind, message: r.message, email: r.email, context: r.context, accountId: r.account_id }));
+  return rows.map((r) => ({ id: r.id, createdAt: r.created_at.toISOString(), kind: r.kind, message: r.message, email: r.email, context: r.context, diagnostics: r.diagnostics, accountId: r.account_id }));
 }

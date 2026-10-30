@@ -17,4 +17,14 @@ export const feedbackChecks: Check[] = [
       }
     },
   },
+  {
+    id: "feedback.diagnostics.too_long",
+    title: "sendFeedback refuses an app log of more than 200 lines with 400 validation_failed, with or without credentials",
+    capability: "feedback",
+    async run(ctx) {
+      for (const auth of ["none", "token"] as const) {
+        expectProblem(await ctx.client.call("sendFeedback", { json: { kind: "problem", message: "x", diagnostics: { log: Array(201).fill("x") } }, auth }), 400, "validation_failed", `sendFeedback with 201 log lines (auth ${auth})`);
+      }
+    },
+  },
 ];

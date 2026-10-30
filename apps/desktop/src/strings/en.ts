@@ -184,9 +184,13 @@ export const en = {
   /** Settings → Help and feedback (ADR-0033). */
   helpFeedback: {
     title: "Help and feedback",
-    intro: "Found a problem, have an idea or a question? Send it from here. Only what you type is sent, and the app version and system if you leave that on.",
+    intro: "Found a problem, have an idea or a question? Send it from here. Only what you type is sent, and the app version and system if you leave that on, and the app log, if you include it.",
     send: "Send feedback…",
     email: (address: string) => `Or write to ${address}`,
+    saveDiagnostics: "Save diagnostics…",
+    diagnosticsSaved: "Saved.",
+    diagnosticsNotSaved: "Not saved.",
+    diagnosticsFailed: "The diagnostics could not be saved.",
   },
 
   updates: {

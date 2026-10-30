@@ -87,6 +87,14 @@ Domains used below (change them when you buy your own domain):
    website's form posts from the site's origin, which must stay in
    `CORS_ORIGINS`.
 
+   Migration `014_feedback_diagnostics.sql` (ADR-0040, the app log in
+   feedback) adds one nullable column (`feedback.diagnostics jsonb`) and needs
+   no backfill. It is additive and safe while the old build runs. **Apply it to
+   Neon before you deploy the server build that contains it.** That build's
+   `storeFeedback` and `listFeedback` name the column, so without it every
+   feedback request (with or without a log) and `feedback list` fail with a
+   database error.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.

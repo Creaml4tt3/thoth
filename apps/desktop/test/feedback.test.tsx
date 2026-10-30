@@ -89,3 +89,62 @@ describe("Send feedback (ADR-0033)", () => {
     expect(servers.calls.some((c) => c.path === "/api/v1/feedback")).toBe(false);
   });
 });
+
+describe("Save diagnostics (ADR-0040)", () => {
+  async function saving(log: string[], answer = true) {
+    const platform = createNodePlatform({ vault: root });
+    const saved: { name: string; text: string }[] = [];
+    platform.saveFile = async (name, bytes) => {
+      saved.push({ name, text: new TextDecoder().decode(bytes) });
+      return answer;
+    };
+    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log }) } });
+    const app = await openApp(root, {}, platform);
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    await app.user.click(within(section).getByRole("button", { name: "Save diagnostics…" }));
+    return { section, saved };
+  }
+
+  it("save_diagnostics_writes_markdown", async () => {
+    const lines = ["2026-10-30T10:00:00Z INFO thoth: started", "a line with ``` inside"];
+    const { section, saved } = await saving(lines);
+    await waitFor(() => expect(within(section).getByRole("status").textContent).toBe("Saved."));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]!.name).toBe("thoth-diagnostics.md");
+    const text = saved[0]!.text;
+    expect(text).toMatch(/^# Thoth diagnostics\n/);
+    for (const field of ["Version: 0.3.0", "OS: macos", "Arch: aarch64"]) expect(text).toContain(field);
+    expect(text).toMatch(/Date: \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/);
+    // A fence longer than any backtick run in the lines, so no line can close it.
+    expect(text).toContain(`\`\`\`\`\n${lines.join("\n")}\n\`\`\`\`\n`);
+  });
+
+  it("with no log yet, says so instead of an empty block; a cancelled save says not saved", async () => {
+    const { section, saved } = await saving([], false);
+    await waitFor(() => expect(within(section).getByRole("status").textContent).toBe("Not saved."));
+    expect(saved[0]!.text).toContain("No log yet.");
+    expect(saved[0]!.text).not.toContain("```");
+  });
+
+  it("is not offered without a host log", async () => {
+    const { app } = await start(() => undefined);
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    expect(within(section).queryByRole("button", { name: "Save diagnostics…" })).toBeNull();
+  });
+
+  it("the dialog offers the log box, off, and adds the arch to the os in the details", async () => {
+    const platform = createNodePlatform({ vault: root, servers: new FakeServers() });
+    platform.servers.connect(TEAM);
+    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log: [] }) } });
+    const app = await openApp(root, {}, platform);
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    const dialog = await openFromSettings(app);
+    // In `os`, not a key of its own: an older server's strict context would refuse `arch` (ADR-0040).
+    await within(dialog).findByText(/^os: (macOS|Windows|Linux) \(aarch64\)$/);
+    expect(within(dialog).queryByText(/^arch:/)).toBeNull();
+    expect((within(dialog).getByRole("checkbox", { name: "Include recent app log" }) as HTMLInputElement).checked).toBe(false);
+  });
+});

@@ -242,6 +242,22 @@ export interface Commands {
   "mcp.answer": { args: { id: string } & McpAnswer; result: null };
   /** The requests of the last 30 days, newest first (at most 500). */
   "mcp.log": { args: Record<string, never>; result: ConnectedAppsLogEntry[] };
+  // ---- Problem reports (ADR-0040). Desktop only: the app's local log, which never leaves the computer by itself.
+  /**
+   * The window's uncaught error, for the local log: the message and the first 5 lines of the stack, redacted by the
+   * host. At most 50 per app run are kept; later ones are accepted and dropped.
+   */
+  "diag.report": { args: { kind: "error" | "rejection"; message: string; stack?: string }; result: null };
+  /** The version, the system and the newest 200 lines (at most 64 KB) of the redacted log; `log` is empty when there is none. */
+  "diag.collect": { args: Record<string, never>; result: DiagnosticsBundle };
+}
+
+/** What `diag.collect` returns, for a problem report. */
+export interface DiagnosticsBundle {
+  version: string;
+  os: string;
+  arch: string;
+  log: string[];
 }
 
 /** A newer version, as the notice shows it. */

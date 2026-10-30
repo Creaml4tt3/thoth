@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Least privilege for the main window and Thoth's own windows on a Private Space (space-*, ADR-0019): Thoth's host commands, event listening, and showing a system notification (check and ask for the permission, notify; ADR-0018). No fs, shell, http, opener or window plugins; native dialogs, the system browser, every server request, link previews (ADR-0020), the update notice's one request for latest.json (ADR-0022), the downloads and installs of in-app updates (ADR-0034; no plugin permission), the Connected apps socket for thoth-mcp (ADR-0021) and the Agent Hub's CLI runs are made by the host, not the webview.",
+  "description": "Least privilege for the main window and Thoth's own windows on a Private Space (space-*, ADR-0019): Thoth's host commands, event listening, and showing a system notification (check and ask for the permission, notify; ADR-0018). No fs, shell, http, opener or window plugins, and no log: permission (the log plugin is used from the host only, ADR-0040); native dialogs, the system browser, every server request, link previews (ADR-0020), the update notice's one request for latest.json (ADR-0022), the downloads and installs of in-app updates (ADR-0034; no plugin permission), the Connected apps socket for thoth-mcp (ADR-0021) and the Agent Hub's CLI runs are made by the host, not the webview.",
   "windows": [
     "main",
     "space-*"
@@ -84,6 +84,8 @@
     "allow-mcp-decide",
     "allow-mcp-forget",
     "allow-mcp-answer",
-    "allow-mcp-log"
+    "allow-mcp-log",
+    "allow-diag-report",
+    "allow-diag-collect"
   ]
 }

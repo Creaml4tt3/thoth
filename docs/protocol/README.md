@@ -97,7 +97,7 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
-| `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; section 10, ADR-0033 |
+| `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; optionally the person's redacted app log (`diagnostics`); section 10, ADR-0033, ADR-0040 |
 | `databases` | none | reserved; no semantics in 1.0 |
 | `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
 
@@ -607,7 +607,8 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
 
 - `POST /feedback` needs no credentials. A valid bearer credential ties the feedback to the account; an invalid one is
   ignored (never 401). The body is strict: `kind` (`problem` | `idea` | `question`), `message` (1 to 5000 characters,
-  not blank), optional `email`, optional `context` `{ client, version?, os?, language? }`, and the honeypot `website`
+  not blank), optional `email`, optional `context` `{ client, version?, os?, language? }` (the desktop app puts the processor type in `os`, e.g. `macOS (aarch64)`), optional `diagnostics` `{ log }` (1 to 200
+  printable lines of at most 500 characters: the app log the person chose to attach), and the honeypot `website`
   (filled in: the same 204, nothing stored). 204 when received; 400 `validation_failed` for anything else; 429
   `rate_limited` with `Retry-After`. Nothing is stored for a refused request.
 - A form-encoded body (the website without JavaScript) carries the same fields flat, plus `return` (a path); it must

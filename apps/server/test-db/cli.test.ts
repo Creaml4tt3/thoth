@@ -127,9 +127,9 @@ describe("admin CLI", () => {
     await c.connect();
     const hash = "a".repeat(64);
     await c.query(
-      `INSERT INTO feedback (id, created_at, kind, message, email, context, ip_hash) VALUES
-       ('0190f2a0-0000-7000-8000-000000000001', now() - interval '3 days', 'idea', 'Old idea', NULL, NULL, $1),
-       ('0190f2a0-0000-7000-8000-000000000002', now() - interval '1 hour', 'problem', E'It broke\\n\\u001b[31mred\\u009b', 'ada@example.org', '{"client":"desktop","version":"0.4.0"}', $1)`,
+      `INSERT INTO feedback (id, created_at, kind, message, email, context, diagnostics, ip_hash) VALUES
+       ('0190f2a0-0000-7000-8000-000000000001', now() - interval '3 days', 'idea', 'Old idea', NULL, NULL, NULL, $1),
+       ('0190f2a0-0000-7000-8000-000000000002', now() - interval '1 hour', 'problem', E'It broke\\n\\u001b[31mred\\u009b', 'ada@example.org', '{"client":"desktop","version":"0.4.0"}', E'{"log":["line one","esc \\\\u001b[31m\\\\u009b","three"]}', $1)`,
       [hash],
     );
     await c.end();
@@ -142,6 +142,7 @@ describe("admin CLI", () => {
     expect(list.stdout).not.toMatch(/[\u001b\u009b]/);
     expect(list.stdout).toContain("\\u001b[31mred\\u009b");
     expect(list.stdout).not.toContain(hash);
+    expect(list.stdout.match(/log: 3 lines/g)).toHaveLength(1);
 
     const recent = await cli(["feedback", "list", "--since", "1d"]);
     expect(recent.stdout).toContain("It broke");
@@ -154,6 +155,7 @@ describe("admin CLI", () => {
     expect(rows.map((r) => r.kind)).toEqual(["problem", "idea"]);
     expect(rows[0]).toMatchObject({ message: "It broke\n\u001b[31mred\u009b", email: "ada@example.org", context: { client: "desktop", version: "0.4.0" }, accountId: null });
     expect(JSON.stringify(rows)).not.toContain(hash);
+    expect(rows.map((r) => (r as { diagnostics?: unknown }).diagnostics)).toEqual([{ log: ["line one", "esc \\u001b[31m\\u009b", "three"] }, null]);
 
     expect((await cli(["feedback"])).code).toBe(2);
     expect((await cli(["feedback", "export"])).code).toBe(2);

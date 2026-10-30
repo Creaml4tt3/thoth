@@ -65,6 +65,21 @@ describe("feedback (ADR-0033)", () => {
     expect((await env.db.query("SELECT account_id FROM feedback WHERE message = 'Who am I?'")).rows).toEqual([{ account_id: null }]);
   });
 
+  it("stores the app log the person attached, and refuses 201 lines, a control character or an unknown member", async () => {
+    const log = ["2026-10-30T10:00:00Z INFO host started", "2026-10-30T10:00:01Z WARN command failed code=io", "ถึงเวลา 🙂"];
+    expect((await env.api(null, "POST", "/feedback", { headers: from(), json: { kind: "problem", message: "With log", diagnostics: { log } } })).status).toBe(204);
+    expect((await env.db.query("SELECT diagnostics FROM feedback WHERE message = 'With log'")).rows).toEqual([{ diagnostics: { log } }]);
+    await env.api(null, "POST", "/feedback", { headers: from(), json: { kind: "idea", message: "Without log" } });
+    expect((await env.db.query("SELECT diagnostics FROM feedback WHERE message = 'Without log'")).rows).toEqual([{ diagnostics: null }]);
+    const before = await count(env);
+    for (const diagnostics of [{ log: Array(201).fill("x") }, { log: ["a\u001bb"] }, { log, extra: true }]) {
+      const res = await env.api(null, "POST", "/feedback", { headers: from(), json: { kind: "problem", message: "Bad log", diagnostics } });
+      expect(res.status, JSON.stringify(diagnostics).slice(0, 40)).toBe(400);
+      expect(res.json.code).toBe("validation_failed");
+    }
+    expect(await count(env)).toBe(before);
+  });
+
   it("refuses invalid bodies with 400 validation_failed naming the field, and stores nothing", async () => {
     const before = await count(env);
     const bad: [unknown, string][] = [
@@ -157,6 +172,12 @@ describe("feedback (ADR-0033)", () => {
       expect(html).toContain(`href="${SITE}/th/support/"`);
       expect(html).toContain('role="status"');
       expect((await env.db.query("SELECT email, context FROM feedback WHERE message = 'Form idea'")).rows).toEqual([{ email: null, context: { client: "site", language: "th" } }]);
+    });
+
+    it("never takes diagnostics from a form: the field is ignored and the row has none", async () => {
+      const res = await post({ kind: "idea", message: "Form with log", client: "site", diagnostics: '{"log":["x"]}' }, { ...from(), origin: SITE });
+      expect(res.status).toBe(200);
+      expect((await env.db.query("SELECT diagnostics FROM feedback WHERE message = 'Form with log'")).rows).toEqual([{ diagnostics: null }]);
     });
 
     it("refuses a form from an origin the server does not allow, and an invalid one with an HTML page; nothing stored", async () => {

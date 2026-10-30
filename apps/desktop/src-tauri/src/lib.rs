@@ -568,7 +568,11 @@ fn handle(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
         match reply {
             Ok((_, Some(bytes))) => Ok(InvokeResponseBody::Raw(bytes)),
             Ok((value, None)) => Ok(InvokeResponseBody::Json(value.to_string())),
-            Err(error) => Err(InvokeError::from(error)),
+            Err(error) => {
+                // The code only: a message can hold a name or a path.
+                log::warn!(target: "host", "{command} failed: {}", error.code);
+                Err(InvokeError::from(error))
+            }
         }
     });
     true
@@ -708,6 +712,60 @@ fn move_legacy_data_dir(identifier: &str) {
     }
 }
 
+/// One line of `thoth.log`, after its time: every record, Thoth's and other crates', is redacted on the way in.
+fn log_line(level: log::Level, target: &str, message: &str) -> String {
+    format!("{level} {target}: {}", thoth_host::diagnostics::redact(message))
+}
+
+/// Panics go to the log too (the formatter redacts any path in the message), then to the previous hook. Call once.
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let payload = payload.downcast_ref::<&str>().copied().or_else(|| payload.downcast_ref::<String>().map(String::as_str)).unwrap_or("non-string payload");
+        // Forward slashes on every OS, so a Windows location reads (and is kept by `redact`) like the others.
+        let at = info.location().map_or_else(|| "unknown location".to_owned(), |l| format!("{}:{}:{}", l.file().replace('\\', "/"), l.line(), l.column()));
+        // The location first: `redact` takes a path to the line's end, so one in the payload would swallow it.
+        log::error!(target: "panic", "at {at}: {payload}");
+        previous(info);
+    }));
+}
+
+/// The local log (ADR-0040): one small rotating `thoth.log` in the OS log folder, UTC, Info and up (other crates Warn).
+/// Used from the host only: the plugin is never registered, so the webview has no `log` command (and no `log:` permission).
+fn attach_log(app: &AppHandle) -> bool {
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
+    let mut builder = tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir { file_name: Some("thoth".into()) }))
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepSome(2))
+        .level(log::LevelFilter::Info)
+        // Replaces the plugin's default format, so the time (UTC) is written here.
+        .format(|out, message, record| {
+            let now = TimezoneStrategy::UseUtc.get_now();
+            out.finish(format_args!(
+                "[{}-{:02}-{:02}][{:02}:{:02}:{:02}] {}",
+                now.year(),
+                u8::from(now.month()),
+                now.day(),
+                now.hour(),
+                now.minute(),
+                now.second(),
+                log_line(record.level(), record.target(), &message.to_string())
+            ))
+        });
+    // fern matches a target or its `::` modules only: `tauri` does not cover `tauri_runtime_wry`.
+    for noisy in ["tao", "wry", "reqwest", "hyper", "hyper_util", "rustls", "tauri", "tauri_runtime_wry", "tauri_plugin_updater"] {
+        builder = builder.level_for(noisy, log::LevelFilter::Warn);
+    }
+    // `split`, not `.plugin(builder.build())`: a log that can't be opened must never stop the app from starting.
+    match builder.split(app) {
+        Ok((_plugin, max_level, logger)) => tauri_plugin_log::attach_logger(max_level, logger).is_ok(),
+        Err(_) => false,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let context = tauri::generate_context!();
@@ -727,6 +785,10 @@ pub fn run() {
         // In-app updates (ADR-0034): used from the host through its Rust API; the webview is granted none of it.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // Without a log (folder not writable), the app starts all the same.
+            attach_log(app.handle());
+            install_panic_hook();
+            log::info!("start {} {} {}", app.package_info().version, std::env::consts::OS, std::env::consts::ARCH);
             // In-app updates read the same address as the notice; a build without one has neither.
             let installer: Arc<dyn Installer> = match tauri::Url::parse(UPDATE_URL) {
                 Ok(endpoint) => {
@@ -763,7 +825,8 @@ pub fn run() {
                 // Link previews connect to public addresses only (ADR-0020); the loopback switch is for tests.
                 link_preview_loopback: false,
             })
-            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), allow_loopback: LOCAL_UPDATE_TEST, installer, ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) });
+            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), allow_loopback: LOCAL_UPDATE_TEST, installer, ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) })
+            .with_log_dir(app.path().app_log_dir().ok());
             let _ = HOST.set(Arc::new(host));
             Ok(())
         })
@@ -1132,6 +1195,53 @@ mod tests {
         let moved = run.find("move_legacy_data_dir(").unwrap();
         assert!(moved < run.find("tauri::Builder::default()").unwrap());
         assert!(run.contains(".build(context)"));
+    }
+
+    #[test]
+    fn log_line_redacts() {
+        assert_eq!(log_line(log::Level::Error, "webview", "at /Users/a/x.md"), "ERROR webview: at <path>");
+    }
+
+    /// Records every log record as the file would get it. `log::set_logger` works once per process: set up once here.
+    struct TestLogger(Mutex<Vec<(log::Level, String)>>);
+    impl log::Log for TestLogger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+        fn log(&self, record: &log::Record) {
+            let line = log_line(record.level(), record.target(), &record.args().to_string());
+            locked(&self.0).push((record.level(), line));
+        }
+        fn flush(&self) {}
+    }
+    static TEST_LOGGER: TestLogger = TestLogger(Mutex::new(Vec::new()));
+
+    #[test]
+    fn panic_hook_logs_location_not_payload_paths() {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        static PREVIOUS_RAN: AtomicBool = AtomicBool::new(false);
+        INIT.call_once(|| {
+            log::set_logger(&TEST_LOGGER).unwrap();
+            log::set_max_level(log::LevelFilter::Info);
+        });
+        // The hook is global for the process: keep the original and put it back at the end.
+        let original = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| PREVIOUS_RAN.store(true, Ordering::SeqCst)));
+        install_panic_hook();
+        let line = line!() + 1;
+        let result = std::panic::catch_unwind(|| panic!("bad /Users/a/x.md"));
+        drop(std::panic::take_hook());
+        std::panic::set_hook(original);
+
+        assert!(result.is_err());
+        assert!(PREVIOUS_RAN.load(Ordering::SeqCst));
+        let records: Vec<_> = locked(&TEST_LOGGER.0).iter().filter(|(_, l)| l.contains(&format!("src/lib.rs:{line}:"))).cloned().collect();
+        assert_eq!(records.len(), 1, "{records:?}");
+        let (level, logged) = &records[0];
+        assert_eq!(*level, log::Level::Error);
+        assert!(logged.starts_with(&format!("ERROR panic: at apps/desktop/src-tauri/src/lib.rs:{line}:")), "{logged}");
+        assert!(logged.ends_with(": bad <path>"), "{logged}");
+        assert!(!logged.contains("/Users"), "{logged}");
     }
 
     #[test]

@@ -56,6 +56,26 @@
       ],
       "additionalProperties": false
     },
+    "diagnostics": {
+      "type": "object",
+      "properties": {
+        "log": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "required": [
+        "log"
+      ],
+      "additionalProperties": false
+    },
     "website": {
       "type": "string",
       "maxLength": 500

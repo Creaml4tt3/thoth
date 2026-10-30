@@ -604,11 +604,11 @@ export const ROUTES: readonly RouteDefinition[] = [
     tag: "Feedback",
     summary: "Send a problem, an idea or a question to the server's operator",
     description:
-      "ADR-0033. No credentials needed; a valid bearer credential, when sent, ties the feedback to that account (an invalid one is ignored, never 401). The body is strict: only `kind`, `message`, an optional `email`, an optional `context` (client, version, os, language) and the website form's honeypot `website`. Nothing is stored for a refused request. A request whose honeypot is filled in gets the same 204 and is not stored. Rate limited per client address and per account, a short and a daily window (429 with `Retry-After`). The website's no-JavaScript form may send the same fields form-encoded (`context` as `client`, `version`, `os`, `language`) and gets an HTML page back; such a request must come from an origin the server allows for CORS.",
+      "ADR-0033. No credentials needed; a valid bearer credential, when sent, ties the feedback to that account (an invalid one is ignored, never 401). The body is strict: only `kind`, `message`, an optional `email`, an optional `context` (client, version, os, language), an optional `diagnostics` (`log`: 1 to 200 printable lines of at most 500 characters, the app log the person chose to attach) and the website form's honeypot `website`. Nothing is stored for a refused request. A request whose honeypot is filled in gets the same 204 and is not stored. Rate limited per client address and per account, a short and a daily window (429 with `Retry-After`). The website's no-JavaScript form may send the same fields form-encoded (`context` as `client`, `version`, `os`, `language`; never `diagnostics`, which a form cannot carry) and gets an HTML page back; such a request must come from an origin the server allows for CORS.",
     capability: "feedback",
     public: true,
     optionalAuth: true,
-    requestBody: { contentType: JSON_CT, schema: FeedbackRequestSchema, required: true, description: "The kind, the message, and optionally an email address and the client's description of itself." },
+    requestBody: { contentType: JSON_CT, schema: FeedbackRequestSchema, required: true, description: "The kind, the message, and optionally an email address, the client's description of itself and the app log the person chose to attach." },
     responses: [{ status: 204, description: "Received.", headers: [] }],
     errors: ["validation_failed", "forbidden", "payload_too_large", "unsupported_media_type", "rate_limited", "internal_error", "service_unavailable"],
   }),

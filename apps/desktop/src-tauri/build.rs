@@ -26,6 +26,9 @@ pub const TAURI_COMMANDS: &[&str] = &[
     // Connected apps (ADR-0021): the settings, the Allow or Deny, a window's answer and the log; thoth-mcp's socket is
     // the host's own.
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
+    // Problem reports (ADR-0040): the webview reports its uncaught errors to the host's local log and reads the redacted
+    // log back; no log plugin permission.
+    "diag_report", "diag_collect",
     // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
     "window_open", "window_close",
 ];

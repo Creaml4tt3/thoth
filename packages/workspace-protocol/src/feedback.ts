@@ -4,7 +4,8 @@ import { z } from "zod";
  * Feedback from users (ADR-0033, capability `feedback`): a problem, an idea or a question, sent from the desktop app,
  * the web client or the website's support page. No sign-in is needed; a valid bearer credential, when one comes with
  * it, ties the feedback to that account. Only what the person typed and, if they agree, a short description of the
- * client goes out: never page text, titles or file names. The objects are strict, so nothing else can ride along.
+ * client and the app log they chose to include (shown to them first, redacted on their computer) goes out: never page
+ * text, titles or file names. The objects are strict, so nothing else can ride along.
  */
 
 export const FEEDBACK_KINDS = ["problem", "idea", "question"] as const;
@@ -13,6 +14,7 @@ export type FeedbackKind = z.infer<typeof FeedbackKindSchema>;
 
 export const FEEDBACK_MESSAGE_MAX = 5000;
 export const FEEDBACK_EMAIL_MAX = 254;
+export const FEEDBACK_LOG_LINES = 200;
 export const FEEDBACK_CLIENTS = ["desktop", "web", "site"] as const;
 
 /** A short label: printable characters only, no control characters, at most `max` characters. */
@@ -33,7 +35,7 @@ export const FeedbackContextSchema = z.strictObject({
     .max(40)
     .regex(/^[0-9A-Za-z][0-9A-Za-z.+-]*$/, "Expected a version like 0.4.0")
     .optional(),
-  /** The operating system, for example `macOS 15.1` or `Windows`. */
+  /** The operating system, for example `macOS 15.1`, `Windows` or, from the desktop app, `macOS (aarch64)`. */
   os: shortText(60).optional(),
   /** The interface language, a BCP 47 tag such as `en` or `th`. */
   language: z
@@ -43,6 +45,10 @@ export const FeedbackContextSchema = z.strictObject({
     .optional(),
 });
 export type FeedbackContext = z.infer<typeof FeedbackContextSchema>;
+
+/** The app log the person chose to attach: the newest lines, already redacted on their computer. */
+export const FeedbackDiagnosticsSchema = z.strictObject({ log: z.array(shortText(500)).min(1).max(FEEDBACK_LOG_LINES) });
+export type FeedbackDiagnostics = z.infer<typeof FeedbackDiagnosticsSchema>;
 
 /** Body of `sendFeedback`. */
 export const FeedbackRequestSchema = z.strictObject({
@@ -55,6 +61,7 @@ export const FeedbackRequestSchema = z.strictObject({
   /** Where to answer, if the person wants an answer. */
   email: z.email().max(FEEDBACK_EMAIL_MAX).optional(),
   context: FeedbackContextSchema.optional(),
+  diagnostics: FeedbackDiagnosticsSchema.optional(),
   /** Honeypot of the website form: people never see it, so a value means a script filled it in. Leave it out. */
   website: z.string().max(500).optional(),
 });
