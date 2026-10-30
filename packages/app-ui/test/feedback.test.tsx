@@ -174,7 +174,7 @@ describe("Include recent app log (ADR-0040)", () => {
     });
     expect(pre.textContent).toBe(LINES.join("\n"));
     expect(pre.tabIndex).toBe(0);
-    expect(description(pre)).toBe("This is everything that will be sent. Page text, titles and file paths are removed.");
+    expect(description(pre)).toBe("This is everything that will be sent. File paths, links and email addresses are removed; check that nothing private is left.");
     // Unticking and ticking again does not ask the host again.
     await user.click(screen.getByRole("checkbox", { name: LOG }));
     await user.click(screen.getByRole("checkbox", { name: LOG }));

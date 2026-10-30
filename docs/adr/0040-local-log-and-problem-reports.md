@@ -43,10 +43,12 @@ service would break all three at once.
    - clips the result to **500 characters**, counting the `…` of a clipped line, at a character boundary (Thai and
      emoji are safe).
 4. **The limit of redaction, stated plainly** (this ADR). `redact` is a safety net. It cannot know that a bare word
-   such as `Secret plan.md` (no `/` in it) or a sentence someone typed is private. So the rule for callers is that they
-   log **codes, not text**: a failing host command logs its `command` and `code`, never its message; a webview error
-   report is bounded in what it carries (rule 7); no code path logs a page, a title, a file name or a search word.
-   Over-redacting is the intended failure.
+   such as `Secret plan.md` (no `/` in it) or a sentence is private. The host's own calls log **codes only**: a failing
+   host command logs its `command` and `code`, never its message, and no host code logs a page, a title, a file name or
+   a search word. But a panic payload and a webview error message are free text from other code, and `redact` only
+   partly cleans them: it masks paths, links, emails and secrets, and it can leave a bare title or file name. That is
+   why the person sees every line before it is sent (rule 9), and why the privacy notice says the log is built to
+   leave out page text and titles, not that it never holds them. Over-redacting is the intended failure.
 5. **The 500-character bound is on the message.** The line on disk also has a timestamp, the level and the target,
    about 60 characters more. `tail` redacts again and clips each line to 500 characters, so what a report carries is
    never longer.
@@ -55,7 +57,8 @@ service would break all three at once.
    otherwise swallow the location.
 7. **The webview's uncaught errors reach the log through `diag.report`**, bounded at **20 per window load** (in the
    webview) and **50 per app run** (in the host, which drops the rest), and a stack is cut to its first **5 lines**.
-   A script that throws on every frame cannot fill the log.
+   These bounds are on size and count, not on content: a script that throws on every frame cannot fill the log, but
+   the message of an error is free text (rule 4).
 8. **Two host commands**, `diag.report` and `diag.collect`, added to every contract list: `thoth_host::COMMANDS`,
    `build.rs` `TAURI_COMMANDS`, `capabilities/main.json` (`allow-diag-report`, `allow-diag-collect`) and
    `packages/platform/src/ipc.ts`. `diag.collect` returns `{ version, os, arch, log }`, where `log` is the newest
@@ -88,17 +91,20 @@ service would break all three at once.
     2026-09-26, at least three weeks old (2.10.1 was 20 days old). It brings `fern`, and `num_threads` transitively
     (the plugin's required time and local-offset support). No other new crate and no new npm package. The Cargo.toml
     comment names these.
-16. **Strings:** every English string has a Thai one, marked `// REVIEW` like the other unreviewed Thai strings.
+16. **Strings:** every English string has a Thai one, marked `// REVIEW` like the other unreviewed Thai strings. The
+    hint under the log says what is true: "This is everything that will be sent. File paths, links and email addresses
+    are removed; check that nothing private is left."
 
 ## Consequences
 
-- Positive: a problem report can say what happened, without anything private in it, and the person sees every line
-  first. A crash leaves a line with its source location. The log's size is bounded on disk and in every report.
+- Positive: a problem report can say what happened, with paths, links, emails and secrets masked, and the person sees
+  every line first and decides. A crash leaves a line with its source location. The log's size is bounded on disk and in every report.
 - Positive: the log is written by the host, so a webview bug or a dependency cannot read or enlarge it.
 - Negative: a person's own words in a message are not redacted for them, since the message is theirs and shown in the
-  form. The log is only as private as its callers are careful (rule 4). A future change that logs a name, a title or
-  a search word is a privacy bug that no test of `redact` will catch, so reviews of new `log::` calls matter.
-- Negative: `redact` takes most words with a slash to be a path, so a line can lose useful words (a `km/h`). The log is a little less readable; nothing leaks.
+  form. The log is only as private as the code that writes it is careful (rule 4): panic payloads and webview error
+  messages are free text. A future change that logs a name, a title or a search word is a privacy bug that no test of
+  `redact` will catch, so reviews of new `log::` calls matter, and the person's look at every line stays the real check.
+- Negative: `redact` takes most words with a slash to be a path, so a line can lose useful words (a `km/h`). The log is a little less readable, and that is the safe way to fail.
 - Negative: start-up records before `setup` are not logged (rule 2).
 - Negative: self-hosters on an older server must untick the box (rule 13), and their server stores nothing new until
   it is upgraded and migrated.
@@ -111,11 +117,11 @@ service would break all three at once.
 - **Sentry, or another crash-reporting service.** Considered and not chosen. It is a third party, so it would need
   the privacy notice, a processor agreement and a consent step, and it would send from the person's computer to a
   server they never added, against ADR-0014. A crash dump or a breadcrumb can hold typed text, page text or file
-  names, which the rules above rule out and which no filter can promise to remove from a native dump.
+  names, which the rules above rule out, and no filter can promise to remove them from a native dump.
 - **Registering the log plugin the usual way.** It exposes a `log` command to the webview (or needs care to keep it
   off), and a log folder that cannot be opened stops the app from starting. `split()` and `attach_logger` avoid both.
-- **A log with no redaction, trusting callers.** One careless `log::warn!("{err}")` with a path in it would leave the
-  computer in a report. The formatter is the one place every record passes, so the net is there.
+- **A log with no redaction, trusting the code that logs.** One careless `log::warn!("{err}")` with a path in it would
+  leave the computer in a report. The formatter is the one place every record passes, so the net is there.
 - **Sending the log with every report, or in the background.** The log leaves only when the person ticks the box and
   has seen it.
 - **Retrying without `diagnostics` on a 400** (an earlier plan). It would hide from the person that the log was not

@@ -890,7 +890,7 @@ export const en = {
     /** `privacy` where the app log can be included (the desktop app). */
     privacyLog: "Only what you type here is sent, the details above if you leave them on, and, if you include it, the app log shown above. Never your pages, their titles or file names.",
     includeLog: "Include recent app log",
-    logHint: "This is everything that will be sent. Page text, titles and file paths are removed.",
+    logHint: "This is everything that will be sent. File paths, links and email addresses are removed; check that nothing private is left.",
     logLoading: "Reading the app log…",
     noLog: "No log yet.",
     logFailed: "The app log could not be read. You can still send your message without it.",

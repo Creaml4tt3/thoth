@@ -12,7 +12,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Added
 
-- Report a Problem can include the recent app log. The app keeps a small log on your computer (errors and app events, never page text, titles or file paths), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings, Help and feedback, also has Save diagnostics… to save the same log to a file.
+- Report a Problem can include the recent app log. The app keeps a small log on your computer (errors and app events; it is built to leave out page text and titles, and it masks file paths, links and email addresses), shows you every line before it is sent, and sends it only if you tick "Include recent app log". Settings, Help and feedback, also has Save diagnostics… to save the same log to a file.
 
 ### Changed
 
