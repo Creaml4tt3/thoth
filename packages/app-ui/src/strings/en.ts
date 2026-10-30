@@ -888,7 +888,7 @@ export const en = {
     includeHint: "This is exactly what is added:",
     privacy: "Only what you type here is sent, and the details above if you leave them on. Never your pages, their titles or file names.",
     /** `privacy` where the app log can be included (the desktop app). */
-    privacyLog: "Only what you type here is sent, the details above if you leave them on, and, if you include it, the app log shown above. Never your pages, their titles or file names.",
+    privacyLog: "Only what you type here is sent, the details above if you leave them on, and, if you include it, the app log shown above. Your pages themselves are never sent.",
     includeLog: "Include recent app log",
     logHint: "This is everything that will be sent. File paths, links and email addresses are removed; check that nothing private is left.",
     logLoading: "Reading the app log…",
