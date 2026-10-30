@@ -51,7 +51,8 @@ fn is_delim(ch: char) -> bool {
 }
 
 /// `scheme://[userinfo@]host[:port]/rest` → `scheme://[<redacted>@]host[:port]/<redacted>`; writes it and returns
-/// where the URL ends.
+/// where the URL ends. The host ends at the first character a host cannot hold, and anything after it that is not a
+/// path, query or fragment goes back to the scan (`https://h,token=x`). A `file:` URL's path ends like a plain path.
 fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     let is_scheme = |ch: char| ch.is_ascii_alphanumeric() || "+.-".contains(ch);
     if !c[i].is_ascii_alphabetic() || i > 0 && is_scheme(c[i - 1]) {
@@ -62,10 +63,16 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         return None;
     }
     let host_start = colon + 3;
-    let host_end = (host_start..c.len()).find(|&k| c[k].is_whitespace() || "/?#\"')\\`".contains(c[k])).unwrap_or(c.len());
+    // Letters, digits, `.-`, `[]:` (IPv6, port) and `@%` (user info).
+    let is_host = |ch: char| ch.is_alphanumeric() || ".-[]:@%".contains(ch);
+    // User info this function already redacted, met again when `tail` re-redacts a line.
+    let done: Vec<char> = "<redacted>@".chars().collect();
+    let skip = if c[host_start..].starts_with(&done) { done.len() } else { 0 };
+    let host_end = (host_start + skip..c.len()).find(|&k| !is_host(c[k])).unwrap_or(c.len());
     let host = &c[host_start..host_end];
     let at = host.iter().rposition(|&ch| ch == '@').map_or(0, |at| at + 1);
-    let port = host[at..].iter().rposition(|&ch| ch == ':').map_or(&[][..], |colon| &host[at + colon + 1..]);
+    let after_ipv6 = host[at..].iter().rposition(|&ch| ch == ']').map_or(at, |b| at + b + 1);
+    let port = host[after_ipv6..].iter().rposition(|&ch| ch == ':').map_or(&[][..], |colon| &host[after_ipv6 + colon + 1..]);
     out.extend(&c[i..host_start]);
     if !port.iter().all(char::is_ascii_digit) {
         // `user:pass` cut short by a `/` in the password: not a host.
@@ -75,6 +82,13 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
             out.push_str("<redacted>@");
         }
         out.extend(&host[at..]);
+    }
+    if !matches!(c.get(host_end), Some('/' | '\\' | '?' | '#')) {
+        return Some(host_end);
+    }
+    out.push_str("/<redacted>");
+    if c[i..colon].iter().collect::<String>().eq_ignore_ascii_case("file") {
+        return Some(path_end(c, host_end, false));
     }
     let mut depth = 0usize;
     let mut end = host_end;
@@ -87,15 +101,13 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         }
         end += 1;
     }
-    if end > host_end {
-        out.push_str("/<redacted>");
-    }
     Some(end)
 }
 
 /// A key from `KEYS`, a separator (`:`, `=` or spaces, after an optional closing quote) and its value; writes the key
 /// and separator with `<redacted>` for the value and returns where the value ends. A quoted value runs to its
-/// closing quote, any other to the next space (or the end of the line, for `WHOLE_LINE_KEYS`).
+/// closing quote, one that opens with `Some(`, `(`, `[` or `{` (Rust's `Debug`) to its matching bracket, any other to
+/// the next space (or the end of the line, for `WHOLE_LINE_KEYS`).
 fn secret(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     let is_word = |ch: char| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-');
     if !is_word(c[i]) || i > 0 && is_word(c[i - 1]) {
@@ -125,10 +137,19 @@ fn secret(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     if quote.is_some() {
         k += 1;
     }
-    let end = if WHOLE_LINE_KEYS.contains(key) && quote.is_none() {
+    const REDACTED: [char; 10] = ['<', 'r', 'e', 'd', 'a', 'c', 't', 'e', 'd', '>'];
+    let bracket = if c[k..].starts_with(&['S', 'o', 'm', 'e', '(']) { Some(k + 4) } else { Some(k).filter(|_| matches!(c.get(k), Some('(' | '[' | '{'))) };
+    let end = if c[k..].starts_with(&REDACTED) {
+        // Already redacted (by `tail`'s second pass): keep what follows, such as the `,` after a `Debug` value.
+        k + REDACTED.len()
+    } else if let Some(q) = quote {
+        (k..c.len()).find(|&e| c[e] == q && c[e - 1] != '\\').unwrap_or(c.len())
+    } else if let Some(open) = bracket {
+        bracket_end(c, open)
+    } else if WHOLE_LINE_KEYS.contains(key) {
         c.len()
     } else {
-        (k..c.len()).find(|&e| quote.map_or(c[e].is_whitespace(), |q| c[e] == q && c[e - 1] != '\\')).unwrap_or(c.len())
+        (k..c.len()).find(|&e| c[e].is_whitespace()).unwrap_or(c.len())
     };
     if end == k {
         return None;
@@ -138,40 +159,79 @@ fn secret(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     Some(end)
 }
 
+/// Just past the bracket that closes the one at `open` (brackets inside `"…"` do not count), or the end of the line.
+fn bracket_end(c: &[char], open: usize) -> usize {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    for e in open..c.len() {
+        match c[e] {
+            '"' if in_string && c[e - 1] != '\\' => in_string = false,
+            _ if in_string => {}
+            '"' => in_string = true,
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return e + 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    c.len()
+}
+
 /// A path: `X:\` or `X:/`, or a token (from a delimiter to the next) holding `/` or `\` that starts with one or holds
-/// a letter (`/Users/a`, `~/x`, `./x`, `\\srv\share`, `Notes/x.md`, but not `3/5`). Returns where it ends: a path
-/// opened by `'` at the line's last `'`; any other at an unescaped `"`, an unmatched `)`, `": "` or the end of the
-/// line, so the spaces, `'` and `(…)` of a name stay inside it.
+/// a letter (`/Users/a`, `~/x`, `./x`, `\\srv\share`, `Notes/x.md`, but not `3/5`). Kept: a relative source location
+/// (`src/lib.rs:42:5`, from panics) and `HTTP/1.1`. Returns where it ends: a path opened by `'` at the line's last
+/// `'`; any other as `path_end` says, so the spaces, `'` and `(…)` of a name stay inside it.
 fn path(c: &[char], i: usize) -> Option<usize> {
     if i > 0 && !is_delim(c[i - 1]) {
         return None;
     }
-    let is_sep = |k: usize| matches!(c.get(k), Some('/' | '\\'));
-    let token_end = (i..c.len()).find(|&k| is_delim(c[k])).unwrap_or(c.len());
-    let drive = c[i].is_ascii_alphabetic() && c.get(i + 1) == Some(&':') && is_sep(i + 2);
-    if !drive && (token_end - i < 2 || !(i..token_end).any(is_sep) || !is_sep(i) && !c[i..token_end].iter().any(|ch| ch.is_alphabetic())) {
+    let token = &c[i..(i..c.len()).find(|&k| is_delim(c[k])).unwrap_or(c.len())];
+    let after = c.get(i + token.len()..).unwrap_or_default();
+    let starts_with_sep = matches!(c[i], '/' | '\\');
+    let drive = c[i].is_ascii_alphabetic() && matches!(c.get(i + 1..i + 3), Some([':', '/' | '\\']));
+    let has_sep = token.iter().any(|&ch| matches!(ch, '/' | '\\'));
+    let has_letter = token.iter().any(|ch| ch.is_alphabetic());
+    let looks_like_path = drive || token.len() >= 2 && has_sep && (starts_with_sep || has_letter);
+    let relative = !starts_with_sep && !drive && c[i] != '~';
+    let source_location = relative && token.ends_with(&['.', 'r', 's']) && matches!(after, [':', d, ..] if d.is_ascii_digit());
+    let token_text: String = token.iter().collect();
+    let http_version = token_text.get(..5).is_some_and(|h| h.eq_ignore_ascii_case("http/")) && token_text[5..].chars().all(|ch| ch.is_ascii_digit() || ch == '.');
+    if !looks_like_path || source_location || http_version {
         return None;
     }
-    if i > 0
-        && c[i - 1] == '\''
+    let opener = (i > 0).then(|| c[i - 1]);
+    if opener == Some('\'')
         && let Some(q) = (i..c.len()).rev().find(|&k| c[k] == '\'')
     {
         return Some(q);
     }
-    let mut depth = 0usize;
-    let mut end = i;
+    Some(path_end(c, i, opener == Some('[')))
+}
+
+/// Where a path from `from` ends: at an unescaped `"`, at `": "`, at an unmatched `)` (or `]`, for a path `[` opened)
+/// or at the end of the line.
+fn path_end(c: &[char], from: usize, in_square: bool) -> usize {
+    let (mut round, mut square) = (0usize, 0usize);
+    let mut end = from;
     while end < c.len() {
         match c[end] {
-            '"' if c[end - 1] != '\\' => break,
+            '"' if end == 0 || c[end - 1] != '\\' => break,
             ':' if c.get(end + 1) == Some(&' ') => break,
-            '(' => depth += 1,
-            ')' if depth == 0 => break,
-            ')' => depth -= 1,
+            '(' => round += 1,
+            ')' if round == 0 => break,
+            ')' => round -= 1,
+            '[' if in_square => square += 1,
+            ']' if in_square && square == 0 => break,
+            ']' if in_square => square -= 1,
             _ => {}
         }
         end += 1;
     }
-    Some(end)
+    end
 }
 
 /// `local@domain.tld`, where the last label is not all digits (so `pkg@1.2.3` stays). Letters of any script count.
@@ -225,6 +285,7 @@ pub fn tail(dir: &Path, max_lines: usize, max_bytes: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut bytes = 0;
     'files: for (_, _, file) in files.iter().rev() {
+        // shortcut: reads whole files, relies on 1 MB rotation; read only the tail if rotation ever changes.
         let Ok(raw) = std::fs::read(file) else { continue };
         for line in String::from_utf8_lossy(&raw).lines().rev() {
             let line = redact(line);
@@ -279,8 +340,23 @@ mod tests {
         assert_eq!(redact("https://thothnotes.com"), "https://thothnotes.com");
         assert_eq!(redact("(see https://thothnotes.com)"), "(see https://thothnotes.com)");
         assert_eq!(redact("GET https://thothnotes.com/?invite=x 404"), "GET https://thothnotes.com/<redacted> 404");
-        assert_eq!(redact("postgres://me:p,w@db.local:5432/thoth"), "postgres://<redacted>@db.local:5432/<redacted>");
+        assert_eq!(redact("postgres://me:pw@db.local:5432/thoth"), "postgres://<redacted>@db.local:5432/<redacted>");
+        assert_eq!(redact("postgres://me:p,w@db.local:5432/thoth"), "postgres://<redacted>,<email>:<path>");
+        assert_eq!(redact("http://[::1]:8080/x http://[::1]/y"), "http://[::1]:8080/<redacted> http://[::1]/<redacted>");
         assert_eq!(redact("file:///Users/a/x.md"), "file:///<redacted>");
+    }
+
+    #[test]
+    fn url_host_ends_where_a_host_cannot_go_on() {
+        assert_eq!(redact("url=https://api.x.com,token=abc123"), "url=https://api.x.com,token=<redacted>");
+        assert_eq!(redact("https://h;password=x"), "https://h;password=<redacted>");
+        assert_eq!(redact("https://h,me@x.com"), "https://h,<email>");
+    }
+
+    #[test]
+    fn file_url_path_ends_like_a_path() {
+        assert_eq!(redact("file:///Users/a/My Big plan.md"), "file:///<redacted>");
+        assert_eq!(redact("open file:///Users/a/My Big plan.md: denied"), "open file:///<redacted>: denied");
     }
 
     #[test]
@@ -310,6 +386,26 @@ mod tests {
     }
 
     #[test]
+    fn redacts_debug_values_to_their_closing_bracket() {
+        assert_eq!(redact("token: Some(\n        \"abc\",\n    ),"), "token: <redacted>,");
+        assert_eq!(redact(r#"password: Some("a b")"#), "password: <redacted>");
+        assert_eq!(redact(r#"Login { password: Some("a ) b"), user: 1 }"#), "Login { password: <redacted>, user: 1 }");
+        assert_eq!(redact("secret: [1, 2, 3] next"), "secret: <redacted> next");
+        assert_eq!(redact("secret: (1, 2"), "secret: <redacted>");
+    }
+
+    #[test]
+    fn keeps_code_locations_and_protocol_tokens() {
+        assert_eq!(redact("panicked at src/lib.rs:42:5: boom"), "panicked at src/lib.rs:42:5: boom");
+        assert_eq!(redact(r"panicked at crates\thoth-host\src\sql.rs:7: boom"), r"panicked at crates\thoth-host\src\sql.rs:7: boom");
+        assert_eq!(redact("panicked at /Users/a/src/lib.rs:42:5: boom"), "panicked at <path>: boom");
+        assert_eq!(redact("open Notes/plan.rs now"), "open <path>");
+        assert_eq!(redact("response HTTP/1.1 503 Service Unavailable"), "response HTTP/1.1 503 Service Unavailable");
+        assert_eq!(redact("[/Users/a/x.md] y"), "[<path>] y");
+        assert_eq!(redact("[/Users/a/[draft] x.md] y"), "[<path>] y");
+    }
+
+    #[test]
     fn redacts_long_opaque_runs() {
         let run = "aB3+=_-9".repeat(4);
         assert_eq!(redact(&format!("id {run} end")), "id <redacted> end");
@@ -325,6 +421,9 @@ mod tests {
             "failed to open /Users/a/My Notes/Secret plan.md: denied",
             "https://api.thothnotes.com/s/AbC123xyz?x=1",
             "postgres://me:pw@db.local/thoth",
+            "file:///Users/a/My Big plan.md",
+            "panicked at src/lib.rs:42:5: boom",
+            "[/Users/a/x.md] y",
             "mail a.b@c.co now",
             "Authorization: Bearer abc",
             &"ก".repeat(600),
@@ -373,6 +472,13 @@ mod tests {
         assert_eq!(lines.last().unwrap(), &long(299));
         assert!(lines.iter().all(|l| l.ends_with("ipsum ")));
         assert_eq!(lines.first().unwrap(), &long(300 - lines.len()));
+    }
+
+    #[test]
+    fn tail_keeps_the_other_lines_of_a_file_with_bad_utf8() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("thoth.log"), b"a\n\xff\xfe bad\nb\n").unwrap();
+        assert_eq!(tail(dir.path(), TAIL_LINES, TAIL_BYTES), ["a", "\u{FFFD}\u{FFFD} bad", "b"]);
     }
 
     #[test]
