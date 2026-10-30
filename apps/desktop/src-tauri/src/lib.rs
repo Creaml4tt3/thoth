@@ -723,7 +723,8 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(move |info| {
         let payload = info.payload();
         let payload = payload.downcast_ref::<&str>().copied().or_else(|| payload.downcast_ref::<String>().map(String::as_str)).unwrap_or("non-string payload");
-        let at = info.location().map_or_else(|| "unknown location".to_owned(), |l| format!("{}:{}:{}", l.file(), l.line(), l.column()));
+        // Forward slashes on every OS, so a Windows location reads (and is kept by `redact`) like the others.
+        let at = info.location().map_or_else(|| "unknown location".to_owned(), |l| format!("{}:{}:{}", l.file().replace('\\', "/"), l.line(), l.column()));
         // The location first: `redact` takes a path to the line's end, so one in the payload would swallow it.
         log::error!(target: "panic", "at {at}: {payload}");
         previous(info);
