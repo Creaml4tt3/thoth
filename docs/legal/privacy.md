@@ -120,8 +120,9 @@ contractual safeguards, as the PDPA allows for transfers abroad.
 - **Server logs** are kept for up to 30 days.
   <!-- OWNER: check your Vercel plan's log retention and match this number. -->
 - **Rate-limit counters** are deleted within a day.
-- **Feedback, and the app log sent with it,** is kept until the operator deletes it.
-  <!-- OWNER: how long feedback and its app log are kept is not decided yet (ADR-0033 and ADR-0040, open questions). Decide it, then change this sentence and the code to match. -->
+- **Feedback.** There is no automatic deletion yet: feedback, and any app log sent with it, is kept until the operator
+  deletes it.
+  <!-- OWNER: decide how long feedback and its log are kept (ADR-0040 open question). -->
 - **Analytics data** is kept in Google Analytics for 2 months.
 - **Your cookie choice** is kept in your browser until you clear it.
 

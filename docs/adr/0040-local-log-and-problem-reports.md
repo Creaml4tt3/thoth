@@ -10,7 +10,8 @@
 
 "Send feedback" (ADR-0033) tells the owner what a person typed, but not what the app was doing when it failed. A
 problem report that says "it broke when I saved" is hard to act on, and the desktop app keeps no record of its own
-errors. Thoth's rules stay as they were: no page text, titles, file names or paths leave the device, the desktop app
+errors. Thoth's rules stay as they were: page text, titles, file names and paths are not meant to leave the device (the log
+below is built to that rule, and rule 4 says where it falls short), the desktop app
 contacts no server the person has not added (ADR-0014), and the webview has no network (ADR-0008). A crash-reporting
 service would break all three at once.
 
