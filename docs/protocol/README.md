@@ -607,7 +607,8 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
 
 - `POST /feedback` needs no credentials. A valid bearer credential ties the feedback to the account; an invalid one is
   ignored (never 401). The body is strict: `kind` (`problem` | `idea` | `question`), `message` (1 to 5000 characters,
-  not blank), optional `email`, optional `context` `{ client, version?, os?, language? }`, and the honeypot `website`
+  not blank), optional `email`, optional `context` `{ client, version?, os?, arch?, language? }`, optional `diagnostics` `{ log }` (1 to 200
+  printable lines of at most 500 characters: the app log the person chose to attach), and the honeypot `website`
   (filled in: the same 204, nothing stored). 204 when received; 400 `validation_failed` for anything else; 429
   `rate_limited` with `Retry-After`. Nothing is stored for a refused request.
 - A form-encoded body (the website without JavaScript) carries the same fields flat, plus `return` (a path); it must

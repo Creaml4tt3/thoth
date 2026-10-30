@@ -132,7 +132,7 @@ async function main(argv: string[]): Promise<number> {
         const rows = await listFeedback(db, since ? { since } : {});
         if (sub === "export") {
           if (values.json !== true) fail("feedback export needs --json (the only format)");
-          console.log(safeJson(rows));
+          console.log(safeJson(rows.map((r) => (r.diagnostics ? { ...r, diagnostics: { log: r.diagnostics.log.map(printable) } } : r))));
         } else console.log(rows.length === 0 ? "no feedback" : rows.map(formatFeedback).join("\n\n"));
         return 0;
       }
@@ -177,7 +177,7 @@ const safeJson = (value: unknown): string => JSON.stringify(value, null, 2).repl
 
 function formatFeedback(row: FeedbackRow): string {
   const context = row.context ? Object.entries(row.context).map(([k, v]) => `${k}=${v}`).join(" ") : "";
-  const head = [row.createdAt, row.kind, row.email ?? "-", row.accountId ? `account ${row.accountId}` : "anonymous", context].filter((x) => x !== "").join("  ");
+  const head = [row.createdAt, row.kind, row.email ?? "-", row.accountId ? `account ${row.accountId}` : "anonymous", context, row.diagnostics ? `log: ${row.diagnostics.log.length} lines` : ""].filter((x) => x !== "").join("  ");
   return `${printable(head)}\n${printable(row.message).replace(/^/gm, "    ")}`;
 }
 
