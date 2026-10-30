@@ -51,8 +51,9 @@ fn is_delim(ch: char) -> bool {
 }
 
 /// `scheme://[userinfo@]host[:port]/rest` → `scheme://[<redacted>@]host[:port]/<redacted>`; writes it and returns
-/// where the URL ends. The host ends at the first character a host cannot hold, and anything after it that is not a
-/// path, query or fragment goes back to the scan (`https://h,token=x`). A `file:` URL's path ends like a plain path.
+/// where the URL ends. User info runs to the last `@` before a `/`, `?`, `#`, quote or space. The host ends at the first
+/// character a host cannot hold, and anything after it that is not a path, query or fragment goes back to the scan
+/// (`https://h,token=x`). A `file:` URL's path ends like a plain path.
 fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
     let is_scheme = |ch: char| ch.is_ascii_alphanumeric() || "+.-".contains(ch);
     if !c[i].is_ascii_alphabetic() || i > 0 && is_scheme(c[i - 1]) {
@@ -63,25 +64,25 @@ fn url(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         return None;
     }
     let host_start = colon + 3;
-    // Letters, digits, `.-`, `[]:` (IPv6, port) and `@%` (user info).
-    let is_host = |ch: char| ch.is_alphanumeric() || ".-[]:@%".contains(ch);
-    // User info this function already redacted, met again when `tail` re-redacts a line.
-    let done: Vec<char> = "<redacted>@".chars().collect();
-    let skip = if c[host_start..].starts_with(&done) { done.len() } else { 0 };
-    let host_end = (host_start + skip..c.len()).find(|&k| !is_host(c[k])).unwrap_or(c.len());
+    // User info is everything up to the last `@` before the path, whatever characters the password holds.
+    let authority_end = (host_start..c.len()).find(|&k| c[k].is_whitespace() || "/?#\"'`".contains(c[k])).unwrap_or(c.len());
+    let user_info_end = (host_start..authority_end).rfind(|&k| c[k] == '@');
+    let host_start = user_info_end.map_or(host_start, |at| at + 1);
+    // Letters, digits, `.-`, `[]:` (IPv6, port) and `%`.
+    let is_host = |ch: char| ch.is_alphanumeric() || ".-[]:%".contains(ch);
+    let host_end = (host_start..c.len()).find(|&k| !is_host(c[k])).unwrap_or(c.len());
     let host = &c[host_start..host_end];
-    let at = host.iter().rposition(|&ch| ch == '@').map_or(0, |at| at + 1);
-    let after_ipv6 = host[at..].iter().rposition(|&ch| ch == ']').map_or(at, |b| at + b + 1);
+    let after_ipv6 = host.iter().rposition(|&ch| ch == ']').map_or(0, |b| b + 1);
     let port = host[after_ipv6..].iter().rposition(|&ch| ch == ':').map_or(&[][..], |colon| &host[after_ipv6 + colon + 1..]);
-    out.extend(&c[i..host_start]);
+    out.extend(&c[i..colon + 3]);
+    if user_info_end.is_some() {
+        out.push_str("<redacted>@");
+    }
     if !port.iter().all(char::is_ascii_digit) {
         // `user:pass` cut short by a `/` in the password: not a host.
         out.push_str("<redacted>");
     } else {
-        if at > 0 {
-            out.push_str("<redacted>@");
-        }
-        out.extend(&host[at..]);
+        out.extend(host);
     }
     if !matches!(c.get(host_end), Some('/' | '\\' | '?' | '#')) {
         return Some(host_end);
@@ -183,7 +184,7 @@ fn bracket_end(c: &[char], open: usize) -> usize {
 
 /// A path: `X:\` or `X:/`, or a token (from a delimiter to the next) holding `/` or `\` that starts with one or holds
 /// a letter (`/Users/a`, `~/x`, `./x`, `\\srv\share`, `Notes/x.md`, but not `3/5`). Kept: a relative source location
-/// (`src/lib.rs:42:5`, from panics) and `HTTP/1.1`. Returns where it ends: a path opened by `'` at the line's last
+/// under a `src` folder (`src/lib.rs:42:5`, `crates/x/src/y.rs:3:1`, from panics) and `HTTP/1.1`. Returns where it ends: a path opened by `'` at the line's last
 /// `'`; any other as `path_end` says, so the spaces, `'` and `(…)` of a name stay inside it.
 fn path(c: &[char], i: usize) -> Option<usize> {
     if i > 0 && !is_delim(c[i - 1]) {
@@ -197,7 +198,8 @@ fn path(c: &[char], i: usize) -> Option<usize> {
     let has_letter = token.iter().any(|ch| ch.is_alphabetic());
     let looks_like_path = drive || token.len() >= 2 && has_sep && (starts_with_sep || has_letter);
     let relative = !starts_with_sep && !drive && c[i] != '~';
-    let source_location = relative && token.ends_with(&['.', 'r', 's']) && matches!(after, [':', d, ..] if d.is_ascii_digit());
+    let in_src = token.split(|&ch| matches!(ch, '/' | '\\')).any(|segment| segment == ['s', 'r', 'c']);
+    let source_location = relative && in_src && token.ends_with(&['.', 'r', 's']) && matches!(after, [':', d, ..] if d.is_ascii_digit());
     let token_text: String = token.iter().collect();
     let http_version = token_text.get(..5).is_some_and(|h| h.eq_ignore_ascii_case("http/")) && token_text[5..].chars().all(|ch| ch.is_ascii_digit() || ch == '.');
     if !looks_like_path || source_location || http_version {
@@ -341,7 +343,7 @@ mod tests {
         assert_eq!(redact("(see https://thothnotes.com)"), "(see https://thothnotes.com)");
         assert_eq!(redact("GET https://thothnotes.com/?invite=x 404"), "GET https://thothnotes.com/<redacted> 404");
         assert_eq!(redact("postgres://me:pw@db.local:5432/thoth"), "postgres://<redacted>@db.local:5432/<redacted>");
-        assert_eq!(redact("postgres://me:p,w@db.local:5432/thoth"), "postgres://<redacted>,<email>:<path>");
+        assert_eq!(redact("postgres://me:p,w@db.local:5432/thoth"), "postgres://<redacted>@db.local:5432/<redacted>");
         assert_eq!(redact("http://[::1]:8080/x http://[::1]/y"), "http://[::1]:8080/<redacted> http://[::1]/<redacted>");
         assert_eq!(redact("file:///Users/a/x.md"), "file:///<redacted>");
     }
@@ -350,7 +352,19 @@ mod tests {
     fn url_host_ends_where_a_host_cannot_go_on() {
         assert_eq!(redact("url=https://api.x.com,token=abc123"), "url=https://api.x.com,token=<redacted>");
         assert_eq!(redact("https://h;password=x"), "https://h;password=<redacted>");
-        assert_eq!(redact("https://h,me@x.com"), "https://h,<email>");
+        // An `@` before the path makes all before it user info (round 2 ruling): `me` is hidden either way.
+        assert_eq!(redact("https://h,me@x.com"), "https://<redacted>@x.com");
+        assert_eq!(redact("https://h,see me@x.com"), "https://h,see <email>");
+    }
+
+    #[test]
+    fn url_user_info_is_hidden_whatever_the_password_holds() {
+        assert_eq!(redact("postgres://me:pa$s@h/x"), "postgres://<redacted>@h/<redacted>");
+        assert_eq!(redact("redis://:p_w~x@h:6379"), "redis://<redacted>@h:6379");
+        assert_eq!(redact("amqp://u:abc|def@h/v"), "amqp://<redacted>@h/<redacted>");
+        assert_eq!(redact("postgres://me:pa!ss@db.local:5432/thoth"), "postgres://<redacted>@db.local:5432/<redacted>");
+        assert_eq!(redact("postgres://me:pa&ss=1@h/x"), "postgres://<redacted>@h/<redacted>");
+        assert_eq!(redact("postgres://me:p@ss@h/x"), "postgres://<redacted>@h/<redacted>");
     }
 
     #[test]
@@ -399,7 +413,11 @@ mod tests {
         assert_eq!(redact("panicked at src/lib.rs:42:5: boom"), "panicked at src/lib.rs:42:5: boom");
         assert_eq!(redact(r"panicked at crates\thoth-host\src\sql.rs:7: boom"), r"panicked at crates\thoth-host\src\sql.rs:7: boom");
         assert_eq!(redact("panicked at /Users/a/src/lib.rs:42:5: boom"), "panicked at <path>: boom");
+        assert_eq!(redact("panicked at crates/x/src/y.rs:3:1: boom"), "panicked at crates/x/src/y.rs:3:1: boom");
         assert_eq!(redact("open Notes/plan.rs now"), "open <path>");
+        for outside_src in ["Notes/secret.rs:1", "./Secret/x.rs:3", "../Secret/x.rs:3"] {
+            assert_eq!(redact(&format!("at {outside_src} x")), "at <path>", "{outside_src}");
+        }
         assert_eq!(redact("response HTTP/1.1 503 Service Unavailable"), "response HTTP/1.1 503 Service Unavailable");
         assert_eq!(redact("[/Users/a/x.md] y"), "[<path>] y");
         assert_eq!(redact("[/Users/a/[draft] x.md] y"), "[<path>] y");
@@ -421,6 +439,8 @@ mod tests {
             "failed to open /Users/a/My Notes/Secret plan.md: denied",
             "https://api.thothnotes.com/s/AbC123xyz?x=1",
             "postgres://me:pw@db.local/thoth",
+            "postgres://me:pa!ss@db.local:5432/thoth",
+            "redis://:p_w~x@h:6379",
             "file:///Users/a/My Big plan.md",
             "panicked at src/lib.rs:42:5: boom",
             "[/Users/a/x.md] y",
