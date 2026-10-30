@@ -130,7 +130,30 @@ service would break all three at once.
 
 ## Measurements
 
-Filled in before release: see Task 8 of the plan.
+Measured on one Mac only (Mac16,12, Apple M4, macOS 15.8.1), on release builds of the Tauri app: the baseline is the
+commit before this work (1dfa579), the final is the branch with the local log, `diag.*` and Report a Problem. Cold
+start is the median of 5 launches to a visible window, taken 3 times; the figures below are the median of those 3 runs.
+
+| Metric | Baseline | Final | Difference |
+| --- | --- | --- | --- |
+| App size | 18416 KB | 18748 KB | +332 KB (+1.8%) |
+| `.dmg` size | 7668 KB | 7804 KB | +136 KB (+1.8%) |
+| Cold start to window | 0.244 s | 0.344 s | within noise, see below |
+| Idle CPU (host process, 10 s) | 0.00 % | 0.00 % | none |
+| Idle RSS (host process) | 88.7 MB | 88.6 MB | none |
+| Save, median of 1000 x 20 KB `fs.write` | 4257 us | 4922 us | within noise, see below |
+
+Noise, which is larger than any difference here: cold start ran 0.227 to 0.354 s for the baseline and 0.248 to 0.361 s
+for the final in the same session (0.294 to 0.41 s on an earlier day). Interleaving 15 launches of each build one after
+the other gave a median of 0.217 s for the baseline and 0.218 s for the final, so the log file's open at start costs
+nothing that shows. The save median ran 4023 to 4929 us for the baseline and 4194 to 4935 us for the final, and the
+save does not touch the log. The baseline column is a rebuild of 1dfa579 measured in the same session as the final;
+the first baseline, taken a day earlier by the first measurement, was cold start 0.376 s, idle RSS 68.2 MB and save
+median 4044 us, and the machine's idle RSS had moved by about 20 MB since then for both builds.
+
+Idle CPU and RSS cover the host process only: the macOS WebContent, GPU and Networking processes are separate and are
+not counted. Idle CPU is read at 0.01 s resolution, so it can only show a rise above about 0.1 %. One machine says
+little about others; the figures are here to show that this change did not make the app measurably slower or larger.
 
 ## Spec references
 
