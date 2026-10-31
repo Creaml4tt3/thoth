@@ -23,8 +23,8 @@
 //! keychain (`KeychainStore`), sign-in opens the system browser from the host (`SystemBrowser`), and the
 //! webview gets no http, opener or shell permission.
 use serde_json::Value;
-use std::path::PathBuf;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -33,7 +33,9 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use thoth_host::install::{Failure, Fetched, Installer, NoInstaller};
 use thoth_host::updates::{UpdateOptions, Version};
-use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MovingSecretStore, Picker, SecretStore};
+use thoth_host::{
+    Browser, FileManager, Host, HostConfig, HostError, HostResult, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MovingSecretStore, Picker, SecretStore,
+};
 
 /// Where the update notice reads `latest.json` and where "Download" goes (ADR-0022). Fixed when the app is built:
 /// `build.rs` reads `THOTH_UPDATE_URL` and `THOTH_DOWNLOADS_PAGE_URL` for a self-built copy; an empty address turns the
@@ -87,7 +89,11 @@ fn updates_in_app(bundle: Option<tauri::utils::config::BundleType>, exe: &std::p
 
 /// The update file must come from where `latest.json` is: the same scheme, host and port, no credentials.
 fn same_origin(url: &tauri::Url, endpoint: &tauri::Url) -> bool {
-    url.scheme() == endpoint.scheme() && url.host_str() == endpoint.host_str() && url.port_or_known_default() == endpoint.port_or_known_default() && url.username().is_empty() && url.password().is_none()
+    url.scheme() == endpoint.scheme()
+        && url.host_str() == endpoint.host_str()
+        && url.port_or_known_default() == endpoint.port_or_known_default()
+        && url.username().is_empty()
+        && url.password().is_none()
 }
 
 /// What the popup says about an updater error (the error itself is not shown: it could echo a server).
@@ -125,7 +131,13 @@ impl PluginInstaller {
                 let (Some(current), Some(latest)) = (Version::parse(&current.to_string()), Version::parse(&release.version.to_string())) else { return false };
                 thoth_host::updates::is_offered(&current, &latest)
             })
-            .configure_client(|client| client.https_only(!LOCAL_UPDATE_TEST).redirect(reqwest::redirect::Policy::none()).connect_timeout(Duration::from_secs(10)).read_timeout(Duration::from_secs(30)))
+            .configure_client(|client| {
+                client
+                    .https_only(!LOCAL_UPDATE_TEST)
+                    .redirect(reqwest::redirect::Policy::none())
+                    .connect_timeout(Duration::from_secs(10))
+                    .read_timeout(Duration::from_secs(30))
+            })
             .build()
             .map_err(|e| failure_of(&e))
     }
@@ -161,7 +173,15 @@ impl Installer for PluginInstaller {
                 return Err(Failure::Verify);
             }
             // The plugin checks the signature once the whole file is in, before it returns it.
-            let bytes = update.download(move |chunk, total| { let _ = tx.send((chunk, total)); }, || ()).await.map_err(|e| failure_of(&e))?;
+            let bytes = update
+                .download(
+                    move |chunk, total| {
+                        let _ = tx.send((chunk, total));
+                    },
+                    || (),
+                )
+                .await
+                .map_err(|e| failure_of(&e))?;
             Ok((update, bytes))
         });
         let mut received = 0u64;
@@ -825,7 +845,12 @@ pub fn run() {
                 // Link previews connect to public addresses only (ADR-0020); the loopback switch is for tests.
                 link_preview_loopback: false,
             })
-            .with_updates(UpdateOptions { downloads_page: DOWNLOADS_PAGE_URL.to_owned(), allow_loopback: LOCAL_UPDATE_TEST, installer, ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL) })
+            .with_updates(UpdateOptions {
+                downloads_page: DOWNLOADS_PAGE_URL.to_owned(),
+                allow_loopback: LOCAL_UPDATE_TEST,
+                installer,
+                ..UpdateOptions::new(app.package_info().version.to_string(), UPDATE_URL)
+            })
             .with_log_dir(app.path().app_log_dir().ok());
             let _ = HOST.set(Arc::new(host));
             Ok(())
@@ -965,7 +990,8 @@ mod tests {
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more", "tabs": "x", "at": { "x": "1", "y": 2 } })), "BAD_ARGUMENT");
         assert_eq!(refused(json!({ "id": "space-x", "root": "/Users/a/Notes & more" })), "BAD_ARGUMENT");
         // An address in the request is not used: the page is the app's own whatever else is sent.
-        let elsewhere = new_window(&json!({ "id": "space-x", "url": "https://example.org/", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent, 1).unwrap();
+        let elsewhere =
+            new_window(&json!({ "id": "space-x", "url": "https://example.org/", "root": "/Users/a/Notes & more", "tabs": "x" }), &recent, 1).unwrap();
         assert!(elsewhere.page.starts_with("index.html?window=space-x&") && !elsewhere.page.contains("example.org"));
     }
 
@@ -988,7 +1014,10 @@ mod tests {
         let mut granted = Vec::new();
         for permission in capability["permissions"].as_array().unwrap() {
             let p = permission.as_str().unwrap();
-            assert!(p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten" || NOTIFICATION.contains(&p), "unexpected permission {p}");
+            assert!(
+                p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten" || NOTIFICATION.contains(&p),
+                "unexpected permission {p}"
+            );
             if p.starts_with("notification:") {
                 granted.push(p);
             }
@@ -1006,8 +1035,14 @@ mod tests {
         // Nothing beyond the contract: link previews (ADR-0020) add `link.preview`, `link.preview.clear` and `link.open`
         // and no plugin (no http, no opener).
         let capability: Value = serde_json::from_str(include_str!("../capabilities/main.json")).unwrap();
-        let granted: BTreeSet<String> = capability["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).filter(|p| p.starts_with("allow-")).map(str::to_owned).collect();
-        let expected: BTreeSet<String> = thoth_host::COMMANDS.iter().map(|c| c.replace('.', "_")).chain(SHELL_COMMANDS.iter().map(|c| (*c).to_owned())).map(|c| format!("allow-{}", c.replace('_', "-"))).collect();
+        let granted: BTreeSet<String> =
+            capability["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).filter(|p| p.starts_with("allow-")).map(str::to_owned).collect();
+        let expected: BTreeSet<String> = thoth_host::COMMANDS
+            .iter()
+            .map(|c| c.replace('.', "_"))
+            .chain(SHELL_COMMANDS.iter().map(|c| (*c).to_owned()))
+            .map(|c| format!("allow-{}", c.replace('_', "-")))
+            .collect();
         assert_eq!(granted, expected);
         for link in ["allow-link-preview", "allow-link-preview-clear", "allow-link-open"] {
             assert!(granted.contains(link), "{link}");
@@ -1016,13 +1051,26 @@ mod tests {
         // `update.install`, `update.cancel`, `update.status` and `update.restart`, the host's own commands. The updater
         // plugin is the shell's, through its Rust API: none of its permissions is granted to the webview.
         let updates: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.contains("update")).collect();
-        assert_eq!(updates, BTreeSet::from(["allow-update-check", "allow-update-settings", "allow-update-install", "allow-update-cancel", "allow-update-status", "allow-update-restart"]));
+        assert_eq!(
+            updates,
+            BTreeSet::from([
+                "allow-update-check",
+                "allow-update-settings",
+                "allow-update-install",
+                "allow-update-cancel",
+                "allow-update-status",
+                "allow-update-restart"
+            ])
+        );
         let text = include_str!("../capabilities/main.json");
         assert!(!text.contains("updater"), "no updater plugin permission");
         assert!(include_str!("../Cargo.toml").contains("tauri-plugin-updater"));
         // Connected apps (ADR-0021) add exactly their six commands and no plugin: the socket is the host's.
         let mcp: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.starts_with("allow-mcp-")).collect();
-        assert_eq!(mcp, BTreeSet::from(["allow-mcp-settings", "allow-mcp-configure", "allow-mcp-decide", "allow-mcp-forget", "allow-mcp-answer", "allow-mcp-log"]));
+        assert_eq!(
+            mcp,
+            BTreeSet::from(["allow-mcp-settings", "allow-mcp-configure", "allow-mcp-decide", "allow-mcp-forget", "allow-mcp-answer", "allow-mcp-log"])
+        );
     }
 
     #[test]
@@ -1049,7 +1097,12 @@ mod tests {
         // macOS: the app in its bundle; not a build from the source tree, not a copy macOS runs from a read-only place.
         assert!(updates_in_app(Some(BundleType::App), app, false, "macos"));
         assert!(!updates_in_app(Some(BundleType::App), elsewhere, false, "macos"));
-        assert!(!updates_in_app(Some(BundleType::App), std::path::Path::new("/private/var/folders/x/AppTranslocation/1/d/Thoth.app/Contents/MacOS/thoth-desktop"), false, "macos"));
+        assert!(!updates_in_app(
+            Some(BundleType::App),
+            std::path::Path::new("/private/var/folders/x/AppTranslocation/1/d/Thoth.app/Contents/MacOS/thoth-desktop"),
+            false,
+            "macos"
+        ));
         // Windows: whichever installer put it there updates it (NSIS by NSIS, MSI by the MSI).
         assert!(updates_in_app(Some(BundleType::Nsis), elsewhere, false, "windows"));
         assert!(updates_in_app(Some(BundleType::Msi), elsewhere, false, "windows"));
@@ -1068,7 +1121,13 @@ mod tests {
         let endpoint = tauri::Url::parse("https://download.thothnotes.com/latest.json").unwrap();
         let ok = |u: &str| same_origin(&tauri::Url::parse(u).unwrap(), &endpoint);
         assert!(ok("https://download.thothnotes.com/v0.2.3/Thoth_0.2.3_universal.app.tar.gz"));
-        for bad in ["http://download.thothnotes.com/v0.2.3/x", "https://download.thothnotes.com.evil.example/x", "https://evil.example/x", "https://download.thothnotes.com:8443/x", "https://user@download.thothnotes.com/x"] {
+        for bad in [
+            "http://download.thothnotes.com/v0.2.3/x",
+            "https://download.thothnotes.com.evil.example/x",
+            "https://evil.example/x",
+            "https://download.thothnotes.com:8443/x",
+            "https://user@download.thothnotes.com/x",
+        ] {
             assert!(!ok(bad), "{bad}");
         }
     }
@@ -1105,6 +1164,8 @@ mod tests {
         // The shell's updater uses the address compiled in, which is https in a release build (build.rs refuses http
         // unless the profile is debug, and the updater itself refuses http in a release build).
         assert!(include_str!("../build.rs").contains("PROFILE"));
+        // Both values come from build.rs's environment, so they are constants here on purpose.
+        #[allow(clippy::const_is_empty, clippy::assertions_on_constants)]
         if !cfg!(debug_assertions) {
             assert!(UPDATE_URL.is_empty() || UPDATE_URL.starts_with("https://"));
             assert!(!LOCAL_UPDATE_TEST);

@@ -30,7 +30,8 @@ pub struct Callback {
 
 impl Loopback {
     pub fn bind() -> HostResult<Self> {
-        let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0))).map_err(|_| sign_in_failed("Could not open a local port for the browser to return to"))?;
+        let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
+            .map_err(|_| sign_in_failed("Could not open a local port for the browser to return to"))?;
         listener.set_nonblocking(true).map_err(|_| sign_in_failed("Could not open a local port for the browser to return to"))?;
         let port = listener.local_addr().map_err(|_| sign_in_failed("Could not open a local port for the browser to return to"))?.port();
         Ok(Self { listener, port })
@@ -223,7 +224,12 @@ mod tests {
 
     #[test]
     fn refuses_a_wrong_or_missing_state() {
-        for query in ["code=c&state=other&iss=http%3A%2F%2F127.0.0.1%3A9", "code=c&iss=http%3A%2F%2F127.0.0.1%3A9", "code=c&state=the-statE&iss=http%3A%2F%2F127.0.0.1%3A9", "code=c&state=the-state&state=the-state&iss=http%3A%2F%2F127.0.0.1%3A9"] {
+        for query in [
+            "code=c&state=other&iss=http%3A%2F%2F127.0.0.1%3A9",
+            "code=c&iss=http%3A%2F%2F127.0.0.1%3A9",
+            "code=c&state=the-statE&iss=http%3A%2F%2F127.0.0.1%3A9",
+            "code=c&state=the-state&state=the-state&iss=http%3A%2F%2F127.0.0.1%3A9",
+        ] {
             let (port, waiter) = waiting(Duration::from_secs(10), Arc::new(AtomicBool::new(false)));
             let (status, body) = get(port, &callback(query)).unwrap();
             assert_eq!(status, 400, "{query}");
@@ -234,7 +240,9 @@ mod tests {
 
     #[test]
     fn refuses_a_wrong_or_missing_issuer() {
-        for query in ["code=c&state=the-state&iss=https%3A%2F%2Fevil.example.org", "code=c&state=the-state", "code=c&state=the-state&iss=http%3A%2F%2F127.0.0.1%3A9%2F"] {
+        for query in
+            ["code=c&state=the-state&iss=https%3A%2F%2Fevil.example.org", "code=c&state=the-state", "code=c&state=the-state&iss=http%3A%2F%2F127.0.0.1%3A9%2F"]
+        {
             let (port, waiter) = waiting(Duration::from_secs(10), Arc::new(AtomicBool::new(false)));
             assert_eq!(get(port, &callback(query)).unwrap().0, 400, "{query}");
             let error = waiter.join().unwrap().unwrap_err();

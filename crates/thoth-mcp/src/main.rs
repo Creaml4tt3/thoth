@@ -99,7 +99,12 @@ fn main() {
             _ => usage(&format!("unknown argument {arg:?}")),
         }
     }
-    let server = Arc::new(Server { socket: socket.or_else(relay::default_socket), session: Mutex::new(None), out: Mutex::new(std::io::stdout()), calls: Mutex::new(HashMap::new()) });
+    let server = Arc::new(Server {
+        socket: socket.or_else(relay::default_socket),
+        session: Mutex::new(None),
+        out: Mutex::new(std::io::stdout()),
+        calls: Mutex::new(HashMap::new()),
+    });
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     loop {
@@ -246,14 +251,20 @@ impl Server {
             Some(_) => self.era(params)?,
             None => Era::Modern { app: None },
         };
-        Ok(Era::Modern { app: era.app() }.finish(json!({ "supportedVersions": [MODERN], "capabilities": { "tools": {} }, "instructions": INSTRUCTIONS, "ttlMs": 3_600_000, "cacheScope": "public" })))
+        Ok(Era::Modern { app: era.app() }.finish(
+            json!({ "supportedVersions": [MODERN], "capabilities": { "tools": {} }, "instructions": INSTRUCTIONS, "ttlMs": 3_600_000, "cacheScope": "public" }),
+        ))
     }
 
     /// Which era a request is in: its own `_meta` version (2026-07-28), else the handshake session.
     fn era(&self, params: &Value) -> Result<Era, Rpc> {
         if let Some(version) = requested_version(params) {
             if version != MODERN {
-                return Err(Rpc { code: UNSUPPORTED_PROTOCOL_VERSION, message: "Unsupported protocol version".into(), data: Some(json!({ "supported": [MODERN], "requested": version })) });
+                return Err(Rpc {
+                    code: UNSUPPORTED_PROTOCOL_VERSION,
+                    message: "Unsupported protocol version".into(),
+                    data: Some(json!({ "supported": [MODERN], "requested": version })),
+                });
             }
             let app = params["_meta"].get(CLIENT_KEY).and_then(|c| c.get("name")).and_then(Value::as_str).map(str::to_owned);
             return Ok(Era::Modern { app });

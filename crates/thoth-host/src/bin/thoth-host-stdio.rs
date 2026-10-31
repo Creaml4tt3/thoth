@@ -35,9 +35,9 @@ use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
 use thoth_host::install::{Failure, Fetched, ScriptedInstaller};
 use thoth_host::updates::UpdateOptions;
+use thoth_host::{Browser, FileManager, Host, HostConfig, HostError, HostResult, MemorySecretStore, Picker, SecretStore};
 
 /// Longest request line accepted (1 GiB of base64 plus JSON overhead).
 const MAX_LINE: usize = 1024 * 1024 * 1024 / 3 * 4 + 1024 * 1024;
@@ -164,7 +164,9 @@ impl SecretStore for FileSecretStore {
 }
 
 fn usage(message: &str) -> ! {
-    eprintln!("thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--pick-save DIR] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS] [--update-installer ok|windows|slow|verify|offline|disk]");
+    eprintln!(
+        "thoth-host-stdio: {message}\nusage: thoth-host-stdio [--allow-root DIR]... [--pick-vault DIR] [--pick-source PATH] [--pick-image PATH] [--pick-save DIR] [--data-dir DIR] [--agent-search-dir DIR]... [--secrets-file PATH] [--link-preview-loopback] [--update-url URL] [--update-current VERSION] [--update-now SECONDS] [--update-installer ok|windows|slow|verify|offline|disk]"
+    );
     std::process::exit(2);
 }
 
@@ -289,7 +291,14 @@ fn runs_off_main(line: &str) -> bool {
     serde_json::from_str::<Value>(line)
         .ok()
         .and_then(|r| {
-            r.get("command").and_then(Value::as_str).map(|c| c.starts_with("server.") || c.starts_with("sql.") || c.starts_with("fs.") || c.starts_with("link.") || c.starts_with("update.") || matches!(c, "api.call" | "agent.events" | "agent.detect"))
+            r.get("command").and_then(Value::as_str).map(|c| {
+                c.starts_with("server.")
+                    || c.starts_with("sql.")
+                    || c.starts_with("fs.")
+                    || c.starts_with("link.")
+                    || c.starts_with("update.")
+                    || matches!(c, "api.call" | "agent.events" | "agent.detect")
+            })
         })
         .unwrap_or(false)
 }

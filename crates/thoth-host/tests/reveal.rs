@@ -69,12 +69,8 @@ fn reveals_only_the_root_of_an_open_vault_named_by_its_handle() {
     assert_eq!(*recorder.0.lock().unwrap(), vec![(thoth_host::paths::canonicalize_path(&vault).unwrap(), None)]);
 
     // A path, an unknown handle, a missing argument or request bytes reveal nothing.
-    let refused = [
-        json!({ "vault": vault.to_string_lossy() }),
-        json!({ "vault": "vault_0000" }),
-        json!({ "root": vault.to_string_lossy() }),
-        json!({ "vault": 1 }),
-    ];
+    let refused =
+        [json!({ "vault": vault.to_string_lossy() }), json!({ "vault": "vault_0000" }), json!({ "root": vault.to_string_lossy() }), json!({ "vault": 1 })];
     for args in refused {
         let code = host.call("vault.reveal", &args, None).unwrap_err().code;
         assert!(code == "BAD_HANDLE" || code == "BAD_ARGUMENT", "{args}: {code}");

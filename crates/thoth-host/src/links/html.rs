@@ -167,13 +167,26 @@ mod tests {
             <meta content="/img.png" property="og:image" />
             </head><body><meta property="og:title" content="in the body"></body></html>"#,
         );
-        assert_eq!(head, Head { title: Some("The & title".into()), description: Some("Two <lines> – here".into()), site_name: Some("Example".into()), image: Some("/img.png".into()) });
+        assert_eq!(
+            head,
+            Head {
+                title: Some("The & title".into()),
+                description: Some("Two <lines> – here".into()),
+                site_name: Some("Example".into()),
+                image: Some("/img.png".into())
+            }
+        );
     }
 
     #[test]
     fn falls_back_to_twitter_then_title() {
-        let head = read_head(r#"<head><TITLE>Plain &quot;title&quot;</TITLE><meta name="twitter:description" content="Tw desc"><meta name="twitter:image:src" content="https://x.example/t.jpg"></head>"#);
-        assert_eq!(head, Head { title: Some("Plain \"title\"".into()), description: Some("Tw desc".into()), site_name: None, image: Some("https://x.example/t.jpg".into()) });
+        let head = read_head(
+            r#"<head><TITLE>Plain &quot;title&quot;</TITLE><meta name="twitter:description" content="Tw desc"><meta name="twitter:image:src" content="https://x.example/t.jpg"></head>"#,
+        );
+        assert_eq!(
+            head,
+            Head { title: Some("Plain \"title\"".into()), description: Some("Tw desc".into()), site_name: None, image: Some("https://x.example/t.jpg".into()) }
+        );
         let head = read_head(r#"<head><title>T</title><meta name="twitter:title" content="Tw"></head>"#);
         assert_eq!(head.title.as_deref(), Some("Tw"));
         assert_eq!(read_head("<head><meta property=\"og:title\" content=\"\"><title>Kept</title></head>").title.as_deref(), Some("Kept"));
@@ -195,7 +208,18 @@ mod tests {
 
     #[test]
     fn survives_broken_markup() {
-        for html in ["<", "<meta", "<meta property=\"og:title\" content=\"x", "<title>no end", "<!-- no end", "<script>no end", "<meta =x>", "<<<>>>", "<meta property=og:title content=>", "\u{0}<\u{1}meta"] {
+        for html in [
+            "<",
+            "<meta",
+            "<meta property=\"og:title\" content=\"x",
+            "<title>no end",
+            "<!-- no end",
+            "<script>no end",
+            "<meta =x>",
+            "<<<>>>",
+            "<meta property=og:title content=>",
+            "\u{0}<\u{1}meta",
+        ] {
             let _ = read_head(html);
         }
         assert_eq!(read_head("<title>no end").title.as_deref(), Some("no end"));

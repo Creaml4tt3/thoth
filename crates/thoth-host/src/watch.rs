@@ -91,7 +91,13 @@ mod tests {
     #[test]
     fn collects_relative_paths_without_thoth() {
         let root = Path::new("/v");
-        let events = [PathBuf::from("/v/a.md"), PathBuf::from("/v/.thoth/index.sqlite"), PathBuf::from("/v/.THOTH/x"), PathBuf::from("/other/b.md"), PathBuf::from("/v/d/cafe\u{301}.md")];
+        let events = [
+            PathBuf::from("/v/a.md"),
+            PathBuf::from("/v/.thoth/index.sqlite"),
+            PathBuf::from("/v/.THOTH/x"),
+            PathBuf::from("/other/b.md"),
+            PathBuf::from("/v/d/cafe\u{301}.md"),
+        ];
         let (paths, rescan) = collect(root, events.iter().map(|p| (p, false)));
         assert_eq!(paths, vec!["a.md".to_owned(), "d/caf\u{e9}.md".to_owned()]);
         assert!(!rescan);

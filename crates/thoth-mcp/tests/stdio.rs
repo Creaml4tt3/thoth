@@ -21,7 +21,14 @@ struct Server {
 
 impl Server {
     fn start(socket: &Path) -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_thoth-mcp")).arg("--socket").arg(socket).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+        let mut child = Command::new(env!("CARGO_BIN_EXE_thoth-mcp"))
+            .arg("--socket")
+            .arg(socket)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Self { child, stdin: Some(stdin), stdout }
@@ -55,7 +62,8 @@ impl Server {
 
     /// The 2025-11-25 handshake as `clientInfo.name`.
     fn initialize(&mut self, app: &str) -> Value {
-        let answer = self.call(0, "initialize", json!({ "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": { "name": app, "version": "1.0.0" } }));
+        let answer =
+            self.call(0, "initialize", json!({ "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": { "name": app, "version": "1.0.0" } }));
         self.send(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }));
         answer
     }
@@ -167,7 +175,11 @@ fn the_2026_07_28_requests_carry_their_version_and_client_in_meta() {
     assert_eq!(call["result"]["resultType"], "complete");
     assert_eq!(app.seen.lock().unwrap()[0]["app"], "Cursor");
 
-    let wrong = server.call(4, "tools/list", json!({ "_meta": { "io.modelcontextprotocol/protocolVersion": "1900-01-01", "io.modelcontextprotocol/clientCapabilities": {} } }));
+    let wrong = server.call(
+        4,
+        "tools/list",
+        json!({ "_meta": { "io.modelcontextprotocol/protocolVersion": "1900-01-01", "io.modelcontextprotocol/clientCapabilities": {} } }),
+    );
     assert_eq!(wrong["error"]["code"], -32022);
     assert_eq!(wrong["error"]["data"], json!({ "supported": [MODERN], "requested": "1900-01-01" }));
 }
@@ -176,7 +188,9 @@ fn the_2026_07_28_requests_carry_their_version_and_client_in_meta() {
 fn a_call_that_fails_is_a_tool_error_the_model_can_read() {
     let app = app(|request: &Value| match request["tool"].as_str() {
         Some("read_page") => json!({ "ok": false, "error": { "code": "NOT_FOUND", "message": "No page Nope.md in Notes" } }),
-        _ => json!({ "ok": false, "error": { "code": "DENIED", "message": "claude-ai may not read your notes: allow it in Thoth, under Settings → Connected apps" } }),
+        _ => {
+            json!({ "ok": false, "error": { "code": "DENIED", "message": "claude-ai may not read your notes: allow it in Thoth, under Settings → Connected apps" } })
+        }
     });
     let mut server = Server::start(&app.socket);
     server.initialize("claude-ai");

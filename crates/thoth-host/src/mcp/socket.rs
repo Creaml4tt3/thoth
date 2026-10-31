@@ -36,7 +36,10 @@ mod unix {
             private_dir(dir)?;
             let path = dir.join(SOCKET_NAME);
             if path.as_os_str().len() > MAX_SOCKET_PATH {
-                return Err(HostError::new("UNAVAILABLE", format!("The app data folder's path is too long for a local socket ({} bytes)", path.as_os_str().len())));
+                return Err(HostError::new(
+                    "UNAVAILABLE",
+                    format!("The app data folder's path is too long for a local socket ({} bytes)", path.as_os_str().len()),
+                ));
             }
             match std::fs::symlink_metadata(&path) {
                 Ok(meta) if meta.file_type().is_socket() => {

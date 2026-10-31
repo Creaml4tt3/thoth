@@ -345,7 +345,11 @@ fn sign_in_endpoints_on_another_origin_are_refused() {
 #[test]
 fn one_sign_in_per_server_and_cancel() {
     let fake = Fake::start(Config::default());
-    let h = Arc::new(Harness::with(TestBrowser { record_only: true, ..TestBrowser::default() }, tempfile::tempdir().unwrap(), Arc::new(MemorySecretStore::default())));
+    let h = Arc::new(Harness::with(
+        TestBrowser { record_only: true, ..TestBrowser::default() },
+        tempfile::tempdir().unwrap(),
+        Arc::new(MemorySecretStore::default()),
+    ));
     let id = h.add(&fake);
     let first = {
         let (h, id) = (h.clone(), id.clone());
@@ -442,7 +446,9 @@ fn stdio_harness_never_prints_a_secret() {
     let mut stdin = child.stdin.take().unwrap();
     let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
     let mut printed: Vec<String> = Vec::new();
-    let send = |stdin: &mut std::process::ChildStdin, id: u64, command: &str, args: Value| writeln!(stdin, "{}", json!({ "id": id, "command": command, "args": args })).unwrap();
+    let send = |stdin: &mut std::process::ChildStdin, id: u64, command: &str, args: Value| {
+        writeln!(stdin, "{}", json!({ "id": id, "command": command, "args": args })).unwrap()
+    };
     let mut until = |printed: &mut Vec<String>, pred: &dyn Fn(&Value) -> bool| -> Value {
         loop {
             let line = lines.next().unwrap().unwrap();

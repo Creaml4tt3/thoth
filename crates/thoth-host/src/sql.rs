@@ -81,7 +81,14 @@ impl Sql {
         c.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true).map_err(sql_error)?;
         c.set_db_config(DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false).map_err(sql_error)?;
         // SAFETY: valid open handle; this config takes (int, int*) and accepts a null out-pointer.
-        let rc = unsafe { rusqlite::ffi::sqlite3_db_config(c.handle(), rusqlite::ffi::SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, 0 as std::ffi::c_int, std::ptr::null_mut::<std::ffi::c_int>()) };
+        let rc = unsafe {
+            rusqlite::ffi::sqlite3_db_config(
+                c.handle(),
+                rusqlite::ffi::SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION,
+                0 as std::ffi::c_int,
+                std::ptr::null_mut::<std::ffi::c_int>(),
+            )
+        };
         if rc != rusqlite::ffi::SQLITE_OK {
             return Err(HostError::internal("Could not disable SQLite extension loading"));
         }
@@ -186,11 +193,13 @@ fn row_object(row: &rusqlite::Row<'_>, names: &[String], budget: &mut usize) -> 
     let mut obj = Map::with_capacity(names.len());
     for (i, name) in names.iter().enumerate() {
         let value = sql_to_wire(row.get_ref(i).map_err(sql_error)?)?;
-        let cost = 16 + name.len() + match &value {
-            Value::String(s) => s.len(),
-            Value::Object(o) => o.values().map(|v| v.as_str().map_or(0, str::len)).sum(),
-            _ => 8,
-        };
+        let cost = 16
+            + name.len()
+            + match &value {
+                Value::String(s) => s.len(),
+                Value::Object(o) => o.values().map(|v| v.as_str().map_or(0, str::len)).sum(),
+                _ => 8,
+            };
         *budget = budget.checked_sub(cost).ok_or_else(|| HostError::bad_argument(format!("Result set exceeds {MAX_RESULT_BYTES} bytes")))?;
         obj.insert(name.clone(), value);
     }
@@ -244,7 +253,9 @@ fn authorize(ctx: AuthContext<'_>) -> Authorization {
         // Reading these is harmless; assigning them is not.
         AuthAction::Pragma { pragma_name, pragma_value: Some(_) } if DENIED_PRAGMAS.iter().any(|p| p.eq_ignore_ascii_case(pragma_name)) => Authorization::Deny,
         // These name files even when read with an argument-less form, so deny them outright.
-        AuthAction::Pragma { pragma_name, .. } if ["temp_store_directory", "data_store_directory"].iter().any(|p| p.eq_ignore_ascii_case(pragma_name)) => Authorization::Deny,
+        AuthAction::Pragma { pragma_name, .. } if ["temp_store_directory", "data_store_directory"].iter().any(|p| p.eq_ignore_ascii_case(pragma_name)) => {
+            Authorization::Deny
+        }
         AuthAction::Function { function_name } if DENIED_FUNCTIONS.iter().any(|f| f.eq_ignore_ascii_case(function_name)) => Authorization::Deny,
         AuthAction::CreateVtable { module_name, .. } if !ALLOWED_VTAB_MODULES.iter().any(|m| m.eq_ignore_ascii_case(module_name)) => Authorization::Deny,
         _ => Authorization::Allow,
@@ -302,7 +313,15 @@ mod tests {
     #[test]
     fn wire_values_round_trip() {
         let (_d, sql) = open();
-        let row = sql.get("SELECT ? AS n, ? AS big, ? AS b, ? AS t, 9007199254740993 AS unsafe", &[json!(1.5), json!({ "$bigint": "-9223372036854775808" }), json!({ "$bytes": "AP8=" }), json!("x")]).unwrap();
-        assert_eq!(row, json!({ "n": 1.5, "big": { "$bigint": "-9223372036854775808" }, "b": { "$bytes": "AP8=" }, "t": "x", "unsafe": { "$bigint": "9007199254740993" } }));
+        let row = sql
+            .get(
+                "SELECT ? AS n, ? AS big, ? AS b, ? AS t, 9007199254740993 AS unsafe",
+                &[json!(1.5), json!({ "$bigint": "-9223372036854775808" }), json!({ "$bytes": "AP8=" }), json!("x")],
+            )
+            .unwrap();
+        assert_eq!(
+            row,
+            json!({ "n": 1.5, "big": { "$bigint": "-9223372036854775808" }, "b": { "$bytes": "AP8=" }, "t": "x", "unsafe": { "$bigint": "9007199254740993" } })
+        );
     }
 }

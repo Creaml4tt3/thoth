@@ -1,0 +1,3 @@
+# The code wraps long lines by hand at about 160 columns; this keeps cargo fmt to that style.
+max_width = 160
+use_small_heuristics = "Max"

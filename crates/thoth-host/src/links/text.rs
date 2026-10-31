@@ -9,7 +9,9 @@ pub const MAX_SITE: usize = 80;
 
 /// Decodes a page's bytes. `charset` is the `Content-Type` parameter, if any.
 pub fn decode(bytes: &[u8], charset: Option<&str>) -> String {
-    let latin = charset.map(|c| c.trim().trim_matches('"').to_ascii_lowercase()).is_some_and(|c| matches!(c.as_str(), "iso-8859-1" | "latin1" | "latin-1" | "windows-1252" | "cp1252" | "us-ascii" | "ascii"));
+    let latin = charset
+        .map(|c| c.trim().trim_matches('"').to_ascii_lowercase())
+        .is_some_and(|c| matches!(c.as_str(), "iso-8859-1" | "latin1" | "latin-1" | "windows-1252" | "cp1252" | "us-ascii" | "ascii"));
     if latin {
         // Windows-1252 differs from Latin-1 in 0x80..0x9f only, which become control characters and are removed.
         bytes.iter().map(|b| *b as char).collect()
@@ -19,9 +21,28 @@ pub fn decode(bytes: &[u8], charset: Option<&str>) -> String {
 }
 
 const NAMED: &[(&str, &str)] = &[
-    ("amp", "&"), ("lt", "<"), ("gt", ">"), ("quot", "\""), ("apos", "'"), ("nbsp", "\u{a0}"), ("ndash", "–"), ("mdash", "—"),
-    ("hellip", "…"), ("lsquo", "‘"), ("rsquo", "’"), ("ldquo", "“"), ("rdquo", "”"), ("laquo", "«"), ("raquo", "»"), ("middot", "·"),
-    ("bull", "•"), ("copy", "©"), ("reg", "®"), ("trade", "™"), ("deg", "°"), ("times", "×"),
+    ("amp", "&"),
+    ("lt", "<"),
+    ("gt", ">"),
+    ("quot", "\""),
+    ("apos", "'"),
+    ("nbsp", "\u{a0}"),
+    ("ndash", "–"),
+    ("mdash", "—"),
+    ("hellip", "…"),
+    ("lsquo", "‘"),
+    ("rsquo", "’"),
+    ("ldquo", "“"),
+    ("rdquo", "”"),
+    ("laquo", "«"),
+    ("raquo", "»"),
+    ("middot", "·"),
+    ("bull", "•"),
+    ("copy", "©"),
+    ("reg", "®"),
+    ("trade", "™"),
+    ("deg", "°"),
+    ("times", "×"),
 ];
 
 /// Decodes HTML character references: numeric ones and a few common names. Anything else is left as written.

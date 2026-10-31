@@ -123,7 +123,10 @@ fn denied_name(name: &str) -> bool {
 
 /// An alias (`sonnet`) or a full model name (`claude-sonnet-5`, `claude-sonnet-5[1m]`). Never starts with `-`.
 fn model_name(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 100 && name.starts_with(|c: char| c.is_ascii_alphanumeric()) && name.chars().all(|c| c.is_ascii_alphanumeric() || "._:-[]".contains(c))
+    !name.is_empty()
+        && name.len() <= 100
+        && name.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || "._:-[]".contains(c))
 }
 
 /// A positive dollar amount with at most two decimals and at most [`MAX_BUDGET_USD`].

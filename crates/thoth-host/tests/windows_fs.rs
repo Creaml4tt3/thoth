@@ -92,7 +92,13 @@ impl Fixture {
     }
     fn names(&self, dir: &str) -> Vec<(String, String)> {
         let listed = self.call("fs.list", json!({ "dir": dir })).unwrap();
-        let mut names: Vec<(String, String)> = listed.as_array().unwrap().iter().map(|e| (e["name"].as_str().unwrap().to_owned(), e["kind"].as_str().unwrap().to_owned())).filter(|(n, _)| n != ".thoth").collect();
+        let mut names: Vec<(String, String)> = listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| (e["name"].as_str().unwrap().to_owned(), e["kind"].as_str().unwrap().to_owned()))
+            .filter(|(n, _)| n != ".thoth")
+            .collect();
         names.sort();
         names
     }
@@ -351,7 +357,12 @@ fn a_folder_source_never_follows_a_junction_or_names_a_stream() {
     let host = host(base.path(), data.path(), false);
     let source = host.call("source.open", &json!({ "location": b.join("Export").to_string_lossy() }), None).unwrap().0["source"].as_str().unwrap().to_owned();
     let listed = host.call("source.list", &json!({ "source": source, "dir": "" }), None).unwrap().0;
-    let mut kinds: Vec<(String, String, u64)> = listed.as_array().unwrap().iter().map(|e| (e["name"].as_str().unwrap().into(), e["kind"].as_str().unwrap().into(), e["size"].as_u64().unwrap())).collect();
+    let mut kinds: Vec<(String, String, u64)> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| (e["name"].as_str().unwrap().into(), e["kind"].as_str().unwrap().into(), e["size"].as_u64().unwrap()))
+        .collect();
     kinds.sort();
     assert_eq!(kinds, vec![("a.md".into(), "file".into(), 10), ("linkdir".into(), "symlink".into(), 0), ("sub".into(), "directory".into(), 0)]);
     let open = |path: &str| host.call("source.file.open", &json!({ "source": source, "path": path }), None);

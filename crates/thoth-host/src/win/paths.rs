@@ -133,7 +133,8 @@ pub fn check_root_policy(root: &Path, home: Option<&Path>, data_dir: Option<&Pat
     };
     let drive = root.components().next().map(|c| with_root(c.as_os_str())).unwrap_or_default();
     let system_drive = std::env::var_os("SystemDrive").map(|d| with_root(&d)).unwrap_or_else(|| PathBuf::from(r"C:\"));
-    let mut trees: Vec<PathBuf> = ["SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"].iter().filter_map(|v| env_dir(v)).collect();
+    let mut trees: Vec<PathBuf> =
+        ["SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"].iter().filter_map(|v| env_dir(v)).collect();
     for fallback in [r"C:\Windows", r"C:\Program Files", r"C:\Program Files (x86)", r"C:\ProgramData"] {
         trees.push(PathBuf::from(fallback));
     }
@@ -197,7 +198,14 @@ mod tests {
         ] {
             assert!(check_root_policy(Path::new(bad), Some(home), Some(data)).is_err(), "{bad}");
         }
-        for good in [r"C:\Users\alice\Notes", r"C:\Users\alice\OneDrive\Notes", r"D:\Vaults\Work", r"\\srv\share\Notes", r"C:\Users\alice\AppData\Local\Temp\vault-1", r"\\?\C:\Users\alice\Notes"] {
+        for good in [
+            r"C:\Users\alice\Notes",
+            r"C:\Users\alice\OneDrive\Notes",
+            r"D:\Vaults\Work",
+            r"\\srv\share\Notes",
+            r"C:\Users\alice\AppData\Local\Temp\vault-1",
+            r"\\?\C:\Users\alice\Notes",
+        ] {
             assert!(check_root_policy(Path::new(good), Some(home), Some(data)).is_ok(), "{good}");
         }
     }

@@ -20,7 +20,11 @@ pub const MAX_TIMEOUT_MS: u64 = 24 * 60 * 60 * 1000;
 pub fn validate_timeout(timeout_ms: Option<u64>) -> HostResult<Duration> {
     let ms = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
     if !(MIN_TIMEOUT_MS..=MAX_TIMEOUT_MS).contains(&ms) {
-        return Err(HostError::bad_argument(format!("The time limit must be between {} second and {} hours", MIN_TIMEOUT_MS / 1000, MAX_TIMEOUT_MS / 3_600_000)));
+        return Err(HostError::bad_argument(format!(
+            "The time limit must be between {} second and {} hours",
+            MIN_TIMEOUT_MS / 1000,
+            MAX_TIMEOUT_MS / 3_600_000
+        )));
     }
     Ok(Duration::from_millis(ms))
 }

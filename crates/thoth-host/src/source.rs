@@ -27,7 +27,10 @@ pub const MAX_OPEN_FILES: usize = 256;
 pub enum SourceRoot {
     Directory(OwnedFd),
     /// The archive itself, kept open from `source.open` so a later swap of the path cannot substitute it.
-    File { file: File, size: u64 },
+    File {
+        file: File,
+        size: u64,
+    },
 }
 
 pub struct Source {
@@ -49,7 +52,8 @@ impl Source {
     pub fn open(location: &Path) -> HostResult<Self> {
         let display = location.display().to_string();
         let label = location.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| display.clone());
-        let fd = openat(rustix::fs::CWD, location, crate::no_symlinks(OFlags::RDONLY | OFlags::NONBLOCK | OFlags::CLOEXEC), Mode::empty()).map_err(|e| HostError::errno(e, "open", &display))?;
+        let fd = openat(rustix::fs::CWD, location, crate::no_symlinks(OFlags::RDONLY | OFlags::NONBLOCK | OFlags::CLOEXEC), Mode::empty())
+            .map_err(|e| HostError::errno(e, "open", &display))?;
         let st = rustix::fs::fstat(&fd).map_err(|e| HostError::errno(e, "fstat", &display))?;
         let root = match file_type(&st) {
             FileType::Directory => SourceRoot::Directory(at::reopen(fd.as_fd()).map_err(|e| HostError::errno(e, "open", &display))?),
@@ -80,7 +84,8 @@ impl Source {
         let mut out = Vec::new();
         for (name, ft) in at::read_dir(fd.as_fd()).map_err(|e| HostError::errno(e, "scandir", dir))? {
             // lstat never follows symlinks; size is reported for regular files only.
-            let size = if ft == FileType::RegularFile { statat(&fd, name.as_str(), AtFlags::SYMLINK_NOFOLLOW).map(|s| s.st_size as u64).unwrap_or(0) } else { 0 };
+            let size =
+                if ft == FileType::RegularFile { statat(&fd, name.as_str(), AtFlags::SYMLINK_NOFOLLOW).map(|s| s.st_size as u64).unwrap_or(0) } else { 0 };
             out.push(json!({ "name": name, "kind": kind_name(ft), "size": size }));
         }
         Ok(Value::Array(out))
@@ -162,7 +167,10 @@ impl OpenFile {
         if self.temp_path.is_none() {
             return Err(HostError::bad_argument("Only temp files are writable"));
         }
-        let end = position.checked_add(data.len() as u64).filter(|end| *end <= MAX_TEMP_BYTES).ok_or_else(|| HostError::bad_argument(format!("Temp files are limited to {MAX_TEMP_BYTES} bytes")))?;
+        let end = position
+            .checked_add(data.len() as u64)
+            .filter(|end| *end <= MAX_TEMP_BYTES)
+            .ok_or_else(|| HostError::bad_argument(format!("Temp files are limited to {MAX_TEMP_BYTES} bytes")))?;
         self.file.write_all_at(data, position).map_err(|e| HostError::io(&e, "write", "temp"))?;
         self.size = self.size.max(end);
         Ok(())

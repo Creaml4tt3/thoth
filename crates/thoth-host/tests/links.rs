@@ -183,8 +183,10 @@ fn image(server: &Server, path: &str, bytes: &[u8], content_type: &str) {
 }
 
 fn page(title: &str, image: &str) -> String {
-    format!(r#"<!doctype html><html><head><meta charset="utf-8"><title>Fallback</title><meta property="og:title" content="{title}"><meta property="og:description" content="Line one.
-Line two."><meta property="og:site_name" content="Example Site"><meta property="og:image" content="{image}"></head><body>Body</body></html>"#)
+    format!(
+        r#"<!doctype html><html><head><meta charset="utf-8"><title>Fallback</title><meta property="og:title" content="{title}"><meta property="og:description" content="Line one.
+Line two."><meta property="og:site_name" content="Example Site"><meta property="og:image" content="{image}"></head><body>Body</body></html>"#
+    )
 }
 
 // ------------------------------------------------------------------------------------------------------- tests
@@ -212,7 +214,15 @@ fn reads_a_preview_and_its_image_as_a_data_url() {
 fn cuts_title_description_and_site_name() {
     let server = Server::start();
     let long = |n: usize| "ก".repeat(n);
-    server.html("/long", &format!(r#"<head><meta property="og:title" content="{}"><meta property="og:description" content="{}"><meta property="og:site_name" content="{}"></head>"#, long(500), long(500), long(500)));
+    server.html(
+        "/long",
+        &format!(
+            r#"<head><meta property="og:title" content="{}"><meta property="og:description" content="{}"><meta property="og:site_name" content="{}"></head>"#,
+            long(500),
+            long(500),
+            long(500)
+        ),
+    );
     let p = previews(true, None, None).preview(&server.url("/long")).unwrap();
     assert_eq!(p["title"].as_str().unwrap().chars().count(), 200);
     assert_eq!(p["description"].as_str().unwrap().chars().count(), 300);
@@ -241,7 +251,10 @@ fn refuses_every_non_public_address_without_connecting() {
         ("loop6.test", &["::1"]),
     ]);
     let links = previews(false, Some(dns.clone()), None);
-    let mut urls: Vec<String> = ["ten", "home", "corp", "meta", "cgnat", "multi", "zero", "loop", "ula", "ll6", "mapped", "mapped-loop", "loop6"].iter().map(|n| format!("http://{n}.test:{port}/page")).collect();
+    let mut urls: Vec<String> = ["ten", "home", "corp", "meta", "cgnat", "multi", "zero", "loop", "ula", "ll6", "mapped", "mapped-loop", "loop6"]
+        .iter()
+        .map(|n| format!("http://{n}.test:{port}/page"))
+        .collect();
     urls.extend([
         format!("http://127.0.0.1:{port}/page"),
         format!("http://[::1]:{port}/page"),
@@ -482,7 +495,12 @@ fn the_cache_expires_and_stays_bounded() {
     let data = tempfile::tempdir().unwrap();
     let links = LinkPreviews::new(
         Some(data.path().to_owned()),
-        LinkOptions { allow_loopback: true, limits: CacheLimits { max_entries: 3, ..thoth_host::links::cache::LIMITS }, clock: Arc::new(move || *clock.lock().unwrap()), ..LinkOptions::default() },
+        LinkOptions {
+            allow_loopback: true,
+            limits: CacheLimits { max_entries: 3, ..thoth_host::links::cache::LIMITS },
+            clock: Arc::new(move || *clock.lock().unwrap()),
+            ..LinkOptions::default()
+        },
     );
     let tick = |secs: u64| *now.lock().unwrap() += Duration::from_secs(secs);
     for n in 0..4 {
@@ -757,7 +775,7 @@ fn turned_off_means_no_request_at_all_even_for_check_now() {
     serve_latest(&server, &latest("0.2.0"));
     let (clock, data) = (Clock::new(), tempfile::tempdir().unwrap());
     let notice = updates("0.1.3", &server.url("/latest.json"), true, &clock, Some(data.path()));
-    assert_eq!(notice.settings(&json!({}), ).unwrap()["notify"], true, "On by default");
+    assert_eq!(notice.settings(&json!({}),).unwrap()["notify"], true, "On by default");
     assert_eq!(notice.settings(&json!({ "notify": false })).unwrap()["notify"], false);
     assert_eq!(state(&notice.check(false)), "off");
     assert_eq!(state(&notice.check(true)), "off");
@@ -927,7 +945,8 @@ fn the_update_commands_through_the_host() {
     assert_eq!(noticed.call("update.check", &json!({}), Some(b"x")).unwrap_err().code, "BAD_ARGUMENT");
     assert_eq!(noticed.call("update.settings", &json!({ "notify": 1 }), None).unwrap_err().code, "BAD_ARGUMENT");
     // The host's own loopback switch is what lets the test server through: as shipped, it is refused.
-    let shipped = host(tempfile::tempdir().unwrap().path(), false, Arc::new(Opened::default())).with_updates(UpdateOptions::new("0.1.3", server.url("/latest.json")));
+    let shipped =
+        host(tempfile::tempdir().unwrap().path(), false, Arc::new(Opened::default())).with_updates(UpdateOptions::new("0.1.3", server.url("/latest.json")));
     assert_eq!(shipped.call("update.check", &json!({}), None).unwrap().0["state"], "failed");
     assert_eq!(server.count(), 1);
 }
@@ -935,7 +954,13 @@ fn the_update_commands_through_the_host() {
 #[test]
 fn the_shipped_shell_has_no_way_to_change_where_the_notice_looks() {
     let shell = include_str!("../../../apps/desktop/src-tauri/src/lib.rs");
-    assert!(!shell.contains("--update-url") && !shell.contains("--update-current") && !shell.contains("--update-now") && !shell.contains("--update-installer") && !shell.contains("ScriptedInstaller"));
+    assert!(
+        !shell.contains("--update-url")
+            && !shell.contains("--update-current")
+            && !shell.contains("--update-now")
+            && !shell.contains("--update-installer")
+            && !shell.contains("ScriptedInstaller")
+    );
     let harness = include_str!("../src/bin/thoth-host-stdio.rs");
     assert!(harness.contains("\"--update-url\""));
 }

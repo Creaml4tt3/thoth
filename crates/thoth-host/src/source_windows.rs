@@ -32,7 +32,10 @@ pub const MAX_OPEN_FILES: usize = 256;
 pub enum SourceRoot {
     Directory(OwnedHandle),
     /// The archive itself, kept open from `source.open` so a later swap of the path cannot substitute it.
-    File { file: File, size: u64 },
+    File {
+        file: File,
+        size: u64,
+    },
 }
 
 pub struct Source {
@@ -182,7 +185,10 @@ impl OpenFile {
         if self.temp_path.is_none() {
             return Err(HostError::bad_argument("Only temp files are writable"));
         }
-        let end = position.checked_add(data.len() as u64).filter(|end| *end <= MAX_TEMP_BYTES).ok_or_else(|| HostError::bad_argument(format!("Temp files are limited to {MAX_TEMP_BYTES} bytes")))?;
+        let end = position
+            .checked_add(data.len() as u64)
+            .filter(|end| *end <= MAX_TEMP_BYTES)
+            .ok_or_else(|| HostError::bad_argument(format!("Temp files are limited to {MAX_TEMP_BYTES} bytes")))?;
         let mut done = 0;
         while done < data.len() {
             match self.file.seek_write(&data[done..], position + done as u64) {

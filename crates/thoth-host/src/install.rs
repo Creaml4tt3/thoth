@@ -225,7 +225,16 @@ pub struct ScriptedInstaller {
 
 impl ScriptedInstaller {
     pub fn new(outcome: Result<Fetched, Failure>) -> Self {
-        Self { supported: true, outcome: Mutex::new(outcome), chunks: Mutex::new(Vec::new()), step: Duration::ZERO, fetches: AtomicUsize::new(0), restarts: AtomicUsize::new(0), saw_cancel: AtomicBool::new(false), on_restart: None }
+        Self {
+            supported: true,
+            outcome: Mutex::new(outcome),
+            chunks: Mutex::new(Vec::new()),
+            step: Duration::ZERO,
+            fetches: AtomicUsize::new(0),
+            restarts: AtomicUsize::new(0),
+            saw_cancel: AtomicBool::new(false),
+            on_restart: None,
+        }
     }
 
     pub fn unsupported() -> Self {

@@ -2,6 +2,7 @@
 //! capability file can grant exactly these (and nothing else) to the webview.
 
 /// `thoth_host::COMMANDS` with `.` replaced by `_`, then the shell's own commands (both checked by unit tests in src/lib.rs).
+#[rustfmt::skip] // grouped by family, one family per line
 pub const TAURI_COMMANDS: &[&str] = &[
     "vault_pick", "vault_recent", "vault_open", "vault_close", "vault_reveal", "vault_shared", "vault_trash",
     "fs_stat", "fs_read", "fs_list", "fs_mkdirp", "fs_write", "fs_rename", "fs_remove",
@@ -41,7 +42,10 @@ fn address(name: &str) {
     let Ok(value) = std::env::var(name) else { return };
     let debug = std::env::var("PROFILE").as_deref() == Ok("debug");
     let local = debug && name == "THOTH_UPDATE_URL" && value.starts_with("http://127.0.0.1:");
-    assert!(value.is_empty() || ((value.starts_with("https://") || local) && !value.chars().any(|c| c.is_control() || c.is_whitespace())), "{name} must be empty or an https address");
+    assert!(
+        value.is_empty() || ((value.starts_with("https://") || local) && !value.chars().any(|c| c.is_control() || c.is_whitespace())),
+        "{name} must be empty or an https address"
+    );
     println!("cargo:rustc-env={name}={value}");
 }
 
