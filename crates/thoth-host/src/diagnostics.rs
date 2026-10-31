@@ -173,7 +173,7 @@ fn secret(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         k += 1;
     }
     const REDACTED: [char; 10] = ['<', 'r', 'e', 'd', 'a', 'c', 't', 'e', 'd', '>'];
-    let bracket = if c[k..].starts_with(&['S', 'o', 'm', 'e', '(']) { Some(k + 4) } else { Some(k).filter(|_| matches!(c.get(k), Some('(' | '[' | '{'))) };
+    let bracket = if c[k..].starts_with(&['S', 'o', 'm', 'e', '(']) { Some(k + 4) } else { matches!(c.get(k), Some('(' | '[' | '{')).then_some(k) };
     let end = if c[k..].starts_with(&REDACTED) {
         // Already redacted (by `tail`'s second pass): keep what follows, such as the `,` after a `Debug` value.
         k + REDACTED.len()

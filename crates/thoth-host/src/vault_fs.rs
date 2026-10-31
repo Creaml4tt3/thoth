@@ -154,6 +154,8 @@ impl VaultFs {
             // Filesystems without hardlinks fall back to an exclusive copy, which also fails with EEXIST.
             let linked =
                 if self.disable_hardlink { Err(Errno::NOTSUP) } else { linkat(&src.dir, src.name.as_str(), &dst.dir, dst.name.as_str(), AtFlags::empty()) };
+            // NOTSUP and OPNOTSUPP are one value on Linux and two on macOS, so the pattern repeats on Linux.
+            #[allow(unreachable_patterns)]
             match linked {
                 Ok(()) => {}
                 Err(e @ (Errno::PERM | Errno::NOTSUP | Errno::OPNOTSUPP | Errno::XDEV | Errno::NOSYS)) => {
