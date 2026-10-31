@@ -900,17 +900,24 @@ export class Vault {
   private async createFolderNow(path: string): Promise<string> {
     const normalized = normalizeVaultPath(path);
     if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
-    const parent = dirname(normalized);
-    const parentStat = parent === "" ? { kind: "directory" as const } : await this.fs.stat(parent);
-    if (parentStat && parentStat.kind !== "directory") throw new ConflictError(parent, null, parentStat.kind);
-    if (parentStat) {
-      const key = collisionKey(basename(normalized));
-      const clash = (await this.fs.list(parent)).find((entry) => collisionKey(entry.name) === key);
-      if (clash) throw new ConflictError(parent === "" ? clash.name : `${parent}/${clash.name}`, null, clash.kind);
+    // Every segment is compared the way the vault compares names (case and Unicode form), not the way the disk does:
+    // on a case-sensitive disk (Linux) "Inbox/welcome.MD/x" would otherwise make a folder beside the page welcome.md.
+    // A folder on the way that exists under another case is reused, as macOS and Windows do.
+    const segments = normalized.split("/");
+    let made = "";
+    for (const [i, segment] of segments.entries()) {
+      const key = collisionKey(segment);
+      const clash = (await this.fs.list(made)).find((entry) => collisionKey(entry.name) === key);
+      const here = made === "" ? (clash?.name ?? segment) : `${made}/${clash?.name ?? segment}`;
+      if (!clash) {
+        made = [here, ...segments.slice(i + 1)].join("/");
+        break;
+      }
+      if (i === segments.length - 1 || clash.kind !== "directory") throw new ConflictError(here, null, clash.kind);
+      made = here;
     }
-    if (await this.fs.stat(normalized)) throw new ConflictError(normalized, null, (await this.hashOrKind(normalized)) ?? "exists");
-    await this.fs.mkdirp(normalized);
-    return normalized;
+    await this.fs.mkdirp(made);
+    return made;
   }
 
   /** Removes a folder that holds nothing but empty folders (and `.DS_Store`); anything else throws. */

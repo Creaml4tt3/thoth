@@ -150,9 +150,7 @@ describe("Vault on Rust ports", () => {
     for (let i = 0; i < 6; i++) expect((await vault.search(`zebramark${i}`)).some((h) => h.path === `Burst/Note ${i}.md`)).toBe(true);
   });
 
-  // Linux: only the last segment is checked for a case clash, so "Inbox/welcome.MD/Inner" creates a folder
-  // "welcome.MD" beside the file "welcome.md" instead of refusing. Known gap; it.fails goes red once fixed.
-  (process.platform === "linux" ? it.fails : it)("creates folders through the Rust mkdir: numbered default names, nested, and the vault's name rules", async () => {
+  it("creates folders through the Rust mkdir: numbered default names, nested, and the vault's name rules", async () => {
     expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder");
     expect(await vault.createUniqueFolder("", "Untitled folder")).toBe("Untitled folder 2");
     expect(await vault.createUniqueFolder("Projects/Thoth", "Untitled folder")).toBe("Projects/Thoth/Untitled folder");
