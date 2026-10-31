@@ -264,10 +264,13 @@ describe("watcher", () => {
     await mkdir(join(root, "Notes"));
     await writeFile(join(root, "Notes", "new.md"), "# New\n");
     await writeFile(join(root, ".thoth", "scratch.json"), "{}");
+    // inotify watches a new folder only after reporting it, so a file written into it at once can go unreported; the
+    // folder's own event is enough, since any event makes the app reconcile.
+    const seen = () => events.some((e) => e.rescan || e.paths.includes("Notes/new.md") || e.paths.includes("Notes"));
     const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && !events.some((e) => e.paths.includes("Notes/new.md") || e.rescan)) await new Promise((r) => setTimeout(r, 50));
+    while (Date.now() < deadline && !seen()) await new Promise((r) => setTimeout(r, 50));
     const paths = events.flatMap((e) => e.paths);
-    expect(paths.includes("Notes/new.md") || events.some((e) => e.rescan)).toBe(true);
+    expect(seen()).toBe(true);
     expect(paths.filter((p) => p.startsWith(".thoth"))).toEqual([]);
     expect(paths.every((p) => !p.startsWith("/"))).toBe(true);
     await stop();
