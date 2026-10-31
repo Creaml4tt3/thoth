@@ -35,6 +35,21 @@ export class NodeVaultFs implements VaultFs {
     return full;
   }
 
+  /**
+   * `abs`, with each name as it is stored on disk. Linux keeps names as bytes, so a name written in NFD (copied from a
+   * Mac, unzipped) does not answer to the NFC spelling `list` reports; macOS and Windows match both, so there the
+   * first check succeeds. A name with no entry stays as it is (it is about to be created).
+   */
+  private async onDisk(path: string): Promise<string> {
+    if (path === "" || /^[\x00-\x7f]*$/.test(path) || (await fs.lstat(this.abs(path)).then(() => true, () => false))) return this.abs(path);
+    let current = this.root;
+    for (const segment of normalizeVaultPath(path).split("/")) {
+      const names = await fs.readdir(current).catch(() => [] as string[]);
+      current = nodePath.join(current, names.find((name) => name.normalize("NFC") === segment) ?? segment);
+    }
+    return current;
+  }
+
   /** Refuses to operate through a symlinked ancestor directory. */
   private async assertNoSymlinkAncestors(path: string): Promise<void> {
     const segments = normalizeVaultPath(path).split("/");
@@ -49,7 +64,7 @@ export class NodeVaultFs implements VaultFs {
 
   async stat(path: string): Promise<FileStat | undefined> {
     if (path !== "") await this.assertNoSymlinkAncestors(path);
-    const s = await fs.lstat(this.abs(path)).catch((e: NodeJS.ErrnoException) => {
+    const s = await fs.lstat(await this.onDisk(path)).catch((e: NodeJS.ErrnoException) => {
       if (e.code === "ENOENT" || e.code === "ENOTDIR") return undefined;
       throw e;
     });
@@ -58,7 +73,7 @@ export class NodeVaultFs implements VaultFs {
 
   async readFile(path: string): Promise<Uint8Array> {
     await this.assertNoSymlinkAncestors(path);
-    const handle = await fs.open(this.abs(path), constants.O_RDONLY | constants.O_NOFOLLOW);
+    const handle = await fs.open(await this.onDisk(path), constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
       return new Uint8Array(await handle.readFile());
     } finally {
@@ -67,20 +82,20 @@ export class NodeVaultFs implements VaultFs {
   }
 
   async list(dir: string): Promise<DirEntry[]> {
-    const entries = await fs.readdir(this.abs(dir), { withFileTypes: true });
+    const entries = await fs.readdir(await this.onDisk(dir), { withFileTypes: true });
     return entries.map((e) => ({ name: e.name.normalize("NFC"), kind: kindOf(e) }));
   }
 
   async mkdirp(dir: string): Promise<void> {
     if (dir === "") return;
     await this.assertNoSymlinkAncestors(`${dir}/x`);
-    await fs.mkdir(this.abs(dir), { recursive: true });
+    await fs.mkdir(await this.onDisk(dir), { recursive: true });
   }
 
   async writeFile(path: string, data: Uint8Array, options: { exclusive?: boolean } = {}): Promise<void> {
     await this.assertNoSymlinkAncestors(path);
     const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | (options.exclusive ? constants.O_EXCL : constants.O_TRUNC);
-    const handle = await fs.open(this.abs(path), flags, 0o644);
+    const handle = await fs.open(await this.onDisk(path), flags, 0o644);
     try {
       await handle.writeFile(data);
       await handle.sync();
@@ -119,17 +134,17 @@ export class NodeVaultFs implements VaultFs {
       // Filesystems without hardlinks (exFAT, FAT, some SMB mounts) fall back to an
       // exclusive copy, which also fails with EEXIST rather than replacing.
       try {
-        await this.link(this.abs(from), this.abs(to));
+        await this.link(await this.onDisk(from), await this.onDisk(to));
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code !== "EPERM" && code !== "ENOTSUP" && code !== "EOPNOTSUPP" && code !== "EXDEV" && code !== "ENOSYS") throw error;
-        await fs.copyFile(this.abs(from), this.abs(to), constants.COPYFILE_EXCL);
+        await fs.copyFile(await this.onDisk(from), await this.onDisk(to), constants.COPYFILE_EXCL);
       }
-      await fs.unlink(this.abs(from));
+      await fs.unlink(await this.onDisk(from));
     } else {
-      await fs.rename(this.abs(from), this.abs(to));
+      await fs.rename(await this.onDisk(from), await this.onDisk(to));
     }
-    const dir = nodePath.dirname(this.abs(to));
+    const dir = nodePath.dirname(await this.onDisk(to));
     const handle = await fs.open(dir, constants.O_RDONLY).catch(() => undefined);
     if (handle) {
       await handle.sync().catch(() => undefined);
@@ -139,7 +154,7 @@ export class NodeVaultFs implements VaultFs {
 
   async remove(path: string): Promise<void> {
     await this.assertNoSymlinkAncestors(path);
-    await fs.rm(this.abs(path), { force: true, recursive: true });
+    await fs.rm(await this.onDisk(path), { force: true, recursive: true });
   }
 }
 

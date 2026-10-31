@@ -46,6 +46,7 @@ impl VaultFs {
         let mut segments = vault_segments(raw, false)?;
         let name = segments.pop().expect("non-empty");
         let dir = at::open_dir(self.root.as_fd(), &segments).map_err(|e| walk_error(e, raw, op))?;
+        let name = at::on_disk_name(dir.as_fd(), &name);
         Ok(Target { dir, name })
     }
 
@@ -108,6 +109,7 @@ impl VaultFs {
         let mut current: Option<OwnedFd> = None;
         for (i, segment) in segments.iter().enumerate() {
             let parent = current.as_ref().map_or(self.root.as_fd(), |fd| fd.as_fd());
+            let segment = &at::on_disk_name(parent, segment);
             let next = match at::open_child_dir(parent, segment) {
                 Ok(fd) => fd,
                 Err(WalkError::Errno(Errno::NOENT)) => {

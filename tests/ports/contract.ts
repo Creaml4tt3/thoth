@@ -14,8 +14,6 @@ import { tempDir } from "./harness.ts";
 const text = (s: string) => new TextEncoder().encode(s);
 /** Windows has no FIFOs and no mode bits; those checks run on macOS and Linux only. */
 const WINDOWS = process.platform === "win32";
-// Known gap (case- and normalization-sensitive file systems, i.e. Linux): see the tests marked with it.
-const onLinux = (process.platform === "linux" ? it.fails : it) as typeof it;
 const decode = (b: Uint8Array) => new TextDecoder().decode(b);
 
 export function vaultFsContract(runtime: PortRuntime): void {
@@ -128,8 +126,7 @@ export function vaultFsContract(runtime: PortRuntime): void {
       expect(await fx.fs.stat("f.md/child")).toBeUndefined();
     });
 
-    // Linux: a name stored in NFD is listed in NFC but cannot be opened by that name (macOS and Windows match both).
-    onLinux("lists entries with kinds and NFC names, even for NFD names on disk", async () => {
+    it("lists entries with kinds and NFC names, even for NFD names on disk", async () => {
       const nfd = "café.md";
       await writeFile(join(fx.root, nfd), "x");
       await mkdir(join(fx.root, "dir"));
