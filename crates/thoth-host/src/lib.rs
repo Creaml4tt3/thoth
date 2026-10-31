@@ -26,6 +26,7 @@ pub mod data_dir;
 pub mod diagnostics;
 pub mod error;
 mod handles;
+pub mod install;
 pub mod links;
 pub mod mcp;
 pub mod paths;
@@ -33,7 +34,6 @@ pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
 pub mod source;
 pub mod sql;
-pub mod install;
 pub mod updates;
 #[cfg_attr(windows, path = "vault_fs_windows.rs")]
 pub mod vault_fs;
@@ -62,6 +62,7 @@ use vault_fs::VaultFs;
 use watch::Watcher;
 
 /// Every command name in the contract (`Commands` in ipc.ts).
+#[rustfmt::skip] // grouped by family, one family per line
 pub const COMMANDS: &[&str] = &[
     "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal", "vault.shared", "vault.trash",
     "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
@@ -216,7 +217,21 @@ impl Host {
         };
         let mcp = mcp::Relay::new(config.data_dir.as_ref().map(|d| d.join(mcp::DIR)), config.events.clone(), open, mcp::McpOptions::default());
         let updates = Updates::new(config.data_dir.clone(), UpdateOptions::off());
-        Self { config, home, allow_roots, state, remote, agents, links, updates, mcp, log_dir: None, version: String::new(), reported: AtomicUsize::new(0), replace: Mutex::new(()) }
+        Self {
+            config,
+            home,
+            allow_roots,
+            state,
+            remote,
+            agents,
+            links,
+            updates,
+            mcp,
+            log_dir: None,
+            version: String::new(),
+            reported: AtomicUsize::new(0),
+            replace: Mutex::new(()),
+        }
     }
 
     /// Turns the update notice on (ADR-0022): `options` name the running version and where `latest.json` is. A host
@@ -276,7 +291,8 @@ impl Host {
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes = matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save");
+        let wants_bytes =
+            matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save");
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -476,7 +492,11 @@ impl Host {
             }
             "agent.start" => {
                 let argv = match args.get("argv") {
-                    Some(Value::Array(items)) => items.iter().map(|v| v.as_str().map(str::to_owned)).collect::<Option<Vec<_>>>().ok_or_else(|| HostError::bad_argument("argv must be strings"))?,
+                    Some(Value::Array(items)) => items
+                        .iter()
+                        .map(|v| v.as_str().map(str::to_owned))
+                        .collect::<Option<Vec<_>>>()
+                        .ok_or_else(|| HostError::bad_argument("argv must be strings"))?,
                     _ => return Err(HostError::bad_argument("argv must be an array")),
                 };
                 let timeout = match args.get("timeoutMs") {
@@ -695,7 +715,11 @@ impl Host {
         let Some(path) = self.recent_path() else { return Vec::new() };
         let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
         let Ok(value) = serde_json::from_str::<Value>(&text) else { return Vec::new() };
-        value.get("roots").and_then(Value::as_array).map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).take(MAX_RECENT).collect()).unwrap_or_default()
+        value
+            .get("roots")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).take(MAX_RECENT).collect())
+            .unwrap_or_default()
     }
 
     /// Moves `root` to the front of the persisted recent list (atomic replace).
@@ -1018,7 +1042,10 @@ fn bool_arg(args: &Value, key: &str) -> HostResult<bool> {
 
 /// A non-negative safe integer (≤ 2^53 - 1).
 fn u64_arg(args: &Value, key: &str) -> HostResult<u64> {
-    args.get(key).and_then(Value::as_u64).filter(|n| *n < (1u64 << 53)).ok_or_else(|| HostError::bad_argument(format!("{key} must be a non-negative safe integer")))
+    args.get(key)
+        .and_then(Value::as_u64)
+        .filter(|n| *n < (1u64 << 53))
+        .ok_or_else(|| HostError::bad_argument(format!("{key} must be a non-negative safe integer")))
 }
 
 #[cfg(test)]

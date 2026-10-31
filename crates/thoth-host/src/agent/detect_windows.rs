@@ -93,7 +93,15 @@ pub fn shim_target(text: &str, dir: &Path) -> Option<PathBuf> {
     let mut found = None;
     for line in text.lines().map(str::trim) {
         let lower = line.to_ascii_lowercase();
-        if line.is_empty() || lower.starts_with('@') || lower.starts_with(':') || lower.starts_with("goto ") || lower.starts_with("set ") || lower == "setlocal" || lower.starts_with("call :") || lower.starts_with("exit") {
+        if line.is_empty()
+            || lower.starts_with('@')
+            || lower.starts_with(':')
+            || lower.starts_with("goto ")
+            || lower.starts_with("set ")
+            || lower == "setlocal"
+            || lower.starts_with("call :")
+            || lower.starts_with("exit")
+        {
             continue;
         }
         if found.is_some() {

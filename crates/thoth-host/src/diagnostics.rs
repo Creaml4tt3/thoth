@@ -31,7 +31,9 @@ pub fn redact(line: &str) -> String {
     while i < c.len() {
         if let Some(end) = url(&c, i, &mut out).or_else(|| secret(&c, i, &mut out)) {
             i = end;
-        } else if let Some((end, placeholder)) = path(&c, i).map(|e| (e, "<path>")).or_else(|| email(&c, i).map(|e| (e, "<email>"))).or_else(|| opaque(&c, i).map(|e| (e, "<redacted>"))) {
+        } else if let Some((end, placeholder)) =
+            path(&c, i).map(|e| (e, "<path>")).or_else(|| email(&c, i).map(|e| (e, "<email>"))).or_else(|| opaque(&c, i).map(|e| (e, "<redacted>")))
+        {
             out.push_str(placeholder);
             i = end;
         } else {
@@ -171,7 +173,7 @@ fn secret(c: &[char], i: usize, out: &mut String) -> Option<usize> {
         k += 1;
     }
     const REDACTED: [char; 10] = ['<', 'r', 'e', 'd', 'a', 'c', 't', 'e', 'd', '>'];
-    let bracket = if c[k..].starts_with(&['S', 'o', 'm', 'e', '(']) { Some(k + 4) } else { Some(k).filter(|_| matches!(c.get(k), Some('(' | '[' | '{'))) };
+    let bracket = if c[k..].starts_with(&['S', 'o', 'm', 'e', '(']) { Some(k + 4) } else { matches!(c.get(k), Some('(' | '[' | '{')).then_some(k) };
     let end = if c[k..].starts_with(&REDACTED) {
         // Already redacted (by `tail`'s second pass): keep what follows, such as the `,` after a `Debug` value.
         k + REDACTED.len()
@@ -233,7 +235,8 @@ fn path(c: &[char], i: usize) -> Option<usize> {
     let in_src = token.split(|&ch| matches!(ch, '/' | '\\')).any(|segment| segment == ['s', 'r', 'c']);
     let source_location = relative && in_src && token.ends_with(&['.', 'r', 's']) && matches!(after, [':', d, ..] if d.is_ascii_digit());
     let token_text: String = token.iter().collect();
-    let http_version = token_text.get(..5).is_some_and(|h| h.eq_ignore_ascii_case("http/")) && token_text[5..].chars().all(|ch| ch.is_ascii_digit() || ch == '.');
+    let http_version =
+        token_text.get(..5).is_some_and(|h| h.eq_ignore_ascii_case("http/")) && token_text[5..].chars().all(|ch| ch.is_ascii_digit() || ch == '.');
     if !looks_like_path || source_location || http_version {
         return None;
     }

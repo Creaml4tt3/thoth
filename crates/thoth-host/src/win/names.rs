@@ -41,8 +41,29 @@ mod tests {
     #[test]
     fn refuses_what_windows_cannot_name() {
         for bad in [
-            "CON", "con", "Nul.md", "aux.txt.bak", "COM1", "lpt9.md", "COM¹", "LPT³.txt", "com0", "CONIN$", "con .md", "a.md:secret", "a<b", "a>b", "a\"b",
-            "a|b", "a?b", "a*b", "tab\there", "x.", "x ", "...", "x. ",
+            "CON",
+            "con",
+            "Nul.md",
+            "aux.txt.bak",
+            "COM1",
+            "lpt9.md",
+            "COM¹",
+            "LPT³.txt",
+            "com0",
+            "CONIN$",
+            "con .md",
+            "a.md:secret",
+            "a<b",
+            "a>b",
+            "a\"b",
+            "a|b",
+            "a?b",
+            "a*b",
+            "tab\there",
+            "x.",
+            "x ",
+            "...",
+            "x. ",
         ] {
             assert!(segment_problem(bad).is_some(), "{bad:?}");
         }

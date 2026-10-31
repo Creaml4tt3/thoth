@@ -90,7 +90,12 @@ impl LinkPreviews {
     /// `data_dir`: where the cache lives; `None` (memory only hosts) fetches every time.
     pub fn new(data_dir: Option<PathBuf>, options: LinkOptions) -> Self {
         let cache = data_dir.map(|d| Cache::new(&d, options.limits));
-        Self { fetcher: Fetcher { lookup: options.lookup, allow_loopback: options.allow_loopback }, cache, clock: options.clock, gate: Gate { busy: Mutex::new(0), free: Condvar::new() } }
+        Self {
+            fetcher: Fetcher { lookup: options.lookup, allow_loopback: options.allow_loopback },
+            cache,
+            clock: options.clock,
+            gate: Gate { busy: Mutex::new(0), free: Condvar::new() },
+        }
     }
 
     /// `link.preview`: the preview of `input`, from the cache when it is fresh. Errors: `BAD_ARGUMENT` (not a link),
@@ -133,7 +138,18 @@ impl LinkPreviews {
 
     fn fetch(&self, url: &Url) -> HostResult<Value> {
         let deadline = Instant::now() + TIMEOUT;
-        let page = self.fetcher.get(url, deadline, &Want { accept: "text/html,application/xhtml+xml;q=0.9", user_agent: USER_AGENT, https_only: false, max: MAX_HTML, stop_at_head: true, refuse_longer: false })?;
+        let page = self.fetcher.get(
+            url,
+            deadline,
+            &Want {
+                accept: "text/html,application/xhtml+xml;q=0.9",
+                user_agent: USER_AGENT,
+                https_only: false,
+                max: MAX_HTML,
+                stop_at_head: true,
+                refuse_longer: false,
+            },
+        )?;
         if mime(page.content_type.as_deref()).as_deref() != Some("text/html") {
             return Err(unavailable(&page.url, "it is not a web page"));
         }
@@ -142,12 +158,19 @@ impl LinkPreviews {
         let mut out = Map::new();
         out.insert("url".into(), Value::String(url.as_str().to_owned()));
         out.insert("finalUrl".into(), Value::String(page.url.as_str().to_owned()));
-        for (key, value, max) in [("siteName", &head.site_name, text::MAX_SITE), ("title", &head.title, text::MAX_TITLE), ("description", &head.description, text::MAX_DESCRIPTION)] {
+        for (key, value, max) in
+            [("siteName", &head.site_name, text::MAX_SITE), ("title", &head.title, text::MAX_TITLE), ("description", &head.description, text::MAX_DESCRIPTION)]
+        {
             if let Some(clean) = value.as_deref().and_then(|v| text::clean(v, max)) {
                 out.insert(key.into(), Value::String(clean));
             }
         }
-        let image = head.image.as_deref().and_then(|src| page.url.join(src.trim()).ok()).filter(|u| matches!(u.scheme(), "http" | "https")).and_then(|u| self.image(&u, deadline));
+        let image = head
+            .image
+            .as_deref()
+            .and_then(|src| page.url.join(src.trim()).ok())
+            .filter(|u| matches!(u.scheme(), "http" | "https"))
+            .and_then(|u| self.image(&u, deadline));
         if let Some(image) = image {
             out.insert("image".into(), Value::String(image));
         }
@@ -159,7 +182,21 @@ impl LinkPreviews {
     fn image(&self, url: &Url, deadline: Instant) -> Option<String> {
         let mut url = url.clone();
         url.set_fragment(None);
-        let fetched = self.fetcher.get(&url, deadline, &Want { accept: "image/png,image/jpeg,image/gif,image/webp", user_agent: USER_AGENT, https_only: false, max: MAX_IMAGE, stop_at_head: false, refuse_longer: true }).ok()?;
+        let fetched = self
+            .fetcher
+            .get(
+                &url,
+                deadline,
+                &Want {
+                    accept: "image/png,image/jpeg,image/gif,image/webp",
+                    user_agent: USER_AGENT,
+                    https_only: false,
+                    max: MAX_IMAGE,
+                    stop_at_head: false,
+                    refuse_longer: true,
+                },
+            )
+            .ok()?;
         let kind = image_type(&fetched.body)?;
         Some(format!("data:{kind};base64,{}", B64.encode(&fetched.body)))
     }

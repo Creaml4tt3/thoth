@@ -8,6 +8,9 @@
 > Line wrapping: a line break between two Thai characters is joined with no space
 > on the site. Where the text needs a space (a phrase break), keep the space
 > inside a line, not at a line break.
+>
+> The "Last updated" date is pinned in thoth-site `test/build.test.ts` ("legal pages");
+> change both together, or the site build fails.
 <!-- repo-only:end -->
 
 ปรับปรุงล่าสุด: 30 ตุลาคม 2569

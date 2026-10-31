@@ -7,7 +7,8 @@ use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
 /// What the user is told when the app is not there to answer.
-pub const NOT_RUNNING: &str = "Thoth is not running, or Connected apps is off. Open Thoth and switch on Connected apps (Settings → Connected apps), then try again.";
+pub const NOT_RUNNING: &str =
+    "Thoth is not running, or Connected apps is off. Open Thoth and switch on Connected apps (Settings → Connected apps), then try again.";
 /// Longest answer read (the app sends at most 1 MB, plus the JSON around it).
 #[cfg(unix)]
 const MAX_ANSWER: u64 = 2 * 1024 * 1024;
@@ -47,7 +48,8 @@ pub fn call(socket: Option<&Path>, app: Option<&str>, tool: &str, arguments: &Va
     let socket = socket.ok_or_else(|| Failure::new(NOT_RUNNING))?;
     let request = json!({ "v": 1, "app": app, "tool": tool, "arguments": arguments });
     let answer = exchange(socket, &request.to_string())?;
-    let answer: Value = serde_json::from_str(&answer).map_err(|_| Failure::new("Thoth sent an answer this thoth-mcp does not understand: install the same version of both"))?;
+    let answer: Value =
+        serde_json::from_str(&answer).map_err(|_| Failure::new("Thoth sent an answer this thoth-mcp does not understand: install the same version of both"))?;
     match answer.get("ok").and_then(Value::as_bool) {
         Some(true) => answer.get("result").cloned().ok_or_else(|| Failure::new("Thoth sent an empty answer")),
         _ => Err(Failure::new(answer.get("error").and_then(|e| e.get("message")).and_then(Value::as_str).unwrap_or("Thoth could not answer"))),
@@ -75,7 +77,9 @@ fn exchange(socket: &Path, line: &str) -> Result<String, Failure> {
     match BufReader::new(&stream).take(MAX_ANSWER).read_line(&mut answer) {
         Ok(0) => Err(Failure::new("Thoth closed the connection without answering")),
         Ok(_) => Ok(answer),
-        Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => Err(Failure::new("Thoth did not answer in time: try again")),
+        Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
+            Err(Failure::new("Thoth did not answer in time: try again"))
+        }
         Err(_) => Err(Failure::new("Thoth's answer could not be read")),
     }
 }

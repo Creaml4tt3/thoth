@@ -36,7 +36,15 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { endpoint_origin: None, sign_in: true, protocol_version: "1.0".into(), expires_in: 900, callback: Callback::Good, refresh_delay: Duration::from_millis(150), server: json!({ "name": "Fake Thoth", "version": "0" }) }
+        Self {
+            endpoint_origin: None,
+            sign_in: true,
+            protocol_version: "1.0".into(),
+            expires_in: 900,
+            callback: Callback::Good,
+            refresh_delay: Duration::from_millis(150),
+            server: json!({ "name": "Fake Thoth", "version": "0" }),
+        }
     }
 }
 
@@ -180,7 +188,9 @@ fn serve(mut stream: TcpStream, state: &Arc<Mutex<State>>, origin: &str) {
         }
         ("GET", "/auth/authorize") => {
             let q = &req.query;
-            let ok = q.get("client_id").map(String::as_str) == Some("thoth-desktop") && q.get("code_challenge_method").map(String::as_str) == Some("S256") && q.get("response_type").map(String::as_str) == Some("code");
+            let ok = q.get("client_id").map(String::as_str) == Some("thoth-desktop")
+                && q.get("code_challenge_method").map(String::as_str) == Some("S256")
+                && q.get("response_type").map(String::as_str) == Some("code");
             let redirect = q.get("redirect_uri").cloned().unwrap_or_default();
             assert!(redirect.starts_with("http://127.0.0.1:") && redirect.ends_with("/callback"), "redirect {redirect}");
             let mut s = state.lock().unwrap();
@@ -193,7 +203,14 @@ fn serve(mut stream: TcpStream, state: &Arc<Mutex<State>>, origin: &str) {
             };
             let iss = if s.config.callback == Callback::WrongIss { "https://evil.example.org".to_owned() } else { origin.to_owned() };
             drop(s);
-            let back = if ok { format!("{redirect}?{}", url::form_urlencoded::Serializer::new(String::new()).append_pair("code", &code).append_pair("state", &st).append_pair("iss", &iss).finish()) } else { format!("{redirect}?error=invalid_request") };
+            let back = if ok {
+                format!(
+                    "{redirect}?{}",
+                    url::form_urlencoded::Serializer::new(String::new()).append_pair("code", &code).append_pair("state", &st).append_pair("iss", &iss).finish()
+                )
+            } else {
+                format!("{redirect}?error=invalid_request")
+            };
             send(&mut stream, 302, &[("location", &back)], "");
         }
         ("POST", "/auth/token") => {
@@ -206,7 +223,10 @@ fn serve(mut stream: TcpStream, state: &Arc<Mutex<State>>, origin: &str) {
                     let entry = s.codes.remove(form.get("code").map(String::as_str).unwrap_or(""));
                     let verifier = form.get("code_verifier").cloned().unwrap_or_default();
                     s.issued.push(verifier.clone());
-                    let Some((challenge, redirect)) = entry else { drop(s); return json_reply(&mut stream, 400, json!({ "error": "invalid_grant" })) };
+                    let Some((challenge, redirect)) = entry else {
+                        drop(s);
+                        return json_reply(&mut stream, 400, json!({ "error": "invalid_grant" }));
+                    };
                     if B64URL.encode(Sha256::digest(verifier.as_bytes())) != challenge || form.get("redirect_uri") != Some(&redirect) {
                         drop(s);
                         return json_reply(&mut stream, 400, json!({ "error": "invalid_grant" }));
@@ -274,13 +294,23 @@ fn serve(mut stream: TcpStream, state: &Arc<Mutex<State>>, origin: &str) {
                 return send(&mut stream, 302, &[("location", &to)], "");
             }
             if !authorized {
-                return send(&mut stream, 401, &[("content-type", "application/problem+json"), ("www-authenticate", "Bearer")], r#"{"type":"about:blank","title":"Unauthorized","status":401,"code":"unauthorized"}"#);
+                return send(
+                    &mut stream,
+                    401,
+                    &[("content-type", "application/problem+json"), ("www-authenticate", "Bearer")],
+                    r#"{"type":"about:blank","title":"Unauthorized","status":401,"code":"unauthorized"}"#,
+                );
             }
             match path {
                 "/api/v1/me" => json_reply(&mut stream, 200, json!({ "id": "usr_1", "displayName": "Ada", "email": "ada@example.org" })),
                 "/api/v1/echo" => {
                     let body = json!({ "method": req.method, "query": req.query, "ifMatch": req.headers.get("if-match"), "contentType": req.headers.get("content-type"), "body": String::from_utf8_lossy(&req.body) });
-                    send(&mut stream, 201, &[("content-type", "application/json"), ("etag", "\"r2\""), ("location", "/api/v1/echo"), ("set-cookie", "sid=x")], &body.to_string());
+                    send(
+                        &mut stream,
+                        201,
+                        &[("content-type", "application/json"), ("etag", "\"r2\""), ("location", "/api/v1/echo"), ("set-cookie", "sid=x")],
+                        &body.to_string(),
+                    );
                 }
                 "/api/v1/missing" => send(&mut stream, 404, &[("content-type", "application/problem+json")], r#"{"code":"not_found"}"#),
                 _ => send(&mut stream, 404, &[], ""),

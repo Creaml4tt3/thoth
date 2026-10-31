@@ -18,12 +18,16 @@ const WORK: &str = "/Users/someone/Work";
 fn window_answer(tool: &str, args: &Value) -> Value {
     match tool {
         "search" => json!({ "result": { "hits": [{ "id": "p1", "path": "Plan.md", "title": "Plan", "snippet": "the [แผน] for 2027" }] } }),
-        "list_pages" => json!({ "result": { "pages": [{ "id": "p1", "path": "Plan.md", "title": "Plan" }, { "id": "p2", "path": "Log.md", "title": "Log" }], "total": 2 } }),
+        "list_pages" => {
+            json!({ "result": { "pages": [{ "id": "p1", "path": "Plan.md", "title": "Plan" }, { "id": "p2", "path": "Log.md", "title": "Log" }], "total": 2 } })
+        }
         "read_page" if args["path"] == "Plan.md" || args["id"] == "p1" => {
             json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": "# Plan\n\nSecret words here.\n", "attachments": ["chart.png"] } } })
         }
         "read_page" | "backlinks" if args["path"] != "Plan.md" => json!({ "error": { "code": "NOT_FOUND", "message": "No page Nope.md" } }),
-        "backlinks" => json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan" }, "links": [{ "id": "p2", "path": "Log.md", "title": "Log", "line": 3 }], "total": 1 } }),
+        "backlinks" => {
+            json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan" }, "links": [{ "id": "p2", "path": "Log.md", "title": "Log", "line": 3 }], "total": 1 } })
+        }
         _ => json!({ "error": { "code": "INTERNAL", "message": "?" } }),
     }
 }
@@ -52,7 +56,12 @@ fn fixture(options: McpOptions) -> Fixture {
         let open = open.clone();
         Arc::new(move || open.lock().unwrap().iter().map(|s| OpenSpace { root: s.root.clone(), owner: s.owner.clone() }).collect())
     };
-    let relay = Arc::new(Relay::new(Some(dir.clone()), Arc::new(move |event: &str, payload: Value| events_tx.lock().unwrap().send((event.to_owned(), payload)).unwrap()), spaces, options));
+    let relay = Arc::new(Relay::new(
+        Some(dir.clone()),
+        Arc::new(move |event: &str, payload: Value| events_tx.lock().unwrap().send((event.to_owned(), payload)).unwrap()),
+        spaces,
+        options,
+    ));
     let requests = Arc::new(Mutex::new(Vec::new()));
     let answering = Arc::new(Mutex::new(true));
     let answer_with = Arc::new(Mutex::new(None));
@@ -69,7 +78,8 @@ fn fixture(options: McpOptions) -> Fixture {
                         requests.lock().unwrap().push(payload.clone());
                         let Some(relay) = relay.upgrade() else { return };
                         if *answering.lock().unwrap() {
-                            let answer = answer_with.lock().unwrap().clone().unwrap_or_else(|| window_answer(payload["tool"].as_str().unwrap(), &payload["args"]));
+                            let answer =
+                                answer_with.lock().unwrap().clone().unwrap_or_else(|| window_answer(payload["tool"].as_str().unwrap(), &payload["args"]));
                             relay.answer(payload["owner"].as_str().unwrap(), payload["id"].as_str().unwrap(), &answer).unwrap();
                         }
                     }
@@ -88,8 +98,12 @@ fn fast() -> McpOptions {
 /// Switches on, shares `NOTES` and allows `app`.
 fn ready(f: &Fixture, app: &str) {
     f.relay.configure(&json!({ "enabled": true, "spaces": [NOTES] }), &[NOTES.to_owned(), WORK.to_owned()]).unwrap();
-    let asking = { let socket = socket(f); let app = app.to_owned(); std::thread::spawn(move || ask(&socket, &app, "list_pages", json!({}))) };
-    pending_is(&f, json!({ "apps": [app] }));
+    let asking = {
+        let socket = socket(f);
+        let app = app.to_owned();
+        std::thread::spawn(move || ask(&socket, &app, "list_pages", json!({})))
+    };
+    pending_is(f, json!({ "apps": [app] }));
     f.relay.decide(app, true).unwrap();
     assert_eq!(asking.join().unwrap()["ok"], true);
 }
@@ -200,7 +214,10 @@ fn a_new_app_is_asked_about_once_then_remembered() {
     f.relay.decide("Claude Desktop", true).unwrap();
     let answer = asking.join().unwrap();
     assert_eq!(answer["ok"], true, "{answer}");
-    assert_eq!(answer["result"]["structured"], json!({ "results": [{ "space": "Notes", "path": "Plan.md", "title": "Plan", "id": "p1", "snippet": "the [แผน] for 2027" }] }));
+    assert_eq!(
+        answer["result"]["structured"],
+        json!({ "results": [{ "space": "Notes", "path": "Plan.md", "title": "Plan", "id": "p1", "snippet": "the [แผน] for 2027" }] })
+    );
     pending_is(&f, json!({ "apps": [] }));
 
     // Remembered: asked again, no question.
@@ -211,7 +228,10 @@ fn a_new_app_is_asked_about_once_then_remembered() {
     assert_eq!(apps[0]["allowed"], true);
     // The window was asked with the checked arguments, for the shared Private Space only.
     let request = f.requests.lock().unwrap()[0].clone();
-    assert_eq!((request["owner"].clone(), request["root"].clone(), request["tool"].clone(), request["args"].clone()), (json!("main"), json!(NOTES), json!("search"), json!({ "query": "แผน", "limit": 10 })));
+    assert_eq!(
+        (request["owner"].clone(), request["root"].clone(), request["tool"].clone(), request["args"].clone()),
+        (json!("main"), json!(NOTES), json!("search"), json!({ "query": "แผน", "limit": 10 }))
+    );
 }
 
 #[test]
@@ -224,7 +244,10 @@ fn a_denied_or_revoked_app_gets_nothing_and_a_forgotten_one_is_asked_again() {
     let asked = f.requests.lock().unwrap().len();
 
     f.relay.forget("Cursor").unwrap();
-    let asking = { let socket = socket.clone(); std::thread::spawn(move || ask(&socket, "Cursor", "search", json!({ "query": "x" }))) };
+    let asking = {
+        let socket = socket.clone();
+        std::thread::spawn(move || ask(&socket, "Cursor", "search", json!({ "query": "x" })))
+    };
     pending_is(&f, json!({ "apps": ["Cursor"] }));
     f.relay.decide("Cursor", false).unwrap();
     assert_eq!(error_code(&asking.join().unwrap()), "DENIED");
@@ -308,7 +331,8 @@ fn limits_sizes_and_timeouts() {
     assert_eq!(error_code(&send(&socket, &long)), "BAD_ARGUMENT");
 
     // An answer over 1 MB is not sent.
-    *f.answer_with.lock().unwrap() = Some(json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": "x".repeat(1024 * 1024 + 1), "attachments": [] } } }));
+    *f.answer_with.lock().unwrap() =
+        Some(json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": "x".repeat(1024 * 1024 + 1), "attachments": [] } } }));
     assert_eq!(error_code(&ask(&socket, "Claude", "read_page", json!({ "path": "Plan.md" }))), "TOO_LARGE");
     *f.answer_with.lock().unwrap() = None;
 
@@ -325,7 +349,10 @@ fn only_the_window_asked_can_answer() {
     let f = fixture(fast());
     ready(&f, "Claude");
     *f.answering.lock().unwrap() = false;
-    let asking = { let socket = socket(&f); std::thread::spawn(move || ask(&socket, "Claude", "search", json!({ "query": "x" }))) };
+    let asking = {
+        let socket = socket(&f);
+        std::thread::spawn(move || ask(&socket, "Claude", "search", json!({ "query": "x" })))
+    };
     let request = loop {
         if let Some(r) = f.requests.lock().unwrap().iter().find(|r| r["tool"] == "search").cloned() {
             break r;
@@ -424,7 +451,10 @@ mod through_the_host {
         assert_eq!(settings["listening"], true);
 
         let socket = data.path().join("mcp").join("thoth.sock");
-        let asking = { let socket = socket.clone(); std::thread::spawn(move || ask(&socket, "Claude", "search", json!({ "query": "x" }))) };
+        let asking = {
+            let socket = socket.clone();
+            std::thread::spawn(move || ask(&socket, "Claude", "search", json!({ "query": "x" })))
+        };
         let mut answered = false;
         while !answered {
             let (event, payload) = events.recv_timeout(Duration::from_secs(5)).unwrap();

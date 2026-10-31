@@ -22,7 +22,8 @@ pub struct CacheLimits {
     pub keep_failure: Duration,
 }
 
-pub const LIMITS: CacheLimits = CacheLimits { max_entries: 500, max_bytes: 20 * 1024 * 1024, keep: Duration::from_secs(7 * 24 * 3600), keep_failure: Duration::from_secs(3600) };
+pub const LIMITS: CacheLimits =
+    CacheLimits { max_entries: 500, max_bytes: 20 * 1024 * 1024, keep: Duration::from_secs(7 * 24 * 3600), keep_failure: Duration::from_secs(3600) };
 
 /// A cached answer: the preview (JSON as sent to the webview) or the error.
 #[derive(Clone, Debug, PartialEq)]
@@ -197,7 +198,10 @@ mod tests {
 
     #[test]
     fn the_limits_are_the_adrs() {
-        assert_eq!(LIMITS, CacheLimits { max_entries: 500, max_bytes: 20 * 1024 * 1024, keep: Duration::from_secs(604_800), keep_failure: Duration::from_secs(3600) });
+        assert_eq!(
+            LIMITS,
+            CacheLimits { max_entries: 500, max_bytes: 20 * 1024 * 1024, keep: Duration::from_secs(604_800), keep_failure: Duration::from_secs(3600) }
+        );
     }
 
     #[test]
@@ -255,7 +259,8 @@ mod tests {
         let path = cache.path("https://a.example/");
         std::fs::write(&path, json!({ "v": 1, "url": "https://other.example/", "at": secs(at(0)), "ok": {} }).to_string()).unwrap();
         assert_eq!(cache.get("https://a.example/", at(1)), None);
-        std::fs::write(&path, json!({ "v": 1, "url": "https://a.example/", "at": secs(at(0)), "error": { "code": "INTERNAL", "message": "x" } }).to_string()).unwrap();
+        std::fs::write(&path, json!({ "v": 1, "url": "https://a.example/", "at": secs(at(0)), "error": { "code": "INTERNAL", "message": "x" } }).to_string())
+            .unwrap();
         assert_eq!(cache.get("https://a.example/", at(1)), None);
         cache.put("https://b.example/", &Cached::Preview(json!({})), at(0));
         std::fs::write(dir.path().join(CACHE_DIR).join("keep.txt"), "not ours").unwrap();

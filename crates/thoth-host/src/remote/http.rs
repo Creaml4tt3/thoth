@@ -82,7 +82,9 @@ impl Http {
         let status = response.status().as_u16();
         let headers = response.headers().iter().filter_map(|(n, v)| v.to_str().ok().map(|v| (n.as_str().to_owned(), v.to_owned()))).collect();
         let body = response.body_mut().with_config().limit(limit as u64).read_to_vec().map_err(|e| match e {
-            ureq::Error::BodyExceedsLimit(_) => HostError::new("SERVER_UNREACHABLE", format!("{origin} sent a response larger than {} MiB", limit / (1024 * 1024))),
+            ureq::Error::BodyExceedsLimit(_) => {
+                HostError::new("SERVER_UNREACHABLE", format!("{origin} sent a response larger than {} MiB", limit / (1024 * 1024)))
+            }
             other => unreachable(&origin, &other),
         })?;
         Ok(HttpResponse { status, headers, body })

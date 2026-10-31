@@ -133,7 +133,8 @@ impl Fetcher {
         if candidates.is_empty() {
             return Err(unavailable(url, "the host name was not found"));
         }
-        let public: Vec<SocketAddr> = candidates.into_iter().filter(|a| is_public(a.ip(), self.allow_loopback)).map(|a| SocketAddr::new(a.ip(), port)).collect();
+        let public: Vec<SocketAddr> =
+            candidates.into_iter().filter(|a| is_public(a.ip(), self.allow_loopback)).map(|a| SocketAddr::new(a.ip(), port)).collect();
         if public.is_empty() {
             return Err(refused(url));
         }
@@ -158,11 +159,17 @@ impl Fetcher {
                 .user_agent(want.user_agent)
                 .build();
             let agent = Agent::with_parts(config, DefaultConnector::new(), Pinned(addrs));
-            let request = Request::builder().method("GET").uri(current.as_str()).header("accept", want.accept).body(()).map_err(|_| unavailable(&current, "the link could not be requested"))?;
+            let request = Request::builder()
+                .method("GET")
+                .uri(current.as_str())
+                .header("accept", want.accept)
+                .body(())
+                .map_err(|_| unavailable(&current, "the link could not be requested"))?;
             let mut response = agent.run(request).map_err(|e| network(&current, &e))?;
             let status = response.status().as_u16();
             if (300..400).contains(&status) && status != 304 {
-                let location = response.headers().get("location").and_then(|v| v.to_str().ok()).ok_or_else(|| unavailable(&current, "a redirect without a target"))?;
+                let location =
+                    response.headers().get("location").and_then(|v| v.to_str().ok()).ok_or_else(|| unavailable(&current, "a redirect without a target"))?;
                 let next = current.join(location).map_err(|_| unavailable(&current, "a redirect to an invalid address"))?;
                 if hop == MAX_REDIRECTS {
                     return Err(unavailable(url, "too many redirects"));
@@ -175,7 +182,14 @@ impl Fetcher {
                 return Err(unavailable(&current, &format!("the server answered {status}")));
             }
             let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).map(str::to_owned);
-            if want.refuse_longer && response.headers().get("content-length").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<u64>().ok()).is_some_and(|n| n > want.max as u64) {
+            if want.refuse_longer
+                && response
+                    .headers()
+                    .get("content-length")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.trim().parse::<u64>().ok())
+                    .is_some_and(|n| n > want.max as u64)
+            {
                 return Err(unavailable(&current, "it is too large"));
             }
             let body = read_body(&current, response.body_mut().with_config().limit(u64::MAX).reader(), want)?;
@@ -197,7 +211,9 @@ fn read_body(url: &Url, mut reader: impl Read, want: &Want<'_>) -> HostResult<Ve
             Ok(n) => n,
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => {
-                let timed_out = matches!(e.kind(), std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock) || e.to_string().to_ascii_lowercase().contains("timeout") || e.to_string().to_ascii_lowercase().contains("timed out");
+                let timed_out = matches!(e.kind(), std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock)
+                    || e.to_string().to_ascii_lowercase().contains("timeout")
+                    || e.to_string().to_ascii_lowercase().contains("timed out");
                 return Err(unavailable(url, if timed_out { "it took too long" } else { "the connection broke" }));
             }
         };

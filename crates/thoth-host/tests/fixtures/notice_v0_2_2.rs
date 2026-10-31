@@ -59,7 +59,9 @@ impl Version {
             None => Vec::new(),
             Some(pre) => {
                 let ids: Vec<String> = pre.split('.').map(str::to_owned).collect();
-                let valid = ids.iter().all(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') && !(numeric(id) && id.len() > 1 && id.starts_with('0')));
+                let valid = ids.iter().all(|id| {
+                    !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') && !(numeric(id) && id.len() > 1 && id.starts_with('0'))
+                });
                 if !valid {
                     return None;
                 }
@@ -172,4 +174,3 @@ pub fn parse_latest(body: &[u8]) -> Option<Latest> {
     };
     Some(Latest { version, date, notes })
 }
-

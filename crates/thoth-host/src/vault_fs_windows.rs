@@ -180,7 +180,9 @@ impl VaultFs {
                 Ok(handle) => handle,
                 Err(WalkError::Os(e)) if e.is_not_found() => match nt::open_at_wide(parent, &name, nt::DIR_ACCESS, FILE_CREATE, FILE_DIRECTORY_FILE) {
                     Ok(handle) => handle,
-                    Err(e) if e.0 == f::ERROR_ALREADY_EXISTS || e.0 == f::ERROR_FILE_EXISTS => walk::open_child_dir_wide(parent, &name).map_err(|e| mkdir_error(e, i == last, raw))?,
+                    Err(e) if e.0 == f::ERROR_ALREADY_EXISTS || e.0 == f::ERROR_FILE_EXISTS => {
+                        walk::open_child_dir_wide(parent, &name).map_err(|e| mkdir_error(e, i == last, raw))?
+                    }
                     Err(e) => return Err(os(e, "mkdir", raw)),
                 },
                 Err(e) => return Err(mkdir_error(e, i == last, raw)),
@@ -328,7 +330,8 @@ fn copy_exclusive(src: &Target, dst: &Target) -> Result<(), OsError> {
     if nt::kind(&input)? != Kind::File {
         return Err(OsError(f::ERROR_NOT_SUPPORTED));
     }
-    let output = nt::open_at_wide(&dst.dir, &dst.name, nt::WRITE_ACCESS | windows_sys::Win32::Storage::FileSystem::DELETE, FILE_CREATE, FILE_NON_DIRECTORY_FILE)?;
+    let output =
+        nt::open_at_wide(&dst.dir, &dst.name, nt::WRITE_ACCESS | windows_sys::Win32::Storage::FileSystem::DELETE, FILE_CREATE, FILE_NON_DIRECTORY_FILE)?;
     let io_error = |e: std::io::Error| OsError(e.raw_os_error().map_or(f::ERROR_WRITE_FAULT, |c| c as u32));
     let mut reader = std::fs::File::from(input);
     let output_file = std::fs::File::from(output.try_clone().map_err(io_error)?);

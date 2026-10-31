@@ -114,7 +114,12 @@ impl Provider {
         let fixed = |list: &[&str]| list.iter().map(OsString::from).collect::<Vec<_>>();
         match self {
             Self::Claude => vec![("version", fixed(&["--version"])), ("help", fixed(&["--help"])), ("auth", fixed(&["auth", "status", "--json"]))],
-            Self::Codex => vec![("version", fixed(&["--version"])), ("help", fixed(&["exec", "--help"])), ("auth", fixed(&["login", "status"])), ("sandbox", codex::sandbox_probe(bin))],
+            Self::Codex => vec![
+                ("version", fixed(&["--version"])),
+                ("help", fixed(&["exec", "--help"])),
+                ("auth", fixed(&["login", "status"])),
+                ("sandbox", codex::sandbox_probe(bin)),
+            ],
         }
     }
 

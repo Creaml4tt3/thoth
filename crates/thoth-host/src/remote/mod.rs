@@ -275,7 +275,8 @@ impl Remote {
         let list_path = data_dir.map(|d| d.join(LIST_FILE));
         let mut records = list_path.as_deref().map(load).unwrap_or_default();
         let moved = move_trial(&mut records);
-        let remote = Self { http: Http::new(), secrets, browser, list_path, records: Mutex::new(records), sessions: Mutex::default(), sign_ins: Mutex::default() };
+        let remote =
+            Self { http: Http::new(), secrets, browser, list_path, records: Mutex::new(records), sessions: Mutex::default(), sign_ins: Mutex::default() };
         if moved {
             remote.save(&lock(&remote.records));
         }
@@ -313,7 +314,16 @@ impl Remote {
         if records.len() >= MAX_SERVERS {
             return Err(HostError::bad_argument("Too many servers; remove one first"));
         }
-        let record = Record { id: handles::new_handle("server")?, url: origin, label, auth: Auth::SignedOut, account: None, providers: caps.providers, limits: caps.limits, endpoints: None };
+        let record = Record {
+            id: handles::new_handle("server")?,
+            url: origin,
+            label,
+            auth: Auth::SignedOut,
+            account: None,
+            providers: caps.providers,
+            limits: caps.limits,
+            endpoints: None,
+        };
         let info = record.info();
         records.push(record);
         self.save(&records);
@@ -389,7 +399,13 @@ impl Remote {
         self.browser.open(url.as_str()).map_err(|_| sign_in_failed("Could not open the web browser for sign-in"))?;
         let callback = loopback.wait(&state, &origin, SIGN_IN_TIMEOUT, &cancel)?;
 
-        let form = [("grant_type", "authorization_code"), ("code", callback.code.as_str()), ("redirect_uri", redirect_uri.as_str()), ("client_id", CLIENT_ID), ("code_verifier", verifier.as_str())];
+        let form = [
+            ("grant_type", "authorization_code"),
+            ("code", callback.code.as_str()),
+            ("redirect_uri", redirect_uri.as_str()),
+            ("client_id", CLIENT_ID),
+            ("code_verifier", verifier.as_str()),
+        ];
         let response = self.http.post_form(&token_endpoint, &form)?;
         let Some(Grant { access, refresh: Some(refresh), expires_in }) = grant(&response) else {
             return Err(sign_in_failed("The server refused to complete the sign-in"));
@@ -409,7 +425,8 @@ impl Remote {
             self.revoke(revocation.as_ref(), &refresh);
             return Err(sign_in_failed("Sign-in was cancelled"));
         }
-        let previous = if record.auth == Auth::Browser { self.secrets.get(id).ok().flatten().map(|t| (record.endpoint(|e| e.revocation.as_ref()), t)) } else { None };
+        let previous =
+            if record.auth == Auth::Browser { self.secrets.get(id).ok().flatten().map(|t| (record.endpoint(|e| e.revocation.as_ref()), t)) } else { None };
         if self.secrets.set(id, &refresh).is_err() {
             self.revoke(revocation.as_ref(), &refresh);
             return Err(HostError::internal("Could not save the sign-in to the system keychain"));
@@ -682,14 +699,23 @@ impl Remote {
             return Err(HostError::new("SERVER_UNREACHABLE", format!("{origin} speaks a protocol version this app does not support")));
         }
         let label = caps.pointer("/server/name").and_then(Value::as_str).map(clean_label).filter(|s| !s.is_empty());
-        let limits = caps.get("limits").and_then(Value::as_object).map(|m| m.iter().filter(|(k, v)| v.is_number() && k.len() <= 64).take(32).map(|(k, v)| (k.clone(), v.clone())).collect::<Map<_, _>>()).filter(|m| !m.is_empty());
+        let limits = caps
+            .get("limits")
+            .and_then(Value::as_object)
+            .map(|m| m.iter().filter(|(k, v)| v.is_number() && k.len() <= 64).take(32).map(|(k, v)| (k.clone(), v.clone())).collect::<Map<_, _>>())
+            .filter(|m| !m.is_empty());
         let sign_in = caps.get("signIn").and_then(Value::as_object);
         let providers = sign_in
             .and_then(|s| s.get("providers"))
             .and_then(Value::as_array)
             .map(|list| {
                 list.iter()
-                    .filter_map(|p| Some(Provider { id: p.get("id")?.as_str().filter(|id| !id.is_empty() && id.len() <= 64)?.to_owned(), name: clean_text(p.get("name")?.as_str()?) }))
+                    .filter_map(|p| {
+                        Some(Provider {
+                            id: p.get("id")?.as_str().filter(|id| !id.is_empty() && id.len() <= 64)?.to_owned(),
+                            name: clean_text(p.get("name")?.as_str()?),
+                        })
+                    })
                     .take(MAX_PROVIDERS)
                     .collect()
             })
@@ -802,7 +828,10 @@ mod tests {
     #[test]
     fn grants_need_a_bearer_type_and_well_formed_tokens() {
         let ok = |body: Value| HttpResponse { status: 200, headers: vec![], body: body.to_string().into_bytes() };
-        let g = grant(&ok(json!({ "access_token": "thoth_at_0123456789abcdef", "token_type": "Bearer", "expires_in": 900, "refresh_token": "thoth_rt_0123456789abcdef" }))).unwrap();
+        let g = grant(&ok(
+            json!({ "access_token": "thoth_at_0123456789abcdef", "token_type": "Bearer", "expires_in": 900, "refresh_token": "thoth_rt_0123456789abcdef" }),
+        ))
+        .unwrap();
         assert_eq!((g.expires_in, g.refresh.is_some()), (900, true));
         assert!(grant(&ok(json!({ "access_token": "thoth_at_0123456789abcdef", "token_type": "mac" }))).is_none());
         assert!(grant(&ok(json!({ "access_token": "short", "token_type": "Bearer" }))).is_none());
@@ -821,12 +850,17 @@ mod tests {
     fn the_server_list_holds_no_secrets_and_drops_malformed_entries() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join(LIST_FILE);
-        std::fs::write(&path, json!({ "version": 1, "servers": [
+        std::fs::write(
+            &path,
+            json!({ "version": 1, "servers": [
             { "id": "server_1", "url": "https://a.example.org", "label": "A", "auth": "browser", "providers": [] },
             { "id": "server_2", "url": "http://evil.example.org", "label": "B", "auth": "token", "providers": [] },
             { "id": "vault_3", "url": "https://c.example.org", "label": "C", "auth": "token", "providers": [] },
             { "id": "server_4", "url": "https://d.example.org/path", "label": "D", "auth": "token", "providers": [] }
-        ] }).to_string()).unwrap();
+        ] })
+            .to_string(),
+        )
+        .unwrap();
         let loaded = load(&path);
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].info(), json!({ "id": "server_1", "url": "https://a.example.org", "label": "A", "auth": "browser", "providers": [] }));
@@ -899,12 +933,16 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let secrets = Arc::new(MemorySecretStore::default());
         secrets.set("server_trial", "thoth_rt_0123456789abcdef").unwrap();
-        let remote = remote_with(dir.path(), json!([
-            { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "Thoth demo server", "auth": "browser",
-              "account": { "id": "u1", "displayName": "Ann" }, "providers": [],
-              "endpoints": { "token": "https://api.thoth.creaml4tt3.me/oauth/token", "revocation": "https://api.thoth.creaml4tt3.me/oauth/revoke" } },
-            { "id": "server_other", "url": "https://a.example.org", "label": "A", "auth": "token", "providers": [] }
-        ]), secrets.clone());
+        let remote = remote_with(
+            dir.path(),
+            json!([
+                { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "Thoth demo server", "auth": "browser",
+                  "account": { "id": "u1", "displayName": "Ann" }, "providers": [],
+                  "endpoints": { "token": "https://api.thoth.creaml4tt3.me/oauth/token", "revocation": "https://api.thoth.creaml4tt3.me/oauth/revoke" } },
+                { "id": "server_other", "url": "https://a.example.org", "label": "A", "auth": "token", "providers": [] }
+            ]),
+            secrets.clone(),
+        );
 
         let list = remote.list();
         // Same handle (the keychain entry is keyed by it), new address, still signed in as the same account.
@@ -928,9 +966,13 @@ mod tests {
     #[test]
     fn a_label_that_was_only_the_old_host_name_becomes_the_new_one() {
         let dir = tempfile::tempdir().unwrap();
-        let remote = remote_with(dir.path(), json!([
-            { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "api.thoth.creaml4tt3.me", "auth": "signed-out", "providers": [] }
-        ]), Arc::default());
+        let remote = remote_with(
+            dir.path(),
+            json!([
+                { "id": "server_trial", "url": "https://api.thoth.creaml4tt3.me", "label": "api.thoth.creaml4tt3.me", "auth": "signed-out", "providers": [] }
+            ]),
+            Arc::default(),
+        );
         assert_eq!(remote.list()[0]["label"], "api.thothnotes.com");
     }
 

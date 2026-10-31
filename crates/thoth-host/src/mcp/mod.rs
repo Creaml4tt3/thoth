@@ -156,7 +156,10 @@ impl Relay {
         let enabled = settings.enabled;
         let log = Log::new(dir.as_deref());
         let state = State { settings, pending: Vec::new(), waiting: HashMap::new(), error: None };
-        let relay = Self { inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log }), listener: Mutex::new(None) };
+        let relay = Self {
+            inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log }),
+            listener: Mutex::new(None),
+        };
         if enabled {
             let _ = relay.listen();
         }
@@ -366,7 +369,8 @@ impl Inner {
             if out.len() > MAX_RESPONSE { Err(too_large()) } else { Ok(out) }
         });
         if let Some(app) = entry.app {
-            let mut logged = json!({ "time": log::timestamp(), "app": app, "tool": entry.tool, "spaces": entry.spaces, "paths": entry.paths, "ok": outcome.is_ok() });
+            let mut logged =
+                json!({ "time": log::timestamp(), "app": app, "tool": entry.tool, "spaces": entry.spaces, "paths": entry.paths, "ok": outcome.is_ok() });
             if let Err(error) = &outcome {
                 logged["error"] = json!(error.code);
             }
@@ -434,7 +438,11 @@ impl Inner {
                 return Err(HostError::new("NOT_ENABLED", "Connected apps are off: open Thoth and switch on Connected apps in Settings"));
             }
             if let Some(known) = state.settings.apps.iter().find(|a| a.name == app) {
-                return if known.allowed { Ok(()) } else { Err(HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps"))) };
+                return if known.allowed {
+                    Ok(())
+                } else {
+                    Err(HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps")))
+                };
             }
             if !state.pending.iter().any(|p| p == app) {
                 if asked {
@@ -442,7 +450,10 @@ impl Inner {
                     return Err(HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps")));
                 }
                 if state.pending.len() >= MAX_PENDING || state.settings.apps.len() + state.pending.len() >= MAX_APPS {
-                    return Err(HostError::new("BUSY", "Too many apps are waiting for an answer in Thoth: answer them, or remove some under Settings → Connected apps"));
+                    return Err(HostError::new(
+                        "BUSY",
+                        "Too many apps are waiting for an answer in Thoth: answer them, or remove some under Settings → Connected apps",
+                    ));
                 }
                 state.pending.push(app.to_owned());
                 drop(state);
@@ -478,7 +489,10 @@ impl Inner {
             targets.push(Target { label, root, owner });
         }
         if targets.is_empty() {
-            return Err(HostError::new("NO_SPACE", "No Private Space is shared with connected apps right now: in Thoth, open one and tick it under Settings → Connected apps"));
+            return Err(HostError::new(
+                "NO_SPACE",
+                "No Private Space is shared with connected apps right now: in Thoth, open one and tick it under Settings → Connected apps",
+            ));
         }
         let names = || targets.iter().map(|t| format!("{:?}", t.label)).collect::<Vec<_>>().join(", ");
         if let Some(space) = call.space() {
@@ -497,7 +511,10 @@ impl Inner {
         let id = new_handle("mcp")?;
         let (tx, rx) = sync_channel(1);
         self.state().waiting.insert(id.clone(), Waiting { owner: target.owner.clone(), answer: tx });
-        (self.events)(REQUEST_EVENT, json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": call.tool(), "args": call.window_args() }));
+        (self.events)(
+            REQUEST_EVENT,
+            json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": call.tool(), "args": call.window_args() }),
+        );
         Ok((id, rx))
     }
 

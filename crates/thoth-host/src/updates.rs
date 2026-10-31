@@ -80,7 +80,9 @@ impl Version {
             None => Vec::new(),
             Some(pre) => {
                 let ids: Vec<String> = pre.split('.').map(str::to_owned).collect();
-                let valid = ids.iter().all(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') && !(numeric(id) && id.len() > 1 && id.starts_with('0')));
+                let valid = ids.iter().all(|id| {
+                    !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') && !(numeric(id) && id.len() > 1 && id.starts_with('0'))
+                });
                 if !valid {
                     return None;
                 }
@@ -211,13 +213,22 @@ pub struct UpdateOptions {
     /// What downloads and installs an update (ADR-0034); `NoInstaller` keeps the notice only.
     pub installer: Arc<dyn Installer>,
     /// Where `update.progress` goes (`Host::with_updates` sets the host's event sink).
-    pub events: Option<Arc<dyn Fn(&str, Value) + Send + Sync>>,
+    pub events: Option<crate::EventSink>,
 }
 
 impl UpdateOptions {
     /// An update notice for `current` that looks at `url`.
     pub fn new(current: impl Into<String>, url: impl Into<String>) -> Self {
-        Self { current: current.into(), url: url.into(), downloads_page: DEFAULT_DOWNLOADS_PAGE.to_owned(), allow_loopback: false, lookup: Arc::new(SystemLookup), clock: Arc::new(SystemTime::now), installer: Arc::new(NoInstaller), events: None }
+        Self {
+            current: current.into(),
+            url: url.into(),
+            downloads_page: DEFAULT_DOWNLOADS_PAGE.to_owned(),
+            allow_loopback: false,
+            lookup: Arc::new(SystemLookup),
+            clock: Arc::new(SystemTime::now),
+            installer: Arc::new(NoInstaller),
+            events: None,
+        }
     }
 
     /// No update notice: no request is ever made.
@@ -484,7 +495,26 @@ mod tests {
     fn reads_versions_strictly() {
         assert_eq!(v("0.1.3").to_string(), "0.1.3");
         assert_eq!(v("1.2.3-rc.1+build.5").to_string(), "1.2.3-rc.1");
-        for bad in ["", "1", "1.2", "1.2.3.4", "v1.2.3", "01.2.3", "1.02.3", "1.2.-3", "1.2.3-", "1.2.3-01", "1.2.3-a..b", "1.2.3+", "1.2.3+a b", "1.2.3 ", " 1.2.3", "1.2.x", "99999999999999999999.0.0", "1.2.3-é"] {
+        for bad in [
+            "",
+            "1",
+            "1.2",
+            "1.2.3.4",
+            "v1.2.3",
+            "01.2.3",
+            "1.02.3",
+            "1.2.-3",
+            "1.2.3-",
+            "1.2.3-01",
+            "1.2.3-a..b",
+            "1.2.3+",
+            "1.2.3+a b",
+            "1.2.3 ",
+            " 1.2.3",
+            "1.2.x",
+            "99999999999999999999.0.0",
+            "1.2.3-é",
+        ] {
             assert!(Version::parse(bad).is_none(), "{bad:?} should be refused");
         }
         assert!(Version::parse(&format!("1.2.3-{}", "a".repeat(80))).is_none());
@@ -493,7 +523,19 @@ mod tests {
     #[test]
     fn orders_versions_by_the_semver_rules() {
         // The order semver.org gives as its example, lowest first.
-        let chain = ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0", "1.0.1", "1.1.0", "2.0.0"];
+        let chain = [
+            "1.0.0-alpha",
+            "1.0.0-alpha.1",
+            "1.0.0-alpha.beta",
+            "1.0.0-beta",
+            "1.0.0-beta.2",
+            "1.0.0-beta.11",
+            "1.0.0-rc.1",
+            "1.0.0",
+            "1.0.1",
+            "1.1.0",
+            "2.0.0",
+        ];
         for (i, a) in chain.iter().enumerate() {
             for (j, b) in chain.iter().enumerate() {
                 assert_eq!(v(a).cmp(&v(b)), i.cmp(&j), "{a} against {b}");

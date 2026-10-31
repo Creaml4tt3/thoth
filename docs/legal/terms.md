@@ -8,6 +8,9 @@
 >
 > The website (ADR-0039) publishes this file at `/terms/` and the Thai version at
 > `/th/terms/`, without this block and without HTML comments.
+>
+> The "Last updated" date is pinned in thoth-site `test/build.test.ts` ("legal pages");
+> change both together, or the site build fails.
 <!-- repo-only:end -->
 
 Last updated: 27 October 2026

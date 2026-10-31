@@ -162,7 +162,8 @@ pub fn answer(call: &Call, found: &[Found<'_>]) -> HostResult<Answer> {
         Call::ReadPage { .. } => {
             let f = found.first().ok_or_else(malformed)?;
             let page = f.value.get("page").ok_or_else(malformed)?;
-            let attachments: Vec<String> = list(page, "attachments")?.iter().map(|a| a.as_str().map(str::to_owned).ok_or_else(malformed)).collect::<HostResult<_>>()?;
+            let attachments: Vec<String> =
+                list(page, "attachments")?.iter().map(|a| a.as_str().map(str::to_owned).ok_or_else(malformed)).collect::<HostResult<_>>()?;
             let path = text(page, "path")?.to_owned();
             // The page's own text is the answer; attachments are named, never sent (ADR-0021 rule 3).
             let structured = json!({ "space": f.space, "path": path, "id": text(page, "id")?, "title": text(page, "title")?, "attachments": attachments });
@@ -272,9 +273,18 @@ mod tests {
     #[test]
     fn checks_every_tools_arguments() {
         assert_eq!(Call::parse("search", &json!({ "query": "  แผนงาน " })).unwrap(), Call::Search { query: "แผนงาน".into(), limit: 10, space: None });
-        assert_eq!(Call::parse("search", &json!({ "query": "x", "limit": 9999, "space": "Notes" })).unwrap(), Call::Search { query: "x".into(), limit: 50, space: Some("Notes".into()) });
-        assert_eq!(Call::parse("list_pages", &json!({ "folder": "/Projects/2026/" })).unwrap(), Call::ListPages { folder: "Projects/2026".into(), limit: 200, space: None });
-        assert_eq!(Call::parse("read_page", &json!({ "id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" })).unwrap().window_args(), json!({ "id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" }));
+        assert_eq!(
+            Call::parse("search", &json!({ "query": "x", "limit": 9999, "space": "Notes" })).unwrap(),
+            Call::Search { query: "x".into(), limit: 50, space: Some("Notes".into()) }
+        );
+        assert_eq!(
+            Call::parse("list_pages", &json!({ "folder": "/Projects/2026/" })).unwrap(),
+            Call::ListPages { folder: "Projects/2026".into(), limit: 200, space: None }
+        );
+        assert_eq!(
+            Call::parse("read_page", &json!({ "id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" })).unwrap().window_args(),
+            json!({ "id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" })
+        );
         assert_eq!(Call::parse("backlinks", &json!({ "path": "A.md", "limit": 3 })).unwrap().window_args(), json!({ "path": "A.md", "limit": 3 }));
 
         let refused = |tool: &str, args: Value| Call::parse(tool, &args).unwrap_err().code;
@@ -301,7 +311,10 @@ mod tests {
         let a = json!({ "hits": [{ "id": "1", "path": "A.md", "title": "A", "snippet": "[x]", "secret": "no" }, { "id": "2", "path": "B.md", "title": "B", "snippet": "" }] });
         let b = json!({ "hits": [{ "id": "3", "path": "C.md", "title": "C", "snippet": "" }] });
         let answer = answer(&call, &[Found { space: "Notes", value: &a }, Found { space: "Work", value: &b }]).unwrap();
-        assert_eq!(answer.structured, json!({ "results": [{ "space": "Notes", "path": "A.md", "title": "A", "id": "1", "snippet": "[x]" }, { "space": "Notes", "path": "B.md", "title": "B", "id": "2", "snippet": "" }] }));
+        assert_eq!(
+            answer.structured,
+            json!({ "results": [{ "space": "Notes", "path": "A.md", "title": "A", "id": "1", "snippet": "[x]" }, { "space": "Notes", "path": "B.md", "title": "B", "id": "2", "snippet": "" }] })
+        );
         assert_eq!(answer.paths, ["A.md", "B.md"]);
         assert!(!answer.text.contains("secret"));
 

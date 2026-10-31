@@ -119,7 +119,10 @@ pub fn validate(argv: &[String]) -> HostResult<()> {
 
 /// A model slug (`gpt-5.5`, `gpt-6.1-sol`): ASCII letters, digits and `._:-`, starting with a letter or digit.
 fn model_name(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 100 && name.starts_with(|c: char| c.is_ascii_alphanumeric()) && name.chars().all(|c| c.is_ascii_alphanumeric() || "._:-".contains(c))
+    !name.is_empty()
+        && name.len() <= 100
+        && name.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || "._:-".contains(c))
 }
 
 /// The sandbox probe: Codex's own `codex sandbox` runs `<bin> --version` under Thoth's permission profile. It fails

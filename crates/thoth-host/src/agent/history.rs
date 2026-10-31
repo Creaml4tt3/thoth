@@ -39,7 +39,10 @@ pub fn is_run_id(id: &str) -> bool {
 
 /// A flat file name: 1 to 64 of `a-z 0-9 . _ -`, not starting with a dot.
 pub fn is_file_name(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 64 && !name.starts_with('.') && name.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'.' | b'_' | b'-'))
+    !name.is_empty()
+        && name.len() <= 64
+        && !name.starts_with('.')
+        && name.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'.' | b'_' | b'-'))
 }
 
 fn io(e: &std::io::Error, op: &str, path: &Path) -> HostError {
@@ -77,7 +80,8 @@ fn files_of(dir: &Path) -> HostResult<Vec<(String, u64, u64)>> {
         if !meta.is_file() || !is_file_name(&name) {
             continue;
         }
-        let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+        let modified =
+            meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
         out.push((name, meta.len(), modified));
     }
     out.sort();
@@ -208,7 +212,14 @@ mod tests {
     #[test]
     fn names_are_uuids_and_flat_files() {
         assert!(is_run_id(ID));
-        for bad in ["", "run_0123", "019E0000-0000-7000-8000-000000000001", "019e0000-0000-7000-8000-00000000000", "../019e0000-0000-7000-8000-000000000001", "019e0000_0000-7000-8000-000000000001"] {
+        for bad in [
+            "",
+            "run_0123",
+            "019E0000-0000-7000-8000-000000000001",
+            "019e0000-0000-7000-8000-00000000000",
+            "../019e0000-0000-7000-8000-000000000001",
+            "019e0000_0000-7000-8000-000000000001",
+        ] {
             assert!(!is_run_id(bad), "{bad}");
         }
         for good in ["transcript.jsonl", "review.json", "change-0003.bin", "a", "x_y-z.0"] {

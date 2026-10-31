@@ -49,8 +49,9 @@ impl Log {
     pub fn read(&self) -> Vec<Value> {
         let Some(dir) = &self.dir else { return Vec::new() };
         self.prune(dir, days_now());
-        let mut days: Vec<(u64, PathBuf)> = std::fs::read_dir(dir).into_iter().flatten().flatten().filter_map(|e| day_of(&e.file_name().to_string_lossy()).map(|d| (d, e.path()))).collect();
-        days.sort_by(|a, b| b.0.cmp(&a.0));
+        let mut days: Vec<(u64, PathBuf)> =
+            std::fs::read_dir(dir).into_iter().flatten().flatten().filter_map(|e| day_of(&e.file_name().to_string_lossy()).map(|d| (d, e.path()))).collect();
+        days.sort_by_key(|a| std::cmp::Reverse(a.0));
         let mut out = Vec::new();
         for (_, path) in days {
             let Ok(text) = std::fs::read_to_string(&path) else { continue };

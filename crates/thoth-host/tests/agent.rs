@@ -266,7 +266,8 @@ fn the_working_directory_api_is_scoped_and_never_follows_symlinks() {
     call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": argv(0) }), prompt.as_bytes()).unwrap();
     drain(&f.host, run);
     let listed = call(&f.host, "agent.fs.list", json!({ "run": run, "dir": "" }));
-    let mut kinds: Vec<(String, String)> = listed.as_array().unwrap().iter().map(|e| (e["name"].as_str().unwrap().into(), e["kind"].as_str().unwrap().into())).collect();
+    let mut kinds: Vec<(String, String)> =
+        listed.as_array().unwrap().iter().map(|e| (e["name"].as_str().unwrap().into(), e["kind"].as_str().unwrap().into())).collect();
     kinds.sort();
     assert_eq!(kinds, vec![("dir".into(), "symlink".into()), ("link.md".into(), "symlink".into())]);
     assert!(f.host.call("agent.fs.read", &json!({ "run": run, "path": "link.md" }), None).is_err());
@@ -416,7 +417,12 @@ fn a_budget_stop_is_reported_by_the_cli_itself() {
     let f = fixture(Some(vec![fake_dir()]), true);
     let (run, _) = start_with(&f, with_budget(0, "0.25"), "@budget\n");
     let events = drain(&f.host, &run);
-    let result: Value = events.iter().filter(|e| e["kind"] == "stdout").map(|e| serde_json::from_str::<Value>(e["line"].as_str().unwrap()).unwrap()).find(|v| v["type"] == "result").unwrap();
+    let result: Value = events
+        .iter()
+        .filter(|e| e["kind"] == "stdout")
+        .map(|e| serde_json::from_str::<Value>(e["line"].as_str().unwrap()).unwrap())
+        .find(|v| v["type"] == "result")
+        .unwrap();
     assert_eq!(result["subtype"], json!("error_max_budget_usd"));
     assert_eq!(result["errors"], json!(["Reached maximum budget ($0.25)"]));
     assert_eq!(events.last().unwrap()["code"], json!(1));
@@ -604,7 +610,11 @@ fn a_codex_run_past_its_time_limit_is_stopped() {
     let created = call(&f.host, "agent.run.create", json!({ "provider": "codex" }));
     let run = created["run"].as_str().unwrap();
     for ms in [json!(0), json!(24 * 60 * 60 * 1000 + 1)] {
-        assert_eq!(call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0), "timeoutMs": ms }), b"hi").unwrap_err().code, "BAD_ARGUMENT", "{ms}");
+        assert_eq!(
+            call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0), "timeoutMs": ms }), b"hi").unwrap_err().code,
+            "BAD_ARGUMENT",
+            "{ms}"
+        );
     }
     call_bytes(&f.host, "agent.start", json!({ "run": run, "argv": codex_argv(0), "timeoutMs": 1000 }), b"@hang\n").unwrap();
     assert_eq!(drain(&f.host, run).pop().unwrap()["reason"], json!("timeout"));
@@ -622,14 +632,18 @@ fn local_run_details_live_in_the_app_data_folder_only() {
     assert_eq!(f.host.call("agent.history.read", &json!({ "id": HISTORY_ID, "name": "change-0001.bin" }), None).unwrap().1.unwrap(), vec![0, 1, 2, 255]);
     let listed = call(&f.host, "agent.history.list", json!({}));
     assert_eq!(listed[0]["id"], json!(HISTORY_ID));
-    assert_eq!(listed[0]["files"], json!([{ "name": "change-0001.bin", "size": 4 }, { "name": "review.json", "size": 14 }, { "name": "transcript.jsonl", "size": 16 }]));
+    assert_eq!(
+        listed[0]["files"],
+        json!([{ "name": "change-0001.bin", "size": 4 }, { "name": "review.json", "size": 14 }, { "name": "transcript.jsonl", "size": 16 }])
+    );
     assert!(listed[0]["modifiedMs"].as_u64().unwrap() > 1_600_000_000_000);
     assert!(f.data.path().join("agent-history").join(HISTORY_ID).join("review.json").is_file());
     // Never under a vault.
     assert!(std::fs::read_dir(f.vault.path()).unwrap().next().is_none());
 
     // Only a UUID and a flat name can be addressed.
-    for (id, name) in [("../etc", "a.bin"), (HISTORY_ID, "../x"), (HISTORY_ID, "sub/x"), (HISTORY_ID, ".x"), ("run_0123456789abcdef0123456789abcdef", "a.bin")] {
+    for (id, name) in [("../etc", "a.bin"), (HISTORY_ID, "../x"), (HISTORY_ID, "sub/x"), (HISTORY_ID, ".x"), ("run_0123456789abcdef0123456789abcdef", "a.bin")]
+    {
         assert_eq!(call_bytes(&f.host, "agent.history.write", json!({ "id": id, "name": name }), b"x").unwrap_err().code, "BAD_ARGUMENT", "{id} {name}");
         assert_eq!(f.host.call("agent.history.read", &json!({ "id": id, "name": name }), None).unwrap_err().code, "BAD_ARGUMENT", "{id} {name}");
     }

@@ -250,7 +250,8 @@ fn restart_waits_for_the_person_while_an_assistant_run_is_going() {
     // A real run of the fake Claude CLI that does not end on its own.
     let created = call(&f, "agent.run.create", json!({ "provider": "claude" }));
     let run = created["run"].as_str().unwrap().to_owned();
-    let argv: Value = serde_json::from_str::<Value>(include_str!("../../../packages/agent-claude/test/fixtures/argv.json")).unwrap()["cases"][0]["argv"].clone();
+    let argv: Value =
+        serde_json::from_str::<Value>(include_str!("../../../packages/agent-claude/test/fixtures/argv.json")).unwrap()["cases"][0]["argv"].clone();
     f.host.call("agent.start", &json!({ "run": run, "argv": argv }), Some(b"@hang\n")).unwrap();
 
     assert_eq!(call(&f, "update.restart", json!({})), json!({ "state": "busy", "runs": 1 }));

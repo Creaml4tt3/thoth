@@ -99,9 +99,7 @@ impl VaultFs {
         let segments = vault_segments(raw, true)?;
         let dir = at::open_dir(self.root.as_fd(), &segments).map_err(|e| walk_error(e, raw, "scandir"))?;
         let entries = at::read_dir(dir.as_fd()).map_err(|e| HostError::errno(e, "scandir", raw))?;
-        Ok(Value::Array(
-            entries.into_iter().map(|(name, ft)| json!({ "name": name.nfc().collect::<String>(), "kind": kind_name(ft) })).collect(),
-        ))
+        Ok(Value::Array(entries.into_iter().map(|(name, ft)| json!({ "name": name.nfc().collect::<String>(), "kind": kind_name(ft) })).collect()))
     }
 
     pub fn mkdirp(&self, raw: &str) -> HostResult<()> {
@@ -154,14 +152,15 @@ impl VaultFs {
         if no_replace {
             // link() fails with EEXIST if the target exists, giving an atomic no-replace rename.
             // Filesystems without hardlinks fall back to an exclusive copy, which also fails with EEXIST.
-            let linked = if self.disable_hardlink {
-                Err(Errno::NOTSUP)
-            } else {
-                linkat(&src.dir, src.name.as_str(), &dst.dir, dst.name.as_str(), AtFlags::empty())
-            };
+            let linked =
+                if self.disable_hardlink { Err(Errno::NOTSUP) } else { linkat(&src.dir, src.name.as_str(), &dst.dir, dst.name.as_str(), AtFlags::empty()) };
+            // NOTSUP and OPNOTSUPP are one value on Linux and two on macOS, so the pattern repeats on Linux.
+            #[allow(unreachable_patterns)]
             match linked {
                 Ok(()) => {}
-                Err(e @ (Errno::PERM | Errno::NOTSUP | Errno::OPNOTSUPP | Errno::XDEV | Errno::NOSYS)) => copy_exclusive(&src, &dst, e).map_err(|e| HostError::errno(e, "copyfile", &pair))?,
+                Err(e @ (Errno::PERM | Errno::NOTSUP | Errno::OPNOTSUPP | Errno::XDEV | Errno::NOSYS)) => {
+                    copy_exclusive(&src, &dst, e).map_err(|e| HostError::errno(e, "copyfile", &pair))?
+                }
                 Err(e) => return Err(HostError::errno(e, "link", &pair)),
             }
             unlinkat(&src.dir, src.name.as_str(), AtFlags::empty()).map_err(|e| HostError::errno(e, "unlink", from))?;

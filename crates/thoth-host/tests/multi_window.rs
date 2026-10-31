@@ -163,7 +163,9 @@ fn rename_with_replace_hash_replaces_only_the_expected_bytes() {
     let host = host(base.path(), data.path());
     let vault = open(&host, "main", &notes)["vault"].clone();
     let write = |path: &str, text: &str| host.call("fs.write", &json!({ "vault": vault, "path": path, "exclusive": false }), Some(text.as_bytes())).unwrap();
-    let rename = |from: &str, to: &str, hash: &str| host.call("fs.rename", &json!({ "vault": vault, "from": from, "to": to, "noReplace": false, "replaceHash": hash }), None);
+    let rename = |from: &str, to: &str, hash: &str| {
+        host.call("fs.rename", &json!({ "vault": vault, "from": from, "to": to, "noReplace": false, "replaceHash": hash }), None)
+    };
 
     write("b.tmp", "# Plan\n\nFrom B.\n");
     // B expected the version before A's save: refused, and nothing moved.
@@ -177,5 +179,8 @@ fn rename_with_replace_hash_replaces_only_the_expected_bytes() {
     // A page that is gone has no expected bytes any more.
     write("c.tmp", "C");
     assert_eq!(rename("c.tmp", "Gone.md", &hex(b"anything")).unwrap_err().code, "CONFLICT");
-    assert_eq!(host.call("fs.rename", &json!({ "vault": vault, "from": "c.tmp", "to": "Plan.md", "noReplace": false, "replaceHash": 7 }), None).unwrap_err().code, "BAD_ARGUMENT");
+    assert_eq!(
+        host.call("fs.rename", &json!({ "vault": vault, "from": "c.tmp", "to": "Plan.md", "noReplace": false, "replaceHash": 7 }), None).unwrap_err().code,
+        "BAD_ARGUMENT"
+    );
 }

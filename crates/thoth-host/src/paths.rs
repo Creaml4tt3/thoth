@@ -110,13 +110,10 @@ pub fn check_root_policy(root: &Path, home: Option<&Path>, data_dir: Option<&Pat
     {
         return refuse("overlaps Thoth's own data directory");
     }
-    const SYSTEM_TREES: &[&str] = &[
-        "/System", "/Library", "/Applications", "/usr", "/bin", "/sbin", "/etc", "/dev", "/cores", "/private/etc", "/proc", "/sys", "/boot",
-        "/run", "/snap",
-    ];
-    const SYSTEM_DIRS: &[&str] = &[
-        "/private", "/private/var", "/var", "/private/tmp", "/tmp", "/Users", "/Volumes", "/home", "/opt", "/mnt", "/media", "/root", "/srv",
-    ];
+    const SYSTEM_TREES: &[&str] =
+        &["/System", "/Library", "/Applications", "/usr", "/bin", "/sbin", "/etc", "/dev", "/cores", "/private/etc", "/proc", "/sys", "/boot", "/run", "/snap"];
+    const SYSTEM_DIRS: &[&str] =
+        &["/private", "/private/var", "/var", "/private/tmp", "/tmp", "/Users", "/Volumes", "/home", "/opt", "/mnt", "/media", "/root", "/srv"];
     if SYSTEM_TREES.iter().any(|t| root.starts_with(t)) || SYSTEM_DIRS.iter().any(|d| root == Path::new(d)) {
         return refuse("system directory");
     }

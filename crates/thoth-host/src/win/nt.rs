@@ -105,7 +105,8 @@ pub fn open_path(path: &Path, access: u32, directory: bool) -> Result<OwnedHandl
         flags |= fs::FILE_FLAG_BACKUP_SEMANTICS;
     }
     // SAFETY: `wide` is NUL-terminated and outlives the call.
-    let handle = unsafe { fs::CreateFileW(wide.as_ptr(), access | fs::SYNCHRONIZE, SHARE_ALL, std::ptr::null(), fs::OPEN_EXISTING, flags, std::ptr::null_mut()) };
+    let handle =
+        unsafe { fs::CreateFileW(wide.as_ptr(), access | fs::SYNCHRONIZE, SHARE_ALL, std::ptr::null(), fs::OPEN_EXISTING, flags, std::ptr::null_mut()) };
     if handle == f::INVALID_HANDLE_VALUE {
         return Err(OsError::last());
     }
@@ -161,10 +162,9 @@ fn query<T: Default>(handle: &OwnedHandle, class: fs::FILE_INFO_BY_HANDLE_CLASS)
 /// ERROR_INVALID_PARAMETER. Those volumes have no reparse points, so the attributes from `FileBasicInfo` are enough;
 /// see `attr_tag_from`.
 pub fn attr_tag(handle: &OwnedHandle) -> Result<(u32, u32), OsError> {
-    attr_tag_from(
-        query::<fs::FILE_ATTRIBUTE_TAG_INFO>(handle, fs::FileAttributeTagInfo).map(|info| (info.FileAttributes, info.ReparseTag)),
-        || query::<fs::FILE_BASIC_INFO>(handle, fs::FileBasicInfo).map(|info| info.FileAttributes),
-    )
+    attr_tag_from(query::<fs::FILE_ATTRIBUTE_TAG_INFO>(handle, fs::FileAttributeTagInfo).map(|info| (info.FileAttributes, info.ReparseTag)), || {
+        query::<fs::FILE_BASIC_INFO>(handle, fs::FileBasicInfo).map(|info| info.FileAttributes)
+    })
 }
 
 /// The attributes and reparse tag from the tag query, or, where the volume does not support it, the attributes from
@@ -339,7 +339,8 @@ pub fn final_path(handle: &OwnedHandle) -> Result<PathBuf, OsError> {
     let mut buf = vec![0u16; 512];
     loop {
         // SAFETY: `buf` is writable for its length.
-        let n = unsafe { fs::GetFinalPathNameByHandleW(raw(handle), buf.as_mut_ptr(), buf.len() as u32, fs::FILE_NAME_NORMALIZED | fs::VOLUME_NAME_DOS) } as usize;
+        let n =
+            unsafe { fs::GetFinalPathNameByHandleW(raw(handle), buf.as_mut_ptr(), buf.len() as u32, fs::FILE_NAME_NORMALIZED | fs::VOLUME_NAME_DOS) } as usize;
         if n == 0 {
             return Err(OsError::last());
         }
@@ -372,7 +373,13 @@ mod tests {
     #[test]
     fn other_errors_and_answers_are_kept() {
         let mut asked = false;
-        assert_eq!(attr_tag_from(Err(OsError(f::ERROR_ACCESS_DENIED)), || { asked = true; Ok(0) }), Err(OsError(f::ERROR_ACCESS_DENIED)));
+        assert_eq!(
+            attr_tag_from(Err(OsError(f::ERROR_ACCESS_DENIED)), || {
+                asked = true;
+                Ok(0)
+            }),
+            Err(OsError(f::ERROR_ACCESS_DENIED))
+        );
         assert!(!asked);
         assert_eq!(attr_tag_from(Ok((fs::FILE_ATTRIBUTE_REPARSE_POINT, 0xA000_0003)), || Ok(0)).map(|(a, t)| kind_of(a, t)), Ok(Kind::Symlink));
         assert_eq!(attr_tag_from(Err(INVALID_PARAMETER), || Err(OsError(f::ERROR_ACCESS_DENIED))), Err(OsError(f::ERROR_ACCESS_DENIED)));

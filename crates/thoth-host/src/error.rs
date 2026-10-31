@@ -93,7 +93,9 @@ pub fn win32_code(error: u32) -> &'static str {
     use windows_sys::Win32::Foundation as f;
     match error {
         f::ERROR_FILE_EXISTS | f::ERROR_ALREADY_EXISTS => "EEXIST",
-        f::ERROR_FILE_NOT_FOUND | f::ERROR_PATH_NOT_FOUND | f::ERROR_INVALID_NAME | f::ERROR_BAD_NETPATH | f::ERROR_BAD_PATHNAME | f::ERROR_INVALID_DRIVE => "ENOENT",
+        f::ERROR_FILE_NOT_FOUND | f::ERROR_PATH_NOT_FOUND | f::ERROR_INVALID_NAME | f::ERROR_BAD_NETPATH | f::ERROR_BAD_PATHNAME | f::ERROR_INVALID_DRIVE => {
+            "ENOENT"
+        }
         f::ERROR_DIRECTORY => "ENOTDIR",
         // What the Windows layer reports for STATUS_FILE_IS_A_DIRECTORY (see win::nt).
         f::ERROR_DIRECTORY_NOT_SUPPORTED => "EISDIR",
