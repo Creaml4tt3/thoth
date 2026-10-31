@@ -93,7 +93,7 @@ describe("allow-list", () => {
   it("refuses the filesystem root, home and system directories even when allow-listed", async () => {
     const windows = process.platform === "win32";
     const t = await transport({ allowRoots: [windows ? "C:\\" : "/"] });
-    const roots = windows ? ["C:\\", process.env.USERPROFILE!, "C:\\Windows", "C:\\Program Files", "C:\\Users"] : ["/", process.env.HOME!, "/usr", "/System", "/etc"];
+    const roots = windows ? ["C:\\", process.env.USERPROFILE!, "C:\\Windows", "C:\\Program Files", "C:\\Users"] : ["/", process.env.HOME!, "/usr", "/etc", ...(process.platform === "darwin" ? ["/System"] : [])];
     for (const root of roots) {
       await expect(openRemoteVault(t, root), root).rejects.toMatchObject({ code: "NOT_ALLOWED" });
     }

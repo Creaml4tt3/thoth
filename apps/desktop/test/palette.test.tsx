@@ -193,7 +193,8 @@ describe("commands", () => {
     expect(field.value).toBe("Beta");
     await app.user.clear(field);
     await app.user.type(field, "Delta{Enter}");
-    await waitFor(async () => expect(await app.read("Delta.md")).toBe(BETA));
+    // The heading was the old name, so it follows the new one (as F2 does).
+    await waitFor(async () => expect(await app.read("Delta.md")).toBe(BETA.replace("# Beta", "# Delta")));
     await expect(app.read("Beta.md")).rejects.toThrow();
     // The link in Alpha follows the file.
     await waitFor(async () => expect(await app.read("Alpha.md")).toContain("[[Delta]]"));
