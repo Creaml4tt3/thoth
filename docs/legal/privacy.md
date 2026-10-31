@@ -8,6 +8,9 @@
 > The website (ADR-0039) publishes this file at `/privacy/` and the Thai version at
 > `/th/privacy/`. The site leaves out this block (between the `repo-only`
 > markers) and every HTML comment, so owner notes in comments stay in the repo.
+>
+> The "Last updated" date is pinned in thoth-site `test/build.test.ts` ("legal pages");
+> change both together, or the site build fails.
 <!-- repo-only:end -->
 
 Last updated: 30 October 2026

@@ -5,6 +5,9 @@
 > คุ้มครองผู้บริโภคของไทยตรวจทานก่อน** เนื้อหาต้องตรงกับฉบับภาษาอังกฤษ (`terms.md`)
 > เว็บไซต์ (ADR-0039) เผยแพร่ไฟล์นี้ที่ `/th/terms/` โดยตัดส่วนนี้และคอมเมนต์ HTML ออก
 > (line wrapping: see the note in `privacy.th.md`)
+>
+> The "Last updated" date is pinned in thoth-site `test/build.test.ts` ("legal pages");
+> change both together, or the site build fails.
 <!-- repo-only:end -->
 
 ปรับปรุงล่าสุด: 27 ตุลาคม 2569
