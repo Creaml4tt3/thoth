@@ -13,7 +13,7 @@ async function signedIn(pages: { title: string; position?: string }[]) {
   for (const p of pages) server.servers.writeAsOther(ws, { title: p.title, markdown: `# ${p.title}\n`, ...(p.position ? { position: p.position } : {}) });
   const browser = fakeBrowser(server);
   await signInThroughUi(browser);
-  const tree = screen.getByRole("tree", { name: "Workspaces" });
+  const tree = await screen.findByRole("tree", { name: "Workspaces" });
   const group = await within(tree).findByRole("group", { name: "Pages in Notes" });
   return { browser, ws, tree, group };
 }
