@@ -320,6 +320,8 @@ export function remoteDiagnostics(transport: Transport): Diagnostics {
   return {
     report: async (e) => void (await transport.call("diag.report", e)),
     collect: () => transport.call("diag.collect", {}),
+    enabled: async () => (await transport.call("diag.settings", {})).enabled,
+    setEnabled: async (on) => (await transport.call("diag.settings", { enabled: on })).enabled,
   };
 }
 

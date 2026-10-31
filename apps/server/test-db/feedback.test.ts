@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FEEDBACK_LIMITS } from "../src/feedback.ts";
+import { runMaintenance } from "../src/maintenance.ts";
 import { startTestEnv, type TestEnv } from "./helpers.ts";
 
 const SITE = "https://site.thoth.test";
@@ -78,6 +79,18 @@ describe("feedback (ADR-0033)", () => {
       expect(res.json.code).toBe("validation_failed");
     }
     expect(await count(env)).toBe(before);
+  });
+
+  it("maintenance deletes feedback older than 90 days, with its log, and keeps newer feedback", async () => {
+    const send = (message: string) => env.api(null, "POST", "/feedback", { headers: from(), json: { kind: "problem", message, diagnostics: { log: ["ERROR host: fs.write failed: EACCES"] } } });
+    expect((await send("old one")).status).toBe(204);
+    expect((await send("new one")).status).toBe(204);
+    await env.db.query("UPDATE feedback SET created_at = now() - interval '91 days' WHERE message = 'old one'");
+    await env.db.query("UPDATE feedback SET created_at = now() - interval '89 days' WHERE message = 'new one'");
+    const result = await runMaintenance(env.db, { revisionRetentionDays: undefined, blobs: env.server.deps.blobs });
+    expect(result.feedbackDeleted).toBeGreaterThanOrEqual(1);
+    const { rows } = await env.db.query<{ message: string }>("SELECT message FROM feedback WHERE message IN ('old one', 'new one')");
+    expect(rows.map((r) => r.message)).toEqual(["new one"]);
   });
 
   it("refuses invalid bodies with 400 validation_failed naming the field, and stores nothing", async () => {

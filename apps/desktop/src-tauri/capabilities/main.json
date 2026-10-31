@@ -86,6 +86,7 @@
     "allow-mcp-answer",
     "allow-mcp-log",
     "allow-diag-report",
-    "allow-diag-collect"
+    "allow-diag-collect",
+    "allow-diag-settings"
   ]
 }

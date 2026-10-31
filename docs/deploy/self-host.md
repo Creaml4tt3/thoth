@@ -96,8 +96,8 @@ With nginx, also set `proxy_buffering off;` and `proxy_read_timeout 1h;` for `/a
 
 ## Maintenance
 
-Prunes old revisions (only with `REVISION_RETENTION_DAYS`), purges workspaces deleted more than 30 days ago, and
-clears expired sign-in and rate-limit rows. Nothing runs it on its own; schedule it daily, for example with cron:
+Prunes old revisions (only with `REVISION_RETENTION_DAYS`), purges workspaces deleted more than 30 days ago,
+deletes feedback older than 90 days, and clears expired sign-in and rate-limit rows. Nothing runs it on its own; schedule it daily, for example with cron:
 
 ```sh
 15 3 * * *  cd /srv/thoth && docker compose exec -T server node src/cli.ts maintenance

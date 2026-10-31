@@ -29,7 +29,7 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
     // Problem reports (ADR-0040): the webview reports its uncaught errors to the host's local log and reads the redacted
     // log back; no log plugin permission.
-    "diag_report", "diag_collect",
+    "diag_report", "diag_collect", "diag_settings",
     // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
     "window_open", "window_close",
 ];

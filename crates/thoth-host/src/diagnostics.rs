@@ -3,7 +3,49 @@
 //! what went wrong and where in the code; paths, file and folder names, URL paths and queries, emails, tokens,
 //! passwords and other secrets are never kept, only `<path>`, `<email>` or `<redacted>` in their place.
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
+
+/// Whether the app keeps its local log (Settings, on by default): the shell's logger drops every record while it is off.
+static LOG_ON: AtomicBool = AtomicBool::new(true);
+/// The person's choice, in the app data folder.
+pub const SETTINGS_FILE: &str = "diagnostics.json";
+
+pub fn log_enabled() -> bool {
+    LOG_ON.load(Ordering::Relaxed)
+}
+
+/// Reads the saved choice into the switch the logger checks; a missing or unreadable file means on. Call before logging.
+pub fn load_switch(data_dir: Option<&Path>) -> bool {
+    let on = data_dir
+        .and_then(|d| std::fs::read_to_string(d.join(SETTINGS_FILE)).ok())
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("enabled").and_then(serde_json::Value::as_bool))
+        .unwrap_or(true);
+    LOG_ON.store(on, Ordering::Relaxed);
+    on
+}
+
+/// Turns the log on or off now, saves the choice (a choice that cannot be saved lasts until the app quits), and when off
+/// empties `thoth.log` and deletes its rotated siblings. Emptied, not deleted: the logger keeps the file open in append
+/// mode, so it writes there again once the log is back on.
+pub fn set_switch(on: bool, data_dir: Option<&Path>, log_dir: Option<&Path>) {
+    LOG_ON.store(on, Ordering::Relaxed);
+    if let Some(dir) = data_dir {
+        let _ = std::fs::create_dir_all(dir).and_then(|()| std::fs::write(dir.join(SETTINGS_FILE), serde_json::json!({ "enabled": on }).to_string()));
+    }
+    if on {
+        return;
+    }
+    for entry in log_dir.map(std::fs::read_dir).into_iter().flatten().flatten().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name == "thoth.log" {
+            let _ = std::fs::OpenOptions::new().write(true).open(entry.path()).and_then(|f| f.set_len(0));
+        } else if name.starts_with("thoth") && name.ends_with(".log") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
 
 /// The longest line, in characters (Unicode scalar values), counting the `…` of a clipped line.
 pub const MAX_LINE_CHARS: usize = 500;

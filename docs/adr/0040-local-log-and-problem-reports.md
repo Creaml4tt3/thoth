@@ -1,6 +1,6 @@
 # ADR-0040: A local log, and problem reports with it
 
-- **Status:** Proposed
+- **Status:** Accepted 2026-10-31 (rules 17 to 19 added then)
 - **Date:** 2026-10-30
 - **Deciders:** owner (the aim and the privacy rules); implementation agent (the rest, marked "(this ADR)")
 - **Extends:** ADR-0033 (feedback). **Refines:** ADR-0007 rule 7 and ADR-0015 (nothing leaves the device without the
@@ -105,6 +105,18 @@ service would break all three at once.
 16. **Strings:** every English string has a Thai one, marked `// REVIEW` like the other unreviewed Thai strings. The
     hint under the log says what is true: "This is everything that will be sent. File paths, links and email addresses
     are removed; check that nothing private is left."
+17. **A switch for the log** (owner, 2026-10-31). Settings → Help and feedback has "Keep an app log on this computer",
+    on by default. The host keeps the choice in `diagnostics.json` in the app data folder and reads it before the
+    logger is attached; the logger's filter drops every record while it is off. Turning it off empties `thoth.log`
+    (emptied, not deleted, because the logger holds it open in append mode) and deletes the rotated files, so a report
+    then has "No log yet". One more host command, `diag.settings` (`{ enabled? }` → `{ enabled }`), in every contract
+    list of rule 8.
+18. **Feedback is kept 90 days** (owner, 2026-10-31). `maintenance` deletes feedback, with its `diagnostics`, 90 days
+    after `created_at` (`FEEDBACK_RETENTION_DAYS`, `feedbackDeleted` in its result). The same period as an inactive
+    account. The privacy notice says so.
+19. **The legal basis in the privacy notice** (owner, 2026-10-31): the message, email and details rest on legitimate
+    interest (answering and fixing the app); the app log rests on consent, given by ticking the box. The Thai
+    interface calls the log "รายงาน" (report), because "บันทึก" also means "save" beside "บันทึกข้อมูลวินิจฉัย…".
 
 ## Consequences
 
@@ -176,6 +188,4 @@ added), ADR-0033 (feedback), ADR-0039 (the private site repository). Plan:
 
 ## Open questions
 
-- How long the server keeps `diagnostics` (and feedback in general, ADR-0033). There is no limit yet, and the privacy
-  notice cannot name one until the owner decides.
-- Whether to add a Settings switch that turns the local log off. Today it is always on, small and local.
+None. How long feedback is kept is rule 18; the switch is rule 17.

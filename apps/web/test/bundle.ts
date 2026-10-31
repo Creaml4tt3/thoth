@@ -27,6 +27,8 @@ export const DESKTOP_ONLY = [
   "diag_report",
   "diag.collect",
   "diag_collect",
+  "diag.settings",
+  "diag_settings",
   "latest.json",
   "@tauri-apps",
   "plugin:fs",

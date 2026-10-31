@@ -98,7 +98,7 @@ describe("Save diagnostics (ADR-0040)", () => {
       saved.push({ name, text: new TextDecoder().decode(bytes) });
       return answer;
     };
-    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log }) } });
+    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log }), enabled: async () => true, setEnabled: async (on: boolean) => on } });
     const app = await openApp(root, {}, platform);
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
@@ -128,6 +128,23 @@ describe("Save diagnostics (ADR-0040)", () => {
     expect(saved[0]!.text).not.toContain("```");
   });
 
+  it("the log switch shows the host's choice and turns it off", async () => {
+    const platform = createNodePlatform({ vault: root });
+    const calls: boolean[] = [];
+    Object.assign(platform, {
+      diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log: [] }), enabled: async () => true, setEnabled: async (on: boolean) => (calls.push(on), on) },
+    });
+    const app = await openApp(root, {}, platform);
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    const toggle = (await within(section).findByRole("switch", { name: "Keep an app log on this computer" })) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await app.user.click(toggle);
+    await waitFor(() => expect(toggle.checked).toBe(false));
+    expect(calls).toEqual([false]);
+  });
+
   it("is not offered without a host log", async () => {
     const { app } = await start(() => undefined);
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
@@ -138,7 +155,7 @@ describe("Save diagnostics (ADR-0040)", () => {
   it("the dialog offers the log box, off, and adds the arch to the os in the details", async () => {
     const platform = createNodePlatform({ vault: root, servers: new FakeServers() });
     platform.servers.connect(TEAM);
-    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log: [] }) } });
+    Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log: [] }), enabled: async () => true, setEnabled: async (on: boolean) => on } });
     const app = await openApp(root, {}, platform);
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
     const dialog = await openFromSettings(app);

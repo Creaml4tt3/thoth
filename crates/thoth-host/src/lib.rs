@@ -80,7 +80,7 @@ pub const COMMANDS: &[&str] = &[
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
-    "diag.report", "diag.collect",
+    "diag.report", "diag.collect", "diag.settings",
 ];
 
 pub const VAULT_CHANGED: &str = "vault.changed";
@@ -576,6 +576,15 @@ impl Host {
             "diag.collect" => {
                 let log = self.log_dir.as_deref().map_or_else(Vec::new, |d| diagnostics::tail(d, diagnostics::TAIL_LINES, diagnostics::TAIL_BYTES));
                 json(json!({ "version": self.version, "os": std::env::consts::OS, "arch": std::env::consts::ARCH, "log": log }))
+            }
+            // The local log's switch (Settings): off stops the log and deletes what it holds.
+            "diag.settings" => {
+                match args.get("enabled") {
+                    None | Some(Value::Null) => {}
+                    Some(Value::Bool(on)) => diagnostics::set_switch(*on, self.config.data_dir.as_deref(), self.log_dir.as_deref()),
+                    Some(_) => return Err(HostError::bad_argument("enabled must be a boolean")),
+                }
+                json(json!({ "enabled": diagnostics::log_enabled() }))
             }
             _ => Err(HostError::bad_argument(format!("Unknown command {command:?}"))),
         }

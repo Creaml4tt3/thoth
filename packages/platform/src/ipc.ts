@@ -250,6 +250,8 @@ export interface Commands {
   "diag.report": { args: { kind: "error" | "rejection"; message: string; stack?: string }; result: null };
   /** The version, the system and the newest 200 lines (at most 64 KB) of the redacted log; `log` is empty when there is none. */
   "diag.collect": { args: Record<string, never>; result: DiagnosticsBundle };
+  /** The local log's switch; with `enabled`, sets it first (off empties the log). */
+  "diag.settings": { args: { enabled?: boolean }; result: { enabled: boolean } };
 }
 
 /** What `diag.collect` returns, for a problem report. */
