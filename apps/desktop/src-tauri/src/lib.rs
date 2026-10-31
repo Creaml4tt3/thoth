@@ -372,7 +372,10 @@ impl SystemFileManager {
         let command = {
             let mut command = std::process::Command::new("xdg-open");
             // A folder opens as itself; a file, by the folder it is in (the file manager cannot be told to select it).
-            let folder = if shown.is_dir() { shown } else { shown.parent().unwrap_or(root) };
+            let folder = match entry {
+                Some(path) if !path.is_dir() => path.parent().unwrap_or(root),
+                _ => shown,
+            };
             command.arg(folder);
             command
         };
