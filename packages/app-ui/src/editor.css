@@ -10,8 +10,9 @@
 .prose li > p { margin: 0 0 0.2em; }
 .prose ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
 .task-item { display: flex; gap: 8px; align-items: flex-start; }
+/* A 24×24 target (WCAG 2.5.8); the negative margin keeps the row laid out as for the old 15px box. */
 .task-check { padding-top: 5px; }
-.task-box { width: 15px; height: 15px; accent-color: var(--thoth-link); margin: 0; }
+.task-box { width: 24px; height: 24px; margin: -4.5px; accent-color: var(--thoth-link); }
 .task-content { flex: 1; }
 .task-item[data-checked="true"] > .task-content { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
 .prose blockquote { margin: 0.8em 0; padding-left: 1em; border-left: 3px solid var(--thoth-border-strong); color: var(--thoth-ink-secondary); }

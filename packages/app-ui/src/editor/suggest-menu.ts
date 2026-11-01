@@ -67,7 +67,6 @@ export function createSuggestMenu<T>(owner: HTMLElement, o: SuggestMenuOptions<T
     if (owner.getAttribute("aria-controls") !== id) return;
     owner.removeAttribute("aria-controls");
     owner.removeAttribute("aria-activedescendant");
-    owner.removeAttribute("aria-expanded");
   };
 
   return {
@@ -128,8 +127,8 @@ export function createSuggestMenu<T>(owner: HTMLElement, o: SuggestMenuOptions<T
       root.style.top = `${above ? rect.top - height - 6 : below}px`;
       // Which side of the caret the menu sits on: the pop-in grows from that edge (editor.css).
       root.dataset["side"] = above ? "top" : "bottom";
+      // No aria-expanded: the editor's role is textbox, which does not take it (axe aria-allowed-attr).
       owner.setAttribute("aria-controls", id);
-      owner.setAttribute("aria-expanded", "true");
       paintActive();
     },
     move(delta) {
