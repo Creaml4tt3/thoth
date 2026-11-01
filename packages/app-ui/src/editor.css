@@ -68,7 +68,7 @@
 .callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 12px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border-left: 3px solid var(--callout); }
 .callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
 .callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
-.callout-fold { all: unset; box-sizing: border-box; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
+.callout-fold { all: unset; box-sizing: border-box; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
 .callout-fold { transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .callout-fold:focus-visible { outline: 2px solid var(--thoth-accent); }

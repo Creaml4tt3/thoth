@@ -286,14 +286,15 @@ test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact byte
   // 3. Collapse the toggle: view only, nothing becomes unsaved by it. (The page is already dirty from typing; save first.)
   await page.keyboard.press("ControlOrMeta+s");
   await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).not.toBe(source);
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved");
+  await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveCount(1); // an explicit save is spoken
   const saved = await readFile(join(vault, "Blocks.md"), "utf8");
   await toggle.getByRole("button", { name: /collapse toggle/i }).click();
   await expect(toggle).toHaveAttribute("data-collapsed", "true");
   await expect(toggle.getByText("hidden line")).toBeHidden();
   await page.waitForTimeout(500);
   expect(await readFile(join(vault, "Blocks.md"), "utf8")).toBe(saved);
-  await expect(page.getByRole("status").filter({ hasText: /Unsaved/ })).toHaveCount(0);
+  await expect(page.locator(".save-status")).not.toHaveText(/Unsaved/);
 
   // 4. Save and check the file: new blocks canonical, every untouched line byte-identical.
   await page.keyboard.press("ControlOrMeta+s");

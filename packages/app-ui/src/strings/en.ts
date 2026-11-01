@@ -22,6 +22,8 @@ export const en = {
   editor: {
     status: { idle: "", dirty: "Unsaved changes", saving: "Saving…", saved: "Saved", error: "Not saved" },
     modeGroup: "Editor mode",
+    /** The editor's accessible name. */
+    content: "Page content",
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },

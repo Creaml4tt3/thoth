@@ -213,7 +213,7 @@ describe("workspaces", () => {
     await browser.user.keyboard("# Plan");
     const ws = browser.server.servers.workspaces.get(browser.server.handle)![0]!;
     await waitFor(() => expect([...ws.pages.values()][0]!.markdown.trim()).toBe("# Plan"));
-    await waitFor(() => expect(screen.getByRole("status", { name: "" }).textContent).toBe("Saved"));
+    await waitFor(() => expect(document.querySelector(".save-status")!.textContent).toBe("Saved"));
 
     await browser.user.click(screen.getByRole("button", { name: "Plain" }));
     const plain = await editorBox();
