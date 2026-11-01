@@ -27,6 +27,7 @@ import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type Works
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
 import { MembersDialog } from "./MembersDialog.tsx";
+import { VisibilityDialog } from "./VisibilityDialog.tsx";
 import { clearMembers, usePendingMembers } from "./members-request.ts";
 import { ConfirmByNameDialog } from "./ConfirmByNameDialog.tsx";
 import { announceWorkspaces, clearWorkspaceAdmin, usePendingWorkspaceAdmin } from "./workspace-admin-request.ts";
@@ -254,6 +255,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [sharing, setSharing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [coloring, setColoring] = useState<string | null>(null);
+  const [limiting, setLimiting] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
   const { download, said: downloadSaid } = useDownload();
@@ -272,6 +274,9 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   // ADR-0024: every member sees the members; owners also manage them and, with `invite-links`, invite people.
   const canMembers = state.capabilities[server]?.includes("members") ?? false;
   const canInvite = state.capabilities[server]?.includes("invite-links") ?? false;
+  // ADR-0042: teams on a server that lists `teams`; owners and managers choose which teams see a folder or page.
+  const canTeams = state.capabilities[server]?.includes("teams") ?? false;
+  const canLimit = canTeams && roleCan(workspace.role, "manage");
   // ADR-0025: owners rename and delete the workspace, on a server that lists `workspace-management`.
   const canAdminister = workspace.role === "owner" && (state.capabilities[server]?.includes("workspace-management") ?? false);
   const account = state.servers.find((s) => s.info.id === server)?.info;
@@ -555,6 +560,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       { id: "new-page", label: tt.newPageInside, onSelect: () => void create("page", id) },
       { id: "new-folder", label: tt.newFolderInside, onSelect: () => void create("folder", id) },
       ...(folder ? [{ id: "color", label: tt.color, onSelect: () => setColoring(id) }] : []),
+      ...(canLimit ? [{ id: "visible-to", label: tt.visibleTo, onSelect: () => setLimiting(id) }] : []),
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: !ordered || i <= 0, onSelect: () => reorder(id, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
@@ -709,6 +715,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           workspace={workspace}
           {...(account?.account?.id ? { me: account.account.id } : {})}
           canInvite={canInvite}
+          canTeams={canTeams}
           {...(account?.limits?.["maxMembersPerWorkspace"] !== undefined ? { maxMembers: account.limits["maxMembersPerWorkspace"] } : {})}
           onChanged={() => void directory.loadWorkspaces(server)}
           onLeft={() => {
@@ -781,6 +788,24 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           onClose={() => {
             const id = coloring;
             setColoring(null);
+            focusTreeItemSoon(id);
+          }}
+        />
+      )}
+      {limiting && canLimit && (
+        <VisibilityDialog
+          client={directory.client(server)}
+          workspace={workspace.id}
+          page={limiting}
+          name={titleOf(limiting)}
+          onSaved={(text) => {
+            setSaid(text);
+            // Who sees what changed: the server expires older change cursors, so read the tree again now.
+            void directory.loadTree(server, workspace.id);
+          }}
+          onClose={() => {
+            const id = limiting;
+            setLimiting(null);
             focusTreeItemSoon(id);
           }}
         />

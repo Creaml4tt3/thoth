@@ -37,6 +37,7 @@ import {
   type RevisionRow,
 } from "../pages.ts";
 import { signInCapability } from "../signin/routes.ts";
+import { HIDDEN, assertVisible, assertVisibleParent, hasLimits, visibilityChanged } from "../visibility.ts";
 import pkg from "../../package.json" with { type: "json" };
 
 interface WsParams {
@@ -124,9 +125,9 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     }
     const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; kind: PageKind | null; current_revision_id: string; updated_at: Date }>(
       `SELECT id, parent_id, title, position, kind, current_revision_id, updated_at FROM pages
-        WHERE workspace_id = $1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id > $2)
+        WHERE workspace_id = $1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id > $2) AND id NOT IN ${HIDDEN("$1", "$4")}
         ORDER BY id LIMIT $3`,
-      [ws.id, afterId, limit + 1],
+      [ws.id, afterId, limit + 1, me.id],
     );
     const page = rows.slice(0, limit);
     return send(
@@ -148,6 +149,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     if (wanted !== undefined && !RevisionIdSchema.safeParse(wanted).success) throw new ApiError("validation_failed", "revision is not a valid revision ID", fieldError("query:revision", "invalid"));
     const page = await loadPage(db, ws.id, pageId);
     if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+    await assertVisible(db, ws.id, me.id, pageId);
     const rev = wanted === undefined ? await loadCurrentRevision(db, page) : await loadRevision(db, ws.id, pageId, wanted);
     if (!rev) throw new ApiError("not_found", "revision not found");
     return send(reply, jsonReply(200, pageResource(page, rev, withKind), { etag: formatEtag(rev.id) }));
@@ -176,6 +178,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
         checkStorableText(parsed.data.markdown, "/markdown");
 
         const existing = await loadPage(tx, ws.id, pageId, { forUpdate: true });
+        // ADR-0042: a page the writer may not see answers as if it did not exist, also to a create over its ID.
+        if (existing) await assertVisible(tx, ws.id, me.id, pageId);
         const conflict = async (detail: string) => new ApiError("revision_conflict", detail, { currentRevision: revisionSummary(await loadCurrentRevision(tx, existing!)) });
         if (ifNoneMatch !== undefined) {
           // A deleted page still occupies its ID: recreating over it is a conflict (protocol open question 5).
@@ -185,9 +189,12 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
           if (expected !== existing.current_revision_id) throw await conflict("If-Match does not match the current revision");
         }
         await checkParent(tx, ws.id, pageId, parsed.data.parentId);
+        await assertVisibleParent(tx, ws.id, me.id, parsed.data.parentId);
         // Under the workspace lock taken above, so concurrent creates cannot both pass at limit - 1. Updates never count.
         if (!existing) await assertCanCreatePages(tx, config, ws.id, 1);
         const { page, revision, created } = await writeRevision(tx, { workspaceId: ws.id, pageId, input: parsed.data, userId: me.id, existing, now });
+        // Moved under another parent where limits exist: who sees it may have changed (ADR-0042).
+        if (existing && existing.parent_id !== page.parent_id && (await hasLimits(tx, ws.id))) await visibilityChanged(tx, ws.id, me.id, now);
         return jsonReply(created ? 201 : 200, pageResource(page, revision, withKind), { etag: formatEtag(revision.id) });
       }),
   );
@@ -206,10 +213,13 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       if (!parsed.success) throw zodFailure(parsed.error);
       const page = await loadPage(tx, ws.id, pageId, { forUpdate: true });
       if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+      await assertVisible(tx, ws.id, me.id, pageId);
       // If-Match guards the content revision; moves themselves do not create one, so the last move wins.
       if (expected !== page.current_revision_id) throw new ApiError("revision_conflict", "If-Match does not match the current revision", { currentRevision: revisionSummary(await loadCurrentRevision(tx, page)) });
       await checkParent(tx, ws.id, pageId, parsed.data.parentId);
+      await assertVisibleParent(tx, ws.id, me.id, parsed.data.parentId);
       const moved = await movePage(tx, { page, parentId: parsed.data.parentId, position: parsed.data.position, userId: me.id, now });
+      if (moved.parent_id !== page.parent_id && (await hasLimits(tx, ws.id))) await visibilityChanged(tx, ws.id, me.id, now);
       return jsonReply(200, treeNode(moved, withKind), { etag: formatEtag(moved.current_revision_id) });
     }),
   );
@@ -225,6 +235,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       if (expected === null) throw new ApiError("validation_failed", "If-Match must be one strong entity tag", fieldError("header:If-Match", "expected one strong entity tag"));
       const page = await loadPage(tx, ws.id, pageId, { forUpdate: true });
       if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+      await assertVisible(tx, ws.id, me.id, pageId);
       if (expected !== page.current_revision_id) throw new ApiError("revision_conflict", "If-Match does not match the current revision", { currentRevision: revisionSummary(await loadCurrentRevision(tx, page)) });
       await deletePage(tx, ws.id, pageId, me.id, now);
       return { status: 204, headers: {} };
@@ -237,6 +248,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     const pageId = parsePageId(request.params.pageId);
     const page = await loadPage(db, ws.id, pageId);
     if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+    await assertVisible(db, ws.id, me.id, pageId);
     const limit = limitFrom(request.query.limit);
     const before = request.query.cursor === undefined ? null : decodeIntCursor("r", `${ws.id}/${pageId}`, request.query.cursor);
     const { rows } = await db.query<Omit<RevisionRow, "markdown">>(
@@ -252,16 +264,21 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
     const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "read");
     const limit = limitFrom(request.query.limit);
     const position = request.query.cursor === undefined ? 0 : decodeIntCursor("c", ws.id, request.query.cursor);
-    const head = (await db.query<{ change_seq: number }>("SELECT change_seq FROM workspaces WHERE id = $1", [ws.id])).rows[0]!.change_seq;
+    const { change_seq: head, visibility_seq } = (await db.query<{ change_seq: number; visibility_seq: number }>("SELECT change_seq, visibility_seq FROM workspaces WHERE id = $1", [ws.id])).rows[0]!;
     if (position > head) throw new ApiError("cursor_invalid", "cursor is ahead of the feed");
+    // ADR-0042: who sees which pages changed after this cursor, so its tree may hold pages it may no longer see.
+    if (request.query.cursor !== undefined && position < visibility_seq) throw new ApiError("cursor_expired", "who sees which pages has changed since this cursor; read the tree again");
     // Entries are read after the head, and an entry at seq <= head is always fully committed
     // (writers hold the workspace lock until commit), so no entry can appear below a cursor we hand out.
-    const { rows } = await db.query<ChangeRow>(
-      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, page_kind, attachment_id
+    // Entries of pages the reader may not see are skipped, but still move the cursor on (ADR-0042).
+    const { rows } = await db.query<ChangeRow & { hidden: boolean }>(
+      `SELECT seq, kind, occurred_at, actor_id, page_id, revision_id, parent_id, title, position, page_kind, attachment_id,
+              coalesce(page_id IN ${HIDDEN("$1", "$5")}, false) AS hidden
          FROM changes WHERE workspace_id = $1 AND seq > $2 AND seq <= $3 ORDER BY seq LIMIT $4`,
-      [ws.id, position, head, limit],
+      [ws.id, position, head, limit, me.id],
     );
     const next = rows.length ? rows[rows.length - 1]!.seq : position;
-    return send(reply, jsonReply(200, { entries: rows.map((row) => changeEntryOf(row, withKind)), cursor: changeCursorOf(ws.id, next), hasMore: next < head }));
+    const entries = rows.filter((row) => !row.hidden).map((row) => changeEntryOf(row, withKind));
+    return send(reply, jsonReply(200, { entries, cursor: changeCursorOf(ws.id, next), hasMore: next < head }));
   });
 }

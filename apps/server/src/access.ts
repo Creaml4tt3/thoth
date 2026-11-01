@@ -15,13 +15,13 @@ export interface WorkspaceAccess {
  * - Not a member (or no such workspace, a deleted one (ADR-0025), or a malformed ID): 404 `not_found`, so existence is
  *   not leaked.
  * - A member whose role lacks `need`: 403 `forbidden`. `administer` is the owners' permission (ADR-0024: members and
- *   invite links).
+ *   invite links); `manage` is owners' and managers' (ADR-0042: teams and page visibility).
  *
  * With `lock`, the workspace row is locked `FOR NO KEY UPDATE` for the rest of the transaction.
  * Every write takes that lock first, which serializes writers per workspace: change-feed sequence
  * numbers are gap-free and commit in order, and an `If-Match` check cannot be raced past.
  */
-export type Need = "read" | "write" | "administer";
+export type Need = "read" | "write" | "manage" | "administer";
 
 export async function workspaceAccess(q: Queryable, workspaceId: string, userId: string, need: Need, options: { lock?: boolean } = {}): Promise<WorkspaceAccess> {
   if (!OpaqueIdSchema.safeParse(workspaceId).success) throw new ApiError("not_found", "workspace not found");
@@ -39,5 +39,5 @@ export async function workspaceAccess(q: Queryable, workspaceId: string, userId:
 }
 
 export function requireRole(access: WorkspaceAccess, need: Need): void {
-  if (!roleCan(access.role, need)) throw new ApiError("forbidden", need === "administer" ? "only owners of this workspace may do this" : `role ${access.role} may not ${need} in this workspace`);
+  if (!roleCan(access.role, need)) throw new ApiError("forbidden", need === "administer" ? "only owners of this workspace may do this" : need === "manage" ? "only owners and managers of this workspace may do this" : `role ${access.role} may not ${need} in this workspace`);
 }

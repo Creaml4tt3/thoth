@@ -9,7 +9,7 @@
 import { newStableId, sha256Hex } from "@thoth/domain";
 import type { ApiCallArgs, ApiCallResult, ServerInfo, Servers } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
-import { DELETED_WORKSPACE_RESTORE_DAYS, FeedbackRequestSchema, InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type RevisionSummary, type Role, type TransferResource } from "@thoth/workspace-protocol";
+import { DELETED_WORKSPACE_RESTORE_DAYS, FeedbackRequestSchema, InviteAcceptRequestSchema, InviteLinkCreateRequestSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema, MemberRoleChangeSchema, PageMoveSchema, pageKindOf, parseEtag, problem, ShareLinkCreateRequestSchema, TransferCommitRequestSchema, TransferCreateRequestSchema, type ChangeEntry, type ErrorCode, type InviteRole, type RevisionSummary, type Role, type TransferResource, roleCan } from "@thoth/workspace-protocol";
 
 export interface FakePage {
   id: string;
@@ -37,11 +37,14 @@ export interface FakeWorkspace {
   /** Public share links (capability `public-share`); the token is kept only so tests can read it. */
   shares: { id: string; workspaceId: string; pageId: string; createdAt: string; createdBy: string; expiresAt: string | null; token: string; revoked: boolean }[];
   /** Invite links (capability `invite-links`, ADR-0024); the token is kept only so tests can read it. */
-  invites: { id: string; role: "editor" | "viewer"; maxUses: number; uses: number; createdAt: string; createdBy: string; expiresAt: string; token: string; revoked: boolean }[];
+  invites: { id: string; role: InviteRole; maxUses: number; uses: number; createdAt: string; createdBy: string; expiresAt: string; token: string; revoked: boolean }[];
   /** False for a workspace "me" is not in yet (it can be joined with one of its invite links). */
   joined: boolean;
   /** ADR-0025: when it was deleted (restorable for 30 days), or null. */
   deletedAt: string | null;
+  /** Teams (capability `teams`, ADR-0042) and the teams each limited page is limited to. Not enforced on reads here. */
+  teams: { id: string; name: string; memberIds: string[] }[];
+  visibility: Map<string, string[]>;
 }
 
 export interface FakeTransfer {
@@ -140,6 +143,8 @@ export class FakeServers implements Servers {
       invites: [],
       joined: init.joined ?? true,
       deletedAt: null,
+      teams: [],
+      visibility: new Map(),
     };
     this.serverOf.set(ws, server);
     const list = this.workspaces.get(server) ?? [];
@@ -149,7 +154,7 @@ export class FakeServers implements Servers {
   }
 
   /** An invite link to `ws` made by someone else (an owner), as the test's "received" link. Returns its token. */
-  inviteAsOther(ws: FakeWorkspace, init: { role?: "editor" | "viewer"; maxUses?: number } = {}): string {
+  inviteAsOther(ws: FakeWorkspace, init: { role?: InviteRole; maxUses?: number } = {}): string {
     const token = `inv${String(ws.invites.length + 1).padStart(29, "0")}`;
     ws.invites.push({ id: `inv_${ws.invites.length + 1}`, role: init.role ?? "editor", maxUses: init.maxUses ?? 1, uses: 0, createdAt: iso(T0), createdBy: "usr_other", expiresAt: iso(T0 + 7 * 86_400_000), token, revoked: false });
     return token;
@@ -328,6 +333,7 @@ export class FakeServers implements Servers {
     if (rest === "/name" && method === "PUT") return this.renameWorkspace(server, ws, text);
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
+    if (rest === "/teams" || rest.startsWith("/teams/") || /^\/pages\/[^/]+\/visibility$/.test(rest)) return this.teams(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
       const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));
       return json(200, { workspaceId: ws.id, items, nextCursor: null, changeCursor: this.cursor(ws.changes.length) });
@@ -557,6 +563,45 @@ export class FakeServers implements Servers {
       if (member.role === "owner" && owners <= 1) return fail("last_owner", "a workspace keeps at least one owner: make another member an owner first");
       ws.members = ws.members.filter((m) => m.userId !== userId);
       if (userId === me) ws.joined = false;
+      return { status: 204, headers: {}, body: "" };
+    }
+    return fail("method_not_allowed");
+  }
+
+  /** Teams and page visibility (capability `teams`, ADR-0042): everyone reads teams; owners and managers change them. */
+  private teams(server: string, ws: FakeWorkspace, method: string, rest: string, text: string): ApiCallResult {
+    if (!this.capable(server, "teams")) return fail("capability_not_supported");
+    if (method !== "GET" && !roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
+    const vis = /^\/pages\/([^/]+)\/visibility$/.exec(rest);
+    if (vis) {
+      if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
+      const pageId = decodeURIComponent(vis[1]!);
+      if (method === "PUT") {
+        const teamIds = (JSON.parse(text) as { teamIds: string[] | null }).teamIds;
+        if (teamIds === null) ws.visibility.delete(pageId);
+        else ws.visibility.set(pageId, teamIds);
+      }
+      return json(200, { pageId, teamIds: ws.visibility.get(pageId) ?? null, limitedAbove: false });
+    }
+    const [, , teamId, , userId] = rest.split("/").map(decodeURIComponent);
+    if (rest === "/teams" && method === "GET") return json(200, { items: [...ws.teams].sort((a, b) => a.name.localeCompare(b.name)) });
+    if (rest === "/teams" && method === "POST") {
+      const team = { id: `team_${ws.teams.length + 1}`, name: (JSON.parse(text) as { name: string }).name.trim(), memberIds: [] as string[] };
+      ws.teams.push(team);
+      return json(201, team);
+    }
+    const team = ws.teams.find((t) => t.id === teamId);
+    if (!team) return fail("not_found", "team not found");
+    if (userId !== undefined) {
+      team.memberIds = method === "PUT" ? [...new Set([...team.memberIds, userId])].sort() : team.memberIds.filter((id) => id !== userId);
+      return json(200, team);
+    }
+    if (method === "PUT") {
+      team.name = (JSON.parse(text) as { name: string }).name.trim();
+      return json(200, team);
+    }
+    if (method === "DELETE") {
+      ws.teams = ws.teams.filter((t) => t !== team);
       return { status: 204, headers: {}, body: "" };
     }
     return fail("method_not_allowed");

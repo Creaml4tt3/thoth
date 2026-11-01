@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { INVITE_EXPIRY_DAYS, INVITE_ROLES, INVITE_USES, RoleSchema, type InviteExpiry, type InviteLink, type InviteLinkCreated, type InviteRole, type InviteUses, type Member, type Role } from "@thoth/workspace-protocol";
+import { INVITE_EXPIRY_DAYS, INVITE_ROLES, INVITE_USES, RoleSchema, TEAM_NAME_MAX, roleCan, type InviteExpiry, type InviteLink, type InviteLinkCreated, type InviteRole, type InviteUses, type Member, type Role, type Team } from "@thoth/workspace-protocol";
 import { ProblemError, type WorkspaceClient } from "@thoth/workspace-client";
 import { shellRoot } from "../order/ContextMenu.tsx";
 import { useStrings } from "../strings/index.ts";
@@ -8,7 +8,8 @@ import { Button } from "../ui/Button.tsx";
 import { copyText } from "../ui/clipboard.ts";
 import { Modal } from "../ui/Modal.tsx";
 
-type MembersClient = Pick<WorkspaceClient, "getMe" | "listMembers" | "setMemberRole" | "removeMember" | "createInviteLink" | "listInviteLinks" | "revokeInviteLink">;
+type MembersClient = Pick<WorkspaceClient, "getMe" | "listMembers" | "setMemberRole" | "removeMember" | "createInviteLink" | "listInviteLinks" | "revokeInviteLink"> &
+  Partial<Pick<WorkspaceClient, "listTeams" | "createTeam" | "renameTeam" | "deleteTeam" | "setTeamMember">>;
 
 interface Props {
   client: MembersClient;
@@ -17,6 +18,8 @@ interface Props {
   me?: string;
   /** The server offers invite links (`invite-links`). */
   canInvite: boolean;
+  /** The server offers teams (`teams`, ADR-0042). */
+  canTeams?: boolean;
   /** The server's `maxMembersPerWorkspace`, to offer no more uses than there is room for. */
   maxMembers?: number;
   /** After a change of members or roles: read the workspace list again. */
@@ -39,7 +42,7 @@ type Confirm = { kind: "remove"; member: Member } | { kind: "leave" } | null;
  * and revoke the active ones. Removing and leaving ask first, inline, so focus stays in the dialog. Changes are told
  * to screen readers in a live region; refusals (such as the last owner) are alerts.
  */
-export function MembersDialog({ client, workspace, me: knownMe, canInvite, maxMembers, onChanged, onLeft, onClose }: Props) {
+export function MembersDialog({ client, workspace, me: knownMe, canInvite, canTeams = false, maxMembers, onChanged, onLeft, onClose }: Props) {
   const strings = useStrings();
   const t = strings.members;
   const owner = workspace.role === "owner";
@@ -268,6 +271,8 @@ export function MembersDialog({ client, workspace, me: knownMe, canInvite, maxMe
         {question}
       </section>
 
+      {canTeams && members !== null && <TeamsSection client={client} workspace={workspace} members={members} />}
+
       {owner && canInvite && (
         <section className="members-invite" role="region" aria-labelledby={ids.invite}>
           <h3 id={ids.invite} className="share-heading">
@@ -377,5 +382,135 @@ export function MembersDialog({ client, workspace, me: knownMe, canInvite, maxMe
       </div>
     </Modal>,
     shellRoot(),
+  );
+}
+
+/**
+ * Teams of the workspace (ADR-0042): every member sees them and who is in each; owners and managers create, rename and
+ * delete teams and tick who is in each. Each change is said in the live region; a failure is an alert.
+ */
+function TeamsSection({ client, workspace, members }: { client: MembersClient; workspace: { id: string; role: Role }; members: Member[] }) {
+  const t = useStrings().members;
+  const manage = roleCan(workspace.role, "manage");
+  const [teams, setTeams] = useState<Team[] | null>(null);
+  const [name, setName] = useState("");
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const ids = { heading: useId(), name: useId() };
+
+  const reload = useCallback(async () => {
+    try {
+      setTeams((await client.listTeams?.(workspace.id)) ?? []);
+    } catch (e) {
+      setTeams((prev) => prev ?? []);
+      setError(t.teamsFailed(message(e)));
+    }
+  }, [client, workspace.id, t]);
+  useEffect(() => void reload(), [reload]);
+
+  const act = async (job: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    setError(null);
+    setSaid("");
+    try {
+      await job();
+      setSaid(done);
+    } catch (e) {
+      setError(t.teamsFailed(message(e)));
+    } finally {
+      setBusy(false);
+      await reload();
+    }
+  };
+
+  const nameOf = (id: string) => members.find((m) => m.userId === id)?.displayName ?? id;
+
+  return (
+    <section className="members-teams" role="region" aria-labelledby={ids.heading}>
+      <h3 id={ids.heading} className="share-heading">
+        {t.teams}
+      </h3>
+      <p className="share-note">{t.teamsIntro}</p>
+      {teams === null ? (
+        <p className="share-note">{t.loadingTeams}</p>
+      ) : teams.length === 0 ? (
+        <p className="share-note">{t.noTeams}</p>
+      ) : (
+        <ul className="members-list" aria-labelledby={ids.heading}>
+          {teams.map((team) => (
+            <li key={team.id} className="member team">
+              {manage ? (
+                <form
+                  className="share-copy"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const next = (names[team.id] ?? team.name).trim();
+                    if (next && next !== team.name) void act(() => client.renameTeam!(workspace.id, team.id, next), t.teamRenamed(next));
+                  }}
+                >
+                  <input className="input" aria-label={t.teamName(team.name)} maxLength={TEAM_NAME_MAX} value={names[team.id] ?? team.name} disabled={busy} onChange={(event) => setNames({ ...names, [team.id]: event.target.value })} />
+                  <Button small variant="quiet" type="submit" disabled={busy}>
+                    {t.renameTeam}
+                  </Button>
+                  <Button small variant="quiet" aria-label={t.deleteTeamLabel(team.name)} disabled={busy} onClick={() => void act(() => client.deleteTeam!(workspace.id, team.id), t.teamDeleted(team.name))}>
+                    {t.deleteTeam}
+                  </Button>
+                </form>
+              ) : (
+                <span className="member-name">
+                  <span>{team.name}</span>
+                  <span className="share-note member-hint">{team.memberIds.map(nameOf).join(", ") || t.teamMembers(0)}</span>
+                </span>
+              )}
+              {manage && (
+                <fieldset className="share-expiry">
+                  <legend className="sr-only">{team.name}</legend>
+                  <div className="share-choices">
+                    {members.map((m) => (
+                      <label key={m.userId} className="share-choice">
+                        <input
+                          type="checkbox"
+                          aria-label={t.teamMember(m.displayName, team.name)}
+                          checked={team.memberIds.includes(m.userId)}
+                          disabled={busy}
+                          onChange={(event) => void act(() => client.setTeamMember!(workspace.id, team.id, m.userId, event.target.checked), t.teamChanged(team.name))}
+                        />
+                        <span>{m.displayName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {manage && (
+        <form
+          className="share-copy"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const next = name.trim();
+            if (!next) return;
+            void act(() => client.createTeam!(workspace.id, next), t.teamCreated(next)).then(() => setName(""));
+          }}
+        >
+          <input id={ids.name} className="input" aria-label={t.newTeam} placeholder={t.newTeam} maxLength={TEAM_NAME_MAX} value={name} disabled={busy} onChange={(event) => setName(event.target.value)} />
+          <Button variant="primary" type="submit" disabled={busy || name.trim() === ""}>
+            {t.createTeam}
+          </Button>
+        </form>
+      )}
+      <p role="status" className="share-said">
+        {said}
+      </p>
+      {error !== null && (
+        <p role="alert" className="alert alert-danger">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }

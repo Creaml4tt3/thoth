@@ -13,6 +13,7 @@ import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackRequestSchema } from "./feedback.ts";
+import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -101,6 +102,8 @@ const LOCATION_HEADER: ResponseHeaderSpec = { name: "Location", description: "Ab
 const workspaceParams = { workspaceId: WorkspaceIdSchema } as const;
 const pageParams = { workspaceId: WorkspaceIdSchema, pageId: PageIdSchema } as const;
 const memberParams = { workspaceId: WorkspaceIdSchema, userId: OpaqueIdSchema } as const;
+const teamParams = { workspaceId: WorkspaceIdSchema, teamId: TeamIdSchema } as const;
+const teamMemberParams = { workspaceId: WorkspaceIdSchema, teamId: TeamIdSchema, userId: OpaqueIdSchema } as const;
 
 interface RouteInit {
   operationId: string;
@@ -598,6 +601,113 @@ export const ROUTES: readonly RouteDefinition[] = [
     responses: [{ status: 204, description: "Purged.", headers: [] }],
     errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
   }),  route({
+    operationId: "listTeams",
+    method: "get",
+    path: "/workspaces/{workspaceId}/teams",
+    tag: "Teams",
+    summary: "Teams of a workspace",
+    description: "ADR-0042. Every member may read the list: each team's name and its members' user IDs. At most `TEAMS_MAX` (100) teams, all in one response, by name.",
+    capability: "teams",
+    pathParams: workspaceParams,
+    responses: [json(200, "Every team of the workspace.", TeamListSchema)],
+    errors: ["not_found"],
+  }),
+  route({
+    operationId: "createTeam",
+    method: "post",
+    path: "/workspaces/{workspaceId}/teams",
+    tag: "Teams",
+    summary: "Create a team",
+    description: "Owners and managers (403 for others). A name of 1 to 100 characters. 409 `quota_exceeded` (`quota: teamsPerWorkspace`) past 100 teams.",
+    capability: "teams",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: TeamWriteSchema, required: true, description: "The name." },
+    responses: [json(201, "The new team, with no members.", TeamSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "quota_exceeded", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "renameTeam",
+    method: "put",
+    path: "/workspaces/{workspaceId}/teams/{teamId}",
+    tag: "Teams",
+    summary: "Rename a team",
+    description: "Owners and managers (403 for others; 404 for an unknown team).",
+    capability: "teams",
+    pathParams: teamParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: TeamWriteSchema, required: true, description: "The new name." },
+    responses: [json(200, "The renamed team.", TeamSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "deleteTeam",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/teams/{teamId}",
+    tag: "Teams",
+    summary: "Delete a team",
+    description:
+      "Owners and managers. Pages limited to this team stay limited to their other teams; a page left with no team is seen by owners only (deleting a team never shows a page to more people). Older change cursors expire (410 `cursor_expired`).",
+    capability: "teams",
+    pathParams: teamParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [{ status: 204, description: "Deleted.", headers: [] }],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "addTeamMember",
+    method: "put",
+    path: "/workspaces/{workspaceId}/teams/{teamId}/members/{userId}",
+    tag: "Teams",
+    summary: "Add a member to a team",
+    description: "Owners and managers. The user must be a member of the workspace (404 otherwise). Adding someone already in the team succeeds and changes nothing. Older change cursors expire (410 `cursor_expired`).",
+    capability: "teams",
+    pathParams: teamMemberParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [json(200, "The team.", TeamSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "removeTeamMember",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/teams/{teamId}/members/{userId}",
+    tag: "Teams",
+    summary: "Remove a member from a team",
+    description: "Owners and managers. Removing someone who is not in the team succeeds and changes nothing. Older change cursors expire (410 `cursor_expired`).",
+    capability: "teams",
+    pathParams: teamMemberParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [json(200, "The team.", TeamSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "getPageVisibility",
+    method: "get",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/visibility",
+    tag: "Teams",
+    summary: "Who sees a page",
+    description: "Owners and managers (403 for others). 404 for a page the caller cannot see.",
+    capability: "teams",
+    pathParams: pageParams,
+    responses: [json(200, "The page's teams, or null for no limit on the page itself.", PageVisibilitySchema)],
+    errors: ["validation_failed", "forbidden", "not_found"],
+  }),
+  route({
+    operationId: "setPageVisibility",
+    method: "put",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/visibility",
+    tag: "Teams",
+    summary: "Limit a page, and everything below it, to some teams",
+    description:
+      "Owners and managers (403 for others; 404 for a page the caller cannot see). `teamIds`: one or more teams of this workspace, or `null` for everyone. The limit applies to the page and every page below it, and to pages moved under it later. Members in none of the teams no longer see them (404); owners always do. Older change cursors expire (410 `cursor_expired`).",
+    capability: "teams",
+    pathParams: pageParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: PageVisibilityWriteSchema, required: true, description: "The teams, or null." },
+    responses: [json(200, "Who sees the page now.", PageVisibilitySchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
     operationId: "sendFeedback",
     method: "post",
     path: "/feedback",

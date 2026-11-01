@@ -15,7 +15,7 @@ let root: string;
 
 const CAPS = ["search", "transfers", "attachments", "page-order", "page-kind", "public-share", "members", "invite-links"];
 const LOCAL: FakeServerConfig = { url: "http://127.0.0.1:8080", name: "Team server", tokens: ["thoth_pat_good"], account: { id: "usr_me", displayName: "Ada" }, capabilities: CAPS };
-const TEAM = (role: "owner" | "editor" | "viewer") => [
+const TEAM = (role: "owner" | "manager" | "editor" | "viewer") => [
   { userId: "usr_me", displayName: "Ada", role },
   { userId: "usr_bo", displayName: "Bo", role: "editor" as const },
   { userId: "usr_cy", displayName: "Cy", role: "viewer" as const },
@@ -30,7 +30,7 @@ afterEach(async () => {
   await dirs.cleanup();
 });
 
-async function workspace(options: { role?: "owner" | "editor" | "viewer"; capabilities?: string[]; members?: FakeWorkspace["members"]; config?: Partial<FakeServerConfig> } = {}) {
+async function workspace(options: { role?: "owner" | "manager" | "editor" | "viewer"; capabilities?: string[]; members?: FakeWorkspace["members"]; config?: Partial<FakeServerConfig> } = {}) {
   const servers = new FakeServers();
   const role = options.role ?? "owner";
   servers.connect({ ...LOCAL, capabilities: options.capabilities ?? CAPS, ...options.config });
@@ -226,5 +226,84 @@ describe("Settings → Servers → Join with an invite link", () => {
     await app.user.click(within(region).getByRole("button", { name: "Sign in with Google" }));
     expect((await within(region).findByRole("status")).textContent).toBe("You joined Garden as Viewer. It is in the sidebar now.");
     expect(garden.joined).toBe(true);
+  });
+});
+
+// ADR-0042: teams in the members dialog, the Manager role, and "Visible to…" on a folder.
+describe("Teams and Visible to…", () => {
+  const TEAMS = [...CAPS, "teams"];
+
+  it("lets a manager create a team, add a member, rename it and delete it", async () => {
+    const { app, ws } = await workspace({ role: "manager", capabilities: TEAMS });
+    const dialog = await openMembers(app);
+    const teams = await within(dialog).findByRole("region", { name: "Teams" });
+    expect(await within(teams).findByText("No teams yet.")).toBeTruthy();
+    await app.user.type(within(teams).getByRole("textbox", { name: "New team name" }), "Finance");
+    await app.user.click(within(teams).getByRole("button", { name: "Create team" }));
+    await waitFor(() => expect(ws.teams.map((t) => t.name)).toEqual(["Finance"]));
+    await app.user.click(await within(teams).findByRole("checkbox", { name: "Bo in Finance" }));
+    await waitFor(() => expect(ws.teams[0]!.memberIds).toEqual(["usr_bo"]));
+    expect(within(teams).getByRole("status").textContent).toBe("Changed the members of Finance.");
+    const name = within(teams).getByRole("textbox", { name: "Name of Finance" });
+    await app.user.clear(name);
+    await app.user.type(name, "Money{Enter}");
+    await waitFor(() => expect(ws.teams[0]!.name).toBe("Money"));
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(teams).getByRole("button", { name: "Delete team Money" }));
+    await waitFor(() => expect(ws.teams).toEqual([]));
+    // A manager does not manage members or invite links.
+    expect(within(dialog).queryByRole("region", { name: "Invite people" })).toBeNull();
+    expect(within(dialog).queryByRole("combobox", { name: "Role of Bo" })).toBeNull();
+  });
+
+  it("shows teams read-only to an editor, and offers Manager in an owner's invite and role pickers", async () => {
+    const { app: editorApp, ws } = await workspace({ role: "editor", capabilities: TEAMS });
+    ws.teams.push({ id: "team_1", name: "Finance", memberIds: ["usr_bo"] });
+    const dialog = await openMembers(editorApp);
+    const teams = await within(dialog).findByRole("region", { name: "Teams" });
+    expect(await within(teams).findByText("Bo")).toBeTruthy();
+    expect(within(teams).queryByRole("button", { name: "Create team" })).toBeNull();
+    expect(within(teams).queryByRole("checkbox")).toBeNull();
+    cleanup();
+
+    const { app } = await workspace({ capabilities: TEAMS });
+    const owner = await openMembers(app);
+    const invite = within(owner).getByRole("region", { name: "Invite people" });
+    expect(within(invite).getByRole("radio", { name: "Manager" })).toBeTruthy();
+    const cy = (await within(owner).findByRole("combobox", { name: "Role of Cy" })) as HTMLSelectElement;
+    expect([...cy.options].map((o) => o.value)).toEqual(["owner", "manager", "editor", "viewer"]);
+  });
+
+  it("offers Visible to… on a folder to owners and managers only, and limits it to a team", async () => {
+    const { app, ws, list } = await workspace({ role: "manager", capabilities: TEAMS });
+    ws.teams.push({ id: "team_1", name: "Finance", memberIds: [] });
+    await app.user.click(within(list).getByRole("treeitem", { name: /^Design/ }));
+    const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+    fireEvent.contextMenu(within(pages).getByRole("treeitem", { name: "Roadmap" }));
+    await app.user.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Visible to…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Who sees “Roadmap”" });
+    await app.user.click(await within(dialog).findByRole("radio", { name: "Only these teams" }));
+    await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe("Choose at least one team.");
+    await app.user.click(within(dialog).getByRole("checkbox", { name: "Finance" }));
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect([...ws.visibility.values()]).toEqual([["team_1"]]);
+  });
+
+  it("does not offer Visible to… to editors, nor on a server without teams", async () => {
+    for (const options of [{ role: "editor" as const, capabilities: TEAMS }, { role: "owner" as const, capabilities: CAPS }]) {
+      const { app, list } = await workspace(options);
+      await app.user.click(within(list).getByRole("treeitem", { name: /^Design/ }));
+      const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+      fireEvent.contextMenu(within(pages).getByRole("treeitem", { name: "Roadmap" }));
+      const menu = await screen.findByRole("menu");
+      expect(within(menu).queryByRole("menuitem", { name: "Visible to…" }), JSON.stringify(options)).toBeNull();
+      await app.user.keyboard("{Escape}");
+      // An older server: no Teams section either.
+      if (options.capabilities === CAPS) expect(within(await openMembers(app)).queryByRole("region", { name: "Teams" })).toBeNull();
+      cleanup();
+    }
   });
 });

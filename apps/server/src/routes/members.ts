@@ -7,6 +7,7 @@ import type { Deps } from "../deps.ts";
 import { ApiError, jsonReply, zodFailure } from "../errors.ts";
 import { audit, mutate, parseJsonBody, principalOf, send } from "../http.ts";
 import { opaqueId } from "../ids.ts";
+import { visibilityChanged } from "../visibility.ts";
 import { INVITE_ACTIVE, acceptInviteIn, generateInviteToken, hashInviteToken, inviteNotFound, resolveInvite } from "../invites.ts";
 import { limitFrom } from "../pages.ts";
 import { assertCanOwnAnotherWorkspace, quotaExceeded } from "../quota.ts";
@@ -15,7 +16,7 @@ import { clientIp, hit } from "../ratelimit.ts";
 interface InviteRow {
   id: string;
   workspace_id: string;
-  role: "editor" | "viewer";
+  role: "manager" | "editor" | "viewer";
   max_uses: number;
   uses: number;
   created_at: Date;
@@ -105,6 +106,8 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
         if (target.role === "owner" && (await ownerCount(tx, ws.id)) <= 1) throw lastOwner();
         if (next === "owner") await assertCanOwnAnotherWorkspace(tx, config, userId);
         await tx.query("UPDATE memberships SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [ws.id, userId, next]);
+        // Owners see every page (ADR-0042): becoming or ceasing to be one changes what this member sees.
+        if (target.role === "owner" || next === "owner") await visibilityChanged(tx, ws.id, me.id);
         await audit(tx, { actorId: me.id, workspaceId: ws.id, action: "member.role_changed", detail: { userId, from: target.role, to: next } });
       }
       return jsonReply(200, { userId, displayName: target.display_name, role: next });
@@ -122,6 +125,8 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
       if (!target) throw new ApiError("not_found", "no such member");
       if (target.role === "owner" && (await ownerCount(tx, ws.id)) <= 1) throw lastOwner();
       await tx.query("DELETE FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws.id, userId]);
+      // Out of the workspace, out of its teams: rejoining later starts in none (ADR-0042).
+      await tx.query("DELETE FROM team_members tm USING teams t WHERE t.id = tm.team_id AND t.workspace_id = $1 AND tm.user_id = $2", [ws.id, userId]);
       await audit(tx, { actorId: me.id, workspaceId: ws.id, action: leaving ? "member.left" : "member.removed", detail: { userId, role: target.role } });
       return { status: 204, headers: {} };
     }),

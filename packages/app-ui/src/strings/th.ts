@@ -174,6 +174,22 @@ export const th: Strings = {
     newPage: "หน้าใหม่",
     openNewTab: "เปิดในแท็บใหม่",
     color: "สี…", // REVIEW
+    visibleTo: "ใครเห็นได้…", // REVIEW
+    visibility: {
+      title: (name) => `ใครเห็น “${name}” ได้`, // REVIEW
+      intro: "เลือกว่าใครเห็นรายการนี้และทุกอย่างข้างในได้ เจ้าของเห็นทุกอย่างเสมอ", // REVIEW
+      everyone: "ทุกคนในเวิร์กสเปซ", // REVIEW
+      teams: "เฉพาะทีมเหล่านี้", // REVIEW
+      noTeams: "ยังไม่มีทีม สร้างทีมได้ใน สมาชิก…", // REVIEW
+      above: "โฟลเดอร์ที่อยู่เหนือขึ้นไปจำกัดให้บางทีมเห็นด้วย", // REVIEW
+      loading: "กำลังโหลด…", // REVIEW
+      save: "บันทึก", // REVIEW
+      saving: "กำลังบันทึก…", // REVIEW
+      cancel: "ยกเลิก",
+      pickOne: "เลือกอย่างน้อยหนึ่งทีม", // REVIEW
+      failed: (detail) => `เปลี่ยนว่าใครเห็นได้ไม่สำเร็จ: ${detail}`, // REVIEW
+      saved: (name) => `เปลี่ยนว่าใครเห็น ${name} แล้ว`, // REVIEW
+    },
     colorDialog: {
       title: (name) => `สีของ “${name}”`, // REVIEW
       label: "สีโฟลเดอร์", // REVIEW
@@ -286,8 +302,8 @@ export const th: Strings = {
     list: "สมาชิก",
     loading: "กำลังโหลดสมาชิก…",
     you: "คุณ",
-    roles: { owner: "เจ้าของ", editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
-    roleHints: { owner: "จัดการสมาชิกและลิงก์เชิญ", editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" },
+    roles: { owner: "เจ้าของ", manager: "ผู้จัดการ" /* REVIEW */, editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
+    roleHints: { owner: "จัดการสมาชิก ลิงก์เชิญ และทีม เห็นทุกหน้า" /* REVIEW */, manager: "แก้ไขหน้า จัดการทีมและเลือกว่าใครเห็นโฟลเดอร์ใด" /* REVIEW */, editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" },
     roleOf: (name) => `บทบาทของ ${name}`,
     remove: "นำออก",
     removeLabel: (name) => `นำ ${name} ออกจากเวิร์กสเปซ`,
@@ -330,6 +346,23 @@ export const th: Strings = {
     inviteFailed: (detail) => `สร้างลิงก์เชิญไม่ได้: ${detail}`,
     linksFailed: (detail) => `โหลดลิงก์เชิญไม่ได้: ${detail}`,
     revokeFailed: (detail) => `เพิกถอนลิงก์เชิญไม่ได้: ${detail}`,
+    teams: "ทีม", // REVIEW
+    teamsIntro: "เจ้าของและผู้จัดการจำกัดโฟลเดอร์ให้บางทีมเห็นได้ เจ้าของเห็นทุกอย่าง", // REVIEW
+    noTeams: "ยังไม่มีทีม", // REVIEW
+    loadingTeams: "กำลังโหลดทีม…", // REVIEW
+    newTeam: "ชื่อทีมใหม่", // REVIEW
+    createTeam: "สร้างทีม", // REVIEW
+    teamName: (name) => `ชื่อของ ${name}`, // REVIEW
+    renameTeam: "เปลี่ยนชื่อ", // REVIEW
+    deleteTeam: "ลบ", // REVIEW
+    deleteTeamLabel: (name) => `ลบทีม ${name}`, // REVIEW
+    teamMember: (person, team) => `${person} ใน ${team}`, // REVIEW
+    teamMembers: (n) => `สมาชิก ${count(n)} คน`, // REVIEW
+    teamCreated: (name) => `สร้างทีม ${name} แล้ว`, // REVIEW
+    teamRenamed: (name) => `เปลี่ยนชื่อทีมเป็น ${name} แล้ว`, // REVIEW
+    teamDeleted: (name) => `ลบทีม ${name} แล้ว โฟลเดอร์ที่จำกัดไว้ให้ทีมนี้เท่านั้นตอนนี้เห็นได้เฉพาะเจ้าของ`, // REVIEW
+    teamChanged: (name) => `เปลี่ยนสมาชิกของ ${name} แล้ว`, // REVIEW
+    teamsFailed: (detail) => `เปลี่ยนทีมไม่ได้: ${detail}`, // REVIEW
     done: "เสร็จ",
   },
 
@@ -689,7 +722,7 @@ export const th: Strings = {
     whoCanSee: "ใครเห็นได้บ้าง",
     visibleTo: (n) => (n === 1 ? "มีแค่คุณ ซึ่งเป็นสมาชิกคนเดียวของเวิร์กสเปซนี้" : `ทุกคนในเวิร์กสเปซนี้ (สมาชิก ${count(n)} คน) จะเห็นหน้าเหล่านี้`),
     membersHidden: (n) => `สมาชิก ${count(n)} คนจะเห็นหน้าเหล่านี้ เซิร์ฟเวอร์นี้ไม่แสดงรายชื่อ`,
-    roles: { owner: "เจ้าของ", editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
+    roles: { owner: "เจ้าของ", manager: "ผู้จัดการ" /* REVIEW */, editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
     you: (role) => `บทบาทของคุณ: ${role}`,
     pagesHeading: "หน้า",
     attachmentsHeading: (n) => `จะอัปโหลดไฟล์แนบ ${count(n)} ไฟล์`,

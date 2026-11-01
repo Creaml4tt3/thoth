@@ -11,6 +11,7 @@ import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemS
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
+import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -66,6 +67,11 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "InviteLinkList", file: "invite-link-list.v1", schema: InviteLinkListSchema },
   { name: "InviteAcceptRequest", file: "invite-accept-request.v1", schema: InviteAcceptRequestSchema },
   { name: "InviteAccepted", file: "invite-accepted.v1", schema: InviteAcceptedSchema },
+  { name: "Team", file: "team.v1", schema: TeamSchema },
+  { name: "TeamList", file: "team-list.v1", schema: TeamListSchema },
+  { name: "TeamWrite", file: "team-write.v1", schema: TeamWriteSchema },
+  { name: "PageVisibility", file: "page-visibility.v1", schema: PageVisibilitySchema },
+  { name: "PageVisibilityWrite", file: "page-visibility-write.v1", schema: PageVisibilityWriteSchema },
   { name: "WorkspaceCreateRequest", file: "workspace-create-request.v1", schema: WorkspaceCreateRequestSchema },
   { name: "WorkspaceRename", file: "workspace-rename.v1", schema: WorkspaceRenameSchema },
   { name: "DeletedWorkspace", file: "deleted-workspace.v1", schema: DeletedWorkspaceSchema },

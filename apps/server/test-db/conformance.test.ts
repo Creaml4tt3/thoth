@@ -27,8 +27,8 @@ describe("conformance suite against the reference server (real PostgreSQL)", () 
     expect(report.results.length).toBeGreaterThanOrEqual(35);
   });
 
-  it("lists exactly the ten capabilities the server implements", () => {
-    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"]);
+  it("lists exactly the capabilities the server implements", () => {
+    expect(report.capabilities).toEqual(["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams"]);
     expect(report.groups.map((g) => g.capability)).toEqual(["core", "attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"]);
   });
 
