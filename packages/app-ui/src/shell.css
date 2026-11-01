@@ -33,8 +33,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .fav-row { position: relative; }
 .fav-item { padding-left: 24px; min-height: 28px; }
 .fav-item[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
-.fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-faint); }
-.fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-faint); }
+.fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-tertiary); }
+.fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 [data-fav-dragging] .fav-row:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
 .fav-row[data-dragging] { z-index: 2; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); }
 [data-fav-dragging], [data-fav-dragging] .fav-item { cursor: grabbing; }
@@ -378,7 +378,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-row:hover { background: var(--thoth-bg-hover); }
 .home-row:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .home-row .tree-icon { color: var(--thoth-ink-tertiary); }
-.home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-faint); }
+.home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-tertiary); }
 .home-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { flex: none; display: flex; align-items: center; gap: 8px; max-width: 50%; min-width: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
