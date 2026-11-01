@@ -239,7 +239,7 @@ test("@ links a folder (ADR-0043): the chip shows the folder in the sidebar; no 
   await page.keyboard.type(" mail@proj");
   await expect(menu).toBeHidden();
   await page.keyboard.type(" @proj");
-  await expect(menu.getByRole("option", { name: /Projects/ })).toBeVisible();
+  await expect(menu.getByRole("option", { name: "Projects Folder" })).toBeVisible();
   await expect(box).toHaveAttribute("aria-activedescendant", /.+/);
   await page.keyboard.press("Enter");
   await expect(menu).toBeHidden();
