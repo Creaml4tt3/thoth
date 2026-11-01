@@ -8,6 +8,19 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Teams in workspaces: group members into teams, and limit a folder or page to some teams with "Visible to…". Pages inside a limited folder are limited too. Members in none of those teams cannot see them, search them or open their share links.
+- A new role, Manager. Managers edit pages, manage teams, members and invite links, and see every page. Only an Owner can make someone an Owner, change or remove an Owner, or rename or delete the workspace.
+- A Trash for workspace pages ("Trash…" in the workspace menu). Deleted pages and folders stay 30 days. Owners and Managers can restore anything or delete it for good; Editors can restore what they deleted.
+
+### Changed
+
+- "Delete team" now asks first and lists the folders that only that team could see.
+- Servers now remove deleted workspace pages 30 days after they are deleted. Pages deleted before this version get 30 days from the upgrade.
+
 ## [0.3.1] - 2026-11-01
 
 ### Added
