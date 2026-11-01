@@ -8,7 +8,7 @@ import { Extension, InputRule, textblockTypeInputRule, wrappingInputRule, type A
 import { history, redo, undo } from "@tiptap/pm/history";
 import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
-import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
+import { calloutView, embedView, inlineRawView, mentionView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
 import { imageView } from "./image-views.ts";
 import { imageInsertExtension } from "./image-insert.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
@@ -73,6 +73,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     raw: preservedView(ctx),
     inlineRaw: inlineRawView(ctx),
     wikilink: wikilinkView(ctx),
+    mention: mentionView(ctx),
     embed: embedView(ctx),
     taskItem: taskItemView(ctx),
     image: imageView(ctx, false),

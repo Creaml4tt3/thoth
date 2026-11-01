@@ -16,6 +16,7 @@ import { RenameInput } from "../order/RenameInput.tsx";
 import { TreeGroup } from "../order/TreeGroup.tsx";
 import { focusTreeItemSoon, treeKeyDown } from "../order/tree-keys.ts";
 import { useStrings } from "../strings/index.ts";
+import { requestShowSidebar } from "../ui/sidebar-hidden.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { tipIfClipped } from "../ui/Tooltip.tsx";
 import type { OpenOptions } from "../tabs/model.ts";
@@ -30,6 +31,16 @@ import { MembersDialog } from "./MembersDialog.tsx";
 import { clearMembers, usePendingMembers } from "./members-request.ts";
 import { ConfirmByNameDialog } from "./ConfirmByNameDialog.tsx";
 import { announceWorkspaces, clearWorkspaceAdmin, usePendingWorkspaceAdmin } from "./workspace-admin-request.ts";
+
+/**
+ * "Show this page or folder in the sidebar" (a `[[thoth:page/<id>]]` folder link, ADR-0043): the section of that
+ * workspace expands it and the folders above it, then moves focus to its row.
+ */
+const revealListeners = new Set<(ref: WorkspacePageRef) => void>();
+export function requestRevealWorkspacePage(ref: WorkspacePageRef): void {
+  requestShowSidebar();
+  for (const listener of [...revealListeners]) listener(ref);
+}
 
 /** The drop target for "no parent": the workspace row itself. */
 const TOP = "\u0000top";
@@ -293,6 +304,19 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     if (up.length === 0) return;
     setOpen((prev) => (up.every((id) => prev.has(id)) ? prev : new Set([...prev, ...up])));
   }, [here, tree]);
+
+  useEffect(() => {
+    const listener = (ref: WorkspacePageRef) => {
+      if (ref.server !== server || ref.workspace !== workspace.id) return;
+      directory.expand(server, workspace.id);
+      const up = workspaceAncestors(directory.getState().trees[key]?.nodes ?? [], ref.page);
+      setOpen((prev) => new Set([...prev, ...up, ref.page]));
+      // The row exists once the tree has rendered with it open.
+      setTimeout(() => focusTreeItemSoon(ref.page), 30);
+    };
+    revealListeners.add(listener);
+    return () => void revealListeners.delete(listener);
+  }, [directory, server, workspace.id, key]);
 
   const toggle = (id: string, force?: boolean) =>
     setOpen((prev) => {

@@ -1,4 +1,4 @@
-import { basename, collisionKey, extname, isMarkdownPath, resolveRelative, stripExtension } from "@thoth/domain";
+import { basename, collisionKey, dirname, extname, isMarkdownPath, resolveRelative, stripExtension } from "@thoth/domain";
 import type { ParsedReference } from "./schema.ts";
 
 export interface ResolvablePage {
@@ -20,19 +20,26 @@ export type Resolution =
  * relative to the linking file, then vault-root path. Multiple candidates are
  * reported as ambiguous and never guessed; matching is case-insensitive only
  * when the case-insensitive match is unique.
+ *
+ * A wikilink whose target ends in `/` names a folder (ADR-0043): `[[Projects/2026/]]`. It resolves to the folder's
+ * path with a trailing `/`, by exact path, then relative to the linking file, then a unique path suffix. Folders are
+ * the given ones plus every folder that holds a file.
  */
 export class LinkResolver {
   private readonly exact = new Map<string, string>();
   private readonly folded = new Map<string, string[]>();
   private readonly byBasename = new Map<string, string[]>();
   private readonly byAlias = new Map<string, string[]>();
+  private readonly folders = new Map<string, string>();
 
-  constructor(files: readonly string[], pages: readonly ResolvablePage[] = []) {
+  constructor(files: readonly string[], pages: readonly ResolvablePage[] = [], folders: readonly string[] = []) {
     for (const path of files) this.addFile(path);
     for (const page of pages) {
       if (!this.exact.has(page.path)) this.addFile(page.path);
       for (const alias of page.aliases) push(this.byAlias, collisionKey(alias), page.path);
     }
+    for (const folder of folders) this.folders.set(folder, folder);
+    for (const path of this.exact.keys()) for (let d = dirname(path); d !== ""; d = dirname(d)) this.folders.set(d, d);
   }
 
   private addFile(path: string): void {
@@ -67,7 +74,23 @@ export class LinkResolver {
     return this.lookup(path) ?? (extname(path) === "" ? this.lookup(`${path}.md`) : undefined);
   }
 
+  private resolveFolder(fromPath: string, target: string): Resolution {
+    const clean = target.replace(/^\/+|\/+$/g, "").normalize("NFC");
+    if (clean === "") return { state: "unresolved" };
+    const exact = this.folders.get(clean) ?? this.folders.get(resolveRelative(fromPath, clean) ?? "");
+    if (exact) return { state: "resolved", path: `${exact}/` };
+    const key = collisionKey(clean);
+    const matches = [...this.folders.keys()].filter((f) => {
+      const k = collisionKey(f);
+      return k === key || k.endsWith(`/${key}`);
+    });
+    if (matches.length === 1) return { state: "resolved", path: `${matches[0]!}/` };
+    if (matches.length > 1) return { state: "ambiguous", candidates: matches.map((m) => `${m}/`).sort() };
+    return { state: "unresolved" };
+  }
+
   private resolveWikilink(fromPath: string, target: string): Resolution {
+    if (target.endsWith("/")) return this.resolveFolder(fromPath, target);
     const clean = target.replace(/^\/+/, "");
     const direct = this.lookupPage(clean) ?? this.lookupPage(resolveRelative(fromPath, clean));
     if (direct) return direct;

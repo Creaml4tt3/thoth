@@ -50,6 +50,8 @@ export const TableAttrsSchema = z.object({
 });
 export const ImageAttrsSchema = z.object({ src: str, alt: str, title: optStr });
 export const WikiAttrsSchema = z.object({ target: str, fragment: optStr, label: optStr });
+/** A person mention (ADR-0043): an opaque user ID and the display name it was written with. */
+export const MentionAttrsSchema = z.object({ id: str, label: str });
 export const SourceOnlyAttrsSchema = z.object({ source: str });
 export const LinkMarkAttrsSchema = z.object({ href: str, title: optStr });
 

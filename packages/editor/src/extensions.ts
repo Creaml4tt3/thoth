@@ -244,6 +244,17 @@ const Wikilink = Node.create({
   renderHTML: ({ node }) => ["span", { "data-wikilink": node.attrs["target"] as string }, (node.attrs["label"] ?? node.attrs["target"]) as string],
 });
 
+/** `[@Name](thoth:user/<id>)` (ADR-0043): a person mention, an atom like a wikilink. */
+const Mention = Node.create({
+  name: "mention",
+  group: "inline cellInline",
+  inline: true,
+  atom: true,
+  addAttributes: () => ({ id: attr(""), label: attr("") }),
+  parseHTML: () => [{ tag: "span[data-mention]" }],
+  renderHTML: ({ node }) => ["span", { "data-mention": node.attrs["id"] as string }, `@${node.attrs["label"] as string}`],
+});
+
 const InlineImage = Node.create({
   name: "inlineImage",
   group: "inline cellInline",
@@ -305,7 +316,7 @@ export function thothExtensions(): AnyExtension[] {
     Doc, Text, Paragraph, Heading, List, ListItem, TaskList, TaskItem, Blockquote, Callout, CalloutTitle, Code,
     Table, TableRow, TableCell, TableHeader, ThematicBreak, Image, Embed,
     rawBlock("html"), rawBlock("math"), rawBlock("raw"),
-    HardBreak, Wikilink, InlineImage, InlineRaw,
+    HardBreak, Wikilink, Mention, InlineImage, InlineRaw,
     simpleMark("bold", "strong"), simpleMark("italic", "em"), simpleMark("strike", "s"), simpleMark("inlineCode", "code"),
     Link, Highlight, Underline, TextColor, SourceAttrs,
   ];

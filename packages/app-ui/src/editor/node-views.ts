@@ -5,6 +5,7 @@
 import type { NodeViewRenderer } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { EditorContext } from "./context.ts";
+import type { LinkTarget } from "./links.ts";
 import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
 import { linkHint, pageLinkOpens } from "./link-open.ts";
 
@@ -123,7 +124,30 @@ export function setLinkTip(dom: HTMLElement, text: string, hint: string | null):
   else dom.removeAttribute("data-tip-detail");
 }
 
-/** `[[Target]]` as a chip. Clicking (or Enter on it) opens the resolved page. */
+/**
+ * Paints a link chip (both editor modes): its text, state, kind and tooltip. A folder link (ADR-0043) is a folder chip;
+ * a workspace link shows the page's current title when it was written without a label.
+ */
+export function paintLinkChip(chip: HTMLElement, ctx: EditorContext, target: string, shown: string | null, result: LinkTarget): void {
+  const t = ctx.strings;
+  const folder = result.state === "resolved" ? result.folder === true : target.endsWith("/");
+  chip.textContent = shown ?? (result.state === "resolved" && result.title !== undefined ? result.title : target);
+  chip.dataset["state"] = result.state;
+  chip.dataset["target"] = result.state === "resolved" ? result.path : "";
+  if (folder) chip.dataset["kind"] = "folder";
+  else delete chip.dataset["kind"];
+  const where = result.state === "resolved" ? (result.title ?? result.path) : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : folder ? t.linkUnresolvedFolder(target) : t.linkUnresolved(target);
+  setLinkTip(chip, where, result.state !== "resolved" ? null : folder ? t.linkOpenFolder : linkHint(t, "page"));
+}
+
+/** Follows a resolved link: a page opens (a new tab or window by the click, 0.2.7); a folder is shown in the sidebar (ADR-0043). */
+export function followLink(ctx: EditorContext, result: LinkTarget, event: Event): void {
+  if (result.state !== "resolved") return;
+  if (result.folder) ctx.openFolder?.(result.path.slice(0, -1));
+  else ctx.openPage(result.path, event instanceof MouseEvent ? pageLinkOpens(event) : undefined);
+}
+
+/** `[[Target]]` as a chip. Clicking (or Enter on it) opens the resolved page, or shows the folder. */
 export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: initial }) => {
   let node = initial;
   const dom = el("a", "wikilink");
@@ -133,18 +157,15 @@ export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: i
   const paint = (): void => {
     const target = node.attrs["target"] as string;
     const result = ctx.lookup().resolve(target);
-    dom.textContent = labelOf(target, node.attrs["label"] as string | null, node.attrs["fragment"] as string | null);
-    dom.dataset["state"] = result.state;
-    dom.dataset["target"] = result.state === "resolved" ? result.path : "";
-    const t = ctx.strings;
-    setLinkTip(dom, result.state === "resolved" ? result.path : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : t.linkUnresolved(target), result.state === "resolved" ? linkHint(t, "page") : null);
-    dom.setAttribute("aria-label", `${dom.textContent} (${t.linkState[result.state]})`);
+    const label = node.attrs["label"] as string | null;
+    const fragment = node.attrs["fragment"] as string | null;
+    paintLinkChip(dom, ctx, target, label !== null || fragment ? labelOf(target, label, fragment) : null, result);
+    dom.setAttribute("aria-label", `${dom.textContent} (${ctx.strings.linkState[result.state]})`);
   };
   const open = (event: Event): void => {
     event.preventDefault();
     event.stopPropagation();
-    const result = ctx.lookup().resolve(node.attrs["target"] as string);
-    if (result.state === "resolved") ctx.openPage(result.path, event instanceof MouseEvent ? pageLinkOpens(event) : undefined);
+    followLink(ctx, ctx.lookup().resolve(node.attrs["target"] as string), event);
   };
   dom.addEventListener("click", open);
   dom.addEventListener("auxclick", (event) => event.button === 1 && open(event));
@@ -167,6 +188,14 @@ export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: i
     stopEvent: (event) => event.type === "click" || event.type === "auxclick" || event.type === "mousedown",
     destroy: () => void ctx.views.delete(handle),
   };
+};
+
+/** `[@Name](thoth:user/<id>)` as a chip (ADR-0043): the name only; nothing opens and nothing is looked up. */
+export const mentionView = (ctx: EditorContext): NodeViewRenderer => ({ node }) => {
+  const dom = el("span", "mention", `@${node.attrs["label"] as string}`);
+  dom.setAttribute("contenteditable", "false");
+  dom.setAttribute("aria-label", ctx.strings.mention(node.attrs["label"] as string));
+  return { dom };
 };
 
 /** `![[Target]]` on its own line: shown as a chip; embedding is not rendered in v1. */

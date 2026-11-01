@@ -2,6 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import {
   ImageAttrsSchema,
   LinkMarkAttrsSchema,
+  MentionAttrsSchema,
   SourceOnlyAttrsSchema,
   TextColorMarkAttrsSchema,
   WikiAttrsSchema,
@@ -110,6 +111,17 @@ function wikiText(attrs: ReturnType<typeof readWiki>, embed: boolean, cell: bool
 const readWiki = (n: JSONContent) => readAttrs(WikiAttrsSchema, n);
 export const wikilinkText = (n: JSONContent, embed: boolean, cell: boolean) => wikiText(readWiki(n), embed, cell);
 
+/** A person mention's link prefix (ADR-0043): `[@Name](thoth:user/<id>)`. */
+export const USER_LINK_PREFIX = "thoth:user/";
+/** IDs are opaque and URL-unreserved (the protocol's `OpaqueId`), so they need no escaping in a link destination. */
+export const USER_ID = /^[A-Za-z0-9_.~-]{1,128}$/;
+
+/** `[@Name](thoth:user/<id>)`; reads as "@Name" in any Markdown editor. */
+export function mentionText(id: string, label: string): string {
+  const name = escapeText(label, { blockEscapes: false, firstLineStart: false, flatten: true, urls: "off" });
+  return `[@${name}](${USER_LINK_PREFIX}${USER_ID.test(id) ? id : encodeURIComponent(id)})`;
+}
+
 const balanced = (s: string) => {
   let depth = 0;
   for (const c of s) {
@@ -150,6 +162,7 @@ const AUTOLINK = /^[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>\u0000-\u001f]*$/;
 function plainText(n: JSONContent): string {
   if (n.type === "text") return n.text ?? "";
   if (n.type === "wikilink") return wikilinkText(n, false, false);
+  if (n.type === "mention") return `@${readAttrs(MentionAttrsSchema, n).label}`;
   if (n.type === "inlineRaw") return readAttrs(SourceOnlyAttrsSchema, n).source;
   return "";
 }
@@ -166,6 +179,10 @@ function renderLeaf(node: JSONContent, o: InlineOptions, atStart: boolean, eq: E
       return "\\\n";
     case "wikilink":
       return wikilinkText(node, false, o.cell);
+    case "mention": {
+      const m = readAttrs(MentionAttrsSchema, node);
+      return mentionText(m.id, m.label);
+    }
     case "inlineImage":
       return imageText(node);
     case "inlineRaw":

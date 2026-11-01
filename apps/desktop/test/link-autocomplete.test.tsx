@@ -147,3 +147,54 @@ describe("[[ autocomplete in Plain mode", () => {
     expect(view.state.doc.toString()).toContain("First paragraph stays exactly. [[notes\n");
   });
 });
+
+describe("@ in both modes (ADR-0043)", () => {
+  const atMenu = () => screen.queryByRole("listbox", { name: "Link to a page or folder" });
+  const atOptions = () => within(atMenu()!).getAllByRole("option").map((o) => o.querySelector(".link-option-title")!.textContent);
+
+  it("Blocks: lists pages and folders, inserts a folder chip and saves [[Folder/]]; the listbox pattern holds", async () => {
+    const { app, box } = await openAlpha();
+    box.focus();
+    caretAtEnd(paragraph(box, "First paragraph stays exactly."));
+    typeBlocks(box, " @proj");
+    await waitFor(() => expect(atOptions()).toEqual(["Projects", "Roadmap"]));
+    expect(within(atMenu()!).getAllByRole("option")[0]!.textContent).toContain("Folder");
+    // The editor points at the open listbox and its highlighted option.
+    expect(box.getAttribute("aria-controls")).toBe(atMenu()!.id);
+    expect(box.getAttribute("aria-activedescendant")).toBe(within(atMenu()!).getAllByRole("option")[0]!.id);
+    await app.user.keyboard("{Enter}");
+    await waitFor(() => expect(atMenu()?.hidden ?? true).toBe(true));
+    expect(box.querySelector('.wikilink[data-kind="folder"][data-target="Projects/"]')).not.toBeNull();
+    await app.user.keyboard("{Meta>}s{/Meta}");
+    await waitFor(async () => expect(await app.read("Alpha.md")).toBe(ALPHA.replace("First paragraph stays exactly.", "First paragraph stays exactly. [[Projects/]]")));
+  });
+
+  it("Blocks: no menu inside an email address; Escape closes; a space with no match closes", async () => {
+    const { app, box } = await openAlpha();
+    box.focus();
+    caretAtEnd(paragraph(box, "First paragraph stays exactly."));
+    typeBlocks(box, " mail@beta");
+    expect(atMenu()?.hidden ?? true).toBe(true);
+    typeBlocks(box, " @be");
+    await waitFor(() => expect(atOptions()).toEqual(["Beta"]));
+    await app.user.keyboard("{Escape}");
+    await waitFor(() => expect(atMenu()?.hidden ?? true).toBe(true));
+    typeBlocks(box, " @zz");
+    await waitFor(() => expect(atMenu()?.hidden).toBe(false));
+    typeBlocks(box, " q");
+    await waitFor(() => expect(atMenu()?.hidden ?? true).toBe(true));
+  });
+
+  it("Plain: picks a page with Tab and writes [[Name]]", async () => {
+    setDefaultEditorMode("plain");
+    const { app, box } = await openAlpha();
+    const view = CodeMirrorView.findFromDOM(box.closest(".cm-editor") as HTMLElement)!;
+    view.focus();
+    const end = view.state.doc.toString().indexOf("First paragraph stays exactly.") + "First paragraph stays exactly.".length;
+    view.dispatch({ selection: { anchor: end } });
+    for (const ch of " @roa") view.dispatch(view.state.replaceSelection(ch), { userEvent: "input.type" });
+    await waitFor(() => expect(atOptions()).toEqual(["Roadmap"]));
+    await app.user.keyboard("{Tab}");
+    expect(view.state.doc.toString()).toContain("First paragraph stays exactly. [[Roadmap]]\n");
+  });
+});

@@ -5,7 +5,7 @@
  * 1. Create a note offline → edit → edit externally → conflict prompt → keep both.
  * 2. Import wizard: Obsidian ZIP happy path, then cancel and resume.
  * 3. Plain mode: real keystrokes, mode switching, exact bytes.
- * 4. `[[` autocomplete in both modes.
+ * 4. `[[` autocomplete in both modes, and `@` to a folder.
  * 5. Blocks mode: `/` menu, toggle and to-do, drag with the handle, fold, exact bytes on disk.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -223,6 +223,33 @@ test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => 
   await page.keyboard.press("ControlOrMeta+s");
 
   await expect.poll(() => readFile(join(vault, "Linking.md"), "utf8")).toBe("# Linking\n\nBlocks: [[Roadmap]]\n\nPlain: [[Roadmap]]\n");
+});
+
+test("@ links a folder (ADR-0043): the chip shows the folder in the sidebar; no menu inside an email address", async ({ page }) => {
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await mkdir(join(vault, "Projects"));
+  await writeFile(join(vault, "Projects/Roadmap.md"), "# Roadmap\n");
+  await writeFile(join(vault, "Mention.md"), "# Mention\n\nSee:\n");
+  await page.getByRole("treeitem", { name: "Mention" }).click({ timeout: 15_000 });
+  const box = await editor(page);
+  const menu = page.getByRole("listbox", { name: "Link to a page or folder" });
+
+  await box.getByText("See:").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" mail@proj");
+  await expect(menu).toBeHidden();
+  await page.keyboard.type(" @proj");
+  await expect(menu.getByRole("option", { name: /Projects/ })).toBeVisible();
+  await expect(box).toHaveAttribute("aria-activedescendant", /.+/);
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  const chip = box.locator('.wikilink[data-kind="folder"][data-target="Projects/"]');
+  await expect(chip).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Mention.md"), "utf8")).toBe("# Mention\n\nSee: mail@proj [[Projects/]]\n");
+
+  await chip.click();
+  await expect(page.locator('.private-tree [data-tree-id="Projects"]')).toBeFocused();
 });
 
 test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact bytes on disk", async ({ page }) => {

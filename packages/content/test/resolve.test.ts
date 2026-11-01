@@ -53,3 +53,28 @@ describe("LinkResolver", () => {
     });
   });
 });
+
+describe("folder links (ADR-0043)", () => {
+  const r = new LinkResolver(["Projects/2026/Plan.md", "Archive/2026/Old.md", "Inbox/Welcome.md"], [], ["Empty", "Projects/2026/Drafts"]);
+  const folder = (target: string, from = "Inbox/Welcome.md") => r.resolve(from, { syntax: "wikilink", target, external: false });
+
+  it("resolves a trailing-slash target to the folder, by path, relative path or unique suffix", () => {
+    expect(folder("Projects/2026/")).toEqual({ state: "resolved", path: "Projects/2026/" });
+    expect(folder("projects/")).toEqual({ state: "resolved", path: "Projects/" });
+    expect(folder("Drafts/")).toEqual({ state: "resolved", path: "Projects/2026/Drafts/" });
+    expect(folder("Empty/")).toEqual({ state: "resolved", path: "Empty/" }); // a folder with no files
+    expect(folder("2026/Drafts/", "Projects/x.md")).toEqual({ state: "resolved", path: "Projects/2026/Drafts/" });
+  });
+
+  it("reports a shared folder name as ambiguous and a missing one as unresolved", () => {
+    expect(folder("2026/")).toEqual({ state: "ambiguous", candidates: ["Archive/2026/", "Projects/2026/"] });
+    expect(folder("Nowhere/")).toEqual({ state: "unresolved" });
+    expect(folder("/")).toEqual({ state: "unresolved" });
+  });
+
+  it("never mixes a page and a folder of the same name", () => {
+    const both = new LinkResolver(["Plan.md", "Plan/Step.md"]);
+    expect(both.resolve("x.md", { syntax: "wikilink", target: "Plan", external: false })).toEqual({ state: "resolved", path: "Plan.md" });
+    expect(both.resolve("x.md", { syntax: "wikilink", target: "Plan/", external: false })).toEqual({ state: "resolved", path: "Plan/" });
+  });
+});

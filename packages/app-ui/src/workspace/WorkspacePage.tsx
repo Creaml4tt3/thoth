@@ -6,13 +6,16 @@ import { Notice } from "../ui/Notice.tsx";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { workspacePageStore } from "./workspace-store.ts";
 import { workspacePageMedia } from "./workspace-media.ts";
+import { workspaceLinkLookup, workspaceLinkSuggester } from "./workspace-links.ts";
+import { requestRevealWorkspacePage } from "./WorkspaceTree.tsx";
+import type { OpenOptions } from "../tabs/model.ts";
 
 export interface WorkspacePageProps {
   directory: ServerDirectory;
   target: WorkspacePageRef;
   /** Remembers the editor mode per server: usually the server's address. */
   modeSpace: string;
-  openPage(ref: WorkspacePageRef): void;
+  openPage(ref: WorkspacePageRef, options?: OpenOptions): void;
   /** Shown instead of the page when the server is signed out before the page ever loaded. */
   signedOutNotice: ReactNode;
   /** Shown under a save error while signed out (for example a Sign in button). */
@@ -29,9 +32,9 @@ export interface WorkspacePageProps {
 
 /**
  * A page of a workspace on a server, in the same Blocks/Plain editor as a
- * Private Space page. Wikilinks and backlinks are not resolved across a
- * workspace yet (they come from the local index), so links show unresolved and
- * there is no backlinks panel.
+ * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, ADR-0043) and resolve against
+ * the workspace's tree; `[[` and `@` offer its pages and folders, and `@` its members. Path and title links do not
+ * resolve here, and there is no backlinks panel.
  */
 export function WorkspacePage({ directory, target, modeSpace, openPage, signedOutNotice, signedOutAction, goneNotice, onConflict, onSaved, onOpened, actions }: WorkspacePageProps) {
   const t = useStrings().workspace;
@@ -59,6 +62,16 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   // Images (ADR-0028): attachments through the authorised download; editors upload new ones.
   const media = useMemo(() => workspacePageMedia(directory.client(target.server), target.workspace, { canWrite: role !== undefined && role !== "viewer" }), [directory, target.server, target.workspace, role]);
   const onWritten = useCallback(() => undefined, []);
+  // Links resolve against the tree this client already holds; the editor re-reads them whenever the tree changes.
+  const nodes = tree?.nodes;
+  const kinds = tree?.kinds;
+  const members = workspace?.members ?? null;
+  const loadLinks = useCallback(async () => {
+    const source = { nodes: nodes ?? [], isFolder: (id: string) => kinds?.[id]?.folder === true, page: target.page, members };
+    return { lookup: workspaceLinkLookup(source), suggester: workspaceLinkSuggester(source) };
+  }, [nodes, kinds, members, target.page]);
+  const openLink = useCallback((page: string, options?: OpenOptions) => openPage({ ...target, page }, options), [openPage, target]);
+  const openFolder = useCallback((page: string) => requestRevealWorkspacePage({ ...target, page }), [target]);
   const openCopy = useCallback((page: string) => openPage({ ...target, page }), [openPage, target]);
 
   const opened = useRef(onOpened);
@@ -87,9 +100,10 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
       crumbs={{ badge: <span className="badge badge-workspace">{t.badge(name)}</span>, parts: [title] }}
       checkTick={tree?.ticks[target.page] ?? 0}
       onWritten={onWritten}
-      loadLinks={null}
+      loadLinks={loadLinks}
       linkTick={0}
-      openLink={() => undefined}
+      openLink={openLink}
+      openFolder={openFolder}
       openCopy={openCopy}
       readOnlyNote={t.readOnly(name)}
       missing={{ title: t.missingTitle, detail: t.missingDetail }}

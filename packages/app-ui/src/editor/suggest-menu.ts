@@ -25,8 +25,8 @@ export interface SuggestMenuOptions<T> {
 }
 
 export interface SuggestMenu<T> {
-  /** Shows `items` at `rect` (viewport coordinates of the caret); hides when `rect` is null. */
-  show(items: T[], query: string, rect: DOMRect | null): void;
+  /** Shows `items` at `rect` (viewport coordinates of the caret); hides when `rect` is null. `label` renames the listbox. */
+  show(items: T[], query: string, rect: DOMRect | null, label?: string): void;
   move(delta: 1 | -1): void;
   /** The highlighted item, or null when the menu is empty. */
   selected(): T | null;
@@ -71,8 +71,9 @@ export function createSuggestMenu<T>(owner: HTMLElement, o: SuggestMenuOptions<T
   };
 
   return {
-    show(next, query, rect) {
+    show(next, query, rect, label) {
       if (!rect) return hide();
+      if (label) root.setAttribute("aria-label", label);
       items = next;
       active = Math.min(active, Math.max(0, items.length - 1));
       root.replaceChildren();

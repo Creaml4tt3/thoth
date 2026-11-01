@@ -5,8 +5,8 @@ import { buildLinkLookup, type LinkLookup } from "@thoth/app-ui/editor/links.ts"
 import { createLinkSuggester, type LinkSuggester } from "@thoth/app-ui/editor/link-suggest.ts";
 
 export async function loadLinkLookup(vault: Vault, path: string): Promise<{ lookup: LinkLookup; suggester: LinkSuggester }> {
-  const [outgoing, pages] = await Promise.all([vault.outgoingLinks(path).catch(() => []), vault.listPages()]);
-  return { lookup: buildLinkLookup(path, outgoing, pages), suggester: createLinkSuggester(path, pages) };
+  const [outgoing, pages, folders] = await Promise.all([vault.outgoingLinks(path).catch(() => []), vault.listPages(), vault.listFolders().catch(() => [])]);
+  return { lookup: buildLinkLookup(path, outgoing, pages, folders), suggester: createLinkSuggester(path, pages, folders) };
 }
 
 export function vaultPageStore(vault: Vault, path: string): PageStore {
