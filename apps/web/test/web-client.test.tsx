@@ -330,7 +330,7 @@ describe("English and Thai", () => {
     open(browser);
     const tree = await screen.findByRole("tree", { name: "เวิร์กสเปซ" });
     await browser.user.click(within(tree).getByRole("button", { name: "หน้าใหม่ใน งานของฉัน" }));
-    const box = await editorBox();
+    const box = await editorBox("เนื้อหาของหน้า"); // the editor's own name is Thai too
     expect(screen.getByRole("group", { name: "โหมดแก้ไข" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "บล็อก" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "ข้อความล้วน" })).toBeTruthy();

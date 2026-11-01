@@ -62,7 +62,7 @@ test.afterEach(async ({ page }) => {
 const row = (page: Page, name: string) => page.getByRole("tree", { name: "Pages in this Private Space" }).getByRole("treeitem", { name, exact: true });
 const current = (page: Page) => page.getByRole("tab", { selected: true });
 const axe = async (page: Page, ...include: string[]) => {
-  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]);
+  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]);
   for (const selector of include) builder = builder.include(selector);
   const bad = (await builder.analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   return bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
@@ -152,6 +152,25 @@ for (const scheme of ["light", "dark"] as const) {
     await page.keyboard.press("ControlOrMeta+End");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Written before leaving.");
+
+    // The whole window with a page open and the `/` menu showing (crumbs, editor, menus, sidebar): no scope, so shared
+    // styles are checked too, not only the features that have their own check.
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/");
+    await expect(page.getByRole("listbox", { name: "Insert block" })).toBeVisible();
+    await settled(page);
+    expect(await axe(page)).toEqual([]);
+    await page.screenshot({ path: join(SHOTS, `page-slash-menu-${scheme}.png`) });
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Backspace"); // the empty line the menu was opened on
+    await page.keyboard.press("Backspace");
+
+    // Reflow (WCAG 1.4.10): the smallest window (720px) zoomed to 200% is 360 CSS px. Nothing scrolls sideways.
+    await page.setViewportSize({ width: 360, height: 640 });
+    await settled(page);
+    expect(await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector(".page-col")!.scrollWidth <= document.querySelector(".page-scroll")!.clientWidth])).toEqual([360, true]);
+    await page.screenshot({ path: join(SHOTS, `reflow-360-${scheme}.png`) });
+    await page.setViewportSize({ width: 1200, height: 800 });
 
     // The logo's menu (0.2.6), All Private Spaces: the edit is written, and the picker lists this Private Space first.
     await page.locator("aside.sidebar").getByRole("button", { name: /^Thoth, Private Space/ }).click();

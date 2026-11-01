@@ -19,7 +19,8 @@ Hosts the platform ports for the webview (ADR-0008, option (a)). The React UI in
 - Commands: each contract command `a.b` in `packages/platform/src/ipc.ts` is the
   Tauri command `a_b`. Events are emitted as `vault:changed`.
 - Capabilities (`capabilities/main.json`): only Thoth's commands plus
-  `core:event:allow-listen`/`allow-unlisten`. No fs, shell, http or dialog
+  `core:event:allow-listen`/`allow-unlisten`, and `core:webview:allow-set-webview-zoom` for the
+  zoom keys (`zoomHotkeysEnabled`: Cmd/Ctrl + - = 0; on macOS and Linux Tauri's polyfill calls it). No fs, shell, http or dialog
   permissions are granted to the webview. Native dialogs are opened by the host
   (`vault.pick`, `source.pick`), so only user-chosen paths enter the allow-list.
 - `vault.reveal` shows an open vault's folder in Finder, File Explorer or the
