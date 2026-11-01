@@ -14,8 +14,9 @@ export interface WorkspaceAccess {
  *
  * - Not a member (or no such workspace, a deleted one (ADR-0025), or a malformed ID): 404 `not_found`, so existence is
  *   not leaked.
- * - A member whose role lacks `need`: 403 `forbidden`. `administer` is the owners' permission (ADR-0024: members and
- *   invite links); `manage` is owners' and managers' (ADR-0042: teams and page visibility).
+ * - A member whose role lacks `need`: 403 `forbidden`. `administer` is the owners' permission (owners themselves, and
+ *   renaming or deleting the workspace); `manage` is owners' and managers' (ADR-0042, ADR-0043: teams, page
+ *   visibility, the whole Trash, invite links and the members who are not owners).
  *
  * With `lock`, the workspace row is locked `FOR NO KEY UPDATE` for the rest of the transaction.
  * Every write takes that lock first, which serializes writers per workspace: change-feed sequence

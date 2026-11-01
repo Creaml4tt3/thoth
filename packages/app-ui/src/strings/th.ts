@@ -177,7 +177,7 @@ export const th: Strings = {
     visibleTo: "ใครเห็นได้…", // REVIEW
     visibility: {
       title: (name) => `ใครเห็น “${name}” ได้`, // REVIEW
-      intro: "เลือกว่าใครเห็นรายการนี้และทุกอย่างข้างในได้ เจ้าของเห็นทุกอย่างเสมอ", // REVIEW
+      intro: "เลือกว่าใครเห็นรายการนี้และทุกอย่างข้างในได้ เจ้าของและผู้จัดการเห็นทุกอย่างเสมอ", // REVIEW
       everyone: "ทุกคนในเวิร์กสเปซ", // REVIEW
       teams: "เฉพาะทีมเหล่านี้", // REVIEW
       noTeams: "ยังไม่มีทีม สร้างทีมได้ใน สมาชิก…", // REVIEW
@@ -236,6 +236,7 @@ export const th: Strings = {
       privateFolder: (pages, trash) => `โฟลเดอร์นี้และทุกอย่างข้างใน${pages > 0 ? ` รวมถึง ${count(pages)} หน้า` : ""} จะย้ายไปที่${trash} คุณนำกลับมาจากที่นั่นได้`, // REVIEW
       workspacePage: (others) => (others > 0 ? `หน้านี้และอีก ${count(others)} หน้าข้างในจะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้` : "หน้านี้จะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้"), // REVIEW
       workspaceFolder: (others) => (others > 0 ? `โฟลเดอร์นี้และอีก ${count(others)} หน้าข้างในจะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้` : "โฟลเดอร์นี้จะถูกลบสำหรับทุกคนในเวิร์กสเปซนี้"), // REVIEW
+      inTrash: "รายการนี้จะอยู่ในถังขยะของเวิร์กสเปซ 30 วัน", // REVIEW
       delete: "ลบ", // REVIEW
       deleting: "กำลังลบ…", // REVIEW
       cancel: "ยกเลิก",
@@ -293,6 +294,31 @@ export const th: Strings = {
     done: "เสร็จ",
   },
 
+  // REVIEW: the whole Trash block (ADR-0043).
+  trash: {
+    menuItem: "ถังขยะ…",
+    title: (workspace) => `ถังขยะของ “${workspace}”`,
+    introManage: "หน้าและโฟลเดอร์ที่ลบจะอยู่ที่นี่ 30 วัน แล้วจะหายไปถาวร คุณนำรายการใดกลับมาก็ได้ หรือลบถาวรเลยตอนนี้",
+    introEditor: "หน้าและโฟลเดอร์ที่คุณลบจะอยู่ที่นี่ 30 วัน แล้วจะหายไปถาวร นำกลับมาเพื่อให้อยู่ที่เดิม",
+    list: "หน้าที่ลบแล้ว",
+    loading: "กำลังโหลดถังขยะ…",
+    empty: "ถังขยะว่างเปล่า",
+    line: (folder, below, by, deleted, until) => `${folder ? "โฟลเดอร์" : "หน้า"}${below > 0 ? ` มี ${count(below)} หน้าข้างใน` : ""} · ลบเมื่อ ${deleted}${by ? ` โดย ${by}` : ""} · นำกลับได้ถึง ${until}`,
+    restore: "นำกลับ",
+    restoreLabel: (name) => `นำ ${name} กลับ`,
+    restored: (name) => `นำ ${name} กลับแล้ว`,
+    restoreFailed: (detail) => `นำกลับไม่ได้: ${detail}`,
+    purge: "ลบถาวร…",
+    purgeLabel: (name) => `ลบ ${name} ถาวร`,
+    purgeTitle: (name) => `ลบ ${name} ถาวรไหม`,
+    purgeBody: (below) => `${below > 0 ? `รายการนี้และ ${count(below)} หน้าข้างใน` : "รายการนี้"}จะหายไปถาวรพร้อมทุกเวอร์ชันก่อนหน้า ย้อนกลับไม่ได้`,
+    purgeConfirm: "ลบถาวร",
+    purged: (name) => `ลบ ${name} ถาวรแล้ว`,
+    purgeFailed: (detail) => `ลบไม่ได้: ${detail}`,
+    loadFailed: (detail) => `โหลดถังขยะไม่ได้: ${detail}`,
+    cancel: "ยกเลิก",
+    done: "เสร็จ",
+  },
   members: {
     menuItem: "สมาชิก…",
     button: (workspace) => `สมาชิกของ ${workspace}`,
@@ -303,7 +329,7 @@ export const th: Strings = {
     loading: "กำลังโหลดสมาชิก…",
     you: "คุณ",
     roles: { owner: "เจ้าของ", manager: "ผู้จัดการ" /* REVIEW */, editor: "ผู้แก้ไข", viewer: "ผู้ดู" },
-    roleHints: { owner: "จัดการสมาชิก ลิงก์เชิญ และทีม เห็นทุกหน้า" /* REVIEW */, manager: "แก้ไขหน้า จัดการทีมและเลือกว่าใครเห็นโฟลเดอร์ใด" /* REVIEW */, editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" },
+    roleHints: { owner: "ทำได้ทุกอย่างที่ผู้จัดการทำ และตั้งเจ้าของ เปลี่ยนชื่อหรือลบเวิร์กสเปซได้" /* REVIEW */, manager: "จัดการสมาชิก ลิงก์เชิญ ทีม และถังขยะ เห็นทุกหน้า" /* REVIEW */, editor: "อ่านและแก้ไขหน้า", viewer: "อ่านหน้า" },
     roleOf: (name) => `บทบาทของ ${name}`,
     remove: "นำออก",
     removeLabel: (name) => `นำ ${name} ออกจากเวิร์กสเปซ`,
@@ -312,7 +338,7 @@ export const th: Strings = {
     removeConfirm: "นำสมาชิกออก",
     leave: "ออกจากเวิร์กสเปซ",
     confirmLeave: (workspace) => `ออกจาก ${workspace} ไหม`,
-    confirmLeaveBody: "คุณจะเข้าถึงไม่ได้ทันที หากต้องการกลับมา เจ้าของต้องเชิญคุณใหม่",
+    confirmLeaveBody: "คุณจะเข้าถึงไม่ได้ทันที หากต้องการกลับมา เจ้าของหรือผู้จัดการต้องเชิญคุณใหม่", // REVIEW
     leaveConfirm: "ออก",
     cancel: "ยกเลิก",
     roleChanged: (name, role) => `ตอนนี้ ${name} เป็น${role}`,
@@ -320,7 +346,8 @@ export const th: Strings = {
     lastOwner: "เวิร์กสเปซต้องมีเจ้าของอย่างน้อยหนึ่งคน ให้คนอื่นเป็นเจ้าของก่อน",
     failed: (detail) => `เปลี่ยนสมาชิกไม่ได้: ${detail}`,
     loadFailed: (detail) => `โหลดสมาชิกไม่ได้: ${detail}`,
-    readOnlyNote: "เฉพาะเจ้าของเท่านั้นที่เปลี่ยนบทบาทและเชิญคนได้",
+    readOnlyNote: "เฉพาะเจ้าของและผู้จัดการเท่านั้นที่เปลี่ยนบทบาทและเชิญคนได้", // REVIEW
+    ownersNote: "เฉพาะเจ้าของเท่านั้นที่ตั้งใครเป็นเจ้าของ หรือเปลี่ยนบทบาทหรือนำเจ้าของออกได้", // REVIEW
     invite: "เชิญคน",
     inviteIntro: "ทุกคนที่มีลิงก์จะลงชื่อเข้าใช้และเข้าร่วมด้วยบทบาทที่คุณเลือกได้ จนกว่าลิงก์จะใช้ไม่ได้",
     inviteRole: "เข้าร่วมในฐานะ",
@@ -347,7 +374,7 @@ export const th: Strings = {
     linksFailed: (detail) => `โหลดลิงก์เชิญไม่ได้: ${detail}`,
     revokeFailed: (detail) => `เพิกถอนลิงก์เชิญไม่ได้: ${detail}`,
     teams: "ทีม", // REVIEW
-    teamsIntro: "เจ้าของและผู้จัดการจำกัดโฟลเดอร์ให้บางทีมเห็นได้ เจ้าของเห็นทุกอย่าง", // REVIEW
+    teamsIntro: "เจ้าของและผู้จัดการจำกัดโฟลเดอร์ให้บางทีมเห็นได้ เจ้าของและผู้จัดการเห็นทุกอย่าง", // REVIEW
     noTeams: "ยังไม่มีทีม", // REVIEW
     loadingTeams: "กำลังโหลดทีม…", // REVIEW
     newTeam: "ชื่อทีมใหม่", // REVIEW
@@ -360,7 +387,13 @@ export const th: Strings = {
     teamMembers: (n) => `สมาชิก ${count(n)} คน`, // REVIEW
     teamCreated: (name) => `สร้างทีม ${name} แล้ว`, // REVIEW
     teamRenamed: (name) => `เปลี่ยนชื่อทีมเป็น ${name} แล้ว`, // REVIEW
-    teamDeleted: (name) => `ลบทีม ${name} แล้ว โฟลเดอร์ที่จำกัดไว้ให้ทีมนี้เท่านั้นตอนนี้เห็นได้เฉพาะเจ้าของ`, // REVIEW
+    teamDeleted: (name) => `ลบทีม ${name} แล้ว โฟลเดอร์ที่จำกัดไว้ให้ทีมนี้เท่านั้นตอนนี้เห็นได้เฉพาะเจ้าของและผู้จัดการ`, // REVIEW
+    confirmDeleteTeam: (name) => `ลบทีม ${name} ไหม`, // REVIEW
+    deleteTeamChecking: "กำลังตรวจว่ามีโฟลเดอร์ใดจำกัดไว้ให้ทีมนี้…", // REVIEW
+    deleteTeamNothing: "ไม่มีโฟลเดอร์ใดจำกัดไว้ให้ทีมนี้ หน้าต่าง ๆ ยังอยู่ที่เดิม", // REVIEW
+    deleteTeamOnly: "รายการเหล่านี้จะเห็นได้เฉพาะเจ้าของและผู้จัดการ เพราะไม่มีทีมอื่นเห็น:", // REVIEW
+    deleteTeamShared: "รายการเหล่านี้ทีมอื่นของมันยังเห็นได้:", // REVIEW
+    deleteTeamConfirm: "ลบทีม", // REVIEW
     teamChanged: (name) => `เปลี่ยนสมาชิกของ ${name} แล้ว`, // REVIEW
     teamsFailed: (detail) => `เปลี่ยนทีมไม่ได้: ${detail}`, // REVIEW
     done: "เสร็จ",

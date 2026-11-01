@@ -20,6 +20,8 @@ export interface FakePage {
   position?: string | null;
   revisions: RevisionSummary[];
   deleted: boolean;
+  /** Who deleted it (capability `trash`, ADR-0043). */
+  deletedBy?: string;
   /** Markdown of each revision, in step with `revisions` (for `?revision=`). */
   history?: string[];
 }
@@ -333,6 +335,7 @@ export class FakeServers implements Servers {
     if (rest === "/name" && method === "PUT") return this.renameWorkspace(server, ws, text);
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
+    if (rest === "/trash" || rest.startsWith("/trash/")) return this.trash(server, ws, method, rest);
     if (rest === "/teams" || rest.startsWith("/teams/") || /^\/pages\/[^/]+\/visibility$/.test(rest)) return this.teams(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
       const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));
@@ -404,6 +407,7 @@ export class FakeServers implements Servers {
       if (!live) return fail("not_found");
       if (parseEtag(headers["if-match"]) !== live.revisions.at(-1)!.id) return this.conflict(live);
       live.deleted = true;
+      live.deletedBy = this.me(server).id;
       this.record(ws, "page.deleted", live, "usr_me");
       return { status: 204, headers: {}, body: "" };
     }
@@ -546,20 +550,22 @@ export class FakeServers implements Servers {
     const me = this.me(server).id;
     const owners = ws.members.filter((m) => m.role === "owner").length;
     if (method === "PUT") {
-      if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+      if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
       const parsed = MemberRoleChangeSchema.safeParse(JSON.parse(text));
       if (!parsed.success) return fail("validation_failed", parsed.error.message);
       const member = ws.members.find((m) => m.userId === userId);
       if (!member) return fail("not_found", "no such member");
+      if ((member.role === "owner" || parsed.data.role === "owner") && member.role !== parsed.data.role && ws.role !== "owner") return fail("forbidden", "only owners of this workspace may make, demote or remove an owner");
       if (member.role === "owner" && parsed.data.role !== "owner" && owners <= 1) return fail("last_owner", "a workspace keeps at least one owner: make another member an owner first");
       member.role = parsed.data.role;
       if (userId === me) ws.role = parsed.data.role;
       return json(200, member);
     }
     if (method === "DELETE") {
-      if (userId !== me && ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+      if (userId !== me && !roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
       const member = ws.members.find((m) => m.userId === userId);
       if (!member) return fail("not_found", "no such member");
+      if (userId !== me && member.role === "owner" && ws.role !== "owner") return fail("forbidden", "only owners of this workspace may make, demote or remove an owner");
       if (member.role === "owner" && owners <= 1) return fail("last_owner", "a workspace keeps at least one owner: make another member an owner first");
       ws.members = ws.members.filter((m) => m.userId !== userId);
       if (userId === me) ws.joined = false;
@@ -592,6 +598,11 @@ export class FakeServers implements Servers {
     }
     const team = ws.teams.find((t) => t.id === teamId);
     if (!team) return fail("not_found", "team not found");
+    if (rest.endsWith("/pages") && method === "GET") {
+      if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
+      const items = [...ws.visibility].filter(([id, teams]) => teams.includes(team.id) && ws.pages.get(id)?.deleted === false).map(([id, teams]) => ({ pageId: id, title: ws.pages.get(id)!.title, kind: this.kinded(ws) ? pageKindOf(ws.pages.get(id)!.markdown) : null, onlyTeam: teams.length === 1 }));
+      return json(200, { items });
+    }
     if (userId !== undefined) {
       team.memberIds = method === "PUT" ? [...new Set([...team.memberIds, userId])].sort() : team.memberIds.filter((id) => id !== userId);
       return json(200, team);
@@ -602,6 +613,34 @@ export class FakeServers implements Servers {
     }
     if (method === "DELETE") {
       ws.teams = ws.teams.filter((t) => t !== team);
+      return { status: 204, headers: {}, body: "" };
+    }
+    return fail("method_not_allowed");
+  }
+
+  /** The Trash (capability `trash`, ADR-0043), flat: every deleted page is an item; a restore brings back just that page. */
+  private trash(server: string, ws: FakeWorkspace, method: string, rest: string): ApiCallResult {
+    if (!this.capable(server, "trash")) return fail("capability_not_supported");
+    if (!roleCan(ws.role, "write")) return fail("forbidden", "role viewer may not write in this workspace");
+    const me = this.me(server).id;
+    const mine = (p: FakePage) => p.deleted && (roleCan(ws.role, "manage") || p.deletedBy === me);
+    if (rest === "/trash" && method === "GET") {
+      const at = iso(this.now());
+      const items = [...ws.pages.values()].filter(mine).map((p) => ({ pageId: p.id, title: p.title, kind: this.kinded(ws) ? pageKindOf(p.markdown) : null, parentId: p.parentId, pagesBelow: 0, deletedAt: at, deletedBy: p.deletedBy ?? null, deletedByName: p.deletedBy === me ? this.me(server).displayName : null, restorableUntil: iso(this.now() + 30 * 86_400_000) }));
+      return json(200, { items, nextCursor: null });
+    }
+    const m = /^\/trash\/([^/]+)(\/restore)?$/.exec(rest);
+    const page = m ? ws.pages.get(decodeURIComponent(m[1]!)) : undefined;
+    if (!m || !page || !mine(page)) return fail("not_found", "page not found in the Trash");
+    if (m[2] && method === "POST") {
+      page.deleted = false;
+      delete page.deletedBy;
+      this.record(ws, "page.created", page, me);
+      return json(200, { pageIds: [page.id] });
+    }
+    if (!m[2] && method === "DELETE") {
+      if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
+      ws.pages.delete(page.id);
       return { status: 204, headers: {}, body: "" };
     }
     return fail("method_not_allowed");
@@ -618,7 +657,7 @@ export class FakeServers implements Servers {
   /** `createInviteLink`, `listInviteLinks`, `revokeInviteLink` (capability `invite-links`): owners only. */
   private inviteLinks(server: string, ws: FakeWorkspace, method: string, rest: string, text: string): ApiCallResult {
     if (!this.capable(server, "invite-links")) return fail("capability_not_supported");
-    if (ws.role !== "owner") return fail("forbidden", "only owners of this workspace may do this");
+    if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
     if (rest === "/invite-links" && method === "GET") return json(200, { items: this.activeInvites(ws).reverse().map((l) => this.inviteResource(ws, l)), nextCursor: null });
     if (rest === "/invite-links" && method === "POST") {
       const parsed = InviteLinkCreateRequestSchema.safeParse(JSON.parse(text));

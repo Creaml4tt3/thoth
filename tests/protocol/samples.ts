@@ -23,6 +23,17 @@ const META = {
 };
 const WORKSPACE = { id: "ws_1", kind: "workspace", name: "Main", role: "editor", exportRestricted: false, memberCount: 1, members: [{ userId: "user_1", displayName: "Ann", role: "editor" }], createdAt: "2026-01-01T00:00:00Z" };
 const DELETED_WORKSPACE = { id: "ws_2", name: "Old notes", exportRestricted: false, memberCount: 2, deletedAt: "2026-10-26T10:00:00Z", deletedBy: "user_1", restorableUntil: "2026-11-25T10:00:00Z" };
+const TRASH_ITEM = {
+  pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019",
+  title: "Plans",
+  kind: "folder",
+  parentId: null,
+  pagesBelow: 2,
+  deletedAt: "2026-10-26T10:00:00Z",
+  deletedBy: "user_1",
+  deletedByName: "Ada",
+  restorableUntil: "2026-11-25T10:00:00Z",
+};
 const TRANSFER = {
   operationId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019",
   workspaceId: "ws_1",
@@ -86,6 +97,11 @@ export const SAMPLES: Record<string, unknown> = {
   TeamWrite: { name: "Design" },
   PageVisibility: { pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", teamIds: ["team_1"], limitedAbove: false },
   PageVisibilityWrite: { teamIds: null },
+  TeamPage: { pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", title: "Finance", kind: "folder", onlyTeam: true },
+  TeamPageList: { items: [{ pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", title: "Finance", kind: null, onlyTeam: false }] },
+  TrashItem: TRASH_ITEM,
+  TrashList: { items: [TRASH_ITEM], nextCursor: null },
+  TrashRestored: { pageIds: ["01a15cc9-7d0d-7982-a22a-e5ae3df6b019"] },
   WorkspaceCreateRequest: { name: "Design", exportRestricted: false },
   WorkspaceRename: { name: "Design team" },
   DeletedWorkspace: DELETED_WORKSPACE,

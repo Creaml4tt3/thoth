@@ -155,7 +155,7 @@ describe("Members… for editors and viewers", () => {
     expect(within(dialog).queryByRole("combobox")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /^Remove / })).toBeNull();
     expect(within(dialog).queryByRole("region", { name: "Invite people" })).toBeNull();
-    expect(within(dialog).getByText("Only owners change roles and invite people.")).toBeTruthy();
+    expect(within(dialog).getByText("Only owners and managers change roles and invite people.")).toBeTruthy();
     expect(rowOf(dialog, /^Bo/).textContent).toContain("Editor");
     expect(servers.calls.some((c) => c.path.includes("invite-links"))).toBe(false);
     expect(await axeViolations(dialog)).toEqual([]);
@@ -249,11 +249,34 @@ describe("Teams and Visible to…", () => {
     await app.user.type(name, "Money{Enter}");
     await waitFor(() => expect(ws.teams[0]!.name).toBe("Money"));
     expect(await axeViolations(dialog)).toEqual([]);
+    // Deleting asks first and says which folders only this team saw (ADR-0043).
+    const folder = [...ws.pages.values()][0]!;
+    ws.visibility.set(folder.id, [ws.teams[0]!.id]);
     await app.user.click(within(teams).getByRole("button", { name: "Delete team Money" }));
+    const confirm = await within(teams).findByRole("group", { name: "Delete team Money?" });
+    expect(await within(confirm).findByText("Only owners and managers will see these, because no other team does:")).toBeTruthy();
+    expect(within(confirm).getByText(folder.title)).toBeTruthy();
+    expect(ws.teams).toHaveLength(1);
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(confirm).getByRole("button", { name: "Delete team" }));
     await waitFor(() => expect(ws.teams).toEqual([]));
-    // A manager does not manage members or invite links.
-    expect(within(dialog).queryByRole("region", { name: "Invite people" })).toBeNull();
-    expect(within(dialog).queryByRole("combobox", { name: "Role of Bo" })).toBeNull();
+  });
+
+  it("lets a manager change roles up to Manager, remove members and invite people, but not touch owners (ADR-0043)", async () => {
+    const members = [...TEAM("manager"), { userId: "usr_oz", displayName: "Oz", role: "owner" as const }];
+    const { app, ws } = await workspace({ role: "manager", capabilities: TEAMS, members });
+    const dialog = await openMembers(app);
+    const bo = (await within(dialog).findByRole("combobox", { name: "Role of Bo" })) as HTMLSelectElement;
+    expect([...bo.options].map((o) => o.value)).toEqual(["manager", "editor", "viewer"]);
+    await app.user.selectOptions(bo, "manager");
+    await waitFor(() => expect(ws.members.find((m) => m.userId === "usr_bo")!.role).toBe("manager"));
+    expect(within(dialog).queryByRole("combobox", { name: "Role of Oz" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Remove Oz from the workspace" })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Remove Cy from the workspace" })).toBeTruthy();
+    expect(within(dialog).getByText("Only an owner can make someone an owner, or change or remove an owner.")).toBeTruthy();
+    const invite = within(dialog).getByRole("region", { name: "Invite people" });
+    await app.user.click(within(invite).getByRole("button", { name: "Create invite link" }));
+    await waitFor(() => expect(ws.invites).toHaveLength(1));
   });
 
   it("shows teams read-only to an editor, and offers Manager in an owner's invite and role pickers", async () => {
@@ -305,5 +328,57 @@ describe("Teams and Visible to…", () => {
       if (options.capabilities === CAPS) expect(within(await openMembers(app)).queryByRole("region", { name: "Teams" })).toBeNull();
       cleanup();
     }
+  });
+});
+
+describe("Trash… (ADR-0043)", () => {
+  const TRASH = [...CAPS, "trash"];
+  const openTrash = async (app: Harness, list: HTMLElement) => {
+    fireEvent.contextMenu(within(list).getByRole("treeitem", { name: /^Design/ }));
+    const menu = await screen.findByRole("menu", { name: "Actions for Design" });
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Trash…" }));
+    return screen.findByRole("dialog", { name: "Trash of “Design”" });
+  };
+  const trashed = (ws: FakeWorkspace) => {
+    const page = [...ws.pages.values()].find((p) => p.title === "Roadmap")!;
+    page.deleted = true;
+    page.deletedBy = "usr_me";
+    return page;
+  };
+
+  it("lets an owner restore a deleted page, or delete one for good after asking", async () => {
+    const { app, ws, list } = await workspace({ capabilities: TRASH });
+    const page = trashed(ws);
+    const dialog = await openTrash(app, list);
+    const items = await within(dialog).findByRole("list", { name: "Deleted pages" });
+    expect(within(items).getByRole("listitem").textContent).toMatch(/^Roadmap.*deleted .* by Ada · can be restored until/);
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(dialog).getByRole("button", { name: "Restore Roadmap" }));
+    await waitFor(() => expect(page.deleted).toBe(false));
+    expect(await within(dialog).findByText("The Trash is empty.")).toBeTruthy();
+    expect(within(dialog).getByRole("status").textContent).toBe("Restored Roadmap.");
+
+    trashed(ws);
+    await app.user.click(within(dialog).getByRole("button", { name: "Done" }));
+    const again = await openTrash(app, list);
+    await app.user.click(await within(again).findByRole("button", { name: "Delete Roadmap for good" }));
+    const confirm = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
+    expect(within(confirm).getByText(/cannot be undone/)).toBeTruthy();
+    await app.user.click(within(confirm).getByRole("button", { name: "Delete for good" }));
+    await waitFor(() => expect(ws.pages.has(page.id)).toBe(false));
+  });
+
+  it("lets an editor restore but not delete for good, and gives viewers no Trash", async () => {
+    const { app, ws, list } = await workspace({ role: "editor", capabilities: TRASH });
+    trashed(ws);
+    const dialog = await openTrash(app, list);
+    expect(await within(dialog).findByRole("button", { name: "Restore Roadmap" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Delete Roadmap for good" })).toBeNull();
+    cleanup();
+
+    const viewer = await workspace({ role: "viewer", capabilities: TRASH });
+    fireEvent.contextMenu(within(viewer.list).getByRole("treeitem", { name: /^Design/ }));
+    const menu = await screen.findByRole("menu", { name: "Actions for Design" });
+    expect(within(menu).queryByRole("menuitem", { name: "Trash…" })).toBeNull();
   });
 });

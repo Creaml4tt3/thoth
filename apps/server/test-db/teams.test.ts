@@ -33,10 +33,30 @@ describe("teams: the Manager role and team management", () => {
     await env.api(owner, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "viewer" } });
   });
 
-  it("lets a manager write pages like an editor, but not change roles or make invite links", async () => {
+  it("lets a manager write pages, change roles up to manager and make invite links, but never touch owners (ADR-0043)", async () => {
     await createPage(env, manager, ws, { title: "By the manager" });
-    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "editor" } })).status).toBe(403);
-    expect((await env.api(manager, "POST", `/workspaces/${ws}/invite-links`, { json: { role: "viewer" } })).status).toBe(403);
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "editor" } })).json.role).toBe("editor");
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "manager" } })).json.role).toBe("manager");
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "viewer" } })).json.role).toBe("viewer");
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "owner" } })).status).toBe(403);
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/members/${owner.userId}`, { json: { role: "editor" } })).status).toBe(403);
+    expect((await env.api(manager, "DELETE", `/workspaces/${ws}/members/${owner.userId}`)).status).toBe(403);
+    for (const who of [editor, viewer]) expect((await env.api(who, "PUT", `/workspaces/${ws}/members/${editor.userId}`, { json: { role: "viewer" } })).status, who.userId).toBe(403);
+    const link = await env.api(manager, "POST", `/workspaces/${ws}/invite-links`, { json: { role: "manager" } });
+    expect([link.status, link.json.role]).toEqual([201, "manager"]);
+    expect((await env.api(manager, "GET", `/workspaces/${ws}/invite-links`)).json.items.map((l: { id: string }) => l.id)).toContain(link.json.id);
+    expect((await env.api(editor, "POST", `/workspaces/${ws}/invite-links`, { json: { role: "viewer" } })).status).toBe(403);
+    // Renaming and deleting the workspace stay with owners.
+    expect((await env.api(manager, "PUT", `/workspaces/${ws}/name`, { json: { name: "Taken" } })).status).toBe(403);
+    expect((await env.api(manager, "DELETE", `/workspaces/${ws}`)).status).toBe(403);
+    // A manager removes a member who is not an owner.
+    const temp = await env.user("Tim");
+    await env.db.query("INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'editor')", [ws, temp.userId]);
+    expect((await env.api(manager, "DELETE", `/workspaces/${ws}/members/${temp.userId}`)).status).toBe(204);
+    // A link stops working once its creator is no longer a manager.
+    await env.api(owner, "PUT", `/workspaces/${ws}/members/${manager.userId}`, { json: { role: "editor" } });
+    expect((await env.api(await env.user("Late"), "POST", "/invites/accept", { json: { token: link.json.token } })).status).toBe(404);
+    await env.api(owner, "PUT", `/workspaces/${ws}/members/${manager.userId}`, { json: { role: "manager" } });
   });
 
   it("lets an owner make a manager invite link, and joining with it makes a manager", async () => {
@@ -212,11 +232,15 @@ describe("teams: a hidden page does not leak through any route", () => {
     expect(await home.text()).not.toContain("Bonuses");
   });
 
-  it("visibility routes: editors get the same 403 for hidden and open pages; a manager outside the team gets 404", async () => {
+  it("visibility routes: editors get the same 403 for hidden and open pages; a manager in no team still sees and manages them", async () => {
     // The role is checked first, so the answer says nothing about the page.
     for (const id of [secret.id, open.id, uuid()]) expect((await env.api(outsider, "GET", `/workspaces/${ws}/pages/${id}/visibility`)).status, id).toBe(403);
-    // The manager is in no team: the limited folder is hidden from them too, so they cannot lift it.
-    notFound(await env.api(manager, "PUT", `/workspaces/${ws}/pages/${folder}/visibility`, { json: { teamIds: null } }));
+    // ADR-0043: managers see every page, like owners.
+    expect((await env.api(manager, "GET", `/workspaces/${ws}/pages/${secret.id}`)).status).toBe(200);
+    expect((await env.api(manager, "GET", `/workspaces/${ws}/pages/${folder}/visibility`)).json.teamIds).toEqual([team]);
+    const pages = await env.api(manager, "GET", `/workspaces/${ws}/teams/${team}/pages`);
+    expect(pages.json.items).toContainEqual({ pageId: folder, title: "Finance", kind: "folder", onlyTeam: true });
+    expect((await env.api(outsider, "GET", `/workspaces/${ws}/teams/${team}/pages`)).status).toBe(403);
   });
 
   it("events: the SSE stream carries only hints, never a page ID or title", async () => {
@@ -234,7 +258,7 @@ describe("teams: a hidden page does not leak through any route", () => {
     expect((await env.api(outsider, "GET", `/workspaces/${ws}/changes`, { query: { cursor: before } })).status).toBe(410);
   });
 
-  it("deleting the only team keeps its pages hidden from everyone but owners", async () => {
+  it("deleting the only team keeps its pages hidden from everyone but owners and managers", async () => {
     const solo = (await env.api(owner, "POST", `/workspaces/${ws}/teams`, { json: { name: "Solo" } })).json.id as string;
     await env.api(owner, "PUT", `/workspaces/${ws}/teams/${solo}/members/${outsider.userId}`);
     const page = await createPage(env, owner, ws, { title: "Solo page" });

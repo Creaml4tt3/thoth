@@ -82,6 +82,10 @@ describe("route registry", () => {
       removeTeamMember: "teams",
       getPageVisibility: "teams",
       setPageVisibility: "teams",
+      listTeamPages: "teams",
+      listTrash: "trash",
+      restoreTrashedPage: "trash",
+      purgeTrashedPage: "trash",
     });
   });
 

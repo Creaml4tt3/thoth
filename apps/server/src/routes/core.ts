@@ -277,7 +277,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
          FROM changes WHERE workspace_id = $1 AND seq > $2 AND seq <= $3 ORDER BY seq LIMIT $4`,
       [ws.id, position, head, limit, me.id],
     );
-    const next = rows.length ? rows[rows.length - 1]!.seq : position;
+    // Entries of pages deleted for good are removed (ADR-0043), so the feed has holes: nothing left up to the head.
+    const next = rows.length ? rows[rows.length - 1]!.seq : head;
     const entries = rows.filter((row) => !row.hidden).map((row) => changeEntryOf(row, withKind));
     return send(reply, jsonReply(200, { entries, cursor: changeCursorOf(ws.id, next), hasMore: next < head }));
   });

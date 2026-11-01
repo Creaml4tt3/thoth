@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-01
 - **Deciders:** owner (rules 1 to 3, the decisions in the task); rules 4 to 9 are how they are built
+- **Amended by:** ADR-0043 (managers see every page, run members who are not owners, and make invite links)
 
 ## Context
 
@@ -87,4 +88,4 @@ Section 3.2 (authorization on the server), 8, 9.1, 11 (authorization, audit even
 ## Open questions
 
 - Attachments of limited pages (rule 8): limit them by the pages that use them. Blocks nothing now.
-- Whether managers should see every page, like owners. Not asked for.
+- Whether managers should see every page, like owners. Decided in ADR-0043: they do.

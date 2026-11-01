@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { API_BASE_PATH, OpaqueIdSchema, PageVisibilityWriteSchema, TEAMS_MAX, TeamWriteSchema } from "@thoth/workspace-protocol";
+import { API_BASE_PATH, OpaqueIdSchema, PageVisibilityWriteSchema, TEAMS_MAX, TeamWriteSchema, type PageKind } from "@thoth/workspace-protocol";
 import { workspaceAccess } from "../access.ts";
 import type { Queryable } from "../db.ts";
 import type { Deps } from "../deps.ts";
@@ -91,13 +91,29 @@ export function registerTeamRoutes(app: FastifyInstance, deps: Deps): void {
       const me = principalOf(request);
       const ws = await workspaceAccess(tx, request.params.workspaceId, me.id, "manage", { lock: true });
       const team = await teamOr404(tx, ws.id, request.params.teamId);
-      // Cascades to team_members and page_visibility_teams; a page left with no team stays limited (owners only).
+      // Cascades to team_members and page_visibility_teams; a page left with no team stays limited (owners and managers only).
       await tx.query("DELETE FROM teams WHERE workspace_id = $1 AND id = $2", [ws.id, team.id]);
       await visibilityChanged(tx, ws.id, me.id);
       await audit(tx, { actorId: me.id, workspaceId: ws.id, action: "team.deleted", detail: { teamId: team.id } });
       return { status: 204, headers: {} };
     }),
   );
+
+  // ADR-0043: what deleting a team changes. Owners and managers see every page, so nothing is filtered.
+  app.get<{ Params: { workspaceId: string; teamId: string } }>(`${base}/teams/:teamId/pages`, async (request, reply) => {
+    const me = principalOf(request);
+    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "manage");
+    const team = await teamOr404(db, ws.id, request.params.teamId);
+    const { rows } = await db.query<{ id: string; title: string; kind: PageKind | null; only_team: boolean }>(
+      `SELECT p.id, p.title, p.kind,
+              NOT EXISTS (SELECT 1 FROM page_visibility_teams o WHERE o.workspace_id = $1 AND o.page_id = p.id AND o.team_id <> $2) AS only_team
+         FROM page_visibility_teams t JOIN pages p ON p.workspace_id = t.workspace_id AND p.id = t.page_id
+        WHERE t.workspace_id = $1 AND t.team_id = $2 AND p.deleted_at IS NULL
+        ORDER BY p.title, p.id`,
+      [ws.id, team.id],
+    );
+    return send(reply, jsonReply(200, { items: rows.map((r) => ({ pageId: r.id, title: r.title, kind: r.kind, onlyTeam: r.only_team })) }));
+  });
 
   const membership = (add: boolean) => (request: { params: { workspaceId: string; teamId: string; userId: string } }, tx: Queryable, actorId: string) =>
     (async () => {

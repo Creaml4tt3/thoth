@@ -47,7 +47,11 @@ export const ROLE_PERMISSIONS = {
   owner: ["read", "write", "manage", "administer"],
 } as const satisfies Record<Role, readonly string[]>;
 
-/** `manage`: teams and page visibility (ADR-0042). `administer`: members, invite links and the workspace (ADR-0024, ADR-0025). */
+/**
+ * `manage` (ADR-0042, ADR-0043): teams, page visibility, every page (limited ones too), the whole Trash, invite links,
+ * and members who are not owners (their roles up to manager, and removing them). `administer` (owners): making,
+ * demoting or removing owners, and renaming or deleting the workspace.
+ */
 export type Permission = "read" | "write" | "manage" | "administer";
 
 export function roleCan(role: Role, permission: Permission): boolean {

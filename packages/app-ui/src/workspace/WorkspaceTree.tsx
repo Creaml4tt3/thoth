@@ -27,6 +27,7 @@ import { childrenOf, isWithin, nestWorkspaceTree, workspaceAncestors, type Works
 import { ShareDialog } from "./ShareDialog.tsx";
 import { clearShare, usePendingShare } from "./share-request.ts";
 import { MembersDialog } from "./MembersDialog.tsx";
+import { TrashDialog } from "./TrashDialog.tsx";
 import { VisibilityDialog } from "./VisibilityDialog.tsx";
 import { clearMembers, usePendingMembers } from "./members-request.ts";
 import { ConfirmByNameDialog } from "./ConfirmByNameDialog.tsx";
@@ -236,6 +237,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const tt = useStrings().tree;
   const tx = useStrings().transfer;
   const tm = useStrings().members;
+  const tr = useStrings().trash;
   const tw = useStrings().workspaces;
   const tf = useStrings().favorites;
   const td = useStrings().download;
@@ -260,6 +262,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
   const { download, said: downloadSaid } = useDownload();
   const [membersOpen, setMembersOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   /** ADR-0025: the owner's Rename… and Delete… of this workspace. */
   const [admin, setAdmin] = useState<"rename" | "delete" | null>(null);
   const [rowMenu, setRowMenu] = useState<{ x: number; y: number } | null>(null);
@@ -277,6 +280,8 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   // ADR-0042: teams on a server that lists `teams`; owners and managers choose which teams see a folder or page.
   const canTeams = state.capabilities[server]?.includes("teams") ?? false;
   const canLimit = canTeams && roleCan(workspace.role, "manage");
+  // ADR-0043: the Trash, for editors and up, on a server that lists `trash`.
+  const canTrash = canWrite && (state.capabilities[server]?.includes("trash") ?? false);
   // ADR-0025: owners rename and delete the workspace, on a server that lists `workspace-management`.
   const canAdminister = workspace.role === "owner" && (state.capabilities[server]?.includes("workspace-management") ?? false);
   const account = state.servers.find((s) => s.info.id === server)?.info;
@@ -586,6 +591,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   /** The workspace row's own menu: Members…, for owners Rename… and Delete…, and for writers New page and New folder. */
   const rowItems: MenuItem[] = [
     ...(canMembers ? [{ id: "members", label: tm.menuItem, onSelect: () => setMembersOpen(true) }] : []),
+    ...(canTrash ? [{ id: "trash", label: tr.menuItem, onSelect: () => setTrashOpen(true) }] : []),
     ...(canAdminister
       ? [
           { id: "rename-workspace", label: tw.rename, hint: "F2", onSelect: () => setAdmin("rename") },
@@ -725,6 +731,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
           onClose={() => setMembersOpen(false)}
         />
       )}
+      {trashOpen && canTrash && <TrashDialog client={directory.client(server)} workspace={workspace} onChanged={() => void directory.loadTree(server, workspace.id)} onClose={() => setTrashOpen(false)} />}
       {admin === "rename" && canAdminister && (
         <RenameDialog
           name={workspace.name}
@@ -766,7 +773,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       {deleting && canWrite && (
         <DeleteDialog
           name={titleOf(deleting)}
-          body={(tree?.kinds[deleting]?.folder ? tt.deleteDialog.workspaceFolder : tt.deleteDialog.workspacePage)(pagesUnder(deleting))}
+          body={`${(tree?.kinds[deleting]?.folder ? tt.deleteDialog.workspaceFolder : tt.deleteDialog.workspacePage)(pagesUnder(deleting))}${canTrash ? ` ${tt.deleteDialog.inTrash}` : ""}`}
           onDelete={async () => {
             const name = titleOf(deleting);
             const ok = await enqueue(() => run(() => directory.deletePage(server, workspace.id, deleting), tt.deleteFailed));

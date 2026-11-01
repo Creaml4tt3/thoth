@@ -11,7 +11,8 @@ import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemS
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
-import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
+import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamPageListSchema, TeamPageSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
+import { TrashItemSchema, TrashListSchema, TrashRestoredSchema } from "./trash.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -72,6 +73,11 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "TeamWrite", file: "team-write.v1", schema: TeamWriteSchema },
   { name: "PageVisibility", file: "page-visibility.v1", schema: PageVisibilitySchema },
   { name: "PageVisibilityWrite", file: "page-visibility-write.v1", schema: PageVisibilityWriteSchema },
+  { name: "TeamPage", file: "team-page.v1", schema: TeamPageSchema },
+  { name: "TeamPageList", file: "team-page-list.v1", schema: TeamPageListSchema },
+  { name: "TrashItem", file: "trash-item.v1", schema: TrashItemSchema },
+  { name: "TrashList", file: "trash-list.v1", schema: TrashListSchema },
+  { name: "TrashRestored", file: "trash-restored.v1", schema: TrashRestoredSchema },
   { name: "WorkspaceCreateRequest", file: "workspace-create-request.v1", schema: WorkspaceCreateRequestSchema },
   { name: "WorkspaceRename", file: "workspace-rename.v1", schema: WorkspaceRenameSchema },
   { name: "DeletedWorkspace", file: "deleted-workspace.v1", schema: DeletedWorkspaceSchema },

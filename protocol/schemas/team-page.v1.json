@@ -1,0 +1,39 @@
+{
+  "$id": "https://thoth.invalid/schemas/team-page.v1.json",
+  "title": "team-page.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "page",
+            "folder"
+          ],
+          "description": "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "onlyTeam": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "pageId",
+    "title",
+    "kind",
+    "onlyTeam"
+  ]
+}

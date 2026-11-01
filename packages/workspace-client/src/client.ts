@@ -23,6 +23,9 @@ import {
   InviteAcceptedSchema,
   PageVisibilitySchema,
   TeamListSchema,
+  TeamPageListSchema,
+  TrashListSchema,
+  TrashRestoredSchema,
   TeamSchema,
   InviteLinkCreatedSchema,
   InviteLinkListSchema,
@@ -48,6 +51,8 @@ import {
   type InviteAccepted,
   type PageVisibility,
   type Team,
+  type TeamPageList,
+  type TrashItem,
   type InviteLink,
   type InviteLinkCreateRequest,
   type InviteLinkCreated,
@@ -361,6 +366,35 @@ export class WorkspaceClient {
 
   async deleteTeam(workspaceId: string, teamId: string): Promise<void> {
     await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}`, ok: [204] });
+  }
+
+  /** Owners and managers (ADR-0043): the pages limited to a team, so deleting it can say what changes. */
+  async listTeamPages(workspaceId: string, teamId: string): Promise<TeamPageList["items"]> {
+    return (await this.request(TeamPageListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}/pages` })).data.items;
+  }
+
+  /** The Trash (capability `trash`, ADR-0043), newest first: all of it for owners and managers, an editor's own deletions for an editor. */
+  async listTrash(workspaceId: string): Promise<TrashItem[]> {
+    const out: TrashItem[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(TrashListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/trash`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    return out;
+  }
+
+  /** Brings a deleted page back with what was deleted below it. Returns the IDs of the pages that came back. */
+  async restoreTrashedPage(workspaceId: string, pageId: string): Promise<string[]> {
+    return (await this.request(TrashRestoredSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/trash/${seg(pageId)}/restore` })).data.pageIds;
+  }
+
+  /** Owners and managers: deletes a page in the Trash for good, now. It cannot be undone. */
+  async purgeTrashedPage(workspaceId: string, pageId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/trash/${seg(pageId)}`, ok: [204] });
   }
 
   /** Adds (`true`) or removes (`false`) a member of the workspace to or from a team. */
