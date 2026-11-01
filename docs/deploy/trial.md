@@ -95,6 +95,14 @@ Domains used below (change them when you buy your own domain):
    feedback request (with or without a log) and `feedback list` fail with a
    database error.
 
+   Migrations `015_teams.sql` (ADR-0042, teams and the Manager role) and
+   `016_trash.sql` (ADR-0043, the Trash) are additive and safe while the old
+   build runs, and need no backfill. **Apply both to Neon before you deploy the
+   server build that contains them.** That build calls `thoth_hidden_pages` on
+   every page read, so without them every page request fails. 016 gives pages
+   that were deleted before it 30 days from the migration, after which the
+   daily maintenance removes them.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
