@@ -1,0 +1,42 @@
+{
+  "$id": "https://thoth.invalid/schemas/team-list.v1.json",
+  "title": "team-list.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.~-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.~-]+$"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "memberIds"
+        ]
+      }
+    }
+  },
+  "required": [
+    "items"
+  ]
+}

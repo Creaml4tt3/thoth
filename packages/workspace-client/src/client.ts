@@ -21,6 +21,12 @@ import {
   ShareLinkCreatedSchema,
   ShareLinkListSchema,
   InviteAcceptedSchema,
+  PageVisibilitySchema,
+  TeamListSchema,
+  TeamPageListSchema,
+  TrashListSchema,
+  TrashRestoredSchema,
+  TeamSchema,
   InviteLinkCreatedSchema,
   InviteLinkListSchema,
   MemberListSchema,
@@ -43,6 +49,10 @@ import {
   type SearchResponse,
   type ShareExpiry,
   type InviteAccepted,
+  type PageVisibility,
+  type Team,
+  type TeamPageList,
+  type TrashItem,
   type InviteLink,
   type InviteLinkCreateRequest,
   type InviteLinkCreated,
@@ -338,6 +348,68 @@ export class WorkspaceClient {
   /** Owners remove anyone; anyone removes themself (leaves). The last owner cannot leave (`last_owner`). */
   async removeMember(workspaceId: string, userId: string): Promise<void> {
     await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/members/${seg(userId)}`, ok: [204] });
+  }
+
+  /** The workspace's teams (capability `teams`, ADR-0042), by name. Every member may read them. */
+  async listTeams(workspaceId: string): Promise<Team[]> {
+    return (await this.request(TeamListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/teams` })).data.items;
+  }
+
+  /** Owners and managers: a new team with no members. */
+  async createTeam(workspaceId: string, name: string): Promise<Team> {
+    return (await this.request(TeamSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/teams`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ name })), ok: [201] })).data;
+  }
+
+  async renameTeam(workspaceId: string, teamId: string, name: string): Promise<Team> {
+    return (await this.request(TeamSchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ name })) })).data;
+  }
+
+  async deleteTeam(workspaceId: string, teamId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}`, ok: [204] });
+  }
+
+  /** Owners and managers (ADR-0043): the pages limited to a team, so deleting it can say what changes. */
+  async listTeamPages(workspaceId: string, teamId: string): Promise<TeamPageList["items"]> {
+    return (await this.request(TeamPageListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}/pages` })).data.items;
+  }
+
+  /** The Trash (capability `trash`, ADR-0043), newest first: all of it for owners and managers, an editor's own deletions for an editor. */
+  async listTrash(workspaceId: string): Promise<TrashItem[]> {
+    const out: TrashItem[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = cursor === null ? {} : { cursor };
+      const { data } = await this.request(TrashListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/trash`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    return out;
+  }
+
+  /** Brings a deleted page back with what was deleted below it. Returns the IDs of the pages that came back. */
+  async restoreTrashedPage(workspaceId: string, pageId: string): Promise<string[]> {
+    return (await this.request(TrashRestoredSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/trash/${seg(pageId)}/restore` })).data.pageIds;
+  }
+
+  /** Owners and managers: deletes a page in the Trash for good, now. It cannot be undone. */
+  async purgeTrashedPage(workspaceId: string, pageId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/trash/${seg(pageId)}`, ok: [204] });
+  }
+
+  /** Adds (`true`) or removes (`false`) a member of the workspace to or from a team. */
+  async setTeamMember(workspaceId: string, teamId: string, userId: string, member: boolean): Promise<Team> {
+    return (await this.request(TeamSchema, { method: member ? "PUT" : "DELETE", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}/members/${seg(userId)}` })).data;
+  }
+
+  /** Owners and managers: which teams see a page (`null`: no limit on the page itself). */
+  async getPageVisibility(workspaceId: string, pageId: string): Promise<PageVisibility> {
+    return (await this.request(PageVisibilitySchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/visibility` })).data;
+  }
+
+  /** Limits a page and everything below it to `teamIds`, or `null` for everyone. */
+  async setPageVisibility(workspaceId: string, pageId: string, teamIds: string[] | null): Promise<PageVisibility> {
+    return (await this.request(PageVisibilitySchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/visibility`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ teamIds })) })).data;
   }
 
   /** An invite link (capability `invite-links`). The token and the address are in this response only. */

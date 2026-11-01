@@ -5,11 +5,12 @@ import { MemberSchema, RoleSchema } from "./identity.ts";
 /**
  * Workspace members and invite links (ADR-0024).
  *
- * - Capability `members`: every member reads the member list (display names and roles, never emails); owners change
- *   roles and remove members; any member leaves (removes themself). A workspace always keeps at least one owner:
+ * - Capability `members`: every member reads the member list (display names and roles, never emails); owners and
+ *   managers change roles and remove members, but only owners make, demote or remove owners (ADR-0043); any member
+ *   leaves (removes themself). A workspace always keeps at least one owner:
  *   a change that would leave none is 409 `last_owner`.
- * - Capability `invite-links`: owners make links `<server origin>/i/<token>` that let whoever opens them join with a
- *   role (editor or viewer), for 1, 7 or 30 days, for 1, 5 or 10 people. The token is shown once, in the create
+ * - Capability `invite-links`: owners and managers make links `<server origin>/i/<token>` that let whoever opens them join with a
+ *   role (manager, editor or viewer), for 1, 7 or 30 days, for 1, 5 or 10 people. The token is shown once, in the create
  *   response; the server keeps only its hash. Anyone signed in to the server accepts a link with `acceptInvite`.
  */
 
@@ -24,8 +25,8 @@ export type MemberRoleChange = z.infer<typeof MemberRoleChangeSchema>;
 /** Server-assigned invite-link ID (not the token): used to list and revoke a link. */
 export const InviteLinkIdSchema = OpaqueIdSchema;
 
-/** The roles a link can give. Owner only by promoting someone who is already a member. */
-export const INVITE_ROLES = ["editor", "viewer"] as const;
+/** The roles a link can give (owners and managers make links, ADR-0043). Owner only by promoting someone who is already a member. */
+export const INVITE_ROLES = ["manager", "editor", "viewer"] as const;
 export const InviteRoleSchema = z.enum(INVITE_ROLES);
 export type InviteRole = z.infer<typeof InviteRoleSchema>;
 
@@ -49,7 +50,7 @@ export const InviteLinkCreateRequestSchema = z.object({
 });
 export type InviteLinkCreateRequest = z.infer<typeof InviteLinkCreateRequestSchema>;
 
-/** An invite link as owners see it. Never carries the token. */
+/** An invite link as owners and managers see it. Never carries the token. */
 export const InviteLinkSchema = z.object({
   id: InviteLinkIdSchema,
   workspaceId: WorkspaceIdSchema,

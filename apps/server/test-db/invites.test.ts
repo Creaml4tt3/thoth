@@ -52,7 +52,7 @@ const problemOf = (r: ApiResult) => {
 const membership = async (env: TestEnv, ws: string, userId: string) => (await env.db.query<{ role: string }>("SELECT role FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws, userId])).rows[0]?.role ?? null;
 const usesOf = async (env: TestEnv, id: string) => (await env.db.query<{ uses: number }>("SELECT uses FROM invite_links WHERE id = $1", [id])).rows[0]!.uses;
 
-describe("invite links: create, list, revoke (owners only)", () => {
+describe("invite links: create, list, revoke (owners and managers)", () => {
   let env: TestEnv;
   let owner: TestPrincipal;
   let editor: TestPrincipal;
