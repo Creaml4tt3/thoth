@@ -424,17 +424,49 @@ describe("change-feed polling", () => {
     await waitFor(() => expect(within(pages).queryByRole("treeitem", { name: "Retro" })).toBeNull());
   });
 
-  it("with local edits, a remote change waits for the next save, which meets the conflict", async () => {
-    const { app, servers, ws } = await withWorkspace({ pollMs: 30 });
+  it("with local edits, a remote change opens the conflict at once, before the next save (ADR-0041)", async () => {
+    const { app, servers, ws } = await withWorkspace({ pollMs: 30, autosaveMs: 60_000 });
     const box = await openPlan(app);
     await type(app, box, " Draft.");
+    const puts = () => servers.calls.filter((c) => c.method === "PUT" && /\/pages\/[^/]+$/.test(c.path)).length;
     servers.writeAsOther(ws, { id: servers.page(ws, "Plan").id, title: "Plan", markdown: "# Plan\n\nTheirs.\n" });
-    const changesBefore = servers.calls.filter((c) => c.path.endsWith("/changes")).length;
-    await waitFor(() => expect(servers.calls.filter((c) => c.path.endsWith("/changes")).length).toBeGreaterThan(changesBefore + 1));
+    const dialog = await screen.findByRole("dialog", { name: "This page changed on the server" });
+    expect(within(dialog).getByText("Theirs.")).toBeTruthy();
+    expect(puts()).toBe(0); // nothing was written: the person decides first
     expect(box.textContent).toContain("First line here. Draft.");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    await app.user.keyboard("{Meta>}s{/Meta}");
-    expect(await screen.findByRole("dialog", { name: "This page changed on the server" })).toBeTruthy();
+  });
+
+  it("says who changed an open page it reloaded, and the notice goes away (ADR-0041)", async () => {
+    let ws!: FakeWorkspace;
+    const { app, servers } = await start((s) => {
+      ws = s.addWorkspace(s.connect(LOCAL), { name: "Design", members: [{ userId: "usr_me", displayName: "Ada", role: "editor" }, { userId: "usr_other", displayName: "Grace", role: "editor" }] });
+      s.writeAsOther(ws, { title: "Plan", markdown: PLAN });
+    }, { pollMs: 30 });
+    const box = await openPlan(app);
+    servers.writeAsOther(ws, { id: servers.page(ws, "Plan").id, title: "Plan", markdown: "# Plan\n\nUpdated elsewhere.\n" });
+    await waitFor(() => expect(box.textContent).toContain("Updated elsewhere."));
+    const notice = await screen.findByText(/Updated by Grace just now\./);
+    await app.user.click(within(notice.closest("p")!).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/Updated by Grace/)).toBeNull();
+  });
+
+  it("shows who else has the page open when the server lists presence, and tells the server when the page is left (ADR-0041)", async () => {
+    const { app, servers, ws } = await withWorkspace({ pollMs: 0 }, "editor", { ...LOCAL, capabilities: ["search", "transfers", "attachments", "page-order", "page-kind", "presence"] });
+    servers.presence = () => [{ userId: "usr_ana", displayName: "Ana" }];
+    await openPlan(app);
+    expect(await screen.findByText("Ana is also here")).toBeTruthy();
+    const page = servers.page(ws, "Plan").id;
+    expect(servers.calls.some((c) => c.method === "PUT" && c.path.endsWith(`/pages/${page}/presence`))).toBe(true);
+    await app.user.click(screen.getAllByRole("tab").find((t) => t.textContent === "Plan")!.parentElement!.querySelector<HTMLElement>(".tab-close")!);
+    await waitFor(() => expect(servers.calls.some((c) => c.method === "DELETE" && c.path.endsWith(`/pages/${page}/presence`))).toBe(true));
+  });
+
+  it("asks nothing about presence of a server that does not list it", async () => {
+    const { app, servers } = await withWorkspace({ pollMs: 0 });
+    await openPlan(app);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(servers.calls.some((c) => c.path.endsWith("/presence"))).toBe(false);
+    expect(screen.queryByText(/is also here/)).toBeNull();
   });
 
   it("stops while the window is hidden and resumes when it is visible", async () => {

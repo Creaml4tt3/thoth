@@ -100,6 +100,52 @@ export class WebServers implements Servers {
     return { status: res.status, headers, body: await res.text() };
   }
 
+  /**
+   * Change hints of one workspace (ADR-0041) over `fetch`, not `EventSource`, so the bearer token stays in a header.
+   * Only `event: changes` lines count; their payload is not read (a hint is not data, ADR-0004). A 401 renews the
+   * token once, as `call` does; any other answer or a dropped stream ends it and the app polls.
+   */
+  events(server: string, workspace: string, on: { open(): void; hint(): void; end(): void }): () => void {
+    const abort = new AbortController();
+    let closed = false;
+    const url = new URL(`/api/v1/workspaces/${encodeURIComponent(workspace)}/events`, this.deps.server);
+    const connect = (token: string | null) =>
+      this.deps.fetch(url, { headers: { accept: "text/event-stream", ...(token ? { authorization: `Bearer ${token}` } : {}) }, redirect: "error", credentials: "omit", cache: "no-store", signal: abort.signal });
+    void (async () => {
+      if (server !== SERVER_ID) throw new Error("Unknown server");
+      const token = await this.deps.auth.token();
+      let res = await connect(token);
+      if (res.status === 401 && token) {
+        const next = await this.deps.auth.renew(token).catch(() => null);
+        if (next) res = await connect(next);
+      }
+      if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").startsWith("text/event-stream")) return;
+      on.open();
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) return;
+        buffer += value.replace(/\r\n?/g, "\n");
+        let at: number;
+        while ((at = buffer.indexOf("\n\n")) >= 0) {
+          const block = buffer.slice(0, at);
+          buffer = buffer.slice(at + 2);
+          if (block.split("\n").some((line) => line.replace(/^event:\s?/, "") === "changes" && line.startsWith("event:"))) on.hint();
+        }
+        if (buffer.length > 65_536) return; // no frame is this long: not a stream to trust
+      }
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        if (!closed) on.end();
+      });
+    return () => {
+      closed = true;
+      abort.abort();
+    };
+  }
+
   // The web client has one fixed server: there is nothing to add, remove or sign in to through this port.
   add(): Promise<ServerInfo> {
     return Promise.reject(new Error("The web client connects only to its own server."));

@@ -13,6 +13,7 @@ import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackRequestSchema } from "./feedback.ts";
+import { PresenceListSchema } from "./presence.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -598,6 +599,31 @@ export const ROUTES: readonly RouteDefinition[] = [
     responses: [{ status: 204, description: "Purged.", headers: [] }],
     errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
   }),  route({
+    operationId: "heartbeatPresence",
+    method: "put",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/presence",
+    tag: "Presence",
+    summary: "Say that the caller has this page open, and read who else has",
+    description:
+      "ADR-0041. Any member who can read the workspace (viewers too). No body. Send it when the page opens and at least every 15 seconds while it stays open; the server forgets a heartbeat 45 seconds after it arrived. The answer lists the other members who have the page open now (never the caller), with only their user ID and display name. A deleted or unknown page is 404.",
+    capability: "presence",
+    pathParams: pageParams,
+    responses: [json(200, "The other members who have the page open.", PresenceListSchema)],
+    errors: ["validation_failed", "not_found"],
+  }),
+  route({
+    operationId: "leavePresence",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/presence",
+    tag: "Presence",
+    summary: "Say that the caller closed this page",
+    description: "ADR-0041. Removes the caller's heartbeat for the page at once. Leaving a page the caller never sent a heartbeat for succeeds and changes nothing.",
+    capability: "presence",
+    pathParams: pageParams,
+    responses: [{ status: 204, description: "Removed.", headers: [] }],
+    errors: ["validation_failed", "not_found"],
+  }),
+  route({
     operationId: "sendFeedback",
     method: "post",
     path: "/feedback",

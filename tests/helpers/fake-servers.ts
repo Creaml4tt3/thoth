@@ -99,6 +99,8 @@ export class FakeServers implements Servers {
   beforeCall: ((args: ApiCallArgs) => void) | undefined;
   /** Test hook: runs after a request was answered (its effect is done); throwing simulates a lost response. */
   afterCall: ((args: ApiCallArgs, result: ApiCallResult) => void) | undefined;
+  /** Capability `presence` (ADR-0041): who else the server says has a page open (the caller is never in it). */
+  presence: (ws: FakeWorkspace, pageId: string) => { userId: string; displayName: string }[] = () => [];
   /** Tokens `useToken` received (to prove the UI sent it once). */
   readonly tokensReceived: string[] = [];
   /** "auto" finishes browser sign-in at once; "manual" waits for `finishSignIn` / `failSignIn`. */
@@ -326,6 +328,15 @@ export class FakeServers implements Servers {
     if (!m || !ws) return fail("not_found");
     const rest = m[2]!;
     if (rest === "/name" && method === "PUT") return this.renameWorkspace(server, ws, text);
+    const presenceMatch = /^\/pages\/([^/]+)\/presence$/.exec(rest);
+    if (presenceMatch) {
+      if (!this.capable(server, "presence")) return fail("capability_not_supported");
+      const page = ws.pages.get(decodeURIComponent(presenceMatch[1]!));
+      if (method === "DELETE") return { status: 204, headers: {}, body: "" };
+      if (method !== "PUT") return fail("method_not_allowed");
+      if (!page || page.deleted) return fail("not_found");
+      return json(200, { items: this.presence(ws, page.id) });
+    }
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {

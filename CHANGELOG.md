@@ -8,6 +8,18 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- A workspace page shows who else has it open ("Ana is also here") when the server supports it.
+- When someone changes a workspace page you have open, the page says so ("Updated by Grace just now.") instead of reloading silently.
+- The web client gets other people's changes as soon as they are saved, on servers that send live updates; otherwise it checks every 5 seconds, as before.
+
+### Changed
+
+- If you have unsaved edits when someone else changes the same workspace page, the choice between your version and theirs opens at once, instead of at your next save.
+
 ## [0.3.1] - 2026-11-01
 
 ### Added
@@ -216,6 +228,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Creaml4tt3/thoth/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/Creaml4tt3/thoth/compare/v0.2.7...v0.2.8

@@ -24,7 +24,7 @@ describe("EVENTS=off", () => {
       expect(env.server.deps.hub).toBeNull();
       expect(await listeners(env)).toBe(0);
       const caps = (await env.api(null, "GET", "/capabilities")).json;
-      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"]);
+      expect(caps.capabilities).toEqual(["attachments", "search", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "presence"]);
       const events = await env.api(who, "GET", `/workspaces/${ws}/events`);
       expect([events.status, events.json.code]).toEqual([501, "capability_not_supported"]);
       expect(events.headers.get("content-type")).toContain("application/problem+json");
@@ -422,7 +422,7 @@ describe("maintenance", () => {
     }
     const ok = await callCron(`Bearer ${secret}`);
     expect(ok.status).toBe(200);
-    expect(Object.keys(ok.json).sort()).toEqual(["feedbackDeleted", "idempotencyRecordsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted", "workspacesPurged"]);
+    expect(Object.keys(ok.json).sort()).toEqual(["feedbackDeleted", "idempotencyRecordsDeleted", "presenceRowsDeleted", "rateLimitRowsDeleted", "revisionsPruned", "signInRowsDeleted", "workspacesPurged"]);
     expect((await fetch(`${env.url}/internal/maintenance`, { method: "POST", headers: { authorization: `Bearer ${secret}` } })).status).toBe(405);
     await env.restart({ logStream }); // startup logs too
     responses.push(JSON.stringify(await callCron(`Bearer ${secret}`)));

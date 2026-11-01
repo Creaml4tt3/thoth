@@ -2,6 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-20
+- **Extended by:** ADR-0041 (a remote change is shown at once: a notice after a reload, the conflict dialog at once
+  under unsaved edits; presence; live change hints)
 
 ## Context
 

@@ -17,6 +17,7 @@ import { registerWorkspaceRoutes } from "./routes/workspaces.ts";
 import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
 import { registerFeedbackRoutes } from "./routes/feedback.ts";
+import { registerPresenceRoutes } from "./routes/presence.ts";
 import { authErrorReply, isAuthCorsPath, isAuthPath, registerSignInRoutes } from "./signin/routes.ts";
 import type { CapabilityId } from "@thoth/workspace-protocol";
 
@@ -78,6 +79,7 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
   { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
   { capability: "members", test: (_m, p) => /^\/workspaces\/[^/]+\/members(\/[^/]+)?$/.test(p) },
+  { capability: "presence", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/presence$/.test(p) },
   { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },
   // ADR-0025. `GET /workspaces` is a core route and stays open.
   {
@@ -216,6 +218,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerMemberRoutes(app, deps);
   registerWorkspaceRoutes(app, deps);
   registerFeedbackRoutes(app, deps);
+  registerPresenceRoutes(app, deps);
   const invitePages = registerInvitePages(app, deps);
   registerMaintenanceRoutes(app, deps);
   invitePages.useBroker(registerSignInRoutes(app, deps, { inviteSignedIn: invitePages.signedIn }));

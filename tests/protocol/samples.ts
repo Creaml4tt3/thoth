@@ -87,4 +87,6 @@ export const SAMPLES: Record<string, unknown> = {
   DeletedWorkspaceList: { items: [DELETED_WORKSPACE], nextCursor: null },
   FeedbackRequest: { kind: "idea", message: "A dark sidebar, please.", email: "ada@example.org", context: { client: "desktop", version: "0.4.0", os: "macOS", language: "th" } },
   FeedbackContext: { client: "web", language: "en" },
+  PresenceEntry: { userId: "usr_ana", displayName: "Ana" },
+  PresenceList: { items: [{ userId: "usr_ana", displayName: "Ana" }] },
 };

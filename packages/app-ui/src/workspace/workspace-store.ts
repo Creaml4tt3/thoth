@@ -79,7 +79,7 @@ export function workspacePageStore(deps: WorkspaceStoreDeps): PageStore {
       try {
         const resource = await client.getPage(workspace, page);
         remember(resource);
-        return { source: resource.markdown, hash: resource.revision.id, editable };
+        return { source: resource.markdown, hash: resource.revision.id, editable, author: resource.revision.authorId };
       } catch (error) {
         if (error instanceof ProblemError && error.status === 404) return null;
         throw error;

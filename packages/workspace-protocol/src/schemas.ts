@@ -11,6 +11,7 @@ import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemS
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
+import { PresenceEntrySchema, PresenceListSchema } from "./presence.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -72,4 +73,6 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "DeletedWorkspaceList", file: "deleted-workspace-list.v1", schema: DeletedWorkspaceListSchema },
   { name: "FeedbackRequest", file: "feedback-request.v1", schema: FeedbackRequestSchema },
   { name: "FeedbackContext", file: "feedback-context.v1", schema: FeedbackContextSchema },
+  { name: "PresenceEntry", file: "presence-entry.v1", schema: PresenceEntrySchema },
+  { name: "PresenceList", file: "presence-list.v1", schema: PresenceListSchema },
 ];

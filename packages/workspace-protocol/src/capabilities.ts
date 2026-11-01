@@ -19,10 +19,11 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `workspace-management` routes: createWorkspace, renameWorkspace, deleteWorkspace, listDeletedWorkspaces,
  *                      restoreWorkspace, purgeWorkspace (ADR-0025)
  * - `feedback`         routes: sendFeedback (ADR-0033); no sign-in needed
+ * - `presence`         routes: heartbeatPresence, leavePresence (ADR-0041): who else has a page open
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "presence", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

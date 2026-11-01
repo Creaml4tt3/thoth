@@ -74,6 +74,8 @@ describe("route registry", () => {
       restoreWorkspace: "workspace-management",
       purgeWorkspace: "workspace-management",
       sendFeedback: "feedback",
+      heartbeatPresence: "presence",
+      leavePresence: "presence",
     });
   });
 

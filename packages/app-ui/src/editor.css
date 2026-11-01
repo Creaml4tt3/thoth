@@ -306,3 +306,10 @@
 .link-card-menu[hidden] { display: none; }
 .link-card-item { text-align: left; padding: 6px 10px; border: 0; border-radius: var(--thoth-radius-sm); background: transparent; color: var(--thoth-ink-primary); font: var(--thoth-text-ui); cursor: pointer; }
 .link-card-item:hover, .link-card-item:focus-visible { background: var(--thoth-bg-hover); }
+
+/* ADR-0041: who else has a workspace page open, in the breadcrumb bar. */
+.presence { display: inline-flex; gap: 6px; align-items: center; min-width: 0; color: var(--thoth-ink-secondary); font: var(--thoth-text-ui); }
+.presence-faces { display: inline-flex; }
+.presence-face { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--thoth-workspace) 18%, var(--thoth-bg)); color: var(--thoth-workspace); font: 600 10px/1 var(--thoth-font-sans); box-shadow: 0 0 0 2px var(--thoth-bg); }
+.presence-face + .presence-face { margin-left: -6px; }
+.presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }

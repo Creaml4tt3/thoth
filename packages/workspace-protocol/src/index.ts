@@ -13,6 +13,7 @@ export * from "./shares.ts";
 export * from "./members.ts";
 export * from "./workspaces.ts";
 export * from "./feedback.ts";
+export * from "./presence.ts";
 export * from "./routes.ts";
 export * from "./schemas.ts";
 export * from "./validate.ts";

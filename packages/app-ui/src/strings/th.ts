@@ -163,6 +163,10 @@ export const th: Strings = {
     creating: "กำลังสร้าง…",
     noAccessTitle: "คุณไม่มีสิทธิ์เข้าถึงเวิร์กสเปซนี้แล้ว",
     noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ เจ้าของนำคุณออก หรือเวิร์กสเปซถูกลบ เจ้าของกู้คืนเวิร์กสเปซที่ลบได้ภายใน 30 วัน หรือส่งลิงก์เชิญใหม่ให้คุณ",
+    changedBy: (name) => (name ? `${name} เพิ่งอัปเดตหน้านี้` : "หน้านี้เพิ่งอัปเดตบนเซิร์ฟเวอร์"), // REVIEW
+    dismissChange: "ปิด", // REVIEW
+    presence: (names) => (names.length <= 2 ? `${names.join(" และ ")} เปิดหน้านี้อยู่ด้วย` : `${names[0]}, ${names[1]} และอีก ${count(names.length - 2)} คนเปิดหน้านี้อยู่ด้วย`), // REVIEW
+    presenceLabel: "คนอื่นที่เปิดหน้านี้อยู่", // REVIEW
   },
 
   tree: {

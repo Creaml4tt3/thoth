@@ -178,7 +178,7 @@ function limitFrom(query: URLSearchParams): number {
 
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const flaws = options.flaws ?? {};
-  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback"];
+  const capabilities: CapabilityId[] = options.capabilities ?? ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "presence"];
   const caps = new Set<string>(capabilities);
 
   const users: Record<string, { id: string; displayName: string }> = {
@@ -512,6 +512,23 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
       return { status: 204, headers: {} };
     }),
   );
+
+  // ADR-0041: who has a page open; this in-memory server keeps no time, so an entry lasts until it is left.
+  const presence = new Map<string, Set<string>>();
+  add("PUT", "/workspaces/:workspaceId/pages/:pageId/presence", "presence", (ctx) => {
+    const ws = workspaceFor(ctx, "read");
+    const key = pageKey(ws.id, parsePageId(ctx.params.pageId));
+    const page = pages.get(key);
+    if (!page || page.deleted) throw new ApiError("not_found", "page not found");
+    const here = presence.get(key) ?? new Set<string>();
+    presence.set(key, here.add(ctx.user.id));
+    return jsonReply(200, { items: [...here].filter((id) => id !== ctx.user.id).map((userId) => ({ userId, displayName: userId })) });
+  });
+  add("DELETE", "/workspaces/:workspaceId/pages/:pageId/presence", "presence", (ctx) => {
+    const ws = workspaceFor(ctx, "read");
+    presence.get(pageKey(ws.id, parsePageId(ctx.params.pageId)))?.delete(ctx.user.id);
+    return { status: 204, headers: {} };
+  });
 
   add("GET", "/workspaces/:workspaceId/pages/:pageId/revisions", null, (ctx) => {
     const ws = workspaceFor(ctx, "read");
