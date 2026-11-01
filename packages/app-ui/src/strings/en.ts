@@ -561,6 +561,7 @@ export const en = {
       "tab.pin": "Pin or unpin the current tab",
       "tab.split": "Split the current tab to the right, or move it to the other pane",
       "pane.focusOther": "Move focus to the other pane",
+      "region.next": "Move focus between the sidebar and the panes",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
