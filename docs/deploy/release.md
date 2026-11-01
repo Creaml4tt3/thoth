@@ -69,7 +69,8 @@ website's private repository (`Creaml4tt3/thoth-site`) holds the post, its pictu
 4. **Link the post from the GitHub release:** once the post is live, run the `github-release` job again
    (Actions → the tag's run → Re-run jobs → "GitHub release notes", or `gh run rerun <run id> --job <job id>`). It
    edits the release, and the notes now link the post.
-5. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
+5. **winget and the AUR**, once the files are on R2: see "Package managers" below.
+6. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
    edit v0.1.3 --notes-file notes.md`.
 
 ## Windows
@@ -134,7 +135,26 @@ To try an update locally: build two debug versions with `THOTH_UPDATE_URL=http:/
 with a throwaway key (never committed), and serve the newer one's files and `latest.json` from that port. A release
 build refuses an `http` address.
 
+## Package managers
+
+Both take the installers straight from `download.thothnotes.com` over HTTPS, at the versioned path, with no redirect.
+The hashes are the release's `SHA256SUMS`.
+
+- **winget** (`Creaml4tt3.Thoth`, the NSIS installer, per user): the manifests are in `packaging/winget/manifests/`, in
+  the same layout as `microsoft/winget-pkgs`. For a new version, copy the folder to the new version, change
+  `PackageVersion`, `InstallerUrl`, `InstallerSha256` (upper case), `ReleaseDate` and `ReleaseNotesUrl`, and open a
+  pull request to `microsoft/winget-pkgs` with the three files (or run `wingetcreate update Creaml4tt3.Thoth --version
+  x.y.z --urls <installer URL> --submit` on Windows). Microsoft's validation scans the installer and tests a silent
+  install and uninstall; a moderator then reviews it. Neither policy page requires a signed installer, but an unsigned,
+  new installer is more likely to trip Defender or SmartScreen in that validation.
+- **AUR** (`thoth-notes-bin`; `thoth` and `thoth-bin` belong to an unrelated project): `packaging/aur/thoth-notes-bin`
+  repackages the `.deb`. For a new version, set `pkgver` (and `pkgrel=1`) and the `.deb`'s hash, run `makepkg
+  --printsrcinfo > .SRCINFO`, and push both files to `ssh://aur@aur.archlinux.org/thoth-notes-bin.git` from the
+  owner's AUR account. It was built, checked with `namcap` and installed in an Arch container for 0.3.1.
+
 ## Signing (not yet)
+
+Windows: SignPath Foundation's free signing is being applied for; what it needs is in `signpath.md`.
 
 The builds are not signed with a Developer ID. The macOS app is ad-hoc signed (a sealed bundle, so macOS does
 not call it damaged), but Gatekeeper still says it cannot check the app until the user chooses Open Anyway

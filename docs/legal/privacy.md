@@ -13,13 +13,14 @@
 > change both together, or the site build fails.
 <!-- repo-only:end -->
 
-Last updated: 31 October 2026
+Last updated: 2 November 2026
 
 ## Who we are
 
 Creaml4tt3, an individual in Thailand, runs the Thoth website at
 `thothnotes.com`, the web version of Thoth at `thothnotes.com/app`,
-and the Thoth demo server at `api.thothnotes.com`. For the personal data
+the Thoth demo server at `api.thothnotes.com`, and the download site at
+`download.thothnotes.com`. For the personal data
 described here, Creaml4tt3 is the data controller under Thailand's Personal
 Data Protection Act B.E. 2562 (2019) ("PDPA").
 
@@ -27,13 +28,26 @@ Contact: privacy@thothnotes.com
 
 ## What this notice covers
 
-This notice covers the website, the web version and the demo server. It does
-not cover:
+This notice covers the website, the web version, the demo server and the
+download site. It does not cover:
 
 - **The Thoth desktop app.** Your Private Space stays on your own computer.
-  The app sends nothing anywhere unless you connect it to a server, and it has
-  no analytics. It keeps a small log on your computer of errors and app events
-  (about 3 MB at most). It is built to leave out page text and titles, and it
+  The app has no analytics and never sends your notes anywhere you didn't
+  choose. On its own it does two things, and you can turn both off in Settings:
+  - **Update check.** When it opens, and about once a day while it stays open,
+    it asks the download site whether a new version is out, sending only its
+    version number. Turn it off with Settings → Updates → "Tell me when a new
+    version is out"; then it makes no request at all.
+  - **Link previews.** When a link sits on its own line in one of your pages,
+    for example a link you paste, it fetches that page's title, description and
+    image from the linked site to show a preview card, which tells that site
+    the page was looked at. Links in workspace pages are fetched only when you
+    choose "Load preview". Settings → Editor → "Link previews" offers On, Only
+    for links I paste, and Off.
+
+  Everything else happens only when you choose it, such as connecting to a
+  server or sending a problem report. The app also keeps a small log on your
+  computer of errors and app events (about 3 MB at most). It is built to leave out page text and titles, and it
   masks file paths, links and email addresses. The log is sent only if you
   include it in a problem report, after you have seen every line. You can turn
   the log off in Settings, which also deletes it.
@@ -48,6 +62,7 @@ not cover:
 | Pages, page history, attachments and workspace membership | You | To provide the service | Performing our agreement with you |
 | Sign-in sessions (stored only as hashes) | Created when you sign in | To keep you signed in | Performing our agreement with you |
 | IP address and request counts | Each request to the demo server | Rate limiting and preventing abuse | Our legitimate interest in keeping the service secure |
+| IP address, country, user agent (for the app, its version number), time and path of each request to the download site: update checks and installer downloads | Your app or your browser | Delivering the files; counting, once a week, how many different addresses check for updates or download an installer, which tells us roughly how many people use Thoth | Our legitimate interest in running the download site and knowing whether Thoth is used |
 | Server logs: time, method, path without query, status code, request ID | Each request to the demo server | Running and fixing the service | Our legitimate interest in running the service |
 | Feedback you send from the website, the web version or the desktop app: your message, the kind, and, only if you give or include them, your email address, the app version, operating system, processor type and language, and the recent app log (from the desktop app, only if you tick "Include recent app log", after you have seen every line; built to leave out page text and titles; file paths, links and emails masked). If you are signed in when you send it, it is linked to your account | You, when you send it; the demo server only receives it if the app sends it there | To read and answer problems, ideas and questions, and to fix bugs | Our legitimate interest in answering you and fixing the app; for the app log, your consent, given by ticking the box |
 | Website and web version analytics (see below) | Your browser, only if you accept analytics | Learning which pages and features people use, so we can improve them | Your consent |
@@ -108,7 +123,8 @@ We use these providers, each under its own terms and privacy policy:
 - **Neon** (United States), with the database in the AWS Asia Pacific
   (Singapore) region: the demo server's database;
 - **Google** (United States): sign-in, and analytics if you accept it;
-- **GitHub** (United States): sign-in.
+- **GitHub** (United States): sign-in;
+- **Cloudflare** (United States): the download site.
 
 Your data may therefore be transferred to and processed in other countries,
 including the United States and Singapore, whose data protection standards may
@@ -123,6 +139,10 @@ contractual safeguards, as the PDPA allows for transfers abroad.
   together with the workspaces it alone owns. The app shows a warning first.
 - **Server logs** are kept for up to 30 days.
   <!-- OWNER: check your Vercel plan's log retention and match this number. -->
+- **Download site request records** are kept by Cloudflare for about a month
+  (at least 31 days). We keep only the weekly totals, not the addresses.
+  <!-- OWNER: Cloudflare documents "at least 31 days" for adaptive request analytics on every plan
+       (developers.cloudflare.com/analytics/graphql-api/limits/). Check your zone's settings and match this if it differs. -->
 - **Rate-limit counters** are deleted within a day.
 - **Feedback**, and any app log sent with it, is deleted 90 days after it arrives.
 - **Analytics data** is kept in Google Analytics for 2 months.

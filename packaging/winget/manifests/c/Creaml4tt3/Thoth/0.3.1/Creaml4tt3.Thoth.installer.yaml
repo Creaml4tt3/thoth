@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: Creaml4tt3.Thoth
+PackageVersion: 0.3.1
+InstallerLocale: en-US
+InstallerType: nullsoft
+Scope: user
+ReleaseDate: 2026-11-01
+# The Tauri NSIS installer's uninstall key is HKCU\...\Uninstall\Thoth; its publisher is pinned to "github" (ADR-0031).
+ProductCode: Thoth
+AppsAndFeaturesEntries:
+- DisplayName: Thoth
+  Publisher: github
+  ProductCode: Thoth
+Installers:
+- Architecture: x64
+  InstallerUrl: https://download.thothnotes.com/v0.3.1/Thoth_0.3.1_x64-setup.exe
+  InstallerSha256: 26DF67B4C4CE55C4B1F137463C44F5DE94CE2EDF64340C48D159F5F23A43E1EF
+ManifestType: installer
+ManifestVersion: 1.12.0
