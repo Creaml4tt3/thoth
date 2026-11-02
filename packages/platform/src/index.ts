@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -116,9 +116,16 @@ export interface ConnectedApps {
   forget(app: string): Promise<ConnectedAppsSettings>;
   log(): Promise<ConnectedAppsLogEntry[]>;
   answer(id: string, answer: McpAnswer): Promise<void>;
+  /** "May propose changes" for an app (ADR-0048). */
+  mayPropose(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
+  proposals(): Promise<{ proposals: ConnectedAppProposal[]; open: number }>;
+  proposal(id: string): Promise<ConnectedAppProposalText>;
+  settle(id: string, status: "applied" | "declined" | "conflicted"): Promise<ConnectedAppProposal>;
+  /** Proposals were added or settled; `open` is how many wait for review. Returns the remover. */
+  onProposals(listener: (open: number) => void): Promise<() => void>;
   /** A request for some window (each window answers only those whose `owner` is its own id). Returns the remover. */
   onRequest(listener: (request: McpRequest) => void): Promise<() => void>;
-  /** The apps waiting for Allow or Deny changed. Returns the remover. */
+  /** The apps waiting for an answer (Allow or Deny, or "May propose changes") changed. Returns the remover. */
   onPending(listener: (apps: string[]) => void): Promise<() => void>;
 }
 

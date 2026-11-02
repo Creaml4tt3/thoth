@@ -343,7 +343,7 @@ export function remoteUpdates(transport: Transport, events: Pick<Updates, "onPro
 }
 
 /** Connected apps (ADR-0021) over the `mcp.*` commands; the events come from the platform's own event channel. */
-export function remoteConnectedApps(transport: Transport, events: Pick<ConnectedApps, "onRequest" | "onPending">): ConnectedApps {
+export function remoteConnectedApps(transport: Transport, events: Pick<ConnectedApps, "onRequest" | "onPending" | "onProposals">): ConnectedApps {
   return {
     settings: () => transport.call("mcp.settings", {}),
     configure: (change) => transport.call("mcp.configure", change),
@@ -351,8 +351,13 @@ export function remoteConnectedApps(transport: Transport, events: Pick<Connected
     forget: (app) => transport.call("mcp.forget", { app }),
     log: () => transport.call("mcp.log", {}),
     answer: async (id, answer) => void (await transport.call("mcp.answer", { id, ...answer })),
+    mayPropose: (app, allow) => transport.call("mcp.mayPropose", { app, allow }),
+    proposals: () => transport.call("mcp.proposals", {}),
+    proposal: (id) => transport.call("mcp.proposal", { id }),
+    settle: (id, status) => transport.call("mcp.settle", { id, status }),
     onRequest: (listener) => events.onRequest(listener),
     onPending: (listener) => events.onPending(listener),
+    onProposals: (listener) => events.onProposals(listener),
   };
 }
 

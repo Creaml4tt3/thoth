@@ -8,6 +8,17 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Connected apps can propose changes to your pages: a new page, an edit (the whole page or exact pieces of text), or an addition at the end or under a heading. Nothing is written until you review the change under the bell and apply it. Each app needs "May propose changes", which is off until you turn it on.
+- The review of proposed changes shows the app, when, the page and a diff, with Apply, Decline and "Apply all from" an app. A page that changed in the meantime is never overwritten: you see the difference against the page as it is now and choose.
+
+### Changed
+
+- `read_page` now gives the page's version, so an app can say which version its proposal is based on.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added

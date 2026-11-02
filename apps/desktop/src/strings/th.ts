@@ -229,7 +229,8 @@ export const th: DesktopStrings = {
   // Settings → Connected apps and the question when an app connects (ADR-0021). "Private Space" and "MCP" stay in English, as elsewhere.
   connectedApps: {
     title: "แอปที่เชื่อมต่อ",
-    intro: "แอปในเครื่องนี้ที่ใช้ MCP ได้ เช่น Claude Desktop หรือ Cursor จะค้นหาและอ่าน Private Space ที่คุณแชร์ไว้ที่นี่ได้ แต่แก้ไขอะไรไม่ได้",
+    // REVIEW
+    intro: "แอปในเครื่องนี้ที่ใช้ MCP ได้ เช่น Claude Desktop หรือ Cursor จะค้นหาและอ่าน Private Space ที่คุณแชร์ไว้ที่นี่ได้ และถ้าคุณอนุญาต ก็เสนอการแก้ไขได้ด้วย โดยคุณตรวจดูก่อนทุกครั้ง ไม่มีอะไรถูกเขียนจนกว่าคุณจะยืนยัน",
     unavailable: "เครื่องนี้ยังใช้แอปที่เชื่อมต่อไม่ได้",
     enable: "ให้แอปอื่นอ่านโน้ตของฉัน",
     enableHint: "ปิดอยู่โดยค่าเริ่มต้น แอปจะอ่าน Private Space ได้ก็ต่อเมื่อ Thoth เปิดอยู่และ Private Space นั้นเปิดอยู่ในหน้าต่างหนึ่ง",
@@ -264,7 +265,18 @@ export const th: DesktopStrings = {
     logLabel: "คำขอจากแอปที่เชื่อมต่อ",
     when: (date) => date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }),
     columns: { time: "เวลา", app: "แอป", tool: "สิ่งที่ขอ", pages: "หน้า", result: "ผล" },
-    tools: { search: "ค้นหา", list_pages: "รายการหน้า", read_page: "อ่านหน้า", backlinks: "ลิงก์มายังหน้า", unknown: "สิ่งที่ไม่รู้จัก" },
+    tools: {
+      search: "ค้นหา",
+      list_pages: "รายการหน้า",
+      read_page: "อ่านหน้า",
+      backlinks: "ลิงก์มายังหน้า",
+      propose_create_page: "เสนอหน้าใหม่", // REVIEW
+      propose_edit_page: "เสนอการแก้ไข", // REVIEW
+      propose_append: "เสนอการเพิ่มเนื้อหา", // REVIEW
+      list_proposals: "ข้อเสนอของแอป", // REVIEW
+      get_proposal: "ข้อเสนอหนึ่งรายการ", // REVIEW
+      unknown: "สิ่งที่ไม่รู้จัก",
+    },
     answered: "ตอบแล้ว",
     refused: {
       DENIED: "ปฏิเสธ: ไม่ได้รับอนุญาต",
@@ -276,16 +288,48 @@ export const th: DesktopStrings = {
       TIMEOUT: "ใช้เวลานานเกินไป",
       BAD_ARGUMENT: "คำขอไม่ถูกต้อง",
       BUSY: "ไม่ว่าง",
+      EXISTS: "ปฏิเสธ: มีหน้านี้อยู่แล้ว", // REVIEW
+      CONFLICT: "ปฏิเสธ: หน้าถูกแก้ไขไปแล้ว", // REVIEW
     },
     failed: (code) => `ไม่สำเร็จ (${code})`,
     prompt: {
       title: (app) => `ให้ “${app}” อ่านโน้ตของคุณไหม`,
-      body: (spaces) => `แอปนี้จะค้นหาและอ่านหน้าใน ${spaces} ได้ แต่แก้ไขอะไรไม่ได้`,
+      body: (spaces) => `แอปนี้จะค้นหาและอ่านหน้าใน ${spaces} ได้ แต่แก้ไขอะไรไม่ได้ถ้าคุณไม่ได้ตรวจดูก่อน`, // REVIEW
       nothingShared: "ยังไม่ได้แชร์ Private Space ใด ติ๊กเลือกได้ที่ การตั้งค่า → แอปที่เชื่อมต่อ",
       caution: (app) => `แอปตั้งชื่อตัวเอง Thoth ตรวจสอบไม่ได้ว่าใช่ ${app} จริงหรือไม่ อนุญาตเฉพาะเมื่อคุณเพิ่งตั้งค่าแอปนี้เอง`,
       later: "Thoth จะจำคำตอบของคุณไว้ เปลี่ยนได้ทุกเมื่อที่ การตั้งค่า → แอปที่เชื่อมต่อ",
       allow: "อนุญาต",
       deny: "ไม่อนุญาต",
+    },
+    // REVIEW: the strings below, for proposed changes (ADR-0048).
+    mayPropose: "เสนอการแก้ไขได้", // REVIEW
+    mayProposeHint: "ปิดอยู่จนกว่าคุณจะเปิด การแก้ไขแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้", // REVIEW
+    proposePrompt: {
+      title: (app) => `ให้ “${app}” เสนอการแก้ไขไหม`, // REVIEW
+      body: "แอปนี้ต้องการเสนอการแก้ไขหน้าของคุณ การแก้ไขแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง เป็นส่วนที่ต่างกันซึ่งคุณกดใช้หรือปฏิเสธได้ ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้", // REVIEW
+      later: "Thoth จะจำคำตอบของคุณไว้ เปลี่ยนได้ทุกเมื่อที่ การตั้งค่า → แอปที่เชื่อมต่อ ตรง “เสนอการแก้ไขได้”", // REVIEW
+      allow: "อนุญาตให้เสนอ", // REVIEW
+      deny: "ไม่อนุญาต", // REVIEW
+    },
+    proposals: {
+      entry: (n) => `การแก้ไขที่เสนอมา ${count(n)} รายการรอตรวจ`, // REVIEW
+      entryBody: "จากแอปที่เชื่อมต่อ ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้", // REVIEW
+      title: "การแก้ไขที่เสนอมา", // REVIEW
+      lede: "แอปที่เชื่อมต่อเสนอการแก้ไขเหล่านี้ ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้ และแต่ละรายการจะถูกตรวจกับหน้าในตอนนี้ก่อน", // REVIEW
+      none: "ไม่มีการแก้ไขที่เสนอมารอตรวจ", // REVIEW
+      loading: "กำลังโหลด…", // REVIEW
+      from: (app) => `จาก “${app}”`, // REVIEW
+      applyAll: (app) => `ใช้ทั้งหมดจาก ${app}`, // REVIEW
+      apply: "ใช้", // REVIEW
+      applyAnyway: "ใช้อยู่ดี", // REVIEW
+      decline: "ปฏิเสธ", // REVIEW
+      kinds: { create: "หน้าใหม่", edit: "แก้ไข", append: "เพิ่มเนื้อหา" }, // REVIEW
+      when: (date) => date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }),
+      label: (path) => `การแก้ไขที่เสนอสำหรับ ${path}`, // REVIEW
+      conflict: "หน้านี้ถูกแก้ไขหลังจากที่แอปเสนอมา จึงยังไม่มีอะไรถูกเขียน ส่วนที่ต่างกันด้านล่างเทียบกับหน้าในตอนนี้ กดใช้อยู่ดีเพื่อแทนที่เวอร์ชันนั้น หรือปฏิเสธ", // REVIEW
+      conflictExists: "ตอนนี้มีไฟล์อยู่ที่ตำแหน่งนี้แล้ว จึงสร้างหน้าใหม่นี้ไม่ได้ ให้ปฏิเสธ แล้วขอให้แอปใช้ตำแหน่งอื่น", // REVIEW
+      applied: (path) => `ใช้กับ ${path} แล้ว`, // REVIEW
+      failed: (message) => `ใช้ไม่ได้: ${message}`, // REVIEW
     },
   },
 

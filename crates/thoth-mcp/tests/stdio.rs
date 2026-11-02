@@ -1,5 +1,5 @@
 //! `thoth-mcp` over stdio (ADR-0021), as an MCP client starts it: the 2025-11-25 handshake (`initialize`), the
-//! 2026-07-28 per-request metadata (`server/discover`, `_meta`), the four tools, and every way a call can fail. The
+//! 2026-07-28 per-request metadata (`server/discover`, `_meta`), the tools, and every way a call can fail. The
 //! running app is played by a socket that records what it is sent. `tests/mcp/schema.test.ts` checks the same answers
 //! against the official MCP JSON schemas.
 #![cfg(unix)]
@@ -114,7 +114,7 @@ fn meta(app: &str) -> Value {
 }
 
 #[test]
-fn the_2025_11_25_handshake_then_the_four_read_only_tools() {
+fn the_2025_11_25_handshake_then_the_read_tools_and_the_ones_that_only_propose() {
     let app = app(page_answer);
     let mut server = Server::start(&app.socket);
     let init = server.initialize("claude-ai");
@@ -126,10 +126,16 @@ fn the_2025_11_25_handshake_then_the_four_read_only_tools() {
 
     let tools = server.call(2, "tools/list", json!({}))["result"]["tools"].clone();
     let names: Vec<&str> = tools.as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["search", "list_pages", "read_page", "backlinks"]);
+    assert_eq!(
+        names,
+        ["search", "list_pages", "read_page", "backlinks", "propose_create_page", "propose_edit_page", "propose_append", "list_proposals", "get_proposal"]
+    );
     for tool in tools.as_array().unwrap() {
         assert_eq!(tool["inputSchema"]["type"], "object");
-        assert_eq!(tool["annotations"]["readOnlyHint"], true, "{tool}");
+        // A proposal writes nothing until the user applies it in Thoth (ADR-0048): not read-only, never destructive.
+        let proposes = tool["name"].as_str().unwrap().starts_with("propose_");
+        assert_eq!(tool["annotations"]["readOnlyHint"], !proposes, "{tool}");
+        assert_eq!(tool["annotations"]["destructiveHint"], false, "{tool}");
         assert_eq!(tool["annotations"]["openWorldHint"], false);
     }
     assert_eq!(tools[0]["inputSchema"]["required"], json!(["query"]));
@@ -168,7 +174,7 @@ fn the_2026_07_28_requests_carry_their_version_and_client_in_meta() {
 
     let list = server.call(2, "tools/list", json!({ "_meta": meta("Cursor") }));
     assert_eq!(list["result"]["resultType"], "complete");
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 4);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 9);
     assert!(list["result"]["ttlMs"].is_u64());
 
     let call = server.call(3, "tools/call", json!({ "_meta": meta("Cursor"), "name": "search", "arguments": { "query": "แผน" } }));

@@ -242,6 +242,18 @@ export interface Commands {
   "mcp.answer": { args: { id: string } & McpAnswer; result: null };
   /** The requests of the last 30 days, newest first (at most 500). */
   "mcp.log": { args: Record<string, never>; result: ConnectedAppsLogEntry[] };
+  /** "May propose changes" for an app that connected (ADR-0048); also the answer when it first proposes. */
+  "mcp.mayPropose": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
+  /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
+  "mcp.proposals": { args: Record<string, never>; result: { proposals: ConnectedAppProposal[]; open: number } };
+  /** One proposal with the page as it was and as proposed (both null once it is settled). */
+  "mcp.proposal": { args: { id: string }; result: ConnectedAppProposalText };
+  /**
+   * This window applied a proposal (compare-and-swap, in its Vault), the user declined it, or the page had changed
+   * (`conflicted`). `NOT_ALLOWED` unless this window has the proposal's Private Space open; `CONFLICT` when it is
+   * settled already.
+   */
+  "mcp.settle": { args: { id: string; status: "applied" | "declined" | "conflicted" }; result: ConnectedAppProposal };
   // ---- Problem reports (ADR-0040). Desktop only: the app's local log, which never leaves the computer by itself.
   /**
    * The window's uncaught error, for the local log: the message and the first 5 lines of the stack, redacted by the
@@ -331,10 +343,15 @@ export interface ConnectedAppsSettings {
   error: string | null;
   /** Canonical roots of the shared Private Spaces. */
   spaces: string[];
-  /** Apps the user allowed or denied; `name` is what the app calls itself (MCP `clientInfo.name`), not verified. */
-  apps: { name: string; allowed: boolean; decidedAt: string }[];
+  /**
+   * Apps the user allowed or denied; `name` is what the app calls itself (MCP `clientInfo.name`), not verified.
+   * `propose`: "May propose changes" (ADR-0048); null until the user answered.
+   */
+  apps: { name: string; allowed: boolean; decidedAt: string; propose: boolean | null }[];
   /** Apps waiting for Allow or Deny, oldest first. */
   pending: string[];
+  /** Allowed apps that proposed a change and wait for "May propose changes", oldest first. */
+  proposers: string[];
   /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
   setup: { command: string; args: string[] } | null;
 }
@@ -350,6 +367,34 @@ export interface ConnectedAppsLogEntry {
   ok: boolean;
   /** The error code when `ok` is false (`DENIED`, `NOT_FOUND`, `NO_SPACE`, …). */
   error?: string;
+}
+
+/** A change a connected app proposed (ADR-0048), as the host keeps it. Nothing is written until a window applies it. */
+export interface ConnectedAppProposal {
+  id: string;
+  /** The app's own name (not verified). */
+  app: string;
+  kind: "create" | "edit" | "append";
+  /** The Private Space's canonical root, and its name as the app saw it. */
+  root: string;
+  space: string;
+  path: string;
+  pageId: string | null;
+  /** The page's version (content hash) the proposal was made from; null for a new page, which must not exist. */
+  baseHash: string | null;
+  status: "pending" | "applied" | "declined" | "expired" | "conflicted";
+  /** UTC, `YYYY-MM-DDTHH:MM:SSZ`. */
+  createdAt: string;
+  /** While it waits. */
+  expiresAt?: string;
+  settledAt?: string;
+}
+
+export interface ConnectedAppProposalText extends ConnectedAppProposal {
+  /** The page when it was proposed (null: a new page, or settled). */
+  before: string | null;
+  /** The page as proposed (null once settled). */
+  after: string | null;
 }
 
 /** The host asks a window to answer an app's tool call from its open Vault (event `mcp.request`). */

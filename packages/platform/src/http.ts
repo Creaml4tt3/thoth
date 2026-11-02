@@ -101,6 +101,7 @@ function bridgeConnectedApps(transport: HttpTransport, on: BridgeEvents): Connec
   return remoteConnectedApps(transport, {
     onRequest: (listener) => on<McpRequest>("mcp.request", listener),
     onPending: (listener) => on<{ apps: string[] }>("mcp.pending", (payload) => listener(payload.apps)),
+    onProposals: (listener) => on<{ open: number }>("mcp.proposals", (payload) => listener(payload.open)),
   });
 }
 

@@ -1,6 +1,7 @@
 # ADR-0021: Connected apps: a read-only MCP server
 
-- **Status:** Accepted (owner, 2026-10-26)
+- **Status:** Accepted (owner, 2026-10-26). Rule 4 amended by ADR-0048 (2026-11-02): apps may propose changes, reviewed in
+  Thoth.
 - **Date:** 2026-10-26
 - **Deciders:** project owner (the request, 2026-10-25); rules 1 to 6 were decided by the orchestrator for the owner.
   The details marked "(this ADR)" were decided while implementing them.
