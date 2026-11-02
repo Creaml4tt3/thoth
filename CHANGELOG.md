@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- The desktop app keeps a Private Space's search index in its own data folder on this computer, no longer in the notes folder, so notes on a network share or a synced drive no longer carry a changing database. The old index there is deleted and rebuilt once. A Private Space on a network drive gets a short notice.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added
@@ -229,6 +235,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Creaml4tt3/thoth/compare/v0.2.8...v0.3.0

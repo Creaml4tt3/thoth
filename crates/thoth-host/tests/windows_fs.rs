@@ -194,8 +194,18 @@ fn a_vault_whose_metadata_or_index_is_a_link_does_not_open() {
     assert!(!b.join("elsewhere/index.sqlite").exists());
     std::fs::create_dir_all(b.join("v2/.thoth")).unwrap();
     std::fs::write(b.join("elsewhere.sqlite"), "").unwrap();
-    if std::os::windows::fs::symlink_file(b.join("elsewhere.sqlite"), b.join("v2/.thoth/index.sqlite")).is_ok() {
+    // The index lives in the data folder (ADR-0046): a link there is refused.
+    let new_index = canonical(data.path()).join(thoth_host::index_home::DIR).join(thoth_host::index_home::digest(&b.join("v2"))).join("index.sqlite");
+    std::fs::create_dir_all(new_index.parent().unwrap()).unwrap();
+    if std::os::windows::fs::symlink_file(b.join("elsewhere.sqlite"), &new_index).is_ok() {
         assert_eq!(code(host.call("vault.open", &json!({ "root": b.join("v2").to_string_lossy() }), None)), "SQLITE_ERROR");
+        std::fs::remove_file(&new_index).unwrap();
+    }
+    // An old index in `.thoth/` that is a link is removed as a link, never opened.
+    if std::os::windows::fs::symlink_file(b.join("elsewhere.sqlite"), b.join("v2/.thoth/index.sqlite")).is_ok() {
+        host.call("vault.open", &json!({ "root": b.join("v2").to_string_lossy() }), None).unwrap();
+        assert!(std::fs::symlink_metadata(b.join("v2/.thoth/index.sqlite")).is_err());
+        assert_eq!(std::fs::read(b.join("elsewhere.sqlite")).unwrap(), b"");
     }
     // A root reached through a junction opens as its canonical target, which is what the host shows and keeps.
     std::fs::create_dir_all(b.join("real")).unwrap();

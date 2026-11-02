@@ -26,9 +26,11 @@ pub mod data_dir;
 pub mod diagnostics;
 pub mod error;
 mod handles;
+pub mod index_home;
 pub mod install;
 pub mod links;
 pub mod mcp;
+pub mod network;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
@@ -199,6 +201,8 @@ pub struct Host {
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
+    /// Where a host without a data folder keeps its indexes (ADR-0046): made on first use, removed with the host.
+    scratch_indexes: std::sync::OnceLock<tempfile::TempDir>,
 }
 
 type Reply = (Value, Option<Vec<u8>>);
@@ -231,6 +235,7 @@ impl Host {
             version: String::new(),
             reported: AtomicUsize::new(0),
             replace: Mutex::new(()),
+            scratch_indexes: std::sync::OnceLock::new(),
         }
     }
 
@@ -616,14 +621,19 @@ impl Host {
         let fd = open_root_dir(&root)?;
         let fs = VaultFs::new(fd, self.config.disable_hardlink);
         fs.mkdirp(".thoth")?;
-        // SQLITE_OPEN_NOFOLLOW refuses a symlink anywhere in this path; `.thoth` was just checked through the root fd.
-        // On Windows SQLite ignores that flag, so the host checks the database files through the root handle.
-        #[cfg(windows)]
-        fs.refuse_linked_index()?;
-        let db = root.join(".thoth").join("index.sqlite");
+        // The index lives in the app's data folder (ADR-0046). The folders on the way are checked by `index_home`;
+        // SQLITE_OPEN_NOFOLLOW refuses a link anywhere in the path (on Windows, where SQLite ignores that flag,
+        // `index_home` checks the database files too).
+        let db = index_home::database(&self.index_base()?, &root)?;
         #[cfg(windows)]
         let db = win::paths::for_win32(&db);
+        // The first handle on this folder in this app deletes the index an older Thoth left in `.thoth/`. A later one
+        // finds it gone (or one an older Thoth made since, which the next first open deletes).
+        if !self.state().vaults.values().any(|v| v.root == root) {
+            drop_old_index(&fs, &root);
+        }
         let sql = Sql::open(&db)?;
+        let network = network::on_network(&root);
         let label = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let handle = handles::new_handle("vault")?;
         let shown = root.to_string_lossy().into_owned();
@@ -637,7 +647,25 @@ impl Host {
             shared
         };
         self.remember(&shown);
-        Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared }))
+        Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared, "network": network }))
+    }
+
+    /// The folder the indexes live under: the data folder, or this host's own temporary folder when it has none.
+    fn index_base(&self) -> HostResult<PathBuf> {
+        match &self.config.data_dir {
+            Some(data) => index_home::canonical_base(data),
+            None => {
+                let scratch = match self.scratch_indexes.get() {
+                    Some(dir) => dir,
+                    None => {
+                        let dir =
+                            tempfile::Builder::new().prefix("thoth-indexes-").tempdir().map_err(|e| HostError::io(&e, "mkdir", "temporary index folder"))?;
+                        self.scratch_indexes.get_or_init(|| dir)
+                    }
+                };
+                index_home::canonical_base(scratch.path())
+            }
+        }
     }
 
     /// Has an owner other than `owner` (another window) a handle open on `root`?
@@ -973,6 +1001,25 @@ fn discard(entry: Arc<FileEntry>) {
 const HOME_VAR: &str = "HOME";
 #[cfg(windows)]
 const HOME_VAR: &str = "USERPROFILE";
+
+/// Deletes the index an older Thoth kept in `<root>/.thoth/` (ADR-0046), unless another Thoth has it open (an older
+/// version on this folder, maybe on another computer: `Sql::in_use`). It is not copied: the index rebuilds from the
+/// files. An older Thoth that opens the folder later makes and fills its own again. Best effort: what cannot be
+/// deleted now is tried again on the next open.
+fn drop_old_index(fs: &VaultFs, root: &Path) {
+    let old = root.join(".thoth").join(index_home::FILE);
+    // On Windows SQLite would follow a link, so a linked old index is never opened, only removed.
+    #[cfg(windows)]
+    let (linked, old) = (fs.refuse_linked_index().is_err(), win::paths::for_win32(&old));
+    #[cfg(not(windows))]
+    let linked = false;
+    if !linked && Sql::in_use(&old) {
+        return;
+    }
+    if let Err(e) = fs.remove_old_index() {
+        log::warn!("The old index in .thoth/ was not deleted: {}", e.message);
+    }
+}
 
 /// Opens a canonical root directory. On macOS `O_NOFOLLOW_ANY` refuses a symlink in any component,
 /// so a component swapped for a symlink after canonicalization cannot redirect the vault.

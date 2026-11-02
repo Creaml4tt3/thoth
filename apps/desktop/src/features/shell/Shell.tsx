@@ -88,6 +88,9 @@ function RecoveryNotice() {
   );
 }
 
+/** The network drive notice of a Private Space was dismissed: this prefix and its folder, in localStorage. */
+export const NETWORK_NOTICE_KEY_PREFIX = "thoth.desktop.networkNotice.";
+
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
   const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
@@ -98,6 +101,17 @@ export function Shell() {
   const strings = useStrings();
   const tt = strings.tabs;
   const [problem, setProblem] = useState<string | null>(null);
+  // A Private Space on a network drive (ADR-0046): said once per Private Space, until dismissed.
+  const networkKey = `${NETWORK_NOTICE_KEY_PREFIX}${connection.root}`;
+  const [networkNotice, setNetworkNotice] = useState(() => connection.network === true && globalThis.localStorage?.getItem(networkKey) !== "dismissed");
+  const dismissNetworkNotice = () => {
+    try {
+      globalThis.localStorage?.setItem(networkKey, "dismissed");
+    } catch {
+      // Not remembered (storage full or off): it is said again next time.
+    }
+    setNetworkNotice(false);
+  };
   const dismissText = useDesktopStrings().transfer.dismiss;
   const editor = useEditorActions();
   const { theme: themeNow, setTheme, cycle } = useTheme(desktopTheme);
@@ -469,6 +483,14 @@ export function Shell() {
               {watchError && (
                 <p role="alert" className="alert alert-warning banner">
                   {t.watchError(watchError)}
+                </p>
+              )}
+              {networkNotice && (
+                <p role="status" className="alert banner">
+                  {t.networkNotice}{" "}
+                  <Button variant="quiet" small onClick={dismissNetworkNotice}>
+                    {dismissText}
+                  </Button>
                 </p>
               )}
               {favorites.error && (

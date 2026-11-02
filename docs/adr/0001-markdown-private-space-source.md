@@ -23,7 +23,9 @@ crash can leave the file tree and the index disagreeing (section 6.3).
 2. **`.thoth/` directory.** It holds:
    - `config.json`
    - `index.sqlite` - a cache. Deleting it loses no content and the index is
-     rebuilt from the files plus the durable JSON records below.
+     rebuilt from the files plus the durable JSON records below. *Amended by
+     ADR-0046:* after 0.4.0 the desktop app keeps it in its own data folder on
+     each computer, not in `.thoth/`.
    - `operations/` - journal and staging for imports and transfers.
    - `manifests/` - import manifests and reports.
    - `sync/` (reserved for P2/P3) - durable JSON records for remote mappings
