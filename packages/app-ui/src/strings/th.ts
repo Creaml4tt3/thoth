@@ -250,6 +250,29 @@ export const th: Strings = {
       move: "ย้าย",
       cancel: "ยกเลิก",
     },
+    duplicate: "ทำสำเนา", // REVIEW
+    duplicateStructure: "ทำสำเนาเฉพาะโครงสร้าง", // REVIEW
+    duplicateTo: "ทำสำเนาไปที่…", // REVIEW
+    copyName: (title, n) => (n === 1 ? `${title} (สำเนา)` : `${title} (สำเนา ${n})`), // REVIEW
+    duplicated: (title) => `ทำสำเนา ${title} แล้ว`, // REVIEW
+    duplicateFailed: (detail) => `ทำสำเนาไม่ได้: ${detail} ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateQuota: (limit, current, adding) =>
+      `ทำสำเนาไม่ได้เพราะเกินขีดจำกัด: เวิร์กสเปซนี้มีได้ไม่เกิน ${count(limit)} หน้า ตอนนี้ใช้อยู่ ${count(current)} หน้า และสำเนาต้องใช้อีก ${count(adding)} หน้า ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateDialog: {
+      title: (name, pages) => (pages > 0 ? `ทำสำเนา ${name} และ ${count(pages)} หน้าข้างในใช่ไหม` : `ทำสำเนา ${name} ใช่ไหม`), // REVIEW
+      copy: "สำเนาจะอยู่ใต้ต้นฉบับทันที มีหน้า โฟลเดอร์ และลำดับเหมือนเดิม โดยไม่คัดลอกเวอร์ชันก่อนหน้าและลิงก์แชร์", // REVIEW
+      structure: "สำเนาจะมีหน้า โฟลเดอร์ และลำดับเหมือนเดิม แต่แต่ละหน้าจะเหลือแค่ชื่อ", // REVIEW
+      everyone: "ต้นฉบับมองเห็นได้เฉพาะบางทีม สำเนาไม่มีการจำกัดทีม ทุกคนในเวิร์กสเปซนี้จึงจะมองเห็นสำเนา", // REVIEW
+      noLimits: "สำเนาไม่มีการจำกัดทีม", // REVIEW
+      duplicate: "ทำสำเนา", // REVIEW
+      duplicating: "กำลังทำสำเนา…", // REVIEW
+      cancel: "ยกเลิก",
+    },
+    duplicateToDialog: {
+      title: (name) => `ทำสำเนา “${name}” ไปที่…`, // REVIEW
+      destination: "วางสำเนาไว้ใน", // REVIEW
+      pages: (pages) => `${count(pages)} หน้าข้างในจะถูกคัดลอกด้วย`, // REVIEW
+    },
     across: {
       copyTo: (name) => `คัดลอกไปที่ ${name}…`,
       moveTo: (name) => `ย้ายไปที่ ${name}…`,
@@ -516,6 +539,7 @@ export const th: Strings = {
       newFolderIn: (workspace) => `โฟลเดอร์ใหม่ใน ${workspace}`,
       rename: "เปลี่ยนชื่อหน้า",
       moveTo: "ย้ายไปที่…",
+      duplicate: "ทำสำเนาหน้า", // REVIEW
       moveUp: "ย้ายหน้าขึ้น",
       moveDown: "ย้ายหน้าลง",
       share: "แชร์หน้า…",
@@ -578,6 +602,7 @@ export const th: Strings = {
       "tree.rename": "เปลี่ยนชื่อ",
       "tree.reorder": "ย้ายหน้าขึ้นหรือลง",
       "tree.menu": "เปิดเมนูของหน้า",
+      "tree.duplicate": "ทำสำเนาหน้าหรือโฟลเดอร์", // REVIEW
       "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง",
       "editor.save": "บันทึกทันที",
       "editor.mode": "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",

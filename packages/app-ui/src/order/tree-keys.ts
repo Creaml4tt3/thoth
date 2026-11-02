@@ -5,10 +5,11 @@
  *
  * - Up/Down move between visible rows, Home/End jump to the first and last, Right opens a folder (or steps into
  *   it), Left closes it (or steps out to the parent). Enter and Space are the row's own click.
- * - F2 renames, Alt+Shift+Up/Down reorders, the Menu key (or Shift+F10) opens the row's menu.
+ * - F2 renames, Cmd/Ctrl+Shift+D duplicates, Alt+Shift+Up/Down reorders, the Menu key (or Shift+F10) opens the row's menu.
  * - Only one row is in the Tab order (the focused one, else the open page, else the first), so Tab leaves the tree.
  */
 import { useEffect, type KeyboardEvent, type RefObject } from "react";
+import { currentPlatform, matchesChord, shortcutById } from "../keyboard/shortcuts.ts";
 
 export interface TreeKeyHandlers {
   /** The row can have children shown below it. */
@@ -22,6 +23,8 @@ export interface TreeKeyHandlers {
   reorder?(delta: -1 | 1): void;
   /** Menu key or Shift+F10. */
   menu?(): void;
+  /** Cmd/Ctrl+Shift+D (`tree.duplicate`). Omit when the row cannot be duplicated. */
+  duplicate?(): void;
 }
 
 const ITEMS = '[role="treeitem"]';
@@ -72,6 +75,10 @@ export function treeKeyDown(event: KeyboardEvent<HTMLElement>, h: TreeKeyHandler
   if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
     if (!h.reorder) return false;
     h.reorder(event.key === "ArrowUp" ? -1 : 1);
+    return handled();
+  }
+  if (h.duplicate && shortcutById("tree.duplicate")!.desktop.some((chord) => matchesChord(event, chord, currentPlatform()))) {
+    h.duplicate();
     return handled();
   }
   if (event.altKey || event.ctrlKey || event.metaKey) return false;

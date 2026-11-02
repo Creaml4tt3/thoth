@@ -35,6 +35,8 @@ export interface CommandActions {
   newWorkspaceFolder?: { workspace: string; run(): void };
   rename?(): void;
   moveTo?(): void;
+  /** Duplicate the open page (ADR-0046). */
+  duplicate?(): void;
   /** Copy or move the open workspace page (and its sub-pages) to another workspace (ADR-0006, amendment of 2026-10-27). */
   copyToWorkspace?(): void;
   moveToWorkspace?(): void;
@@ -116,6 +118,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.newWorkspaceFolder) add("folder.newWorkspace", t.newFolderIn(a.newWorkspaceFolder.workspace), a.newWorkspaceFolder.run, { keywords: "create add workspace" });
   if (a.rename) add("page.rename", t.rename, a.rename, { ...key("tree.rename"), keywords: "name title" });
   if (a.moveTo) add("page.moveTo", t.moveTo, a.moveTo, { keywords: "folder nest" });
+  if (a.duplicate) add("page.duplicate", t.duplicate, a.duplicate, { ...key("tree.duplicate"), keywords: "copy clone template" });
   if (a.copyToWorkspace) add("page.copy-to-workspace", t.copyToWorkspace, a.copyToWorkspace, { keywords: "transfer duplicate other workspace server" });
   if (a.moveToWorkspace) add("page.move-to-workspace", t.moveToWorkspace, a.moveToWorkspace, { keywords: "transfer other workspace server" });
   if (a.sharePage) add("page.share", t.share, a.sharePage, { keywords: "public link publish url read-only" });

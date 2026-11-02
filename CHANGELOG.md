@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Duplicate pages and folders, in the Private Space and in workspaces: "Duplicate", "Duplicate structure only" (each page keeps only its title, for templates) and "Duplicate to…" in a page's or folder's menu, Cmd/Ctrl+Shift+D on the selected item, and "Duplicate page" in the command palette. A folder is copied with everything in it; links between the copied pages point at the copies, and images a Private Space page shows are copied with it. The copy never replaces anything, and a failure part-way removes what was copied.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added

@@ -587,7 +587,9 @@ export class FakeServers implements Servers {
         if (teamIds === null) ws.visibility.delete(pageId);
         else ws.visibility.set(pageId, teamIds);
       }
-      return json(200, { pageId, teamIds: ws.visibility.get(pageId) ?? null, limitedAbove: false });
+      let limitedAbove = false;
+      for (let at = ws.pages.get(pageId)?.parentId ?? null, depth = 0; at !== null && depth < 1000; at = ws.pages.get(at)?.parentId ?? null, depth++) if (ws.visibility.has(at)) limitedAbove = true;
+      return json(200, { pageId, teamIds: ws.visibility.get(pageId) ?? null, limitedAbove });
     }
     const [, , teamId, , userId] = rest.split("/").map(decodeURIComponent);
     if (rest === "/teams" && method === "GET") return json(200, { items: [...ws.teams].sort((a, b) => a.name.localeCompare(b.name)) });

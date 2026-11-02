@@ -9,6 +9,9 @@ import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
 import { RenameDialog } from "../order/RenameDialog.tsx";
 import { DeleteDialog } from "../order/DeleteDialog.tsx";
+import { DuplicateDialog } from "../order/DuplicateDialog.tsx";
+import { clearDuplicate, copyName, usePendingDuplicate } from "../order/duplicate.ts";
+import { DuplicateQuota, duplicateInWorkspace } from "./duplicate.ts";
 import { ColorDialog } from "../order/ColorDialog.tsx";
 import { currentPlatform, formatChordShort } from "../keyboard/shortcuts.ts";
 import { DownloadStatus, readWorkspaceMarkdown, useDownload, workspaceCanDownload } from "../download/DownloadButton.tsx";
@@ -57,6 +60,8 @@ interface Ctx {
   dnd: TreeDnd;
   openMenu(id: string, at: { x: number; y: number }): void;
   reorder(id: string, delta: -1 | 1): void;
+  /** Duplicate (ADR-0046), Cmd/Ctrl+Shift+D. */
+  duplicate(id: string): void;
   /** The folder New page and New folder go into (the last one clicked, 0.2.6); null is the top level. */
   target: string | null;
   setTarget(id: string | null): void;
@@ -119,7 +124,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
       expanded,
       expand: () => ctx.toggle(item.id, true),
       collapse: () => ctx.toggle(item.id, false),
-      ...(ctx.canWrite ? { rename: () => ctx.startRename(item.id), reorder: (delta: -1 | 1) => ctx.reorder(item.id, delta) } : {}),
+      ...(ctx.canWrite ? { rename: () => ctx.startRename(item.id), reorder: (delta: -1 | 1) => ctx.reorder(item.id, delta), duplicate: () => ctx.duplicate(item.id) } : {}),
       ...(ctx.hasMenu ? { menu: () => ctx.openMenu(item.id, anchorOf(event.currentTarget)) } : {}),
     });
 
@@ -213,6 +218,12 @@ const isThisWorkspace = (server: string, workspace: string) => (request: MoveToR
 const isThisWorkspaceReorder = (server: string, workspace: string) => (request: ReorderRequest): request is Extract<ReorderRequest, { kind: "workspace" }> =>
   request.kind === "workspace" && request.server === server && request.workspace === workspace;
 
+/**
+ * What team limits (ADR-0042) mean for a copy, which keeps none: the original is limited itself (`self`), by a folder
+ * above it (`above`, the nearest limited one), not at all (`none`), or the person cannot ask (`unknown`: editors).
+ */
+type TeamLimit = { kind: "none" } | { kind: "unknown" } | { kind: "self" } | { kind: "above"; folder: string };
+
 /** Pages of the tree below `items`, for the "Move to…" list; the subtree of `except` is left out (it cannot move into itself). */
 function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: string): Destination[] {
   const out: Destination[] = [{ id: "", label: topLevel, depth: 0, folder: false }];
@@ -258,7 +269,10 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [deleting, setDeleting] = useState<string | null>(null);
   const [coloring, setColoring] = useState<string | null>(null);
   const [limiting, setLimiting] = useState<string | null>(null);
+  /** Duplicate (ADR-0046): asking first (`to: false`) or picking the folder for "Duplicate to…" (`to: true`). */
+  const [duplicating, setDuplicating] = useState<{ id: string; structure: boolean; to: boolean; limit: TeamLimit } | null>(null);
   const [target, setTarget] = useState<string | null>(null);
+  const duplicateKeys = formatChordShort({ key: "d", mod: true, shift: true }, currentPlatform());
   const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
   const { download, said: downloadSaid } = useDownload();
   const [membersOpen, setMembersOpen] = useState(false);
@@ -418,6 +432,92 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     });
   };
 
+  /** How the original is limited to teams. Only owners and managers may ask the server (`GET …/visibility`). */
+  const limitOf = async (id: string): Promise<TeamLimit> => {
+    if (!canTeams) return { kind: "none" };
+    if (!canLimit) return { kind: "unknown" };
+    try {
+      const client = directory.client(server);
+      const own = await client.getPageVisibility(workspace.id, id);
+      if (own.teamIds !== null) return { kind: "self" };
+      if (!own.limitedAbove) return { kind: "none" };
+      for (const folder of workspaceAncestors(fresh() ?? [], id)) if ((await client.getPageVisibility(workspace.id, folder)).teamIds !== null) return { kind: "above", folder };
+      return { kind: "self" }; // limited by something this tree does not show: warn as if it were the page itself
+    } catch {
+      return { kind: "unknown" };
+    }
+  };
+  /** What the question says about team limits, for a copy put into `parent`. */
+  const limitNotes = (limit: TeamLimit, parent: string | null): string[] => {
+    if (limit.kind === "unknown") return [tt.duplicateDialog.noLimits];
+    if (limit.kind === "self") return [tt.duplicateDialog.everyone];
+    if (limit.kind === "above" && !(parent !== null && isWithin(fresh() ?? [], parent, limit.folder))) return [tt.duplicateDialog.everyone];
+    return [];
+  };
+  const parentOfRow = (id: string): string | null => siblingsOf(id)?.parent ?? null;
+
+  /**
+   * Copies `id` and every page below it into `parent` (ADR-0046): right after the original when that is its parent,
+   * else at the end. Pending edits are written first, so the copy has the current text. Opens the copy (a page) and
+   * puts its name into rename. Returns the reason it failed (nothing is left behind then), or null.
+   */
+  const duplicateNow = (id: string, parent: string | null, structureOnly: boolean): Promise<string | null> =>
+    enqueue(async () => {
+      setCreateError(null);
+      if (flush && !(await flush())) return "";
+      const all = fresh();
+      const original = all?.find((n) => n.id === id);
+      if (!all || !original) return "";
+      const title = titleOf(id);
+      const folder = directory.getState().trees[key]?.kinds[id]?.folder === true;
+      const taken = new Set(childrenOf(all, parent, ordered).map((n) => n.title.toLocaleLowerCase()));
+      const name = copyName((c) => !taken.has(c.toLocaleLowerCase()), (n) => tt.copyName(title, n));
+      const maxPages = directory.getState().limits[server]?.["maxPagesPerWorkspace"];
+      try {
+        const made = await duplicateInWorkspace(directory.client(server), { workspace: workspace.id, nodes: all, rootId: id, parentId: parent, title: name, structureOnly, ordered, ...(maxPages !== undefined ? { maxPages } : {}) });
+        for (const page of made) directory.notePageSaved(server, page);
+        const copy = made[0]!;
+        if (ordered) {
+          const siblings = childrenOf(fresh() ?? [], parent, ordered).filter((n) => n.id !== copy.id);
+          const index = parentOfRow(id) === parent ? siblings.findIndex((n) => n.id === id) + 1 : siblings.length;
+          try {
+            await directory.movePage(server, workspace.id, copy.id, { parentId: parent, index });
+          } catch (error) {
+            await directory.deletePage(server, workspace.id, copy.id).catch(() => undefined);
+            throw error;
+          }
+        }
+        directory.expand(server, workspace.id);
+        if (parent) toggle(parent, true);
+        if (!folder) openPage({ server, workspace: workspace.id, page: copy.id });
+        setRenaming(copy.id);
+        setSaid(tt.duplicated(title));
+        return null;
+      } catch (error) {
+        return error instanceof DuplicateQuota ? tt.duplicateQuota(error.limit, error.current, error.adding) : tt.duplicateFailed(error instanceof Error ? error.message : String(error));
+      }
+    });
+
+  /** Duplicate or Duplicate structure only, in place: asks first for pages inside it, or when team limits are lost. */
+  const startDuplicate = (id: string, structure: boolean) =>
+    void (async () => {
+      const limit = await limitOf(id);
+      if (pagesUnder(id) > 0 || limitNotes(limit, parentOfRow(id)).length > 0) return setDuplicating({ id, structure, to: false, limit });
+      const failure = await duplicateNow(id, parentOfRow(id), structure);
+      if (failure) setCreateError(failure);
+    })();
+
+  const startDuplicateTo = (id: string) => void limitOf(id).then((limit) => setDuplicating({ id, structure: false, to: true, limit }));
+
+  // "Duplicate" asked for from code (the command palette).
+  const duplicateRequest = usePendingDuplicate(isThisWorkspace(server, workspace.id));
+  useEffect(() => {
+    if (!duplicateRequest) return;
+    clearDuplicate();
+    if (canWrite && fresh()?.some((n) => n.id === duplicateRequest.page)) startDuplicate(duplicateRequest.page, false);
+    // `startDuplicate` reads the current tree; the request is what triggers this.
+  }, [duplicateRequest]);
+
   const drop = (dragId: string, overId: string, zone: DropZone) => {
     if (overId === TOP) return void moveTo(dragId, null, END, () => tt.movedToTop(titleOf(dragId)));
     if (zone === "inside") return void moveTo(dragId, overId, END, () => tt.movedInto(titleOf(dragId), titleOf(overId)));
@@ -477,6 +577,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
     dnd,
     openMenu: (id, at) => setMenu({ id, at }),
     reorder,
+    duplicate: (id) => startDuplicate(id, false),
     target: target !== null && tree?.kinds[target]?.folder === true && nodes?.some((n) => n.id === target) ? target : null,
     setTarget,
     colorOf: (id) => tree?.kinds[id]?.color ?? null,
@@ -569,6 +670,9 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: !ordered || i <= 0, onSelect: () => reorder(id, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: !ordered || !at || i < 0 || i >= at.list.length - 1, onSelect: () => reorder(id, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(id) },
+      { id: "duplicate", label: tt.duplicate, hint: duplicateKeys, onSelect: () => startDuplicate(id, false) },
+      { id: "duplicate-structure", label: tt.duplicateStructure, onSelect: () => startDuplicate(id, true) },
+      { id: "duplicate-to", label: tt.duplicateTo, onSelect: () => startDuplicateTo(id) },
       ...toPrivate,
       ...toWorkspace,
       ...(canShare ? [{ id: "share", label: tt.share, onSelect: () => setSharing(id) }] : []),
@@ -782,6 +886,31 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
             return null;
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+      {duplicating && canWrite && !duplicating.to && nodes?.some((n) => n.id === duplicating.id) && (
+        <DuplicateDialog
+          name={titleOf(duplicating.id)}
+          pages={pagesUnder(duplicating.id)}
+          notes={[duplicating.structure ? tt.duplicateDialog.structure : tt.duplicateDialog.copy, ...limitNotes(duplicating.limit, parentOfRow(duplicating.id))]}
+          onDuplicate={() => duplicateNow(duplicating.id, parentOfRow(duplicating.id), duplicating.structure)}
+          onClose={() => setDuplicating(null)}
+        />
+      )}
+      {duplicating && canWrite && duplicating.to && nodes?.some((n) => n.id === duplicating.id) && (
+        <MoveToDialog
+          name={titleOf(duplicating.id)}
+          destinations={destinationsFor(items, duplicating.id, tt.moveDialog.topLevel)}
+          initial={parentOfRow(duplicating.id) ?? ""}
+          onMove={(destination) => duplicateNow(duplicating.id, destination === "" ? null : destination, false)}
+          onClose={() => setDuplicating(null)}
+          as={{
+            title: tt.duplicateToDialog.title(titleOf(duplicating.id)),
+            destination: tt.duplicateToDialog.destination,
+            action: tt.duplicateDialog.duplicate,
+            busy: tt.duplicateDialog.duplicating,
+            notes: (destination) => [...(pagesUnder(duplicating.id) > 0 ? [tt.duplicateToDialog.pages(pagesUnder(duplicating.id))] : []), ...limitNotes(duplicating.limit, destination === "" ? null : destination)],
+          }}
         />
       )}
       {coloring && canWrite && (
