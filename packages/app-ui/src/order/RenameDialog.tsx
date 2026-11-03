@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStrings } from "../strings/index.ts";
 import { Button } from "../ui/Button.tsx";
@@ -20,6 +20,8 @@ export function RenameDialog({ name, maxLength, onRename, onClose }: Props) {
   const [value, setValue] = useState(name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
+  const invalid = error !== null && error !== "";
 
   const submit = async () => {
     const next = value.trim();
@@ -44,10 +46,10 @@ export function RenameDialog({ name, maxLength, onRename, onClose }: Props) {
       >
         <label className="field">
           <span>{t.renameDialog.name}</span>
-          <input data-autofocus className="input" value={value} maxLength={maxLength} disabled={busy} onChange={(event) => setValue(event.target.value)} onFocus={(event) => event.currentTarget.select()} />
+          <input data-autofocus className="input" value={value} maxLength={maxLength} disabled={busy} aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? errorId : undefined} onChange={(event) => setValue(event.target.value)} onFocus={(event) => event.currentTarget.select()} />
         </label>
-        {error !== null && error !== "" && (
-          <p role="alert" className="alert alert-danger">
+        {invalid && (
+          <p id={errorId} role="alert" className="alert alert-danger">
             {error}
           </p>
         )}

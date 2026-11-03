@@ -49,6 +49,7 @@ export function ConflictDialog({ name, where = "disk", conflict, error, onChoose
         {rows.map((row, i) => (
           <div key={i} className={`diff-line diff-${row.kind}`} data-kind={row.kind}>
             <i aria-hidden="true">{row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}</i>
+            {row.kind !== "same" && <span className="sr-only">{row.kind === "add" ? t.yourEdits : text.side}: </span>}
             <span>{row.text}</span>
           </div>
         ))}

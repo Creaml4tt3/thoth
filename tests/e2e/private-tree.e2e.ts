@@ -77,7 +77,7 @@ test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a fold
   await page.keyboard.press("Enter");
   await expect(page.getByRole("alert")).toContainText("cannot contain");
   await expect(field).toBeFocused();
-  const bad = (await new AxeBuilder({ page }).include('[role="tree"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  const bad = (await new AxeBuilder({ page }).include('[role="tree"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   expect(await read("Plan.md")).toBe("# Plan\n\nThe plan.\n");
 

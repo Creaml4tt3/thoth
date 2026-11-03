@@ -12,6 +12,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Changed
 
+- Accessibility (WCAG 2.2 AA): stronger grey, red and amber text, larger click targets for small controls, and clearer names for screen readers (the page editor, folder colours, the lines of the conflict dialog, field errors). "Saved" is spoken only after a failed or explicit save, not after every autosave.
+- In the desktop app, Cmd/Ctrl + and − zoom the window (Cmd/Ctrl 0 resets), and F6 moves focus between the sidebar and each pane. Below 600px wide the sidebar sits above the page.
+- In Members, Trash and Visible to…, focus goes back to the button that asked when a question is cancelled, and "Choose at least one team" is read with the team boxes.
 - The desktop app keeps a Private Space's search index in its own data folder on this computer, no longer in the notes folder, so notes on a network share or a synced drive no longer carry a changing database. The old index there is deleted and rebuilt once. A Private Space on a network drive gets a short notice.
 
 ## [0.4.0] - 2026-11-02

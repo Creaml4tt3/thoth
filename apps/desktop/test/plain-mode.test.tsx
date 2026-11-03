@@ -96,7 +96,7 @@ describe("Plain mode", () => {
     await waitFor(() => expect(box.classList.contains("ProseMirror-focused")).toBe(true)); // focus follows the switch (Tiptap focuses on the next frame)
     expect(guard.calls).toHaveLength(0);
     expect(await app.read("Alpha.md")).toBe(ALPHA);
-    expect(screen.getByRole("status", { name: "" }).textContent).toBe("Unsaved changes");
+    expect(document.querySelector(".save-status")!.textContent).toBe("Unsaved changes");
 
     // Saved from Blocks: the edited paragraph changes, every other byte (odd bullets, __emphasis__, spacing) stays.
     await app.user.keyboard("{Meta>}s{/Meta}");

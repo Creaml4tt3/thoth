@@ -239,12 +239,28 @@ export function Shell() {
     });
   };
   const split = tabs.layout.panes.length > 1;
-  /** Alt/Option+Shift+\ or F6 (ADR-0030): the other pane, with focus on its current tab. */
+  /** Alt/Option+Shift+\ (ADR-0030): the other pane, with focus on its current tab. */
   const focusOtherPane = () => {
     if (!split) return;
     const next = (tabs.layout.active + 1) % tabs.layout.panes.length;
     tabs.focusOther();
     focusPaneTab(next);
+  };
+  /** F6: the sidebar's tree, then each pane's current tab, then the sidebar again. With the sidebar hidden, the panes only. */
+  const nextRegion = () => {
+    const sidebarRow = side.hidden ? null : document.querySelector<HTMLElement>('.sidebar [role="treeitem"][tabindex="0"]');
+    const inSidebar = document.activeElement?.closest(".sidebar") != null;
+    const pane = document.activeElement?.closest<HTMLElement>("[data-pane]");
+    const from = inSidebar ? -1 : pane ? Number(pane.dataset["pane"]) : tabs.layout.active;
+    const next = from + 1;
+    if (next < tabs.layout.panes.length) {
+      tabs.focusPane(next);
+      focusPaneTab(next);
+    } else if (sidebarRow) sidebarRow.focus();
+    else {
+      tabs.focusPane(0);
+      focusPaneTab(0);
+    }
   };
   const makeActions = (): CommandActions => ({
     newPage: () => requestNewPage(),
@@ -347,6 +363,7 @@ export function Shell() {
     "tab.pin": () => togglePin(),
     "tab.split": () => tabs.split(),
     "pane.focusOther": focusOtherPane,
+    "region.next": nextRegion,
     "page.favorite": toggleFavorite,
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });

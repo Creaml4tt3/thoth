@@ -102,7 +102,7 @@ export function TrashDialog({ client, workspace, onChanged, onClose }: Props) {
                   {t.restore}
                 </Button>
                 {manage && (
-                  <Button small variant="quiet" aria-label={t.purgeLabel(title(item))} disabled={busy || purging !== null} onClick={() => setPurging(item)}>
+                  <Button small variant="quiet" data-purge={item.pageId} aria-label={t.purgeLabel(title(item))} disabled={busy || purging !== null} onClick={() => setPurging(item)}>
                     {t.purge}
                   </Button>
                 )}
@@ -117,7 +117,17 @@ export function TrashDialog({ client, workspace, onChanged, onClose }: Props) {
             </p>
             <p className="share-note">{t.purgeBody(purging.pagesBelow)}</p>
             <div className="move-actions">
-              <Button variant="quiet" small disabled={busy} onClick={() => setPurging(null)}>
+              <Button
+                variant="quiet"
+                small
+                disabled={busy}
+                onClick={() => {
+                  const id = purging.pageId;
+                  setPurging(null);
+                  // Back to the button that asked, once it is enabled again.
+                  setTimeout(() => document.querySelector<HTMLElement>(`[data-purge="${CSS.escape(id)}"]`)?.focus(), 0);
+                }}
+              >
                 {t.cancel}
               </Button>
               <Button ref={confirmButton} variant="danger" small disabled={busy} onClick={() => void act(() => client.purgeTrashedPage(workspace.id, purging.pageId), t.purged(title(purging)), t.purgeFailed)}>
