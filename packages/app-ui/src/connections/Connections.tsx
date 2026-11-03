@@ -195,11 +195,9 @@ export function Connections({ source }: { source: ConnectionsSource }) {
                   <li key={rowKey(row)} className="connection-mention">
                     <PageButton page={row.page} open={source.open}>
                       <span className="connection-context">
-                        {row.mention.before && "…"}
                         {row.mention.before}
                         <mark>{row.mention.text}</mark>
                         {row.mention.after}
-                        {row.mention.after && "…"}
                       </span>
                     </PageButton>
                     {source.link && (

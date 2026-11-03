@@ -12,6 +12,13 @@ describe("findMentions", () => {
     expect(source.slice(m!.start, m!.end)).toBe("project atlas");
   });
 
+  it("adds an ellipsis only where the line goes on", () => {
+    const long = `${"x ".repeat(40)}Atlas${" y".repeat(40)}`;
+    const [m] = findMentions(long, "Atlas");
+    expect(m!.before.startsWith("…")).toBe(true);
+    expect(m!.after.endsWith("…")).toBe(true);
+  });
+
   it("keeps word edges for scripts written with spaces", () => {
     expect(texts("Atlases and atlas, Atlas! (Atlas) xAtlas Atlas2", "Atlas")).toEqual(["atlas", "Atlas", "Atlas"]);
     expect(texts("Café au lait, cafés", "café")).toEqual(["Café"]);

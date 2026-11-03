@@ -25,7 +25,7 @@ export interface Mention {
   occurrence: number;
   /** In a table cell, where a wikilink's `|` is written `\|`. */
   inTable: boolean;
-  /** A few words before and after, on the same line. */
+  /** A few words before and after, on the same line; "…" where the line goes on. */
   before: string;
   after: string;
 }
@@ -95,9 +95,11 @@ function textRuns(source: string): Run[] {
 const lineContext = (source: string, start: number, end: number) => {
   const lineStart = source.lastIndexOf("\n", start - 1) + 1;
   const lineEnd = source.indexOf("\n", end);
-  const before = source.slice(Math.max(lineStart, start - CONTEXT), start);
-  const after = source.slice(end, Math.min(lineEnd === -1 ? source.length : lineEnd, end + CONTEXT));
-  return { before: before.trimStart(), after: after.trimEnd() };
+  const from = Math.max(lineStart, start - CONTEXT);
+  const lineStop = lineEnd === -1 ? source.length : lineEnd;
+  const to = Math.min(lineStop, end + CONTEXT);
+  // An ellipsis only where the line goes on.
+  return { before: (from > lineStart ? "…" : "") + source.slice(from, start).trimStart(), after: source.slice(end, to).trimEnd() + (to < lineStop ? "…" : "") };
 };
 
 /** Every unlinked mention of `title` in `source`, in order; at most `limit`. */
