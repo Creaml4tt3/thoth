@@ -427,6 +427,7 @@ export const en = {
     createTeam: "Create team",
     teamName: (name: string) => `Name of ${name}`,
     renameTeam: "Rename",
+    renameTeamLabel: (name: string) => `Rename team ${name}`,
     deleteTeam: "Delete",
     deleteTeamLabel: (name: string) => `Delete team ${name}`,
     teamMember: (person: string, team: string) => `${person} in ${team}`,

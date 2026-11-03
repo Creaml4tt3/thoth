@@ -246,7 +246,8 @@ describe("Teams and Visible to…", () => {
     expect(within(teams).getByRole("status").textContent).toBe("Changed the members of Finance.");
     const name = within(teams).getByRole("textbox", { name: "Name of Finance" });
     await app.user.clear(name);
-    await app.user.type(name, "Money{Enter}");
+    await app.user.type(name, "Money");
+    await app.user.click(within(teams).getByRole("button", { name: "Rename team Finance" }));
     await waitFor(() => expect(ws.teams[0]!.name).toBe("Money"));
     expect(await axeViolations(dialog)).toEqual([]);
     // Deleting asks first and says which folders only this team saw (ADR-0043).
@@ -258,8 +259,14 @@ describe("Teams and Visible to…", () => {
     expect(within(confirm).getByText(folder.title)).toBeTruthy();
     expect(ws.teams).toHaveLength(1);
     expect(await axeViolations(dialog)).toEqual([]);
-    await app.user.click(within(confirm).getByRole("button", { name: "Delete team" }));
+    // Cancel puts focus back on the button that asked, not on the page behind the dialog.
+    await app.user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(teams).getByRole("button", { name: "Delete team Money" })));
+    await app.user.click(within(teams).getByRole("button", { name: "Delete team Money" }));
+    const again = await within(teams).findByRole("group", { name: "Delete team Money?" });
+    await app.user.click(await within(again).findByRole("button", { name: "Delete team" }));
     await waitFor(() => expect(ws.teams).toEqual([]));
+    expect(document.activeElement).toBe(within(teams).getByRole("heading", { name: "Teams" }));
   });
 
   it("lets a manager change roles up to Manager, remove members and invite people, but not touch owners (ADR-0043)", async () => {
@@ -307,8 +314,14 @@ describe("Teams and Visible to…", () => {
     const dialog = await screen.findByRole("dialog", { name: "Who sees “Roadmap”" });
     await app.user.click(await within(dialog).findByRole("radio", { name: "Only these teams" }));
     await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect((await within(dialog).findByRole("alert")).textContent).toBe("Choose at least one team.");
-    await app.user.click(within(dialog).getByRole("checkbox", { name: "Finance" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toBe("Choose at least one team.");
+    const finance = within(dialog).getByRole("checkbox", { name: "Finance" });
+    expect(finance.getAttribute("aria-invalid")).toBe("true"); // the error belongs to the team boxes (WCAG 3.3.1)
+    expect(finance.getAttribute("aria-describedby")).toBe(alert.id);
+    await app.user.click(finance);
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(finance.hasAttribute("aria-invalid")).toBe(false);
     expect(await axeViolations(dialog)).toEqual([]);
     await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -362,6 +375,10 @@ describe("Trash… (ADR-0043)", () => {
     await app.user.click(within(dialog).getByRole("button", { name: "Done" }));
     const again = await openTrash(app, list);
     await app.user.click(await within(again).findByRole("button", { name: "Delete Roadmap for good" }));
+    const ask = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
+    await app.user.click(within(ask).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(again).getByRole("button", { name: "Delete Roadmap for good" })));
+    await app.user.click(within(again).getByRole("button", { name: "Delete Roadmap for good" }));
     const confirm = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
     expect(within(confirm).getByText(/cannot be undone/)).toBeTruthy();
     await app.user.click(within(confirm).getByRole("button", { name: "Delete for good" }));

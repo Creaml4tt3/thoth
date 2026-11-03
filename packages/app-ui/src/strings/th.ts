@@ -382,6 +382,7 @@ export const th: Strings = {
     createTeam: "สร้างทีม", // REVIEW
     teamName: (name) => `ชื่อของ ${name}`, // REVIEW
     renameTeam: "เปลี่ยนชื่อ", // REVIEW
+    renameTeamLabel: (name) => `เปลี่ยนชื่อทีม ${name}`, // REVIEW
     deleteTeam: "ลบ", // REVIEW
     deleteTeamLabel: (name) => `ลบทีม ${name}`, // REVIEW
     teamMember: (person, team) => `${person} ใน ${team}`, // REVIEW
