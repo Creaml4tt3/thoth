@@ -35,6 +35,9 @@ export const th: Strings = {
     moveDown: "เลื่อนลง",
     handleLabel: "ลากเพื่อย้าย หรือคลิกเพื่อเปิดเมนูบล็อก",
     handleTitle: "ลากเพื่อย้าย · คลิกเพื่อเปิดเมนู",
+    dragBlocks: (n) => `${count(n)} บล็อก`, // REVIEW
+    dragTable: "ตาราง", // REVIEW
+    dragBlock: "บล็อก", // REVIEW
     linkToPage: "ลิงก์ไปยังหน้า",
     linkAlias: (alias) => `ชื่อเรียกอื่น “${alias}”`,
     linkNoMatch: (query) => `ไม่มีหน้าที่ตรงกับ “${query}” พิมพ์ต่อเพื่อลิงก์ไปยังหน้าใหม่`,
