@@ -21,6 +21,8 @@ import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { DeleteDialog } from "@thoth/app-ui/order/DeleteDialog.tsx";
+import { DuplicateDialog } from "@thoth/app-ui/order/DuplicateDialog.tsx";
+import { clearDuplicate, usePendingDuplicate } from "@thoth/app-ui/order/duplicate.ts";
 import { DownloadStatus, useDownload } from "@thoth/app-ui/download/DownloadButton.tsx";
 import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "@thoth/app-ui/tabs/open-keys.ts";
@@ -28,6 +30,7 @@ import { useSession } from "../../app/context.ts";
 import { useFavorites } from "@thoth/app-ui/favorites/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { colorFolder, moveIntoFolder, reorderInFolder } from "./arrange.ts";
+import { duplicatePrivate } from "./duplicate.ts";
 import { RenameError, renamePrivate, renameProblemText } from "./rename.ts";
 import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
@@ -92,7 +95,10 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const [moving, setMoving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [coloring, setColoring] = useState<string | null>(null);
+  /** Duplicate (ADR-0047): a folder with pages asks first (`ask`); "Duplicate to…" picks the folder (`to`). */
+  const [duplicating, setDuplicating] = useState<{ path: string; structure: boolean; to: boolean } | null>(null);
   const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
+  const duplicateKeys = formatChordShort({ key: "d", mod: true, shift: true }, currentPlatform());
   const colorOf = (path: string): TextColor | null => {
     const color = colors[path];
     return isTextColor(color) ? color : null;
@@ -383,6 +389,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
+      { id: "duplicate", label: tt.duplicate, hint: duplicateKeys, onSelect: () => startDuplicate(node, false) },
+      { id: "duplicate-structure", label: tt.duplicateStructure, onSelect: () => startDuplicate(node, true) },
+      { id: "duplicate-to", label: tt.duplicateTo, onSelect: () => setDuplicating({ path: node.path, structure: false, to: true }) },
       ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
       // The host checks the path itself (inside the folder, no symlink, not .thoth/) and shows it selected.
       ...(connection.reveal ? [{ id: "reveal", label: revealName, onSelect: () => void revealEntry(node.path) }] : []),
@@ -413,6 +422,52 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       setSaid(tt.deleted(name));
       return null;
     });
+
+  /**
+   * Copies a page, or a folder and everything in it, into `into` (ADR-0047): right after the original when that is its
+   * folder, else at the end. Edits are written first, so the copy has the current text. The copy is opened (a page)
+   * and its name goes into rename. Returns the reason it failed (nothing is left behind then), or null.
+   */
+  const duplicateEntry = (path: string, into: string, structureOnly: boolean): Promise<string | null> =>
+    enqueue(async () => {
+      setError(null);
+      const node = find(path);
+      if (!node) return "";
+      if (!(await flushAll())) return t.unsavedChanges;
+      const title = label(path);
+      const siblings = childrenAt(latest.current, into).map(nodeName);
+      const index = into === dirname(path) ? siblings.indexOf(basename(path)) + 1 : END;
+      try {
+        const made = await duplicatePrivate(vault, { source: path, kind: node.kind, into, structureOnly, label: tt.copyName, place: { siblings, index } });
+        onOrder(made.order);
+        await refresh();
+        if (into !== "") setFolder(into, true);
+        if (node.kind === "page") openPage(made.path);
+        setRenaming(made.path);
+        setSaid(tt.duplicated(title));
+        return null;
+      } catch (failure) {
+        return tt.duplicateFailed(failure instanceof Error ? failure.message : String(failure));
+      }
+    });
+
+  /** Duplicate or Duplicate structure only, in place: a folder with pages in it asks first. */
+  const startDuplicate = (node: TreeNode, structure: boolean) => {
+    if (node.kind === "folder" && pagesIn(node).length > 0) return setDuplicating({ path: node.path, structure, to: false });
+    void duplicateEntry(node.path, dirname(node.path), structure).then((failure) => {
+      if (failure) setError(failure);
+    });
+  };
+
+  // "Duplicate" asked for from code (the command palette).
+  const duplicateRequest = usePendingDuplicate(isPrivate);
+  useEffect(() => {
+    if (!duplicateRequest) return;
+    clearDuplicate();
+    const node = find(duplicateRequest.path);
+    if (node) startDuplicate(node, false);
+    // `find` reads the current tree; the request is what triggers this.
+  }, [duplicateRequest]);
 
   const revealEntry = async (path: string) => {
     setError(null);
@@ -452,6 +507,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
         collapse: () => setFolder(node.path, false),
         ...(selection.active ? {} : { rename: () => setRenaming(node.path) }),
         reorder: (delta) => reorder(node, delta),
+        ...(selection.active ? {} : { duplicate: () => startDuplicate(node, false) }),
         menu: () => {
           const r = event.currentTarget.getBoundingClientRect();
           setMenu({ path: node.path, at: { x: r.left + 16, y: r.bottom } });
@@ -586,6 +642,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const { draggable: _draggable, onDragStart: _onDragStart, ...topDrop } = dnd.rowProps(TOP);
   const movingNode = moving ? find(moving) : undefined;
   const deletingNode = deleting ? find(deleting) : undefined;
+  const duplicatingNode = duplicating ? find(duplicating.path) : undefined;
   const menuNode = menu?.path != null ? find(menu.path) : undefined;
 
   return (
@@ -681,6 +738,31 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           initial={dirname(movingNode.path)}
           onMove={(folder) => arrange(movingNode.path, folder, END)}
           onClose={() => setMoving(null)}
+        />
+      )}
+      {duplicatingNode && duplicating && !duplicating.to && (
+        <DuplicateDialog
+          name={label(duplicatingNode.path)}
+          pages={pagesIn(duplicatingNode).length}
+          notes={[duplicating.structure ? tt.duplicateDialog.structure : tt.duplicateDialog.copy]}
+          onDuplicate={() => duplicateEntry(duplicatingNode.path, dirname(duplicatingNode.path), duplicating.structure)}
+          onClose={() => setDuplicating(null)}
+        />
+      )}
+      {duplicatingNode && duplicating?.to && (
+        <MoveToDialog
+          name={label(duplicatingNode.path)}
+          destinations={destinations(duplicatingNode.path)}
+          initial={dirname(duplicatingNode.path)}
+          onMove={(folder) => duplicateEntry(duplicatingNode.path, folder, false)}
+          onClose={() => setDuplicating(null)}
+          as={{
+            title: tt.duplicateToDialog.title(label(duplicatingNode.path)),
+            destination: tt.duplicateToDialog.destination,
+            action: tt.duplicateDialog.duplicate,
+            busy: tt.duplicateDialog.duplicating,
+            notes: () => (duplicatingNode.kind === "folder" && pagesIn(duplicatingNode).length > 0 ? [tt.duplicateToDialog.pages(pagesIn(duplicatingNode).length)] : []),
+          }}
         />
       )}
     </div>

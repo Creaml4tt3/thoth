@@ -10,6 +10,10 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ## [Unreleased]
 
+### Added
+
+- Duplicate pages and folders, in the Private Space and in workspaces: "Duplicate", "Duplicate structure only" (each page keeps only its title, for templates) and "Duplicate to…" in a page's or folder's menu, Cmd/Ctrl+Shift+D on the selected item, and "Duplicate page" in the command palette. A folder is copied with everything in it; links between the copied pages point at the copies, and images a Private Space page shows are copied with it. The copy never replaces anything, and a failure part-way removes what was copied.
+
 ### Changed
 
 - Accessibility (WCAG 2.2 AA): stronger grey, red and amber text, larger click targets for small controls, and clearer names for screen readers (the page editor, folder colours, the lines of the conflict dialog, field errors). "Saved" is spoken only after a failed or explicit save, not after every autosave.
