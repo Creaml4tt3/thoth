@@ -1,5 +1,5 @@
 //! `SqlDriver` (packages/local-store/src/ports.ts) on one rusqlite connection
-//! per open vault, at `<root>/.thoth/index.sqlite`, configured like
+//! per open vault, at `<data>/indexes/<digest>/index.sqlite` (`index_home`, ADR-0046), configured like
 //! `NodeSqlDriver` (WAL, foreign keys, 5 s busy timeout).
 //!
 //! The webview may run arbitrary SQL, but only against this one database
@@ -72,6 +72,24 @@ impl Sql {
         // Installed after the pragmas above, so only the host itself can choose the journal mode.
         sql.conn.authorizer(Some(authorize));
         Ok(sql)
+    }
+
+    /// Has another connection the database at `path` open (another Thoth, such as an older version on the same
+    /// folder, maybe on another computer)? Asks for what only a lone connection gets: leaving WAL mode needs every other
+    /// connection gone, and Thoth's indexes are always in WAL mode. Nothing waits. A file that is missing, a link
+    /// (`SQLITE_OPEN_NOFOLLOW`; Windows callers check links first) or not a database is not in use.
+    pub fn in_use(path: &Path) -> bool {
+        let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        let Ok(conn) = Connection::open_with_flags(path, flags) else { return false };
+        let _ = conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true);
+        let _ = conn.set_db_config(DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false);
+        if conn.busy_timeout(Duration::ZERO).is_err() {
+            return true;
+        }
+        match conn.query_row("PRAGMA journal_mode = DELETE", [], |row| row.get::<_, String>(0)) {
+            Ok(mode) => !mode.eq_ignore_ascii_case("delete"),
+            Err(e) => matches!(e.sqlite_error_code(), Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)),
+        }
     }
 
     fn harden(&self) -> HostResult<()> {
@@ -271,6 +289,32 @@ mod tests {
         // Canonical: SQLITE_OPEN_NOFOLLOW refuses symlinked ancestors such as macOS's /var -> /private/var.
         let sql = Sql::open(&std::fs::canonicalize(dir.path()).unwrap().join("index.sqlite")).unwrap();
         (dir, sql)
+    }
+
+    #[test]
+    fn an_index_is_in_use_while_another_connection_has_it_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = std::fs::canonicalize(dir.path()).unwrap().join("index.sqlite");
+        assert!(!Sql::in_use(&path), "a missing file is not in use");
+        assert!(!path.exists(), "and is not created");
+        let other = Sql::open(&path).unwrap();
+        other.exec("CREATE TABLE t (x); INSERT INTO t VALUES (1);").unwrap();
+        assert!(Sql::in_use(&path));
+        drop(other);
+        assert!(!Sql::in_use(&path));
+        std::fs::write(&path, "not a database").unwrap();
+        assert!(!Sql::in_use(&path));
+        #[cfg(unix)]
+        {
+            let target = path.with_file_name("elsewhere.sqlite");
+            drop(Sql::open(&target).unwrap());
+            std::fs::remove_file(&path).unwrap();
+            std::os::unix::fs::symlink(&target, &path).unwrap();
+            let held = Sql::open(&target).unwrap();
+            // A link is never opened, so it is not "in use" even though its target is.
+            assert!(!Sql::in_use(&path));
+            drop(held);
+        }
     }
 
     #[test]

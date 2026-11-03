@@ -73,8 +73,11 @@ type Bytes = Uint8Array;
 export interface Commands {
   "vault.pick": { args: Record<string, never>; result: string | null };
   "vault.recent": { args: Record<string, never>; result: string[] };
-  /** `shared`: another handle (another window) already has this folder open (ADR-0019); that window ran recovery. */
-  "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string; shared: boolean } };
+  /**
+   * `shared`: another handle (another window) already has this folder open (ADR-0019); that window ran recovery.
+   * `network`: the folder is on a network drive (ADR-0046); the app says that Thoth keeps its own data on this computer.
+   */
+  "vault.open": { args: { root: string }; result: { vault: string; root: string; label: string; shared: boolean; network?: boolean } };
   "vault.close": { args: { vault: string }; result: null };
   /**
    * Shows the open vault's folder in the system file manager, or with `path` (vault-relative) that file or folder in it,
