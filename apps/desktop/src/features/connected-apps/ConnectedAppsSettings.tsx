@@ -167,6 +167,9 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
 
       <h3 id="set-mcp-apps">{t.apps}</h3>
       <p className="muted small">{t.selfReported}</p>
+      <p id="mcp-propose-hint" className="muted small">
+        {t.mayProposeHint}
+      </p>
       {settings.apps.length === 0 && settings.pending.length === 0 ? (
         <p className="muted">{t.noApps}</p>
       ) : (
@@ -177,10 +180,25 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
               <span className="badge">{t.waiting}</span>
             </li>
           ))}
-          {settings.apps.map((app) => (
+          {settings.apps.map((app, i) => (
             <li key={app.name} aria-label={app.name} className="mcp-app">
               <span className="mcp-app-name">{app.name}</span>
               <span className={`badge ${app.allowed ? "badge-allowed" : "badge-denied"}`}>{app.allowed ? t.allowed : t.denied}</span>
+              {app.allowed && (
+                <span className="set-toggle mcp-app-propose">
+                  {/* ADR-0048: off until the user turns it on; each change still waits for review. */}
+                  <input
+                    id={`mcp-propose-${i}`}
+                    type="checkbox"
+                    role="switch"
+                    checked={app.propose === true}
+                    onChange={(e) => void change(() => connectedApps.mayPropose(app.name, e.target.checked))}
+                    aria-describedby="mcp-propose-hint"
+                  />
+                  <label htmlFor={`mcp-propose-${i}`}>{t.mayPropose}</label>
+                  {settings.proposers.includes(app.name) && <span className="badge">{t.waiting}</span>}
+                </span>
+              )}
               <span className="mcp-app-actions">
                 <Button variant="ghost" small onClick={() => void change(() => connectedApps.decide(app.name, !app.allowed))}>
                   {app.allowed ? t.revoke : t.allow}

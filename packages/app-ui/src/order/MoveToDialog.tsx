@@ -22,10 +22,12 @@ interface Props {
   /** Resolves with an error message to show (the dialog stays open), or null when the move is done. */
   onMove(destination: string): Promise<string | null>;
   onClose(): void;
+  /** "Duplicate to…" (ADR-0047): the same picker in its own words; the copy may also go where the original is. */
+  as?: { title: string; destination: string; action: string; busy: string; notes(destination: string): readonly string[] };
 }
 
 /** "Move to…": pick the page or folder to move into. The same dialog serves both trees. */
-export function MoveToDialog({ name, destinations, initial, onMove, onClose }: Props) {
+export function MoveToDialog({ name, destinations, initial, onMove, onClose, as }: Props) {
   const t = useStrings().tree;
   const selectId = useId();
   const [value, setValue] = useState(initial);
@@ -42,7 +44,7 @@ export function MoveToDialog({ name, destinations, initial, onMove, onClose }: P
   };
 
   return createPortal(
-    <Modal title={t.moveDialog.title(name)} onClose={onClose}>
+    <Modal title={as?.title ?? t.moveDialog.title(name)} onClose={onClose}>
       <form
         className="form"
         onSubmit={(event) => {
@@ -51,7 +53,7 @@ export function MoveToDialog({ name, destinations, initial, onMove, onClose }: P
         }}
       >
         <label className="field" htmlFor={selectId}>
-          <span>{t.moveDialog.destination}</span>
+          <span>{as?.destination ?? t.moveDialog.destination}</span>
           <select id={selectId} className="input move-list" size={Math.min(8, Math.max(3, destinations.length))} value={value} onChange={(event) => setValue(event.target.value)} data-autofocus>
             {destinations.map((d) => (
               <option key={d.id} value={d.id}>
@@ -61,6 +63,11 @@ export function MoveToDialog({ name, destinations, initial, onMove, onClose }: P
             ))}
           </select>
         </label>
+        {as?.notes(value).map((note) => (
+          <p key={note} className="share-note">
+            {note}
+          </p>
+        ))}
         {error !== null && error !== "" && (
           <p role="alert" className="alert alert-danger">
             {error}
@@ -70,8 +77,8 @@ export function MoveToDialog({ name, destinations, initial, onMove, onClose }: P
           <Button variant="quiet" onClick={onClose}>
             {t.moveDialog.cancel}
           </Button>
-          <Button variant="primary" type="submit" disabled={busy || value === initial}>
-            {t.moveDialog.move}
+          <Button variant="primary" type="submit" disabled={busy || (!as && value === initial)}>
+            {as ? (busy ? as.busy : as.action) : t.moveDialog.move}
           </Button>
         </div>
       </form>

@@ -1,7 +1,8 @@
 //! Connected apps (ADR-0021): other apps on this computer read the Private Spaces the user shares, through the MCP
 //! server `thoth-mcp` that they start. `thoth-mcp` opens no vault: it relays each tool call over a local socket to
 //! this host, which checks it, asks the user about an app it has not seen, and has the window that holds the Private
-//! Space answer from its open `Vault` (one index per window, ADR-0019). Read only.
+//! Space answer from its open `Vault` (one index per window, ADR-0019). Apps read, and they may propose changes
+//! (ADR-0048), which the host keeps (`proposals.rs`) until the user reviews them in a window: no tool call writes.
 //!
 //! Off by default. What is shared (the switch, the Private Spaces, each app's Allow or Deny) is kept in
 //! `<data>/mcp/settings.json`; every request is logged in `<data>/mcp/log/` (`log.rs`).
@@ -10,6 +11,7 @@
 //! user can give any name. Allow and Deny are the user's consent for a name, not proof of who connects; the socket
 //! being the user's own (`0600` in a `0700` folder) is what keeps other users out.
 pub mod log;
+pub mod proposals;
 mod socket;
 pub mod tools;
 
@@ -17,6 +19,7 @@ use crate::EventSink;
 use crate::error::{HostError, HostResult};
 use crate::handles::new_handle;
 use log::Log;
+use proposals::{Kind, Proposals, Status};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use socket::Listener;
@@ -32,10 +35,13 @@ pub const DIR: &str = "mcp";
 /// Sent to the windows: answer this request from your open Vault (`mcp.answer`). Payload:
 /// `{ id, owner, root, space, tool, args }`; only the window `owner` may answer.
 pub const REQUEST_EVENT: &str = "mcp.request";
-/// Sent to the windows when the apps waiting for Allow or Deny change. Payload: `{ apps: [name] }`.
+/// Sent to the windows when the apps waiting for an answer change (Allow or Deny, or "May propose changes"). Payload:
+/// `{ apps: [name], proposers: [name] }`.
 pub const PENDING_EVENT: &str = "mcp.pending";
-/// Longest request line from `thoth-mcp`.
-pub const MAX_REQUEST: usize = 64 * 1024;
+/// Sent to the windows when proposals are added or settled. Payload: `{ open }`, how many wait for review.
+pub const PROPOSALS_EVENT: &str = "mcp.proposals";
+/// Longest request line from `thoth-mcp`: a proposed page of 1 MB (ADR-0048), JSON-escaped, and the rest of the call.
+pub const MAX_REQUEST: usize = 2 * MAX_RESPONSE + 64 * 1024;
 /// Largest answer to an app (ADR-0021 rule 3).
 pub const MAX_RESPONSE: usize = 1024 * 1024;
 /// Requests answered at once; more are told to try again.
@@ -98,6 +104,9 @@ struct App {
     name: String,
     allowed: bool,
     decided_at: String,
+    /// "May propose changes" (ADR-0048): None until the user answers, asked the first time the app proposes.
+    #[serde(default)]
+    propose: Option<bool>,
 }
 
 struct Waiting {
@@ -109,6 +118,8 @@ struct State {
     settings: Settings,
     /// Apps that asked and wait for Allow or Deny, oldest first.
     pending: Vec<String>,
+    /// Allowed apps that proposed a change and wait for "May propose changes", oldest first.
+    proposers: Vec<String>,
     /// Requests sent to a window, by id.
     waiting: HashMap<String, Waiting>,
     /// Why listening failed, when it did.
@@ -124,6 +135,7 @@ pub(crate) struct Inner {
     /// Signalled when an app is allowed, denied or forgotten, or the switch goes off.
     decided: Condvar,
     log: Log,
+    proposals: Proposals,
 }
 
 /// Connected apps: the settings the windows change (`mcp.*` commands) and the socket `thoth-mcp` talks to.
@@ -155,9 +167,10 @@ impl Relay {
         let settings = dir.as_deref().map(load).unwrap_or_default();
         let enabled = settings.enabled;
         let log = Log::new(dir.as_deref());
-        let state = State { settings, pending: Vec::new(), waiting: HashMap::new(), error: None };
+        let proposals = Proposals::new(dir.as_deref(), Arc::new(log::now_secs));
+        let state = State { settings, pending: Vec::new(), proposers: Vec::new(), waiting: HashMap::new(), error: None };
         let relay = Self {
-            inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log }),
+            inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log, proposals }),
             listener: Mutex::new(None),
         };
         if enabled {
@@ -171,7 +184,8 @@ impl Relay {
     pub fn settings(&self) -> Value {
         let listening = lock(&self.listener).is_some();
         let state = self.inner.state();
-        let apps: Vec<Value> = state.settings.apps.iter().map(|a| json!({ "name": a.name, "allowed": a.allowed, "decidedAt": a.decided_at })).collect();
+        let apps: Vec<Value> =
+            state.settings.apps.iter().map(|a| json!({ "name": a.name, "allowed": a.allowed, "decidedAt": a.decided_at, "propose": a.propose })).collect();
         json!({
             "available": cfg!(unix) && self.inner.dir.is_some(),
             "enabled": state.settings.enabled,
@@ -180,6 +194,7 @@ impl Relay {
             "spaces": state.settings.spaces,
             "apps": apps,
             "pending": state.pending,
+            "proposers": state.proposers,
             "setup": self.setup(),
         })
     }
@@ -229,12 +244,19 @@ impl Relay {
             if known.is_none() && !state.pending.contains(&name) {
                 return Err(HostError::bad_argument(format!("No app called {name:?} asked")));
             }
-            let decided = App { name: name.clone(), allowed: allow, decided_at: log::timestamp() };
             match known {
-                Some(i) => state.settings.apps[i] = decided,
-                None => state.settings.apps.push(decided),
+                Some(i) => {
+                    let app = &mut state.settings.apps[i];
+                    app.allowed = allow;
+                    app.decided_at = log::timestamp();
+                }
+                None => state.settings.apps.push(App { name: name.clone(), allowed: allow, decided_at: log::timestamp(), propose: None }),
             }
             state.pending.retain(|p| p != &name);
+            if !allow {
+                // An app that may not read is not asked whether it may propose either.
+                state.proposers.retain(|p| p != &name);
+            }
             self.inner.save(&state.settings)?;
         }
         self.inner.decided.notify_all();
@@ -249,11 +271,70 @@ impl Relay {
             let mut state = self.inner.state();
             state.settings.apps.retain(|a| a.name != name);
             state.pending.retain(|p| p != &name);
+            state.proposers.retain(|p| p != &name);
             self.inner.save(&state.settings)?;
         }
         self.inner.decided.notify_all();
         self.inner.emit_pending();
         Ok(self.settings())
+    }
+
+    /// `mcp.mayPropose { app, allow }`: the per-app switch "May propose changes" (ADR-0048), and the answer to the
+    /// question asked when an allowed app first proposes.
+    pub fn may_propose(&self, app: &str, allow: bool) -> HostResult<Value> {
+        let name = app_name(app).ok_or_else(|| HostError::bad_argument("app must be an app's name"))?;
+        {
+            let mut state = self.inner.state();
+            let known =
+                state.settings.apps.iter_mut().find(|a| a.name == name).ok_or_else(|| HostError::bad_argument(format!("No app called {name:?} connected")))?;
+            known.propose = Some(allow);
+            state.proposers.retain(|p| p != &name);
+            self.inner.save(&state.settings)?;
+        }
+        self.inner.decided.notify_all();
+        self.inner.emit_pending();
+        Ok(self.settings())
+    }
+
+    /// `mcp.proposals`: every proposal remembered (without text), oldest first, and how many wait for review.
+    pub fn proposals(&self) -> Value {
+        let list = self.inner.proposals.list();
+        let open = list.iter().filter(|r| r.status.open()).count();
+        json!({ "proposals": list.iter().map(proposals::Record::to_json).collect::<Vec<_>>(), "open": open })
+    }
+
+    /// `mcp.proposal { id }`: one proposal, with the page as it was and as proposed while it waits.
+    pub fn proposal(&self, id: &str) -> HostResult<Value> {
+        let (record, before, after) = self.inner.proposals.get(id)?;
+        let mut out = record.to_json();
+        out["before"] = json!(before);
+        out["after"] = json!(after);
+        Ok(out)
+    }
+
+    /// `mcp.settle { id, status }` from the window `owner`, which must have the proposal's Private Space open: it
+    /// applied the proposal (with compare-and-swap), the user declined it, or the page had changed (conflicted).
+    pub fn settle(&self, owner: &str, id: &str, status: &str) -> HostResult<Value> {
+        let status = match status {
+            "applied" => Status::Applied,
+            "declined" => Status::Declined,
+            "conflicted" => Status::Conflicted,
+            _ => return Err(HostError::bad_argument("status must be applied, declined or conflicted")),
+        };
+        let root = self
+            .inner
+            .proposals
+            .list()
+            .into_iter()
+            .find(|r| r.id == id)
+            .map(|r| r.root)
+            .ok_or_else(|| HostError::new("NOT_FOUND", format!("No proposal {id}")))?;
+        if !(self.inner.spaces)().iter().any(|s| s.owner == owner && s.root.to_string_lossy() == root.as_str()) {
+            return Err(HostError::not_allowed("Only a window with this Private Space open can settle its proposals"));
+        }
+        let record = self.inner.proposals.settle(id, status)?;
+        self.inner.emit_proposals();
+        Ok(record.to_json())
     }
 
     /// `mcp.answer { id, result | error }` from the window `owner`: its answer to an `mcp.request`.
@@ -347,13 +428,26 @@ impl Inner {
     }
 
     fn emit_pending(&self) {
-        let pending = self.state().pending.clone();
-        (self.events)(PENDING_EVENT, json!({ "apps": pending }));
+        let (apps, proposers) = {
+            let state = self.state();
+            (state.pending.clone(), state.proposers.clone())
+        };
+        (self.events)(PENDING_EVENT, json!({ "apps": apps, "proposers": proposers }));
+    }
+
+    fn emit_proposals(&self) {
+        (self.events)(PROPOSALS_EVENT, json!({ "open": self.proposals.open() }));
     }
 
     /// Switched off or quitting: the apps waiting for an answer are no longer asked about.
     fn end_waits(&self) {
-        let had = !std::mem::take(&mut self.state().pending).is_empty();
+        let had = {
+            let mut state = self.state();
+            let had = !state.pending.is_empty() || !state.proposers.is_empty();
+            state.pending.clear();
+            state.proposers.clear();
+            had
+        };
         self.decided.notify_all();
         if had {
             self.emit_pending();
@@ -392,6 +486,14 @@ impl Inner {
         self.permit(&app)?;
         let call = Call::parse(tool, &arguments)?;
         entry.paths = call.asked_paths();
+        if call.about_proposals() {
+            let answer = self.about_proposals(&app, &call)?;
+            entry.paths = answer.paths.clone();
+            return Ok(answer);
+        }
+        if call.is_proposal() {
+            self.permit_propose(&app)?;
+        }
         let targets = self.targets(&call)?;
         entry.spaces = targets.iter().map(|t| t.label.clone()).collect();
 
@@ -411,6 +513,8 @@ impl Inner {
             let left = deadline.saturating_duration_since(Instant::now());
             match answer.recv_timeout(left) {
                 Ok(Ok(value)) => values.push(value),
+                // A new page is proposed where there is none.
+                Ok(Err(error)) if error.code == "NOT_FOUND" && matches!(call, Call::ProposeCreate { .. }) => values.push(Value::Null),
                 Ok(Err(error)) => {
                     self.forget_waits(&asked[i..]);
                     return Err(error);
@@ -421,6 +525,11 @@ impl Inner {
                 }
             }
         }
+        if call.is_proposal() {
+            let answer = self.propose(&app, &call, &targets[0], &values[0])?;
+            entry.paths = answer.paths.clone();
+            return Ok(answer);
+        }
         let found: Vec<Found<'_>> = targets.iter().zip(&values).map(|(t, value)| Found { space: &t.label, value }).collect();
         let answer = tools::answer(&call, &found)?;
         entry.paths = answer.paths.clone();
@@ -430,6 +539,44 @@ impl Inner {
     /// Waits until `app` may read (allowed), or says why not. An app never seen is added to the apps waiting for the
     /// user's answer, and the windows are told; the request waits for that answer up to `prompt_timeout`.
     fn permit(&self, app: &str) -> HostResult<()> {
+        let denied = || HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps"));
+        self.wait_for(
+            app,
+            |settings| settings.apps.iter().find(|a| a.name == app).map(|known| if known.allowed { Ok(()) } else { Err(denied()) }),
+            |state| &mut state.pending,
+            denied,
+            || HostError::not_allowed(format!("Thoth is asking whether {app} may read your notes: answer in Thoth's window, then try again")),
+        )
+    }
+
+    /// Waits until the allowed `app` may propose changes ("May propose changes", ADR-0048). Asked once, the first
+    /// time it proposes, as `permit` asks; off until the user turns it on.
+    fn permit_propose(&self, app: &str) -> HostResult<()> {
+        let refused = || {
+            HostError::new("DENIED", format!("{app} may not propose changes: turn on “May propose changes” for it in Thoth, under Settings → Connected apps"))
+        };
+        self.wait_for(
+            app,
+            |settings| match settings.apps.iter().find(|a| a.name == app) {
+                None | Some(App { allowed: false, .. }) => Some(Err(refused())),
+                Some(known) => known.propose.map(|on| if on { Ok(()) } else { Err(refused()) }),
+            },
+            |state| &mut state.proposers,
+            refused,
+            || HostError::not_allowed(format!("Thoth is asking whether {app} may propose changes: answer in Thoth's window, then try again")),
+        )
+    }
+
+    /// The question both permissions share: `decided` says the answer once there is one; until then the app waits in
+    /// `queue` (the windows are told) for up to `prompt_timeout`.
+    fn wait_for(
+        &self,
+        app: &str,
+        decided: impl Fn(&Settings) -> Option<HostResult<()>>,
+        queue: fn(&mut State) -> &mut Vec<String>,
+        gone: impl Fn() -> HostError,
+        timed_out: impl Fn() -> HostError,
+    ) -> HostResult<()> {
         let deadline = Instant::now() + self.options.prompt_timeout;
         let mut state = self.state();
         let mut asked = false;
@@ -437,25 +584,21 @@ impl Inner {
             if !state.settings.enabled {
                 return Err(HostError::new("NOT_ENABLED", "Connected apps are off: open Thoth and switch on Connected apps in Settings"));
             }
-            if let Some(known) = state.settings.apps.iter().find(|a| a.name == app) {
-                return if known.allowed {
-                    Ok(())
-                } else {
-                    Err(HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps")))
-                };
+            if let Some(answer) = decided(&state.settings) {
+                return answer;
             }
-            if !state.pending.iter().any(|p| p == app) {
+            if !queue(&mut state).iter().any(|p| p == app) {
                 if asked {
                     // It was waiting and is gone without a decision: forgotten, or Connected apps went off.
-                    return Err(HostError::new("DENIED", format!("{app} may not read your notes: allow it in Thoth, under Settings → Connected apps")));
+                    return Err(gone());
                 }
-                if state.pending.len() >= MAX_PENDING || state.settings.apps.len() + state.pending.len() >= MAX_APPS {
+                if state.pending.len() + state.proposers.len() >= MAX_PENDING || state.settings.apps.len() + state.pending.len() >= MAX_APPS {
                     return Err(HostError::new(
                         "BUSY",
                         "Too many apps are waiting for an answer in Thoth: answer them, or remove some under Settings → Connected apps",
                     ));
                 }
-                state.pending.push(app.to_owned());
+                queue(&mut state).push(app.to_owned());
                 drop(state);
                 self.emit_pending();
                 state = self.state();
@@ -463,10 +606,103 @@ impl Inner {
             asked = true;
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
-                return Err(HostError::not_allowed(format!("Thoth is asking whether {app} may read your notes: answer in Thoth's window, then try again")));
+                return Err(timed_out());
             }
             state = self.decided.wait_timeout(state, left).unwrap_or_else(|p| p.into_inner()).0;
         }
+    }
+
+    /// Keeps a proposal (ADR-0048) made from `found`, the window's `read_page` answer (null: no page at that path),
+    /// and answers at once with its id. Nothing is written: the user reviews it in a window.
+    fn propose(&self, app: &str, call: &Call, target: &Target, found: &Value) -> HostResult<tools::Answer> {
+        let malformed = || HostError::internal("Thoth's window sent an answer it should not have");
+        let (kind, path, page_id, base_hash, before) = match call {
+            Call::ProposeCreate { path, .. } => {
+                if !found.is_null() {
+                    return Err(HostError::new("EXISTS", format!("{path} is already a page: propose an edit instead, or another path")));
+                }
+                (Kind::Create, path.clone(), None, None, None)
+            }
+            _ => {
+                let page = found.get("page").ok_or_else(malformed)?;
+                let text = |key: &str| page.get(key).and_then(Value::as_str).map(str::to_owned).ok_or_else(malformed);
+                let path = text("path")?;
+                if path.split('/').any(|part| part.starts_with('.')) {
+                    return Err(HostError::bad_argument("Pages in hidden folders cannot be changed"));
+                }
+                let kind = if matches!(call, Call::ProposeAppend { .. }) { Kind::Append } else { Kind::Edit };
+                (kind, path, Some(text("id")?), Some(text("hash")?), Some(text("markdown")?))
+            }
+        };
+        let expected = match call {
+            Call::ProposeEdit { expected, .. } | Call::ProposeAppend { expected, .. } => expected.as_deref(),
+            _ => None,
+        };
+        if let Some(expected) = expected
+            && Some(expected) != base_hash.as_deref()
+        {
+            return Err(HostError::new("CONFLICT", format!("{path} changed since version {expected}: read it again, then propose the change again")));
+        }
+        let after = tools::proposed_text(call, before.as_deref())?;
+        if after.len() > tools::MAX_MARKDOWN {
+            return Err(HostError::new("TOO_LARGE", "The page would be over 1 MB: propose a smaller change"));
+        }
+        if before.as_deref() == Some(after.as_str()) {
+            return Err(HostError::bad_argument("That would not change the page"));
+        }
+        let record = self.proposals.add(proposals::New {
+            app: app.to_owned(),
+            kind,
+            root: target.root.clone(),
+            space: target.label.clone(),
+            path: path.clone(),
+            page_id,
+            base_hash,
+            before,
+            after,
+        })?;
+        self.emit_proposals();
+        let what = match kind {
+            Kind::Create => "a new page",
+            Kind::Edit => "a change to",
+            Kind::Append => "an addition to",
+        };
+        let text = format!(
+            "Proposed {what} {path} in {}. It waits for the user's review in Thoth and nothing is written until they apply it. Proposal {} (pending); check it later with get_proposal.",
+            target.label, record.id
+        );
+        let structured =
+            json!({ "id": record.id, "status": "pending", "space": target.label, "path": path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS) });
+        Ok(tools::Answer { text, structured, paths: vec![path] })
+    }
+
+    /// `list_proposals` and `get_proposal`: what happened to this app's own proposals. Never their text.
+    fn about_proposals(&self, app: &str, call: &Call) -> HostResult<tools::Answer> {
+        let mine: Vec<proposals::Record> = self.proposals.list().into_iter().filter(|r| r.app == app).collect();
+        let shown = |r: &proposals::Record| {
+            let mut out = r.to_json();
+            if let Some(map) = out.as_object_mut() {
+                for private in ["root", "app", "baseHash"] {
+                    map.remove(private);
+                }
+            }
+            out
+        };
+        let (structured, paths) = match call {
+            Call::ListProposals { status, limit } => {
+                let chosen: Vec<&proposals::Record> = mine.iter().rev().filter(|r| status.as_deref().is_none_or(|s| s == r.status.name())).collect();
+                let total = chosen.len();
+                let listed: Vec<&proposals::Record> = chosen.into_iter().take(*limit as usize).collect();
+                let paths = listed.iter().map(|r| r.path.clone()).take(tools::LOGGED_PATHS).collect();
+                (json!({ "proposals": listed.iter().map(|r| shown(r)).collect::<Vec<_>>(), "total": total }), paths)
+            }
+            Call::GetProposal { id } => {
+                let record = mine.iter().find(|r| &r.id == id).ok_or_else(|| HostError::new("NOT_FOUND", format!("No proposal {id} from {app}")))?;
+                (shown(record), vec![record.path.clone()])
+            }
+            _ => return Err(HostError::internal("Not about proposals")),
+        };
+        Ok(tools::Answer { text: serde_json::to_string_pretty(&structured).unwrap_or_default(), structured, paths })
     }
 
     /// The shared Private Spaces that are open in a window, and which window answers for each (`main` first: the
@@ -513,7 +749,7 @@ impl Inner {
         self.state().waiting.insert(id.clone(), Waiting { owner: target.owner.clone(), answer: tx });
         (self.events)(
             REQUEST_EVENT,
-            json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": call.tool(), "args": call.window_args() }),
+            json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": call.window_tool(), "args": call.window_args() }),
         );
         Ok((id, rx))
     }

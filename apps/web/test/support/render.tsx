@@ -91,5 +91,5 @@ export async function signInThroughUi(browser: FakeBrowser, provider = "Google")
   await screen.findByRole("button", { name: "Sign out" });
 }
 
-export const editorBox = () => screen.findByRole("textbox", { name: /page content/i });
+export const editorBox = (name: RegExp | string = /page content/i) => screen.findByRole("textbox", { name });
 export { cleanup, screen, waitFor, within };

@@ -692,7 +692,7 @@ function freeTitle(title: string, taken: ReadonlySet<string>): string {
 }
 
 /** A page that names its own ID in frontmatter (`thoth_id`) names the destination's; others are left as they are. */
-function withOwnId(markdown: string, id: string): string {
+export function withOwnId(markdown: string, id: string): string {
   const current = /^\uFEFF?---\r?\n[\s\S]*?^thoth_id:[ \t]*["']?([0-9a-f-]{36})["']?[ \t]*$/m.exec(markdown)?.[1];
   if (current === undefined || current === id) return markdown;
   try {
