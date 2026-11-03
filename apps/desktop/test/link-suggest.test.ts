@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { LinkResolver } from "@thoth/content";
 import type { PageSummary } from "@thoth/domain";
 import { atMenuOpen, atQuery, createLinkSuggester } from "@thoth/app-ui/editor/link-suggest.ts";
-import { workspaceLinkLookup, workspaceLinkSuggester } from "@thoth/app-ui/workspace/workspace-links.ts";
+import { NO_TITLES, linkTitles, titledBy, workspaceLinkLookup, workspaceLinkSuggester, type LinkTitles } from "@thoth/app-ui/workspace/workspace-links.ts";
 import { buildLinkLookup } from "@thoth/app-ui/editor/links.ts";
 import { completion, findTrigger } from "@thoth/app-ui/editor/plain/link-suggest-plain.ts";
 import { markdownSupport } from "@thoth/app-ui/editor/plain/syntax.ts";
@@ -195,7 +195,7 @@ describe("workspace links (ADR-0049)", () => {
   const id = (n: number) => `01890000-0000-7000-8000-${String(n).padStart(12, "0")}`;
   const node = (n: number, title: string, parentId: string | null = null) => ({ id: id(n), parentId, title, revisionId: "r", updatedAt: `2026-10-0${n}T00:00:00Z` });
   const nodes = [node(1, "Projects"), node(2, "Roadmap", id(1)), node(3, "Here"), node(4, "Road notes")];
-  const source = { nodes, isFolder: (x: string) => x === id(1), page: id(3), members: [{ userId: "u_1", displayName: "Rosa Diaz", role: "editor" as const }] };
+  const source = { nodes, isFolder: (x: string) => x === id(1), page: id(3), members: [{ userId: "u_1", displayName: "Rosa Diaz", role: "editor" as const }], titled: () => true };
 
   it("offers pages and folders by ID with the title as label, and people only after @", () => {
     const s = workspaceLinkSuggester(source);
@@ -230,5 +230,80 @@ describe("workspace links (ADR-0049)", () => {
 
   it("offers no people when the server does not tell the members", () => {
     expect(workspaceLinkSuggester({ ...source, members: null }).people).toBe(false);
+  });
+
+  describe("which links keep the title (limited pages, owner decision 2026-11-02)", () => {
+    const team = (tid: string, memberIds: string[]) => ({ id: tid, name: tid, memberIds });
+    /** A fake client: the workspace's teams, and the pages each team limits. */
+    const client = (teams: ReturnType<typeof team>[], limits: Record<string, string[]> = {}, fail?: "teams" | "pages") => {
+      const calls: string[] = [];
+      return {
+        calls,
+        listTeams: async () => {
+          calls.push("teams");
+          if (fail === "teams") throw new Error("offline");
+          return teams;
+        },
+        listTeamPages: async (_ws: string, tid: string) => {
+          calls.push(`pages ${tid}`);
+          if (fail === "pages") throw new Error("offline");
+          return (limits[tid] ?? []).map((pageId) => ({ pageId, title: "x", kind: null, onlyTeam: true }));
+        },
+      };
+    };
+    const titles = (c: ReturnType<typeof client>, role: "owner" | "manager" | "editor", ...rest: [me?: string | undefined, teams?: boolean | undefined]) =>
+      linkTitles({ client: c, workspace: "w", role, me: rest.length > 0 ? rest[0] : "u_me", teams: rest.length > 1 ? rest[1] : true });
+    const labels = (t: LinkTitles) => workspaceLinkSuggester({ ...source, page: "none", titled: titledBy(t, nodes) }).suggest("").map((h) => [h.title, h.label ?? null]);
+
+    it("owners and managers: no title for a limited page or anything below a limited folder; titles elsewhere", async () => {
+      for (const role of ["owner", "manager"] as const) {
+        const c = client([team("t1", []), team("t2", ["u_me"])], { t1: [id(1)], t2: [] });
+        const t = await titles(c, role);
+        expect(t).toEqual({ kind: "except", limited: new Set([id(1)]) });
+        expect(Object.fromEntries(labels(t))).toEqual({ Projects: null, Roadmap: null, Here: "Here", "Road notes": "Road notes" });
+        expect(c.calls.sort()).toEqual(["pages t1", "pages t2", "teams"]);
+      }
+    });
+
+    it("an editor in a team: no titles at all (they cannot tell which pages are limited)", async () => {
+      const t = await titles(client([team("t1", ["u_other"]), team("t2", ["u_me"])]), "editor");
+      expect(t).toEqual(NO_TITLES);
+      expect(labels(t).every(([, label]) => label === null)).toBe(true);
+    });
+
+    it("an editor in no team: titles (they cannot see a limited page); never asks for the teams' pages", async () => {
+      const c = client([team("t1", ["u_other"])], { t1: [id(1)] });
+      const t = await titles(c, "editor");
+      expect(t).toEqual({ kind: "all" });
+      expect(labels(t).every(([title, label]) => label === title)).toBe(true);
+      expect(c.calls).toEqual(["teams"]);
+    });
+
+    it("no teams in the workspace, or a server without teams: titles for everyone", async () => {
+      expect(await titles(client([]), "editor")).toEqual({ kind: "all" });
+      expect(await titles(client([]), "owner")).toEqual({ kind: "all" });
+      const c = client([team("t1", ["u_me"])]);
+      expect(await titles(c, "editor", "u_me", false)).toEqual({ kind: "all" });
+      expect(c.calls).toEqual([]);
+    });
+
+    it("anything unknown or failed: no titles", async () => {
+      expect(await titles(client([team("t1", [])]), "editor", "u_me", undefined)).toEqual(NO_TITLES);
+      expect(await titles(client([team("t1", [])]), "editor", undefined)).toEqual(NO_TITLES);
+      expect(await titles(client([], {}, "teams"), "owner")).toEqual(NO_TITLES);
+      expect(await titles(client([team("t1", [])], {}, "pages"), "manager")).toEqual(NO_TITLES);
+      // No `titled` at all: no titles.
+      const { titled: _titled, ...untitled } = source;
+      expect(workspaceLinkSuggester(untitled).suggest("road").map((h) => h.label)).toEqual([undefined, undefined]);
+    });
+
+    it("Plain mode writes a title-less link as [[thoth:page/<id>]] after [[ and after @", () => {
+      const item = workspaceLinkSuggester({ ...source, titled: () => false }).suggest("roadmap")[0]!;
+      for (const doc of ["See [[roadm", "See @roadm"]) {
+        const state = EditorState.create({ doc, selection: EditorSelection.cursor(doc.length), extensions: [markdownSupport()] });
+        ensureSyntaxTree(state, state.doc.length, 5000);
+        expect(completion(state, findTrigger(state)!, item).insert, doc).toBe(`[[thoth:page/${id(2)}]]`);
+      }
+    });
   });
 });

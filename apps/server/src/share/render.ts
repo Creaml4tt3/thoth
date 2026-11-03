@@ -6,7 +6,8 @@
  * re-written as fixed tags.
  *
  * Links: a page of the shared subtree goes to its share address; any other `thoth:` link and every wikilink become
- * plain text (a page outside is never looked up, so its title cannot show); `http`, `https` and `mailto` links keep
+ * plain text (a page outside is never looked up, so its title cannot show; a `[[thoth:page/…]]` to it reads "a page
+ * that is not shared" whether or not a label was written, ADR-0049); `http`, `https` and `mailto` links keep
  * their address with `rel="noopener noreferrer nofollow"`; every other scheme and every relative path is text.
  * Pictures load only from the share's own attachment route; an outside image becomes a link.
  */
@@ -105,8 +106,11 @@ export function renderShareMarkdown(source: string, ctx: RenderContext): Rendere
     const link = thothLink(target);
     if (link?.kind === "page") {
       const page = ctx.page(link.id);
-      return page ? `<a href="${esc(page.href)}">${esc(label ?? page.title)}</a>` : esc(label ?? OUTSIDE_PAGE);
+      // A page left out reads the same with or without a label: a label written into a link may be that page's title
+      // (ADR-0049), and the share must not tell a reader anything about a page it leaves out.
+      return page ? `<a href="${esc(page.href)}">${esc(label ?? page.title)}</a>` : esc(OUTSIDE_PAGE);
     }
+    if (target.trim().startsWith(PAGE_PREFIX)) return esc(OUTSIDE_PAGE); // a malformed ID: never shown
     if (link?.kind === "attachment") {
       const ref = attachmentRef(link.id);
       const shown = label !== undefined && !(embed && SIZE_LABEL.test(label)) ? label : undefined;

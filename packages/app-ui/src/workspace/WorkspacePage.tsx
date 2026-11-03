@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Role } from "@thoth/workspace-protocol";
 import { PageFrame, type PageFrameProps } from "../editor/PageFrame.tsx";
 import { useStrings } from "../strings/index.ts";
@@ -6,7 +6,7 @@ import { Notice } from "../ui/Notice.tsx";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { workspacePageStore } from "./workspace-store.ts";
 import { workspacePageMedia } from "./workspace-media.ts";
-import { workspaceLinkLookup, workspaceLinkSuggester } from "./workspace-links.ts";
+import { NO_TITLES, linkTitles, titledBy, workspaceLinkLookup, workspaceLinkSuggester, type LinkTitles } from "./workspace-links.ts";
 import { requestRevealWorkspacePage } from "./WorkspaceTree.tsx";
 import type { OpenOptions } from "../tabs/model.ts";
 
@@ -32,7 +32,8 @@ export interface WorkspacePageProps {
 
 /**
  * A page of a workspace on a server, in the same Blocks/Plain editor as a
- * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, ADR-0049) and resolve against
+ * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, no title for a page that may be
+ * limited to teams, ADR-0049) and resolve against
  * the workspace's tree; `[[` and `@` offer its pages and folders, and `@` its members. Path and title links do not
  * resolve here, and there is no backlinks panel.
  */
@@ -66,10 +67,24 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   const nodes = tree?.nodes;
   const kinds = tree?.kinds;
   const members = workspace?.members ?? null;
+  // Which links may carry the target's title (ADR-0049): none until known. Read again whenever the tree changes,
+  // since a change to who sees what makes the client read the tree again; the last answer stays meanwhile.
+  const me = entry?.info.account?.id;
+  const teamsCap = state.capabilities[target.server]?.includes("teams");
+  const [titles, setTitles] = useState<{ for: string; titles: LinkTitles }>({ for: "", titles: NO_TITLES });
+  const titlesFor = `${key}\n${role ?? ""}\n${me ?? ""}\n${teamsCap ?? ""}`;
+  useEffect(() => {
+    if (!role) return;
+    let live = true;
+    void linkTitles({ client: directory.client(target.server), workspace: target.workspace, role, me, teams: teamsCap }).then((t) => live && setTitles({ for: titlesFor, titles: t }));
+    return () => void (live = false);
+  }, [directory, target.server, target.workspace, role, me, teamsCap, titlesFor, nodes]);
+  const linkTitlesNow = titles.for === titlesFor ? titles.titles : NO_TITLES;
   const loadLinks = useCallback(async () => {
-    const source = { nodes: nodes ?? [], isFolder: (id: string) => kinds?.[id]?.folder === true, page: target.page, members };
+    const all = nodes ?? [];
+    const source = { nodes: all, isFolder: (id: string) => kinds?.[id]?.folder === true, page: target.page, members, titled: titledBy(linkTitlesNow, all) };
     return { lookup: workspaceLinkLookup(source), suggester: workspaceLinkSuggester(source) };
-  }, [nodes, kinds, members, target.page]);
+  }, [nodes, kinds, members, target.page, linkTitlesNow]);
   const openLink = useCallback((page: string, options?: OpenOptions) => openPage({ ...target, page }, options), [openPage, target]);
   const openFolder = useCallback((page: string) => requestRevealWorkspacePage({ ...target, page }), [target]);
   const openCopy = useCallback((page: string) => openPage({ ...target, page }), [openPage, target]);

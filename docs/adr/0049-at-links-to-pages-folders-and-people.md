@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-01
-- **Deciders:** owner (rules 1, 2, 3 and 6 and the aims of 4 and 5); implementation agent (the rest, marked "(this ADR)")
+- **Deciders:** owner (rules 1, 2, 3 and 6, the aims of 4 and 5, and no title in a link to a limited page,
+  2026-11-02); implementation agent (the rest, marked "(this ADR)")
 - **Refines:** ADR-0002 (the editor's content model: one new inline node), ADR-0010 (link resolution: folder targets),
   ADR-0012 (Plain mode), ADR-0016 (folders), ADR-0038 rule 4 (opening page links).
 - **Respects:** ADR-0042 and ADR-0043 (team limits: a page hidden from the reader is absent; managers; the Trash).
@@ -62,7 +63,7 @@ The owner asked for:
    focuses the row (`requestRevealWorkspacePage`). Cmd/Ctrl, Shift and the middle button do nothing different for a
    folder.
 6. **Workspace links name pages by ID** (owner). `[[` and `@` in a workspace page insert
-   `[[thoth:page/<id>|Title]]`, the form transfers already write and the share renderer already reads
+   `[[thoth:page/<id>|Title]]` (no `|Title` for a page limited to teams, below), the form transfers already write and the share renderer already reads
    (`PAGE_LINK_PREFIX`, `parseThothLink`). The link survives renames and moves. The chip shows the page's current
    title when the link has no label of its own (this ADR). A link with a label shows its label, as in the Private
    Space, and the tooltip shows the current title.
@@ -76,6 +77,30 @@ The owner asked for:
      of the tree it sends, so the menu never offers them and a link to one never resolves. Its chip reads "Page not
      available", with the same tooltip, whether the page is hidden, in the Trash or gone, so a chip tells nothing
      about a hidden page. The label written in the link stays what its writer wrote (this ADR).
+   - **No title in a link to a limited page** (owner, 2026-11-02, option A). A label is stored in the linking page,
+     so everyone who reads that page, and anyone with a share link to it, would read the title of a page limited to
+     teams they are not in. So `[[` and `@` write `[[thoth:page/<id>]]`, with no `|Title`, for a page or folder that
+     is limited itself or sits below a limited folder. Readers who can see it get its current title from their own
+     tree; others read "Page not available". Links to other pages keep the title, so they read well in other
+     Markdown apps. How the client knows (`linkTitles` in `workspace/workspace-links.ts`; this ADR's mechanism):
+     - Owners and managers see every page. The client lists the teams and, for each team, the pages limited to it
+       (`listTeamPages`, one request per team, at most 100, instead of one `getPageVisibility` per page of the
+       tree). A page is limited when it, or a page above it in the tree, is in one of those lists.
+     - Editors (and viewers) cannot read limits. One in at least one team of the workspace (`listTeams`, `memberIds`,
+       the signed-in user's ID) may see limited pages without knowing which, so every link they write has no title.
+       One in no team cannot see a limited page, so their links keep titles.
+     - A workspace with no teams, or a server without the `teams` capability, has no limited pages: titles stay.
+     - Until the answer arrives, while the capabilities or the signed-in user are unknown, and when a request fails,
+       links get no title. The answer is read again whenever the tree changes (a change to who sees what makes the
+       client read the tree again); the last answer stays in use meanwhile.
+     - Nothing adds a title later. Workspace links name pages by ID, so a rename or a move rewrites nothing; the
+       Private Space's move rewriting (rule 4) keeps a link's label, or its lack of one, as written. A label someone
+       types (`[[thoth:page/<id>|my words]]`) is kept as typed.
+     - The share renderer reads `[[thoth:page/<id>]]` and `[[thoth:page/<id>|any label]]` to a page it leaves out (a
+       page outside the shared subtree or limited to teams) the same: "a page that is not shared". A label written
+       before this rule therefore shows on no share page. A link to a shared page shows that page's title, which
+       the share shows anyway. A Markdown link (`[words](thoth:page/<id>)`) still shows its words, which are the
+       writer's text, not a stored title.
 7. **The Markdown of a person mention** (owner's aim; this ADR's form): `[@Display Name](thoth:user/<id>)`.
    - It is a standard Markdown link, so every other editor shows it as "@Display Name" (a link that does nothing).
    - The ID is the opaque user ID of the protocol's `Member.userId` (URL-unreserved, at most 128 characters), so it
@@ -98,7 +123,10 @@ The owner asked for:
 - One new node, `mention`, in the editor schema. `canonical.test.ts` requires every node in a golden, and the new
   `mentions` golden covers it.
 - A link written in a workspace page as `[[thoth:page/<id>|Title]]` is readable in any editor (it shows the label),
-  and Thoth can follow it after a rename.
+  and Thoth can follow it after a rename. A link to a limited page, and every link an editor in a team writes, is
+  `[[thoth:page/<id>]]`: other Markdown apps show the raw ID there.
+- Opening a workspace page asks the server for its teams once per tree change (plus one request per team for owners
+  and managers).
 - A workspace with more than 50 members offers only the first 50 the server sends (those with the lowest IDs) after
   `@`.
 
@@ -123,6 +151,11 @@ The owner asked for:
 - **Workspace links by title (`[[Roadmap]]`):** a rename would break them, and two pages may share a title.
 - **A new route to list a workspace's pages and members for the menu:** the tree and the workspace list are already
   on the client.
+- **Titles in every workspace link** (the first version): a limited page's title would show to every reader of the
+  linking page and on its share link. Options weighed by the owner on 2026-11-02; option A (no title for limited
+  pages) chosen.
+- **`getPageVisibility` for each page** to learn which are limited: one request per page of the tree, again on every
+  tree change. `listTeamPages` per team gives the same answer in at most 100.
 
 ## Open questions
 
