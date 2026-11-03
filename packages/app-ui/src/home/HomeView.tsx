@@ -67,7 +67,47 @@ function Rows({ rows, label }: { rows: readonly HomeRow[]; label: string }) {
   );
 }
 
-export function HomeView({ recent, favorites }: { recent: readonly HomeRow[]; favorites: readonly HomeRow[] }) {
+/** The Today card (ADR-0050): today's date in the reader's language, and whether today's page exists yet. */
+export interface HomeToday {
+  date: string;
+  exists: boolean;
+  /** Set when the last try to make the page failed. */
+  error?: string | null;
+  open(options: { newTab: boolean }): void;
+}
+
+function TodayCard({ today }: { today: HomeToday }) {
+  const t = useStrings().home;
+  return (
+    <div className="home-section home-today">
+      <h2>{t.today}</h2>
+      <button
+        type="button"
+        className="home-row home-today-card"
+        aria-describedby="home-today-template"
+        aria-keyshortcuts="Control+Enter Meta+Enter"
+        onClick={(event: MouseEvent) => today.open({ newTab: clickOpens(event)?.newTab === true })}
+        onKeyDown={(event: KeyboardEvent) => {
+          if (!isOpenInNewTabKey(event)) return;
+          event.preventDefault();
+          today.open({ newTab: true });
+        }}
+      >
+        <PageIcon />
+        <span className="home-row-title">{today.date}</span>
+        <span className="home-row-meta">{today.exists ? t.openToday : t.startToday}</span>
+      </button>
+      <p id="home-today-template" className="muted home-empty">{t.todayTemplate}</p>
+      {today.error && (
+        <p className="home-empty" role="alert">
+          {t.todayFailed(today.error)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function HomeView({ recent, favorites, today }: { recent: readonly HomeRow[]; favorites: readonly HomeRow[]; today?: HomeToday }) {
   const t = useStrings().home;
   return (
     <div className="home" data-testid="home">
@@ -77,6 +117,7 @@ export function HomeView({ recent, favorites }: { recent: readonly HomeRow[]; fa
           <h1>{t.greeting}</h1>
           <p className="muted">{t.lead}</p>
         </header>
+        {today && <TodayCard today={today} />}
         <div className="home-section">
           <h2>{t.recent}</h2>
           {recent.length > 0 ? <Rows rows={recent} label={t.recent} /> : <p className="muted home-empty">{t.recentEmpty}</p>}

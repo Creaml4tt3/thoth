@@ -390,6 +390,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-tertiary); }
 .home-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { flex: none; display: flex; align-items: center; gap: 8px; max-width: 50%; min-width: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+.home-today-card { min-height: 44px; border: 1px solid var(--thoth-border); }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-badge { flex: none; }
 @media (max-width: 520px) { .home { padding: 24px 12px; } .home-row-meta { max-width: 40%; } }

@@ -731,6 +731,34 @@ export const en = {
     favoritesEmpty: "Star a page to keep it here.",
     /** A row's folder, after its space. */
     topLevel: "Top level",
+    /** The Today card (ADR-0050): today's page in the Private Space's Daily folder. */
+    today: "Today",
+    openToday: "Open today's page",
+    startToday: "Start today's page",
+    todayTemplate: "Uses Templates/Daily.md when it exists.",
+    todayFailed: (reason: string) => `Today's page could not be made: ${reason}`,
+  },
+
+  /** The Connections panel under a page (ADR-0050). */
+  connections: {
+    title: "Connections",
+    links: "Links from this page",
+    noLinks: "This page links to no other page.",
+    backlinks: "Backlinks",
+    noBacklinks: "No page links here yet.",
+    mentions: "Unlinked mentions",
+    searching: "Searching…",
+    noMentions: "No page mentions this one without a link.",
+    mentionsUnavailable: "Mentions can't be looked for here.",
+    mentionsCapped: "Only the first ones are shown.",
+    titleTooShort: "This page's title is too short to look for.",
+    mentionsFound: (n: number) => (n === 1 ? "1 unlinked mention." : `${n} unlinked mentions.`),
+    link: "Link",
+    linkLabel: (page: string) => `Link the mention in ${page}`,
+    linked: (page: string) => `Linked in ${page}.`,
+    linkChanged: (page: string) => `${page} changed; nothing was written. Try again.`,
+    linkGone: (page: string) => `The mention in ${page} is no longer there.`,
+    linkFailed: (page: string) => `Could not write ${page}.`,
   },
 
   /**

@@ -8,6 +8,9 @@ import { workspacePageStore } from "./workspace-store.ts";
 import { workspacePageMedia } from "./workspace-media.ts";
 import { NO_TITLES, linkTitles, titledBy, workspaceLinkLookup, workspaceLinkSuggester, type LinkTitles } from "./workspace-links.ts";
 import { requestRevealWorkspacePage } from "./WorkspaceTree.tsx";
+import { workspaceConnectionsSource } from "./workspace-connections.ts";
+import { Connections } from "../connections/Connections.tsx";
+import { usePageHost } from "../editor/host.ts";
 import type { OpenOptions } from "../tabs/model.ts";
 
 export interface WorkspacePageProps {
@@ -35,7 +38,7 @@ export interface WorkspacePageProps {
  * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, no title for a page that may be
  * limited to teams, ADR-0049) and resolve against
  * the workspace's tree; `[[` and `@` offer its pages and folders, and `@` its members. Path and title links do not
- * resolve here, and there is no backlinks panel.
+ * resolve here. Under the page, Connections (ADR-0050) lists its links, backlinks and unlinked mentions.
  */
 export function WorkspacePage({ directory, target, modeSpace, openPage, signedOutNotice, signedOutAction, goneNotice, onConflict, onSaved, onOpened, actions }: WorkspacePageProps) {
   const t = useStrings().workspace;
@@ -99,6 +102,25 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   const openFolder = useCallback((page: string) => requestRevealWorkspacePage({ ...target, page }), [target]);
   const openCopy = useCallback((page: string) => openPage({ ...target, page }), [openPage, target]);
 
+  const host = usePageHost();
+  const searchCap = state.capabilities[target.server]?.includes("search") === true;
+  const connections = useMemo(
+    () =>
+      workspaceConnectionsSource({
+        client: directory.client(target.server),
+        workspace: target.workspace,
+        page: target.page,
+        title: node?.title || t.pageFallback,
+        nodes: nodes ?? [],
+        canSearch: searchCap,
+        canWrite: role !== undefined && role !== "viewer",
+        tick: nodes,
+        open: (page, options) => openPage({ ...target, page }, options),
+        ...(host.flushAll ? { flushAll: host.flushAll } : {}),
+      }),
+    [directory, target, node?.title, t.pageFallback, nodes, searchCap, role, openPage, host.flushAll],
+  );
+
   const opened = useRef(onOpened);
   opened.current = onOpened;
   const ready = store !== null;
@@ -132,6 +154,7 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
       openCopy={openCopy}
       readOnlyNote={t.readOnly(name)}
       missing={{ title: t.missingTitle, detail: t.missingDetail }}
+      footer={<Connections source={connections} />}
       errorAction={signedOut ? signedOutAction : undefined}
       actions={
         <>

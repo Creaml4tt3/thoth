@@ -8,6 +8,13 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Connections, under every page: the pages it links to, its backlinks, and unlinked mentions (pages that name it without a link, Thai included). One click on Link turns a mention into a link; the other page is written only if it has not changed meanwhile, so nothing is overwritten. In a workspace it lists only pages you may see.
+- Today, on Home in the desktop app: one click opens today's page, `Daily/YYYY-MM-DD.md` in your Private Space, made on first use from `Templates/Daily.md` when you have one.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added
@@ -256,6 +263,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1

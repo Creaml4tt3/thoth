@@ -162,9 +162,18 @@
 .backlinks { margin-top: var(--thoth-space-8); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
 .backlinks h2 { font: var(--thoth-text-small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-2); }
 .backlinks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.backlinks button { all: unset; box-sizing: border-box; display: flex; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
-.backlinks button:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
-.backlinks button:focus-visible { outline: 2px solid var(--thoth-accent); }
+.backlinks :is(.connection-page, .connections-toggle) { all: unset; box-sizing: border-box; display: flex; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.backlinks :is(.connection-page, .connections-toggle):hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.backlinks :is(.connection-page, .connections-toggle):focus-visible { outline: 2px solid var(--thoth-accent); }
+/* Connections (ADR-0050): the Backlinks look, in three parts; mentions show their words and a Link button. */
+.connections h3 { margin: var(--thoth-space-3) 0 var(--thoth-space-1); font: var(--thoth-text-small); font-weight: 600; color: var(--thoth-ink-secondary); }
+.connections .connections-toggle { min-height: 24px; padding: 2px 8px; width: auto; color: var(--thoth-ink-secondary); font: inherit; }
+.connections p { margin: 0; padding: 4px 8px; }
+.connection-mention { display: flex; align-items: center; gap: 8px; }
+.connection-mention .connection-page { flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.connection-context { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); overflow-wrap: anywhere; }
+.connection-context mark { background: color-mix(in srgb, var(--thoth-accent) 22%, transparent); color: var(--thoth-ink-primary); border-radius: 2px; }
+.connections .connection-link { flex: none; }
 
 /* Conflict dialog */
 .diff { border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); overflow: auto; max-height: 40vh; font: 13px / 1.6 var(--thoth-font-mono); }
