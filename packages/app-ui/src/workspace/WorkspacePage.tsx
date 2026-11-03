@@ -80,7 +80,6 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   // Which links may carry the target's title (ADR-0049): none until known. Read again whenever the tree changes,
   // since a change to who sees what makes the client read the tree again. An answer holds only for the tree it was
   // asked for: an older one could title a page limited just now, so no titles until the new answer arrives.
-  const me = entry?.info.account?.id;
   const teamsCap = state.capabilities[target.server]?.includes("teams");
   const [titles, setTitles] = useState<{ for: string; nodes: typeof nodes; titles: LinkTitles }>({ for: "", nodes: undefined, titles: NO_TITLES });
   const titlesFor = `${key}\n${role ?? ""}\n${me ?? ""}\n${teamsCap ?? ""}`;
