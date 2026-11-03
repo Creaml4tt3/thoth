@@ -194,6 +194,28 @@ impl VaultFs {
     }
 }
 
+impl VaultFs {
+    /// Deletes the index files an older Thoth kept in `.thoth/` (ADR-0046). The host's own call, never the webview's
+    /// (`remove` refuses these names): unlinks each entry through the root fd, so a link is removed and never followed;
+    /// a folder by one of those names is left.
+    pub fn remove_old_index(&self) -> HostResult<()> {
+        let mut result = Ok(());
+        for name in crate::index_home::FILES {
+            let raw = format!(".thoth/{name}");
+            let target = match self.target(&raw, "rm") {
+                Ok(t) => t,
+                Err(e) if e.code == "ENOENT" => return Ok(()),
+                Err(e) => return Err(e),
+            };
+            match unlinkat(&target.dir, target.name.as_str(), AtFlags::empty()) {
+                Ok(()) | Err(Errno::NOENT) => {}
+                Err(e) => result = result.and(Err(HostError::errno(e, "rm", &raw))),
+            }
+        }
+        result
+    }
+}
+
 fn walk_error(e: WalkError, raw: &str, op: &str) -> HostError {
     match e {
         WalkError::Symlink => HostError::unsafe_path(raw, "symlinked directory in path"),
