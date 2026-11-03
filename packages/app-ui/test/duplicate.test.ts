@@ -1,4 +1,4 @@
-// Duplicate in a workspace (ADR-0046), without a window: names, what is copied and in which order, links inside the
+// Duplicate in a workspace (ADR-0047), without a window: names, what is copied and in which order, links inside the
 // copied set, structure only, the page limit, and the clean-up after a failure part-way.
 import { describe, expect, it } from "vitest";
 import { newStableId } from "@thoth/domain";

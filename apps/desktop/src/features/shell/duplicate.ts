@@ -1,5 +1,5 @@
 /**
- * Duplicate in the Private Space (ADR-0046): a page, or a folder with everything in it, copied as new files. Every
+ * Duplicate in the Private Space (ADR-0047): a page, or a folder with everything in it, copied as new files. Every
  * write is a create (`expectedHash: null`), so nothing existing is ever replaced.
  *
  * - The copy is named by `label` ("Alpha (copy)", then "Alpha (copy 2)"…) and sits right after the original, or at
@@ -94,10 +94,13 @@ export async function duplicatePrivate(vault: Vault, input: PrivateDuplicate): P
     const members = input.kind === "folder" ? files.filter((f) => within(f, input.source)) : [input.source];
     const memberPages = members.filter(isMarkdownPath);
     const copies = new Map(members.filter((m) => !input.structureOnly || isMarkdownPath(m)).map((m) => [m, moved(m)]));
+    const innerFolders = input.kind === "folder" ? folders.filter((f) => f !== input.source && within(f, input.source)) : [];
+    // Claimed before any image copy is named, so an image never takes a name a copied file or folder needs.
+    for (const path of [...copies.values(), ...innerFolders.map(moved)]) claim(path);
 
     // Folders inside, so empty ones come along too (parents first: `listFolders` is sorted).
     if (input.kind === "folder") {
-      for (const folder of folders.filter((f) => f !== input.source && within(f, input.source))) {
+      for (const folder of innerFolders) {
         await vault.createFolder(moved(folder));
         madeFolders.push(moved(folder));
       }

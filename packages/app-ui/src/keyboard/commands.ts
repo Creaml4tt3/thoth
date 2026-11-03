@@ -35,7 +35,7 @@ export interface CommandActions {
   newWorkspaceFolder?: { workspace: string; run(): void };
   rename?(): void;
   moveTo?(): void;
-  /** Duplicate the open page (ADR-0046). */
+  /** Duplicate the open page (ADR-0047). */
   duplicate?(): void;
   /** Copy or move the open workspace page (and its sub-pages) to another workspace (ADR-0006, amendment of 2026-10-27). */
   copyToWorkspace?(): void;

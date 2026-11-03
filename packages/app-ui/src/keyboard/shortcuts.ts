@@ -176,7 +176,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "tree.rename", group: "tree", scope: "tree", desktop: [{ key: "F2" }] },
   { id: "tree.reorder", group: "tree", scope: "tree", desktop: [{ key: "ArrowUp", alt: true, shift: true }, { key: "ArrowDown", alt: true, shift: true }], display: { desktop: "Alt+Shift+↑ / ↓" } },
   { id: "tree.menu", group: "tree", scope: "tree", desktop: [{ key: "ContextMenu" }, { key: "F10", shift: true }], display: { desktop: "Menu key / Shift+F10" } },
-  // Duplicate (ADR-0046). Not Cmd/Ctrl+D: that is Favorites, everywhere, and a browser's bookmark key.
+  // Duplicate (ADR-0047). Not Cmd/Ctrl+D: that is Favorites, everywhere, and a browser's bookmark key.
   { id: "tree.duplicate", group: "tree", scope: "tree", desktop: [{ key: "d", mod: true, shift: true }] },
   // On a sidebar section's header (ADR-0019 amendment; the desktop has sections, the web client's sidebar has one list).
   { id: "section.move", group: "tree", scope: "sidebar", only: "desktop", desktop: [{ key: "ArrowUp", alt: true, shift: true }, { key: "ArrowDown", alt: true, shift: true }], display: { desktop: "Alt+Shift+↑ / ↓" } },

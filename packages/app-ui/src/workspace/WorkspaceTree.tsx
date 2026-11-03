@@ -11,7 +11,7 @@ import { RenameDialog } from "../order/RenameDialog.tsx";
 import { DeleteDialog } from "../order/DeleteDialog.tsx";
 import { DuplicateDialog } from "../order/DuplicateDialog.tsx";
 import { clearDuplicate, copyName, usePendingDuplicate } from "../order/duplicate.ts";
-import { DuplicateQuota, duplicateInWorkspace } from "./duplicate.ts";
+import { DuplicateQuota, duplicateInWorkspace, duplicatedIds } from "./duplicate.ts";
 import { ColorDialog } from "../order/ColorDialog.tsx";
 import { currentPlatform, formatChordShort } from "../keyboard/shortcuts.ts";
 import { DownloadStatus, readWorkspaceMarkdown, useDownload, workspaceCanDownload } from "../download/DownloadButton.tsx";
@@ -60,7 +60,7 @@ interface Ctx {
   dnd: TreeDnd;
   openMenu(id: string, at: { x: number; y: number }): void;
   reorder(id: string, delta: -1 | 1): void;
-  /** Duplicate (ADR-0046), Cmd/Ctrl+Shift+D. */
+  /** Duplicate (ADR-0047), Cmd/Ctrl+Shift+D. */
   duplicate(id: string): void;
   /** The folder New page and New folder go into (the last one clicked, 0.2.6); null is the top level. */
   target: string | null;
@@ -222,7 +222,10 @@ const isThisWorkspaceReorder = (server: string, workspace: string) => (request: 
  * What team limits (ADR-0042) mean for a copy, which keeps none: the original is limited itself (`self`), by a folder
  * above it (`above`, the nearest limited one), not at all (`none`), or the person cannot ask (`unknown`: editors).
  */
-type TeamLimit = { kind: "none" } | { kind: "unknown" } | { kind: "self" } | { kind: "above"; folder: string };
+type TeamLimit = ({ kind: "none" } | { kind: "unknown" } | { kind: "self" } | { kind: "above"; folder: string }) & {
+  /** A page below the original is limited itself: its copy loses that limit wherever the copy goes. */
+  below?: boolean;
+};
 
 /** Pages of the tree below `items`, for the "Move to…" list; the subtree of `except` is left out (it cannot move into itself). */
 function destinationsFor(items: WorkspaceTreeItem[], except: string, topLevel: string): Destination[] {
@@ -269,7 +272,7 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const [deleting, setDeleting] = useState<string | null>(null);
   const [coloring, setColoring] = useState<string | null>(null);
   const [limiting, setLimiting] = useState<string | null>(null);
-  /** Duplicate (ADR-0046): asking first (`to: false`) or picking the folder for "Duplicate to…" (`to: true`). */
+  /** Duplicate (ADR-0047): asking first (`to: false`) or picking the folder for "Duplicate to…" (`to: true`). */
   const [duplicating, setDuplicating] = useState<{ id: string; structure: boolean; to: boolean; limit: TeamLimit } | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const duplicateKeys = formatChordShort({ key: "d", mod: true, shift: true }, currentPlatform());
@@ -440,8 +443,15 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
       const client = directory.client(server);
       const own = await client.getPageVisibility(workspace.id, id);
       if (own.teamIds !== null) return { kind: "self" };
-      if (!own.limitedAbove) return { kind: "none" };
-      for (const folder of workspaceAncestors(fresh() ?? [], id)) if ((await client.getPageVisibility(workspace.id, folder)).teamIds !== null) return { kind: "above", folder };
+      let below = false;
+      for (const sub of duplicatedIds(fresh() ?? [], id).slice(1)) {
+        if ((await client.getPageVisibility(workspace.id, sub)).teamIds !== null) {
+          below = true;
+          break;
+        }
+      }
+      if (!own.limitedAbove) return { kind: "none", below };
+      for (const folder of workspaceAncestors(fresh() ?? [], id)) if ((await client.getPageVisibility(workspace.id, folder)).teamIds !== null) return { kind: "above", folder, below };
       return { kind: "self" }; // limited by something this tree does not show: warn as if it were the page itself
     } catch {
       return { kind: "unknown" };
@@ -451,13 +461,14 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   const limitNotes = (limit: TeamLimit, parent: string | null): string[] => {
     if (limit.kind === "unknown") return [tt.duplicateDialog.noLimits];
     if (limit.kind === "self") return [tt.duplicateDialog.everyone];
-    if (limit.kind === "above" && !(parent !== null && isWithin(fresh() ?? [], parent, limit.folder))) return [tt.duplicateDialog.everyone];
-    return [];
+    const below = limit.below ? [tt.duplicateDialog.below] : [];
+    if (limit.kind === "above" && !(parent !== null && isWithin(fresh() ?? [], parent, limit.folder))) return [tt.duplicateDialog.everyone, ...below];
+    return below;
   };
   const parentOfRow = (id: string): string | null => siblingsOf(id)?.parent ?? null;
 
   /**
-   * Copies `id` and every page below it into `parent` (ADR-0046): right after the original when that is its parent,
+   * Copies `id` and every page below it into `parent` (ADR-0047): right after the original when that is its parent,
    * else at the end. Pending edits are written first, so the copy has the current text. Opens the copy (a page) and
    * puts its name into rename. Returns the reason it failed (nothing is left behind then), or null.
    */

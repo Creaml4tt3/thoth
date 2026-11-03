@@ -95,7 +95,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const [moving, setMoving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [coloring, setColoring] = useState<string | null>(null);
-  /** Duplicate (ADR-0046): a folder with pages asks first (`ask`); "Duplicate to…" picks the folder (`to`). */
+  /** Duplicate (ADR-0047): a folder with pages asks first (`ask`); "Duplicate to…" picks the folder (`to`). */
   const [duplicating, setDuplicating] = useState<{ path: string; structure: boolean; to: boolean } | null>(null);
   const newTabKeys = formatChordShort({ key: "Enter", mod: true }, currentPlatform());
   const duplicateKeys = formatChordShort({ key: "d", mod: true, shift: true }, currentPlatform());
@@ -424,7 +424,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     });
 
   /**
-   * Copies a page, or a folder and everything in it, into `into` (ADR-0046): right after the original when that is its
+   * Copies a page, or a folder and everything in it, into `into` (ADR-0047): right after the original when that is its
    * folder, else at the end. Edits are written first, so the copy has the current text. The copy is opened (a page)
    * and its name goes into rename. Returns the reason it failed (nothing is left behind then), or null.
    */

@@ -48,7 +48,7 @@ export function DuplicateDialog({ name, pages, notes, onDuplicate, onClose }: Pr
             {note}
           </p>
         ))}
-        {error !== null && (
+        {error !== null && error !== "" && (
           <p role="alert" className="alert alert-danger">
             {error}
           </p>

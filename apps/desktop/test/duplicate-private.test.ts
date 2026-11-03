@@ -1,4 +1,4 @@
-// Duplicate in the Private Space (ADR-0046), on a real vault without a window: names, a folder's structure and order,
+// Duplicate in the Private Space (ADR-0047), on a real vault without a window: names, a folder's structure and order,
 // links inside the copied set, structure only, images copied under a free name, and the clean-up after a failure.
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -98,6 +98,15 @@ describe("Duplicate a folder", () => {
     // The image outside the folder is copied next to the page's copy; the original stays.
     expect(await readFile(join(root, "Notes (copy)/logo.png"))).toEqual(Buffer.from(PNG));
     expect(await read("Notes/Plan.md")).toContain("![logo](../logo.png)");
+  });
+
+  it("an image copied from outside never takes the name of a file the folder brings along", async () => {
+    const own = new Uint8Array([...PNG, 9]);
+    await put("Notes/logo.png", own);
+    const made = await run({ source: "Notes", kind: "folder" });
+    expect(await readFile(join(root, "Notes (copy)/logo.png"))).toEqual(Buffer.from(own));
+    expect(await readFile(join(root, "Notes (copy)/logo-2.png"))).toEqual(Buffer.from(PNG));
+    expect(await read(`${made.path}/Plan.md`)).toContain("![logo](logo-2.png)");
   });
 
   it("structure only: the folders and pages, each page with just its title, and no other files", async () => {

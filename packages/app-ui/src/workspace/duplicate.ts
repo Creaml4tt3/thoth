@@ -1,5 +1,5 @@
 /**
- * Duplicate in a workspace (ADR-0046): a page or folder and every page below it, copied in the same workspace with
+ * Duplicate in a workspace (ADR-0047): a page or folder and every page below it, copied in the same workspace with
  * new page ids. Each copy is a plain create (`If-None-Match: *`), so nothing existing is ever replaced. Links between
  * pages of the copied set point at the copies (the transfer link rewriting, `classifyBetween`); links to any other
  * page, and images (`thoth:attachment/<id>`, the same attachment), stay as written. Earlier versions, share links and

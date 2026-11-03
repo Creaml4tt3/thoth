@@ -290,7 +290,7 @@ export const en = {
       move: "Move",
       cancel: "Cancel",
     },
-    /** Duplicate in a tree's menu (ADR-0046). */
+    /** Duplicate in a tree's menu (ADR-0047). */
     duplicate: "Duplicate",
     duplicateStructure: "Duplicate structure only",
     duplicateTo: "Duplicate to…",
@@ -305,6 +305,7 @@ export const en = {
       copy: "The copy goes right below it, with the same pages, folders and order. Earlier versions and share links are not copied.",
       structure: "The copy keeps the pages, folders and order, but each page keeps only its title.",
       everyone: "Only some teams can see the original. The copy keeps no team limits, so it will be visible to everyone in this workspace.",
+      below: "Only some teams can see some of the pages inside. Their copies keep no team limits, so they will be visible to everyone in this workspace.",
       noLimits: "The copy keeps no team limits.",
       duplicate: "Duplicate",
       duplicating: "Duplicating…",

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Duplicate, Duplicate structure only and Duplicate to… in the trees' menus (ADR-0046): the copy goes right below the
+// Duplicate, Duplicate structure only and Duplicate to… in the trees' menus (ADR-0047): the copy goes right below the
 // original, is opened and named at once; a folder with pages asks first; a workspace copy checks the page limit,
 // warns about team limits, and leaves nothing behind when it fails part-way.
 import { fireEvent } from "@testing-library/react";
@@ -212,6 +212,15 @@ describe("Duplicate in a workspace", () => {
     await app.user.selectOptions(within(picker).getByRole("listbox", { name: "Put the copy in" }), "");
     expect(picker.textContent).toContain("visible to everyone");
     expect(await axeViolations(picker)).toEqual([]);
+  });
+
+  it("warns a manager when a page inside the copied folder is team-limited, even though the folder is not", async () => {
+    const { app, ws, group, ids } = await workspace({ role: "manager", capabilities: [...CAPS, "teams"] });
+    ws.visibility.set(ids.q1, ["team_1"]);
+    await app.user.click(within(await openMenu(group, /^Roadmap/, "Roadmap")).getByRole("menuitem", { name: "Duplicate" }));
+    const dialog = await screen.findByRole("dialog", { name: "Duplicate Roadmap and its 2 pages?" });
+    expect(dialog.textContent).toContain("Only some teams can see some of the pages inside.");
+    expect(dialog.textContent).not.toContain("Only some teams can see the original.");
   });
 
   it("tells an editor, who cannot see team limits, that the copy keeps none", async () => {

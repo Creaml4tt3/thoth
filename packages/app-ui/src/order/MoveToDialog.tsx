@@ -22,7 +22,7 @@ interface Props {
   /** Resolves with an error message to show (the dialog stays open), or null when the move is done. */
   onMove(destination: string): Promise<string | null>;
   onClose(): void;
-  /** "Duplicate to…" (ADR-0046): the same picker in its own words; the copy may also go where the original is. */
+  /** "Duplicate to…" (ADR-0047): the same picker in its own words; the copy may also go where the original is. */
   as?: { title: string; destination: string; action: string; busy: string; notes(destination: string): readonly string[] };
 }
 

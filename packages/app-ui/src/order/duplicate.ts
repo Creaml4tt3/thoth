@@ -1,5 +1,5 @@
 /**
- * Duplicate for pages and folders (ADR-0046), the parts both trees share: the copy's name, and "Duplicate" asked for
+ * Duplicate for pages and folders (ADR-0047), the parts both trees share: the copy's name, and "Duplicate" asked for
  * from code (the command palette), the way `move-to.ts` asks for "Move to…".
  */
 import { useSyncExternalStore } from "react";
