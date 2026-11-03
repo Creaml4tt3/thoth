@@ -3,7 +3,7 @@ import { PAGE_TITLE_MAX, WORKSPACE_NAME_MAX, roleCan, type TreeNode, type Worksp
 import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
 import { useTreeDnd, type AcrossTarget, type DropZone, type TreeDnd } from "../order/dnd.ts";
 import { betweenRefusal, crossDirection, refusalText, spaceDropRefusal, workspaceAccess, type SpaceDrag } from "../order/space-drag.ts";
-import { Disclosure, FolderIcon, PageIcon } from "../order/icons.tsx";
+import { Disclosure, FolderColorName, FolderIcon, PageIcon } from "../order/icons.tsx";
 import { MoveToDialog, type Destination } from "../order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "../order/move-to.ts";
 import { clearReorder, usePendingReorder, type ReorderRequest } from "../order/reorder-request.ts";
@@ -104,6 +104,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
       {expandable ? <Disclosure open={expanded} onToggle={() => ctx.toggle(item.id)} /> : <Disclosure open={false} hidden />}
       {item.folder ? <FolderIcon open={expanded} color={ctx.colorOf(item.id)} /> : <PageIcon />}
       <span className="tree-label">{item.title}</span>
+      {item.folder && <FolderColorName color={ctx.colorOf(item.id)} />}
     </>
   );
 

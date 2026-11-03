@@ -22,7 +22,7 @@ import { opaqueId } from "../../apps/server/src/ids.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "share");
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
 let ref: ReferenceServer;
 let issuer: FakeIssuer;

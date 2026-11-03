@@ -35,7 +35,7 @@
 .plain-editor .md-line-code .md-code { background: none; }
 .plain-editor .md-link { color: var(--thoth-link); }
 .plain-editor .md-url, .plain-editor .md-label { color: var(--thoth-ink-tertiary); }
-.plain-editor .md-mark { color: var(--thoth-ink-faint); }
+.plain-editor .md-mark { color: var(--thoth-ink-secondary); }
 .plain-editor .md-quote { color: var(--thoth-ink-secondary); }
 .plain-editor .md-meta { color: var(--thoth-ink-tertiary); }
 .plain-editor .md-key { color: var(--thoth-ink-secondary); }

@@ -48,6 +48,7 @@ export type ShortcutId =
   | "tab.pin"
   | "tab.split"
   | "pane.focusOther"
+  | "region.next"
   | "page.favorite"
   | "tree.move"
   | "tree.expand"
@@ -165,8 +166,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "tab.pin", group: "tabs", scope: "global", desktop: [{ code: "KeyP", alt: true, shift: true }] },
   // Split view (ADR-0030). Cmd/Ctrl+\ is the sidebar; by physical key, as Option changes the character on a Mac.
   { id: "tab.split", group: "tabs", scope: "global", desktop: [{ code: "Backslash", mod: true, alt: true }] },
-  // F6 moves between panes in most desktop apps; a browser keeps it (the address bar), so the web has only the other key.
-  { id: "pane.focusOther", group: "tabs", scope: "global", desktop: [{ key: "F6" }, { code: "Backslash", alt: true, shift: true }], web: [{ code: "Backslash", alt: true, shift: true }] },
+  { id: "pane.focusOther", group: "tabs", scope: "global", desktop: [{ code: "Backslash", alt: true, shift: true }] },
+  // F6 moves between the window's regions in most desktop apps: the sidebar, then each pane. A browser keeps F6 (the
+  // address bar), so the web has none; it has the landmarks and Tab.
+  { id: "region.next", group: "tabs", scope: "global", only: "desktop", desktop: [{ key: "F6" }] },
   { id: "tab.menu", group: "tabs", scope: "tabs", desktop: [{ key: "ContextMenu" }, { key: "F10", shift: true }], display: { desktop: "Menu key / Shift+F10" } },
 
   // The page trees

@@ -95,6 +95,36 @@ describe.each(Object.entries(themes))("accent contrast, %s theme", (_name, t) =>
   });
 });
 
+/** Text tokens on every surface they sit on: the page (dialogs and menus too), the sidebar, and a hover, active or
+ * menu-highlight row over each. 4.5:1 because they are body-size text, not large text or UI parts. */
+describe.each(Object.entries(themes))("text contrast, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const surfaces: [string, Rgb][] = ["--thoth-bg", "--thoth-bg-sidebar"].flatMap((name) => {
+    const base = colour(name).rgb;
+    return [[name, base], ...["--thoth-bg-hover", "--thoth-bg-active", "--thoth-moon-soft"].map((wash): [string, Rgb] => [`${wash} over ${name}`, over(colour(wash), base)])];
+  });
+  const text = ["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-ink-tertiary", "--thoth-danger", "--thoth-warning"];
+
+  it.each(text)("%s is at least 4.5:1 on every surface", (name) => {
+    const low = surfaces.filter(([, back]) => ratio(over(colour(name), back), back) < 4.5).map(([surface]) => surface);
+    expect(low).toEqual([]);
+  });
+});
+
+describe("faint ink is not text", () => {
+  /** --thoth-ink-faint is under 3:1: fine for disabled items, icons and separators, not for text someone has to read. */
+  const files = ["../src/editor.css", "../src/shell.css", "../src/plain.css", "../src/ui.css"];
+  it.each(files)("%s uses faint ink as a colour only for disabled items, icons and separators", (file) => {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    const rules = [...source.matchAll(/([^{}]+)\{[^}]*[^-]color:\s*var\(--thoth-ink-faint\)/g)].map((m) => m[1]!.trim());
+    expect(rules.filter((selector) => !/disabled|caret|icon|handle|::before/.test(selector))).toEqual([]);
+  });
+});
+
 describe("accent role tokens", () => {
   it("defines the tab and drop roles in terms of the accent for every theme scope", () => {
     const scope = block(css, ":root, [data-theme] {");

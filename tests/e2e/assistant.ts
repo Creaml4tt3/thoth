@@ -63,6 +63,6 @@ export async function axe(page: Page, selector: string | string[]): Promise<void
   await settled(page);
   let builder = new AxeBuilder({ page });
   for (const s of Array.isArray(selector) ? selector : [selector]) builder = builder.include(s);
-  const bad = (await builder.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  const bad = (await builder.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }

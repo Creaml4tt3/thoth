@@ -409,6 +409,7 @@ function TeamsSection({ client, workspace, members }: { client: MembersClient; w
   /** "Delete team" asks first, listing the folders limited to it (ADR-0043); `pages` is null while they load. */
   const [deleting, setDeleting] = useState<{ team: Team; pages: TeamPageList["items"] | null } | null>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (deleting?.pages) confirmButton.current?.focus();
   }, [deleting?.pages]);
@@ -455,7 +456,7 @@ function TeamsSection({ client, workspace, members }: { client: MembersClient; w
 
   return (
     <section className="members-teams" role="region" aria-labelledby={ids.heading}>
-      <h3 id={ids.heading} className="share-heading">
+      <h3 id={ids.heading} ref={heading} tabIndex={-1} className="share-heading">
         {t.teams}
       </h3>
       <p className="share-note">{t.teamsIntro}</p>
@@ -477,10 +478,10 @@ function TeamsSection({ client, workspace, members }: { client: MembersClient; w
                   }}
                 >
                   <input className="input" aria-label={t.teamName(team.name)} maxLength={TEAM_NAME_MAX} value={names[team.id] ?? team.name} disabled={busy} onChange={(event) => setNames({ ...names, [team.id]: event.target.value })} />
-                  <Button small variant="quiet" type="submit" disabled={busy}>
+                  <Button small variant="quiet" type="submit" aria-label={t.renameTeamLabel(team.name)} disabled={busy}>
                     {t.renameTeam}
                   </Button>
-                  <Button small variant="quiet" aria-label={t.deleteTeamLabel(team.name)} disabled={busy} onClick={() => void askDelete(team)}>
+                  <Button small variant="quiet" data-delete-team={team.id} aria-label={t.deleteTeamLabel(team.name)} disabled={busy} onClick={() => void askDelete(team)}>
                     {t.deleteTeam}
                   </Button>
                 </form>
@@ -538,7 +539,16 @@ function TeamsSection({ client, workspace, members }: { client: MembersClient; w
             })
           )}
           <div className="move-actions">
-            <Button variant="quiet" small onClick={() => setDeleting(null)}>
+            <Button
+              variant="quiet"
+              small
+              onClick={() => {
+                const id = deleting.team.id;
+                setDeleting(null);
+                // Back to the button that asked.
+                setTimeout(() => document.querySelector<HTMLElement>(`[data-delete-team="${CSS.escape(id)}"]`)?.focus(), 0);
+              }}
+            >
               {t.cancel}
             </Button>
             <Button
@@ -549,6 +559,8 @@ function TeamsSection({ client, workspace, members }: { client: MembersClient; w
               onClick={() => {
                 const team = deleting.team;
                 setDeleting(null);
+                // The team's row goes away with it: focus waits on the Teams heading, as in the Trash.
+                heading.current?.focus();
                 void act(() => client.deleteTeam!(workspace.id, team.id), t.teamDeleted(team.name));
               }}
             >

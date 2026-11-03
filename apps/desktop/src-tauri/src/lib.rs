@@ -539,6 +539,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     .min_inner_size(720.0, 480.0)
                     // Files dropped from the system arrive as the page's own drop events (images, ADR-0028), not as paths.
                     .disable_drag_drop_handler()
+                    // Cmd/Ctrl + - = 0 zoom the page (WCAG 1.4.4), as in the main window (tauri.conf.json).
+                    .zoom_hotkeys_enabled(true)
                     .focused(true);
                 // The tab was let go here: the new window's tab bar starts under the pointer.
                 if let Some((x, y)) = window.at {
@@ -1022,7 +1024,12 @@ mod tests {
         for permission in capability["permissions"].as_array().unwrap() {
             let p = permission.as_str().unwrap();
             assert!(
-                p.starts_with("allow-") || p == "core:event:allow-listen" || p == "core:event:allow-unlisten" || NOTIFICATION.contains(&p),
+                p.starts_with("allow-")
+                    || p == "core:event:allow-listen"
+                    || p == "core:event:allow-unlisten"
+                    // The zoom keys (zoomHotkeysEnabled): set the webview's own zoom, nothing else of core:webview.
+                    || p == "core:webview:allow-set-webview-zoom"
+                    || NOTIFICATION.contains(&p),
                 "unexpected permission {p}"
             );
             if p.starts_with("notification:") {
@@ -1032,7 +1039,7 @@ mod tests {
         assert_eq!(granted, NOTIFICATION);
         assert!(capability.get("remote").is_none());
         let text = include_str!("../capabilities/main.json");
-        for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default"] {
+        for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
         }
     }
