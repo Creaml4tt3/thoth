@@ -5,7 +5,7 @@
  * a page marked as a folder, so a folder link is a page link whose target the tree draws as a folder. People come
  * from the members list the workspace list already carries (`Workspace.members`) and are offered after `@` only.
  *
- * Everything here comes from the tree and the workspace list the client already holds: no new request.
+ * Candidates come from the tree and the workspace list the client already holds; only `linkTitles` asks the server.
  */
 import { PAGE_LINK_PREFIX, parseThothLink } from "@thoth/transfer";
 import { roleCan, type Member, type Role, type TreeNode } from "@thoth/workspace-protocol";
@@ -30,10 +30,10 @@ export interface WorkspaceLinkSource {
  * linking page, which readers of that page (and its share link) see even when the target is limited to teams they are
  * not in (ADR-0042). So a link to a limited page is written `[[thoth:page/<id>]]`: readers who see the page get its
  * title from their own tree, others read "Page not available".
- * - `all`: nothing in the workspace can be limited (the server has no teams, or the workspace has none), or the writer
- *   is in no team and so cannot see a limited page.
- * - `except`: owners and managers, who see every page: titles except for pages limited themselves or below a limited
- *   folder (`limited` holds the pages limited themselves).
+ * - `all`: the server has no teams, or the writer is an editor or viewer in no team of the workspace (none at all, or
+ *   none they are in), who cannot see a limited page.
+ * - `except`: owners and managers, who see every page: titles except for pages limited themselves (`listLimitedPages`,
+ *   also those whose teams were all deleted) or below one.
  * - `none`: an editor in a team (who cannot tell which of their pages are limited), or anything unknown or failed.
  */
 export type LinkTitles = { kind: "all" } | { kind: "none" } | { kind: "except"; limited: ReadonlySet<string> };
@@ -41,7 +41,7 @@ export type LinkTitles = { kind: "all" } | { kind: "none" } | { kind: "except"; 
 export const NO_TITLES: LinkTitles = { kind: "none" };
 
 export async function linkTitles(input: {
-  client: Pick<WorkspaceClient, "listTeams" | "listTeamPages">;
+  client: Pick<WorkspaceClient, "listTeams" | "listLimitedPages">;
   workspace: string;
   role: Role;
   /** The signed-in user's ID. */
@@ -52,13 +52,14 @@ export async function linkTitles(input: {
   if (input.teams === false) return { kind: "all" };
   if (input.teams === undefined) return NO_TITLES;
   try {
+    if (roleCan(input.role, "manage")) {
+      // One request, also listing pages whose teams were all deleted (still limited, ADR-0042). A server without the
+      // route (501 or 404) throws, so: no titles.
+      const limited = await input.client.listLimitedPages(input.workspace);
+      return { kind: "except", limited: new Set(limited.map((p) => p.pageId)) };
+    }
     const teams = await input.client.listTeams(input.workspace);
     if (teams.length === 0) return { kind: "all" };
-    if (roleCan(input.role, "manage")) {
-      // One request per team (at most TEAMS_MAX) instead of one `getPageVisibility` per page of the tree.
-      const lists = await Promise.all(teams.map((t) => input.client.listTeamPages(input.workspace, t.id)));
-      return { kind: "except", limited: new Set(lists.flat().map((p) => p.pageId)) };
-    }
     if (input.me === undefined || teams.some((t) => t.memberIds.includes(input.me!))) return NO_TITLES;
     return { kind: "all" };
   } catch {

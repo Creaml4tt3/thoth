@@ -15,6 +15,7 @@ import { completion, findTrigger } from "@thoth/app-ui/editor/plain/link-suggest
 import { markdownSupport } from "@thoth/app-ui/editor/plain/syntax.ts";
 import { findTrigger as findBlocksTrigger } from "@thoth/app-ui/editor/link-suggest-blocks.ts";
 import { thothSchema } from "@thoth/editor";
+import { ProblemError } from "@thoth/workspace-client";
 import { EditorState as PmState, Selection as PmSelection } from "@tiptap/pm/state";
 
 let mtime = 0;
@@ -234,8 +235,9 @@ describe("workspace links (ADR-0049)", () => {
 
   describe("which links keep the title (limited pages, owner decision 2026-11-02)", () => {
     const team = (tid: string, memberIds: string[]) => ({ id: tid, name: tid, memberIds });
-    /** A fake client: the workspace's teams, and the pages each team limits. */
-    const client = (teams: ReturnType<typeof team>[], limits: Record<string, string[]> = {}, fail?: "teams" | "pages") => {
+    const problem = (status: number, code: string) => new ProblemError({ type: `https://example.test/${code}`, title: code, status, code });
+    /** A fake client: the workspace's teams, and the pages limited themselves (`listLimitedPages`). */
+    const client = (teams: ReturnType<typeof team>[], limited: string[] = [], fail?: "teams" | "limited" | ProblemError) => {
       const calls: string[] = [];
       return {
         calls,
@@ -244,10 +246,11 @@ describe("workspace links (ADR-0049)", () => {
           if (fail === "teams") throw new Error("offline");
           return teams;
         },
-        listTeamPages: async (_ws: string, tid: string) => {
-          calls.push(`pages ${tid}`);
-          if (fail === "pages") throw new Error("offline");
-          return (limits[tid] ?? []).map((pageId) => ({ pageId, title: "x", kind: null, onlyTeam: true }));
+        listLimitedPages: async () => {
+          calls.push("limited");
+          if (fail === "limited") throw new Error("offline");
+          if (fail instanceof ProblemError) throw fail;
+          return limited.map((pageId) => ({ pageId }));
         },
       };
     };
@@ -255,14 +258,20 @@ describe("workspace links (ADR-0049)", () => {
       linkTitles({ client: c, workspace: "w", role, me: rest.length > 0 ? rest[0] : "u_me", teams: rest.length > 1 ? rest[1] : true });
     const labels = (t: LinkTitles) => workspaceLinkSuggester({ ...source, page: "none", titled: titledBy(t, nodes) }).suggest("").map((h) => [h.title, h.label ?? null]);
 
-    it("owners and managers: no title for a limited page or anything below a limited folder; titles elsewhere", async () => {
+    it("owners and managers: no title for a limited page or anything below a limited folder; titles elsewhere; one request", async () => {
       for (const role of ["owner", "manager"] as const) {
-        const c = client([team("t1", []), team("t2", ["u_me"])], { t1: [id(1)], t2: [] });
+        const c = client([team("t1", []), team("t2", ["u_me"])], [id(1)]);
         const t = await titles(c, role);
         expect(t).toEqual({ kind: "except", limited: new Set([id(1)]) });
         expect(Object.fromEntries(labels(t))).toEqual({ Projects: null, Roadmap: null, Here: "Here", "Road notes": "Road notes" });
-        expect(c.calls.sort()).toEqual(["pages t1", "pages t2", "teams"]);
+        expect(c.calls).toEqual(["limited"]);
       }
+    });
+
+    it("owners and managers: a page whose teams were all deleted still gets no title, also with no team left (ADR-0042)", async () => {
+      // The workspace has no teams any more, but the folder stays limited: the server still lists it.
+      const t = await titles(client([], [id(1)]), "owner");
+      expect(Object.fromEntries(labels(t))).toEqual({ Projects: null, Roadmap: null, Here: "Here", "Road notes": "Road notes" });
     });
 
     it("an editor in a team: no titles at all (they cannot tell which pages are limited)", async () => {
@@ -271,8 +280,8 @@ describe("workspace links (ADR-0049)", () => {
       expect(labels(t).every(([, label]) => label === null)).toBe(true);
     });
 
-    it("an editor in no team: titles (they cannot see a limited page); never asks for the teams' pages", async () => {
-      const c = client([team("t1", ["u_other"])], { t1: [id(1)] });
+    it("an editor in no team: titles (they cannot see a limited page); never asks for the limited pages", async () => {
+      const c = client([team("t1", ["u_other"])], [id(1)]);
       const t = await titles(c, "editor");
       expect(t).toEqual({ kind: "all" });
       expect(labels(t).every(([title, label]) => label === title)).toBe(true);
@@ -281,17 +290,19 @@ describe("workspace links (ADR-0049)", () => {
 
     it("no teams in the workspace, or a server without teams: titles for everyone", async () => {
       expect(await titles(client([]), "editor")).toEqual({ kind: "all" });
-      expect(await titles(client([]), "owner")).toEqual({ kind: "all" });
+      expect(labels(await titles(client([]), "owner")).every(([title, label]) => label === title)).toBe(true);
       const c = client([team("t1", ["u_me"])]);
       expect(await titles(c, "editor", "u_me", false)).toEqual({ kind: "all" });
       expect(c.calls).toEqual([]);
     });
 
-    it("anything unknown or failed: no titles", async () => {
+    it("anything unknown or failed, or a server without listLimitedPages (501, 404): no titles", async () => {
       expect(await titles(client([team("t1", [])]), "editor", "u_me", undefined)).toEqual(NO_TITLES);
       expect(await titles(client([team("t1", [])]), "editor", undefined)).toEqual(NO_TITLES);
-      expect(await titles(client([], {}, "teams"), "owner")).toEqual(NO_TITLES);
-      expect(await titles(client([team("t1", [])], {}, "pages"), "manager")).toEqual(NO_TITLES);
+      expect(await titles(client([], [], "teams"), "editor")).toEqual(NO_TITLES);
+      expect(await titles(client([team("t1", [])], [], "limited"), "manager")).toEqual(NO_TITLES);
+      expect(await titles(client([], [], problem(501, "capability_not_supported")), "owner")).toEqual(NO_TITLES);
+      expect(await titles(client([], [], problem(404, "not_found")), "manager")).toEqual(NO_TITLES);
       // No `titled` at all: no titles.
       const { titled: _titled, ...untitled } = source;
       expect(workspaceLinkSuggester(untitled).suggest("road").map((h) => h.label)).toEqual([undefined, undefined]);

@@ -83,16 +83,21 @@ The owner asked for:
      is limited itself or sits below a limited folder. Readers who can see it get its current title from their own
      tree; others read "Page not available". Links to other pages keep the title, so they read well in other
      Markdown apps. How the client knows (`linkTitles` in `workspace/workspace-links.ts`; this ADR's mechanism):
-     - Owners and managers see every page. The client lists the teams and, for each team, the pages limited to it
-       (`listTeamPages`, one request per team, at most 100, instead of one `getPageVisibility` per page of the
-       tree). A page is limited when it, or a page above it in the tree, is in one of those lists.
+     - Owners and managers see every page. The client asks once for the pages limited themselves (`listLimitedPages`,
+       `GET /workspaces/{workspaceId}/limited-pages`, capability `teams`, owners and managers only, 403 for others,
+       `{ items: [{ pageId }] }`, every page not deleted that has a limit, all in one response). It lists also a page
+       whose teams were all deleted, which stays limited (ADR-0042) and which no per-team list names. A page is
+       limited when it, or a page above it in the tree, is in that list. A server without the route (501
+       `capability_not_supported` or 404) gives no titles.
      - Editors (and viewers) cannot read limits. One in at least one team of the workspace (`listTeams`, `memberIds`,
        the signed-in user's ID) may see limited pages without knowing which, so every link they write has no title.
        One in no team cannot see a limited page, so their links keep titles.
-     - A workspace with no teams, or a server without the `teams` capability, has no limited pages: titles stay.
+     - A server without the `teams` capability has no limited pages: titles stay. So does a workspace with no teams
+       for editors (for owners and managers the list decides, since a page can stay limited with no team).
      - Until the answer arrives, while the capabilities or the signed-in user are unknown, and when a request fails,
        links get no title. The answer is read again whenever the tree changes (a change to who sees what makes the
-       client read the tree again); the last answer stays in use meanwhile.
+       client read the tree again), and holds only for the tree it was read for: until the new answer arrives, links
+       get no title, since the older one could title a page limited just now.
      - Nothing adds a title later. Workspace links name pages by ID, so a rename or a move rewrites nothing; the
        Private Space's move rewriting (rule 4) keeps a link's label, or its lack of one, as written. A label someone
        types (`[[thoth:page/<id>|my words]]`) is kept as typed.
@@ -155,7 +160,9 @@ The owner asked for:
   linking page and on its share link. Options weighed by the owner on 2026-11-02; option A (no title for limited
   pages) chosen.
 - **`getPageVisibility` for each page** to learn which are limited: one request per page of the tree, again on every
-  tree change. `listTeamPages` per team gives the same answer in at most 100.
+  tree change. `listLimitedPages` gives the answer in one.
+- **`listTeams` plus `listTeamPages` per team** (the first version of this rule): up to 101 requests, and it misses a
+  page whose teams were all deleted, which stays limited with no team (ADR-0042).
 
 ## Open questions
 

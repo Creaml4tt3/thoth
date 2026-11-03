@@ -11,7 +11,7 @@ import { TransferCommitRequestSchema, TransferCreateRequestSchema, TransferItemS
 import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkListSchema, ShareLinkSchema } from "./shares.ts";
 import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
-import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamPageListSchema, TeamPageSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
+import { LimitedPageListSchema, PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamPageListSchema, TeamPageSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { TrashItemSchema, TrashListSchema, TrashRestoredSchema } from "./trash.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
@@ -75,6 +75,7 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "PageVisibilityWrite", file: "page-visibility-write.v1", schema: PageVisibilityWriteSchema },
   { name: "TeamPage", file: "team-page.v1", schema: TeamPageSchema },
   { name: "TeamPageList", file: "team-page-list.v1", schema: TeamPageListSchema },
+  { name: "LimitedPageList", file: "limited-page-list.v1", schema: LimitedPageListSchema },
   { name: "TrashItem", file: "trash-item.v1", schema: TrashItemSchema },
   { name: "TrashList", file: "trash-list.v1", schema: TrashListSchema },
   { name: "TrashRestored", file: "trash-restored.v1", schema: TrashRestoredSchema },
