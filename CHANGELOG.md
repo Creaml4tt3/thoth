@@ -29,6 +29,11 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The desktop app keeps a Private Space's search index in its own data folder on this computer, no longer in the notes folder, so notes on a network share or a synced drive no longer carry a changing database. The old index there is deleted and rebuilt once. A Private Space on a network drive gets a short notice.
 - `read_page` now gives the page's version, so an app can say which version its proposal is based on.
 - If you have unsaved edits when someone else changes the same workspace page, the choice between your version and theirs opens at once, instead of at your next save.
+- Dragging a block by its handle shows a small card next to the pointer with the block's icon and the start of its text (an image shows its picture), instead of a copy of the whole block. The block fades while it moves, and the line showing where it will land sits half way between blocks, as wide as they are.
+
+### Fixed
+
+- In Blocks mode, the arrow keys no longer make a long page jump by half a screen when the caret reaches the top or bottom edge: the page follows the caret a line at a time, as in Plain mode. Page Up and Page Down now take the caret along, so the next arrow key no longer jumps back to where it was.
 
 ## [0.4.0] - 2026-11-02
 

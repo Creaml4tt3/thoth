@@ -50,6 +50,10 @@ export const en = {
     moveDown: "Move down",
     handleLabel: "Drag to move, click for block menu",
     handleTitle: "Drag to move · Click for menu",
+    /** The card under the pointer while blocks are dragged: several, a table, any other block with no text. */
+    dragBlocks: (n: number) => plural(n, "block"),
+    dragTable: "Table",
+    dragBlock: "Block",
     linkToPage: "Link to page",
     linkAlias: (alias: string) => `alias “${alias}”`,
     linkNoMatch: (query: string) => `No page matches “${query}”. Keep typing to link to a new page.`,

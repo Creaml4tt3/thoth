@@ -213,6 +213,11 @@
 .block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-instant) var(--thoth-ease-out); }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
+/* The card under the pointer while a block is dragged (drag-preview.ts): in the document and painted, off screen. */
+.block-drag-preview { position: fixed; top: -200px; left: -1000px; z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 8px; max-width: 400px; height: 32px; padding: 0 10px 0 4px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; }
+.block-drag-icon { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-xs); color: var(--thoth-ink-secondary); font: 600 11px / 1 var(--thoth-font-sans); }
+.block-drag-thumb { flex: none; width: 24px; height: 24px; border-radius: var(--thoth-radius-xs); }
+.block-drag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .block-menu { position: fixed; z-index: 50; min-width: 220px; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
 .block-menu[hidden] { display: none; }
 .block-submenu { z-index: 51; max-height: calc(100vh - 16px); overflow: auto; }

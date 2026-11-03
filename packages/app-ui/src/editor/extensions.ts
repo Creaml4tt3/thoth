@@ -14,6 +14,7 @@ import { imageInsertExtension } from "./image-insert.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
+import { caretScrollExtension } from "./caret-scroll.ts";
 import { textStylesExtension } from "./selection-toolbar.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
@@ -91,6 +92,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     listKeysExtension(),
     slashExtension(ctx),
     blockHandleExtension(ctx.strings),
+    caretScrollExtension(),
     textStylesExtension(ctx.strings, ctx.client),
     linkSuggestExtension(ctx),
     imageInsertExtension(ctx),

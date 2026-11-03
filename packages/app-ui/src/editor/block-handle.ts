@@ -16,6 +16,7 @@ import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/stat
 import type { EditorView } from "@tiptap/pm/view";
 import { createBlockMenu, type BlockAction, type BlockMenu } from "./block-menu.ts";
 import { editImageAlt } from "./image-views.ts";
+import { POINTER, createDragPreview, dragPreviewContent } from "./drag-preview.ts";
 import type { EditorStrings } from "../strings/en.ts";
 import {
   applyAsOneStep,
@@ -41,6 +42,14 @@ export const BLOCK_MENU_SHORTCUT = "Mod-Alt-m";
 /** Handle geometry (CSS px). */
 const HANDLE = 22;
 
+/** A place a dragged block can land: its index among its siblings, and the drop line's height, left and width on screen. */
+interface Slot {
+  slot: number;
+  y: number;
+  left: number;
+  width: number;
+}
+
 function targetAtPos(view: EditorView, pos: number): BlockTarget | null {
   try {
     return handleBlockAt(view.state.doc.resolve(Math.max(0, Math.min(pos, view.state.doc.content.size))));
@@ -61,6 +70,8 @@ export function blockHandleExtension(strings: EditorStrings) {
       let hovered: BlockTarget | null = null;
       let menuTarget: BlockTarget | null = null;
       let dragged: BlockTarget | null = null;
+      /** The card under the pointer, until the browser has taken its picture. */
+      let preview: HTMLElement | null = null;
 
       let hideTimer: ReturnType<typeof setTimeout> | undefined;
       const hideHandle = () => {
@@ -135,45 +146,54 @@ export function blockHandleExtension(strings: EditorStrings) {
 
       // Drag and drop ------------------------------------------------------
 
-      const slotAt = (view: EditorView, event: DragEvent, target: BlockTarget): { slot: number; y: number } | null => {
+      /** The slot nearest the pointer, and where its line goes: half way between the blocks around it, as wide as they are. */
+      const slotAt = (view: EditorView, event: DragEvent, target: BlockTarget): Slot | null => {
         const sibs = siblingsOf(view.state.doc, target);
         const min = view.state.doc.resolve(target.pos).parent.type.name === "callout" ? 1 : 0;
-        let best: { slot: number; y: number } | null = null;
-        let bestDistance = Infinity;
-        sibs.forEach((s, i) => {
-          if (i < min) return;
+        const boxes = sibs.map((s) => {
           const dom = view.nodeDOM(s.pos);
-          if (!(dom instanceof HTMLElement)) return;
-          const r = dom.getBoundingClientRect();
-          for (const [slot, y] of [[i, r.top], [i + 1, r.bottom]] as const) {
-            const d = Math.abs(event.clientY - y);
-            if (d < bestDistance) {
-              bestDistance = d;
-              best = { slot, y };
-            }
-          }
+          return dom instanceof HTMLElement ? dom.getBoundingClientRect() : null;
         });
+        let best: Slot | null = null;
+        let bestDistance = Infinity;
+        for (let slot = min; slot <= sibs.length; slot++) {
+          const above = boxes[slot - 1] ?? null;
+          const below = boxes[slot] ?? null;
+          const edge = below ?? above;
+          if (!edge) continue;
+          const y = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom : edge.top;
+          const d = Math.abs(event.clientY - y);
+          if (d < bestDistance) {
+            bestDistance = d;
+            best = { slot, y, left: edge.left, width: edge.width };
+          }
+        }
         return best;
       };
 
-      const showIndicator = (view: EditorView, y: number | null): void => {
+      const showIndicator = (view: EditorView, at: Slot | null): void => {
         if (!indicator) return;
-        if (y === null) {
+        if (at === null) {
           indicator.hidden = true;
           return;
         }
         const host = indicator.offsetParent instanceof HTMLElement ? indicator.offsetParent.getBoundingClientRect() : view.dom.getBoundingClientRect();
-        const rect = view.dom.getBoundingClientRect();
-        indicator.style.top = `${y - host.top - 1}px`;
-        indicator.style.left = `${rect.left - host.left}px`;
-        indicator.style.width = `${rect.width}px`;
+        indicator.style.top = `${at.y - host.top - 1}px`;
+        indicator.style.left = `${at.left - host.left}px`;
+        indicator.style.width = `${at.width}px`;
         indicator.hidden = false;
+      };
+
+      const dropPreview = (): void => {
+        preview?.remove();
+        preview = null;
       };
 
       const endDrag = (view: EditorView | null): void => {
         dragged = null;
         if (view) view.dragging = null;
         if (indicator) indicator.hidden = true;
+        dropPreview();
         editorView?.dom.classList.remove("is-block-dragging");
       };
 
@@ -244,8 +264,16 @@ export function blockHandleExtension(strings: EditorStrings) {
               view.dragging = { slice: sel.content(), move: true };
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", "");
+              dropPreview();
               const dom = view.nodeDOM(target.pos);
-              if (dom instanceof HTMLElement) event.dataTransfer.setDragImage(dom, 0, 0);
+              const picture = dom instanceof HTMLElement ? dom.querySelector("img") : null;
+              const content = dragPreviewContent([{ node: target.node, parent: view.state.doc.resolve(target.pos).parent }], strings);
+              const card = (preview = createDragPreview(content, picture, handle!.parentElement ?? document.body));
+              event.dataTransfer.setDragImage?.(card, POINTER.x, POINTER.y);
+              // The browser has taken its picture once dragstart is over.
+              setTimeout(() => {
+                if (preview === card) dropPreview();
+              }, 0);
               view.dom.classList.add("is-block-dragging");
             });
             handle.addEventListener("dragend", () => endDrag(view));
@@ -261,6 +289,7 @@ export function blockHandleExtension(strings: EditorStrings) {
                 menu?.destroy();
                 handle?.remove();
                 indicator?.remove();
+                dropPreview();
                 menu = handle = indicator = editorView = null;
               },
             };
@@ -287,7 +316,7 @@ export function blockHandleExtension(strings: EditorStrings) {
                 const hit = slotAt(view, event, current);
                 event.preventDefault();
                 if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-                showIndicator(view, hit ? hit.y : null);
+                showIndicator(view, hit);
                 return true;
               },
               dragleave(view, event) {
