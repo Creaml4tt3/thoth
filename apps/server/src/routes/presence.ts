@@ -6,6 +6,7 @@ import { ApiError, jsonReply } from "../errors.ts";
 import { principalOf, send } from "../http.ts";
 import { loadPage, parsePageId } from "../pages.ts";
 import { heartbeat, leave } from "../presence.ts";
+import { assertVisible } from "../visibility.ts";
 
 interface PageParams {
   workspaceId: string;
@@ -26,6 +27,8 @@ export function registerPresenceRoutes(app: FastifyInstance, deps: Deps): void {
     const pageId = parsePageId(request.params.pageId);
     const page = await loadPage(db, ws.id, pageId);
     if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+    // ADR-0042: a page hidden from the caller is a 404, and nobody on it is shown.
+    await assertVisible(db, ws.id, me.id, pageId);
     return send(reply, jsonReply(200, { items: await heartbeat(db, ws.id, pageId, me.id) }));
   });
 

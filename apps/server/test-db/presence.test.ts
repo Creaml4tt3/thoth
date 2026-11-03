@@ -84,3 +84,46 @@ describe("presence (capability presence)", () => {
     }
   });
 });
+
+// ADR-0042 rule 4: a hidden page is a 404 and absent everywhere, presence included.
+describe("presence on a page limited to a team", () => {
+  let env: TestEnv;
+  let owner: TestPrincipal;
+  let insider: TestPrincipal;
+  let outsider: TestPrincipal;
+  let ws: string;
+  let team: string;
+  let secret: string;
+  const path = () => `/workspaces/${ws}/pages/${secret}/presence`;
+  const limit = async (teamIds: string[] | null) => expect((await env.api(owner, "PUT", `/workspaces/${ws}/pages/${secret}/visibility`, { json: { teamIds } })).status).toBe(200);
+  beforeAll(async () => {
+    env = await startTestEnv();
+    owner = await env.user("Olive");
+    insider = await env.user("Ian");
+    outsider = await env.user("Otto");
+    ws = await env.workspace("W", { members: { [owner.userId]: "owner", [insider.userId]: "editor", [outsider.userId]: "editor" } });
+    team = (await env.api(owner, "POST", `/workspaces/${ws}/teams`, { json: { name: "Finance" } })).json.id as string;
+    await env.api(owner, "PUT", `/workspaces/${ws}/teams/${team}/members/${insider.userId}`);
+    secret = (await createPage(env, owner, ws, { title: "Salaries" })).id;
+  });
+  afterAll(() => env.close());
+
+  it("is 404 for a member who cannot see the page, word for word an unknown page's 404, and records nothing", async () => {
+    await limit([team]);
+    const hidden = await env.api(outsider, "PUT", path());
+    const unknown = await env.api(outsider, "PUT", `/workspaces/${ws}/pages/${uuid()}/presence`);
+    expect(hidden.status).toBe(404);
+    expect(hidden.json).toEqual(unknown.json);
+    expect((await env.db.query("SELECT 1 FROM page_presence WHERE user_id = $1", [outsider.userId])).rowCount).toBe(0);
+    expect((await env.api(insider, "PUT", path())).json.items).toEqual([]);
+    expect((await env.api(owner, "PUT", path())).json.items).toEqual([{ userId: insider.userId, displayName: "Ian" }]);
+  });
+
+  it("stops showing a member at once when the page is hidden from them", async () => {
+    await limit(null);
+    await env.api(outsider, "PUT", path());
+    expect((await env.api(insider, "PUT", path())).json.items.map((e: { userId: string }) => e.userId)).toContain(outsider.userId);
+    await limit([team]); // Otto's row is still fresh, but he can no longer see the page
+    expect((await env.api(insider, "PUT", path())).json.items).toEqual([{ userId: owner.userId, displayName: "Olive" }]);
+  });
+});

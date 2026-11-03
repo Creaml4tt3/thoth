@@ -10,6 +10,7 @@ import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../..
 import { ALPHA, seed } from "./support/fixtures.ts";
 import { STARTER_SERVER } from "@thoth/app-ui/workspace/starter.ts";
 import { th } from "../src/strings/index.ts";
+import { axeViolations } from "../../../tests/helpers/axe.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -446,6 +447,8 @@ describe("change-feed polling", () => {
     servers.writeAsOther(ws, { id: servers.page(ws, "Plan").id, title: "Plan", markdown: "# Plan\n\nUpdated elsewhere.\n" });
     await waitFor(() => expect(box.textContent).toContain("Updated elsewhere."));
     const notice = await screen.findByText(/Updated by Grace just now\./);
+    expect(notice.closest("p")!.getAttribute("role")).toBe("status");
+    expect(await axeViolations(notice.closest("p")!)).toEqual([]);
     await app.user.click(within(notice.closest("p")!).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText(/Updated by Grace/)).toBeNull();
   });
@@ -454,7 +457,10 @@ describe("change-feed polling", () => {
     const { app, servers, ws } = await withWorkspace({ pollMs: 0 }, "editor", { ...LOCAL, capabilities: ["search", "transfers", "attachments", "page-order", "page-kind", "presence"] });
     servers.presence = () => [{ userId: "usr_ana", displayName: "Ana" }];
     await openPlan(app);
-    expect(await screen.findByText("Ana is also here")).toBeTruthy();
+    const here = await screen.findByText("Ana is also here");
+    const status = screen.getByRole("status", { name: "Who else has this page open" });
+    expect(status.contains(here)).toBe(true);
+    expect(await axeViolations(status)).toEqual([]);
     const page = servers.page(ws, "Plan").id;
     expect(servers.calls.some((c) => c.method === "PUT" && c.path.endsWith(`/pages/${page}/presence`))).toBe(true);
     await app.user.click(screen.getAllByRole("tab").find((t) => t.textContent === "Plan")!.parentElement!.querySelector<HTMLElement>(".tab-close")!);

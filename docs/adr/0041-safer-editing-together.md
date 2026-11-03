@@ -47,7 +47,8 @@ polling stays the fallback. Live co-editing (a CRDT such as Yjs) is a separate, 
    answers `{ items: [{ userId, displayName }] }`: the other members who have it open now, never the caller, at most
    50. `DELETE` on the same path says the caller left (204, also when there was nothing to remove). Both are for any
    member who can read the workspace, viewers too; a non-member, an unknown and a deleted page are 404, like every
-   other workspace route (ADR-0009).
+   other workspace route (ADR-0009). A page hidden from the caller by a team limit (ADR-0042) is the same 404 and
+   records nothing, and the list leaves out anyone who can no longer see the page, at once.
 5. **Heartbeats with a short lifetime.** A client sends the heartbeat when a page opens and every 15 seconds
    (`PRESENCE_HEARTBEAT_SECONDS`) while the page is shown and the window is visible, and the leave when the last view
    of the page closes. The server forgets a heartbeat 45 seconds (`PRESENCE_TTL_SECONDS`) after it arrived, so a

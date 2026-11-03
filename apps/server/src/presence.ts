@@ -12,12 +12,14 @@ export async function heartbeat(db: Queryable, workspaceId: string, pageId: stri
     [workspaceId, pageId, userId],
   );
   await db.query("DELETE FROM page_presence WHERE workspace_id = $1 AND page_id = $2 AND seen_at < now() - make_interval(secs => $3)", [workspaceId, pageId, PRESENCE_TTL_SECONDS]);
-  // Only current members: someone removed from the workspace stops showing at once, before their row expires.
+  // Only current members who can still see the page (ADR-0042): someone removed from the workspace, or from the page's
+  // teams, stops showing at once, before their row expires.
   const { rows } = await db.query<{ user_id: string; display_name: string }>(
     `SELECT p.user_id, u.display_name FROM page_presence p
        JOIN users u ON u.id = p.user_id
        JOIN memberships m ON m.workspace_id = p.workspace_id AND m.user_id = p.user_id
       WHERE p.workspace_id = $1 AND p.page_id = $2 AND p.user_id <> $3 AND p.seen_at >= now() - make_interval(secs => $4)
+        AND NOT EXISTS (SELECT 1 FROM thoth_hidden_pages(p.workspace_id, p.user_id) h WHERE h.id = p.page_id)
       ORDER BY u.display_name, p.user_id LIMIT 50`,
     [workspaceId, pageId, userId, PRESENCE_TTL_SECONDS],
   );

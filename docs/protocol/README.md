@@ -97,6 +97,8 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
+| `teams` | `listTeams`, `createTeam`, `renameTeam`, `deleteTeam`, `addTeamMember`, `removeTeamMember`, `getPageVisibility`, `setPageVisibility`, `listTeamPages` | the role `manager`; teams of members; pages limited to some teams, hidden (404) from everyone else but owners and managers; section 10, ADR-0042, ADR-0043 |
+| `trash` | `listTrash`, `restoreTrashedPage`, `purgeTrashedPage` | deleted pages kept 30 days, restored or deleted for good; ADR-0043 |
 | `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; optionally the person's redacted app log (`diagnostics`); section 10, ADR-0033, ADR-0040 |
 | `presence` | `heartbeatPresence`, `leavePresence` | who else has a page open: a heartbeat every 15 s, forgotten after 45 s; names and opaque IDs only; section 10, ADR-0041 |
 | `databases` | none | reserved; no semantics in 1.0 |
@@ -165,18 +167,24 @@ Rules for every credential:
 - **The server is the sole authority.** Every resource, tree entry, search result,
   revision, attachment, change-feed entry and transfer is authorized server-side. A client
   cannot bypass it by guessing IDs.
-- **Roles per workspace:** `owner`, `editor`, `viewer`.
+- **Roles per workspace**, highest first: `owner`, `manager` (servers listing `teams`, ADR-0042), `editor`, `viewer`.
 
-| Capability of the role | viewer | editor | owner |
-| --- | --- | --- | --- |
-| read tree, pages, revisions, attachments, search, changes, events | yes | yes | yes |
-| write or delete pages, upload attachments | no | yes | yes |
-| create `to_workspace` transfers, create `from_workspace` move transfers | no | yes | yes |
-| create `from_workspace` copy transfers | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted |
-| create, list and revoke share links (`public-share`) | no | yes, unless export restricted | yes, unless export restricted |
-| read the member list (`members`) | yes | yes | yes |
-| change roles, remove members, create, list and revoke invite links (`members`, `invite-links`) | no | no | yes |
-| leave the workspace | yes | yes | yes, unless the last owner |
+| Capability of the role | viewer | editor | manager | owner |
+| --- | --- | --- | --- | --- |
+| read tree, pages, revisions, attachments, search, changes, events | yes | yes | yes | yes |
+| write or delete pages, upload attachments | no | yes | yes | yes |
+| create `to_workspace` transfers, create `from_workspace` move transfers | no | yes | yes | yes |
+| create `from_workspace` copy transfers | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted |
+| create, list and revoke share links (`public-share`) | no | yes, unless export restricted | yes, unless export restricted | yes, unless export restricted |
+| read the member list (`members`) and the teams (`teams`) | yes | yes | yes | yes |
+| create, rename and delete teams, set their members, set who sees a page (`teams`) | no | no | yes | yes |
+| see pages limited to teams they are not in (`teams`) | no | no | yes | yes |
+| see the Trash and restore from it (`trash`) | no | their own deletions | everything | everything |
+| delete from the Trash for good (`trash`) | no | no | yes | yes |
+| change roles among manager, editor and viewer, remove members who are not owners, create, list and revoke invite links (`members`, `invite-links`) | no | no | yes | yes |
+| make someone an owner, change or remove an owner (`members`) | no | no | no | yes |
+| rename or delete the workspace (`workspace-management`) | no | no | no | yes |
+| leave the workspace | yes | yes | yes | yes, unless the last owner |
 
 - **Existence is not leaked.** A workspace, page, attachment or transfer the principal may
   not read is 404 `not_found`. 403 `forbidden` is used only when the principal can see the
@@ -545,21 +553,66 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
 
 - `GET .../members` (every member) lists `{ userId, displayName, role }`, paginated, ordered by user
   ID. Emails are never returned.
-- `PUT .../members/{userId}` (owners) takes `{ role }` and returns the member. Setting the role a member
+- `PUT .../members/{userId}` (owners and managers) takes `{ role }` and returns the member. Only owners make
+  someone an owner or change an owner's role (403 for a manager, ADR-0043). Setting the role a member
   already has changes nothing. Making someone an owner counts against that account's
   `maxWorkspacesPerAccount` (409 `quota_exceeded`, `quota: workspacesPerAccount`).
-- `DELETE .../members/{userId}` (204): owners remove anyone; any member removes themself (leaves).
+- `DELETE .../members/{userId}` (204): owners remove anyone, managers anyone but an owner; any member removes
+  themself (leaves).
 - **One owner is always kept.** Demoting or removing the last owner, or the last owner leaving, is 409
   `last_owner`. The check runs under the workspace's write lock, so two owners stepping down at once
   cannot both succeed.
 - Removal takes effect at once: the account's next request to the workspace is 404, and share links
   it made stop working (their creator is re-checked on every view). An open event stream ends at its
   next re-check (30 seconds).
-- Editors and viewers get 403 for the owners' calls; non-members get 404.
+- Editors and viewers get 403 for these calls; non-members get 404. An invite link works while its creator is still
+  an owner or a manager.
+
+### Teams and page visibility (capability `teams`, ADR-0042)
+
+- `GET .../teams` (every member) returns `{ items: [{ id, name, memberIds }] }`, all teams (at most 100), by name.
+- Owners and managers: `POST .../teams` `{ name }` (201), `PUT .../teams/{teamId}` `{ name }`, `DELETE
+  .../teams/{teamId}` (204), `PUT` and `DELETE .../teams/{teamId}/members/{userId}` (the user must be a member of the
+  workspace; both return the team and are no-ops when nothing changes). Past 100 teams: 409 `quota_exceeded`, `quota:
+  teamsPerWorkspace`. Editors and viewers get 403.
+- `GET` and `PUT .../pages/{pageId}/visibility` (owners and managers) read and set `{ teamIds }`: one or more teams of
+  the workspace, or `null` for everyone. The answer is `{ pageId, teamIds, limitedAbove }`.
+- **A limit applies to the page and everything below it**, also to pages moved under it later. A member in none of the
+  page's teams cannot see it or anything below it. Owners and managers see every page (ADR-0043). A page whose last
+  team was deleted is seen by owners and managers only. `GET .../teams/{teamId}/pages` (owners and managers) lists
+  the pages limited to a team, `{ items: [{ pageId, title, kind, onlyTeam }] }`, so a client can say what deleting it
+  changes.
+- **A hidden page does not exist** for that member: 404 `not_found` (never 403) for reads, writes, moves, deletes,
+  revisions, the visibility calls, share links, and as a parent of a new or moved page; it is absent from the tree,
+  search and transfers, and its change-feed entries are left out (the cursor still moves past them). A transfer by
+  another member that names it is 404.
+- **Who sees what changed**: setting a limit, deleting a team, changing a team's members, making someone an owner or a
+  manager or no longer one, and moving a page under another parent while any limit exists. Every change cursor from before such a
+  change is answered with 410 `cursor_expired`, so clients read the tree again. The feed records it as an entry of the
+  vendor kind `x-thoth.visibility`, which clients ignore.
+- **Public share links** (`public-share`) never serve a limited page or anything below it: a link to one stops working
+  (the same 404 as any dead link), a shared tree leaves those pages out, and creating a link to one is 403 `forbidden`.
+- Attachments are not limited: an attachment is not tied to a page.
+
+### The Trash (capability `trash`, ADR-0043)
+
+- A deleted page stays in its workspace's Trash for 30 days, then the server removes it for good with its revisions,
+  its change-feed entries and its share links. An item of the Trash is a deleted page whose folder is not deleted; the
+  pages deleted below it belong to that item (`pagesBelow`).
+- `GET .../trash` (editors and up; viewers 403) returns `{ items: [{ pageId, title, kind, parentId, pagesBelow,
+  deletedAt, deletedBy, deletedByName, restorableUntil }], nextCursor }`, newest first. Owners and managers see every
+  item, editors those they deleted. Pages the caller cannot see are left out.
+- `POST .../trash/{pageId}/restore` returns `{ pageIds }`: the page, where it was (at the top level when its folder is
+  gone for good), and every page deleted below it that the caller may restore. Each one is `page.created` in the change
+  feed. An editor restoring another member's item gets 404. Restored pages count toward `maxPagesPerWorkspace`.
+- `DELETE .../trash/{pageId}` (owners and managers; editors 403) removes the item for good (204). A live page that was
+  added below a deleted folder moves to where the folder was, keeping the limits of the folders removed above it.
+- Removed entries leave holes in the change feed's positions; a read with nothing left up to the head moves the cursor
+  to the head.
 
 ### Invite links (capability `invite-links`, ADR-0024)
 
-- `POST .../invite-links` (owners) takes `{ role: "editor" | "viewer", expiresInDays?: 1 | 7 | 30,
+- `POST .../invite-links` (owners and managers, ADR-0043) takes `{ role: "manager" | "editor" | "viewer", expiresInDays?: 1 | 7 | 30,
   maxUses?: 1 | 5 | 10 }` (absent: 7 days, 1 use) and returns 201 with the link (`id`, `workspaceId`,
   `role`, `maxUses`, `usesLeft`, `createdAt`, `createdBy`, `createdByName`, `expiresAt`) plus `token`
   and `url` (`<origin>/i/<token>`). As for share links, the token is returned this once, only a hash is
@@ -613,7 +666,8 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   the caller, at most 50. Clients send it when a page opens and at least every `PRESENCE_HEARTBEAT_SECONDS` (15) while
   it stays open; a server forgets a heartbeat `PRESENCE_TTL_SECONDS` (45) after it arrived.
 - `DELETE` on the same path says the caller left: 204, also when there was nothing to remove.
-- Both are 404 for a non-member and an unknown or deleted page. An entry carries nothing but the opaque user ID (the
+- Both are 404 for a non-member. `PUT` is 404 for an unknown or deleted page, and the same 404 for a page hidden from
+  the caller (ADR-0042), recording nothing; `DELETE` answers 204 for any page ID, so it tells nothing about one. The list leaves out members who can no longer see the page. An entry carries nothing but the opaque user ID (the
   same ID as `actorId` and `userId` elsewhere) and the display name.
 
 ### Feedback (capability `feedback`, ADR-0033)

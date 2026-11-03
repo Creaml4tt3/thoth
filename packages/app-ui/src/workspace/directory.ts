@@ -742,7 +742,11 @@ export class ServerDirectory {
         if (!page.hasMore) break;
       }
     } catch (error) {
-      if (error instanceof ProblemError && error.code === "cursor_expired") await this.loadTree(server, workspace);
+      if (error instanceof ProblemError && error.code === "cursor_expired") {
+        await this.loadTree(server, workspace);
+        // Who sees what changed (ADR-0042): an open page re-reads itself, so one now hidden goes at once (ADR-0041).
+        for (const { ref } of this.opened.values()) if (ref.server === server && ref.workspace === workspace) this.bumpTick(key, ref.page);
+      }
       // Not found: the user is no longer a member (ADR-0024). The list read again drops the workspace.
       else if (error instanceof ProblemError && error.status === 404) await this.loadWorkspaces(server);
       return; // a failed poll is retried at the next tick

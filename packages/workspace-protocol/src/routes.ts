@@ -771,7 +771,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     tag: "Presence",
     summary: "Say that the caller has this page open, and read who else has",
     description:
-      "ADR-0041. Any member who can read the workspace (viewers too). No body. Send it when the page opens and at least every 15 seconds while it stays open; the server forgets a heartbeat 45 seconds after it arrived. The answer lists the other members who have the page open now (never the caller), with only their user ID and display name. A deleted or unknown page is 404.",
+      "ADR-0041. Any member who can read the workspace (viewers too). No body. Send it when the page opens and at least every 15 seconds while it stays open; the server forgets a heartbeat 45 seconds after it arrived. The answer lists the other members who have the page open now (never the caller), with only their user ID and display name, and only members who can see the page. A deleted or unknown page, or one hidden from the caller (ADR-0042), is 404.",
     capability: "presence",
     pathParams: pageParams,
     responses: [json(200, "The other members who have the page open.", PresenceListSchema)],

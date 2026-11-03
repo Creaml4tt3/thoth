@@ -1,7 +1,8 @@
 // ADR-0041: live change hints where the server lists `events.sse` and the host can stream, the 5 s poll otherwise;
 // presence heartbeats only for servers that list `presence`.
 import { afterEach, describe, expect, it } from "vitest";
-import type { Servers } from "@thoth/platform";
+import type { ApiCallArgs, ApiCallResult, Servers } from "@thoth/platform";
+import { problem } from "@thoth/workspace-protocol";
 import { ServerDirectory, presenceKey, workspaceKey } from "../src/workspace/directory.ts";
 import { FakeServers, type FakeServerConfig } from "../../../tests/helpers/fake-servers.ts";
 
@@ -16,6 +17,17 @@ class StreamingServers extends FakeServers {
     const stream = { workspace, on, closed: false };
     this.streams.push(stream);
     return () => void (stream.closed = true);
+  }
+  /** The next change-feed read answers 410 `cursor_expired`, as after a visibility change (ADR-0042). */
+  expireFeed = false;
+  override async call(args: ApiCallArgs, body?: Uint8Array): Promise<ApiCallResult> {
+    if (this.expireFeed && args.path.endsWith("/changes")) {
+      this.expireFeed = false;
+      this.calls.push(structuredClone(args));
+      const p = problem("cursor_expired");
+      return { status: p.status, headers: { "content-type": "application/problem+json" }, body: JSON.stringify(p) };
+    }
+    return super.call(args, body);
   }
 }
 
@@ -74,6 +86,45 @@ describe("live change hints (events.sse)", () => {
     expect(feedReads()).toBeGreaterThan(before);
     expect(directory.getState().trees[workspaceKey(ref.server, ws.id)]!.nodes.map((n) => n.title)).toContain("While down");
     expect(streaming.streams).toHaveLength(1); // retried later, not in a tight loop
+  });
+
+  it("on a hint after a visibility change (410 cursor_expired) reads the tree again and makes the open page re-read itself", async () => {
+    const { servers, ws, directory, ref } = await setup([...CAPS, "events.sse"]);
+    const streaming = servers as StreamingServers;
+    const other = servers.writeAsOther(ws, { title: "Hidden soon", markdown: "# Hidden soon\n" });
+    await directory.pollNow();
+    directory.openPage(ref);
+    streaming.streams[0]!.on.open();
+    const key = workspaceKey(ref.server, ws.id);
+    const before = directory.getState().trees[key]!.ticks[ref.page] ?? 0;
+    // The page is now hidden from this account: the server drops it from the tree and expires older cursors.
+    ws.pages.delete(other.id);
+    streaming.expireFeed = true;
+    const treeReads = () => servers.calls.filter((c) => c.method === "GET" && c.path.endsWith("/tree")).length;
+    const reads = treeReads();
+    streaming.streams[0]!.on.hint();
+    await tick();
+    expect(treeReads()).toBe(reads + 1);
+    expect(directory.getState().trees[key]!.nodes.map((n) => n.id)).not.toContain(other.id);
+    expect(directory.getState().trees[key]!.ticks[ref.page]).toBe(before + 1);
+  });
+
+  it("a page restored from the Trash comes back with the next hint (page.created)", async () => {
+    const { servers, ws, directory, ref } = await setup([...CAPS, "events.sse"]);
+    const streaming = servers as StreamingServers;
+    const gone = servers.writeAsOther(ws, { title: "Restored", markdown: "# Restored\n" });
+    directory.openPage(ref);
+    streaming.streams[0]!.on.open();
+    servers.deleteAsOther(ws, gone.id);
+    streaming.streams[0]!.on.hint();
+    await tick();
+    const titles = () => directory.getState().trees[workspaceKey(ref.server, ws.id)]!.nodes.map((n) => n.title);
+    expect(titles()).not.toContain("Restored");
+    ws.pages.delete(gone.id);
+    servers.writeAsOther(ws, { id: gone.id, title: "Restored", markdown: "# Restored\n" }); // page.created, as a restore records
+    streaming.streams[0]!.on.hint();
+    await tick();
+    expect(titles()).toContain("Restored");
   });
 
   it("polls a server without events.sse, and a host that cannot stream", async () => {
