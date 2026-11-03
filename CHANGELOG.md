@@ -14,6 +14,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 - Type @ to link a page or a folder, in both editor modes. A folder link shows that folder in the sidebar. In a workspace page, @ also names a member by their display name; nobody is notified.
 - Links in workspace pages now work: [[ and @ list that workspace's pages and folders, and a link keeps working after the page is renamed or moved. A link to a page you cannot see reads "Page not available". A link to a page limited to some teams is saved without its title, so only people who can see that page see its title; a share page shows any link to a page it leaves out as "a page that is not shared".
+- Duplicate pages and folders, in the Private Space and in workspaces: "Duplicate", "Duplicate structure only" (each page keeps only its title, for templates) and "Duplicate to…" in a page's or folder's menu, Cmd/Ctrl+Shift+D on the selected item, and "Duplicate page" in the command palette. A folder is copied with everything in it; links between the copied pages point at the copies, and images a Private Space page shows are copied with it. The copy never replaces anything, and a failure part-way removes what was copied.
 
 ### Changed
 
