@@ -10,8 +10,9 @@
 .prose li > p { margin: 0 0 0.2em; }
 .prose ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
 .task-item { display: flex; gap: 8px; align-items: flex-start; }
+/* A 24×24 target (WCAG 2.5.8); the negative margin keeps the row laid out as for the old 15px box. */
 .task-check { padding-top: 5px; }
-.task-box { width: 15px; height: 15px; accent-color: var(--thoth-link); margin: 0; }
+.task-box { width: 24px; height: 24px; margin: -4.5px; accent-color: var(--thoth-link); }
 .task-content { flex: 1; }
 .task-item[data-checked="true"] > .task-content { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
 .prose blockquote { margin: 0.8em 0; padding-left: 1em; border-left: 3px solid var(--thoth-border-strong); color: var(--thoth-ink-secondary); }
@@ -71,7 +72,7 @@
 .callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 12px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border-left: 3px solid var(--callout); }
 .callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
 .callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
-.callout-fold { all: unset; box-sizing: border-box; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
+.callout-fold { all: unset; box-sizing: border-box; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
 .callout-fold { transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .callout-fold:focus-visible { outline: 2px solid var(--thoth-accent); }

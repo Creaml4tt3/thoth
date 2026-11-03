@@ -22,6 +22,8 @@ export const en = {
   editor: {
     status: { idle: "", dirty: "Unsaved changes", saving: "Saving…", saved: "Saved", error: "Not saved" },
     modeGroup: "Editor mode",
+    /** The editor's accessible name. */
+    content: "Page content",
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },
@@ -434,6 +436,7 @@ export const en = {
     createTeam: "Create team",
     teamName: (name: string) => `Name of ${name}`,
     renameTeam: "Rename",
+    renameTeamLabel: (name: string) => `Rename team ${name}`,
     deleteTeam: "Delete",
     deleteTeamLabel: (name: string) => `Delete team ${name}`,
     teamMember: (person: string, team: string) => `${person} in ${team}`,
@@ -638,6 +641,7 @@ export const en = {
       "tab.pin": "Pin or unpin the current tab",
       "tab.split": "Split the current tab to the right, or move it to the other pane",
       "pane.focusOther": "Move focus to the other pane",
+      "region.next": "Move focus between the sidebar and the panes",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",

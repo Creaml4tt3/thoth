@@ -15,6 +15,12 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Type @ to link a page or a folder, in both editor modes. A folder link shows that folder in the sidebar. In a workspace page, @ also names a member by their display name; nobody is notified.
 - Links in workspace pages now work: [[ and @ list that workspace's pages and folders, and a link keeps working after the page is renamed or moved. A link to a page you cannot see reads "Page not available".
 
+### Changed
+
+- Accessibility (WCAG 2.2 AA): stronger grey, red and amber text, larger click targets for small controls, and clearer names for screen readers (the page editor, folder colours, the lines of the conflict dialog, field errors). "Saved" is spoken only after a failed or explicit save, not after every autosave.
+- In the desktop app, Cmd/Ctrl + and − zoom the window (Cmd/Ctrl 0 resets), and F6 moves focus between the sidebar and each pane. Below 600px wide the sidebar sits above the page.
+- In Members, Trash and Visible to…, focus goes back to the button that asked when a question is cancelled, and "Choose at least one team" is read with the team boxes.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added
@@ -236,6 +242,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Creaml4tt3/thoth/compare/v0.2.8...v0.3.0

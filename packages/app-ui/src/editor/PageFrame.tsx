@@ -44,7 +44,7 @@ function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: 
   );
 }
 
-function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, children }: PageFrameProps["crumbs"] & { status: SaveStatus; children?: ReactNode }) {
+function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, announce, children }: PageFrameProps["crumbs"] & { status: SaveStatus; announce: string; children?: ReactNode }) {
   const t = useStrings().editor;
   const trail = useRef<HTMLElement>(null);
   const path = parts.join("\n");
@@ -106,8 +106,12 @@ function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, children }: PageF
         </ol>
       </nav>
       <div className="crumb-tools">
-        <span className="save-status" data-state={status} role="status" aria-live="polite">
+        {/* Not a live region: autosave would announce on every pause in typing. Failures are spoken by the alert below. */}
+        <span className="save-status" data-state={status}>
           {t.status[status]}
+        </span>
+        <span className="sr-only" role="status">
+          {announce}
         </span>
         {children}
       </div>
@@ -230,6 +234,21 @@ export function PageFrame(props: PageFrameProps) {
     if (state.save === "saved" && tells.current) saved.current?.();
   }, [state.save]);
 
+  // "Saved" is spoken only after a failure or a save the person asked for (Mod+S, Retry), never after an autosave.
+  const announceNext = useRef(false);
+  const [announce, setAnnounce] = useState("");
+  const saveNow = () => {
+    announceNext.current = true;
+    void session?.save();
+  };
+  useEffect(() => {
+    if (state.save === "error") announceNext.current = true;
+    if (state.save === "saved" && announceNext.current) {
+      announceNext.current = false;
+      setAnnounce(t.status.saved);
+    } else if (state.save === "dirty") setAnnounce("");
+  }, [state.save, t.status.saved]);
+
   const canSwitch = state.phase === "ready" && !state.conflict;
   const switchMode = useCallback(
     (next: EditorMode) => {
@@ -279,11 +298,11 @@ export function PageFrame(props: PageFrameProps) {
   );
 
   // `edited` also tells the session; `focused` brings the other pane's last edit here before anything is typed.
-  const editorProps = { ctx, handleRef: handle, onEdit: () => member?.edited(), onSaveShortcut: () => void session?.save() };
+  const editorProps = { ctx, handleRef: handle, onEdit: () => member?.edited(), onSaveShortcut: saveNow };
 
   return (
     <section className="page-view" aria-label={props.label}>
-      <Breadcrumbs {...props.crumbs} status={state.save}>
+      <Breadcrumbs {...props.crumbs} status={state.save} announce={announce}>
         {props.actions}
         <ModeSwitch mode={mode} disabled={!canSwitch} onChange={switchMode} />
       </Breadcrumbs>
@@ -311,7 +330,7 @@ export function PageFrame(props: PageFrameProps) {
                 <p role="alert" className="alert alert-danger">
                   {state.error}{" "}
                   {state.save === "error" && (
-                    <Button variant="quiet" small onClick={() => void session?.save()}>
+                    <Button variant="quiet" small onClick={saveNow}>
                       {t.retry}
                     </Button>
                   )}

@@ -40,7 +40,7 @@ export function PageEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     editorProps: {
-      attributes: { class: "prose", role: "textbox", "aria-multiline": "true", "aria-label": "Page content", spellcheck: "true" },
+      attributes: { class: "prose", role: "textbox", "aria-multiline": "true", "aria-label": ctx.strings.content, spellcheck: "true" },
       handleKeyDown: (_view, event) => {
         if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "s") {
           event.preventDefault();
