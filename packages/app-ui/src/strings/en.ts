@@ -199,6 +199,13 @@ export const en = {
     /** Shown instead of a page of a workspace the user was removed from or left (ADR-0024), or that was deleted (ADR-0025). */
     noAccessTitle: "You no longer have access to this workspace",
     noAccessDetail: "You left it, an owner removed you, or it was deleted. An owner can restore a deleted workspace for 30 days, or send you a new invite link.",
+    /** ADR-0041: an open page reloaded because someone else changed it on the server. `name` null: the author is not known. */
+    changedBy: (name: string | null) => (name ? `Updated by ${name} just now.` : "Updated on the server just now."),
+    dismissChange: "Dismiss",
+    /** ADR-0041: who else has the page open. */
+    presence: (names: string[]) =>
+      names.length === 1 ? `${names[0]} is also here` : names.length === 2 ? `${names[0]} and ${names[1]} are also here` : `${names[0]}, ${names[1]} and ${plural(names.length - 2, "other")} are also here`,
+    presenceLabel: "Who else has this page open",
   },
 
   /** Both page trees (Private Space and workspaces): rename, folders, moving and ordering. */

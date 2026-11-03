@@ -170,4 +170,10 @@ export interface Servers {
   signOut(server: string): Promise<ServerInfo>;
   /** One protocol request; `body` is sent as the request bytes. */
   call(args: ApiCallArgs, body?: Uint8Array): Promise<ApiCallResult>;
+  /**
+   * Server-sent change hints of one workspace (`events.sse`, ADR-0041). Optional: a host that cannot hold a stream
+   * leaves it out and the app polls the change feed. `open` once the stream is up, `hint` per hint, `end` once when it
+   * ends or fails (never after the returned closer was called).
+   */
+  events?(server: string, workspace: string, on: { open(): void; hint(): void; end(): void }): () => void;
 }

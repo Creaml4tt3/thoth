@@ -87,6 +87,8 @@ describe("route registry", () => {
       listTrash: "trash",
       restoreTrashedPage: "trash",
       purgeTrashedPage: "trash",
+      heartbeatPresence: "presence",
+      leavePresence: "presence",
     });
   });
 

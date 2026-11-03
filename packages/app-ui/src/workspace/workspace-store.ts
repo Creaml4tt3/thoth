@@ -79,7 +79,7 @@ export function workspacePageStore(deps: WorkspaceStoreDeps): PageStore {
       try {
         const resource = await client.getPage(workspace, page);
         remember(resource);
-        return { source: resource.markdown, hash: resource.revision.id, editable };
+        return { source: resource.markdown, hash: resource.revision.id, editable, author: resource.revision.authorId };
       } catch (error) {
         if (error instanceof ProblemError && error.status === 404) return null;
         throw error;
@@ -94,7 +94,14 @@ export function workspacePageStore(deps: WorkspaceStoreDeps): PageStore {
     },
     async writeCopy(source) {
       const title = `${titleFor(source)} (conflict copy)`.slice(0, TITLE_MAX);
-      const created = await client.createPage(workspace, { title, markdown: source, parentId: current.parentId });
+      let created: PageResource;
+      try {
+        created = await client.createPage(workspace, { title, markdown: source, parentId: current.parentId });
+      } catch (error) {
+        // The folder was deleted, or is now hidden from this account (ADR-0042): keep the text at the top level instead.
+        if (!(current.parentId !== null && error instanceof ProblemError && error.status === 404)) throw error;
+        created = await client.createPage(workspace, { title, markdown: source, parentId: null });
+      }
       deps.onSaved(created);
       return { ref: created.id, label: title };
     },

@@ -32,6 +32,7 @@ import {
   InviteLinkListSchema,
   MemberListSchema,
   MemberSchema,
+  PresenceListSchema,
   TransferResourceSchema,
   TreeNodeSchema,
   TreePageSchema,
@@ -59,6 +60,7 @@ import {
   type InviteLinkCreateRequest,
   type InviteLinkCreated,
   type Member,
+  type PresenceEntry,
   type Role,
   type ShareLink,
   type ShareLinkCreated,
@@ -235,6 +237,15 @@ export class WorkspaceClient {
     if (cursor !== undefined) query["cursor"] = cursor;
     if (options.limit !== undefined) query["limit"] = String(options.limit);
     return (await this.request(ChangesResponseSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/changes`, query })).data;
+  }
+
+  /** Capability `presence` (ADR-0041): the caller has this page open; the answer is who else has. */
+  async heartbeatPresence(workspaceId: string, pageId: string): Promise<PresenceEntry[]> {
+    return (await this.request(PresenceListSchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/presence` })).data.items;
+  }
+
+  async leavePresence(workspaceId: string, pageId: string): Promise<void> {
+    await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/pages/${seg(pageId)}/presence`, ok: [204] });
   }
 
   async search(workspaceId: string, request: SearchRequest): Promise<SearchResponse> {

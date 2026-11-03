@@ -155,6 +155,8 @@ export interface PageFrameProps {
   onConflict?(event: { kind: "shown" } | { kind: "resolved"; choice: "mine" | "theirs" | "both" }): void;
   /** Told after each save that wrote the page (the web client's anonymous analytics). */
   onSaved?(): void;
+  /** A workspace page that reloaded because someone changed it says so (ADR-0041): the text for its author's ID. */
+  changeNotice?: { text(by: string | null): string | null; dismiss: string };
 }
 
 /** One open page: breadcrumbs, the Blocks or Plain editor, save status and the conflict dialog. Where the page lives is the store's business. */
@@ -335,6 +337,14 @@ export function PageFrame(props: PageFrameProps) {
                     </Button>
                   )}
                   {props.errorAction}
+                </p>
+              )}
+              {state.changed && props.changeNotice?.text(state.changed.by) && (
+                <p role="status" className="alert change-notice">
+                  {props.changeNotice.text(state.changed.by)}{" "}
+                  <Button variant="quiet" small onClick={() => session?.dismissChange()}>
+                    {props.changeNotice.dismiss}
+                  </Button>
                 </p>
               )}
               {state.conflictCopy && (

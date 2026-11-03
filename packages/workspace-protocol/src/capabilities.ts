@@ -23,10 +23,11 @@ import { PROTOCOL_VERSION } from "./common.ts";
  *                      getPageVisibility, setPageVisibility, listTeamPages, listLimitedPages; plus the role `manager`
  *                      (ADR-0042, ADR-0043, ADR-0049)
  * - `trash`            routes: listTrash, restoreTrashedPage, purgeTrashedPage (ADR-0043)
+ * - `presence`         routes: heartbeatPresence, leavePresence (ADR-0041): who else has a page open
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "presence", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

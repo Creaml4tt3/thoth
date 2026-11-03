@@ -13,6 +13,7 @@ import { DeletedWorkspaceListSchema, DeletedWorkspaceSchema, WorkspaceCreateRequ
 import { FeedbackContextSchema, FeedbackRequestSchema } from "./feedback.ts";
 import { LimitedPageListSchema, PageVisibilitySchema, PageVisibilityWriteSchema, TeamListSchema, TeamPageListSchema, TeamPageSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { TrashItemSchema, TrashListSchema, TrashRestoredSchema } from "./trash.ts";
+import { PresenceEntrySchema, PresenceListSchema } from "./presence.ts";
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkListSchema, InviteLinkSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 
 export interface ProtocolSchemaEntry {
@@ -85,4 +86,6 @@ export const PROTOCOL_SCHEMAS: readonly ProtocolSchemaEntry[] = [
   { name: "DeletedWorkspaceList", file: "deleted-workspace-list.v1", schema: DeletedWorkspaceListSchema },
   { name: "FeedbackRequest", file: "feedback-request.v1", schema: FeedbackRequestSchema },
   { name: "FeedbackContext", file: "feedback-context.v1", schema: FeedbackContextSchema },
+  { name: "PresenceEntry", file: "presence-entry.v1", schema: PresenceEntrySchema },
+  { name: "PresenceList", file: "presence-list.v1", schema: PresenceListSchema },
 ];

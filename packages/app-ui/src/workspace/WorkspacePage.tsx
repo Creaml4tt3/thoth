@@ -3,7 +3,7 @@ import type { Role } from "@thoth/workspace-protocol";
 import { PageFrame, type PageFrameProps } from "../editor/PageFrame.tsx";
 import { useStrings } from "../strings/index.ts";
 import { Notice } from "../ui/Notice.tsx";
-import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
+import { presenceKey, workspaceKey, type ServerDirectory, type WorkspacePageRef } from "./directory.ts";
 import { workspacePageStore } from "./workspace-store.ts";
 import { workspacePageMedia } from "./workspace-media.ts";
 import { NO_TITLES, linkTitles, titledBy, workspaceLinkLookup, workspaceLinkSuggester, type LinkTitles } from "./workspace-links.ts";
@@ -52,6 +52,16 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
     if (!signedOut) directory.expand(target.server, target.workspace);
   }, [directory, target.server, target.workspace, signedOut]);
 
+  // ADR-0041: while the page is shown, the server hears that it is open (presence) and its changes stream in where possible.
+  useEffect(() => directory.openPage({ server: target.server, workspace: target.workspace, page: target.page }), [directory, target.server, target.workspace, target.page]);
+  const here = state.presence[presenceKey(target)] ?? [];
+  const me = entry?.info.account?.id;
+  const changeNotice = useMemo(
+    // A change by this account (another window, a rename from the sidebar) is not news: no notice.
+    () => ({ text: (by: string | null) => (by !== null && by === me ? null : t.changedBy(by === null ? null : directory.memberName(target.server, target.workspace, by))), dismiss: t.dismissChange }),
+    [t, directory, target.server, target.workspace, me],
+  );
+
   // Kept once known: a sign-out mid-edit must not unmount the editor and lose what is on screen.
   const known = useRef<{ role: Role; name: string } | null>(null);
   if (workspace) known.current = { role: workspace.role, name: workspace.name };
@@ -70,7 +80,6 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   // Which links may carry the target's title (ADR-0049): none until known. Read again whenever the tree changes,
   // since a change to who sees what makes the client read the tree again. An answer holds only for the tree it was
   // asked for: an older one could title a page limited just now, so no titles until the new answer arrives.
-  const me = entry?.info.account?.id;
   const teamsCap = state.capabilities[target.server]?.includes("teams");
   const [titles, setTitles] = useState<{ for: string; nodes: typeof nodes; titles: LinkTitles }>({ for: "", nodes: undefined, titles: NO_TITLES });
   const titlesFor = `${key}\n${role ?? ""}\n${me ?? ""}\n${teamsCap ?? ""}`;
@@ -124,7 +133,24 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
       readOnlyNote={t.readOnly(name)}
       missing={{ title: t.missingTitle, detail: t.missingDetail }}
       errorAction={signedOut ? signedOutAction : undefined}
-      actions={actions}
+      actions={
+        <>
+          {here.length > 0 && (
+            <span className="presence" role="status" aria-label={t.presenceLabel}>
+              <span className="presence-faces" aria-hidden="true">
+                {here.slice(0, 3).map((p) => (
+                  <span key={p.userId} className="presence-face" title={p.displayName}>
+                    {[...p.displayName.trim()][0]?.toUpperCase() ?? "?"}
+                  </span>
+                ))}
+              </span>
+              <span className="presence-text">{t.presence(here.map((p) => p.displayName))}</span>
+            </span>
+          )}
+          {actions}
+        </>
+      }
+      changeNotice={changeNotice}
       {...(onConflict ? { onConflict } : {})}
       {...(onSaved ? { onSaved } : {})}
     />

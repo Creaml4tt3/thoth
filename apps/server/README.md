@@ -311,7 +311,7 @@ The client IP is the socket address unless `TRUST_PROXY` is set, then `x-real-ip
 ## Maintenance
 
 ```sh
-node apps/server/src/cli.ts maintenance      # prints {"workspacesPurged":..,"trashPagesPurged":..,"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..,"signInRowsDeleted":..,"feedbackDeleted":..}
+node apps/server/src/cli.ts maintenance      # prints {"workspacesPurged":..,"trashPagesPurged":..,"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..,"signInRowsDeleted":..,"feedbackDeleted":..,"presenceRowsDeleted":..}
 curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
 ```
 
