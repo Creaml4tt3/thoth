@@ -347,7 +347,7 @@ export class FakeServers implements Servers {
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
     if (rest === "/trash" || rest.startsWith("/trash/")) return this.trash(server, ws, method, rest);
-    if (rest === "/teams" || rest.startsWith("/teams/") || /^\/pages\/[^/]+\/visibility$/.test(rest)) return this.teams(server, ws, method, rest, text);
+    if (rest === "/teams" || rest.startsWith("/teams/") || rest === "/limited-pages" || /^\/pages\/[^/]+\/visibility$/.test(rest)) return this.teams(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
       const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));
       return json(200, { workspaceId: ws.id, items, nextCursor: null, changeCursor: this.cursor(ws.changes.length) });
@@ -601,6 +601,11 @@ export class FakeServers implements Servers {
       let limitedAbove = false;
       for (let at = ws.pages.get(pageId)?.parentId ?? null, depth = 0; at !== null && depth < 1000; at = ws.pages.get(at)?.parentId ?? null, depth++) if (ws.visibility.has(at)) limitedAbove = true;
       return json(200, { pageId, teamIds: ws.visibility.get(pageId) ?? null, limitedAbove });
+    }
+    if (rest === "/limited-pages") {
+      if (method !== "GET") return fail("method_not_allowed");
+      if (!roleCan(ws.role, "manage")) return fail("forbidden", "only owners and managers of this workspace may do this");
+      return json(200, { items: [...ws.visibility.keys()].filter((id) => ws.pages.get(id)?.deleted === false).map((pageId) => ({ pageId })) });
     }
     const [, , teamId, , userId] = rest.split("/").map(decodeURIComponent);
     if (rest === "/teams" && method === "GET") return json(200, { items: [...ws.teams].sort((a, b) => a.name.localeCompare(b.name)) });

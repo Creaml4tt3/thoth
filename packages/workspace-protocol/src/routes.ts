@@ -13,7 +13,7 @@ import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackRequestSchema } from "./feedback.ts";
-import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamPageListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
+import { LimitedPageListSchema, PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamPageListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { TrashListSchema, TrashRestoredSchema } from "./trash.ts";
 import { PresenceListSchema } from "./presence.ts";
 
@@ -720,6 +720,19 @@ export const ROUTES: readonly RouteDefinition[] = [
     capability: "teams",
     pathParams: teamParams,
     responses: [json(200, "The pages limited to this team.", TeamPageListSchema)],
+    errors: ["forbidden", "not_found"],
+  }),
+  route({
+    operationId: "listLimitedPages",
+    method: "get",
+    path: "/workspaces/{workspaceId}/limited-pages",
+    tag: "Teams",
+    summary: "Pages limited to some teams",
+    description:
+      "ADR-0049. Owners and managers (403 for others). Every page (not deleted) limited itself, also one whose teams were all deleted (ADR-0042), so a client writes links to them, and to pages below them, without a title. Pages below a listed page are not listed. All in one response: at most one item per page of the workspace.",
+    capability: "teams",
+    pathParams: workspaceParams,
+    responses: [json(200, "The limited pages.", LimitedPageListSchema)],
     errors: ["forbidden", "not_found"],
   }),
   route({

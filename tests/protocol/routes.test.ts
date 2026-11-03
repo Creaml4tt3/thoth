@@ -83,6 +83,7 @@ describe("route registry", () => {
       getPageVisibility: "teams",
       setPageVisibility: "teams",
       listTeamPages: "teams",
+      listLimitedPages: "teams",
       listTrash: "trash",
       restoreTrashedPage: "trash",
       purgeTrashedPage: "trash",

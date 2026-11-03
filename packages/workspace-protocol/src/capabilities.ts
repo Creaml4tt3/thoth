@@ -20,7 +20,8 @@ import { PROTOCOL_VERSION } from "./common.ts";
  *                      restoreWorkspace, purgeWorkspace (ADR-0025)
  * - `feedback`         routes: sendFeedback (ADR-0033); no sign-in needed
  * - `teams`            routes: listTeams, createTeam, renameTeam, deleteTeam, addTeamMember, removeTeamMember,
- *                      getPageVisibility, setPageVisibility, listTeamPages; plus the role `manager` (ADR-0042, ADR-0043)
+ *                      getPageVisibility, setPageVisibility, listTeamPages, listLimitedPages; plus the role `manager`
+ *                      (ADR-0042, ADR-0043, ADR-0049)
  * - `trash`            routes: listTrash, restoreTrashedPage, purgeTrashedPage (ADR-0043)
  * - `presence`         routes: heartbeatPresence, leavePresence (ADR-0041): who else has a page open
  * - `databases`        reserved, no routes defined in protocol 1.0

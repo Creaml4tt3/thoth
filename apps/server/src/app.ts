@@ -81,7 +81,7 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
   { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
   { capability: "members", test: (_m, p) => /^\/workspaces\/[^/]+\/members(\/[^/]+)?$/.test(p) },
-  { capability: "teams", test: (_m, p) => /^\/workspaces\/[^/]+\/teams(\/[^/]+(\/members\/[^/]+|\/pages)?)?$/.test(p) || /^\/workspaces\/[^/]+\/pages\/[^/]+\/visibility$/.test(p) },
+  { capability: "teams", test: (_m, p) => /^\/workspaces\/[^/]+\/teams(\/[^/]+(\/members\/[^/]+|\/pages)?)?$/.test(p) || /^\/workspaces\/[^/]+\/(pages\/[^/]+\/visibility|limited-pages)$/.test(p) },
   { capability: "trash", test: (_m, p) => /^\/workspaces\/[^/]+\/trash(\/[^/]+(\/restore)?)?$/.test(p) },
   { capability: "presence", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/presence$/.test(p) },
   { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },

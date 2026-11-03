@@ -140,6 +140,8 @@ export interface PageFrameProps {
   linkTick: number;
   /** Wikilinks open through here; `options` from the click (a new tab or window, 0.2.7). */
   openLink(path: string, options?: OpenOptions): void;
+  /** A `[[Folder/]]` link shows its folder in the sidebar through here (ADR-0049). */
+  openFolder?(path: string): void;
   /** Opens the copy that Keep both made. */
   openCopy(ref: string): void;
   readOnlyNote: string;
@@ -171,6 +173,8 @@ export function PageFrame(props: PageFrameProps) {
   // One context per page: the link opener changes with every index revision, and node views and the Plain editor hold the context.
   const open = useRef(props.openLink);
   open.current = props.openLink;
+  const openFolder = useRef(props.openFolder);
+  openFolder.current = props.openFolder;
   const pageHost = usePageHost();
   const client = pageHost.client ?? "desktop";
   // Link previews (ADR-0020) know where the page lives: links in a workspace page wait for "Load preview".
@@ -186,6 +190,7 @@ export function PageFrame(props: PageFrameProps) {
         lookup: () => lookup.current,
         suggester: () => suggester.current,
         openPage: (p, o) => open.current(p, o),
+        openFolder: (p) => openFolder.current?.(p),
         strings: t,
         client,
         media: () => media.current,

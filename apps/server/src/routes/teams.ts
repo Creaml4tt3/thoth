@@ -115,6 +115,19 @@ export function registerTeamRoutes(app: FastifyInstance, deps: Deps): void {
     return send(reply, jsonReply(200, { items: rows.map((r) => ({ pageId: r.id, title: r.title, kind: r.kind, onlyTeam: r.only_team })) }));
   });
 
+  // ADR-0049: every page limited itself, with or without teams left (ADR-0042), so a client writes links to them
+  // without a title. At most one row per page of the workspace, so not paged.
+  app.get<{ Params: { workspaceId: string } }>(`${base}/limited-pages`, async (request, reply) => {
+    const me = principalOf(request);
+    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "manage");
+    const { rows } = await db.query<{ id: string }>(
+      `SELECT p.id FROM page_visibility v JOIN pages p ON p.workspace_id = v.workspace_id AND p.id = v.page_id
+        WHERE v.workspace_id = $1 AND p.deleted_at IS NULL ORDER BY p.id`,
+      [ws.id],
+    );
+    return send(reply, jsonReply(200, { items: rows.map((r) => ({ pageId: r.id })) }));
+  });
+
   const membership = (add: boolean) => (request: { params: { workspaceId: string; teamId: string; userId: string } }, tx: Queryable, actorId: string) =>
     (async () => {
       const ws = await workspaceAccess(tx, request.params.workspaceId, actorId, "manage", { lock: true });

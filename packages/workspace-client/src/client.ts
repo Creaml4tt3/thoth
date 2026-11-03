@@ -24,6 +24,7 @@ import {
   PageVisibilitySchema,
   TeamListSchema,
   TeamPageListSchema,
+  LimitedPageListSchema,
   TrashListSchema,
   TrashRestoredSchema,
   TeamSchema,
@@ -53,6 +54,7 @@ import {
   type PageVisibility,
   type Team,
   type TeamPageList,
+  type LimitedPageList,
   type TrashItem,
   type InviteLink,
   type InviteLinkCreateRequest,
@@ -382,6 +384,11 @@ export class WorkspaceClient {
   /** Owners and managers (ADR-0043): the pages limited to a team, so deleting it can say what changes. */
   async listTeamPages(workspaceId: string, teamId: string): Promise<TeamPageList["items"]> {
     return (await this.request(TeamPageListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/teams/${seg(teamId)}/pages` })).data.items;
+  }
+
+  /** Owners and managers (ADR-0049): every page limited itself, also one whose teams were all deleted. */
+  async listLimitedPages(workspaceId: string): Promise<LimitedPageList["items"]> {
+    return (await this.request(LimitedPageListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/limited-pages` })).data.items;
   }
 
   /** The Trash (capability `trash`, ADR-0043), newest first: all of it for owners and managers, an editor's own deletions for an editor. */

@@ -277,3 +277,40 @@ describe("teams: a hidden page does not leak through any route", () => {
     expect([res.status, res.json.code]).toEqual([400, "validation_failed"]);
   });
 });
+
+describe("teams: listLimitedPages (ADR-0049)", () => {
+  let env: TestEnv;
+  beforeAll(async () => {
+    env = await startTestEnv();
+  });
+  afterAll(() => env.close());
+
+  it("lists every page limited itself to owners and managers, also one with no team left; never deleted pages; 403 for editors, 404 for strangers", async () => {
+    const [owner, manager, editor, stranger] = (await Promise.all(["Olive", "Mae", "Eddie", "Stan"].map((n) => env.user(n)))) as [TestPrincipal, TestPrincipal, TestPrincipal, TestPrincipal];
+    const ws = await env.workspace("Limits", { members: { [owner.userId]: "owner", [manager.userId]: "manager", [editor.userId]: "editor" } });
+    const kept = (await env.api(owner, "POST", `/workspaces/${ws}/teams`, { json: { name: "Kept" } })).json.id as string;
+    const gone = (await env.api(owner, "POST", `/workspaces/${ws}/teams`, { json: { name: "Gone" } })).json.id as string;
+    const folder = await createPage(env, owner, ws, { title: "Finance", markdown: "---\nthoth_kind: folder\n---\n" });
+    await createPage(env, owner, ws, { title: "Payroll", parentId: folder.id }); // limited by the folder, not listed
+    const orphan = await createPage(env, owner, ws, { title: "Orphan" });
+    const trashed = await createPage(env, owner, ws, { title: "Trashed" });
+    await createPage(env, owner, ws, { title: "Open" });
+    await env.api(owner, "PUT", `/workspaces/${ws}/pages/${folder.id}/visibility`, { json: { teamIds: [kept] } });
+    await env.api(owner, "PUT", `/workspaces/${ws}/pages/${orphan.id}/visibility`, { json: { teamIds: [gone] } });
+    await env.api(owner, "PUT", `/workspaces/${ws}/pages/${trashed.id}/visibility`, { json: { teamIds: [kept] } });
+    expect((await env.api(owner, "DELETE", `/workspaces/${ws}/teams/${gone}`)).status).toBe(204);
+    expect((await env.api(owner, "DELETE", `/workspaces/${ws}/pages/${trashed.id}`, { headers: { "if-match": `"${trashed.revisionId}"` } })).status).toBe(204);
+    for (const who of [owner, manager]) {
+      const res = await env.api(who, "GET", `/workspaces/${ws}/limited-pages`);
+      expect(res.status, who.userId).toBe(200);
+      expect(res.json.items.map((p: { pageId: string }) => p.pageId).sort()).toEqual([folder.id, orphan.id].sort());
+    }
+    // Also with no team left at all.
+    expect((await env.api(owner, "DELETE", `/workspaces/${ws}/teams/${kept}`)).status).toBe(204);
+    expect((await env.api(manager, "GET", `/workspaces/${ws}/limited-pages`)).json.items.map((p: { pageId: string }) => p.pageId).sort()).toEqual([folder.id, orphan.id].sort());
+    const denied = await env.api(editor, "GET", `/workspaces/${ws}/limited-pages`);
+    expect([denied.status, denied.json.code]).toEqual([403, "forbidden"]);
+    const hidden = await env.api(stranger, "GET", `/workspaces/${ws}/limited-pages`);
+    expect([hidden.status, hidden.json.code]).toEqual([404, "not_found"]);
+  });
+});
