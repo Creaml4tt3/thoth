@@ -14,16 +14,16 @@ export const generateInviteToken = generateShareToken;
 export const hashInviteToken = hashShareToken;
 export const inviteTokenMatches = shareTokenMatches;
 
-/** The one detail of every "no such invite": unknown, malformed, expired, revoked, used up, or its creator no longer an owner. */
+/** The one detail of every "no such invite": unknown, malformed, expired, revoked, used up, or its creator no longer an owner or a manager. */
 export const INVITE_NOT_FOUND = "no such invite";
 export const inviteNotFound = () => new ApiError("not_found", INVITE_NOT_FOUND);
 
 /**
- * When a link may be used: not revoked, not expired, not used up, and its creator still an owner of the workspace (a
- * link carries its creator's authority, like a share link; ADR-0023 rule 3). `l` is the invite_links row.
+ * When a link may be used: not revoked, not expired, not used up, and its creator still an owner or a manager of the
+ * workspace (ADR-0043; a link carries its creator's authority, like a share link; ADR-0023 rule 3). `l` is the invite_links row.
  */
 export const INVITE_ACTIVE = `l.revoked_at IS NULL AND l.expires_at > now() AND l.uses < l.max_uses
-  AND EXISTS (SELECT 1 FROM memberships c WHERE c.workspace_id = l.workspace_id AND c.user_id = l.created_by AND c.role = 'owner')`;
+  AND EXISTS (SELECT 1 FROM memberships c WHERE c.workspace_id = l.workspace_id AND c.user_id = l.created_by AND c.role IN ('owner', 'manager'))`;
 
 export interface ActiveInvite {
   id: string;

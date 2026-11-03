@@ -1,0 +1,75 @@
+# The form for the "Help me set up" category (its slug must stay help-me-set-up). GitHub reads it from the default branch.
+title: "[Set-up] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us a little about your team, and we'll help you run your own Thoth server. The first 5 teams get set-up help for free. The guide is [Hosting your own Thoth server](https://github.com/Creaml4tt3/thoth/blob/main/docs/deploy/self-host.md). English or Thai is fine.
+
+        บอกเราเกี่ยวกับทีมของคุณสักนิด แล้วเราจะช่วยติดตั้งเซิร์ฟเวอร์ Thoth ของคุณเอง 5 ทีมแรกได้รับความช่วยเหลือฟรี เขียนเป็นภาษาไทยหรือภาษาอังกฤษก็ได้
+
+        **Never paste passwords, keys, tokens or other secrets here. This page is public.**
+        **ห้ามวางรหัสผ่าน คีย์ โทเค็น หรือข้อมูลลับใด ๆ ที่นี่ หน้านี้เป็นสาธารณะ**
+  - type: dropdown
+    id: team-size
+    attributes:
+      label: Team size
+      description: How many people will use the server?
+      options:
+        - "1–5"
+        - "6–20"
+        - "21–50"
+        - "More than 50"
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: Which setup?
+      description: The two options in the self-hosting guide. Not sure yet is fine.
+      options:
+        - "Option 1: the server and its own bundled database (compose.yaml)"
+        - "Option 2: our own PostgreSQL and our own sign-in provider (compose.external.yaml)"
+        - "Not sure yet"
+    validations:
+      required: true
+  - type: dropdown
+    id: sign-in
+    attributes:
+      label: Sign-in provider
+      description: How people will sign in.
+      multiple: true
+      options:
+        - Google
+        - GitHub
+        - Microsoft Entra ID
+        - Keycloak
+        - Other (say which below)
+        - Not sure yet
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where will it run?
+      description: For example a cloud provider and region, a server in your office, or a NAS. Do not include addresses, passwords or keys.
+    validations:
+      required: true
+  - type: dropdown
+    id: moving-from
+    attributes:
+      label: Are you moving notes from another app?
+      multiple: true
+      options:
+        - Notion
+        - Obsidian
+        - Something else
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: What you need, where you're stuck, or questions. **Never paste passwords, keys or secrets.**

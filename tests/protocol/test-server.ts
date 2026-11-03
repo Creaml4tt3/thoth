@@ -42,6 +42,7 @@ import {
   type Role,
   type TransferResource,
   FeedbackRequestSchema,
+  type InviteRole,
 } from "@thoth/workspace-protocol";
 
 export const EDITOR_TOKEN = "tok_conformance_editor_9f3a7c1e5b";
@@ -904,7 +905,7 @@ export async function startTestServer(options: TestServerOptions = {}): Promise<
     }),
   );
 
-  const inviteLinks = new Map<string, { id: string; workspaceId: string; role: "editor" | "viewer"; maxUses: number; uses: number; tokenHash: string; createdAt: string; createdBy: string; expiresAt: string; revoked: boolean }>();
+  const inviteLinks = new Map<string, { id: string; workspaceId: string; role: InviteRole; maxUses: number; uses: number; tokenHash: string; createdAt: string; createdBy: string; expiresAt: string; revoked: boolean }>();
   type Invite = typeof inviteLinks extends Map<string, infer V> ? V : never;
   const inviteActive = (l: Invite) => (!l.revoked || flaws.inviteRevokeIgnored === true) && l.uses < l.maxUses && Date.parse(l.expiresAt) > Date.now();
   const inviteResource = (l: Invite) => ({ id: l.id, workspaceId: l.workspaceId, role: l.role, maxUses: l.maxUses, usesLeft: l.maxUses - l.uses, createdAt: l.createdAt, createdBy: l.createdBy, createdByName: displayNameOf(l.createdBy), expiresAt: l.expiresAt });

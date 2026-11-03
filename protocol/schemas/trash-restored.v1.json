@@ -1,0 +1,19 @@
+{
+  "$id": "https://thoth.invalid/schemas/trash-restored.v1.json",
+  "title": "trash-restored.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "pageIds": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      }
+    }
+  },
+  "required": [
+    "pageIds"
+  ]
+}

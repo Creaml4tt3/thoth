@@ -50,7 +50,8 @@ Section 3.2, 8, 9.1, 9.4, 11 (authorization, audit events), 12, 14 (step 12),
 
 ## Open questions
 
-- Page-level permissions beyond workspace roles.
+- Page-level permissions beyond workspace roles. Decided 2026-11-01 in ADR-0042: teams, the role `manager`, and
+  pages limited to some teams.
 - Guest and public links.
 - Definition of "export" precisely (copy, move, download, agent context) for the
   restriction flag. For agent context it is decided (ADR-0007, decision 1, 2026-10-25): giving a workspace page to an

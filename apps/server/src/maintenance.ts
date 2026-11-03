@@ -7,6 +7,7 @@ import { purgeRateLimits } from "./ratelimit.ts";
 import { purgeSignIn } from "./signin/sessions.ts";
 import type { BlobStore } from "./blob.ts";
 import { purgeExpiredWorkspaces } from "./workspaces.ts";
+import { purgeExpiredTrash } from "./trash.ts";
 
 export interface MaintenanceResult {
   revisionsPruned: number;
@@ -16,6 +17,8 @@ export interface MaintenanceResult {
   signInRowsDeleted: number;
   /** Workspaces deleted more than 30 days ago, purged with their pages, revisions and attachments (ADR-0025). */
   workspacesPurged: number;
+  /** Pages in a Trash for more than 30 days, removed with their revisions (ADR-0043). */
+  trashPagesPurged: number;
   /** Feedback older than 90 days, with its app log (ADR-0040). */
   feedbackDeleted: number;
   /** Page presence heartbeats past their 45-second lifetime (ADR-0041). */
@@ -55,6 +58,7 @@ export async function runMaintenance(db: Database, options: { revisionRetentionD
   return {
     // First, so the revisions of a purged workspace are not pruned one by one.
     workspacesPurged: await purgeExpiredWorkspaces(db, options.blobs),
+    trashPagesPurged: await purgeExpiredTrash(db),
     revisionsPruned: options.revisionRetentionDays === undefined ? 0 : await pruneRevisions(db, options.revisionRetentionDays),
     idempotencyRecordsDeleted: await purgeIdempotencyRecords(db),
     rateLimitRowsDeleted: await purgeRateLimits(db),

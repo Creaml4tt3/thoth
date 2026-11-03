@@ -52,7 +52,7 @@ polling stays the fallback. Live co-editing (a CRDT such as Yjs) is a separate, 
    (`PRESENCE_HEARTBEAT_SECONDS`) while the page is shown and the window is visible, and the leave when the last view
    of the page closes. The server forgets a heartbeat 45 seconds (`PRESENCE_TTL_SECONDS`) after it arrived, so a
    closed laptop or a lost leave clears itself.
-6. **Kept in Postgres** (this ADR): table `page_presence` (migration `015_presence.sql`, additive), one row per
+6. **Kept in Postgres** (this ADR): table `page_presence` (migration `017_presence.sql`, additive), one row per
    workspace, page and account with `seen_at`. A heartbeat upserts its row, deletes the page's expired rows and reads
    the live ones; `maintenance` deletes expired rows everywhere. It works on the stateless demo exactly as on a
    self-hosted server, with no new infrastructure.
