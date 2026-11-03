@@ -43,8 +43,10 @@ store and the `transfers` capability, and has no "titles only" mode, so it is no
 7. **Team limits are warned about, not copied** (owner). For owners and managers the client asks
    `GET …/pages/{id}/visibility` for the original and, when it is limited from above, for its folders up the tree.
    When the original is limited itself, or the copy goes outside the nearest limited folder, the question says the
-   copy will be visible to everyone in the workspace. Editors cannot ask; for them the question says the copy keeps no
-   team limits.
+   copy will be visible to everyone in the workspace. Editors cannot ask. An editor who is in at least one team of the
+   workspace (`GET …/teams`, which every member may read, against the signed-in account's `GET /me`) is told the copy
+   keeps no team limits; an editor in no team is told nothing, since they cannot see a team-limited page (owner,
+   2026-11-02). When either call fails the note is shown.
 8. **Nothing is replaced, nothing half-made is left** (this ADR). Every write is a create: `Vault.writeFileAtomic` with
    `expectedHash: null`, and `PUT …/pages/{id}` with `If-None-Match: *` and a new page id. Before a workspace copy the
    client checks `maxPagesPerWorkspace` against the tree and refuses with the numbers when the copy does not fit. A

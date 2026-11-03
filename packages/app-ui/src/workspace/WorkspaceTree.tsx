@@ -221,7 +221,7 @@ const isThisWorkspaceReorder = (server: string, workspace: string) => (request: 
 
 /**
  * What team limits (ADR-0042) mean for a copy, which keeps none: the original is limited itself (`self`), by a folder
- * above it (`above`, the nearest limited one), not at all (`none`), or the person cannot ask (`unknown`: editors).
+ * above it (`above`, the nearest limited one), not at all (`none`, also for an editor in no team), or the person cannot ask (`unknown`: editors in a team).
  */
 type TeamLimit = ({ kind: "none" } | { kind: "unknown" } | { kind: "self" } | { kind: "above"; folder: string }) & {
   /** A page below the original is limited itself: its copy loses that limit wherever the copy goes. */
@@ -439,7 +439,17 @@ export function WorkspaceSection({ directory, server, serverLabel, workspace, cu
   /** How the original is limited to teams. Only owners and managers may ask the server (`GET …/visibility`). */
   const limitOf = async (id: string): Promise<TeamLimit> => {
     if (!canTeams) return { kind: "none" };
-    if (!canLimit) return { kind: "unknown" };
+    if (!canLimit) {
+      // An editor in no team sees no team-limited page, so the copy cannot lose a limit. Unsure (a failed call): say it.
+      try {
+        const client = directory.client(server);
+        const [me, teams] = await Promise.all([client.getMe(), client.listTeams(workspace.id)]);
+        if (!teams.some((team) => team.memberIds.includes(me.id))) return { kind: "none" };
+      } catch {
+        // keep the note
+      }
+      return { kind: "unknown" };
+    }
     try {
       const client = directory.client(server);
       const own = await client.getPageVisibility(workspace.id, id);

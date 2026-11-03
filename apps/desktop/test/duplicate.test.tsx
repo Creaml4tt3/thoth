@@ -223,8 +223,33 @@ describe("Duplicate in a workspace", () => {
     expect(dialog.textContent).not.toContain("Only some teams can see the original.");
   });
 
-  it("tells an editor, who cannot see team limits, that the copy keeps none", async () => {
-    const { app, group } = await workspace({ role: "editor", capabilities: [...CAPS, "teams"] });
+  it("tells an editor in a team, who cannot see team limits, that the copy keeps none", async () => {
+    const { app, ws, group } = await workspace({ role: "editor", capabilities: [...CAPS, "teams"] });
+    ws.teams.push({ id: "team_1", name: "Ops", memberIds: ["usr_me"] });
+    await app.user.click(within(await openMenu(group, /^Notes/, "Notes")).getByRole("menuitem", { name: "Duplicate" }));
+    const dialog = await screen.findByRole("dialog", { name: "Duplicate Notes?" });
+    expect(dialog.textContent).toContain("The copy keeps no team limits.");
+  });
+
+  it("says nothing about team limits to an editor in no team, who cannot see a limited page", async () => {
+    const { app, ws, group } = await workspace({ role: "editor", capabilities: [...CAPS, "teams"] });
+    ws.teams.push({ id: "team_1", name: "Ops", memberIds: ["usr_other"] });
+    await app.user.click(within(await openMenu(group, /^Roadmap/, "Roadmap")).getByRole("menuitem", { name: "Duplicate" }));
+    const dialog = await screen.findByRole("dialog", { name: "Duplicate Roadmap and its 2 pages?" });
+    expect(dialog.textContent).not.toContain("team limits");
+    await app.user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    // A page with nothing under it and no note is copied without asking.
+    await app.user.click(within(await openMenu(group, /^Notes/, "Notes")).getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(live(ws)).toContain("Notes (copy)"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps the note for an editor when the teams cannot be read", async () => {
+    const { app, servers, ws, group } = await workspace({ role: "editor", capabilities: [...CAPS, "teams"] });
+    ws.teams.push({ id: "team_1", name: "Ops", memberIds: ["usr_other"] });
+    servers.beforeCall = (args) => {
+      if (args.method === "GET" && args.path.endsWith("/teams")) throw new Error("The network went away.");
+    };
     await app.user.click(within(await openMenu(group, /^Notes/, "Notes")).getByRole("menuitem", { name: "Duplicate" }));
     const dialog = await screen.findByRole("dialog", { name: "Duplicate Notes?" });
     expect(dialog.textContent).toContain("The copy keeps no team limits.");
