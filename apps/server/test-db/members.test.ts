@@ -67,7 +67,7 @@ describe("members: the list, roles, removing and leaving", () => {
     expect(bad.json.code).toBe("cursor_invalid");
   });
 
-  it("lets only owners change a role (403 for editors and viewers); unknown members and roles are refused", async () => {
+  it("lets only owners and managers change a role (403 for editors and viewers); unknown members and roles are refused", async () => {
     for (const who of [editor, viewer]) {
       const res = await env.api(who, "PUT", `/workspaces/${ws}/members/${viewer.userId}`, { json: { role: "editor" } });
       expect([res.status, res.json.code], who.userId).toEqual([403, "forbidden"]);

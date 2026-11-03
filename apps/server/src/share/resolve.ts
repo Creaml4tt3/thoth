@@ -14,17 +14,18 @@ export interface ActiveShareLink {
 
 /**
  * The link for a token hash, if it may be served now: not revoked, not expired, its page not deleted (a page moved
- * out of the workspace is deleted there), its creator still an owner or editor, and the workspace neither export
- * restricted nor deleted (ADR-0025). One statement of one shape whatever the outcome, so an unknown token and a dead one cost the same.
+ * out of the workspace is deleted there), its creator still an owner, manager or editor, the page not limited to some
+ * teams (ADR-0042), and the workspace neither export restricted nor deleted (ADR-0025). One statement of one shape whatever the outcome, so an unknown token and a dead one cost the same.
  */
 export async function resolveShareLink(q: Queryable, tokenHash: string): Promise<ActiveShareLink | null> {
   const { rows } = await q.query<{ id: string; workspace_id: string; page_id: string; token_hash: string }>(
     `SELECT l.id, l.workspace_id, l.page_id, l.token_hash
        FROM share_links l
        JOIN workspaces w ON w.id = l.workspace_id AND NOT w.export_restricted AND w.deleted_at IS NULL
-       JOIN memberships m ON m.workspace_id = l.workspace_id AND m.user_id = l.created_by AND m.role IN ('owner', 'editor')
+       JOIN memberships m ON m.workspace_id = l.workspace_id AND m.user_id = l.created_by AND m.role IN ('owner', 'manager', 'editor')
        JOIN pages p ON p.workspace_id = l.workspace_id AND p.id = l.page_id AND p.deleted_at IS NULL
-      WHERE l.token_hash = $1 AND l.revoked_at IS NULL AND (l.expires_at IS NULL OR l.expires_at > now())`,
+      WHERE l.token_hash = $1 AND l.revoked_at IS NULL AND (l.expires_at IS NULL OR l.expires_at > now())
+        AND l.page_id NOT IN ${PUBLICLY_HIDDEN}`,
     [tokenHash],
   );
   const row = rows[0];
@@ -37,6 +38,13 @@ export interface SharedNode {
   title: string;
   position: string | null;
 }
+
+/**
+ * ADR-0042: pages limited to some teams, and everything below them, are never served by a public link, whoever made it
+ * (an owner sees them all, but the limit says who may). `thoth_hidden_pages` of an account that is in no team and owns
+ * nothing is exactly those pages. `l` is the link row; in `sharedSubtree` `$1` is the workspace.
+ */
+const PUBLICLY_HIDDEN = "(SELECT id FROM thoth_hidden_pages(l.workspace_id, ''))";
 
 /** Deeper than any real page tree; bounds the walk if the data ever held a cycle. */
 const MAX_DEPTH = 64;
@@ -52,6 +60,7 @@ export async function sharedSubtree(q: Queryable, link: ActiveShareLink): Promis
        UNION
        SELECT c.id, c.parent_id, t.depth + 1 FROM pages c JOIN tree t ON c.parent_id = t.id
         WHERE c.workspace_id = $1 AND c.deleted_at IS NULL AND c.id <> $2 AND t.depth < ${MAX_DEPTH}
+          AND c.id NOT IN (SELECT id FROM thoth_hidden_pages($1, ''))
      )
      SELECT DISTINCT ON (t.id) t.id, t.parent_id, r.title, p.position
        FROM tree t

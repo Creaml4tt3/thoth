@@ -7,6 +7,7 @@ import type { Deps } from "../deps.ts";
 import { ApiError, jsonReply, zodFailure } from "../errors.ts";
 import { parseJsonBody, principalOf, send } from "../http.ts";
 import { checkStorableText, limitFrom } from "../pages.ts";
+import { HIDDEN } from "../visibility.ts";
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -53,9 +54,10 @@ export function registerSearchRoutes(app: FastifyInstance, deps: Deps): void {
         WHERE p.workspace_id = $1 AND p.deleted_at IS NULL
           AND (r.title ILIKE $2 ESCAPE '\\' OR r.markdown ILIKE $2 ESCAPE '\\')
           AND ($4::uuid IS NULL OR p.id IN (SELECT id FROM subtree))
+          AND p.id NOT IN ${HIDDEN("$1", "$7")}
         ORDER BY (r.title ILIKE $2 ESCAPE '\\') DESC, p.updated_at DESC, p.id
         OFFSET $5 LIMIT $6`,
-      [ws.id, pattern, query, withinPageId ?? null, offset, limit + 1],
+      [ws.id, pattern, query, withinPageId ?? null, offset, limit + 1, me.id],
     );
     const page = rows.slice(0, limit);
     return send(

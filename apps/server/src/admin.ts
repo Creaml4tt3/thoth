@@ -6,8 +6,8 @@ import type { Database, Queryable } from "./db.ts";
 import { assertCanAddMember, assertCanCreateAccount, assertCanOwnAnotherWorkspace, type Quotas } from "./quota.ts";
 import { opaqueId } from "./ids.ts";
 
-export type Role = "owner" | "editor" | "viewer";
-export const ROLES: readonly Role[] = ["owner", "editor", "viewer"];
+export type Role = "owner" | "manager" | "editor" | "viewer";
+export const ROLES: readonly Role[] = ["owner", "manager", "editor", "viewer"];
 
 export class AdminError extends Error {
   constructor(message: string) {

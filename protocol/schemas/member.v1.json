@@ -17,6 +17,7 @@
       "type": "string",
       "enum": [
         "owner",
+        "manager",
         "editor",
         "viewer"
       ]

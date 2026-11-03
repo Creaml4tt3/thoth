@@ -7,6 +7,7 @@ import type { Deps } from "../deps.ts";
 import { ApiError, jsonReply, zodFailure } from "../errors.ts";
 import { audit, mutate, parseJsonBody, principalOf, send } from "../http.ts";
 import { opaqueId } from "../ids.ts";
+import { visibilityChanged } from "../visibility.ts";
 import { INVITE_ACTIVE, acceptInviteIn, generateInviteToken, hashInviteToken, inviteNotFound, resolveInvite } from "../invites.ts";
 import { limitFrom } from "../pages.ts";
 import { assertCanOwnAnotherWorkspace, quotaExceeded } from "../quota.ts";
@@ -15,7 +16,7 @@ import { clientIp, hit } from "../ratelimit.ts";
 interface InviteRow {
   id: string;
   workspace_id: string;
-  role: "editor" | "viewer";
+  role: "manager" | "editor" | "viewer";
   max_uses: number;
   uses: number;
   created_at: Date;
@@ -56,6 +57,12 @@ async function lockedAccess(tx: Queryable, workspaceId: string, userId: string, 
   return fresh;
 }
 
+/** Owners and managers see every page (ADR-0042, ADR-0043). */
+const seesEverything = (role: Role) => role === "owner" || role === "manager";
+
+/** ADR-0043: managers run members who are not owners; only owners make, demote or remove owners. */
+const onlyOwners = () => new ApiError("forbidden", "only owners of this workspace may make, demote or remove an owner");
+
 const lastOwner = () => new ApiError("last_owner", "a workspace keeps at least one owner: make another member an owner first");
 
 /**
@@ -92,7 +99,7 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
   app.put<{ Params: { workspaceId: string; userId: string } }>(`${API_BASE_PATH}/workspaces/:workspaceId/members/:userId`, (request, reply) =>
     mutate(deps, request, reply, async (tx) => {
       const me = principalOf(request);
-      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, "administer");
+      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, "manage");
       const parsed = MemberRoleChangeSchema.safeParse(parseJsonBody(request));
       if (!parsed.success) throw zodFailure(parsed.error);
       const userId = request.params.userId;
@@ -102,9 +109,12 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
       if (!target) throw new ApiError("not_found", "no such member");
       const next = parsed.data.role;
       if (target.role !== next) {
+        if ((target.role === "owner" || next === "owner") && ws.role !== "owner") throw onlyOwners();
         if (target.role === "owner" && (await ownerCount(tx, ws.id)) <= 1) throw lastOwner();
         if (next === "owner") await assertCanOwnAnotherWorkspace(tx, config, userId);
         await tx.query("UPDATE memberships SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [ws.id, userId, next]);
+        // Owners and managers see every page (ADR-0043): moving in or out of them changes what this member sees.
+        if (seesEverything(target.role) !== seesEverything(next)) await visibilityChanged(tx, ws.id, me.id);
         await audit(tx, { actorId: me.id, workspaceId: ws.id, action: "member.role_changed", detail: { userId, from: target.role, to: next } });
       }
       return jsonReply(200, { userId, displayName: target.display_name, role: next });
@@ -116,12 +126,15 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
       const me = principalOf(request);
       const userId = request.params.userId;
       const leaving = userId === me.id;
-      // Anyone may leave; only owners remove someone else.
-      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, leaving ? "read" : "administer");
+      // Anyone may leave; owners and managers remove someone else, but only owners remove an owner (ADR-0043).
+      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, leaving ? "read" : "manage");
       const target = OpaqueIdSchema.safeParse(userId).success ? (await tx.query<{ role: Role }>("SELECT role FROM memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE", [ws.id, userId])).rows[0] : undefined;
       if (!target) throw new ApiError("not_found", "no such member");
+      if (!leaving && target.role === "owner" && ws.role !== "owner") throw onlyOwners();
       if (target.role === "owner" && (await ownerCount(tx, ws.id)) <= 1) throw lastOwner();
       await tx.query("DELETE FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws.id, userId]);
+      // Out of the workspace, out of its teams: rejoining later starts in none (ADR-0042).
+      await tx.query("DELETE FROM team_members tm USING teams t WHERE t.id = tm.team_id AND t.workspace_id = $1 AND tm.user_id = $2", [ws.id, userId]);
       await audit(tx, { actorId: me.id, workspaceId: ws.id, action: leaving ? "member.left" : "member.removed", detail: { userId, role: target.role } });
       return { status: 204, headers: {} };
     }),
@@ -132,14 +145,14 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
   app.post<{ Params: { workspaceId: string } }>(`${API_BASE_PATH}/workspaces/:workspaceId/invite-links`, async (request, reply) => {
     const me = principalOf(request);
     // Not through the idempotency machinery on purpose: a stored replay would keep the token in the database.
-    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "administer");
+    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "manage");
     const parsed = InviteLinkCreateRequestSchema.safeParse(parseJsonBody(request));
     if (!parsed.success) throw zodFailure(parsed.error);
     const days = parsed.data.expiresInDays ?? INVITE_EXPIRY_DEFAULT_DAYS;
     const maxUses = parsed.data.maxUses ?? INVITE_USES_DEFAULT;
     const token = generateInviteToken();
     const row = await db.tx(async (tx) => {
-      const locked = await lockedAccess(tx, ws.id, me.id, "administer");
+      const locked = await lockedAccess(tx, ws.id, me.id, "manage");
       const limit = config.invite.maxLinksPerWorkspace;
       if (limit !== undefined) {
         const current = Number((await tx.query<{ n: string }>(`SELECT count(*) AS n FROM invite_links l WHERE l.workspace_id = $1 AND l.revoked_at IS NULL AND l.expires_at > now() AND l.uses < l.max_uses`, [locked.id])).rows[0]!.n);
@@ -175,7 +188,7 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
 
   app.get<{ Params: { workspaceId: string }; Querystring: { cursor?: string; limit?: string } }>(`${API_BASE_PATH}/workspaces/:workspaceId/invite-links`, async (request, reply) => {
     const me = principalOf(request);
-    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "administer");
+    const ws = await workspaceAccess(db, request.params.workspaceId, me.id, "manage");
     const limit = limitFrom(request.query.limit);
     let after: { at: Date; id: string } | null = null;
     if (request.query.cursor !== undefined) {
@@ -199,7 +212,7 @@ export function registerMemberRoutes(app: FastifyInstance, deps: Deps): void {
   app.delete<{ Params: { workspaceId: string; inviteId: string } }>(`${API_BASE_PATH}/workspaces/:workspaceId/invite-links/:inviteId`, (request, reply) =>
     mutate(deps, request, reply, async (tx) => {
       const me = principalOf(request);
-      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, "administer");
+      const ws = await lockedAccess(tx, request.params.workspaceId, me.id, "manage");
       const { rows } = await tx.query<{ revoked_at: Date | null }>("SELECT revoked_at FROM invite_links WHERE workspace_id = $1 AND id = $2 FOR UPDATE", [ws.id, request.params.inviteId]);
       const link = rows[0];
       if (!link) throw new ApiError("not_found", "invite link not found");

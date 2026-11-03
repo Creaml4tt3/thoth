@@ -50,6 +50,8 @@ trade-off.
 | [0038](0038-moving-between-spaces-and-opening-links.md) | Moving pages between spaces, and opening links in a page | Proposed 2026-10-29 |
 | [0039](0039-public-code-repository-and-private-website.md) | A public code repository, and the website in a private one | Proposed 2026-10-29 |
 | [0040](0040-local-log-and-problem-reports.md) | A local log, and problem reports with it | Accepted 2026-10-31 |
+| [0042](0042-teams-manager-role-and-folder-visibility.md) | Teams in workspaces, a Manager role, and folder visibility | Proposed 2026-11-01 |
+| [0043](0043-manager-rights-and-page-trash.md) | What managers may do, and a Trash for pages | Proposed 2026-11-01 |
 
 Template: [0000-template.md](0000-template.md).
 

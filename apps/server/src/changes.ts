@@ -6,7 +6,7 @@ import type { Queryable } from "./db.ts";
 export const NOTIFY_CHANNEL = "thoth_changes";
 
 export interface NewChange {
-  kind: "page.created" | "page.updated" | "page.deleted" | "attachment.created";
+  kind: "page.created" | "page.updated" | "page.deleted" | "attachment.created" | "x-thoth.visibility";
   actorId: string | null;
   pageId?: string;
   revisionId?: string;
