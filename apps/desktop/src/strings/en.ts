@@ -21,7 +21,7 @@ export const en = {
     lede: "A private place for everything you know. Your files stay on your computer as Markdown, in a folder you choose. No account, no cloud.",
     choose: "Choose or create a Private Space",
     opening: "Opening…",
-    hint: "Pick an existing folder of Markdown files, or create a new empty folder in the dialog. Thoth keeps its index in a hidden .thoth folder inside it, and the index can always be rebuilt from your files.",
+    hint: "Pick an existing folder of Markdown files, or create a new empty folder in the dialog. Thoth keeps its search index on this computer, not in the folder, and can always rebuild it from your files.",
     recent: "Recent",
     ready: "Ready",
     /** "<b>folder</b> is now a Private Space. …" */
@@ -82,6 +82,9 @@ export const en = {
     /** What the system calls its Trash, after "the": a deleted page or folder goes there. */
     trashName: { mac: "Trash", windows: "Recycle Bin", linux: "Trash" } satisfies Record<Os, string>,
     watchError: (detail: string) => `Changes made outside Thoth may not show up automatically: ${detail}`,
+    /** The Private Space is on a network drive (ADR-0046): shown once per Private Space, until dismissed. */
+    networkNotice:
+      "This Private Space is on a network or synced drive. Your notes work fine there, and Thoth keeps its own data on this computer. Avoid editing the same page on two computers at once.",
   },
 
 
@@ -105,7 +108,7 @@ export const en = {
     title: "Settings",
     privateSpace: "Private Space",
     local: "Local",
-    vaultNote: "Pages are Markdown files in this folder. The index lives in .thoth inside it and can always be rebuilt.",
+    vaultNote: "Pages are Markdown files in this folder. The search index lives on this computer and can always be rebuilt.",
     reveal: { mac: "Show in Finder", windows: "Show in File Explorer", linux: "Show in Files" } satisfies Record<Os, string>,
     switchSpace: "Switch Private Space",
     appearance: "Appearance",

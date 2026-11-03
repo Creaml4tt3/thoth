@@ -10,6 +10,7 @@ export const th: Strings = {
   editor: {
     status: { idle: "", dirty: "ยังไม่ได้บันทึก", saving: "กำลังบันทึก…", saved: "บันทึกแล้ว", error: "บันทึกไม่สำเร็จ" },
     modeGroup: "โหมดแก้ไข",
+    content: "เนื้อหาของหน้า", // REVIEW
     modeSwitchTitle: "สลับโหมดแก้ไข (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "บล็อก", hint: "จัดรูปแบบเป็นบล็อก แบบ Notion" },
@@ -250,6 +251,30 @@ export const th: Strings = {
       move: "ย้าย",
       cancel: "ยกเลิก",
     },
+    duplicate: "ทำสำเนา", // REVIEW
+    duplicateStructure: "ทำสำเนาเฉพาะโครงสร้าง", // REVIEW
+    duplicateTo: "ทำสำเนาไปที่…", // REVIEW
+    copyName: (title, n) => (n === 1 ? `${title} (สำเนา)` : `${title} (สำเนา ${n})`), // REVIEW
+    duplicated: (title) => `ทำสำเนา ${title} แล้ว`, // REVIEW
+    duplicateFailed: (detail) => `ทำสำเนาไม่ได้: ${detail} ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateQuota: (limit, current, adding) =>
+      `ทำสำเนาไม่ได้เพราะเกินขีดจำกัด: เวิร์กสเปซนี้มีได้ไม่เกิน ${count(limit)} หน้า ตอนนี้ใช้อยู่ ${count(current)} หน้า และสำเนาต้องใช้อีก ${count(adding)} หน้า ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateDialog: {
+      title: (name, pages) => (pages > 0 ? `ทำสำเนา ${name} และ ${count(pages)} หน้าข้างในใช่ไหม` : `ทำสำเนา ${name} ใช่ไหม`), // REVIEW
+      copy: "สำเนาจะอยู่ใต้ต้นฉบับทันที มีหน้า โฟลเดอร์ และลำดับเหมือนเดิม โดยไม่คัดลอกเวอร์ชันก่อนหน้าและลิงก์แชร์", // REVIEW
+      structure: "สำเนาจะมีหน้า โฟลเดอร์ และลำดับเหมือนเดิม แต่แต่ละหน้าจะเหลือแค่ชื่อ", // REVIEW
+      everyone: "ต้นฉบับมองเห็นได้เฉพาะบางทีม สำเนาไม่มีการจำกัดทีม ทุกคนในเวิร์กสเปซนี้จึงจะมองเห็นสำเนา", // REVIEW
+      below: "บางหน้าข้างในมองเห็นได้เฉพาะบางทีม สำเนาของหน้าเหล่านั้นไม่มีการจำกัดทีม ทุกคนในเวิร์กสเปซนี้จึงจะมองเห็นสำเนา", // REVIEW
+      noLimits: "สำเนาไม่มีการจำกัดทีม", // REVIEW
+      duplicate: "ทำสำเนา", // REVIEW
+      duplicating: "กำลังทำสำเนา…", // REVIEW
+      cancel: "ยกเลิก",
+    },
+    duplicateToDialog: {
+      title: (name) => `ทำสำเนา “${name}” ไปที่…`, // REVIEW
+      destination: "วางสำเนาไว้ใน", // REVIEW
+      pages: (pages) => `${count(pages)} หน้าข้างในจะถูกคัดลอกด้วย`, // REVIEW
+    },
     across: {
       copyTo: (name) => `คัดลอกไปที่ ${name}…`,
       moveTo: (name) => `ย้ายไปที่ ${name}…`,
@@ -381,6 +406,7 @@ export const th: Strings = {
     createTeam: "สร้างทีม", // REVIEW
     teamName: (name) => `ชื่อของ ${name}`, // REVIEW
     renameTeam: "เปลี่ยนชื่อ", // REVIEW
+    renameTeamLabel: (name) => `เปลี่ยนชื่อทีม ${name}`, // REVIEW
     deleteTeam: "ลบ", // REVIEW
     deleteTeamLabel: (name) => `ลบทีม ${name}`, // REVIEW
     teamMember: (person, team) => `${person} ใน ${team}`, // REVIEW
@@ -516,6 +542,7 @@ export const th: Strings = {
       newFolderIn: (workspace) => `โฟลเดอร์ใหม่ใน ${workspace}`,
       rename: "เปลี่ยนชื่อหน้า",
       moveTo: "ย้ายไปที่…",
+      duplicate: "ทำสำเนาหน้า", // REVIEW
       moveUp: "ย้ายหน้าขึ้น",
       moveDown: "ย้ายหน้าลง",
       share: "แชร์หน้า…",
@@ -572,12 +599,14 @@ export const th: Strings = {
       "tab.pin": "ปักหมุดหรือเลิกปักหมุดแท็บปัจจุบัน",
       "tab.split": "แยกแท็บปัจจุบันไปทางขวา หรือย้ายไปอีกฝั่ง", // REVIEW
       "pane.focusOther": "ย้ายโฟกัสไปอีกฝั่ง", // REVIEW
+      "region.next": "ย้ายโฟกัสระหว่างแถบด้านข้างกับหน้า", // REVIEW
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",
       "tree.rename": "เปลี่ยนชื่อ",
       "tree.reorder": "ย้ายหน้าขึ้นหรือลง",
       "tree.menu": "เปิดเมนูของหน้า",
+      "tree.duplicate": "ทำสำเนาหน้าหรือโฟลเดอร์", // REVIEW
       "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง",
       "editor.save": "บันทึกทันที",
       "editor.mode": "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",

@@ -8,6 +8,7 @@
  * keeps both, then signs out (the server shows the session revoked). No token is ever readable by the page, and
  * no request leaves 127.0.0.1.
  */
+import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import type { Server } from "node:http";
 import { newStableId } from "@thoth/domain";
@@ -164,11 +165,29 @@ test.describe("web client", () => {
     await page.keyboard.press("Enter");
     await page.keyboard.type("Written in Blocks.");
     await page.keyboard.press("ControlOrMeta+s");
-    await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+    await expect(page.locator(".save-status")).toHaveText("Saved");
+    await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveCount(1); // an explicit save is spoken
     const pageRow = async () => (await db.query<{ id: string; title: string }>("SELECT id::text AS id, title FROM pages WHERE workspace_id = $1 AND deleted_at IS NULL ORDER BY created_at", [workspace])).rows;
     await expect.poll(async () => (await pageRow())[0]?.title).toBe("Field notes");
     const pageId = (await pageRow())[0]!.id;
     await expect(pages.getByRole("treeitem", { name: "Field notes" })).toBeVisible();
+
+    // ---- Search (Ctrl/Cmd+K): the active result is the combobox's active descendant, and the dialog passes axe.
+    await page.keyboard.press("ControlOrMeta+k");
+    const search = page.getByRole("combobox", { name: "Search pages" });
+    await search.fill("Field");
+    const results = page.getByRole("listbox", { name: "Search" });
+    await expect(results.getByRole("option").first()).toContainText("Field notes", { timeout: 15_000 });
+    await page.keyboard.press("ArrowDown");
+    const active = await search.getAttribute("aria-activedescendant");
+    expect(active).toBeTruthy();
+    await expect(page.locator(`[id="${active}"]`)).toHaveAttribute("aria-selected", "true");
+    await expect(search).toHaveAttribute("aria-controls", "search-results");
+    await settled(page);
+    const axe = await new AxeBuilder({ page }).include(".modal").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).analyze();
+    expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(search).toBeHidden();
 
     // ---- Switch to Plain and keep writing.
     await page.getByRole("button", { name: "Plain" }).click();

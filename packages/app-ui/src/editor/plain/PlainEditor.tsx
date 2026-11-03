@@ -69,7 +69,7 @@ export function PlainEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
           ...defaultKeymap,
           indentWithTab,
         ]),
-        EditorView.contentAttributes.of({ "aria-label": "Page content", spellcheck: "true", class: "plain-content" }),
+        EditorView.contentAttributes.of({ "aria-label": ctx.strings.content, spellcheck: "true", class: "plain-content" }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !loading.current) edit.current();
         }),

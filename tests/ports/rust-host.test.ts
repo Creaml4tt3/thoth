@@ -2,7 +2,7 @@
  * Rust host security controls that have no Node counterpart: the allow-list,
  * handle isolation, SQL sandboxing, request limits and the watcher.
  */
-import { mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createRemotePlatform, openRemoteVault, RemoteSourceHost } from "@thoth/platform/remote";
@@ -204,12 +204,15 @@ describe("SQL sandbox", () => {
     await vault.close();
   });
 
-  it("refuses an index database that is a symlink", async () => {
+  it("removes an old index in .thoth/ that is a symlink, without following it (ADR-0046)", async () => {
     const root = join(base, "v");
     await mkdir(join(root, ".thoth"), { recursive: true });
     await writeFile(join(base, "elsewhere.sqlite"), "");
     await symlink(join(base, "elsewhere.sqlite"), join(root, ".thoth", "index.sqlite"));
-    await expect(openRemoteVault(await transport({ allowRoots: [root] }), root)).rejects.toMatchObject({ code: "SQLITE_ERROR" });
+    const vault = await openRemoteVault(await transport({ allowRoots: [root] }), root);
+    await expect(lstat(join(root, ".thoth", "index.sqlite"))).rejects.toThrow();
+    expect(await readFile(join(base, "elsewhere.sqlite"), "utf8")).toBe("");
+    await vault.close();
   });
 
   it("refuses a .thoth directory that is a symlink", async () => {

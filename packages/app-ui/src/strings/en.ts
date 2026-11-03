@@ -22,6 +22,8 @@ export const en = {
   editor: {
     status: { idle: "", dirty: "Unsaved changes", saving: "Saving…", saved: "Saved", error: "Not saved" },
     modeGroup: "Editor mode",
+    /** The editor's accessible name. */
+    content: "Page content",
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },
@@ -290,6 +292,32 @@ export const en = {
       move: "Move",
       cancel: "Cancel",
     },
+    /** Duplicate in a tree's menu (ADR-0047). */
+    duplicate: "Duplicate",
+    duplicateStructure: "Duplicate structure only",
+    duplicateTo: "Duplicate to…",
+    /** The copy's name: "Roadmap (copy)", then "Roadmap (copy 2)"… */
+    copyName: (title: string, n: number) => (n === 1 ? `${title} (copy)` : `${title} (copy ${n})`),
+    duplicated: (title: string) => `Duplicated ${title}`,
+    duplicateFailed: (detail: string) => `Could not duplicate: ${detail.replace(/\.$/, "")}. Nothing was copied.`,
+    duplicateQuota: (limit: number, current: number, adding: number) =>
+      `The copy does not fit: this workspace is limited to ${plural(limit, "page")}, ${current.toLocaleString()} are in use and the copy needs ${adding.toLocaleString()}. Nothing was copied.`,
+    duplicateDialog: {
+      title: (name: string, pages: number) => (pages > 0 ? `Duplicate ${name} and its ${plural(pages, "page")}?` : `Duplicate ${name}?`),
+      copy: "The copy goes right below it, with the same pages, folders and order. Earlier versions and share links are not copied.",
+      structure: "The copy keeps the pages, folders and order, but each page keeps only its title.",
+      everyone: "Only some teams can see the original. The copy keeps no team limits, so it will be visible to everyone in this workspace.",
+      below: "Only some teams can see some of the pages inside. Their copies keep no team limits, so they will be visible to everyone in this workspace.",
+      noLimits: "The copy keeps no team limits.",
+      duplicate: "Duplicate",
+      duplicating: "Duplicating…",
+      cancel: "Cancel",
+    },
+    duplicateToDialog: {
+      title: (name: string) => `Duplicate “${name}” to…`,
+      destination: "Put the copy in",
+      pages: (pages: number) => `The ${plural(pages, "page")} inside are copied too.`,
+    },
     /** By the pointer while pages are dragged from one space onto the other (ADR-0006, amendment of 2026-10-26). */
     across: {
       copyTo: (name: string) => `Copy to ${name}…`,
@@ -425,6 +453,7 @@ export const en = {
     createTeam: "Create team",
     teamName: (name: string) => `Name of ${name}`,
     renameTeam: "Rename",
+    renameTeamLabel: (name: string) => `Rename team ${name}`,
     deleteTeam: "Delete",
     deleteTeamLabel: (name: string) => `Delete team ${name}`,
     teamMember: (person: string, team: string) => `${person} in ${team}`,
@@ -568,6 +597,7 @@ export const en = {
       newFolderIn: (workspace: string) => `New folder in ${workspace}`,
       rename: "Rename page",
       moveTo: "Move to…",
+      duplicate: "Duplicate page",
       moveUp: "Move page up",
       moveDown: "Move page down",
       share: "Share page…",
@@ -629,12 +659,14 @@ export const en = {
       "tab.pin": "Pin or unpin the current tab",
       "tab.split": "Split the current tab to the right, or move it to the other pane",
       "pane.focusOther": "Move focus to the other pane",
+      "region.next": "Move focus between the sidebar and the panes",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
       "tree.rename": "Rename",
       "tree.reorder": "Move the page up or down",
       "tree.menu": "Open the page's menu",
+      "tree.duplicate": "Duplicate the page or folder",
       "section.move": "Move the sidebar section up or down",
       "editor.save": "Save now",
       "editor.mode": "Switch between Blocks and Plain",

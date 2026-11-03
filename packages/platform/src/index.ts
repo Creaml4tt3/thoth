@@ -19,6 +19,8 @@ export interface VaultConnection {
    * the start-up recovery (journal, agent runs, transfers); this one must not, since what it would recover is in flight.
    */
   readonly shared?: boolean;
+  /** The folder is on a network drive (ADR-0046). Absent where the host cannot tell. */
+  readonly network?: boolean;
   readonly fs: VaultFs;
   readonly sql: SqlDriver;
   /** Starts the filesystem watcher. It is a trigger only: listeners should debounce into `vault.reconcile()`. */

@@ -129,7 +129,9 @@ test("split from the menu, resize from the keyboard, the same layout after a res
   await expect.poll(() => names(page, "Open pages, right")).toEqual(["Beta"]);
   await expect(tabIn(page, "Open pages, right", "Beta")).toBeFocused();
 
-  // F6 goes to the other pane.
+  // F6 goes round the sidebar and the panes: right pane, sidebar, left pane.
+  await page.keyboard.press("F6");
+  await expect(page.locator(".sidebar [role=treeitem]:focus")).toHaveCount(1);
   await page.keyboard.press("F6");
   await expect(tabIn(page, "Open pages, left", "Alpha")).toBeFocused();
 

@@ -18,7 +18,7 @@ import { freePort, buildWebClient, serveWebClient, startReferenceServer, type Re
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "workspaces");
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
 let ref: ReferenceServer;
 let issuer: FakeIssuer;
