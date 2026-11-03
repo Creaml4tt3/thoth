@@ -125,7 +125,7 @@ export function setLinkTip(dom: HTMLElement, text: string, hint: string | null):
 }
 
 /**
- * Paints a link chip (both editor modes): its text, state, kind and tooltip. A folder link (ADR-0043) is a folder chip;
+ * Paints a link chip (both editor modes): its text, state, kind and tooltip. A folder link (ADR-0049) is a folder chip;
  * a workspace link shows the page's current title when it was written without a label.
  */
 export function paintLinkChip(chip: HTMLElement, ctx: EditorContext, target: string, shown: string | null, result: LinkTarget): void {
@@ -140,7 +140,7 @@ export function paintLinkChip(chip: HTMLElement, ctx: EditorContext, target: str
   setLinkTip(chip, where, result.state !== "resolved" ? null : folder ? t.linkOpenFolder : linkHint(t, "page"));
 }
 
-/** Follows a resolved link: a page opens (a new tab or window by the click, 0.2.7); a folder is shown in the sidebar (ADR-0043). */
+/** Follows a resolved link: a page opens (a new tab or window by the click, 0.2.7); a folder is shown in the sidebar (ADR-0049). */
 export function followLink(ctx: EditorContext, result: LinkTarget, event: Event): void {
   if (result.state !== "resolved") return;
   if (result.folder) ctx.openFolder?.(result.path.slice(0, -1));
@@ -190,7 +190,7 @@ export const wikilinkView = (ctx: EditorContext): NodeViewRenderer => ({ node: i
   };
 };
 
-/** `[@Name](thoth:user/<id>)` as a chip (ADR-0043): the name only; nothing opens and nothing is looked up. */
+/** `[@Name](thoth:user/<id>)` as a chip (ADR-0049): the name only; nothing opens and nothing is looked up. */
 export const mentionView = (ctx: EditorContext): NodeViewRenderer => ({ node }) => {
   const dom = el("span", "mention", `@${node.attrs["label"] as string}`);
   dom.setAttribute("contenteditable", "false");

@@ -74,7 +74,29 @@ describe("route registry", () => {
       restoreWorkspace: "workspace-management",
       purgeWorkspace: "workspace-management",
       sendFeedback: "feedback",
+      listTeams: "teams",
+      createTeam: "teams",
+      renameTeam: "teams",
+      deleteTeam: "teams",
+      addTeamMember: "teams",
+      removeTeamMember: "teams",
+      getPageVisibility: "teams",
+      setPageVisibility: "teams",
+      listTeamPages: "teams",
+      listTrash: "trash",
+      restoreTrashedPage: "trash",
+      purgeTrashedPage: "trash",
     });
+  });
+
+  it("puts the teams calls where ADR-0042 says: owners and managers change them, everyone reads the list, hidden pages are 404", () => {
+    const at = (id: string) => `${getRoute(id).method.toUpperCase()} ${getRoute(id).path}`;
+    expect(at("listTeams")).toBe("GET /workspaces/{workspaceId}/teams");
+    expect(at("createTeam")).toBe("POST /workspaces/{workspaceId}/teams");
+    expect(at("addTeamMember")).toBe("PUT /workspaces/{workspaceId}/teams/{teamId}/members/{userId}");
+    expect(at("setPageVisibility")).toBe("PUT /workspaces/{workspaceId}/pages/{pageId}/visibility");
+    for (const id of ["createTeam", "renameTeam", "deleteTeam", "addTeamMember", "removeTeamMember", "getPageVisibility", "setPageVisibility"]) expect(getRoute(id).errors, id).toEqual(expect.arrayContaining(["forbidden", "not_found"]));
+    expect(getRoute("listTeams").errors).not.toContain("forbidden");
   });
 
   it("puts sendFeedback where ADR-0033 says: POST /feedback, no sign-in, 204, rate limited, nothing else", () => {

@@ -136,7 +136,7 @@ export interface PageFrameProps {
   linkTick: number;
   /** Wikilinks open through here; `options` from the click (a new tab or window, 0.2.7). */
   openLink(path: string, options?: OpenOptions): void;
-  /** A `[[Folder/]]` link shows its folder in the sidebar through here (ADR-0043). */
+  /** A `[[Folder/]]` link shows its folder in the sidebar through here (ADR-0049). */
   openFolder?(path: string): void;
   /** Opens the copy that Keep both made. */
   openCopy(ref: string): void;

@@ -2,8 +2,8 @@ import { z } from "zod";
 import { SpaceSchema } from "@thoth/domain";
 import { OpaqueIdSchema, TimestampSchema, WorkspaceIdSchema, paginated } from "./common.ts";
 
-/** MVP workspace roles (ADR-0009). */
-export const RoleSchema = z.enum(["owner", "editor", "viewer"]);
+/** Workspace roles (ADR-0009), highest first. `manager` (ADR-0042): an editor who also manages teams and who sees which pages. */
+export const RoleSchema = z.enum(["owner", "manager", "editor", "viewer"]);
 export type Role = z.infer<typeof RoleSchema>;
 
 export const MemberSchema = z.object({
@@ -43,9 +43,17 @@ export type WorkspaceList = z.infer<typeof WorkspaceListSchema>;
 export const ROLE_PERMISSIONS = {
   viewer: ["read"],
   editor: ["read", "write"],
-  owner: ["read", "write", "administer"],
+  manager: ["read", "write", "manage"],
+  owner: ["read", "write", "manage", "administer"],
 } as const satisfies Record<Role, readonly string[]>;
 
-export function roleCan(role: Role, permission: "read" | "write" | "administer"): boolean {
+/**
+ * `manage` (ADR-0042, ADR-0043): teams, page visibility, every page (limited ones too), the whole Trash, invite links,
+ * and members who are not owners (their roles up to manager, and removing them). `administer` (owners): making,
+ * demoting or removing owners, and renaming or deleting the workspace.
+ */
+export type Permission = "read" | "write" | "manage" | "administer";
+
+export function roleCan(role: Role, permission: Permission): boolean {
   return (ROLE_PERMISSIONS[role] as readonly string[]).includes(permission);
 }

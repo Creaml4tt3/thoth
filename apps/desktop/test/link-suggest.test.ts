@@ -109,7 +109,7 @@ describe("Plain mode trigger and completion", () => {
   });
 });
 
-describe("@ trigger rules (ADR-0043)", () => {
+describe("@ trigger rules (ADR-0049)", () => {
   it("opens at the start of a line, after whitespace or an opening bracket", () => {
     expect(atQuery("@")).toEqual({ at: 0, query: "" });
     expect(atQuery("@ro")).toEqual({ at: 0, query: "ro" });
@@ -177,7 +177,7 @@ describe("folders in the Private Space menu and chips", () => {
   });
 });
 
-describe("workspace links (ADR-0043)", () => {
+describe("workspace links (ADR-0049)", () => {
   const id = (n: number) => `01890000-0000-7000-8000-${String(n).padStart(12, "0")}`;
   const node = (n: number, title: string, parentId: string | null = null) => ({ id: id(n), parentId, title, revisionId: "r", updatedAt: `2026-10-0${n}T00:00:00Z` });
   const nodes = [node(1, "Projects"), node(2, "Roadmap", id(1)), node(3, "Here"), node(4, "Road notes")];

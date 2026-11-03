@@ -54,7 +54,7 @@ describe("LinkResolver", () => {
   });
 });
 
-describe("folder links (ADR-0043)", () => {
+describe("folder links (ADR-0049)", () => {
   const r = new LinkResolver(["Projects/2026/Plan.md", "Archive/2026/Old.md", "Inbox/Welcome.md"], [], ["Empty", "Projects/2026/Drafts"]);
   const folder = (target: string, from = "Inbox/Welcome.md") => r.resolve(from, { syntax: "wikilink", target, external: false });
 

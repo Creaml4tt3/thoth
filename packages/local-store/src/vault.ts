@@ -1103,7 +1103,7 @@ function newLinkTarget(resolver: LinkResolver, from: string, reference: ParsedRe
     return r.state === "resolved" && r.path === want;
   };
   if (reference.syntax === "wikilink" || reference.syntax === "embed") {
-    // A folder link (`[[Projects/]]`, ADR-0043) keeps its trailing slash.
+    // A folder link (`[[Projects/]]`, ADR-0049) keeps its trailing slash.
     const candidates = want.endsWith("/") ? [`${basename(want.slice(0, -1))}/`, want] : isMarkdownPath(want) ? [stripExtension(basename(want)), stripExtension(want)] : [basename(want), want];
     return candidates.find((c) => !/[[\]|#\n]/.test(c) && reaches(c));
   }

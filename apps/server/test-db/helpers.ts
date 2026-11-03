@@ -47,7 +47,7 @@ export interface TestEnv {
   url: string;
   /** Creates a user with a fresh personal access token. The token exists only in this process. */
   user(name: string): Promise<TestPrincipal>;
-  workspace(name: string, options?: { exportRestricted?: boolean; members?: Record<string, "owner" | "editor" | "viewer"> }): Promise<string>;
+  workspace(name: string, options?: { exportRestricted?: boolean; members?: Record<string, "owner" | "manager" | "editor" | "viewer"> }): Promise<string>;
   /** Stops the server and starts a new one on the same database and blob directory. */
   restart(options?: StartOptions): Promise<void>;
   api(principal: TestPrincipal | null, method: string, path: string, init?: { headers?: Record<string, string>; json?: unknown; body?: Buffer | string | undefined; query?: Record<string, string> }): Promise<ApiResult>;

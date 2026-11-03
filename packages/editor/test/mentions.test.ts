@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { docToMarkdown, mentionText } from "../src/index.ts";
 import { canonical, roundTrip, semantic } from "./helpers.ts";
 
-/** ADR-0043: folder links `[[Folder/]]` and person mentions `[@Name](thoth:user/<id>)`. */
+/** ADR-0049: folder links `[[Folder/]]` and person mentions `[@Name](thoth:user/<id>)`. */
 describe("folder links and person mentions", () => {
   const inline = (source: string) => semantic(source)[0]?.content ?? [];
 

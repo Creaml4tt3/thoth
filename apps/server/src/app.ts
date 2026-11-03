@@ -13,6 +13,8 @@ import { registerEventRoutes } from "./routes/events.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
 import { registerShareRoutes } from "./routes/shares.ts";
 import { registerMemberRoutes } from "./routes/members.ts";
+import { registerTeamRoutes } from "./routes/teams.ts";
+import { registerTrashRoutes } from "./routes/trash.ts";
 import { registerWorkspaceRoutes } from "./routes/workspaces.ts";
 import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
@@ -78,6 +80,8 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "transfers", test: (_m, p) => /^\/workspaces\/[^/]+\/transfers$/.test(p) || /^\/transfers\/[^/]+(\/(commit|abort))?$/.test(p) },
   { capability: "public-share", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/share-links$/.test(p) || /^\/workspaces\/[^/]+\/share-links\/[^/]+$/.test(p) },
   { capability: "members", test: (_m, p) => /^\/workspaces\/[^/]+\/members(\/[^/]+)?$/.test(p) },
+  { capability: "teams", test: (_m, p) => /^\/workspaces\/[^/]+\/teams(\/[^/]+(\/members\/[^/]+|\/pages)?)?$/.test(p) || /^\/workspaces\/[^/]+\/pages\/[^/]+\/visibility$/.test(p) },
+  { capability: "trash", test: (_m, p) => /^\/workspaces\/[^/]+\/trash(\/[^/]+(\/restore)?)?$/.test(p) },
   { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },
   // ADR-0025. `GET /workspaces` is a core route and stays open.
   {
@@ -214,6 +218,8 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerTransferRoutes(app, deps);
   registerShareRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerTeamRoutes(app, deps);
+  registerTrashRoutes(app, deps);
   registerWorkspaceRoutes(app, deps);
   registerFeedbackRoutes(app, deps);
   const invitePages = registerInvitePages(app, deps);

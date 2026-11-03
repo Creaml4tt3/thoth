@@ -244,7 +244,7 @@ const Wikilink = Node.create({
   renderHTML: ({ node }) => ["span", { "data-wikilink": node.attrs["target"] as string }, (node.attrs["label"] ?? node.attrs["target"]) as string],
 });
 
-/** `[@Name](thoth:user/<id>)` (ADR-0043): a person mention, an atom like a wikilink. */
+/** `[@Name](thoth:user/<id>)` (ADR-0049): a person mention, an atom like a wikilink. */
 const Mention = Node.create({
   name: "mention",
   group: "inline cellInline",

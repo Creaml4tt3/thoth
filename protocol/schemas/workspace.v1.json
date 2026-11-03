@@ -21,6 +21,7 @@
       "type": "string",
       "enum": [
         "owner",
+        "manager",
         "editor",
         "viewer"
       ]
@@ -52,6 +53,7 @@
             "type": "string",
             "enum": [
               "owner",
+              "manager",
               "editor",
               "viewer"
             ]

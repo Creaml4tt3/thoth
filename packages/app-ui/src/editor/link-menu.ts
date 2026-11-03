@@ -1,6 +1,6 @@
 /**
  * The link suggestion menu, shared by both editor modes and both triggers: an ARIA listbox (see `suggest-menu.ts`)
- * of pages after `[[`, and of pages, folders and (in a workspace) people after `@` (ADR-0043).
+ * of pages after `[[`, and of pages, folders and (in a workspace) people after `@` (ADR-0049).
  */
 import { createSuggestMenu, type SuggestMenu } from "./suggest-menu.ts";
 import type { LinkSuggestion } from "./link-suggest.ts";

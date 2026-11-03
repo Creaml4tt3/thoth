@@ -1,5 +1,5 @@
 /**
- * Links in a workspace page (ADR-0043). A workspace has no paths, so links name pages and folders by ID:
+ * Links in a workspace page (ADR-0049). A workspace has no paths, so links name pages and folders by ID:
  * `[[thoth:page/<id>|Title]]`, the form transfers already write (`@thoth/transfer` PAGE_LINK_PREFIX) and the share
  * renderer reads. They survive renames and moves; the chip shows the page's current title. A folder of a workspace is
  * a page marked as a folder, so a folder link is a page link whose target the tree draws as a folder. People come

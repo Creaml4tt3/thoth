@@ -1,4 +1,4 @@
-# ADR-0043: "@" to link pages, folders and people
+# ADR-0049: "@" to link pages, folders and people
 
 - **Status:** Proposed
 - **Date:** 2026-11-01

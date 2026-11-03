@@ -7,6 +7,7 @@ import { ApiError, fieldError, jsonReply, problemReply, zodFailure, type Reply }
 import { audit, mutate, parseJsonBody, principalOf, send } from "../http.ts";
 import { checkStorableText, deletePage, loadPage, writeRevision } from "../pages.ts";
 import { assertCanCreatePages } from "../quota.ts";
+import { HIDDEN, isHidden } from "../visibility.ts";
 
 interface TransferRow {
   operation_id: string;
@@ -70,6 +71,11 @@ async function transferFor(q: Queryable, operationId: string, userId: string, ne
   const access = await workspaceAccess(q, first.workspace_id, userId, "read", { lock: options.lock === true }).catch((error: unknown) => {
     throw error instanceof ApiError && error.code === "not_found" ? new ApiError("not_found", "transfer not found") : error;
   });
+  // ADR-0042: another member's transfer that names a page the caller may not see is not found (its creator keeps it).
+  if (first.user_id !== userId) {
+    const hidden = await q.query(`SELECT 1 FROM transfer_items WHERE operation_id = $1 AND page_id IN ${HIDDEN("$2", "$3")} LIMIT 1`, [operationId, first.workspace_id, userId]);
+    if ((hidden.rowCount ?? 0) > 0) throw new ApiError("not_found", "transfer not found");
+  }
   if (need === "write") requireRole(access, "write");
   const transfer = options.lock ? (await q.query<TransferRow>("SELECT * FROM transfers WHERE operation_id = $1 FOR UPDATE", [operationId])).rows[0]! : first;
   return { transfer, access };
@@ -126,6 +132,10 @@ export function registerTransferRoutes(app: FastifyInstance, deps: Deps): void {
         checkStagedTree(plan.pages);
         const taken = await tx.query("SELECT 1 FROM pages WHERE workspace_id = $1 AND id = ANY($2::uuid[]) LIMIT 1", [ws.id, ids]);
         if ((taken.rowCount ?? 0) > 0) throw new ApiError("validation_failed", "pageId values must be new in the workspace", fieldError("/pages", "a pageId already exists"));
+        // ADR-0042: nobody puts pages into a folder they cannot see.
+        for (const parent of new Set(plan.pages.map((p) => p.parentId).filter((id): id is string => id !== null && !ids.includes(id)))) {
+          if (await isHidden(tx, ws.id, me.id, parent)) throw new ApiError("not_found", "parent page not found");
+        }
         if (plan.attachmentIds?.length) {
           const known = await tx.query<{ n: number }>("SELECT count(*)::int AS n FROM attachments WHERE workspace_id = $1 AND id = ANY($2::uuid[])", [ws.id, [...new Set(plan.attachmentIds)]]);
           if (known.rows[0]!.n !== new Set(plan.attachmentIds).size) throw new ApiError("validation_failed", "attachmentIds must name attachments uploaded to this workspace", fieldError("/attachmentIds", "unknown attachment"));
@@ -142,7 +152,8 @@ export function registerTransferRoutes(app: FastifyInstance, deps: Deps): void {
           await audit(db, { actorId: me.id, workspaceId: ws.id, action: "export.refused", detail: { operationId: plan.operationId, mode: plan.mode } }).catch(() => undefined);
           throw new ApiError("export_restricted", "this workspace forbids exporting content");
         }
-        const pinned = await tx.query<{ id: string; current_revision_id: string }>("SELECT id, current_revision_id FROM pages WHERE workspace_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL", [ws.id, ids]);
+        // A page the caller may not see is not found, like one that does not exist (ADR-0042).
+        const pinned = await tx.query<{ id: string; current_revision_id: string }>(`SELECT id, current_revision_id FROM pages WHERE workspace_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL AND id NOT IN ${HIDDEN("$1", "$3")}`, [ws.id, ids, me.id]);
         const byId = new Map(pinned.rows.map((r) => [r.id, r.current_revision_id]));
         items = ids.map((id) => {
           const revisionId = byId.get(id);
@@ -234,7 +245,8 @@ export function registerTransferRoutes(app: FastifyInstance, deps: Deps): void {
       for (const item of items) {
         // FINALIZE_SOURCE: delete only the exact revision the client verified.
         const page = await loadPage(tx, access.id, item.page_id, { forUpdate: true });
-        if (page && !page.deleted_at && page.current_revision_id === item.revision_id) {
+        // A page hidden from the caller since it was staged is left alone, like one changed meanwhile (ADR-0042).
+        if (page && !page.deleted_at && page.current_revision_id === item.revision_id && !(await isHidden(tx, access.id, me.id, item.page_id))) {
           await deletePage(tx, access.id, item.page_id, me.id, now);
           await setItem(item.position, "committed", item.revision_id, null);
         } else {

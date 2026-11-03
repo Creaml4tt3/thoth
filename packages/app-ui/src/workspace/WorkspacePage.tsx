@@ -32,7 +32,7 @@ export interface WorkspacePageProps {
 
 /**
  * A page of a workspace on a server, in the same Blocks/Plain editor as a
- * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, ADR-0043) and resolve against
+ * Private Space page. Links name pages and folders by ID (`[[thoth:page/<id>|Title]]`, ADR-0049) and resolve against
  * the workspace's tree; `[[` and `@` offer its pages and folders, and `@` its members. Path and title links do not
  * resolve here, and there is no backlinks panel.
  */

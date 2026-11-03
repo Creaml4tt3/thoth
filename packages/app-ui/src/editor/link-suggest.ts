@@ -1,5 +1,5 @@
 /**
- * Link suggestions, shared by both editor modes and both triggers (`[[` and `@`, ADR-0043): which pages, folders and
+ * Link suggestions, shared by both editor modes and both triggers (`[[` and `@`, ADR-0049): which pages, folders and
  * (in a workspace, after `@`) people match what was typed, in what order, and what to insert.
  *
  * In the Private Space the inserted target is the shortest one that `LinkResolver` resolves to the chosen page or
@@ -95,7 +95,7 @@ const parentOf = (path: string): string => {
   return slash < 0 ? "" : path.slice(0, slash);
 };
 
-/** The Private Space: vault pages and folders (no people, ADR-0043). */
+/** The Private Space: vault pages and folders (no people, ADR-0049). */
 export function createLinkSuggester(fromPath: string, pages: readonly PageSummary[], folders: readonly string[] = []): LinkSuggester {
   const resolver = new LinkResolver(
     pages.map((p) => p.path),
@@ -124,7 +124,7 @@ export function createLinkSuggester(fromPath: string, pages: readonly PageSummar
 export const EMPTY_SUGGESTER: LinkSuggester = { suggest: () => [] };
 
 /**
- * `@query` directly before the caret (ADR-0043): the `@` starts a word (start of the line, after whitespace or an
+ * `@query` directly before the caret (ADR-0049): the `@` starts a word (start of the line, after whitespace or an
  * opening bracket), so an email address or a word with `@` inside never opens the menu. The query may hold spaces
  * (names have them); the editors close the menu once a query with a space matches nothing. Null otherwise.
  */

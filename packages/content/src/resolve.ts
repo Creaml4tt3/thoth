@@ -21,7 +21,7 @@ export type Resolution =
  * reported as ambiguous and never guessed; matching is case-insensitive only
  * when the case-insensitive match is unique.
  *
- * A wikilink whose target ends in `/` names a folder (ADR-0043): `[[Projects/2026/]]`. It resolves to the folder's
+ * A wikilink whose target ends in `/` names a folder (ADR-0049): `[[Projects/2026/]]`. It resolves to the folder's
  * path with a trailing `/`, by exact path, then relative to the linking file, then a unique path suffix. Folders are
  * the given ones plus every folder that holds a file.
  */

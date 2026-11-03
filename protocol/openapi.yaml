@@ -29,6 +29,8 @@ tags:
   - name: Sharing
   - name: Members
   - name: Workspaces
+  - name: Teams
+  - name: Trash
   - name: Feedback
 paths:
   /api/v1/capabilities:
@@ -407,7 +409,7 @@ paths:
       tags:
         - Pages
       summary: Delete a page
-      description: Requires `If-Match`. The server records the deletion in the change feed. Retention of earlier revisions is unspecified (see open questions).
+      description: Requires `If-Match`. The server records the deletion in the change feed. With capability `trash` the page is in the workspace's Trash for 30 days (listTrash), then removed for good with its revisions (ADR-0043); without it, retention is unspecified (see open questions).
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
         - $ref: "#/components/parameters/PageId"
@@ -1431,7 +1433,7 @@ paths:
         - Members
       summary: Change a member's role
       description: |-
-        Owners only (403 for others; 404 for non-members and for a user who is not a member). Making someone an owner counts against that account's `maxWorkspacesPerAccount` (409 `quota_exceeded`, `quota: workspacesPerAccount`). Demoting the last owner is 409 `last_owner`. Setting the role a member already has succeeds and changes nothing.
+        Owners and managers (403 for others; 404 for non-members and for a user who is not a member). Only owners make someone an owner or change an owner's role (ADR-0043): a manager doing so is 403. Making someone an owner counts against that account's `maxWorkspacesPerAccount` (409 `quota_exceeded`, `quota: workspacesPerAccount`). Demoting the last owner is 409 `last_owner`. Setting the role a member already has succeeds and changes nothing.
 
         Requires capability `members`.
       parameters:
@@ -1509,7 +1511,7 @@ paths:
         - Members
       summary: Remove a member, or leave
       description: |-
-        Owners remove any member; any member removes themself (leaves). Access ends at once: the removed account's requests to the workspace are 404 from then on, and share links it made stop working. Removing the last owner, or the last owner leaving, is 409 `last_owner`.
+        Owners remove any member; managers remove any member who is not an owner (403 for an owner, ADR-0043); any member removes themself (leaves). Access ends at once: the removed account's requests to the workspace are 404 from then on, and share links it made stop working. Removing the last owner, or the last owner leaving, is 409 `last_owner`.
 
         Requires capability `members`.
       parameters:
@@ -1576,7 +1578,7 @@ paths:
         - Members
       summary: Create an invite link
       description: |-
-        ADR-0024. Owners only. Whoever opens the returned `url` (`<origin>/i/<token>`) and signs in joins with `role`. The token is returned this once: the server stores only its hash, so `Idempotency-Key` is not honoured. 409 `quota_exceeded` past the server's number of active links (`quota: inviteLinksPerWorkspace`) or when `maxUses` is more than the member quota leaves room for (`quota: membersPerWorkspace`).
+        ADR-0024, ADR-0043. Owners and managers. A link works while its creator is still an owner or a manager. Whoever opens the returned `url` (`<origin>/i/<token>`) and signs in joins with `role`. The token is returned this once: the server stores only its hash, so `Idempotency-Key` is not honoured. 409 `quota_exceeded` past the server's number of active links (`quota: inviteLinksPerWorkspace`) or when `maxUses` is more than the member quota leaves room for (`quota: membersPerWorkspace`).
 
         Requires capability `invite-links`.
       parameters:
@@ -1639,7 +1641,7 @@ paths:
         - Members
       summary: Active invite links of a workspace
       description: |-
-        Owners only. Links that are neither revoked, expired nor used up, newest first. Tokens are never returned here.
+        Owners and managers. Links that are neither revoked, expired nor used up, newest first. Tokens are never returned here.
 
         Requires capability `invite-links`.
       parameters:
@@ -1695,7 +1697,7 @@ paths:
         - Members
       summary: Revoke an invite link
       description: |-
-        Owners only. The link stops working at once. Revoking a link that is already revoked, expired or used up succeeds and changes nothing.
+        Owners and managers. The link stops working at once. Revoking a link that is already revoked, expired or used up succeeds and changes nothing.
 
         Requires capability `invite-links`.
       parameters:
@@ -2119,6 +2121,765 @@ paths:
         - internal_error
         - capability_not_supported
         - service_unavailable
+  /api/v1/workspaces/{workspaceId}/teams:
+    get:
+      operationId: listTeams
+      tags:
+        - Teams
+      summary: Teams of a workspace
+      description: |-
+        ADR-0042. Every member may read the list: each team's name and its members' user IDs. At most `TEAMS_MAX` (100) teams, all in one response, by name.
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          description: Every team of the workspace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamList"
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    post:
+      operationId: createTeam
+      tags:
+        - Teams
+      summary: Create a team
+      description: |-
+        Owners and managers (403 for others). A name of 1 to 100 characters. 409 `quota_exceeded` (`quota: teamsPerWorkspace`) past 100 teams.
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The name.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamWrite"
+      responses:
+        "201":
+          description: The new team, with no members.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - quota_exceeded
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/teams/{teamId}:
+    put:
+      operationId: renameTeam
+      tags:
+        - Teams
+      summary: Rename a team
+      description: |-
+        Owners and managers (403 for others; 404 for an unknown team).
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/TeamId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The new name.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamWrite"
+      responses:
+        "200":
+          description: The renamed team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    delete:
+      operationId: deleteTeam
+      tags:
+        - Teams
+      summary: Delete a team
+      description: |-
+        Owners and managers. Pages limited to this team stay limited to their other teams; a page left with no team is seen by owners and managers only (deleting a team never shows a page to more people). Older change cursors expire (410 `cursor_expired`).
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/TeamId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/teams/{teamId}/members/{userId}:
+    put:
+      operationId: addTeamMember
+      tags:
+        - Teams
+      summary: Add a member to a team
+      description: |-
+        Owners and managers. The user must be a member of the workspace (404 otherwise). Adding someone already in the team succeeds and changes nothing. Older change cursors expire (410 `cursor_expired`).
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/TeamId"
+        - $ref: "#/components/parameters/UserId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: The team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    delete:
+      operationId: removeTeamMember
+      tags:
+        - Teams
+      summary: Remove a member from a team
+      description: |-
+        Owners and managers. Removing someone who is not in the team succeeds and changes nothing. Older change cursors expire (410 `cursor_expired`).
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/TeamId"
+        - $ref: "#/components/parameters/UserId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: The team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/pages/{pageId}/visibility:
+    get:
+      operationId: getPageVisibility
+      tags:
+        - Teams
+      summary: Who sees a page
+      description: |-
+        Owners and managers (403 for others). 404 for a page the caller cannot see.
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: The page's teams, or null for no limit on the page itself.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageVisibility"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    put:
+      operationId: setPageVisibility
+      tags:
+        - Teams
+      summary: Limit a page, and everything below it, to some teams
+      description: |-
+        Owners and managers (403 for others; 404 for a page the caller cannot see). `teamIds`: one or more teams of this workspace, or `null` for everyone. The limit applies to the page and every page below it, and to pages moved under it later. Members in none of the teams no longer see them (404); owners and managers always do (ADR-0043). Older change cursors expire (410 `cursor_expired`).
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The teams, or null.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageVisibilityWrite"
+      responses:
+        "200":
+          description: Who sees the page now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageVisibility"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/teams/{teamId}/pages:
+    get:
+      operationId: listTeamPages
+      tags:
+        - Teams
+      summary: Pages limited to a team
+      description: |-
+        ADR-0043. Owners and managers (403 for others). Every page (not deleted) whose limit names this team, by title, so a client can say what deleting the team changes: `onlyTeam` pages are seen by owners and managers alone once it is gone.
+
+        Requires capability `teams`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/TeamId"
+      responses:
+        "200":
+          description: The pages limited to this team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPageList"
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: teams
+      x-thoth-error-codes:
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/trash:
+    get:
+      operationId: listTrash
+      tags:
+        - Trash
+      summary: Deleted pages that can still be restored
+      description: |-
+        ADR-0043. Owners and managers see every deleted page; editors only those they deleted; viewers get 403. A folder is one item, with the pages deleted below it counted in `pagesBelow`. Pages the caller cannot see are left out. Newest first. An item stays for 30 days (`restorableUntil`), then the server removes it for good.
+
+        Requires capability `trash`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of deleted pages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashList"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: trash
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/trash/{pageId}/restore:
+    post:
+      operationId: restoreTrashedPage
+      tags:
+        - Trash
+      summary: Restore a deleted page
+      description: |-
+        ADR-0043. Owners and managers restore any item of the Trash; editors only one they deleted (404 otherwise, as in listTrash); viewers get 403. The page comes back where it was, or at the top level when that folder is gone for good, with every page deleted below it that the caller may restore; the others stay in the Trash. Each one is `page.created` in the change feed. Restored pages count toward `maxPagesPerWorkspace` (409 `quota_exceeded`).
+
+        Requires capability `trash`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: The pages that came back, the restored page first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashRestored"
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: trash
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - quota_exceeded
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/trash/{pageId}:
+    delete:
+      operationId: purgeTrashedPage
+      tags:
+        - Trash
+      summary: Delete a page for good
+      description: |-
+        ADR-0043. Owners and managers (403 for others). Removes the page and every page deleted below it, with their revisions, their change-feed entries and their share links; this cannot be undone. A page someone added below it after it was deleted is moved to where the deleted page was, and stays limited to whoever could see it.
+
+        Requires capability `trash`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "204":
+          description: Deleted for good.
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: trash
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
   /api/v1/feedback:
     post:
       operationId: sendFeedback
@@ -2242,6 +3003,8 @@ components:
                   - invite-links
                   - workspace-management
                   - feedback
+                  - teams
+                  - trash
                   - databases
                   - realtime-collab
               - type: string
@@ -2538,6 +3301,7 @@ components:
           type: string
           enum:
             - owner
+            - manager
             - editor
             - viewer
         joined:
@@ -2572,6 +3336,7 @@ components:
         role:
           type: string
           enum:
+            - manager
             - editor
             - viewer
         maxUses:
@@ -2625,6 +3390,7 @@ components:
         role:
           type: string
           enum:
+            - manager
             - editor
             - viewer
         maxUses:
@@ -2676,6 +3442,7 @@ components:
         role:
           type: string
           enum:
+            - manager
             - editor
             - viewer
         expiresInDays:
@@ -2782,6 +3549,7 @@ components:
           type: string
           enum:
             - owner
+            - manager
             - editor
             - viewer
       required:
@@ -2813,6 +3581,7 @@ components:
           type: string
           enum:
             - owner
+            - manager
             - editor
             - viewer
       required:
@@ -2908,6 +3677,43 @@ components:
         - markdown
         - revision
         - metadata
+    PageVisibility:
+      type: object
+      properties:
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        teamIds:
+          anyOf:
+            - type: array
+              items:
+                type: string
+                minLength: 1
+                maxLength: 128
+                pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        limitedAbove:
+          type: boolean
+      required:
+        - pageId
+        - teamIds
+        - limitedAbove
+    PageVisibilityWrite:
+      type: object
+      properties:
+        teamIds:
+          anyOf:
+            - minItems: 1
+              maxItems: 100
+              type: array
+              items:
+                type: string
+                minLength: 1
+                maxLength: 128
+                pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+      required:
+        - teamIds
     PageWrite:
       type: object
       properties:
@@ -3307,6 +4113,77 @@ components:
       required:
         - items
         - nextCursor
+    Team:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.~-]+$
+        name:
+          type: string
+        memberIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: ^[A-Za-z0-9_.~-]+$
+      required:
+        - id
+        - name
+        - memberIds
+    TeamList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+      required:
+        - items
+    TeamPage:
+      type: object
+      properties:
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        title:
+          type: string
+        kind:
+          anyOf:
+            - type: string
+              enum:
+                - page
+                - folder
+              description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
+            - type: "null"
+        onlyTeam:
+          type: boolean
+      required:
+        - pageId
+        - title
+        - kind
+        - onlyTeam
+    TeamPageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamPage"
+      required:
+        - items
+    TeamWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - name
     TransferCommitRequest:
       type: object
       properties:
@@ -3559,6 +4436,89 @@ components:
         - createdAt
         - updatedAt
         - error
+    TrashItem:
+      type: object
+      properties:
+        pageId:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        title:
+          type: string
+        kind:
+          anyOf:
+            - type: string
+              enum:
+                - page
+                - folder
+              description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
+            - type: "null"
+        parentId:
+          anyOf:
+            - type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            - type: "null"
+        pagesBelow:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        deletedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+        deletedBy:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_.~-]+$
+            - type: "null"
+        deletedByName:
+          type:
+            - string
+            - "null"
+        restorableUntil:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+      required:
+        - pageId
+        - title
+        - kind
+        - parentId
+        - pagesBelow
+        - deletedAt
+        - deletedBy
+        - deletedByName
+        - restorableUntil
+    TrashList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItem"
+        nextCursor:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9_.~-]+$
+              description: Opaque cursor. Clients must not parse or construct it.
+            - type: "null"
+      required:
+        - items
+        - nextCursor
+    TrashRestored:
+      type: object
+      properties:
+        pageIds:
+          minItems: 1
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+      required:
+        - pageIds
     TreeNode:
       type: object
       properties:
@@ -3649,6 +4609,7 @@ components:
           type: string
           enum:
             - owner
+            - manager
             - editor
             - viewer
         exportRestricted:
@@ -3781,6 +4742,15 @@ components:
         pattern: ^[A-Za-z0-9_.~-]+$
     InviteId:
       name: inviteId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9_.~-]+$
+    TeamId:
+      name: teamId
       in: path
       required: true
       schema:
@@ -3928,5 +4898,7 @@ x-thoth-capabilities:
   - invite-links
   - workspace-management
   - feedback
+  - teams
+  - trash
   - databases
   - realtime-collab

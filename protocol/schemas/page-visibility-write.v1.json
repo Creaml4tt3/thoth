@@ -1,0 +1,29 @@
+{
+  "$id": "https://thoth.invalid/schemas/page-visibility-write.v1.json",
+  "title": "page-visibility-write.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "teamIds": {
+      "anyOf": [
+        {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.~-]+$"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "teamIds"
+  ]
+}

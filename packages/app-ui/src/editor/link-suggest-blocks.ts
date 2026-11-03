@@ -1,6 +1,6 @@
 /**
  * `[[` and `@` autocomplete for Blocks mode. Typing `[[`, or `@` at the start of
- * a word (ADR-0043), opens the menu; the text typed after it is the query. Enter
+ * a word (ADR-0049), opens the menu; the text typed after it is the query. Enter
  * or Tab (or a click) replaces `[[query` or `@query` with a wikilink node (a page
  * or a folder) or a mention node (a person). Typing `]]` instead turns `[[query]]` into a wikilink
  * node too, so a link typed by hand is a real link and not escaped text.

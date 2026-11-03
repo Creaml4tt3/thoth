@@ -225,7 +225,7 @@ test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => 
   await expect.poll(() => readFile(join(vault, "Linking.md"), "utf8")).toBe("# Linking\n\nBlocks: [[Roadmap]]\n\nPlain: [[Roadmap]]\n");
 });
 
-test("@ links a folder (ADR-0043): the chip shows the folder in the sidebar; no menu inside an email address", async ({ page }) => {
+test("@ links a folder (ADR-0049): the chip shows the folder in the sidebar; no menu inside an email address", async ({ page }) => {
   await page.getByRole("button", { name: /start writing/i }).click();
   await mkdir(join(vault, "Projects"));
   await writeFile(join(vault, "Projects/Roadmap.md"), "# Roadmap\n");

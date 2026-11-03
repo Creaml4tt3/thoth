@@ -14,6 +14,7 @@ import { contentDisposition, fileHeaders, inlineImageType } from "../share/files
 import { NOT_FOUND_HTML, SHARE_HEADERS, TOO_MANY_HTML, sharedPageHtml } from "../share/html.ts";
 import { renderShareMarkdown, type RenderContext } from "../share/render.ts";
 import { pagesMentioning, resolveShareLink, sharedAttachments, sharedMarkdown, sharedSubtree, type ActiveShareLink, type SharedNode } from "../share/resolve.ts";
+import { assertVisible, isHidden } from "../visibility.ts";
 import { SHARE_TOKEN_PATTERN, generateShareToken, hashShareToken, shareTokenMatches } from "../share/tokens.ts";
 
 interface LinkRow {
@@ -66,6 +67,9 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
       if (locked.exportRestricted) throw new ApiError("export_restricted", "this workspace forbids exporting content, so its pages cannot be shared publicly");
       const page = await loadPage(tx, locked.id, pageId);
       if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+      await assertVisible(tx, locked.id, me.id, pageId);
+      // ADR-0042: a page limited to some teams is not served publicly, so a link to it would never work.
+      if (await isHidden(tx, locked.id, "", pageId)) throw new ApiError("forbidden", "this page is visible to some teams only, so it cannot be shared publicly");
       const limit = config.share.maxLinksPerWorkspace;
       if (limit !== undefined) {
         const current = Number((await tx.query<{ n: string }>(`SELECT count(*) AS n FROM share_links WHERE workspace_id = $1 AND ${ACTIVE}`, [locked.id])).rows[0]!.n);
@@ -91,6 +95,7 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
     const pageId = parsePageId(request.params.pageId);
     const page = await loadPage(db, ws.id, pageId);
     if (!page || page.deleted_at) throw new ApiError("not_found", "page not found");
+    await assertVisible(db, ws.id, me.id, pageId);
     const limit = limitFrom(request.query.limit);
     const scope = `${ws.id}/${pageId}`;
     let after: { at: Date; id: string } | null = null;
@@ -119,6 +124,9 @@ export function registerShareRoutes(app: FastifyInstance, deps: Deps): void {
       const { rows } = await tx.query<{ revoked_at: Date | null; page_id: string }>("SELECT revoked_at, page_id FROM share_links WHERE workspace_id = $1 AND id = $2 FOR UPDATE", [ws.id, request.params.linkId]);
       const link = rows[0];
       if (!link) throw new ApiError("not_found", "share link not found");
+      await assertVisible(tx, ws.id, me.id, link.page_id).catch(() => {
+        throw new ApiError("not_found", "share link not found");
+      });
       if (link.revoked_at === null) {
         await tx.query("UPDATE share_links SET revoked_at = now() WHERE workspace_id = $1 AND id = $2", [ws.id, request.params.linkId]);
         await audit(tx, { actorId: me.id, workspaceId: ws.id, action: "share_link.revoked", detail: { linkId: request.params.linkId, pageId: link.page_id } });

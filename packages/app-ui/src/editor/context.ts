@@ -16,7 +16,7 @@ export interface EditorContext {
   /** Pages to offer after `[[`, ranked for the open page. */
   suggester(): LinkSuggester;
   openPage(path: string, options?: OpenOptions): void;
-  /** Shows a folder in the sidebar (a `[[Folder/]]` link, ADR-0043). Absent: a folder chip does nothing on a click. */
+  /** Shows a folder in the sidebar (a `[[Folder/]]` link, ADR-0049). Absent: a folder chip does nothing on a click. */
   openFolder?(path: string): void;
   views: Set<Refreshable>;
   /** Text for the editors' menus and node views (fixed for the editor's lifetime). */

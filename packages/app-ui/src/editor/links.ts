@@ -1,5 +1,5 @@
 /**
- * Resolves a wikilink chip to a page or, for `[[Folder/]]` (ADR-0043), a folder: its path ends in `/`. The index's own resolution
+ * Resolves a wikilink chip to a page or, for `[[Folder/]]` (ADR-0049), a folder: its path ends in `/`. The index's own resolution
  * (`vault.outgoingLinks`) wins; otherwise the same `LinkResolver` the index
  * uses, then a unique title match, so freshly created pages still open.
  */
@@ -8,7 +8,7 @@ import type { PageSummary } from "@thoth/domain";
 
 /**
  * `folder`: the target is a folder (its sidebar row is shown on a click). `title`: the page's current title, shown on
- * a `thoth:page/<id>` chip instead of the label it was written with (a workspace, ADR-0043).
+ * a `thoth:page/<id>` chip instead of the label it was written with (a workspace, ADR-0049).
  */
 export type LinkTarget = { state: "resolved"; path: string; folder?: boolean; title?: string } | { state: "unresolved" } | { state: "ambiguous"; candidates: string[] };
 

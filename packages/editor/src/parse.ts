@@ -118,7 +118,7 @@ function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out:
   }
 }
 
-/** `[@Name](thoth:user/<id>)` with nothing else in the text and no title: a person mention (ADR-0043). */
+/** `[@Name](thoth:user/<id>)` with nothing else in the text and no title: a person mention (ADR-0049). */
 const isMention = (node: Link): boolean =>
   node.url.startsWith(USER_LINK_PREFIX) && USER_ID.test(node.url.slice(USER_LINK_PREFIX.length)) && !node.title && node.children.length === 1 && node.children[0]!.type === "text" && /^@\S/.test(node.children[0]!.value);
 

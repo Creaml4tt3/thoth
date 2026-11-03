@@ -28,7 +28,7 @@ export function PageView({ path }: { path: string }) {
   const store = useMemo(() => vaultPageStore(vault, path), [vault, path]);
   const media = useMemo(() => vaultPageMedia(vault, path), [vault, path]);
   const loadLinks = useCallback(() => loadLinkLookup(vault, path), [vault, path]);
-  // A folder crumb and a `[[Folder/]]` link (ADR-0043) both open that folder in the sidebar and move focus to its row.
+  // A folder crumb and a `[[Folder/]]` link (ADR-0049) both open that folder in the sidebar and move focus to its row.
   const showFolder = useCallback(
     (folder: string) => {
       openFolder(folder, { openFirstPage: false });

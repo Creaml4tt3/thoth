@@ -15,7 +15,7 @@ let root: string;
 
 const CAPS = ["search", "transfers", "attachments", "page-order", "page-kind", "public-share", "members", "invite-links"];
 const LOCAL: FakeServerConfig = { url: "http://127.0.0.1:8080", name: "Team server", tokens: ["thoth_pat_good"], account: { id: "usr_me", displayName: "Ada" }, capabilities: CAPS };
-const TEAM = (role: "owner" | "editor" | "viewer") => [
+const TEAM = (role: "owner" | "manager" | "editor" | "viewer") => [
   { userId: "usr_me", displayName: "Ada", role },
   { userId: "usr_bo", displayName: "Bo", role: "editor" as const },
   { userId: "usr_cy", displayName: "Cy", role: "viewer" as const },
@@ -30,7 +30,7 @@ afterEach(async () => {
   await dirs.cleanup();
 });
 
-async function workspace(options: { role?: "owner" | "editor" | "viewer"; capabilities?: string[]; members?: FakeWorkspace["members"]; config?: Partial<FakeServerConfig> } = {}) {
+async function workspace(options: { role?: "owner" | "manager" | "editor" | "viewer"; capabilities?: string[]; members?: FakeWorkspace["members"]; config?: Partial<FakeServerConfig> } = {}) {
   const servers = new FakeServers();
   const role = options.role ?? "owner";
   servers.connect({ ...LOCAL, capabilities: options.capabilities ?? CAPS, ...options.config });
@@ -155,7 +155,7 @@ describe("Members… for editors and viewers", () => {
     expect(within(dialog).queryByRole("combobox")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /^Remove / })).toBeNull();
     expect(within(dialog).queryByRole("region", { name: "Invite people" })).toBeNull();
-    expect(within(dialog).getByText("Only owners change roles and invite people.")).toBeTruthy();
+    expect(within(dialog).getByText("Only owners and managers change roles and invite people.")).toBeTruthy();
     expect(rowOf(dialog, /^Bo/).textContent).toContain("Editor");
     expect(servers.calls.some((c) => c.path.includes("invite-links"))).toBe(false);
     expect(await axeViolations(dialog)).toEqual([]);
@@ -226,5 +226,159 @@ describe("Settings → Servers → Join with an invite link", () => {
     await app.user.click(within(region).getByRole("button", { name: "Sign in with Google" }));
     expect((await within(region).findByRole("status")).textContent).toBe("You joined Garden as Viewer. It is in the sidebar now.");
     expect(garden.joined).toBe(true);
+  });
+});
+
+// ADR-0042: teams in the members dialog, the Manager role, and "Visible to…" on a folder.
+describe("Teams and Visible to…", () => {
+  const TEAMS = [...CAPS, "teams"];
+
+  it("lets a manager create a team, add a member, rename it and delete it", async () => {
+    const { app, ws } = await workspace({ role: "manager", capabilities: TEAMS });
+    const dialog = await openMembers(app);
+    const teams = await within(dialog).findByRole("region", { name: "Teams" });
+    expect(await within(teams).findByText("No teams yet.")).toBeTruthy();
+    await app.user.type(within(teams).getByRole("textbox", { name: "New team name" }), "Finance");
+    await app.user.click(within(teams).getByRole("button", { name: "Create team" }));
+    await waitFor(() => expect(ws.teams.map((t) => t.name)).toEqual(["Finance"]));
+    await app.user.click(await within(teams).findByRole("checkbox", { name: "Bo in Finance" }));
+    await waitFor(() => expect(ws.teams[0]!.memberIds).toEqual(["usr_bo"]));
+    expect(within(teams).getByRole("status").textContent).toBe("Changed the members of Finance.");
+    const name = within(teams).getByRole("textbox", { name: "Name of Finance" });
+    await app.user.clear(name);
+    await app.user.type(name, "Money{Enter}");
+    await waitFor(() => expect(ws.teams[0]!.name).toBe("Money"));
+    expect(await axeViolations(dialog)).toEqual([]);
+    // Deleting asks first and says which folders only this team saw (ADR-0043).
+    const folder = [...ws.pages.values()][0]!;
+    ws.visibility.set(folder.id, [ws.teams[0]!.id]);
+    await app.user.click(within(teams).getByRole("button", { name: "Delete team Money" }));
+    const confirm = await within(teams).findByRole("group", { name: "Delete team Money?" });
+    expect(await within(confirm).findByText("Only owners and managers will see these, because no other team does:")).toBeTruthy();
+    expect(within(confirm).getByText(folder.title)).toBeTruthy();
+    expect(ws.teams).toHaveLength(1);
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(confirm).getByRole("button", { name: "Delete team" }));
+    await waitFor(() => expect(ws.teams).toEqual([]));
+  });
+
+  it("lets a manager change roles up to Manager, remove members and invite people, but not touch owners (ADR-0043)", async () => {
+    const members = [...TEAM("manager"), { userId: "usr_oz", displayName: "Oz", role: "owner" as const }];
+    const { app, ws } = await workspace({ role: "manager", capabilities: TEAMS, members });
+    const dialog = await openMembers(app);
+    const bo = (await within(dialog).findByRole("combobox", { name: "Role of Bo" })) as HTMLSelectElement;
+    expect([...bo.options].map((o) => o.value)).toEqual(["manager", "editor", "viewer"]);
+    await app.user.selectOptions(bo, "manager");
+    await waitFor(() => expect(ws.members.find((m) => m.userId === "usr_bo")!.role).toBe("manager"));
+    expect(within(dialog).queryByRole("combobox", { name: "Role of Oz" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Remove Oz from the workspace" })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Remove Cy from the workspace" })).toBeTruthy();
+    expect(within(dialog).getByText("Only an owner can make someone an owner, or change or remove an owner.")).toBeTruthy();
+    const invite = within(dialog).getByRole("region", { name: "Invite people" });
+    await app.user.click(within(invite).getByRole("button", { name: "Create invite link" }));
+    await waitFor(() => expect(ws.invites).toHaveLength(1));
+  });
+
+  it("shows teams read-only to an editor, and offers Manager in an owner's invite and role pickers", async () => {
+    const { app: editorApp, ws } = await workspace({ role: "editor", capabilities: TEAMS });
+    ws.teams.push({ id: "team_1", name: "Finance", memberIds: ["usr_bo"] });
+    const dialog = await openMembers(editorApp);
+    const teams = await within(dialog).findByRole("region", { name: "Teams" });
+    expect(await within(teams).findByText("Bo")).toBeTruthy();
+    expect(within(teams).queryByRole("button", { name: "Create team" })).toBeNull();
+    expect(within(teams).queryByRole("checkbox")).toBeNull();
+    cleanup();
+
+    const { app } = await workspace({ capabilities: TEAMS });
+    const owner = await openMembers(app);
+    const invite = within(owner).getByRole("region", { name: "Invite people" });
+    expect(within(invite).getByRole("radio", { name: "Manager" })).toBeTruthy();
+    const cy = (await within(owner).findByRole("combobox", { name: "Role of Cy" })) as HTMLSelectElement;
+    expect([...cy.options].map((o) => o.value)).toEqual(["owner", "manager", "editor", "viewer"]);
+  });
+
+  it("offers Visible to… on a folder to owners and managers only, and limits it to a team", async () => {
+    const { app, ws, list } = await workspace({ role: "manager", capabilities: TEAMS });
+    ws.teams.push({ id: "team_1", name: "Finance", memberIds: [] });
+    await app.user.click(within(list).getByRole("treeitem", { name: /^Design/ }));
+    const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+    fireEvent.contextMenu(within(pages).getByRole("treeitem", { name: "Roadmap" }));
+    await app.user.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Visible to…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Who sees “Roadmap”" });
+    await app.user.click(await within(dialog).findByRole("radio", { name: "Only these teams" }));
+    await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toBe("Choose at least one team.");
+    await app.user.click(within(dialog).getByRole("checkbox", { name: "Finance" }));
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect([...ws.visibility.values()]).toEqual([["team_1"]]);
+  });
+
+  it("does not offer Visible to… to editors, nor on a server without teams", async () => {
+    for (const options of [{ role: "editor" as const, capabilities: TEAMS }, { role: "owner" as const, capabilities: CAPS }]) {
+      const { app, list } = await workspace(options);
+      await app.user.click(within(list).getByRole("treeitem", { name: /^Design/ }));
+      const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+      fireEvent.contextMenu(within(pages).getByRole("treeitem", { name: "Roadmap" }));
+      const menu = await screen.findByRole("menu");
+      expect(within(menu).queryByRole("menuitem", { name: "Visible to…" }), JSON.stringify(options)).toBeNull();
+      await app.user.keyboard("{Escape}");
+      // An older server: no Teams section either.
+      if (options.capabilities === CAPS) expect(within(await openMembers(app)).queryByRole("region", { name: "Teams" })).toBeNull();
+      cleanup();
+    }
+  });
+});
+
+describe("Trash… (ADR-0043)", () => {
+  const TRASH = [...CAPS, "trash"];
+  const openTrash = async (app: Harness, list: HTMLElement) => {
+    fireEvent.contextMenu(within(list).getByRole("treeitem", { name: /^Design/ }));
+    const menu = await screen.findByRole("menu", { name: "Actions for Design" });
+    await app.user.click(within(menu).getByRole("menuitem", { name: "Trash…" }));
+    return screen.findByRole("dialog", { name: "Trash of “Design”" });
+  };
+  const trashed = (ws: FakeWorkspace) => {
+    const page = [...ws.pages.values()].find((p) => p.title === "Roadmap")!;
+    page.deleted = true;
+    page.deletedBy = "usr_me";
+    return page;
+  };
+
+  it("lets an owner restore a deleted page, or delete one for good after asking", async () => {
+    const { app, ws, list } = await workspace({ capabilities: TRASH });
+    const page = trashed(ws);
+    const dialog = await openTrash(app, list);
+    const items = await within(dialog).findByRole("list", { name: "Deleted pages" });
+    expect(within(items).getByRole("listitem").textContent).toMatch(/^Roadmap.*deleted .* by Ada · can be restored until/);
+    expect(await axeViolations(dialog)).toEqual([]);
+    await app.user.click(within(dialog).getByRole("button", { name: "Restore Roadmap" }));
+    await waitFor(() => expect(page.deleted).toBe(false));
+    expect(await within(dialog).findByText("The Trash is empty.")).toBeTruthy();
+    expect(within(dialog).getByRole("status").textContent).toBe("Restored Roadmap.");
+
+    trashed(ws);
+    await app.user.click(within(dialog).getByRole("button", { name: "Done" }));
+    const again = await openTrash(app, list);
+    await app.user.click(await within(again).findByRole("button", { name: "Delete Roadmap for good" }));
+    const confirm = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
+    expect(within(confirm).getByText(/cannot be undone/)).toBeTruthy();
+    await app.user.click(within(confirm).getByRole("button", { name: "Delete for good" }));
+    await waitFor(() => expect(ws.pages.has(page.id)).toBe(false));
+  });
+
+  it("lets an editor restore but not delete for good, and gives viewers no Trash", async () => {
+    const { app, ws, list } = await workspace({ role: "editor", capabilities: TRASH });
+    trashed(ws);
+    const dialog = await openTrash(app, list);
+    expect(await within(dialog).findByRole("button", { name: "Restore Roadmap" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Delete Roadmap for good" })).toBeNull();
+    cleanup();
+
+    const viewer = await workspace({ role: "viewer", capabilities: TRASH });
+    fireEvent.contextMenu(within(viewer.list).getByRole("treeitem", { name: /^Design/ }));
+    const menu = await screen.findByRole("menu", { name: "Actions for Design" });
+    expect(within(menu).queryByRole("menuitem", { name: "Trash…" })).toBeNull();
   });
 });

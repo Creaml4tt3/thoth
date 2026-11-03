@@ -111,7 +111,7 @@ function wikiText(attrs: ReturnType<typeof readWiki>, embed: boolean, cell: bool
 const readWiki = (n: JSONContent) => readAttrs(WikiAttrsSchema, n);
 export const wikilinkText = (n: JSONContent, embed: boolean, cell: boolean) => wikiText(readWiki(n), embed, cell);
 
-/** A person mention's link prefix (ADR-0043): `[@Name](thoth:user/<id>)`. */
+/** A person mention's link prefix (ADR-0049): `[@Name](thoth:user/<id>)`. */
 export const USER_LINK_PREFIX = "thoth:user/";
 /** IDs are opaque and URL-unreserved (the protocol's `OpaqueId`), so they need no escaping in a link destination. */
 export const USER_ID = /^[A-Za-z0-9_.~-]{1,128}$/;

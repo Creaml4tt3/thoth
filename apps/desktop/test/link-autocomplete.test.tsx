@@ -148,7 +148,7 @@ describe("[[ autocomplete in Plain mode", () => {
   });
 });
 
-describe("@ in both modes (ADR-0043)", () => {
+describe("@ in both modes (ADR-0049)", () => {
   const atMenu = () => screen.queryByRole("listbox", { name: "Link to a page or folder" });
   const atOptions = () => within(atMenu()!).getAllByRole("option").map((o) => o.querySelector(".link-option-title")!.textContent);
 

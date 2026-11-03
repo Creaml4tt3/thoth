@@ -1,6 +1,6 @@
 /**
  * `[[` and `@` autocomplete for Plain mode. Typing `[[`, or `@` at the start of a
- * word (ADR-0043), opens the menu; the text after it is the query. Picking a page
+ * word (ADR-0049), opens the menu; the text after it is the query. Picking a page
  * or folder replaces `[[query` with `[[Target]]` (keeping a typed `#heading` or
  * `|label`), or `@query` with `[[Target]]`; a person becomes
  * `[@Name](thoth:user/<id>)`. Each is one ordinary, undoable text edit. Code,
@@ -51,7 +51,7 @@ export function completion(state: EditorState, trigger: Trigger, item: LinkSugge
   const cut = trigger.query.search(/[#|]/);
   const suffix = cut < 0 ? "" : trigger.query.slice(cut);
   const closed = state.sliceDoc(trigger.to, trigger.to + 2) === "]]";
-  // A workspace link carries the title as its label (ADR-0043), unless one was typed.
+  // A workspace link carries the title as its label (ADR-0049), unless one was typed.
   const label = item.label !== undefined && !suffix.includes("|") ? `|${item.label.replace(/[[\]|\n\r]/g, "")}` : "";
   const insert = `[[${item.target}${suffix}${label}${closed ? "" : "]]"}`;
   return { from: trigger.from, to: trigger.to, insert, cursor: trigger.from + insert.length + (closed ? 2 : 0) };

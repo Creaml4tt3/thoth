@@ -62,7 +62,7 @@ class WikilinkChip extends WidgetType {
   }
 }
 
-/** `[@Name](thoth:user/<id>)` off the cursor's line (ADR-0043): the name as a chip. */
+/** `[@Name](thoth:user/<id>)` off the cursor's line (ADR-0049): the name as a chip. */
 class MentionChip extends WidgetType {
   readonly name: string;
   readonly label: string;
