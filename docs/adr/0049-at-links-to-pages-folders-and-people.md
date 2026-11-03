@@ -5,6 +5,7 @@
 - **Deciders:** owner (rules 1, 2, 3 and 6 and the aims of 4 and 5); implementation agent (the rest, marked "(this ADR)")
 - **Refines:** ADR-0002 (the editor's content model: one new inline node), ADR-0010 (link resolution: folder targets),
   ADR-0012 (Plain mode), ADR-0016 (folders), ADR-0038 rule 4 (opening page links).
+- **Respects:** ADR-0042 and ADR-0043 (team limits: a page hidden from the reader is absent; managers; the Trash).
 
 ## Context
 
@@ -71,6 +72,10 @@ The owner asked for:
      client already holds (`ServerDirectory`). No new server route; they update when the change feed changes the
      tree.
    - Path and title links (`[[Roadmap]]`) do not resolve in a workspace. A workspace has no paths.
+   - **Team limits** (ADR-0042, ADR-0043). The server leaves pages the reader may not see, and pages in the Trash, out
+     of the tree it sends, so the menu never offers them and a link to one never resolves. Its chip reads "Page not
+     available", with the same tooltip, whether the page is hidden, in the Trash or gone, so a chip tells nothing
+     about a hidden page. The label written in the link stays what its writer wrote (this ADR).
 7. **The Markdown of a person mention** (owner's aim; this ADR's form): `[@Display Name](thoth:user/<id>)`.
    - It is a standard Markdown link, so every other editor shows it as "@Display Name" (a link that does nothing).
    - The ID is the opaque user ID of the protocol's `Member.userId` (URL-unreserved, at most 128 characters), so it
@@ -83,7 +88,8 @@ The owner asked for:
      shared page shows "@Name" and no address.
 8. **People only in workspaces** (owner). People are offered only after `@` in a workspace page, from the members
    list the workspace list carries (`Workspace.members`; the server sends up to 50). Nothing is offered in the
-   Private Space. When the server does not send members, nobody is offered.
+   Private Space. When the server does not send members, nobody is offered. Every role (owner, manager, editor,
+   viewer) is offered alike, by display name; the menu shows no role, ID or email.
 9. **Privacy** (owner). A mention stores the display name and the opaque user ID, nothing else: no email, no role.
    The chip opens nothing and looks nothing up.
 

@@ -43,7 +43,12 @@ export function findTrigger(state: EditorState): Trigger | null {
     return { from: $pos.pos - query.length - 2, to: $pos.pos, query, kind: "wiki" };
   }
   const at = atQuery(before);
-  return at ? { from: $pos.pos - at.query.length - 1, to: $pos.pos, query: at.query, kind: "at" } : null;
+  if (!at) return null;
+  const from = $pos.pos - at.query.length - 1;
+  // An `@` in the text of a link already written is not a new link (ADR-0049 rule 2).
+  const link = state.schema.marks["link"];
+  if (link && state.doc.rangeHasMark(from, from + 1, link)) return null;
+  return { from, to: $pos.pos, query: at.query, kind: "at" };
 }
 
 /** The node that replaces the trigger: a mention for a person, else a wikilink keeping a `#heading` or `|label` typed after `[[`. */

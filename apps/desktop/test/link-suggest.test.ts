@@ -13,6 +13,9 @@ import { workspaceLinkLookup, workspaceLinkSuggester } from "@thoth/app-ui/works
 import { buildLinkLookup } from "@thoth/app-ui/editor/links.ts";
 import { completion, findTrigger } from "@thoth/app-ui/editor/plain/link-suggest-plain.ts";
 import { markdownSupport } from "@thoth/app-ui/editor/plain/syntax.ts";
+import { findTrigger as findBlocksTrigger } from "@thoth/app-ui/editor/link-suggest-blocks.ts";
+import { thothSchema } from "@thoth/editor";
+import { EditorState as PmState, Selection as PmSelection } from "@tiptap/pm/state";
 
 let mtime = 0;
 const page = (path: string, title: string, aliases: string[] = []): PageSummary => ({
@@ -148,6 +151,17 @@ describe("@ trigger rules (ADR-0049)", () => {
     expect(findTrigger(at("[@Ada|](thoth:user/a)"))).toBeNull();
   });
 
+  it("Blocks mode: finds @query, but not in a link's text or inline code", () => {
+    const schema = thothSchema();
+    const at = (parts: { text: string; mark?: string }[]) => {
+      const doc = schema.node("doc", null, [schema.node("paragraph", null, parts.map((p) => schema.text(p.text, p.mark ? [schema.marks[p.mark]!.create(p.mark === "link" ? { href: "https://x.test" } : {})] : [])))]);
+      return PmState.create({ doc, selection: PmSelection.atEnd(doc) });
+    };
+    expect(findBlocksTrigger(at([{ text: "Hi @ro" }]))).toMatchObject({ query: "ro", kind: "at" });
+    expect(findBlocksTrigger(at([{ text: "Hi " }, { text: "@ro", mark: "link" }]))).toBeNull();
+    expect(findBlocksTrigger(at([{ text: "Hi " }, { text: "@ro", mark: "inlineCode" }]))).toBeNull();
+  });
+
   it("Plain mode: @ inserts a wikilink for a page or folder and a mention for a person", () => {
     const state = EditorState.create({ doc: "Hi @ro", selection: EditorSelection.cursor(6), extensions: [markdownSupport()] });
     ensureSyntaxTree(state, state.doc.length, 5000);
@@ -200,6 +214,18 @@ describe("workspace links (ADR-0049)", () => {
     expect(lookup.resolve(`thoth:page/${id(1)}`)).toEqual({ state: "resolved", path: id(1), title: "Projects", folder: true });
     expect(lookup.resolve(`thoth:page/${id(9)}`)).toEqual({ state: "unresolved" });
     expect(lookup.resolve("Roadmap")).toEqual({ state: "unresolved" });
+  });
+
+  it("never offers or resolves a page the reader cannot see (ADR-0042: hidden pages are absent from the tree)", () => {
+    // The server leaves hidden and trashed pages out of the tree, so the reader's tree is all there is.
+    const seen = { ...source, nodes: nodes.filter((n) => n.id !== id(2)) };
+    expect(workspaceLinkSuggester(seen).suggest("road", { people: true }).map((h) => h.title)).toEqual(["Road notes"]);
+    expect(workspaceLinkLookup(seen).resolve(`thoth:page/${id(2)}`)).toEqual(workspaceLinkLookup(seen).resolve(`thoth:page/${id(9)}`));
+  });
+
+  it("offers people by display name only", () => {
+    const hits = workspaceLinkSuggester(source).suggest("rosa", { people: true });
+    expect(hits).toEqual([{ kind: "person", path: "u_1", title: "Rosa Diaz", folder: "", alias: null, target: "u_1" }]);
   });
 
   it("offers no people when the server does not tell the members", () => {

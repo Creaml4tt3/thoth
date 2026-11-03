@@ -8,6 +8,7 @@ import type { EditorContext } from "./context.ts";
 import type { LinkTarget } from "./links.ts";
 import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
 import { linkHint, pageLinkOpens } from "./link-open.ts";
+import { PAGE_LINK_PREFIX } from "@thoth/transfer";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -131,12 +132,14 @@ export function setLinkTip(dom: HTMLElement, text: string, hint: string | null):
 export function paintLinkChip(chip: HTMLElement, ctx: EditorContext, target: string, shown: string | null, result: LinkTarget): void {
   const t = ctx.strings;
   const folder = result.state === "resolved" ? result.folder === true : target.endsWith("/");
-  chip.textContent = shown ?? (result.state === "resolved" && result.title !== undefined ? result.title : target);
+  // A workspace link to a page the reader cannot see, in the Trash, or gone reads the same (ADR-0042: hidden is absent).
+  const unavailable = result.state === "unresolved" && target.startsWith(PAGE_LINK_PREFIX);
+  chip.textContent = shown ?? (result.state === "resolved" && result.title !== undefined ? result.title : unavailable ? t.linkUnavailable : target);
   chip.dataset["state"] = result.state;
   chip.dataset["target"] = result.state === "resolved" ? result.path : "";
   if (folder) chip.dataset["kind"] = "folder";
   else delete chip.dataset["kind"];
-  const where = result.state === "resolved" ? (result.title ?? result.path) : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : folder ? t.linkUnresolvedFolder(target) : t.linkUnresolved(target);
+  const where = result.state === "resolved" ? (result.title ?? result.path) : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : unavailable ? t.linkUnavailable : folder ? t.linkUnresolvedFolder(target) : t.linkUnresolved(target);
   setLinkTip(chip, where, result.state !== "resolved" ? null : folder ? t.linkOpenFolder : linkHint(t, "page"));
 }
 

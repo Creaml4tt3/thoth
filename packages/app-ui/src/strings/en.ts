@@ -59,6 +59,7 @@ export const en = {
     linkAtNoMatch: (query: string) => (query ? `Nothing matches “${query}”.` : "Nothing to link to yet."),
     linkOpenFolder: "Click to show it in the sidebar",
     linkUnresolvedFolder: (target: string) => `No folder named "${target}"`,
+    linkUnavailable: "Page not available",
     mention: (name: string) => `Mention of ${name}`,
     fold: (collapsed: boolean, toggle: boolean) => `${collapsed ? "Expand" : "Collapse"} ${toggle ? "toggle" : "callout"}`,
     preserved: (kind: "html" | "math" | "raw") => `${kind === "html" ? "HTML" : kind === "math" ? "Math" : "Markdown"} · preserved as written`,

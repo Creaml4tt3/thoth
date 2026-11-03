@@ -17,6 +17,9 @@ import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { guardWrites } from "./support/write-guard.ts";
 import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
+import { axeViolations } from "../../../tests/helpers/axe.ts";
+import { FakeServers } from "../../../tests/helpers/fake-servers.ts";
+import { createNodePlatform } from "./support/node-platform.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -196,5 +199,55 @@ describe("@ in both modes (ADR-0049)", () => {
     await waitFor(() => expect(atOptions()).toEqual(["Roadmap"]));
     await app.user.keyboard("{Tab}");
     expect(view.state.doc.toString()).toContain("First paragraph stays exactly. [[Roadmap]]\n");
+  });
+});
+
+describe("@ in a workspace page (ADR-0049)", () => {
+  const GONE = "01890000-0000-7000-8000-000000000099";
+
+  async function openPlan() {
+    const servers = new FakeServers();
+    const server = servers.connect({ url: "http://127.0.0.1:8080", name: "Team server", tokens: ["thoth_pat_good"], account: { id: "usr_me", displayName: "Ada" }, capabilities: ["page-order", "page-kind", "members"] });
+    const ws = servers.addWorkspace(server, {
+      name: "Design",
+      role: "editor",
+      members: [
+        { userId: "usr_me", displayName: "Ada", role: "editor" },
+        { userId: "usr_rosa", displayName: "Rosa Diaz", role: "manager" },
+      ],
+    });
+    // A page the reader cannot see is absent from the tree the server sends, like one that is gone (ADR-0042).
+    servers.writeAsOther(ws, { title: "Plan", markdown: `# Plan\n\nFirst line here.\n\nSee [[thoth:page/${GONE}]].\n` });
+    servers.writeAsOther(ws, { title: "Roadmap", markdown: "# Roadmap\n" });
+    const app = await openApp(root, { autosaveMs: 0 }, createNodePlatform({ vault: root, servers }));
+    const list = await screen.findByRole("tree", { name: "Workspaces on Team server" });
+    await app.user.click(within(list).getByRole("treeitem", { name: /^Design/ }));
+    const pages = await within(list).findByRole("group", { name: "Pages in Design" });
+    await app.user.click(await within(pages).findByRole("treeitem", { name: "Plan" }));
+    const box = await editorBox();
+    await waitFor(() => expect(box.textContent).toContain("First line here."));
+    return { app, box, plan: () => servers.page(ws, "Plan") };
+  }
+
+  it("offers pages and members by display name, saves a mention, and shows an unseen page as unavailable", async () => {
+    const { app, box, plan } = await openPlan();
+    const chip = box.querySelector<HTMLElement>(".wikilink")!;
+    await waitFor(() => expect(chip.dataset["state"]).toBe("unresolved"));
+    expect(chip.textContent).toBe("Page not available");
+    expect(box.textContent).not.toContain(GONE);
+
+    box.focus();
+    caretAtEnd(paragraph(box, "First line here."));
+    typeBlocks(box, " @ro");
+    const people = () => screen.queryByRole("listbox", { name: "Link to a page, folder or person" });
+    await waitFor(() => expect(within(people()!).getAllByRole("option").map((o) => o.querySelector(".link-option-title")!.textContent)).toEqual(["Roadmap", "Rosa Diaz"]));
+    const rosa = within(people()!).getAllByRole("option")[1]!;
+    expect(rosa.textContent).toContain("Person");
+    expect(rosa.textContent).not.toMatch(/usr_|manager/i); // the name only: no ID and no role
+    await app.user.keyboard("{ArrowDown}{Enter}");
+    await waitFor(() => expect(box.querySelector(".mention")?.textContent).toBe("@Rosa Diaz"));
+    expect(await axeViolations(box)).toEqual([]);
+    await app.user.keyboard("{Meta>}s{/Meta}");
+    await waitFor(() => expect(plan().markdown).toContain("First line here. [@Rosa Diaz](thoth:user/usr_rosa)\n"), { timeout: 3000 });
   });
 });

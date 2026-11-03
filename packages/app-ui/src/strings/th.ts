@@ -44,6 +44,7 @@ export const th: Strings = {
     linkAtNoMatch: (query) => (query ? `ไม่มีอะไรตรงกับ “${query}”` : "ยังไม่มีอะไรให้ลิงก์"), // REVIEW
     linkOpenFolder: "คลิกเพื่อแสดงในแถบด้านข้าง", // REVIEW
     linkUnresolvedFolder: (target) => `ไม่มีโฟลเดอร์ชื่อ "${target}"`, // REVIEW
+    linkUnavailable: "เปิดหน้านี้ไม่ได้", // REVIEW
     mention: (name) => `การกล่าวถึง ${name}`, // REVIEW
     fold: (collapsed, toggle) => `${collapsed ? "กาง" : "พับ"}${toggle ? "บล็อกพับได้" : "กล่องเน้นข้อความ"}`,
     preserved: (kind) => `${kind === "html" ? "HTML" : kind === "math" ? "สูตรคณิตศาสตร์" : "Markdown"} · เก็บไว้ตามต้นฉบับ`,

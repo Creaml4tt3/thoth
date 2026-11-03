@@ -8,6 +8,13 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Type @ to link a page or a folder, in both editor modes. A folder link shows that folder in the sidebar. In a workspace page, @ also names a member by their display name; nobody is notified.
+- Links in workspace pages now work: [[ and @ list that workspace's pages and folders, and a link keeps working after the page is renamed or moved. A link to a page you cannot see reads "Page not available".
+
 ## [0.4.0] - 2026-11-02
 
 ### Added
