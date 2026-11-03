@@ -157,13 +157,17 @@ describe("Proposed changes, under the bell", () => {
 });
 
 describe("Letting an app propose", () => {
-  it("is asked once, when an allowed app first proposes; focus starts on Don’t allow", async () => {
-    await open();
+  it("is asked once, when an allowed app first proposes; focus starts on Don’t allow and Escape does not answer", async () => {
+    const { app } = await open();
     apps.wantsToPropose("Claude");
     const dialog = await screen.findByRole("dialog", { name: "Let “Claude” propose changes?" });
     expect(within(dialog).getByText(/Nothing is written until you apply it/)).toBeTruthy();
     await waitFor(() => expect(document.activeElement?.textContent).toBe("Don’t allow"));
     expect(await axeViolations(dialog)).toEqual([]);
+    // Escape does not answer (ADR-0021, ADR-0048): the question stays until a button is chosen.
+    await app.user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Let “Claude” propose changes?" })).toBeTruthy();
+    expect(apps.calls.some((c) => c[0] === "mayPropose")).toBe(false);
     within(dialog).getByRole("button", { name: "Allow proposals" }).click();
     await waitFor(() => expect(apps.calls).toContainEqual(["mayPropose", "Claude", true]));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

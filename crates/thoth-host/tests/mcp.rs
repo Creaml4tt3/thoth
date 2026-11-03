@@ -356,6 +356,38 @@ fn limits_sizes_and_timeouts() {
 }
 
 #[test]
+fn a_request_line_must_come_whole_in_time_and_within_its_limit() {
+    let f = fixture(McpOptions { read_timeout: Duration::from_millis(300), ..fast() });
+    ready(&f, "Claude");
+    let socket = socket(&f);
+
+    // A byte every 100 ms never waits 300 ms for one, but the whole line must come within 300 ms.
+    let mut slow = UnixStream::connect(&socket).unwrap();
+    let start = std::time::Instant::now();
+    let mut cut = false;
+    for _ in 0..30 {
+        if slow.write_all(b"{").is_err() {
+            cut = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(cut, "the host closes a line that does not come whole in time");
+    assert!(start.elapsed() < Duration::from_secs(2), "{:?}", start.elapsed());
+
+    // Over the limit (2 MiB + 64 KiB): refused without being read to its end.
+    let long = format!("{{\"v\":1,\"app\":\"Claude\",\"tool\":\"search\",\"arguments\":{{\"query\":\"{}\"}}}}", "x".repeat(thoth_host::mcp::MAX_REQUEST));
+    let mut stream = UnixStream::connect(&socket).unwrap();
+    let _ = stream.write_all(long.as_bytes());
+    let mut answer = String::new();
+    BufReader::new(&stream).read_line(&mut answer).unwrap();
+    assert!(answer.contains("too long"), "{answer}");
+
+    // The host still answers.
+    assert_eq!(ask(&socket, "Claude", "list_pages", json!({}))["ok"], true);
+}
+
+#[test]
 fn only_the_window_asked_can_answer() {
     let f = fixture(fast());
     ready(&f, "Claude");
@@ -489,7 +521,7 @@ fn proposals_are_checked_confined_and_kept_to_their_limits() {
     // Exact-text replacements must each match once.
     let replace = |find: &str| propose("propose_edit_page", json!({ "id": "p1", "replacements": [{ "find": find, "replace": "two" }] }));
     assert!(error(&replace("not in the page")).contains("not in the page"));
-    assert!(error(&replace("- one")).contains("2 times"));
+    assert!(error(&replace("- one")).contains("more than once"));
     let ok = replace("- one more");
     let id = ok["result"]["structured"]["id"].as_str().unwrap().to_owned();
     assert!(f.relay.proposal(&id).unwrap()["after"].as_str().unwrap().ends_with("- one\ntwo\n"));

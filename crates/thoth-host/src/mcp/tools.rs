@@ -225,12 +225,12 @@ pub fn proposed_text(call: &Call, current: Option<&str>) -> HostResult<String> {
         Call::ProposeEdit { edit: Edit::Replace(list), .. } => {
             let mut text = current.to_owned();
             for (n, r) in list.iter().enumerate() {
-                match text.matches(r.find.as_str()).count() {
+                match occurrences(&text, &r.find) {
                     1 => text = text.replacen(r.find.as_str(), &r.replace, 1),
                     0 => return Err(HostError::bad_argument(format!("replacements[{n}]: find is not in the page: read it again and copy the text exactly"))),
-                    found => {
+                    _ => {
                         return Err(HostError::bad_argument(format!(
-                            "replacements[{n}]: find is in the page {found} times: give more of the text around it so it matches once"
+                            "replacements[{n}]: find is in the page more than once: give more of the text around it so it matches once"
                         )));
                     }
                 }
@@ -256,6 +256,20 @@ pub fn proposed_text(call: &Call, current: Option<&str>) -> HostResult<String> {
         }
         _ => Err(HostError::internal("Not a proposal")),
     }
+}
+
+/// How often `find` occurs in `text`, overlapping ones too ("aa" is twice in "aaa"), counted up to 2: 0, 1 or "more".
+fn occurrences(text: &str, find: &str) -> usize {
+    let step = find.chars().next().map_or(1, char::len_utf8);
+    let mut found = 0;
+    let mut from = 0;
+    while found < 2
+        && let Some(at) = text[from..].find(find)
+    {
+        found += 1;
+        from += at + step;
+    }
+    found
 }
 
 /// Where the section under the one heading whose text is `heading` ends: at the next heading of the same or a
@@ -617,7 +631,14 @@ mod tests {
             edit(json!([{ "find": "red and", "replace": "pink and" }, { "find": "red", "replace": "rose" }])).unwrap(),
             "# A\n\npink and blue\n\nrose\n"
         );
-        assert!(edit(json!([{ "find": "red", "replace": "x" }])).unwrap_err().message.contains("2 times"));
+        assert!(edit(json!([{ "find": "red", "replace": "x" }])).unwrap_err().message.contains("more than once"));
+        // Overlapping matches count too: "aa" is in "aaa" twice, so it is refused, never replaced at a guess.
+        let overlap =
+            |find: &str| text_of("propose_edit_page", json!({ "path": "A.md", "replacements": [{ "find": find, "replace": "b" }] }), Some("aaa ไทยไทย"));
+        assert!(overlap("aa").unwrap_err().message.contains("more than once"));
+        assert!(overlap("ไทย").unwrap_err().message.contains("more than once"));
+        assert_eq!(overlap("aaa").unwrap(), "b ไทยไทย");
+        assert_eq!(overlap("ยไ").unwrap(), "aaa ไทbทย");
         assert!(edit(json!([{ "find": "purple", "replace": "x" }])).unwrap_err().message.contains("not in the page"));
         assert_eq!(edit(json!([{ "find": "", "replace": "x" }])).unwrap_err().code, "BAD_ARGUMENT");
         assert_eq!(edit(json!([{ "find": "red" }])).unwrap_err().code, "BAD_ARGUMENT");
