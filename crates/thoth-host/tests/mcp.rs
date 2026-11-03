@@ -13,6 +13,8 @@ use thoth_host::mcp::{McpOptions, OpenSpace, Relay};
 
 const NOTES: &str = "/Users/someone/Notes";
 const WORK: &str = "/Users/someone/Work";
+const PLAN: &str = "# Plan\n\nSecret words here.\n\n## Next\n\n- one\n- one more\n";
+const PLAN_HASH: &str = "5f1d0c";
 
 /// What a window answers for each tool, from a two-page Private Space.
 fn window_answer(tool: &str, args: &Value) -> Value {
@@ -22,7 +24,7 @@ fn window_answer(tool: &str, args: &Value) -> Value {
             json!({ "result": { "pages": [{ "id": "p1", "path": "Plan.md", "title": "Plan" }, { "id": "p2", "path": "Log.md", "title": "Log" }], "total": 2 } })
         }
         "read_page" if args["path"] == "Plan.md" || args["id"] == "p1" => {
-            json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": "# Plan\n\nSecret words here.\n", "attachments": ["chart.png"] } } })
+            json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": PLAN, "attachments": ["chart.png"], "hash": PLAN_HASH } } })
         }
         "read_page" | "backlinks" if args["path"] != "Plan.md" => json!({ "error": { "code": "NOT_FOUND", "message": "No page Nope.md" } }),
         "backlinks" => {
@@ -44,6 +46,8 @@ struct Fixture {
     answering: Arc<Mutex<bool>>,
     /// Replaces the windows' answer when set.
     answer_with: Arc<Mutex<Option<Value>>>,
+    /// Every `mcp.proposals` event.
+    proposals: Arc<Mutex<Vec<Value>>>,
 }
 
 fn fixture(options: McpOptions) -> Fixture {
@@ -66,14 +70,17 @@ fn fixture(options: McpOptions) -> Fixture {
     let answering = Arc::new(Mutex::new(true));
     let answer_with = Arc::new(Mutex::new(None));
     let (pending_tx, pending) = channel();
+    let proposals = Arc::new(Mutex::new(Vec::new()));
     {
         let (relay, requests, answering, answer_with) = (Arc::downgrade(&relay), requests.clone(), answering.clone(), answer_with.clone());
+        let proposals_heard = proposals.clone();
         std::thread::spawn(move || {
             for (event, payload) in events_rx {
                 match event.as_str() {
                     "mcp.pending" => {
                         let _ = pending_tx.send(payload);
                     }
+                    "mcp.proposals" => proposals_heard.lock().unwrap().push(payload),
                     "mcp.request" => {
                         requests.lock().unwrap().push(payload.clone());
                         let Some(relay) = relay.upgrade() else { return };
@@ -88,7 +95,7 @@ fn fixture(options: McpOptions) -> Fixture {
             }
         });
     }
-    Fixture { relay, dir, _data: data, open, requests, pending, answering, answer_with }
+    Fixture { relay, dir, _data: data, open, requests, pending, answering, answer_with, proposals }
 }
 
 fn fast() -> McpOptions {
@@ -108,11 +115,12 @@ fn ready(f: &Fixture, app: &str) {
     assert_eq!(asking.join().unwrap()["ok"], true);
 }
 
-/// Waits for the windows to hear that the apps waiting for an answer are `expected`.
+/// Waits for the windows to hear that the apps waiting for an answer are `expected` (`{ apps }`, and `proposers`
+/// when given).
 fn pending_is(f: &Fixture, expected: Value) {
     loop {
         let heard = f.pending.recv_timeout(Duration::from_secs(5)).expect("the windows hear who is waiting");
-        if heard == expected {
+        if heard["apps"] == expected["apps"] && (expected.get("proposers").is_none() || heard["proposers"] == expected["proposers"]) {
             return;
         }
     }
@@ -306,8 +314,11 @@ fn tool_answers_and_their_errors() {
     ready(&f, "Claude");
     let socket = socket(&f);
     let read = ask(&socket, "Claude", "read_page", json!({ "id": "p1" }));
-    assert_eq!(read["result"]["text"], "# Plan\n\nSecret words here.\n");
-    assert_eq!(read["result"]["structured"], json!({ "space": "Notes", "path": "Plan.md", "id": "p1", "title": "Plan", "attachments": ["chart.png"] }));
+    assert_eq!(read["result"]["text"], PLAN);
+    assert_eq!(
+        read["result"]["structured"],
+        json!({ "space": "Notes", "path": "Plan.md", "id": "p1", "title": "Plan", "attachments": ["chart.png"], "version": PLAN_HASH })
+    );
     let back = ask(&socket, "Claude", "backlinks", json!({ "path": "Plan.md" }));
     assert_eq!(back["result"]["structured"]["backlinks"], json!([{ "path": "Log.md", "title": "Log", "id": "p2", "line": 3 }]));
     assert_eq!(error_code(&ask(&socket, "Claude", "read_page", json!({ "path": "Nope.md" }))), "NOT_FOUND");
@@ -326,7 +337,7 @@ fn limits_sizes_and_timeouts() {
     ask(&socket, "Claude", "search", json!({ "query": "x", "limit": 100_000 }));
     assert_eq!(f.requests.lock().unwrap()[0]["args"]["limit"], 50);
 
-    // A request line over 64 KiB is refused before it is read further.
+    // A long search is refused by its own limit (the line may be longer now, for a proposed page of 1 MB, ADR-0048).
     let long = json!({ "v": 1, "app": "Claude", "tool": "search", "arguments": { "query": "x".repeat(70 * 1024) } }).to_string();
     assert_eq!(error_code(&send(&socket, &long)), "BAD_ARGUMENT");
 
@@ -342,6 +353,38 @@ fn limits_sizes_and_timeouts() {
     // Its late answer goes nowhere.
     let late = f.requests.lock().unwrap().last().cloned().unwrap();
     assert_eq!(f.relay.answer("main", late["id"].as_str().unwrap(), &json!({ "result": { "hits": [] } })).unwrap_err().code, "BAD_ARGUMENT");
+}
+
+#[test]
+fn a_request_line_must_come_whole_in_time_and_within_its_limit() {
+    let f = fixture(McpOptions { read_timeout: Duration::from_millis(300), ..fast() });
+    ready(&f, "Claude");
+    let socket = socket(&f);
+
+    // A byte every 100 ms never waits 300 ms for one, but the whole line must come within 300 ms.
+    let mut slow = UnixStream::connect(&socket).unwrap();
+    let start = std::time::Instant::now();
+    let mut cut = false;
+    for _ in 0..30 {
+        if slow.write_all(b"{").is_err() {
+            cut = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(cut, "the host closes a line that does not come whole in time");
+    assert!(start.elapsed() < Duration::from_secs(2), "{:?}", start.elapsed());
+
+    // Over the limit (2 MiB + 64 KiB): refused without being read to its end.
+    let long = format!("{{\"v\":1,\"app\":\"Claude\",\"tool\":\"search\",\"arguments\":{{\"query\":\"{}\"}}}}", "x".repeat(thoth_host::mcp::MAX_REQUEST));
+    let mut stream = UnixStream::connect(&socket).unwrap();
+    let _ = stream.write_all(long.as_bytes());
+    let mut answer = String::new();
+    BufReader::new(&stream).read_line(&mut answer).unwrap();
+    assert!(answer.contains("too long"), "{answer}");
+
+    // The host still answers.
+    assert_eq!(ask(&socket, "Claude", "list_pages", json!({}))["ok"], true);
 }
 
 #[test]
@@ -393,6 +436,186 @@ fn every_request_is_logged_without_page_text_and_old_days_go() {
     let text = std::fs::read_to_string(f.dir.join("log").join(&files[0])).unwrap();
     assert!(!text.contains("Secret"), "no page text and no search words in the log");
     assert_eq!(std::fs::metadata(f.dir.join("log").join(&files[0])).unwrap().permissions().mode() & 0o777, 0o600);
+}
+
+/// `ready`, then lets `app` propose changes too: its first proposal asks, and the user says yes.
+fn may_propose(f: &Fixture, app: &str) -> Value {
+    ready(f, app);
+    let asking = {
+        let socket = socket(f);
+        let app = app.to_owned();
+        std::thread::spawn(move || ask(&socket, &app, "propose_append", json!({ "path": "Plan.md", "markdown": "- two" })))
+    };
+    pending_is(f, json!({ "apps": [], "proposers": [app] }));
+    assert!(f.relay.proposals()["proposals"].as_array().unwrap().is_empty(), "nothing is kept before the user answers");
+    f.relay.may_propose(app, true).unwrap();
+    let answer = asking.join().unwrap();
+    assert_eq!(answer["ok"], true, "{answer}");
+    answer
+}
+
+#[test]
+fn an_app_proposes_only_once_the_user_lets_it_and_the_call_writes_nothing() {
+    let f = fixture(fast());
+    let answer = may_propose(&f, "Claude");
+    let made = &answer["result"]["structured"];
+    assert_eq!((made["status"].clone(), made["space"].clone(), made["path"].clone()), (json!("pending"), json!("Notes"), json!("Plan.md")));
+    let id = made["id"].as_str().unwrap();
+    assert!(answer["result"]["text"].as_str().unwrap().contains("nothing is written"));
+    assert_eq!(f.relay.settings()["apps"][0]["propose"], true);
+
+    // The window was only asked to read the page, never sent the proposed text.
+    let asked = f.requests.lock().unwrap().last().cloned().unwrap();
+    assert_eq!((asked["tool"].clone(), asked["args"].clone()), (json!("read_page"), json!({ "path": "Plan.md" })));
+    // The host keeps it, outside the notes, for the windows to review.
+    let list = f.relay.proposals();
+    assert_eq!(list["open"], 1);
+    assert_eq!(list["proposals"][0]["app"], "Claude");
+    assert_eq!(list["proposals"][0]["root"], NOTES);
+    assert_eq!(list["proposals"][0]["baseHash"], PLAN_HASH);
+    let one = f.relay.proposal(id).unwrap();
+    assert_eq!(one["before"], PLAN);
+    assert_eq!(one["after"], format!("{PLAN}\n- two\n"));
+    assert!(f.dir.join("proposals").join(format!("{id}.json")).exists());
+    // The windows are told, to show it under the bell.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while f.proposals.lock().unwrap().last() != Some(&json!({ "open": 1 })) {
+        assert!(std::time::Instant::now() < deadline, "the windows hear of the proposal");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    // Turned off: refused, and nothing more is kept.
+    f.relay.may_propose("Claude", false).unwrap();
+    let refused = ask(&socket(&f), "Claude", "propose_create_page", json!({ "path": "New.md", "markdown": "# New" }));
+    assert_eq!(error_code(&refused), "DENIED");
+    assert_eq!(f.relay.proposals()["open"], 1);
+    // An app that may not read may not propose either, whatever its switch says.
+    f.relay.may_propose("Claude", true).unwrap();
+    f.relay.decide("Claude", false).unwrap();
+    assert_eq!(error_code(&ask(&socket(&f), "Claude", "propose_create_page", json!({ "path": "New.md", "markdown": "# New" }))), "DENIED");
+    // Only an app that connected has the switch.
+    assert_eq!(f.relay.may_propose("Never Asked", true).unwrap_err().code, "BAD_ARGUMENT");
+}
+
+#[test]
+fn proposals_are_checked_confined_and_kept_to_their_limits() {
+    let f = fixture(fast());
+    may_propose(&f, "Claude");
+    let socket = socket(&f);
+    let propose = |tool: &str, args: Value| ask(&socket, "Claude", tool, args);
+
+    // A new page by title, in a folder.
+    let made = propose("propose_create_page", json!({ "folder": "Meetings/", "title": " Plan: 2026/11? ", "markdown": "# Plan" }));
+    assert_eq!(made["result"]["structured"]["path"], "Meetings/Plan 2026 11.md", "{made}");
+    // Never over a page that is there.
+    assert_eq!(error_code(&propose("propose_create_page", json!({ "path": "Plan.md", "markdown": "x" }))), "EXISTS");
+    // Only Markdown pages in the Private Space, never in `.thoth/` or a hidden folder.
+    for path in [".thoth/index.md", "a/.hidden/b.md", "../Out.md", "/etc/x.md", "Plan.txt", "a\\b.md"] {
+        assert_eq!(error_code(&propose("propose_create_page", json!({ "path": path, "markdown": "x" }))), "BAD_ARGUMENT", "{path}");
+        assert_eq!(error_code(&propose("propose_edit_page", json!({ "path": path, "markdown": "x" }))), "BAD_ARGUMENT", "{path}");
+    }
+    assert_eq!(error_code(&propose("propose_create_page", json!({ "title": "..", "markdown": "x" }))), "BAD_ARGUMENT");
+    // A page that is not there cannot be edited.
+    assert_eq!(error_code(&propose("propose_edit_page", json!({ "path": "Nope.md", "markdown": "x" }))), "NOT_FOUND");
+
+    // Exact-text replacements must each match once.
+    let replace = |find: &str| propose("propose_edit_page", json!({ "id": "p1", "replacements": [{ "find": find, "replace": "two" }] }));
+    assert!(error(&replace("not in the page")).contains("not in the page"));
+    assert!(error(&replace("- one")).contains("more than once"));
+    let ok = replace("- one more");
+    let id = ok["result"]["structured"]["id"].as_str().unwrap().to_owned();
+    assert!(f.relay.proposal(&id).unwrap()["after"].as_str().unwrap().ends_with("- one\ntwo\n"));
+    assert_eq!(error_code(&propose("propose_edit_page", json!({ "path": "Plan.md", "markdown": "x", "replacements": [] }))), "BAD_ARGUMENT");
+    assert_eq!(error_code(&propose("propose_edit_page", json!({ "path": "Plan.md", "markdown": PLAN }))), "BAD_ARGUMENT", "no change");
+
+    // `expected` is the version the app read: another one is refused.
+    assert_eq!(error_code(&propose("propose_edit_page", json!({ "path": "Plan.md", "markdown": "x", "expected": "older" }))), "CONFLICT");
+    assert_eq!(propose("propose_edit_page", json!({ "path": "Plan.md", "markdown": "x", "expected": PLAN_HASH }))["ok"], true);
+
+    // Under a heading: at the end of its section.
+    let under = propose("propose_append", json!({ "path": "Plan.md", "heading": "## Next", "markdown": "- three" }));
+    let id = under["result"]["structured"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(f.relay.proposal(&id).unwrap()["after"], format!("{PLAN}\n- three\n"));
+    assert!(error(&propose("propose_append", json!({ "path": "Plan.md", "heading": "Later", "markdown": "x" }))).contains("No heading"));
+
+    // At most 1 MB.
+    assert_eq!(error_code(&propose("propose_create_page", json!({ "path": "Big.md", "markdown": "x".repeat(1024 * 1024 + 1) }))), "TOO_LARGE");
+    // Only the shared Private Spaces.
+    assert_eq!(error_code(&propose("propose_create_page", json!({ "path": "N.md", "markdown": "x", "space": "Work" }))), "NO_SPACE");
+}
+
+#[test]
+fn the_app_sees_what_became_of_its_own_proposals_and_only_a_window_on_the_space_settles_them() {
+    let f = fixture(fast());
+    let made = may_propose(&f, "Claude");
+    let id = made["result"]["structured"]["id"].as_str().unwrap().to_owned();
+    let socket = socket(&f);
+
+    assert_eq!(f.relay.settle("space-other", &id, "applied").unwrap_err().code, "NOT_ALLOWED");
+    assert_eq!(f.relay.settle("main", &id, "pending").unwrap_err().code, "BAD_ARGUMENT");
+    assert_eq!(f.relay.settle("main", &id, "conflicted").unwrap()["status"], "conflicted");
+    assert_eq!(f.relay.proposal(&id).unwrap()["after"], format!("{PLAN}\n- two\n"), "a conflicted one keeps its text for the review");
+    assert_eq!(f.relay.settle("main", &id, "applied").unwrap()["status"], "applied");
+    assert_eq!(f.relay.proposal(&id).unwrap()["after"], Value::Null, "an applied one keeps no text");
+    assert_eq!(f.relay.settle("main", &id, "declined").unwrap_err().code, "CONFLICT");
+    assert_eq!(f.relay.proposals()["open"], 0);
+
+    let got = ask(&socket, "Claude", "get_proposal", json!({ "id": id }));
+    assert_eq!(got["result"]["structured"]["status"], "applied", "{got}");
+    assert!(got["result"]["structured"].get("root").is_none(), "the folder on this computer is not told");
+    let list = ask(&socket, "Claude", "list_proposals", json!({ "status": "applied" }));
+    assert_eq!(list["result"]["structured"]["total"], 1);
+    assert_eq!(list["result"]["structured"]["proposals"][0]["path"], "Plan.md");
+    assert_eq!(ask(&socket, "Claude", "list_proposals", json!({ "status": "pending" }))["result"]["structured"]["total"], 0);
+    assert_eq!(error_code(&ask(&socket, "Claude", "list_proposals", json!({ "status": "lost" }))), "BAD_ARGUMENT");
+
+    // Another app sees none of them.
+    ready_too(&f, "Cursor");
+    assert_eq!(error_code(&ask(&socket, "Cursor", "get_proposal", json!({ "id": id }))), "NOT_FOUND");
+    assert_eq!(ask(&socket, "Cursor", "list_proposals", json!({}))["result"]["structured"]["total"], 0);
+}
+
+/// Allows a second app (the first already switched Connected apps on).
+fn ready_too(f: &Fixture, app: &str) {
+    let asking = {
+        let socket = socket(f);
+        let app = app.to_owned();
+        std::thread::spawn(move || ask(&socket, &app, "list_pages", json!({})))
+    };
+    pending_is(f, json!({ "apps": [app] }));
+    f.relay.decide(app, true).unwrap();
+    assert_eq!(asking.join().unwrap()["ok"], true);
+}
+
+#[test]
+fn proposals_are_logged_by_tool_app_path_and_outcome_never_their_text() {
+    let f = fixture(fast());
+    may_propose(&f, "Claude");
+    let socket = socket(&f);
+    ask(&socket, "Claude", "propose_create_page", json!({ "path": "Diary.md", "markdown": "Secret proposal text" }));
+    ask(&socket, "Claude", "propose_edit_page", json!({ "path": "Plan.md", "replacements": [{ "find": "Secret words", "replace": "Hidden replacement" }] }));
+    ask(&socket, "Claude", "propose_edit_page", json!({ "path": "Plan.md", "replacements": [{ "find": "Absent finding", "replace": "x" }] }));
+    let entries = f.relay.log();
+    let entries = entries.as_array().unwrap();
+    assert_eq!(entries[0]["tool"], "propose_edit_page");
+    assert_eq!((entries[0]["ok"].clone(), entries[0]["error"].clone(), entries[0]["paths"].clone()), (json!(false), json!("BAD_ARGUMENT"), json!(["Plan.md"])));
+    assert_eq!((entries[1]["ok"].clone(), entries[1]["paths"].clone()), (json!(true), json!(["Plan.md"])));
+    assert_eq!(
+        (entries[2]["tool"].clone(), entries[2]["paths"].clone(), entries[2]["spaces"].clone()),
+        (json!("propose_create_page"), json!(["Diary.md"]), json!(["Notes"]))
+    );
+    let dir = f.dir.join("log");
+    for file in std::fs::read_dir(&dir).unwrap() {
+        let text = std::fs::read_to_string(file.unwrap().path()).unwrap();
+        for words in ["Secret proposal text", "Hidden replacement", "Absent finding", "Secret words", "- two"] {
+            assert!(!text.contains(words), "{words:?} in the log");
+        }
+    }
+}
+
+fn error(answer: &Value) -> String {
+    assert_eq!(answer["ok"], false, "{answer}");
+    answer["error"]["message"].as_str().unwrap().to_owned()
 }
 
 mod through_the_host {

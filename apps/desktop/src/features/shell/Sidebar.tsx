@@ -20,6 +20,7 @@ import { FAVORITES_SECTION, PRIVATE_SECTION } from "./sections.ts";
 import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
 import type { FavoritesController } from "../favorites/useFavoritesController.ts";
 import { useAgentsSection } from "../agents/AgentsSidebar.tsx";
+import { useProposalsEntry } from "../connected-apps/useProposalsEntry.tsx";
 import { pendingCleanups } from "../transfer/service.ts";
 import type { WorkspacePageRef } from "@thoth/app-ui/workspace/directory.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
@@ -98,6 +99,7 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
   const importFrom = useDesktopStrings().settings.importFrom;
+  const proposals = useProposalsEntry();
   const hideLabel = useStrings().sidebar.hide;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
@@ -292,7 +294,8 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
         <IconButton icon="folder-plus" label={t.newFolder} shortcut="folder.new" onClick={onNewFolder} />
         <IconButton icon="import" label={importFrom} onClick={() => openSettings("import")} />
         <span className="side-end">
-          <NotificationBell center={notifications} open={notificationsOpen} onOpenChange={onNotificationsOpen} onOpenTarget={openNotification} />
+          <NotificationBell center={notifications} open={notificationsOpen} onOpenChange={onNotificationsOpen} onOpenTarget={openNotification} pinned={proposals.pinned} />
+          {proposals.dialog}
           <IconButton icon="gear" label={t.settings} shortcut="settings.open" onClick={() => openSettings()} />
         </span>
       </div>

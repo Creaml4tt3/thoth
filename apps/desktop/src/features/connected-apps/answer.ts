@@ -34,7 +34,8 @@ async function run(vault: Vault, request: McpRequest): Promise<unknown> {
       const read = await vault.readPage(page.path);
       const attachments = new Set((await vault.listAttachments()).map((a) => a.path));
       const linked = (await vault.outgoingLinks(page.path)).flatMap((l) => (l.targetPath !== null && attachments.has(l.targetPath) ? [l.targetPath] : []));
-      return { page: { ...summary(page), markdown: read.source, attachments: [...new Set(linked)] } };
+      // `hash`: the version a proposal is made from and checked against when applied (ADR-0048).
+      return { page: { ...summary(page), markdown: read.source, hash: read.hash, attachments: [...new Set(linked)] } };
     }
     case "backlinks": {
       const page = await find(vault, request, request.args);

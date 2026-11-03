@@ -27,6 +27,8 @@ pub const TAURI_COMMANDS: &[&str] = &[
     // Connected apps (ADR-0021): the settings, the Allow or Deny, a window's answer and the log; thoth-mcp's socket is
     // the host's own.
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
+    // Proposed changes (ADR-0048): the per-app switch, the proposals, and a window's report after it applied one.
+    "mcp_mayPropose", "mcp_proposals", "mcp_proposal", "mcp_settle",
     // Problem reports (ADR-0040): the webview reports its uncaught errors to the host's local log and reads the redacted
     // log back; no log plugin permission.
     "diag_report", "diag_collect", "diag_settings",

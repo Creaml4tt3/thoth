@@ -102,10 +102,12 @@ mod unix {
     }
 
     fn serve(inner: &Inner, stream: UnixStream) {
-        let _ = stream.set_read_timeout(Some(inner.options.read_timeout));
         let _ = stream.set_write_timeout(Some(inner.options.read_timeout));
         let mut line = Vec::new();
-        let read = BufReader::new(&stream).take(MAX_REQUEST as u64 + 1).read_until(b'\n', &mut line);
+        // The whole line must come within `read_timeout` (not each piece of it): a client that sends a byte now and
+        // then cannot hold one of the `MAX_CONNECTIONS` for long, however long the line may be.
+        let deadline = Deadline { stream: &stream, until: std::time::Instant::now() + inner.options.read_timeout };
+        let read = BufReader::new(deadline).take(MAX_REQUEST as u64 + 1).read_until(b'\n', &mut line);
         let response = match read {
             Ok(_) if line.len() > MAX_REQUEST => super::super::error_line(&HostError::bad_argument("The request is too long")),
             Ok(0) => return,
@@ -113,6 +115,24 @@ mod unix {
             Err(_) => return,
         };
         let _ = reply(&stream, &response);
+    }
+
+    /// Reads from `stream` until `until`, then fails (`TimedOut`); each read waits at most until then.
+    struct Deadline<'a> {
+        stream: &'a UnixStream,
+        until: std::time::Instant,
+    }
+
+    impl Read for Deadline<'_> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let left = self.until.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                return Err(std::io::ErrorKind::TimedOut.into());
+            }
+            self.stream.set_read_timeout(Some(left))?;
+            let mut stream = self.stream;
+            stream.read(buf)
+        }
     }
 
     fn reply(mut stream: &UnixStream, line: &str) -> std::io::Result<()> {
