@@ -1,0 +1,23 @@
+pkgbase = thoth-notes-bin
+	pkgdesc = Notes in plain Markdown files on your computer, with shared workspaces you can host yourself
+	pkgver = 0.4.0
+	pkgrel = 1
+	url = https://thothnotes.com/
+	arch = x86_64
+	license = Apache-2.0
+	depends = cairo
+	depends = dbus
+	depends = gdk-pixbuf2
+	depends = glib2
+	depends = glibc
+	depends = gtk3
+	depends = hicolor-icon-theme
+	depends = libgcc
+	depends = libsoup3
+	depends = webkit2gtk-4.1
+	options = !strip
+	options = !debug
+	source = https://download.thothnotes.com/v0.4.0/Thoth_0.4.0_amd64.deb
+	sha256sums = da5af536afa3ca0ec3109dbb259100ba30627c594d7300f1b42ac5142bfc1f3c
+
+pkgname = thoth-notes-bin

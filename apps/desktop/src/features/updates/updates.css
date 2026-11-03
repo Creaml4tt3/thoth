@@ -8,7 +8,6 @@
 
 /* Settings → Updates (UpdateSettings.tsx). */
 .update-settings .set-actions { align-items: center; }
-.update-settings .muted { color: var(--thoth-ink-secondary); }
 
 /* In-app updates (InstallPanel.tsx, ADR-0034): the progress bar and the states after Update, in the popup and Settings. */
 .update-install { display: grid; gap: var(--thoth-space-2); }

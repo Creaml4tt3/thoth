@@ -64,7 +64,9 @@ describe("Vault on Rust ports", () => {
     ]);
     expect((await vault.backlinks("Projects/Thoth/Overview.md")).map((b) => b.sourcePath)).toEqual(["Inbox/Welcome.md", "Projects/Thoth/Architecture.md"]);
     expect((await vault.listAttachments()).map((a) => a.path)).toEqual(["Assets/diagram.svg"]);
-    expect(await readdir(join(root, ".thoth"))).toEqual(expect.arrayContaining(["config.json", "index.sqlite", "operations", "manifests"]));
+    expect(await readdir(join(root, ".thoth"))).toEqual(expect.arrayContaining(["config.json", "operations", "manifests"]));
+    // The index is kept outside the notes folder (ADR-0046).
+    expect((await readdir(join(root, ".thoth"))).filter((name) => name.startsWith("index.sqlite"))).toEqual([]);
   });
 
   it("searches Latin text with diacritics folded and Thai by substring", async () => {
@@ -131,10 +133,10 @@ describe("Vault on Rust ports", () => {
     await rm(outside, { recursive: true, force: true });
   });
 
-  it("rebuilds an identical index after the database is deleted", async () => {
+  it("rebuilds an identical index when the database is gone", async () => {
     const before = (await vault.listPages()).map(({ mtimeMs: _, ...p }) => p);
     await close();
-    for (const f of ["index.sqlite", "index.sqlite-wal", "index.sqlite-shm"]) await rm(join(root, ".thoth", f), { force: true });
+    // A new harness process has no data folder of its own, so its index starts empty (ADR-0046).
     await open();
     expect((await vault.listPages()).map(({ mtimeMs: _, ...p }) => p)).toEqual(before);
   });

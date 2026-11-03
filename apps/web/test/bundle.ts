@@ -56,6 +56,13 @@ export const DESKTOP_ONLY = [
   "thoth:mcp-request",
   "thoth-mcp",
   "connected-apps-settings",
+  // Proposed changes from connected apps (ADR-0048): the review, the per-app switch and the host's proposals.
+  "mcp.proposals",
+  "mcp.settle",
+  "mcp.mayPropose",
+  "thoth:mcp-proposals",
+  "mcp-proposals",
+  "propose_create_page",
 ];
 
 export function files(dir: string): string[] {

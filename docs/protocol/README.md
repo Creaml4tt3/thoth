@@ -97,11 +97,12 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
-| `teams` | `listTeams`, `createTeam`, `renameTeam`, `deleteTeam`, `addTeamMember`, `removeTeamMember`, `getPageVisibility`, `setPageVisibility`, `listTeamPages` | the role `manager`; teams of members; pages limited to some teams, hidden (404) from everyone else but owners and managers; section 10, ADR-0042, ADR-0043 |
+| `teams` | `listTeams`, `createTeam`, `renameTeam`, `deleteTeam`, `addTeamMember`, `removeTeamMember`, `getPageVisibility`, `setPageVisibility`, `listTeamPages`, `listLimitedPages` | the role `manager`; teams of members; pages limited to some teams, hidden (404) from everyone else but owners and managers; section 10, ADR-0042, ADR-0043, ADR-0049 |
 | `trash` | `listTrash`, `restoreTrashedPage`, `purgeTrashedPage` | deleted pages kept 30 days, restored or deleted for good; ADR-0043 |
 | `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; optionally the person's redacted app log (`diagnostics`); section 10, ADR-0033, ADR-0040 |
+| `presence` | `heartbeatPresence`, `leavePresence` | who else has a page open: a heartbeat every 15 s, forgotten after 45 s; names and opaque IDs only; section 10, ADR-0041 |
 | `databases` | none | reserved; no semantics in 1.0 |
-| `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005) |
+| `realtime-collab` | none | reserved; no semantics in 1.0 (no CRDT in the MVP, ADR-0005; still deferred, ADR-0041) |
 
 `server` is optional (protocol 1.0). It names the software answering and how people should see it:
 
@@ -496,6 +497,8 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
 - Events may be lost, delayed, merged or duplicated. Clients MUST NOT rely on them for
   correctness and SHOULD poll the feed on reconnect and at a low background interval.
 - A server MAY send comment lines (`:`) as keep-alives.
+- Browsers: `EventSource` cannot send `Authorization`, so the reference web client reads the stream with `fetch` and
+  falls back to polling when the stream is refused or drops (ADR-0041).
 
 ## 10. Search, attachments, share links, members, invite links and workspaces
 
@@ -579,6 +582,9 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   team was deleted is seen by owners and managers only. `GET .../teams/{teamId}/pages` (owners and managers) lists
   the pages limited to a team, `{ items: [{ pageId, title, kind, onlyTeam }] }`, so a client can say what deleting it
   changes.
+- `GET .../limited-pages` (owners and managers, ADR-0049) returns `{ items: [{ pageId }] }`: every page (not deleted)
+  limited itself, also one whose teams were all deleted, all in one response. Pages below them are not listed. A
+  client writes links to these pages, and to pages below them, without a title.
 - **A hidden page does not exist** for that member: 404 `not_found` (never 403) for reads, writes, moves, deletes,
   revisions, the visibility calls, share links, and as a parent of a new or moved page; it is absent from the tree,
   search and transfers, and its change-feed entries are left out (the cursor still moves past them). A transfer by
@@ -655,6 +661,17 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   204) purges it now. Both: 403 for its other members, 404 for anyone else, a live workspace, and one
   past its 30 days (`DELETED_WORKSPACE_RESTORE_DAYS`).
 - After 30 days the server purges a deleted workspace with its pages, revisions and attachments.
+
+### Presence (capability `presence`, ADR-0041)
+
+- `PUT /workspaces/{id}/pages/{pageId}/presence` (no body; any member who can read, viewers too) says the caller has
+  the page open and answers 200 `{ items: [{ userId, displayName }] }`: the other members who have it open now, never
+  the caller, at most 50. Clients send it when a page opens and at least every `PRESENCE_HEARTBEAT_SECONDS` (15) while
+  it stays open; a server forgets a heartbeat `PRESENCE_TTL_SECONDS` (45) after it arrived.
+- `DELETE` on the same path says the caller left: 204, also when there was nothing to remove.
+- Both are 404 for a non-member. `PUT` is 404 for an unknown or deleted page, and the same 404 for a page hidden from
+  the caller (ADR-0042), recording nothing; `DELETE` answers 204 for any page ID, so it tells nothing about one. The list leaves out members who can no longer see the page. An entry carries nothing but the opaque user ID (the
+  same ID as `actorId` and `userId` elsewhere) and the display name.
 
 ### Feedback (capability `feedback`, ADR-0033)
 

@@ -82,7 +82,14 @@ describe("the share renderer", () => {
 
   it("links pages inside the subtree and keeps others as text, never looking up their titles", () => {
     expect(render(`[[thoth:page/${PAGE}]] [[thoth:page/${PAGE}|label]] [in](thoth:page/${PAGE})`)).toBe(`<p><a href="/s/T/p/${PAGE}">Inside</a> <a href="/s/T/p/${PAGE}">label</a> <a href="/s/T/p/${PAGE}">in</a></p>\n`);
-    expect(render(`[[thoth:page/${OUT}|Secret]] [[thoth:page/${OUT}]] [x](thoth:page/${OUT}) [[Some page]] [[Some page|shown]] ![[thoth:page/${OUT}]]`)).toBe("<p>Secret a page that is not shared x Some page shown a page that is not shared</p>\n");
+    expect(render(`[[thoth:page/${OUT}|Secret]] [[thoth:page/${OUT}]] [x](thoth:page/${OUT}) [[Some page]] [[Some page|shown]] ![[thoth:page/${OUT}]]`)).toBe("<p>a page that is not shared a page that is not shared x Some page shown a page that is not shared</p>\n");
+  });
+
+  it("reads a link to a page it leaves out the same with or without a title, and a malformed ID the same (ADR-0049)", () => {
+    const neutral = "<p>a page that is not shared</p>\n";
+    for (const md of [`[[thoth:page/${OUT}]]`, `[[thoth:page/${OUT}|Salary review]]`, `[[thoth:page/${OUT}#Plan|Salary review]]`, "[[thoth:page/not-an-id|Salary review]]"]) expect(render(md), md).toBe(neutral);
+    // A title-less link to a shared page shows that page's title, which the share shows anyway.
+    expect(render(`[[thoth:page/${PAGE}]]`)).toBe(`<p><a href="/s/T/p/${PAGE}">Inside</a></p>\n`);
   });
 
   it("shows inline pictures (SVG too, in an <img>, where it runs no script), links other files for download, and never loads an outside image", () => {

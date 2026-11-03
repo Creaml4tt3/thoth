@@ -85,8 +85,8 @@ export function SearchDialog({ directory, workspaces, canSearch, commands, onRun
         type="search"
         role="combobox"
         aria-expanded={cmd.on ? cmd.items.length > 0 : hits !== null && hits.length > 0}
-        aria-controls={cmd.on ? cmd.listId : "search-results"}
-        aria-activedescendant={cmd.on ? cmd.activeId : undefined}
+        aria-controls={cmd.on ? cmd.listId : hits?.length ? "search-results" : undefined}
+        aria-activedescendant={cmd.on ? cmd.activeId : hits?.[active] ? `search-results-${active}` : undefined}
         aria-label={t.web.searchPlaceholder}
         placeholder={t.keyboard.searchOrCommands}
         value={query}
@@ -124,7 +124,7 @@ export function SearchDialog({ directory, workspaces, canSearch, commands, onRun
           ) : (
             <ul id="search-results" className="results" role="listbox" aria-label={t.web.search}>
               {hits.map((hit, i) => (
-                <li key={`${hit.workspace.id}/${hit.pageId}`} role="option" aria-selected={i === active} className="result" onMouseDown={(e) => e.preventDefault()} onClick={() => open(hit)}>
+                <li key={`${hit.workspace.id}/${hit.pageId}`} id={`search-results-${i}`} role="option" aria-selected={i === active} className="result" onMouseDown={(e) => e.preventDefault()} onClick={() => open(hit)}>
                   <b>{hit.title}</b>
                   {workspaces.length > 1 && <span className="muted">{hit.workspace.name}</span>}
                   {hit.snippet && <span className="snippet" {...tipIfClipped(hit.snippet)}>{hit.snippet}</span>}

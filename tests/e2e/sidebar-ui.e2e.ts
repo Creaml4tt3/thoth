@@ -315,7 +315,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.getByRole("treeitem", { name: LONG, exact: true }).click({ modifiers: ["ControlOrMeta"] });
     await page.getByRole("treeitem", { name: "Docs", exact: true }).click();
     await settled(page);
-    const bad = (await new AxeBuilder({ page }).include(".sidebar").include(".tabstrip").include(".sidebar-resizer").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    const bad = (await new AxeBuilder({ page }).include(".sidebar").include(".tabstrip").include(".sidebar-resizer").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ") + " " + JSON.stringify(n.any.map((a) => a.data))).join(", ")}`)).toEqual([]);
 
     // Pictures for people: the sidebar, the tab bar, and a tooltip.

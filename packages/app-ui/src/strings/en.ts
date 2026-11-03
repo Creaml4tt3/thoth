@@ -22,6 +22,8 @@ export const en = {
   editor: {
     status: { idle: "", dirty: "Unsaved changes", saving: "Saving…", saved: "Saved", error: "Not saved" },
     modeGroup: "Editor mode",
+    /** The editor's accessible name. */
+    content: "Page content",
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },
@@ -48,10 +50,23 @@ export const en = {
     moveDown: "Move down",
     handleLabel: "Drag to move, click for block menu",
     handleTitle: "Drag to move · Click for menu",
+    /** The card under the pointer while blocks are dragged: several, a table, any other block with no text. */
+    dragBlocks: (n: number) => plural(n, "block"),
+    dragTable: "Table",
+    dragBlock: "Block",
     linkToPage: "Link to page",
     linkAlias: (alias: string) => `alias “${alias}”`,
     linkNoMatch: (query: string) => `No page matches “${query}”. Keep typing to link to a new page.`,
     linkNoPages: "No other pages yet.",
+    /** `@` (ADR-0049): the menu's name, what a row is, and the empty list. */
+    linkMention: (people: boolean): string => (people ? "Link to a page, folder or person" : "Link to a page or folder"),
+    linkFolder: "Folder",
+    linkPerson: "Person",
+    linkAtNoMatch: (query: string) => (query ? `Nothing matches “${query}”.` : "Nothing to link to yet."),
+    linkOpenFolder: "Click to show it in the sidebar",
+    linkUnresolvedFolder: (target: string) => `No folder named "${target}"`,
+    linkUnavailable: "Page not available",
+    mention: (name: string) => `Mention of ${name}`,
     fold: (collapsed: boolean, toggle: boolean) => `${collapsed ? "Expand" : "Collapse"} ${toggle ? "toggle" : "callout"}`,
     preserved: (kind: "html" | "math" | "raw") => `${kind === "html" ? "HTML" : kind === "math" ? "Math" : "Markdown"} · preserved as written`,
     preservedTitle: "Preserved as written",
@@ -188,6 +203,13 @@ export const en = {
     /** Shown instead of a page of a workspace the user was removed from or left (ADR-0024), or that was deleted (ADR-0025). */
     noAccessTitle: "You no longer have access to this workspace",
     noAccessDetail: "You left it, an owner removed you, or it was deleted. An owner can restore a deleted workspace for 30 days, or send you a new invite link.",
+    /** ADR-0041: an open page reloaded because someone else changed it on the server. `name` null: the author is not known. */
+    changedBy: (name: string | null) => (name ? `Updated by ${name} just now.` : "Updated on the server just now."),
+    dismissChange: "Dismiss",
+    /** ADR-0041: who else has the page open. */
+    presence: (names: string[]) =>
+      names.length === 1 ? `${names[0]} is also here` : names.length === 2 ? `${names[0]} and ${names[1]} are also here` : `${names[0]}, ${names[1]} and ${plural(names.length - 2, "other")} are also here`,
+    presenceLabel: "Who else has this page open",
   },
 
   /** Both page trees (Private Space and workspaces): rename, folders, moving and ordering. */
@@ -289,6 +311,32 @@ export const en = {
       topLevel: "Top level",
       move: "Move",
       cancel: "Cancel",
+    },
+    /** Duplicate in a tree's menu (ADR-0047). */
+    duplicate: "Duplicate",
+    duplicateStructure: "Duplicate structure only",
+    duplicateTo: "Duplicate to…",
+    /** The copy's name: "Roadmap (copy)", then "Roadmap (copy 2)"… */
+    copyName: (title: string, n: number) => (n === 1 ? `${title} (copy)` : `${title} (copy ${n})`),
+    duplicated: (title: string) => `Duplicated ${title}`,
+    duplicateFailed: (detail: string) => `Could not duplicate: ${detail.replace(/\.$/, "")}. Nothing was copied.`,
+    duplicateQuota: (limit: number, current: number, adding: number) =>
+      `The copy does not fit: this workspace is limited to ${plural(limit, "page")}, ${current.toLocaleString()} are in use and the copy needs ${adding.toLocaleString()}. Nothing was copied.`,
+    duplicateDialog: {
+      title: (name: string, pages: number) => (pages > 0 ? `Duplicate ${name} and its ${plural(pages, "page")}?` : `Duplicate ${name}?`),
+      copy: "The copy goes right below it, with the same pages, folders and order. Earlier versions and share links are not copied.",
+      structure: "The copy keeps the pages, folders and order, but each page keeps only its title.",
+      everyone: "Only some teams can see the original. The copy keeps no team limits, so it will be visible to everyone in this workspace.",
+      below: "Only some teams can see some of the pages inside. Their copies keep no team limits, so they will be visible to everyone in this workspace.",
+      noLimits: "The copy keeps no team limits.",
+      duplicate: "Duplicate",
+      duplicating: "Duplicating…",
+      cancel: "Cancel",
+    },
+    duplicateToDialog: {
+      title: (name: string) => `Duplicate “${name}” to…`,
+      destination: "Put the copy in",
+      pages: (pages: number) => `The ${plural(pages, "page")} inside are copied too.`,
     },
     /** By the pointer while pages are dragged from one space onto the other (ADR-0006, amendment of 2026-10-26). */
     across: {
@@ -425,6 +473,7 @@ export const en = {
     createTeam: "Create team",
     teamName: (name: string) => `Name of ${name}`,
     renameTeam: "Rename",
+    renameTeamLabel: (name: string) => `Rename team ${name}`,
     deleteTeam: "Delete",
     deleteTeamLabel: (name: string) => `Delete team ${name}`,
     teamMember: (person: string, team: string) => `${person} in ${team}`,
@@ -568,6 +617,7 @@ export const en = {
       newFolderIn: (workspace: string) => `New folder in ${workspace}`,
       rename: "Rename page",
       moveTo: "Move to…",
+      duplicate: "Duplicate page",
       moveUp: "Move page up",
       moveDown: "Move page down",
       share: "Share page…",
@@ -629,12 +679,14 @@ export const en = {
       "tab.pin": "Pin or unpin the current tab",
       "tab.split": "Split the current tab to the right, or move it to the other pane",
       "pane.focusOther": "Move focus to the other pane",
+      "region.next": "Move focus between the sidebar and the panes",
       "tree.move": "Move between pages and folders",
       "tree.expand": "Open or close a folder",
       "tree.open": "Open the page",
       "tree.rename": "Rename",
       "tree.reorder": "Move the page up or down",
       "tree.menu": "Open the page's menu",
+      "tree.duplicate": "Duplicate the page or folder",
       "section.move": "Move the sidebar section up or down",
       "editor.save": "Save now",
       "editor.mode": "Switch between Blocks and Plain",

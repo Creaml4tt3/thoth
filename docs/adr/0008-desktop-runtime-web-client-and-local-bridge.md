@@ -65,12 +65,14 @@ from web to Private Space or local CLIs needs an explicit local bridge
        spelling, and creating its NFC twin is `EEXIST`. Import temp files are
        `FILE_FLAG_DELETE_ON_CLOSE`, so they go even if the host crashes.
      - *Weaker or different.* (1) SQLite enforces `SQLITE_OPEN_NOFOLLOW` only
-       in its Unix VFS, so on Windows the host checks `.thoth/index.sqlite`
-       and its `-wal`, `-shm` and `-journal` files through the root handle
+       in its Unix VFS, so on Windows the host checks the index database
+       and its `-wal`, `-shm` and `-journal` files for reparse points
        just before SQLite opens them by path: a file symlink swapped in
        within that window would be followed. Creating a file symlink needs
-       Developer Mode or an elevated account, and `.thoth` itself is checked
-       through the handle. (2) A rename is not followed by a directory flush:
+       Developer Mode or an elevated account. Since ADR-0046 the index is in
+       the app's data folder (`indexes/<digest>/`), whose folders are checked
+       too; before, it was `.thoth/index.sqlite`, checked through the root
+       handle. (2) A rename is not followed by a directory flush:
        Windows cannot flush a directory handle; NTFS journals the rename
        (POSIX's directory `fsync` is best effort too). File data is flushed
        with `FlushFileBuffers` as before. (3) Another program holding a file

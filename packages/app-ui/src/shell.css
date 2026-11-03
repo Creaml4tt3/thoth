@@ -5,6 +5,15 @@
    versions without `clip`. */
 .shell { position: relative; display: grid; grid-template-columns: var(--thoth-sidebar-width) 1fr; height: 100%; overflow: hidden; overflow: clip; background: var(--thoth-bg); color: var(--thoth-ink-primary); }
 .sidebar { background: var(--thoth-bg-sidebar); border-right: 1px solid var(--thoth-border); padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+/* Narrow, as in a desktop window zoomed to 200% (WCAG 1.4.10): the sidebar sits above the page, as on the web (web.css). */
+@media (max-width: 600px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .shell .sidebar-resizer { display: none; }
+  .shell > .sidebar { border-right: 0; border-bottom: 1px solid var(--thoth-border); max-height: 45vh; overflow: auto; }
+  .shell[data-sidebar-hidden] { grid-template-rows: 1fr; }
+  .shell[data-sidebar-hidden] > .sidebar { display: none; }
+  .page-scroll { padding: var(--thoth-space-4); }
+}
 /* The drag handle: an 8px strip over the sidebar's edge, with a line that shows on hover, focus and while dragging. */
 .sidebar-resizer { position: absolute; z-index: 5; top: 0; bottom: 0; inset-inline-start: calc(var(--thoth-sidebar-width) - 4px); width: 8px; cursor: col-resize; touch-action: none; outline: none; }
 .sidebar-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; inset-inline-start: 3px; width: 2px; background: transparent; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
@@ -33,8 +42,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .fav-row { position: relative; }
 .fav-item { padding-left: 24px; min-height: 28px; }
 .fav-item[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
-.fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-faint); }
-.fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-faint); }
+.fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-tertiary); }
+.fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 [data-fav-dragging] .fav-row:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
 .fav-row[data-dragging] { z-index: 2; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); }
 [data-fav-dragging], [data-fav-dragging] .fav-item { cursor: grabbing; }
@@ -378,7 +387,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-row:hover { background: var(--thoth-bg-hover); }
 .home-row:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .home-row .tree-icon { color: var(--thoth-ink-tertiary); }
-.home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-faint); }
+.home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-tertiary); }
 .home-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { flex: none; display: flex; align-items: center; gap: 8px; max-width: 50%; min-width: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -24,6 +24,7 @@ export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
 /** Connected apps (ADR-0021): a request for one window to answer, and the apps waiting for Allow or Deny. */
 export const MCP_REQUEST_EVENT = "thoth:mcp-request";
 export const MCP_PENDING_EVENT = "thoth:mcp-pending";
+export const MCP_PROPOSALS_EVENT = "thoth:mcp-proposals";
 /** In-app updates (ADR-0034): the host's `update.progress`. */
 export const UPDATE_PROGRESS_EVENT = "thoth:update-progress";
 
@@ -138,7 +139,7 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
   };
 }
 
-/** Connected apps (ADR-0021): the `mcp.*` commands and the shell's two events for them. */
+/** Connected apps (ADR-0021, ADR-0048): the `mcp.*` commands and the shell's three events for them. */
 export function tauriConnectedApps(transport: Transport, api: TauriApi = internalsApi()): ConnectedApps {
   return remoteConnectedApps(transport, {
     async onRequest(listener) {
@@ -147,6 +148,10 @@ export function tauriConnectedApps(transport: Transport, api: TauriApi = interna
     },
     async onPending(listener) {
       const unlisten = await api.listen<{ apps: string[] }>(MCP_PENDING_EVENT, (e) => listener(e.payload.apps));
+      return () => void unlisten();
+    },
+    async onProposals(listener) {
+      const unlisten = await api.listen<{ open: number }>(MCP_PROPOSALS_EVENT, (e) => listener(e.payload.open));
       return () => void unlisten();
     },
   });

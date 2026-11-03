@@ -5,7 +5,7 @@
  * 1. Create a note offline → edit → edit externally → conflict prompt → keep both.
  * 2. Import wizard: Obsidian ZIP happy path, then cancel and resume.
  * 3. Plain mode: real keystrokes, mode switching, exact bytes.
- * 4. `[[` autocomplete in both modes.
+ * 4. `[[` autocomplete in both modes, and `@` to a folder.
  * 5. Blocks mode: `/` menu, toggle and to-do, drag with the handle, fold, exact bytes on disk.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -225,6 +225,33 @@ test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => 
   await expect.poll(() => readFile(join(vault, "Linking.md"), "utf8")).toBe("# Linking\n\nBlocks: [[Roadmap]]\n\nPlain: [[Roadmap]]\n");
 });
 
+test("@ links a folder (ADR-0049): the chip shows the folder in the sidebar; no menu inside an email address", async ({ page }) => {
+  await page.getByRole("button", { name: /start writing/i }).click();
+  await mkdir(join(vault, "Projects"));
+  await writeFile(join(vault, "Projects/Roadmap.md"), "# Roadmap\n");
+  await writeFile(join(vault, "Mention.md"), "# Mention\n\nSee:\n");
+  await page.getByRole("treeitem", { name: "Mention" }).click({ timeout: 15_000 });
+  const box = await editor(page);
+  const menu = page.getByRole("listbox", { name: "Link to a page or folder" });
+
+  await box.getByText("See:").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" mail@proj");
+  await expect(menu).toBeHidden();
+  await page.keyboard.type(" @proj");
+  await expect(menu.getByRole("option", { name: "Projects Folder" })).toBeVisible();
+  await expect(box).toHaveAttribute("aria-activedescendant", /.+/);
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  const chip = box.locator('.wikilink[data-kind="folder"][data-target="Projects/"]');
+  await expect(chip).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Mention.md"), "utf8")).toBe("# Mention\n\nSee: mail@proj [[Projects/]]\n");
+
+  await chip.click();
+  await expect(page.locator('.private-tree [data-tree-id="Projects"]')).toBeFocused();
+});
+
 test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact bytes on disk", async ({ page }) => {
   // Odd formatting that Blocks must not touch: double spaces, a `*` bullet, trailing spaces.
   const source = "# Blocks\n\nalpha  para\n\n* star   bullet\n\nomega para   \n";
@@ -286,14 +313,15 @@ test("Blocks mode: / menu, drag a block by its handle, fold a toggle, exact byte
   // 3. Collapse the toggle: view only, nothing becomes unsaved by it. (The page is already dirty from typing; save first.)
   await page.keyboard.press("ControlOrMeta+s");
   await expect.poll(() => readFile(join(vault, "Blocks.md"), "utf8")).not.toBe(source);
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved");
+  await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveCount(1); // an explicit save is spoken
   const saved = await readFile(join(vault, "Blocks.md"), "utf8");
   await toggle.getByRole("button", { name: /collapse toggle/i }).click();
   await expect(toggle).toHaveAttribute("data-collapsed", "true");
   await expect(toggle.getByText("hidden line")).toBeHidden();
   await page.waitForTimeout(500);
   expect(await readFile(join(vault, "Blocks.md"), "utf8")).toBe(saved);
-  await expect(page.getByRole("status").filter({ hasText: /Unsaved/ })).toHaveCount(0);
+  await expect(page.locator(".save-status")).not.toHaveText(/Unsaved/);
 
   // 4. Save and check the file: new blocks canonical, every untouched line byte-identical.
   await page.keyboard.press("ControlOrMeta+s");

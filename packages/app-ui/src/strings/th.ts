@@ -10,6 +10,7 @@ export const th: Strings = {
   editor: {
     status: { idle: "", dirty: "ยังไม่ได้บันทึก", saving: "กำลังบันทึก…", saved: "บันทึกแล้ว", error: "บันทึกไม่สำเร็จ" },
     modeGroup: "โหมดแก้ไข",
+    content: "เนื้อหาของหน้า", // REVIEW
     modeSwitchTitle: "สลับโหมดแก้ไข (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "บล็อก", hint: "จัดรูปแบบเป็นบล็อก แบบ Notion" },
@@ -34,10 +35,21 @@ export const th: Strings = {
     moveDown: "เลื่อนลง",
     handleLabel: "ลากเพื่อย้าย หรือคลิกเพื่อเปิดเมนูบล็อก",
     handleTitle: "ลากเพื่อย้าย · คลิกเพื่อเปิดเมนู",
+    dragBlocks: (n) => `${count(n)} บล็อก`, // REVIEW
+    dragTable: "ตาราง", // REVIEW
+    dragBlock: "บล็อก", // REVIEW
     linkToPage: "ลิงก์ไปยังหน้า",
     linkAlias: (alias) => `ชื่อเรียกอื่น “${alias}”`,
     linkNoMatch: (query) => `ไม่มีหน้าที่ตรงกับ “${query}” พิมพ์ต่อเพื่อลิงก์ไปยังหน้าใหม่`,
     linkNoPages: "ยังไม่มีหน้าอื่น",
+    linkMention: (people) => (people ? "ลิงก์ไปยังหน้า โฟลเดอร์ หรือคน" : "ลิงก์ไปยังหน้าหรือโฟลเดอร์"), // REVIEW
+    linkFolder: "โฟลเดอร์", // REVIEW
+    linkPerson: "คน", // REVIEW
+    linkAtNoMatch: (query) => (query ? `ไม่มีอะไรตรงกับ “${query}”` : "ยังไม่มีอะไรให้ลิงก์"), // REVIEW
+    linkOpenFolder: "คลิกเพื่อแสดงในแถบด้านข้าง", // REVIEW
+    linkUnresolvedFolder: (target) => `ไม่มีโฟลเดอร์ชื่อ "${target}"`, // REVIEW
+    linkUnavailable: "เปิดหน้านี้ไม่ได้", // REVIEW
+    mention: (name) => `การกล่าวถึง ${name}`, // REVIEW
     fold: (collapsed, toggle) => `${collapsed ? "กาง" : "พับ"}${toggle ? "บล็อกพับได้" : "กล่องเน้นข้อความ"}`,
     preserved: (kind) => `${kind === "html" ? "HTML" : kind === "math" ? "สูตรคณิตศาสตร์" : "Markdown"} · เก็บไว้ตามต้นฉบับ`,
     preservedTitle: "เก็บไว้ตามต้นฉบับ",
@@ -163,6 +175,10 @@ export const th: Strings = {
     creating: "กำลังสร้าง…",
     noAccessTitle: "คุณไม่มีสิทธิ์เข้าถึงเวิร์กสเปซนี้แล้ว",
     noAccessDetail: "คุณออกจากเวิร์กสเปซนี้ เจ้าของนำคุณออก หรือเวิร์กสเปซถูกลบ เจ้าของกู้คืนเวิร์กสเปซที่ลบได้ภายใน 30 วัน หรือส่งลิงก์เชิญใหม่ให้คุณ",
+    changedBy: (name) => (name ? `${name} เพิ่งอัปเดตหน้านี้` : "หน้านี้เพิ่งอัปเดตบนเซิร์ฟเวอร์"), // REVIEW
+    dismissChange: "ปิด", // REVIEW
+    presence: (names) => (names.length <= 2 ? `${names.join(" และ ")} เปิดหน้านี้อยู่ด้วย` : `${names[0]}, ${names[1]} และอีก ${count(names.length - 2)} คนเปิดหน้านี้อยู่ด้วย`), // REVIEW
+    presenceLabel: "คนอื่นที่เปิดหน้านี้อยู่", // REVIEW
   },
 
   tree: {
@@ -249,6 +265,30 @@ export const th: Strings = {
       topLevel: "ระดับบนสุด",
       move: "ย้าย",
       cancel: "ยกเลิก",
+    },
+    duplicate: "ทำสำเนา", // REVIEW
+    duplicateStructure: "ทำสำเนาเฉพาะโครงสร้าง", // REVIEW
+    duplicateTo: "ทำสำเนาไปที่…", // REVIEW
+    copyName: (title, n) => (n === 1 ? `${title} (สำเนา)` : `${title} (สำเนา ${n})`), // REVIEW
+    duplicated: (title) => `ทำสำเนา ${title} แล้ว`, // REVIEW
+    duplicateFailed: (detail) => `ทำสำเนาไม่ได้: ${detail} ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateQuota: (limit, current, adding) =>
+      `ทำสำเนาไม่ได้เพราะเกินขีดจำกัด: เวิร์กสเปซนี้มีได้ไม่เกิน ${count(limit)} หน้า ตอนนี้ใช้อยู่ ${count(current)} หน้า และสำเนาต้องใช้อีก ${count(adding)} หน้า ไม่มีอะไรถูกคัดลอก`, // REVIEW
+    duplicateDialog: {
+      title: (name, pages) => (pages > 0 ? `ทำสำเนา ${name} และ ${count(pages)} หน้าข้างในใช่ไหม` : `ทำสำเนา ${name} ใช่ไหม`), // REVIEW
+      copy: "สำเนาจะอยู่ใต้ต้นฉบับทันที มีหน้า โฟลเดอร์ และลำดับเหมือนเดิม โดยไม่คัดลอกเวอร์ชันก่อนหน้าและลิงก์แชร์", // REVIEW
+      structure: "สำเนาจะมีหน้า โฟลเดอร์ และลำดับเหมือนเดิม แต่แต่ละหน้าจะเหลือแค่ชื่อ", // REVIEW
+      everyone: "ต้นฉบับมองเห็นได้เฉพาะบางทีม สำเนาไม่มีการจำกัดทีม ทุกคนในเวิร์กสเปซนี้จึงจะมองเห็นสำเนา", // REVIEW
+      below: "บางหน้าข้างในมองเห็นได้เฉพาะบางทีม สำเนาของหน้าเหล่านั้นไม่มีการจำกัดทีม ทุกคนในเวิร์กสเปซนี้จึงจะมองเห็นสำเนา", // REVIEW
+      noLimits: "สำเนาไม่มีการจำกัดทีม", // REVIEW
+      duplicate: "ทำสำเนา", // REVIEW
+      duplicating: "กำลังทำสำเนา…", // REVIEW
+      cancel: "ยกเลิก",
+    },
+    duplicateToDialog: {
+      title: (name) => `ทำสำเนา “${name}” ไปที่…`, // REVIEW
+      destination: "วางสำเนาไว้ใน", // REVIEW
+      pages: (pages) => `${count(pages)} หน้าข้างในจะถูกคัดลอกด้วย`, // REVIEW
     },
     across: {
       copyTo: (name) => `คัดลอกไปที่ ${name}…`,
@@ -381,6 +421,7 @@ export const th: Strings = {
     createTeam: "สร้างทีม", // REVIEW
     teamName: (name) => `ชื่อของ ${name}`, // REVIEW
     renameTeam: "เปลี่ยนชื่อ", // REVIEW
+    renameTeamLabel: (name) => `เปลี่ยนชื่อทีม ${name}`, // REVIEW
     deleteTeam: "ลบ", // REVIEW
     deleteTeamLabel: (name) => `ลบทีม ${name}`, // REVIEW
     teamMember: (person, team) => `${person} ใน ${team}`, // REVIEW
@@ -516,6 +557,7 @@ export const th: Strings = {
       newFolderIn: (workspace) => `โฟลเดอร์ใหม่ใน ${workspace}`,
       rename: "เปลี่ยนชื่อหน้า",
       moveTo: "ย้ายไปที่…",
+      duplicate: "ทำสำเนาหน้า", // REVIEW
       moveUp: "ย้ายหน้าขึ้น",
       moveDown: "ย้ายหน้าลง",
       share: "แชร์หน้า…",
@@ -572,12 +614,14 @@ export const th: Strings = {
       "tab.pin": "ปักหมุดหรือเลิกปักหมุดแท็บปัจจุบัน",
       "tab.split": "แยกแท็บปัจจุบันไปทางขวา หรือย้ายไปอีกฝั่ง", // REVIEW
       "pane.focusOther": "ย้ายโฟกัสไปอีกฝั่ง", // REVIEW
+      "region.next": "ย้ายโฟกัสระหว่างแถบด้านข้างกับหน้า", // REVIEW
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",
       "tree.rename": "เปลี่ยนชื่อ",
       "tree.reorder": "ย้ายหน้าขึ้นหรือลง",
       "tree.menu": "เปิดเมนูของหน้า",
+      "tree.duplicate": "ทำสำเนาหน้าหรือโฟลเดอร์", // REVIEW
       "section.move": "ย้ายส่วนในแถบด้านข้างขึ้นหรือลง",
       "editor.save": "บันทึกทันที",
       "editor.mode": "สลับระหว่างโหมดบล็อกและโหมดข้อความล้วน",

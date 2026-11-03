@@ -64,7 +64,7 @@ describe("right-click menus", () => {
 describe("folder colors", () => {
   it("Color… sets one of eight colors (kept in .thoth/order.json, not in the folder), follows a rename, and None clears it", async () => {
     const app = await openApp(root);
-    const docs = () => within(screen.getByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name: /^(Docs|Papers)$/ });
+    const docs = () => within(screen.getByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name: /^(Docs|Papers)(, Green)?$/ });
     fireEvent.contextMenu(within(await tree()).getByRole("treeitem", { name: "Docs" }));
     await app.user.click(await screen.findByRole("menuitem", { name: "Color…" }));
     const dialog = await screen.findByRole("dialog", { name: "Color for “Docs”" });
@@ -75,6 +75,7 @@ describe("folder colors", () => {
     await app.user.click(within(dialog).getByRole("radio", { name: "Green" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(docs().querySelector(".tree-icon-folder")!.getAttribute("data-color")).toBe("green"));
+    expect(within(await tree()).getByRole("treeitem", { name: "Docs, Green" })).toBe(docs()); // the colour is spoken, not only seen
     expect(JSON.parse(await app.read(".thoth/order.json")).colors).toEqual({ Docs: "green" });
 
     fireEvent.keyDown(docs(), { key: "F2" });
@@ -108,7 +109,7 @@ describe("folder colors", () => {
     await app.user.click(within(await screen.findByRole("dialog", { name: "Color for “Research”" })).getByRole("radio", { name: "Purple" }));
     await waitFor(() => expect(folderColorOf(ws.pages.get(id)!.markdown)).toBe("purple"));
     expect(ws.pages.get(id)!.markdown).toContain("thoth_kind: folder");
-    await waitFor(() => expect(within(group).getByRole("treeitem", { name: "Research" }).querySelector(".tree-icon-folder")!.getAttribute("data-color")).toBe("purple"));
+    await waitFor(() => expect(within(group).getByRole("treeitem", { name: "Research, Purple" }).querySelector(".tree-icon-folder")!.getAttribute("data-color")).toBe("purple"));
   });
 });
 

@@ -111,3 +111,38 @@ describe("server-sent events are hints; the change feed is the truth", () => {
     }
   });
 });
+
+describe("the web client's change-hint reader against this server (ADR-0041)", () => {
+  it("opens, delivers a hint after a write, and ends with 501 when events.sse is off", async () => {
+    const { WebServers } = await import("../../web/src/servers.ts");
+    const env = await startTestEnv();
+    const off = await startTestEnv({ env: { EVENTS: "off" } });
+    try {
+      const run = async (target: TestEnv, write: boolean) => {
+        const who = await target.user("Ana");
+        const ws = await target.workspace("W", { members: { [who.userId]: "owner" } });
+        const auth = { status: "signed-in", token: async () => who.token, renew: async () => null } as never;
+        const web = new WebServers({ server: target.url, capabilities: { protocolVersion: "1.0", capabilities: [] }, auth, fetch, account: () => undefined });
+        const seen = { opened: false, hints: 0, ended: false };
+        let opened!: () => void;
+        const up = new Promise<void>((r) => (opened = r));
+        const close = web.events("trial", ws, { open: () => ((seen.opened = true), opened()), hint: () => void seen.hints++, end: () => ((seen.ended = true), opened()) });
+        await up;
+        if (write) {
+          const before = seen.hints;
+          await createPage(target, who, ws);
+          const deadline = Date.now() + 5000;
+          while (seen.hints === before && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+          expect(seen.hints).toBeGreaterThan(before);
+        }
+        close();
+        return seen;
+      };
+      expect(await run(env, true)).toMatchObject({ opened: true, ended: false });
+      expect(await run(off, false)).toEqual({ opened: false, hints: 0, ended: true });
+    } finally {
+      await env.close();
+      await off.close();
+    }
+  });
+});

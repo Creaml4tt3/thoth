@@ -1,0 +1,21 @@
+{
+  "$id": "https://thoth.invalid/schemas/presence-entry.v1.json",
+  "title": "presence-entry.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.~-]+$"
+    },
+    "displayName": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "userId",
+    "displayName"
+  ]
+}

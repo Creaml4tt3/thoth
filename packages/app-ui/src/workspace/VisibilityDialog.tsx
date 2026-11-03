@@ -32,6 +32,9 @@ export function VisibilityDialog({ client, workspace, page, name, onSaved, onClo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const legend = useId();
+  const errorId = useId();
+  /** "Choose at least one team" is about the team boxes: they carry it (WCAG 3.3.1), as a field carries its error. */
+  const noneChosen = error === t.pickOne;
 
   useEffect(() => {
     let live = true;
@@ -69,6 +72,7 @@ export function VisibilityDialog({ client, workspace, page, name, onSaved, onClo
     if (on) next.add(id);
     else next.delete(id);
     setPicked(next);
+    if (noneChosen && next.size > 0) setError(null);
   };
 
   return createPortal(
@@ -102,7 +106,7 @@ export function VisibilityDialog({ client, workspace, page, name, onSaved, onClo
               <div className="share-choices">
                 {teams.map((team) => (
                   <label key={team.id} className="share-choice">
-                    <input type="checkbox" checked={picked.has(team.id)} disabled={busy || !limited} onChange={(event) => toggle(team.id, event.target.checked)} />
+                    <input type="checkbox" aria-invalid={noneChosen || undefined} aria-describedby={noneChosen ? errorId : undefined} checked={picked.has(team.id)} disabled={busy || !limited} onChange={(event) => toggle(team.id, event.target.checked)} />
                     <span>{team.name}</span>
                   </label>
                 ))}
@@ -112,7 +116,7 @@ export function VisibilityDialog({ client, workspace, page, name, onSaved, onClo
           </fieldset>
         )}
         {error !== null && (
-          <p role="alert" className="alert alert-danger">
+          <p id={errorId} role="alert" className="alert alert-danger">
             {error}
           </p>
         )}

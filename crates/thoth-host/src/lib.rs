@@ -26,9 +26,11 @@ pub mod data_dir;
 pub mod diagnostics;
 pub mod error;
 mod handles;
+pub mod index_home;
 pub mod install;
 pub mod links;
 pub mod mcp;
+pub mod network;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
@@ -80,6 +82,7 @@ pub const COMMANDS: &[&str] = &[
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
+    "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -199,6 +202,8 @@ pub struct Host {
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
+    /// Where a host without a usable data folder keeps its indexes (ADR-0046): made on first use, removed with the host.
+    scratch_indexes: std::sync::OnceLock<tempfile::TempDir>,
 }
 
 type Reply = (Value, Option<Vec<u8>>);
@@ -231,6 +236,7 @@ impl Host {
             version: String::new(),
             reported: AtomicUsize::new(0),
             replace: Mutex::new(()),
+            scratch_indexes: std::sync::OnceLock::new(),
         }
     }
 
@@ -563,6 +569,18 @@ impl Host {
                 json(self.mcp.decide(str_arg(args, "app")?, allow)?)
             }
             "mcp.forget" => json(self.mcp.forget(str_arg(args, "app")?)?),
+            // Proposed changes (ADR-0048): the per-app switch, the list, one with its text, and a window's report that it
+            // applied one (compare-and-swap, in its Vault), the user declined it, or the page had changed.
+            "mcp.mayPropose" => {
+                let allow = match args.get("allow") {
+                    Some(Value::Bool(b)) => *b,
+                    _ => return Err(HostError::bad_argument("allow must be a boolean")),
+                };
+                json(self.mcp.may_propose(str_arg(args, "app")?, allow)?)
+            }
+            "mcp.proposals" => json(self.mcp.proposals()),
+            "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),
+            "mcp.settle" => json(self.mcp.settle(owner, str_arg(args, "id")?, str_arg(args, "status")?)?),
             "mcp.answer" => {
                 self.mcp.answer(owner, str_arg(args, "id")?, args)?;
                 null()
@@ -616,14 +634,19 @@ impl Host {
         let fd = open_root_dir(&root)?;
         let fs = VaultFs::new(fd, self.config.disable_hardlink);
         fs.mkdirp(".thoth")?;
-        // SQLITE_OPEN_NOFOLLOW refuses a symlink anywhere in this path; `.thoth` was just checked through the root fd.
-        // On Windows SQLite ignores that flag, so the host checks the database files through the root handle.
-        #[cfg(windows)]
-        fs.refuse_linked_index()?;
-        let db = root.join(".thoth").join("index.sqlite");
+        // The index lives in the app's data folder (ADR-0046). The folders on the way are checked by `index_home`;
+        // SQLITE_OPEN_NOFOLLOW refuses a link anywhere in the path (on Windows, where SQLite ignores that flag,
+        // `index_home` checks the database files too).
+        let db = self.index_database(&root)?;
         #[cfg(windows)]
         let db = win::paths::for_win32(&db);
+        // The first handle on this folder in this app deletes the index an older Thoth left in `.thoth/`. A later one
+        // finds it gone (or one an older Thoth made since, which the next first open deletes).
+        if !self.state().vaults.values().any(|v| v.root == root) {
+            drop_old_index(&fs, &root);
+        }
         let sql = Sql::open(&db)?;
+        let network = network::on_network(&root);
         let label = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let handle = handles::new_handle("vault")?;
         let shown = root.to_string_lossy().into_owned();
@@ -637,7 +660,29 @@ impl Host {
             shared
         };
         self.remember(&shown);
-        Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared }))
+        Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared, "network": network }))
+    }
+
+    /// `root`'s index database: in the data folder, or this host's own temporary folder when it has none or the data
+    /// folder cannot hold it (read-only, full, not a folder). The index is a cache, so that does not stop the Private
+    /// Space from opening. A link on the way is still refused, never worked around.
+    fn index_database(&self, root: &Path) -> HostResult<PathBuf> {
+        if let Some(data) = &self.config.data_dir {
+            match index_home::canonical_base(data).and_then(|base| index_home::database(&base, root)) {
+                Ok(db) => return Ok(db),
+                Err(e) if e.code == "UNAVAILABLE" || e.code == "SQLITE_ERROR" => return Err(e),
+                // The code only: the message has the data folder's path in it.
+                Err(e) => log::warn!("The search index is kept in a temporary folder: the data folder cannot hold it ({})", e.code),
+            }
+        }
+        let scratch = match self.scratch_indexes.get() {
+            Some(dir) => dir,
+            None => {
+                let dir = tempfile::Builder::new().prefix("thoth-indexes-").tempdir().map_err(|e| HostError::io(&e, "mkdir", "temporary index folder"))?;
+                self.scratch_indexes.get_or_init(|| dir)
+            }
+        };
+        index_home::database(&index_home::canonical_base(scratch.path())?, root)
     }
 
     /// Has an owner other than `owner` (another window) a handle open on `root`?
@@ -973,6 +1018,25 @@ fn discard(entry: Arc<FileEntry>) {
 const HOME_VAR: &str = "HOME";
 #[cfg(windows)]
 const HOME_VAR: &str = "USERPROFILE";
+
+/// Deletes the index an older Thoth kept in `<root>/.thoth/` (ADR-0046), unless another Thoth has it open (an older
+/// version on this folder, maybe on another computer: `Sql::in_use`). It is not copied: the index rebuilds from the
+/// files. An older Thoth that opens the folder later makes and fills its own again. Best effort: what cannot be
+/// deleted now is tried again on the next open.
+fn drop_old_index(fs: &VaultFs, root: &Path) {
+    let old = root.join(".thoth").join(index_home::FILE);
+    // On Windows SQLite would follow a link, so a linked old index is never opened, only removed.
+    #[cfg(windows)]
+    let (linked, old) = (fs.refuse_linked_index().is_err(), win::paths::for_win32(&old));
+    #[cfg(not(windows))]
+    let linked = false;
+    if !linked && Sql::in_use(&old) {
+        return;
+    }
+    if let Err(e) = fs.remove_old_index() {
+        log::warn!("The old index in .thoth/ was not deleted: {}", e.message);
+    }
+}
 
 /// Opens a canonical root directory. On macOS `O_NOFOLLOW_ANY` refuses a symlink in any component,
 /// so a component swapped for a symlink after canonicalization cannot redirect the vault.

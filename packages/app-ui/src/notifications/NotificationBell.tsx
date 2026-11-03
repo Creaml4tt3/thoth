@@ -11,6 +11,11 @@ interface Props {
   onOpenChange(open: boolean): void;
   /** Opens what an entry is about (a run, a page, a folder). */
   onOpenTarget(target: NotificationTarget): void;
+  /**
+   * Something waiting for the person, shown first in the list for as long as it waits and counted in the badge (the
+   * desktop's proposed changes from connected apps, ADR-0048). Not a notification: "Mark all read" and "Clear" leave it.
+   */
+  pinned?: { count: number; title: string; body: string; onOpen(): void } | null;
 }
 
 const PANEL_WIDTH = 340;
@@ -22,7 +27,7 @@ const MARGIN = 8;
  * the list is a non-modal dialog right after the bell in the focus order. Arrows move between entries, Esc closes
  * and returns focus to the bell, a click elsewhere or focus leaving closes it.
  */
-export function NotificationBell({ center, open, onOpenChange, onOpenTarget }: Props) {
+export function NotificationBell({ center, open, onOpenChange, onOpenTarget, pinned }: Props) {
   const strings = useStrings();
   const t = strings.notifications;
   const state = useSyncExternalStore(center.subscribe, center.getState);
@@ -94,7 +99,9 @@ export function NotificationBell({ center, open, onOpenChange, onOpenTarget }: P
   };
 
   const time = new Intl.DateTimeFormat(strings.lang, { hour: "numeric", minute: "2-digit" });
-  const label = state.unread > 0 ? t.bellUnread(state.unread) : t.bell;
+  const waiting = pinned && pinned.count > 0 ? pinned : null;
+  const count = state.unread + (waiting?.count ?? 0);
+  const label = count > 0 ? t.bellUnread(count) : t.bell;
 
   return (
     <span className="notif">
@@ -107,9 +114,9 @@ export function NotificationBell({ center, open, onOpenChange, onOpenTarget }: P
         aria-controls={open ? panelId : undefined}
         onClick={() => onOpenChange(!open)}
       />
-      {state.unread > 0 && (
+      {count > 0 && (
         <span className="notif-badge" aria-hidden="true" data-testid="notification-badge">
-          {state.unread > 99 ? "99+" : state.unread.toLocaleString(strings.lang)}
+          {count > 99 ? "99+" : count.toLocaleString(strings.lang)}
         </span>
       )}
       <span className="sr-only" aria-live="polite" data-testid="notification-live">
@@ -143,8 +150,27 @@ export function NotificationBell({ center, open, onOpenChange, onOpenTarget }: P
               </Button>
             </span>
           </div>
+          {waiting && (
+            <ul className="notif-list notif-pinned">
+              <li>
+                <button
+                  type="button"
+                  className="notif-item"
+                  data-kind="pinned"
+                  data-unread
+                  onClick={() => {
+                    onOpenChange(false);
+                    waiting.onOpen();
+                  }}
+                >
+                  <span className="notif-title">{waiting.title}</span>
+                  <span className="notif-body">{waiting.body}</span>
+                </button>
+              </li>
+            </ul>
+          )}
           {state.entries.length === 0 ? (
-            <p className="notif-empty muted">{t.empty}</p>
+            !waiting && <p className="notif-empty muted">{t.empty}</p>
           ) : (
             <ul className="notif-list">
               {state.entries.map((entry) => {

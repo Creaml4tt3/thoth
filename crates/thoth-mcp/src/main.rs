@@ -1,7 +1,7 @@
 //! `thoth-mcp`: Thoth's MCP server for other apps (ADR-0021). An MCP client (Claude Desktop, Cursor, …) starts it
 //! from its settings and speaks MCP on its stdin and stdout. It opens no vault and keeps nothing: each tool call is
 //! relayed over a local socket to the running Thoth app, which checks it, asks the user about an app it has not
-//! seen, and answers from the Private Spaces the user shares (read only).
+//! seen, and answers from the Private Spaces the user shares; changes are only proposed, for the user's review (ADR-0048).
 //!
 //! The MCP side is hand-written newline-delimited JSON-RPC 2.0 (the stdio transport). It is "dual-era":
 //! - 2026-07-28 (current): every request carries its protocol version and client in `_meta`; `server/discover`.
@@ -35,10 +35,12 @@ const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const UNSUPPORTED_PROTOCOL_VERSION: i64 = -32022;
 
-const INSTRUCTIONS: &str = "Thoth is a notes app. These tools read, and never change, the Private Spaces (folders of \
-Markdown pages) that Thoth's user shares with this app. Page paths are relative to their Private Space, like \
-Projects/Plan.md. When more than one Private Space is shared, results name theirs in `space`; give `space` to read \
-a page. Each app is allowed or denied by the user in Thoth the first time it connects.";
+const INSTRUCTIONS: &str = "Thoth is a notes app. These tools read the Private Spaces (folders of Markdown pages) that \
+Thoth's user shares with this app, and propose changes to them. A proposal is never written by the call: the user \
+reviews it in Thoth and applies or declines it, so tell the user it waits for their review; get_proposal says what \
+became of it. Page paths are relative to their Private Space, like Projects/Plan.md. When more than one Private Space \
+is shared, results name theirs in `space`; give `space` to read a page or propose a change. Each app is allowed or \
+denied by the user in Thoth the first time it connects, and asked again before its first proposal.";
 
 struct Rpc {
     code: i64,

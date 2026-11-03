@@ -293,6 +293,31 @@ impl VaultFs {
         }
         Ok(())
     }
+
+    /// Deletes the index files an older Thoth kept in `.thoth/` (ADR-0046). The host's own call, never the webview's
+    /// (`remove` refuses these names): deletes each entry through the root handle, so a link is removed and never
+    /// followed; a folder by one of those names is left.
+    pub fn remove_old_index(&self) -> HostResult<()> {
+        let dir = match walk::open_dir(&self.root, &[".thoth".to_owned()]) {
+            Ok(dir) => dir,
+            Err(WalkError::Os(e)) if e.is_not_found() => return Ok(()),
+            Err(e) => return Err(walk_error(e, ".thoth", "open")),
+        };
+        let mut result = Ok(());
+        for name in crate::index_home::FILES {
+            let wide: Vec<u16> = name.encode_utf16().collect();
+            match walk::classify_wide(&dir, &wide) {
+                Ok(Kind::Directory) => {}
+                Err(e) if e.is_not_found() => {}
+                _ => {
+                    if let Err(e) = remove_entry(&dir, &wide, 0) {
+                        result = result.and(Err(os(e, "rm", &format!(".thoth/{name}"))));
+                    }
+                }
+            }
+        }
+        result
+    }
 }
 
 fn walk_error(e: WalkError, raw: &str, op: &str) -> HostError {

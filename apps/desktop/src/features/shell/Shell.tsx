@@ -39,6 +39,7 @@ import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { DesktopFeedbackDialog } from "../feedback/Feedback.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
+import { requestDuplicate } from "@thoth/app-ui/order/duplicate.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
 import { requestMembers } from "@thoth/app-ui/workspace/members-request.ts";
 import { requestWorkspaceAdmin } from "@thoth/app-ui/workspace/workspace-admin-request.ts";
@@ -88,6 +89,9 @@ function RecoveryNotice() {
   );
 }
 
+/** The network drive notice of a Private Space was dismissed: this prefix and its folder, in localStorage. */
+export const NETWORK_NOTICE_KEY_PREFIX = "thoth.desktop.networkNotice.";
+
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
   const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
@@ -98,6 +102,17 @@ export function Shell() {
   const strings = useStrings();
   const tt = strings.tabs;
   const [problem, setProblem] = useState<string | null>(null);
+  // A Private Space on a network drive (ADR-0046): said once per Private Space, until dismissed.
+  const networkKey = `${NETWORK_NOTICE_KEY_PREFIX}${connection.root}`;
+  const [networkNotice, setNetworkNotice] = useState(() => connection.network === true && globalThis.localStorage?.getItem(networkKey) !== "dismissed");
+  const dismissNetworkNotice = () => {
+    try {
+      globalThis.localStorage?.setItem(networkKey, "dismissed");
+    } catch {
+      // Not remembered (storage full or off): it is said again next time.
+    }
+    setNetworkNotice(false);
+  };
   const dismissText = useDesktopStrings().transfer.dismiss;
   const editor = useEditorActions();
   const { theme: themeNow, setTheme, cycle } = useTheme(desktopTheme);
@@ -225,12 +240,28 @@ export function Shell() {
     });
   };
   const split = tabs.layout.panes.length > 1;
-  /** Alt/Option+Shift+\ or F6 (ADR-0030): the other pane, with focus on its current tab. */
+  /** Alt/Option+Shift+\ (ADR-0030): the other pane, with focus on its current tab. */
   const focusOtherPane = () => {
     if (!split) return;
     const next = (tabs.layout.active + 1) % tabs.layout.panes.length;
     tabs.focusOther();
     focusPaneTab(next);
+  };
+  /** F6: the sidebar's tree, then each pane's current tab, then the sidebar again. With the sidebar hidden, the panes only. */
+  const nextRegion = () => {
+    const sidebarRow = side.hidden ? null : document.querySelector<HTMLElement>('.sidebar [role="treeitem"][tabindex="0"]');
+    const inSidebar = document.activeElement?.closest(".sidebar") != null;
+    const pane = document.activeElement?.closest<HTMLElement>("[data-pane]");
+    const from = inSidebar ? -1 : pane ? Number(pane.dataset["pane"]) : tabs.layout.active;
+    const next = from + 1;
+    if (next < tabs.layout.panes.length) {
+      tabs.focusPane(next);
+      focusPaneTab(next);
+    } else if (sidebarRow) sidebarRow.focus();
+    else {
+      tabs.focusPane(0);
+      focusPaneTab(0);
+    }
   };
   const makeActions = (): CommandActions => ({
     newPage: () => requestNewPage(),
@@ -259,11 +290,12 @@ export function Shell() {
           },
         }
       : {}),
-    ...(path ? { rename: () => setDialog({ kind: "rename", target: { kind: "private", path } }), moveTo: () => requestMoveTo({ kind: "private", path }), reorder: (delta: -1 | 1) => requestReorder({ kind: "private", path }, delta) } : {}),
+    ...(path ? { rename: () => setDialog({ kind: "rename", target: { kind: "private", path } }), moveTo: () => requestMoveTo({ kind: "private", path }), duplicate: () => requestDuplicate({ kind: "private", path }), reorder: (delta: -1 | 1) => requestReorder({ kind: "private", path }, delta) } : {}),
     ...(here && canWriteHere
       ? {
           rename: () => setDialog({ kind: "rename", target: { kind: "workspace", server: here.server, workspace: here.workspace, page: here.page, title: remoteTitle(directory, here) ?? "" } }),
           moveTo: () => requestMoveTo({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }),
+          duplicate: () => requestDuplicate({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }),
           reorder: (delta: -1 | 1) => requestReorder({ kind: "workspace", server: here.server, workspace: here.workspace, page: here.page }, delta),
           ...(servers.canShare(here.server) ? { sharePage: () => requestShare({ server: here.server, workspace: here.workspace, page: here.page }) } : {}),
         }
@@ -333,6 +365,7 @@ export function Shell() {
     "tab.pin": () => togglePin(),
     "tab.split": () => tabs.split(),
     "pane.focusOther": focusOtherPane,
+    "region.next": nextRegion,
     "page.favorite": toggleFavorite,
     ...(assistant ? { "assistant.ask": () => assistant.ask(), "assistant.size": () => assistant.toggleSize() } : {}),
   });
@@ -469,6 +502,14 @@ export function Shell() {
               {watchError && (
                 <p role="alert" className="alert alert-warning banner">
                   {t.watchError(watchError)}
+                </p>
+              )}
+              {networkNotice && (
+                <p role="status" className="alert banner">
+                  {t.networkNotice}{" "}
+                  <Button variant="quiet" small onClick={dismissNetworkNotice}>
+                    {dismissText}
+                  </Button>
                 </p>
               )}
               {favorites.error && (

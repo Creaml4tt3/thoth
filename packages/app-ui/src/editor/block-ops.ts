@@ -145,6 +145,7 @@ const plainOf = (content: Fragment): string =>
     const name = leaf.type.name;
     if (name === "hardBreak") return "\n";
     if (name === "wikilink") return `[[${String(leaf.attrs["target"])}]]`;
+    if (name === "mention") return `@${String(leaf.attrs["label"])}`;
     if (name === "inlineRaw") return String(leaf.attrs["source"]);
     return "";
   });
