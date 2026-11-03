@@ -52,8 +52,10 @@
 
   /* Semantic */
   --thoth-success: #2F8F5B;
-  --thoth-warning: #B7791F;
-  --thoth-danger: #D1453B;
+  /* Warning and danger are also text (ambiguous links, delete buttons, "Not saved"): 4.5:1 on the page, the sidebar,
+     a hover or active row and the menu highlight of each theme (packages/app-ui/test/contrast.test.ts). */
+  --thoth-warning: #8A5B00;
+  --thoth-danger: #B83A31;
   --thoth-private: #615D59;   /* Private Space badge: local, stone */
   --thoth-workspace: #0B6BCB; /* Workspace badge: connected, blue */
   --thoth-agent: #E8590C;     /* Agent Hub badge: moon */
@@ -143,6 +145,8 @@
   --thoth-text-blue: #5AA9FF;
   --thoth-text-purple: #B794F6;
   --thoth-text-red: #FF7B72;
+  --thoth-warning: #D09530;
+  --thoth-danger: #FF7B72;
   --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -174,6 +178,8 @@
     --thoth-text-blue: #5AA9FF;
     --thoth-text-purple: #B794F6;
     --thoth-text-red: #FF7B72;
+  --thoth-warning: #D09530;
+  --thoth-danger: #FF7B72;
     color-scheme: dark;
   }
 }
@@ -183,7 +189,7 @@
 :root, [data-theme] {
   --thoth-ink-primary: rgb(var(--thoth-ink) / 0.94);
   --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.66);
-  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.46);
+  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.60); /* the lowest alpha that keeps 4.5:1 on light active rows */
   --thoth-ink-faint: rgb(var(--thoth-ink) / 0.28);
   --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
   --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);

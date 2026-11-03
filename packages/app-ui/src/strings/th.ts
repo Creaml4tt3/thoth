@@ -10,6 +10,7 @@ export const th: Strings = {
   editor: {
     status: { idle: "", dirty: "ยังไม่ได้บันทึก", saving: "กำลังบันทึก…", saved: "บันทึกแล้ว", error: "บันทึกไม่สำเร็จ" },
     modeGroup: "โหมดแก้ไข",
+    content: "เนื้อหาของหน้า", // REVIEW
     modeSwitchTitle: "สลับโหมดแก้ไข (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "บล็อก", hint: "จัดรูปแบบเป็นบล็อก แบบ Notion" },
@@ -381,6 +382,7 @@ export const th: Strings = {
     createTeam: "สร้างทีม", // REVIEW
     teamName: (name) => `ชื่อของ ${name}`, // REVIEW
     renameTeam: "เปลี่ยนชื่อ", // REVIEW
+    renameTeamLabel: (name) => `เปลี่ยนชื่อทีม ${name}`, // REVIEW
     deleteTeam: "ลบ", // REVIEW
     deleteTeamLabel: (name) => `ลบทีม ${name}`, // REVIEW
     teamMember: (person, team) => `${person} ใน ${team}`, // REVIEW
@@ -572,6 +574,7 @@ export const th: Strings = {
       "tab.pin": "ปักหมุดหรือเลิกปักหมุดแท็บปัจจุบัน",
       "tab.split": "แยกแท็บปัจจุบันไปทางขวา หรือย้ายไปอีกฝั่ง", // REVIEW
       "pane.focusOther": "ย้ายโฟกัสไปอีกฝั่ง", // REVIEW
+      "region.next": "ย้ายโฟกัสระหว่างแถบด้านข้างกับหน้า", // REVIEW
       "tree.move": "เลื่อนระหว่างหน้าและโฟลเดอร์",
       "tree.expand": "เปิดหรือปิดโฟลเดอร์",
       "tree.open": "เปิดหน้า",

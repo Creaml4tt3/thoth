@@ -330,7 +330,7 @@ describe("workspace pages", () => {
     const put = servers.calls.find((c) => c.method === "PUT")!;
     expect(put.headers).toMatchObject({ "if-match": `"${before}"`, "content-type": "application/json" });
     expect(servers.page(ws, "Plan").title).toBe("Plan");
-    await waitFor(() => expect(screen.getByRole("status", { name: "" }).textContent).toBe("Saved"));
+    await waitFor(() => expect(document.querySelector(".save-status")!.textContent).toBe("Saved"));
   });
 
   it("a stale save (412) opens the conflict dialog; Keep both creates a conflict copy in the workspace", async () => {

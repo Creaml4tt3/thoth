@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { ServerInfo } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
@@ -48,6 +48,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
   /** Set by Cancel: the host then rejects the waiting sign-in, which is not a failure to report. */
   const cancelled = useRef(false);
   const titleId = `server-${info.id}`;
+  const failureId = useId();
   const signedIn = info.auth !== "signed-out";
   const limits = info.limits ? describeLimits(info.limits, limitsText) : [];
 
@@ -169,7 +170,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
         <form className="form server-token" onSubmit={submitToken}>
           <label className="field">
             <span>{t.tokenLabel}</span>
-            <input ref={tokenField} className="input" type="password" name="token" autoComplete="off" spellCheck={false} data-autofocus />
+            <input ref={tokenField} className="input" type="password" name="token" autoComplete="off" spellCheck={false} data-autofocus aria-invalid={failure ? true : undefined} aria-describedby={failure ? failureId : undefined} />
           </label>
           <div className="set-actions">
             <Button variant="primary" small type="submit" disabled={busy !== null}>
@@ -190,7 +191,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
       )}
 
       {failure && (
-        <p role="alert" className="alert alert-danger">
+        <p id={failureId} role="alert" className="alert alert-danger">
           {failure}
         </p>
       )}
@@ -229,6 +230,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
   const [addingStarter, setAddingStarter] = useState(false);
   const [starterError, setStarterError] = useState<string | null>(null);
   const section = useRef<HTMLElement>(null);
+  const errorId = useId();
   const starter = localStarter(options.starterServer, t);
   // Suggested until added. Nothing is sent to it before the user chooses Add.
   const suggestStarter = starter !== null && state.loaded && !state.servers.some((s) => isStarter(starter, s.info.url));
@@ -308,14 +310,14 @@ export function ServersSettings({ focus }: { focus: boolean }) {
       <form className="server-add" onSubmit={(e) => void add(e)} aria-label={t.addServer}>
         <label className="field">
           <span>{t.address}</span>
-          <input className="input" type="text" inputMode="url" placeholder="https://thoth.example.com" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="url" spellCheck={false} />
+          <input className="input" type="text" inputMode="url" placeholder="https://thoth.example.com" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="url" spellCheck={false} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} />
         </label>
         <Button variant="primary" small type="submit" disabled={adding}>
           {adding ? t.connecting : t.addServer}
         </Button>
       </form>
       {error && (
-        <p role="alert" className="alert alert-danger">
+        <p id={errorId} role="alert" className="alert alert-danger">
           {error}
         </p>
       )}

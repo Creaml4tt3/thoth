@@ -1,3 +1,6 @@
+import type { TextColor } from "@thoth/editor";
+import { useStrings } from "../strings/index.ts";
+
 /** Small row icons for the page trees. Decorative: the row's text and `aria-expanded` carry the meaning. */
 
 const STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -52,4 +55,11 @@ export function PageIcon() {
       </svg>
     </span>
   );
+}
+
+/** A folder's colour for screen readers, placed after the row's label so the name reads "Notes, Red". */
+export function FolderColorName({ color }: { color: string | null | undefined }) {
+  const names = useStrings().editor.styles.colorNames;
+  const name = color ? names[color as TextColor] : undefined;
+  return name ? <span className="sr-only">, {name}</span> : null;
 }

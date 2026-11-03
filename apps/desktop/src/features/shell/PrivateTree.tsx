@@ -5,7 +5,7 @@ import { ConflictError, type OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
 import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
-import { Disclosure, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
+import { Disclosure, FolderColorName, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
 import { clearNewFolder, usePendingNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
@@ -574,6 +574,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           <Disclosure open={expanded} />
           <FolderIcon open={expanded} color={colorOf(node.path)} />
           <span className="tree-label">{node.name}</span>
+          <FolderColorName color={colorOf(node.path)} />
         </button>
         <TreeGroup open={expanded} count={node.children.length}>
           {node.children.map((child, i) => row(child, depth + 1, i + 1, node.children.length))}

@@ -73,19 +73,30 @@ describe("splitting", () => {
     expect(screen.queryByRole("separator", { name: "Resize panes" })).toBeNull();
   });
 
-  it("new pages and next tab act in the active pane; F6 moves to the other pane", async () => {
+  it("new pages and next tab act in the active pane; F6 moves through the sidebar and the panes", async () => {
     const app = await start();
     menu("Beta", "Split right");
     await waitFor(() => expect(right()).toEqual(["Beta"]));
     // The right pane is active: a new tab opens there.
     await app.user.keyboard("{Control>}t{/Control}");
     await waitFor(() => expect(right()).toEqual(["Beta", "New tab"]));
-    await app.user.keyboard("{F6}");
+    await app.user.keyboard("{F6}"); // right pane -> sidebar
+    await waitFor(() => expect(document.activeElement?.getAttribute("role")).toBe("treeitem"));
+    await app.user.keyboard("{F6}"); // sidebar -> left pane
     await waitFor(() => expect(document.activeElement?.textContent).toBe("Alpha"));
     await app.user.keyboard("{Control>}{Enter}{/Control}"); // nothing: not a tree
     await app.user.click(await row("Gamma"));
     await waitFor(() => expect(left()).toEqual(["Gamma"]));
     expect(right()).toEqual(["Beta", "New tab"]);
+  });
+
+  it("with one pane, F6 still moves between the editor and the sidebar", async () => {
+    const app = await start();
+    (await editorBox()).focus();
+    await app.user.keyboard("{F6}");
+    await waitFor(() => expect(document.activeElement?.matches(".sidebar [role=treeitem]")).toBe(true));
+    await app.user.keyboard("{F6}");
+    await waitFor(() => expect(document.activeElement?.getAttribute("role")).toBe("tab"));
   });
 
   it("closing a pane's last tab closes the pane", async () => {
