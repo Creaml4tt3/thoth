@@ -1,0 +1,26 @@
+{
+  "$id": "https://thoth.invalid/schemas/limited-page-list.v1.json",
+  "title": "limited-page-list.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "required": [
+          "pageId"
+        ]
+      }
+    }
+  },
+  "required": [
+    "items"
+  ]
+}

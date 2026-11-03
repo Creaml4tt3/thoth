@@ -443,6 +443,15 @@ function planLinks(ctx: LinkContext, item: ImportItem, rel: string, references: 
       warnings.push({ code: "ambiguous_link", severity: "warning", message: `Link "${ref.rawTarget}" matches ${result.candidates.length} files (${result.candidates.join(", ")}); left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
       continue;
     }
+    // A folder link (`[[Projects/]]`, ADR-0049): kept as written; it counts as resolved when the vault has that folder after the import.
+    if (result.state === "resolved" && result.path.endsWith("/")) {
+      if (ctx.destResolver.resolve(destPath, ref).state === "resolved") stats.resolved++;
+      else {
+        stats.unresolved++;
+        warnings.push({ code: "unresolved_link", severity: "warning", message: `Folder link "${ref.rawTarget}" was not found in the import; left unchanged`, sourcePath: item.sourcePath, line: ref.range.startLine });
+      }
+      continue;
+    }
     const targetDest = result.state === "resolved" ? ctx.destBySource.get(result.path) : undefined;
     if (result.state === "unresolved" || targetDest === undefined) {
       stats.unresolved++;

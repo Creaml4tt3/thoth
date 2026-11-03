@@ -39,6 +39,14 @@ export const th: Strings = {
     linkAlias: (alias) => `ชื่อเรียกอื่น “${alias}”`,
     linkNoMatch: (query) => `ไม่มีหน้าที่ตรงกับ “${query}” พิมพ์ต่อเพื่อลิงก์ไปยังหน้าใหม่`,
     linkNoPages: "ยังไม่มีหน้าอื่น",
+    linkMention: (people) => (people ? "ลิงก์ไปยังหน้า โฟลเดอร์ หรือคน" : "ลิงก์ไปยังหน้าหรือโฟลเดอร์"), // REVIEW
+    linkFolder: "โฟลเดอร์", // REVIEW
+    linkPerson: "คน", // REVIEW
+    linkAtNoMatch: (query) => (query ? `ไม่มีอะไรตรงกับ “${query}”` : "ยังไม่มีอะไรให้ลิงก์"), // REVIEW
+    linkOpenFolder: "คลิกเพื่อแสดงในแถบด้านข้าง", // REVIEW
+    linkUnresolvedFolder: (target) => `ไม่มีโฟลเดอร์ชื่อ "${target}"`, // REVIEW
+    linkUnavailable: "เปิดหน้านี้ไม่ได้", // REVIEW
+    mention: (name) => `การกล่าวถึง ${name}`, // REVIEW
     fold: (collapsed, toggle) => `${collapsed ? "กาง" : "พับ"}${toggle ? "บล็อกพับได้" : "กล่องเน้นข้อความ"}`,
     preserved: (kind) => `${kind === "html" ? "HTML" : kind === "math" ? "สูตรคณิตศาสตร์" : "Markdown"} · เก็บไว้ตามต้นฉบับ`,
     preservedTitle: "เก็บไว้ตามต้นฉบับ",

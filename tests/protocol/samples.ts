@@ -99,6 +99,7 @@ export const SAMPLES: Record<string, unknown> = {
   PageVisibilityWrite: { teamIds: null },
   TeamPage: { pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", title: "Finance", kind: "folder", onlyTeam: true },
   TeamPageList: { items: [{ pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019", title: "Finance", kind: null, onlyTeam: false }] },
+  LimitedPageList: { items: [{ pageId: "01a15cc9-7d0d-7982-a22a-e5ae3df6b019" }] },
   TrashItem: TRASH_ITEM,
   TrashList: { items: [TRASH_ITEM], nextCursor: null },
   TrashRestored: { pageIds: ["01a15cc9-7d0d-7982-a22a-e5ae3df6b019"] },

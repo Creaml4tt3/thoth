@@ -63,3 +63,10 @@ export const TeamPageSchema = z.object({
 });
 export const TeamPageListSchema = z.object({ items: z.array(TeamPageSchema) });
 export type TeamPageList = z.infer<typeof TeamPageListSchema>;
+
+/**
+ * `listLimitedPages` (ADR-0049): every page (not deleted) limited itself, also one whose teams were all deleted. Pages
+ * below them are limited too but not listed. At most one item per page of the workspace, so not paged.
+ */
+export const LimitedPageListSchema = z.object({ items: z.array(z.object({ pageId: PageIdSchema })) });
+export type LimitedPageList = z.infer<typeof LimitedPageListSchema>;

@@ -1,8 +1,8 @@
 import { parseMarkdownTree, splitFrontmatter } from "@thoth/content";
 import type { JSONContent } from "@tiptap/core";
-import type { ListItem, Nodes, PhrasingContent, Root, RootContent, Table, Text } from "mdast";
+import type { Link, ListItem, Nodes, PhrasingContent, Root, RootContent, Table, Text } from "mdast";
 import { canonBlock, isTight } from "./blocks.ts";
-import { MARK_ORDER } from "./inline.ts";
+import { MARK_ORDER, USER_ID, USER_LINK_PREFIX } from "./inline.ts";
 import { findHighlightDelims, maskHighlights, pairStyles, type StyleItem, type StyleMask } from "./styles.ts";
 import { findWikilinks, maskWikilinks, parseWikiInner, unmask, type Mask, type Span } from "./wikilinks.ts";
 
@@ -104,6 +104,7 @@ function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out:
         if (node.children.length === 1 && node.children[0]!.type === "text" && (!posOf(node) || sliceOf(node, ctx) === (node.children[0] as Text).value)) {
           inlineNodes(node.children, marks, ctx, out);
         } else if (hasMarker(node.url, ctx) || hasMarker(node.title, ctx)) raw(node);
+        else if (isMention(node)) pushAtom(out, { type: "mention", attrs: { id: node.url.slice(USER_LINK_PREFIX.length), label: (node.children[0] as Text).value.slice(1) } }, marks);
         else inlineNodes(node.children, [...marks, { type: "link", attrs: { href: node.url, title: node.title ?? null } }], ctx, out);
         break;
       case "image":
@@ -116,6 +117,10 @@ function inlineNodes(nodes: PhrasingContent[], marks: MarkJSON[], ctx: Ctx, out:
     }
   }
 }
+
+/** `[@Name](thoth:user/<id>)` with nothing else in the text and no title: a person mention (ADR-0049). */
+const isMention = (node: Link): boolean =>
+  node.url.startsWith(USER_LINK_PREFIX) && USER_ID.test(node.url.slice(USER_LINK_PREFIX.length)) && !node.title && node.children.length === 1 && node.children[0]!.type === "text" && /^@\S/.test(node.children[0]!.value);
 
 function sortMarks(marks: MarkJSON[]): MarkJSON[] {
   const seen = new Set<string>();

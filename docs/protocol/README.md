@@ -97,7 +97,7 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
 | `workspace-management` | `createWorkspace`, `renameWorkspace`, `deleteWorkspace`, `listDeletedWorkspaces`, `restoreWorkspace`, `purgeWorkspace` | any account creates workspaces it owns; owners rename and delete; deleted ones are restorable for 30 days; section 10, ADR-0025 |
-| `teams` | `listTeams`, `createTeam`, `renameTeam`, `deleteTeam`, `addTeamMember`, `removeTeamMember`, `getPageVisibility`, `setPageVisibility`, `listTeamPages` | the role `manager`; teams of members; pages limited to some teams, hidden (404) from everyone else but owners and managers; section 10, ADR-0042, ADR-0043 |
+| `teams` | `listTeams`, `createTeam`, `renameTeam`, `deleteTeam`, `addTeamMember`, `removeTeamMember`, `getPageVisibility`, `setPageVisibility`, `listTeamPages`, `listLimitedPages` | the role `manager`; teams of members; pages limited to some teams, hidden (404) from everyone else but owners and managers; section 10, ADR-0042, ADR-0043, ADR-0049 |
 | `trash` | `listTrash`, `restoreTrashedPage`, `purgeTrashedPage` | deleted pages kept 30 days, restored or deleted for good; ADR-0043 |
 | `feedback` | `sendFeedback` | a problem, an idea or a question for the operator, no sign-in needed; optionally the person's redacted app log (`diagnostics`); section 10, ADR-0033, ADR-0040 |
 | `databases` | none | reserved; no semantics in 1.0 |
@@ -579,6 +579,9 @@ data: {"type":"changes.available","workspaceId":"ws_1","cursor":"<head cursor>"}
   team was deleted is seen by owners and managers only. `GET .../teams/{teamId}/pages` (owners and managers) lists
   the pages limited to a team, `{ items: [{ pageId, title, kind, onlyTeam }] }`, so a client can say what deleting it
   changes.
+- `GET .../limited-pages` (owners and managers, ADR-0049) returns `{ items: [{ pageId }] }`: every page (not deleted)
+  limited itself, also one whose teams were all deleted, all in one response. Pages below them are not listed. A
+  client writes links to these pages, and to pages below them, without a title.
 - **A hidden page does not exist** for that member: 404 `not_found` (never 403) for reads, writes, moves, deletes,
   revisions, the visibility calls, share links, and as a parent of a new or moved page; it is absent from the tree,
   search and transfers, and its change-feed entries are left out (the cursor still moves past them). A transfer by
