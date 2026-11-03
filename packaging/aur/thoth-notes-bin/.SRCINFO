@@ -1,6 +1,6 @@
 pkgbase = thoth-notes-bin
 	pkgdesc = Notes in plain Markdown files on your computer, with shared workspaces you can host yourself
-	pkgver = 0.4.0
+	pkgver = 0.5.0
 	pkgrel = 1
 	url = https://thothnotes.com/
 	arch = x86_64
@@ -17,7 +17,7 @@ pkgbase = thoth-notes-bin
 	depends = webkit2gtk-4.1
 	options = !strip
 	options = !debug
-	source = https://download.thothnotes.com/v0.4.0/Thoth_0.4.0_amd64.deb
-	sha256sums = da5af536afa3ca0ec3109dbb259100ba30627c594d7300f1b42ac5142bfc1f3c
+	source = https://download.thothnotes.com/v0.5.0/Thoth_0.5.0_amd64.deb
+	sha256sums = 378fbc1b8129442c8089ff3cc21bb80a22d4d025d840b80424ef840666019411
 
 pkgname = thoth-notes-bin

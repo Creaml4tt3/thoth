@@ -150,7 +150,7 @@ The hashes are the release's `SHA256SUMS`.
 - **AUR** (`thoth-notes-bin`; `thoth` and `thoth-bin` belong to an unrelated project): `packaging/aur/thoth-notes-bin`
   repackages the `.deb`. For a new version, set `pkgver` (and `pkgrel=1`) and the `.deb`'s hash, run `makepkg
   --printsrcinfo > .SRCINFO`, and push both files to `ssh://aur@aur.archlinux.org/thoth-notes-bin.git` from the
-  owner's AUR account. It was built, checked with `namcap` and installed in an Arch container (0.3.1; the 0.4.0 PKGBUILD only changes the version and hash).
+  owner's AUR account. It was built, checked with `namcap` and installed in an Arch container (0.3.1; the 0.5.0 PKGBUILD only changes the version and hash).
 
 ## Signing (not yet)
 
