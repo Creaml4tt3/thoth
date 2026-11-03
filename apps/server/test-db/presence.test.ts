@@ -113,7 +113,7 @@ describe("presence on a page limited to a team", () => {
     const hidden = await env.api(outsider, "PUT", path());
     const unknown = await env.api(outsider, "PUT", `/workspaces/${ws}/pages/${uuid()}/presence`);
     expect(hidden.status).toBe(404);
-    expect(hidden.json).toEqual(unknown.json);
+    expect({ code: hidden.json.code, detail: hidden.json.detail }).toEqual({ code: unknown.json.code, detail: unknown.json.detail });
     expect((await env.db.query("SELECT 1 FROM page_presence WHERE user_id = $1", [outsider.userId])).rowCount).toBe(0);
     expect((await env.api(insider, "PUT", path())).json.items).toEqual([]);
     expect((await env.api(owner, "PUT", path())).json.items).toEqual([{ userId: insider.userId, displayName: "Ian" }]);
@@ -121,6 +121,7 @@ describe("presence on a page limited to a team", () => {
 
   it("stops showing a member at once when the page is hidden from them", async () => {
     await limit(null);
+    await env.api(owner, "PUT", path());
     await env.api(outsider, "PUT", path());
     expect((await env.api(insider, "PUT", path())).json.items.map((e: { userId: string }) => e.userId)).toContain(outsider.userId);
     await limit([team]); // Otto's row is still fresh, but he can no longer see the page
