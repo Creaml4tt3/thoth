@@ -2,6 +2,7 @@ import { timingSafeEqual, createHash } from "node:crypto";
 import type { Database } from "./db.ts";
 import { purgeFeedback } from "./feedback.ts";
 import { purgeIdempotencyRecords } from "./idempotency.ts";
+import { purgePresence } from "./presence.ts";
 import { purgeRateLimits } from "./ratelimit.ts";
 import { purgeSignIn } from "./signin/sessions.ts";
 import type { BlobStore } from "./blob.ts";
@@ -20,6 +21,8 @@ export interface MaintenanceResult {
   trashPagesPurged: number;
   /** Feedback older than 90 days, with its app log (ADR-0040). */
   feedbackDeleted: number;
+  /** Page presence heartbeats past their 45-second lifetime (ADR-0041). */
+  presenceRowsDeleted: number;
 }
 
 /**
@@ -61,6 +64,7 @@ export async function runMaintenance(db: Database, options: { revisionRetentionD
     rateLimitRowsDeleted: await purgeRateLimits(db),
     signInRowsDeleted: await purgeSignIn(db),
     feedbackDeleted: await purgeFeedback(db),
+    presenceRowsDeleted: await purgePresence(db),
   };
 }
 

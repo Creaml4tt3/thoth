@@ -205,7 +205,7 @@ describe("workspace tree: order", () => {
     const { app, group } = await workspace(trio);
     fireEvent.contextMenu(item(group, "Beta"));
     const menu = await screen.findByRole("menu", { name: "Actions for Beta" });
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Add to Favorites", "RenameF2", "New page inside", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Copy to Private Space…", "Move to Private Space…", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Add to Favorites", "RenameF2", "New page inside", "New folder inside", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "DuplicateCtrl+Shift+D", "Duplicate structure only", "Duplicate to…", "Copy to Private Space…", "Move to Private Space…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: "Move to…" }));
     expect(await screen.findByRole("dialog", { name: "Move “Beta” to…" })).toBeTruthy();
   });
@@ -593,7 +593,7 @@ describe("Private Space tree", () => {
     fireEvent.contextMenu(document.activeElement!);
     const menu = await screen.findByRole("menu");
     // The row is the "Empty" folder: Rename and New folder inside come first.
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New page inside", "New folder inside", "Color…", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["RenameF2", "New page inside", "New folder inside", "Color…", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "DuplicateCtrl+Shift+D", "Duplicate structure only", "Duplicate to…", "Delete…"]);
     await app.user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
   });
@@ -625,6 +625,9 @@ describe("in Thai", () => {
       `${sharedTh.tree.moveUp}⌥⇧↑`,
       `${sharedTh.tree.moveDown}⌥⇧↓`,
       sharedTh.tree.moveTo,
+      `${sharedTh.tree.duplicate}Ctrl+Shift+D`,
+      sharedTh.tree.duplicateStructure,
+      sharedTh.tree.duplicateTo,
       sharedTh.tree.across.copyTo(sharedTh.tree.across.privateSpace),
       sharedTh.tree.across.moveTo(sharedTh.tree.across.privateSpace),
       sharedTh.tree.delete,

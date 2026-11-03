@@ -70,7 +70,12 @@ regenerated.
 - Programmatic rewrites (`rewriteTargets`) replace only the `targetRange`.
   Fragments, aliases, titles, and surrounding text keep their exact bytes.
 
-## 4. Index (cache) — `.thoth/index.sqlite`
+## 4. Index (cache) — `<app data>/indexes/<digest>/index.sqlite`
+
+On the desktop the index is in the app's data folder on this computer, one per
+Private Space, keyed by the SHA-256 of its canonical root path (ADR-0046; up to
+0.4.0 it was `.thoth/index.sqlite`). Other hosts (the Node ports used in tests)
+may keep it elsewhere; the schema is the same.
 
 Tables per spec §6.3: `pages`, `page_aliases`, `page_tags`, `blocks`, `refs`,
 `attachments`, `search_content` (FTS5 `unicode61`, diacritic-insensitive),

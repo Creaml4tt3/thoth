@@ -76,6 +76,13 @@ describe("Vault.move", () => {
     expect(await vault.unresolvedLinks()).toEqual([]);
   });
 
+  it("moves a folder: folder links to it follow, keeping their trailing slash and label (ADR-0049)", async () => {
+    await put("Inbox/Index.md", "# Index\n\nSee [[Thoth/]], [[Projects/Thoth/|the project]] and [[Projects/]].\n");
+    const report = await vault.move("Projects/Thoth", "Archive/Thoth 2026");
+    expect(report.rewritten).toContain("Inbox/Index.md");
+    expect(await read("Inbox/Index.md")).toBe("# Index\n\nSee [[Thoth 2026/]], [[Thoth 2026/|the project]] and [[Projects/]].\n");
+  });
+
   it("renames a page whose name changes only in letter case", async () => {
     await vault.move("Inbox/Welcome.md", "Inbox/welcome.md");
     expect(await readdir(join(root, "Inbox"))).toEqual(["welcome.md"]);

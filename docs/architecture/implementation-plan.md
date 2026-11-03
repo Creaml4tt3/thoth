@@ -50,7 +50,7 @@ Acceptance tests (`packages/local-store/test/vault.test.ts`,
 - Links resolve by path, basename, suffix and alias. Ambiguous targets are
   reported, never guessed.
 - External create/edit/delete is detected by reconcile.
-- Deleting `index.sqlite` and reopening yields an identical index.
+- Deleting `index.sqlite` and reopening yields an identical index (on the desktop it is in the app's data folder, ADR-0046).
 - Compare-and-swap writes refuse stale writes and never silently overwrite.
 - A crash between the temp write and the rename recovers with no content change.
 - Symlinks are never followed, and writes outside the vault or into `.thoth/`

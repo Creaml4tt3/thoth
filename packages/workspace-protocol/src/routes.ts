@@ -13,8 +13,9 @@ import { ShareLinkCreateRequestSchema, ShareLinkCreatedSchema, ShareLinkIdSchema
 import { InviteAcceptRequestSchema, InviteAcceptedSchema, InviteLinkCreateRequestSchema, InviteLinkCreatedSchema, InviteLinkIdSchema, InviteLinkListSchema, MemberListSchema, MemberRoleChangeSchema } from "./members.ts";
 import { DeletedWorkspaceListSchema, WorkspaceCreateRequestSchema, WorkspaceRenameSchema } from "./workspaces.ts";
 import { FeedbackRequestSchema } from "./feedback.ts";
-import { PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamPageListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
+import { LimitedPageListSchema, PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamPageListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { TrashListSchema, TrashRestoredSchema } from "./trash.ts";
+import { PresenceListSchema } from "./presence.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -722,6 +723,19 @@ export const ROUTES: readonly RouteDefinition[] = [
     errors: ["forbidden", "not_found"],
   }),
   route({
+    operationId: "listLimitedPages",
+    method: "get",
+    path: "/workspaces/{workspaceId}/limited-pages",
+    tag: "Teams",
+    summary: "Pages limited to some teams",
+    description:
+      "ADR-0049. Owners and managers (403 for others). Every page (not deleted) limited itself, also one whose teams were all deleted (ADR-0042), so a client writes links to them, and to pages below them, without a title. Pages below a listed page are not listed. All in one response: at most one item per page of the workspace.",
+    capability: "teams",
+    pathParams: workspaceParams,
+    responses: [json(200, "The limited pages.", LimitedPageListSchema)],
+    errors: ["forbidden", "not_found"],
+  }),
+  route({
     operationId: "listTrash",
     method: "get",
     path: "/workspaces/{workspaceId}/trash",
@@ -762,6 +776,31 @@ export const ROUTES: readonly RouteDefinition[] = [
     requestHeaders: [idempotencyHeader("optional")],
     responses: [{ status: 204, description: "Deleted for good.", headers: [] }],
     errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "heartbeatPresence",
+    method: "put",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/presence",
+    tag: "Presence",
+    summary: "Say that the caller has this page open, and read who else has",
+    description:
+      "ADR-0041. Any member who can read the workspace (viewers too). No body. Send it when the page opens and at least every 15 seconds while it stays open; the server forgets a heartbeat 45 seconds after it arrived. The answer lists the other members who have the page open now (never the caller), with only their user ID and display name, and only members who can see the page. A deleted or unknown page, or one hidden from the caller (ADR-0042), is 404.",
+    capability: "presence",
+    pathParams: pageParams,
+    responses: [json(200, "The other members who have the page open.", PresenceListSchema)],
+    errors: ["validation_failed", "not_found"],
+  }),
+  route({
+    operationId: "leavePresence",
+    method: "delete",
+    path: "/workspaces/{workspaceId}/pages/{pageId}/presence",
+    tag: "Presence",
+    summary: "Say that the caller closed this page",
+    description: "ADR-0041. Removes the caller's heartbeat for the page at once. Leaving a page the caller never sent a heartbeat for succeeds and changes nothing.",
+    capability: "presence",
+    pathParams: pageParams,
+    responses: [{ status: 204, description: "Removed.", headers: [] }],
+    errors: ["validation_failed", "not_found"],
   }),
   route({
     operationId: "sendFeedback",

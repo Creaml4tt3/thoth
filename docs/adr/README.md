@@ -14,7 +14,7 @@ trade-off.
 | [0002](0002-canonical-content-model-and-editor-serialization.md) | Canonical content model and editor serialization | Accepted (editor part accepted 2026-10-21) |
 | [0003](0003-stable-logical-identity-vs-physical-location.md) | Stable logical identity vs physical location | Accepted |
 | [0004](0004-workspace-protocol-and-capability-negotiation.md) | Workspace protocol and capability negotiation | Proposed (finalize in phase P2) |
-| [0005](0005-revision-based-synchronization-and-conflict-resolution.md) | Revision-based synchronization and conflict resolution | Proposed |
+| [0005](0005-revision-based-synchronization-and-conflict-resolution.md) | Revision-based synchronization and conflict resolution | Proposed; extended by 0041 |
 | [0006](0006-transfer-lifecycle-idempotency-and-recovery.md) | Transfer lifecycle, idempotency, and recovery | Proposed (implementation phase P3) |
 | [0007](0007-agent-adapter-contract-and-execution-security.md) | Agent adapter contract and execution security | Accepted for the Claude Code adapter, decisions of 2026-10-25 (owner to confirm); Proposed for Codex, OS-level sandboxing, answers and sessions, and conversations (2026-10-26) |
 | [0008](0008-desktop-runtime-web-client-and-local-bridge.md) | Desktop runtime, web client, and local bridge | Accepted for Tauri 2 + Rust, shared React/TS/Vite UI, and Rust-hosted ports (2026-10-21); Proposed for the local bridge |
@@ -50,9 +50,14 @@ trade-off.
 | [0038](0038-moving-between-spaces-and-opening-links.md) | Moving pages between spaces, and opening links in a page | Proposed 2026-10-29 |
 | [0039](0039-public-code-repository-and-private-website.md) | A public code repository, and the website in a private one | Proposed 2026-10-29 |
 | [0040](0040-local-log-and-problem-reports.md) | A local log, and problem reports with it | Accepted 2026-10-31 |
+| [0041](0041-safer-editing-together.md) | Safer editing together: change notices, presence and live updates (CRDT co-editing deferred) | Proposed 2026-11-01 |
 | [0042](0042-teams-manager-role-and-folder-visibility.md) | Teams in workspaces, a Manager role, and folder visibility | Proposed 2026-11-01 |
 | [0043](0043-manager-rights-and-page-trash.md) | What managers may do, and a Trash for pages | Proposed 2026-11-01 |
 | [0045](0045-switching-from-obsidian-on-thoths-terms.md) | Switching from Obsidian, on Thoth's own terms | Accepted 2026-11-02 |
+| [0046](0046-index-outside-the-notes-folder.md) | The search index lives outside the notes folder | Accepted 2026-11-02 |
+| [0047](0047-duplicate-pages-and-folders.md) | Duplicating pages and folders | Proposed 2026-11-02 |
+| [0048](0048-connected-apps-propose-changes.md) | Connected apps propose changes, reviewed in Thoth | Accepted 2026-11-02 |
+| [0049](0049-at-links-to-pages-folders-and-people.md) | "@" to link pages, folders and people | Proposed 2026-11-01 |
 
 Template: [0000-template.md](0000-template.md).
 

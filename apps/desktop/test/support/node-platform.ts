@@ -31,6 +31,8 @@ export interface NodePlatform extends Platform {
   trashed: string[];
   /** Folders another (unrendered) window has open: connections to them are `shared`. */
   sharedWith: string[];
+  /** Folders the host would say are on a network drive (ADR-0046). */
+  onNetwork: string[];
   /** In-memory workspace servers (no server known by default). */
   servers: FakeServers;
   /** Agent CLIs (the fake claude in tests); absent unless asked for, like a host without the Agent Hub. */
@@ -98,6 +100,7 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     connections,
     trashed: [],
     sharedWith: [],
+    onNetwork: [],
     servers: options.servers ?? new FakeServers(),
     ...(options.agents ? { agents: new NodeAgentHost({ ...options.agents, excludeRoots: () => connections.map((c) => c.root) }) } : {}),
     ...(options.windows ? { windows: options.windows } : {}),
@@ -121,6 +124,7 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
         root: fs.root,
         label: fs.root.split("/").pop() ?? fs.root,
         shared: false,
+        network: platform.onNetwork.includes(fs.root),
         isShared: async () => !closed && others() > 0,
         fs,
         sql,

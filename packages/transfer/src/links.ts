@@ -156,7 +156,7 @@ export function referencedAttachments(pages: readonly { path: string; source: st
     for (const ref of parsePage(page.path, page.source).references) {
       if (ref.external || ref.target === "") continue;
       const resolved = resolver.resolve(page.path, ref);
-      if (resolved.state === "resolved" && !isMarkdownPath(resolved.path)) found.add(resolved.path);
+      if (resolved.state === "resolved" && !isMarkdownPath(resolved.path) && !resolved.path.endsWith("/")) found.add(resolved.path); // a folder link is not an attachment
     }
   }
   return [...found].sort();

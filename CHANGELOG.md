@@ -8,6 +8,33 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Type @ to link a page or a folder, in both editor modes. A folder link shows that folder in the sidebar. In a workspace page, @ also names a member by their display name; nobody is notified.
+- Links in workspace pages now work: [[ and @ list that workspace's pages and folders, and a link keeps working after the page is renamed or moved. A link to a page you cannot see reads "Page not available". A link to a page limited to some teams is saved without its title, so only people who can see that page see its title; a share page shows any link to a page it leaves out as "a page that is not shared".
+- Duplicate pages and folders, in the Private Space and in workspaces: "Duplicate", "Duplicate structure only" (each page keeps only its title, for templates) and "Duplicate to…" in a page's or folder's menu, Cmd/Ctrl+Shift+D on the selected item, and "Duplicate page" in the command palette. A folder is copied with everything in it; links between the copied pages point at the copies, and images a Private Space page shows are copied with it. The copy never replaces anything, and a failure part-way removes what was copied.
+- Connected apps can propose changes to your pages: a new page, an edit (the whole page or exact pieces of text), or an addition at the end or under a heading. Nothing is written until you review the change under the bell and apply it. Each app needs "May propose changes", which is off until you turn it on.
+- The review of proposed changes shows the app, when, the page and a diff, with Apply, Decline and "Apply all from" an app. A page that changed in the meantime is never overwritten: you see the difference against the page as it is now and choose.
+- A workspace page shows who else has it open ("Ana is also here") when the server supports it.
+- When someone changes a workspace page you have open, the page says so ("Updated by Grace just now.") instead of reloading silently.
+- The web client gets other people's changes as soon as they are saved, on servers that send live updates; otherwise it checks every 5 seconds, as before.
+
+### Changed
+
+- Accessibility (WCAG 2.2 AA): stronger grey, red and amber text, larger click targets for small controls, and clearer names for screen readers (the page editor, folder colours, the lines of the conflict dialog, field errors). "Saved" is spoken only after a failed or explicit save, not after every autosave.
+- In the desktop app, Cmd/Ctrl + and − zoom the window (Cmd/Ctrl 0 resets), and F6 moves focus between the sidebar and each pane. Below 600px wide the sidebar sits above the page.
+- In Members, Trash and Visible to…, focus goes back to the button that asked when a question is cancelled, and "Choose at least one team" is read with the team boxes.
+- The desktop app keeps a Private Space's search index in its own data folder on this computer, no longer in the notes folder, so notes on a network share or a synced drive no longer carry a changing database. The old index there is deleted and rebuilt once. A Private Space on a network drive gets a short notice.
+- `read_page` now gives the page's version, so an app can say which version its proposal is based on.
+- If you have unsaved edits when someone else changes the same workspace page, the choice between your version and theirs opens at once, instead of at your next save.
+- Dragging a block by its handle shows a small card next to the pointer with the block's icon and the start of its text (an image shows its picture), instead of a copy of the whole block. The block fades while it moves, and the line showing where it will land sits half way between blocks, as wide as they are.
+
+### Fixed
+
+- In Blocks mode, the arrow keys no longer make a long page jump by half a screen when the caret reaches the top or bottom edge: the page follows the caret a line at a time, as in Plain mode. Page Up and Page Down now take the caret along, so the next arrow key no longer jumps back to where it was.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added
@@ -229,6 +256,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Creaml4tt3/thoth/compare/v0.2.8...v0.3.0

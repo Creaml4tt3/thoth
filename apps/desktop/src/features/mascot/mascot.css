@@ -241,7 +241,7 @@
 .bubble-chip[data-kind="excerpt"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); border-color: transparent; }
 .bubble-chip[data-kind="workspace"]::before { content: ""; width: 6px; height: 6px; margin-inline-end: 4px; border-radius: 50%; background: var(--thoth-workspace); }
 .bubble-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.bubble-chip-remove { all: unset; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--thoth-ink-secondary); cursor: pointer; }
+.bubble-chip-remove { all: unset; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--thoth-ink-secondary); cursor: pointer; }
 .bubble-chip-remove:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .bubble-chip-remove:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .bubble-chip-none { padding: 0 2px; }
@@ -282,7 +282,5 @@
 .mascot-scale-row input[type="range"] { flex: 1; accent-color: var(--thoth-accent); }
 .mascot-scale-row output { min-width: 3.5em; text-align: end; font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) { .mascot-settings-grid { grid-template-columns: minmax(0, 1fr); } }
-/* Text in the bubble is read, not skimmed: the AA-contrast ink, as in the agent views. */
-.mascot-bubble .muted, .mascot-settings .muted { color: var(--thoth-ink-secondary); }
 /* Streamed lines arrive many times a second in a small panel: they appear, they do not rise in. */
 .bubble-log .agents-log > li { animation: none; }

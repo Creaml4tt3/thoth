@@ -16,8 +16,9 @@
  * (`vaultPageStore`, in the desktop app) or a page on a workspace server
  * (`workspace/workspace-store.ts`). A server refuses stale writes itself
  * (`If-Match`, 412), so for a workspace page the pre-write comparison is
- * skipped and a remote change under local edits surfaces at the next save
- * rather than at once.
+ * skipped. A remote change still surfaces at once (ADR-0041): with no local
+ * edits the page reloads and `changed` says who changed it; with local edits
+ * the conflict opens right away instead of waiting for the next save.
  *
  * This module has no filesystem in it, so the web client can share it.
  */
@@ -30,6 +31,8 @@ export interface StoredPage {
   hash: string;
   /** False when the page may be shown but never written (not UTF-8, or a viewer's role). */
   editable: boolean;
+  /** Who wrote this version, when the store knows (a workspace revision's `authorId`). */
+  author?: string | null;
 }
 
 /** Where an open page is read from and written to. */
@@ -79,6 +82,8 @@ export interface PageState {
   error: string | null;
   /** The copy that kept "my" version after Keep both. */
   conflictCopy: { ref: string; label: string } | null;
+  /** A workspace page reloaded because someone changed it on the server (ADR-0041); `by` is the author's ID when known. */
+  changed: { by: string | null } | null;
 }
 
 export interface PageSessionDeps {
@@ -103,6 +108,8 @@ export interface PageSession {
   /** Compares the file on disk with what this page last saw; reloads or opens a conflict as needed. */
   checkDisk(): Promise<void>;
   resolveConflict(choice: ConflictChoice): Promise<void>;
+  /** Hides the "updated by" notice. */
+  dismissChange(): void;
   /** Saves pending edits before leaving the page. False means "stay": a conflict or an error needs the user. */
   flush(): Promise<boolean>;
   /** The text the page last read or wrote (in a conflict: the editor's frozen version); null before it loaded. */
@@ -131,7 +138,7 @@ const message = (error: unknown): string => (error instanceof Error ? error.mess
 export function createPageSession(deps: PageSessionDeps): PageSession {
   const { store, editor } = deps;
   const serverChecked = store.kind === "workspace";
-  let state: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null };
+  let state: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null, changed: null };
   const listeners = new Set<() => void>();
   /** The last content this page read from or wrote to disk. */
   let base: DiskVersion | null = null;
@@ -271,11 +278,14 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         // No local edits: follow the disk silently.
         clearTimer();
         if (!disk) set({ phase: "missing", save: "idle" });
-        else adopt(disk);
+        else {
+          adopt(disk);
+          // ADR-0041: never a silent reload of a shared page; say who changed it.
+          if (serverChecked) set({ changed: { by: disk.author ?? null } });
+        }
         return;
       }
-      // A server rejects the stale write itself: the next save meets the conflict.
-      if (serverChecked) return;
+      // Local edits under a remote change: the conflict opens now, before more is typed on a stale version (ADR-0041).
       await enterConflict(mine, disk);
     });
 
@@ -327,11 +337,13 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
     noteEdited() {
       if (disposed || state.phase !== "ready" || !state.editable || state.conflict) return;
       if (state.save !== "dirty") set({ save: state.save === "saving" ? "saving" : "dirty" });
+      if (state.changed) set({ changed: null }); // typing on: the notice has been seen
       schedule();
     },
     save,
     checkDisk,
     resolveConflict,
+    dismissChange: () => set({ changed: null }),
     async flush() {
       if (state.conflict) return false;
       if (state.phase !== "ready" || !state.editable) return true;

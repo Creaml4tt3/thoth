@@ -8,12 +8,13 @@ import { Extension, InputRule, textblockTypeInputRule, wrappingInputRule, type A
 import { history, redo, undo } from "@tiptap/pm/history";
 import { thothExtensions } from "@thoth/editor";
 import type { EditorContext } from "./context.ts";
-import { calloutView, embedView, inlineRawView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
+import { calloutView, embedView, inlineRawView, mentionView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
 import { imageView } from "./image-views.ts";
 import { imageInsertExtension } from "./image-insert.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
+import { caretScrollExtension } from "./caret-scroll.ts";
 import { textStylesExtension } from "./selection-toolbar.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
@@ -73,6 +74,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     raw: preservedView(ctx),
     inlineRaw: inlineRawView(ctx),
     wikilink: wikilinkView(ctx),
+    mention: mentionView(ctx),
     embed: embedView(ctx),
     taskItem: taskItemView(ctx),
     image: imageView(ctx, false),
@@ -90,6 +92,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     listKeysExtension(),
     slashExtension(ctx),
     blockHandleExtension(ctx.strings),
+    caretScrollExtension(),
     textStylesExtension(ctx.strings, ctx.client),
     linkSuggestExtension(ctx),
     imageInsertExtension(ctx),

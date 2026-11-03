@@ -54,4 +54,4 @@ export function usePageSession(
   return { session: page, state, member, owner };
 }
 
-const LOADING: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null };
+const LOADING: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null, changed: null };

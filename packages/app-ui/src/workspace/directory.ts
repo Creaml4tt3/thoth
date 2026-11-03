@@ -1,6 +1,8 @@
 /**
  * The app's view of workspace servers: which servers the host knows, their
- * workspaces, the page trees of expanded workspaces, and change-feed polling.
+ * workspaces, the page trees of expanded workspaces, change-feed polling, and
+ * (ADR-0041) who else has an open page open and the live change hints of
+ * workspaces with an open page, where the server and the host can stream them.
  *
  * It holds no credential. Every protocol request goes through
  * `servers.call`, where the host adds the server's token (the desktop's Rust
@@ -12,7 +14,7 @@
 import { newStableId } from "@thoth/domain";
 import type { ServerInfo, Servers } from "@thoth/platform";
 import { ProblemError, RevisionConflict, WorkspaceClient, type Send } from "@thoth/workspace-client";
-import { PAGE_TITLE_MAX, type ChangeEntry, type DeletedWorkspace, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
+import { PAGE_TITLE_MAX, PRESENCE_HEARTBEAT_SECONDS, type ChangeEntry, type PresenceEntry, type DeletedWorkspace, type InviteAccepted, type PageMove, type PageResource, type TreeNode, type Workspace } from "@thoth/workspace-protocol";
 import { placeAt } from "../order/fractional.ts";
 import type { TextColor } from "@thoth/editor";
 import { folderColorOf, folderMarkdown, isFolderMarkdown, withFolderColor } from "./folders.ts";
@@ -57,6 +59,10 @@ export interface DirectoryState {
   limits: Record<string, Record<string, number>>;
   /** ADR-0025: the deleted workspaces the user can restore, by server (servers with `workspace-management`). */
   deleted: Record<string, DeletedWorkspace[]>;
+  /** ADR-0041: the other members who have an open page open, by `presenceKey` (servers with `presence`). */
+  presence: Record<string, PresenceEntry[]>;
+  /** ADR-0041: workspaces whose change hints arrive over a live stream (`events.sse`), so they are not polled. */
+  live: string[];
 }
 
 export interface WorkspacePageRef {
@@ -66,6 +72,11 @@ export interface WorkspacePageRef {
 }
 
 export const workspaceKey = (server: string, workspace: string): string => `${server}\n${workspace}`;
+export const presenceKey = (ref: WorkspacePageRef): string => `${ref.server}\n${ref.workspace}\n${ref.page}`;
+
+/** After a stream ends, wait this long before opening it again (doubling up to the cap); the poll runs meanwhile. */
+const STREAM_RETRY_MS = 5_000;
+const STREAM_RETRY_MAX_MS = 60_000;
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const EMPTY_TREE: TreeState = { nodes: [], cursor: null, loading: true, error: null, ticks: {}, kinds: {} };
@@ -94,7 +105,7 @@ function fromBase64(text: string): Uint8Array {
 }
 
 export class ServerDirectory {
-  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {}, limits: {}, deleted: {} };
+  private state: DirectoryState = { loaded: false, error: null, servers: [], trees: {}, expanded: [], capabilities: {}, limits: {}, deleted: {}, presence: {}, live: [] };
   private readonly kindWork = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private readonly servers: Servers;
@@ -103,11 +114,26 @@ export class ServerDirectory {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private polling = false;
   private disposed = false;
-  private readonly onVisibility = () => this.schedule(true);
+  /** Open pages (ADR-0041), by `presenceKey`: how many views show each. */
+  private readonly opened = new Map<string, { ref: WorkspacePageRef; count: number }>();
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private readonly heartbeatMs: number;
+  /** Live change streams by workspace key, and when each may be opened again after it ended. */
+  private readonly streams = new Map<string, () => void>();
+  private readonly retry = new Map<string, { at: number; delay: number }>();
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Change-feed reads in flight, by workspace key; `true` means another read is due when it ends. */
+  private readonly pulls = new Map<string, boolean>();
+  private readonly onVisibility = () => {
+    this.schedule(true);
+    this.syncStreams();
+    if (this.visible()) void this.heartbeat();
+  };
 
-  constructor(servers: Servers, options: { pollMs: number }) {
+  constructor(servers: Servers, options: { pollMs: number; heartbeatMs?: number }) {
     this.servers = servers;
     this.pollMs = options.pollMs;
+    this.heartbeatMs = options.heartbeatMs ?? PRESENCE_HEARTBEAT_SECONDS * 1000;
   }
 
   // ------------------------------------------------------------------ store
@@ -167,6 +193,23 @@ export class ServerDirectory {
   /** Does the server offer invite links (`invite-links`, ADR-0024)? */
   canInvite(server: string): boolean {
     return this.state.capabilities[server]?.includes("invite-links") ?? false;
+  }
+
+  /** Does the server say who else has a page open (`presence`, ADR-0041)? */
+  hasPresence(server: string): boolean {
+    return this.state.capabilities[server]?.includes("presence") ?? false;
+  }
+
+  /** A member's display name, from the workspace's member preview or who has a page open; null when not known. */
+  memberName(server: string, workspace: string, userId: string): string | null {
+    const member = this.workspace(server, workspace)?.members?.find((m) => m.userId === userId);
+    if (member) return member.displayName;
+    const prefix = `${server}\n${workspace}\n`;
+    for (const [key, list] of Object.entries(this.state.presence)) {
+      const found = key.startsWith(prefix) ? list.find((e) => e.userId === userId) : undefined;
+      if (found) return found.displayName;
+    }
+    return null;
   }
 
   /** Does the server let its users create, rename, delete and restore workspaces (`workspace-management`, ADR-0025)? */
@@ -286,6 +329,12 @@ export class ServerDirectory {
     this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    for (const close of this.streams.values()) close();
+    this.streams.clear();
+    for (const { ref } of this.opened.values()) this.leave(ref);
+    this.opened.clear();
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.onVisibility);
     this.listeners.clear();
   }
@@ -332,7 +381,9 @@ export class ServerDirectory {
     this.set({
       expanded: this.state.expanded.filter((k) => !k.startsWith(prefix)),
       trees: Object.fromEntries(Object.entries(this.state.trees).filter(([k]) => !k.startsWith(prefix))),
+      presence: Object.fromEntries(Object.entries(this.state.presence).filter(([k]) => !k.startsWith(prefix))),
     });
+    this.syncStreams();
   }
 
   private adopt(info: ServerInfo): void {
@@ -360,6 +411,8 @@ export class ServerDirectory {
       const { capabilities, limits } = await this.client(server).getCapabilities();
       const numbers = Object.fromEntries(Object.entries(limits ?? {}).filter((e): e is [string, number] => typeof e[1] === "number"));
       this.set({ capabilities: { ...this.state.capabilities, [server]: [...capabilities] }, limits: { ...this.state.limits, [server]: numbers } });
+      this.syncStreams();
+      void this.heartbeat();
     } catch {
       // retried the next time the workspaces load
     }
@@ -689,7 +742,11 @@ export class ServerDirectory {
         if (!page.hasMore) break;
       }
     } catch (error) {
-      if (error instanceof ProblemError && error.code === "cursor_expired") await this.loadTree(server, workspace);
+      if (error instanceof ProblemError && error.code === "cursor_expired") {
+        await this.loadTree(server, workspace);
+        // Who sees what changed (ADR-0042): an open page re-reads itself, so one now hidden goes at once (ADR-0041).
+        for (const { ref } of this.opened.values()) if (ref.server === server && ref.workspace === workspace) this.bumpTick(key, ref.page);
+      }
       // Not found: the user is no longer a member (ADR-0024). The list read again drops the workspace.
       else if (error instanceof ProblemError && error.status === 404) await this.loadWorkspaces(server);
       return; // a failed poll is retried at the next tick
@@ -700,13 +757,152 @@ export class ServerDirectory {
     if (entries.length > 0) void this.resolveKinds(server, workspace);
   }
 
+  /** Polls every expanded workspace whose hints do not arrive over a live stream. */
   async pollNow(): Promise<void> {
     await Promise.all(
-      this.state.expanded.map((key) => {
-        const [server, workspace] = key.split("\n") as [string, string];
-        return this.pollWorkspace(server, workspace);
+      this.state.expanded
+        .filter((key) => !this.state.live.includes(key))
+        .map((key) => {
+          const [server, workspace] = key.split("\n") as [string, string];
+          return this.pull(server, workspace);
+        }),
+    );
+  }
+
+  /** `pollWorkspace`, one at a time per workspace: a hint that arrives during a read makes one more read after it. */
+  private async pull(server: string, workspace: string): Promise<void> {
+    const key = workspaceKey(server, workspace);
+    if (this.pulls.has(key)) {
+      this.pulls.set(key, true);
+      return;
+    }
+    this.pulls.set(key, false);
+    try {
+      do {
+        this.pulls.set(key, false);
+        await this.pollWorkspace(server, workspace);
+      } while (this.pulls.get(key) && !this.disposed);
+    } finally {
+      this.pulls.delete(key);
+    }
+  }
+
+  // --------------------------------------------------- open pages (ADR-0041)
+
+  /**
+   * A view shows this page: while any view does, the server hears a heartbeat every `heartbeatMs` (window visible, server
+   * lists `presence`) and its workspace's change hints are streamed where possible. Returns the release; the last
+   * release tells the server the page was left.
+   */
+  openPage(ref: WorkspacePageRef): () => void {
+    const key = presenceKey(ref);
+    const entry = this.opened.get(key);
+    if (entry) entry.count++;
+    else {
+      this.opened.set(key, { ref, count: 1 });
+      void this.heartbeat(ref);
+    }
+    this.heartbeatTimer ??= setInterval(() => void this.heartbeat(), this.heartbeatMs);
+    this.syncStreams();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const now = this.opened.get(key);
+      if (!now || --now.count > 0) return;
+      this.opened.delete(key);
+      this.leave(ref);
+      if (this.opened.size === 0 && this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = undefined;
+      }
+      this.syncStreams();
+    };
+  }
+
+  /** Sends the heartbeat of one open page, or of all of them; each answer is who else has that page open. */
+  private async heartbeat(only?: WorkspacePageRef): Promise<void> {
+    if (this.disposed || !this.visible()) return;
+    const refs = only ? [only] : [...this.opened.values()].map((e) => e.ref);
+    await Promise.all(
+      refs.map(async (ref) => {
+        if (!this.hasPresence(ref.server) || this.server(ref.server)?.info.auth === "signed-out") return;
+        let items: PresenceEntry[] = [];
+        try {
+          items = await this.client(ref.server).heartbeatPresence(ref.workspace, ref.page);
+        } catch {
+          // a page that is gone, or a server that does not answer: nobody is shown
+        }
+        if (this.opened.has(presenceKey(ref))) this.set({ presence: { ...this.state.presence, [presenceKey(ref)]: items } });
       }),
     );
+  }
+
+  private leave(ref: WorkspacePageRef): void {
+    const { [presenceKey(ref)]: _gone, ...presence } = this.state.presence;
+    this.set({ presence });
+    if (this.hasPresence(ref.server)) void this.client(ref.server).leavePresence(ref.workspace, ref.page).catch(() => undefined);
+  }
+
+  /**
+   * Opens a change stream for each workspace with an open page (server lists `events.sse`, host can stream, window
+   * visible) and closes the others. A hint reads the change feed at once, the same read the poll makes; a stream that
+   * ends hands its workspace back to the poll and is opened again later.
+   */
+  private syncStreams(): void {
+    const open = this.servers.events?.bind(this.servers);
+    const wanted = new Set<string>();
+    if (open && !this.disposed && this.visible()) {
+      for (const { ref } of this.opened.values()) {
+        if (this.state.capabilities[ref.server]?.includes("events.sse") && this.server(ref.server)?.info.auth !== "signed-out") wanted.add(workspaceKey(ref.server, ref.workspace));
+      }
+    }
+    for (const [key, close] of [...this.streams]) {
+      if (wanted.has(key)) continue;
+      this.streams.delete(key);
+      close();
+      this.setLive(key, false);
+    }
+    const now = Date.now();
+    for (const key of wanted) {
+      if (this.streams.has(key) || (this.retry.get(key)?.at ?? 0) > now) continue;
+      const [server, workspace] = key.split("\n") as [string, string];
+      let ended = false;
+      const close = open!(server, workspace, {
+        open: () => {
+          if (ended) return;
+          this.retry.delete(key);
+          this.setLive(key, true);
+        },
+        hint: () => {
+          if (!ended) void this.pull(server, workspace);
+        },
+        end: () => {
+          if (ended) return;
+          ended = true;
+          if (this.streams.get(key) === close) this.streams.delete(key);
+          const delay = Math.min(STREAM_RETRY_MAX_MS, (this.retry.get(key)?.delay ?? STREAM_RETRY_MS / 2) * 2);
+          this.retry.set(key, { at: Date.now() + delay, delay });
+          this.setLive(key, false);
+          this.schedule(true);
+          this.retryLater(delay);
+        },
+      });
+      if (!ended) this.streams.set(key, close);
+    }
+  }
+
+  private retryLater(delay: number): void {
+    if (this.retryTimer || this.disposed) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      this.syncStreams();
+    }, delay);
+  }
+
+  private setLive(key: string, live: boolean): void {
+    if (this.state.live.includes(key) === live) return;
+    this.set({ live: live ? [...this.state.live, key] : this.state.live.filter((k) => k !== key) });
   }
 
   private visible(): boolean {

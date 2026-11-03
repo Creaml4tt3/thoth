@@ -28,6 +28,14 @@ export function PageView({ path }: { path: string }) {
   const store = useMemo(() => vaultPageStore(vault, path), [vault, path]);
   const media = useMemo(() => vaultPageMedia(vault, path), [vault, path]);
   const loadLinks = useCallback(() => loadLinkLookup(vault, path), [vault, path]);
+  // A folder crumb and a `[[Folder/]]` link (ADR-0049) both open that folder in the sidebar and move focus to its row.
+  const showFolder = useCallback(
+    (folder: string) => {
+      openFolder(folder, { openFirstPage: false });
+      focusWhenShown(() => [...document.querySelectorAll<HTMLElement>(".private-tree [data-tree-id]")].find((el) => el.dataset["treeId"] === folder) ?? null);
+    },
+    [openFolder],
+  );
   const onWritten = useCallback(() => void refresh().catch(() => undefined), [refresh]);
   // A save conflict is a notification (ADR-0018): the page's name and where it is, nothing of its text.
   const onConflict = useCallback(
@@ -46,11 +54,7 @@ export function PageView({ path }: { path: string }) {
         badge: <span className="badge badge-private">{strings.shell.local}</span>,
         parts: path.split("/"),
         // A folder crumb opens that folder in the sidebar and moves focus to its row; the badge goes to the section.
-        onCrumb: (index) => {
-          const folder = path.split("/").slice(0, index + 1).join("/");
-          openFolder(folder, { openFirstPage: false });
-          focusWhenShown(() => [...document.querySelectorAll<HTMLElement>(".private-tree [data-tree-id]")].find((el) => el.dataset["treeId"] === folder) ?? null);
-        },
+        onCrumb: (index) => showFolder(path.split("/").slice(0, index + 1).join("/")),
         onBadge: () => {
           requestShowSidebar();
           focusWhenShown(() => document.querySelector<HTMLElement>(`[data-section="${PRIVATE_SECTION}"] .sec-toggle`));
@@ -61,6 +65,7 @@ export function PageView({ path }: { path: string }) {
       loadLinks={loadLinks}
       linkTick={revision}
       openLink={openPage}
+      openFolder={showFolder}
       openCopy={openPage}
       onConflict={onConflict}
       readOnlyNote={t.readOnly}

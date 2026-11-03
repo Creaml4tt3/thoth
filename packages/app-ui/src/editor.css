@@ -10,8 +10,9 @@
 .prose li > p { margin: 0 0 0.2em; }
 .prose ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
 .task-item { display: flex; gap: 8px; align-items: flex-start; }
+/* A 24×24 target (WCAG 2.5.8); the negative margin keeps the row laid out as for the old 15px box. */
 .task-check { padding-top: 5px; }
-.task-box { width: 15px; height: 15px; accent-color: var(--thoth-link); margin: 0; }
+.task-box { width: 24px; height: 24px; margin: -4.5px; accent-color: var(--thoth-link); }
 .task-content { flex: 1; }
 .task-item[data-checked="true"] > .task-content { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
 .prose blockquote { margin: 0.8em 0; padding-left: 1em; border-left: 3px solid var(--thoth-border-strong); color: var(--thoth-ink-secondary); }
@@ -61,6 +62,9 @@
 .wikilink[data-state="resolved"] { text-decoration: underline; text-decoration-color: var(--thoth-ink-faint); text-underline-offset: 3px; }
 .wikilink[data-state="unresolved"] { color: var(--thoth-ink-tertiary); border: 1px dashed var(--thoth-border-strong); padding: 0 5px; cursor: default; }
 .wikilink[data-state="ambiguous"] { color: var(--thoth-warning); cursor: default; }
+/* ADR-0049: a folder link has a folder mark before its name; a person mention is a quiet chip that opens nothing. */
+.wikilink[data-kind="folder"]::before { content: "▸ "; color: var(--thoth-ink-tertiary); }
+.mention { display: inline-block; padding: 0 6px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg-hover); color: var(--thoth-link); line-height: 1.5; }
 .embed { margin: 0.6em 0; }
 
 /* Callouts, styled by kind. Neutral by default; semantic colours only for state kinds.
@@ -68,7 +72,7 @@
 .callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 12px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); border-left: 3px solid var(--callout); }
 .callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
 .callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
-.callout-fold { all: unset; box-sizing: border-box; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
+.callout-fold { all: unset; box-sizing: border-box; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
 .callout-fold { transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .callout-fold:focus-visible { outline: 2px solid var(--thoth-accent); }
@@ -209,6 +213,11 @@
 .block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-instant) var(--thoth-ease-out); }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
+/* The card under the pointer while a block is dragged (drag-preview.ts): in the document and painted, off screen. */
+.block-drag-preview { position: fixed; top: -200px; left: -1000px; z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 8px; max-width: 400px; height: 32px; padding: 0 10px 0 4px; border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-ui); white-space: nowrap; pointer-events: none; }
+.block-drag-icon { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-xs); color: var(--thoth-ink-secondary); font: 600 11px / 1 var(--thoth-font-sans); }
+.block-drag-thumb { flex: none; width: 24px; height: 24px; border-radius: var(--thoth-radius-xs); }
+.block-drag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .block-menu { position: fixed; z-index: 50; min-width: 220px; padding: 4px; background: var(--thoth-bg); border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-modal); font: var(--thoth-text-ui); }
 .block-menu[hidden] { display: none; }
 .block-submenu { z-index: 51; max-height: calc(100vh - 16px); overflow: auto; }
@@ -306,3 +315,10 @@
 .link-card-menu[hidden] { display: none; }
 .link-card-item { text-align: left; padding: 6px 10px; border: 0; border-radius: var(--thoth-radius-sm); background: transparent; color: var(--thoth-ink-primary); font: var(--thoth-text-ui); cursor: pointer; }
 .link-card-item:hover, .link-card-item:focus-visible { background: var(--thoth-bg-hover); }
+
+/* ADR-0041: who else has a workspace page open, in the breadcrumb bar. */
+.presence { display: inline-flex; gap: 6px; align-items: center; min-width: 0; color: var(--thoth-ink-secondary); font: var(--thoth-text-ui); }
+.presence-faces { display: inline-flex; }
+.presence-face { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--thoth-workspace) 18%, var(--thoth-bg)); color: var(--thoth-workspace); font: 600 10px/1 var(--thoth-font-sans); box-shadow: 0 0 0 2px var(--thoth-bg); }
+.presence-face + .presence-face { margin-left: -6px; }
+.presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }

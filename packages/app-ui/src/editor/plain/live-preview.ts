@@ -14,10 +14,10 @@ import { isTextColor, parseWikiInner, type TextColor } from "@thoth/editor";
 import type { EditorContext } from "../context.ts";
 import type { LinkTarget } from "../links.ts";
 import { kindClass, kindIcon, kindLabel } from "../callout-kinds.ts";
-import { linkHint, pageLinkOpens, webLinkOpens } from "../link-open.ts";
+import { linkHint, webLinkOpens } from "../link-open.ts";
 import { openWebLink } from "../web-links.ts";
 import { isPasteLinkHref } from "../paste-links.ts";
-import { setLinkTip } from "../node-views.ts";
+import { followLink, paintLinkChip } from "../node-views.ts";
 
 /** Dispatched when the link index changes, so chips re-resolve. */
 export const refreshLinks = StateEffect.define<null>();
@@ -28,10 +28,10 @@ const line = (cls: string, attributes?: Record<string, string>) => Decoration.li
 class WikilinkChip extends WidgetType {
   readonly ctx: EditorContext;
   readonly target: string;
-  readonly label: string;
+  readonly label: string | null;
   readonly embed: boolean;
   readonly result: LinkTarget;
-  constructor(ctx: EditorContext, target: string, label: string, embed: boolean, result: LinkTarget) {
+  constructor(ctx: EditorContext, target: string, label: string | null, embed: boolean, result: LinkTarget) {
     super();
     this.ctx = ctx;
     this.target = target;
@@ -45,18 +45,15 @@ class WikilinkChip extends WidgetType {
   toDOM(): HTMLElement {
     const chip = document.createElement("a");
     chip.className = "wikilink";
-    chip.dataset["state"] = this.result.state;
-    chip.dataset["target"] = this.result.state === "resolved" ? this.result.path : "";
-    const t = this.ctx.strings;
-    chip.textContent = this.embed ? `${t.embed}${this.label}` : this.label;
-    chip.setAttribute("role", "link");
     const result = this.result;
-    setLinkTip(chip, result.state === "resolved" ? result.path : result.state === "ambiguous" ? t.linkAmbiguous(result.candidates.join(", ")) : t.linkUnresolved(this.target), result.state === "resolved" ? linkHint(t, "page") : null);
+    paintLinkChip(chip, this.ctx, this.target, this.label, result);
+    if (this.embed) chip.textContent = `${this.ctx.strings.embed}${chip.textContent ?? ""}`;
+    chip.setAttribute("role", "link");
     // Left or middle button (0.2.7: Cmd/Ctrl or the middle button opens a new tab, Shift a new window).
     chip.addEventListener("mousedown", (event) => {
       if (event.button !== 0 && event.button !== 1) return;
       event.preventDefault();
-      if (result.state === "resolved") this.ctx.openPage(result.path, pageLinkOpens(event));
+      followLink(this.ctx, result, event);
     });
     return chip;
   }
@@ -64,6 +61,29 @@ class WikilinkChip extends WidgetType {
     return true;
   }
 }
+
+/** `[@Name](thoth:user/<id>)` off the cursor's line (ADR-0049): the name as a chip. */
+class MentionChip extends WidgetType {
+  readonly name: string;
+  readonly label: string;
+  constructor(name: string, label: string) {
+    super();
+    this.name = name;
+    this.label = label;
+  }
+  override eq(other: MentionChip): boolean {
+    return other.name === this.name;
+  }
+  toDOM(): HTMLElement {
+    const chip = document.createElement("span");
+    chip.className = "mention";
+    chip.textContent = `@${this.name}`;
+    chip.setAttribute("aria-label", this.label);
+    return chip;
+  }
+}
+
+const MENTION = /^\[@((?:[^\]\\]|\\.)+)\]\(thoth:user\/[A-Za-z0-9_.~-]{1,128}\)$/;
 
 class TaskBox extends WidgetType {
   readonly checked: boolean;
@@ -317,6 +337,14 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
             replace(node.from, node.to + after);
             break;
           }
+          case "Link": {
+            // A person mention shows as a chip; its markup is not hidden piece by piece.
+            const m = MENTION.exec(doc.sliceString(node.from, node.to));
+            if (!m) break;
+            const name = m[1]!.replace(/\\(.)/g, "$1");
+            replace(node.from, node.to, Decoration.replace({ widget: new MentionChip(name, ctx.strings.mention(name)) }));
+            return false;
+          }
           case "LinkMark":
           case "URL":
           case "LinkTitle":
@@ -343,7 +371,7 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
             const raw = doc.sliceString(node.from, node.to);
             const embed = raw.startsWith("!");
             const { target, fragment, label } = parseWikiInner(raw.slice(embed ? 3 : 2, -2));
-            const shown = label ?? (fragment ? `${target}#${fragment}` : target);
+            const shown = label ?? (fragment ? `${target}#${fragment}` : null);
             replace(node.from, node.to, Decoration.replace({ widget: new WikilinkChip(ctx, target, shown, embed, ctx.lookup().resolve(target)) }));
             return false;
           }
