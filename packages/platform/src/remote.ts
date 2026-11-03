@@ -237,6 +237,7 @@ export async function openRemoteVault(transport: Transport, root: string): Promi
     root: opened.root,
     label: opened.label,
     shared: opened.shared === true,
+    network: opened.network === true,
     fs: new RemoteVaultFs(transport, vault),
     sql: new RemoteSqlDriver(transport, vault),
     async watch(listener) {

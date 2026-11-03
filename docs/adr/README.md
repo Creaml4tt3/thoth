@@ -52,6 +52,7 @@ trade-off.
 | [0040](0040-local-log-and-problem-reports.md) | A local log, and problem reports with it | Accepted 2026-10-31 |
 | [0042](0042-teams-manager-role-and-folder-visibility.md) | Teams in workspaces, a Manager role, and folder visibility | Proposed 2026-11-01 |
 | [0043](0043-manager-rights-and-page-trash.md) | What managers may do, and a Trash for pages | Proposed 2026-11-01 |
+| [0046](0046-index-outside-the-notes-folder.md) | The search index lives outside the notes folder | Accepted 2026-11-02 |
 
 Template: [0000-template.md](0000-template.md).
 
