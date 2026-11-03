@@ -58,18 +58,20 @@ What exists:
      Cyrillic, Greek…), the character next to it must not be a letter or digit: "Atlas" is not found in "Atlases".
      Thai, Lao, Khmer, Myanmar, Chinese and Japanese are written without spaces between words, so a title in those
      scripts is found inside a run of text: "ทอธ" is found in "ฉันใช้ทอธทุกวัน". In every script a match never ends right
-     before a combining mark (a Thai vowel or tone mark above or below), so a match never splits a character as
-     people read it.
+     before a combining mark (a Thai vowel or tone mark above or below), and never starts right after a Thai or Lao
+     leading vowel (เ แ โ ใ ไ), so a match never splits a character as people read it.
    - **Very short titles.** A title shorter than 3 characters is not looked for; the part says so. Shorter titles
      find far more noise than mentions, and the Private Space's Thai search needs 3 characters (trigrams).
    - **Not a mention:** text inside a link of any kind (wikilink, Markdown link, autolink, image), inline code, code
      blocks, HTML, and the frontmatter. Matching is done on the Markdown source of plain text runs, so the replaced
-     text is exactly what was matched. A title split by formatting ("Project *Atlas*") is not found.
+     text is exactly what was matched. A title split by formatting ("Project *Atlas*") is not found, nor text that is
+     not in Unicode NFC form (rare; matching it would shift the offsets of the replacement).
    - **False positives** are expected (a common word as a title, a Thai word inside a longer word). Nothing is changed
      without a click on that one mention, so a false positive costs a glance, not an edit.
 5. **One click links one mention, through the normal save path** (this ADR). Each mention row has a "Link" button
    (accessible name "Link the mention in <page>"). It:
-   1. writes every pending edit of open pages first (`flushAll`); if one cannot be written, nothing happens;
+   1. writes every pending edit of open pages first (`flushAll`); if one cannot be written, nothing is written and
+      the panel says the page changed, as for a conflict;
    2. reads the other page afresh, finds the same mention again (same place and text; else the same occurrence of that
       text), and replaces only those characters;
    3. writes with compare-and-swap on what it just read (`expectedHash` / `If-Match`). If the page changed in between
@@ -117,8 +119,8 @@ What exists:
     page". Its accessible name says both. The date shown follows the UI language (Thai shows the Buddhist-era year,
     e.g. "วันพุธที่ 4 พฤศจิกายน พ.ศ. 2569"); the file name does not.
 11. **Where daily pages live** (this ADR). In the Private Space's top-level folder **`Daily`**, made when first
-    needed. The name is the same in every UI language, so switching language never makes a second folder. Not
-    configurable in 0.6.0 (open question).
+    needed; a top-level folder of that name in another letter case (`daily`) is used as it is. The name is the same in
+    every UI language, so switching language never makes a second folder. Not configurable in 0.6.0 (open question).
 12. **The file name** (this ADR): the ISO date, `Daily/YYYY-MM-DD.md` (`Daily/2026-11-04.md`), so files sort by date in
     the tree, in Finder and in other apps, and Obsidian's default daily-note format reads the same files.
 13. **The template** (this ADR). When `Templates/Daily.md` exists, today's page is made from it: its text, with its
