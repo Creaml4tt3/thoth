@@ -65,7 +65,8 @@ pub enum WindowsRoot {
 pub fn windows_root(path: &str) -> WindowsRoot {
     let rest = path.strip_prefix(r"\\?\").or_else(|| path.strip_prefix("//?/"));
     if let Some(rest) = rest {
-        if rest.len() >= 4 && rest[..4].eq_ignore_ascii_case(r"UNC\") {
+        // `get`, not `[..4]`: a non-ASCII name there would split a character and panic.
+        if rest.get(..4).is_some_and(|p| p.eq_ignore_ascii_case(r"UNC\")) {
             return WindowsRoot::Unc;
         }
         return drive(rest);
@@ -139,6 +140,8 @@ mod tests {
         assert_eq!(windows_root(r"z:\Notes"), WindowsRoot::Drive('Z'));
         assert_eq!(windows_root(r"\\?\D:\Notes"), WindowsRoot::Drive('D'));
         assert_eq!(windows_root(r"\\.\PhysicalDrive0"), WindowsRoot::Other);
+        assert_eq!(windows_root(r"\\?\โน้ต\x"), WindowsRoot::Other);
+        assert_eq!(windows_root(r"\\?\Ü"), WindowsRoot::Other);
         assert_eq!(windows_root("/Users/a/Notes"), WindowsRoot::Other);
     }
 

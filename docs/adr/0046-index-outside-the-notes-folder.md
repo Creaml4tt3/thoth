@@ -38,7 +38,9 @@ not need to travel with the notes.
    hardening of the connection itself (ADR-0008: no `ATTACH`, the authorizer, the deadline) is unchanged.
 3. **A host without a data folder** (a test harness, or a desktop start where the data folder could not be found)
    keeps its indexes in a temporary folder of its own, made on first use and removed when the host ends (this ADR). The
-   index is then rebuilt on every start; nothing is written next to the notes.
+   index is then rebuilt on every start; nothing is written next to the notes. A data folder that cannot hold the
+   index (read-only, full, or not a folder) gets the same temporary folder, with a warning in the local log that names
+   only the error code, so the Private Space still opens. A link on the way is still refused (rule 2).
 4. **What stays in `.thoth/`, and why.** Everything else there is either part of the Private Space (it describes these
    pages and must travel with them, like the pages do) or needs the same volume as the pages, because Thoth moves it
    into place with an atomic rename:

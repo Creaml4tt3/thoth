@@ -201,7 +201,7 @@ pub struct Host {
     /// One compare-and-rename (`fs.rename` with `replaceHash`) at a time, across every handle: two windows saving the
     /// same page cannot both pass the check (ADR-0019).
     replace: Mutex<()>,
-    /// Where a host without a data folder keeps its indexes (ADR-0046): made on first use, removed with the host.
+    /// Where a host without a usable data folder keeps its indexes (ADR-0046): made on first use, removed with the host.
     scratch_indexes: std::sync::OnceLock<tempfile::TempDir>,
 }
 
@@ -624,7 +624,7 @@ impl Host {
         // The index lives in the app's data folder (ADR-0046). The folders on the way are checked by `index_home`;
         // SQLITE_OPEN_NOFOLLOW refuses a link anywhere in the path (on Windows, where SQLite ignores that flag,
         // `index_home` checks the database files too).
-        let db = index_home::database(&self.index_base()?, &root)?;
+        let db = self.index_database(&root)?;
         #[cfg(windows)]
         let db = win::paths::for_win32(&db);
         // The first handle on this folder in this app deletes the index an older Thoth left in `.thoth/`. A later one
@@ -650,22 +650,26 @@ impl Host {
         Ok(json!({ "vault": handle, "root": shown, "label": label, "shared": shared, "network": network }))
     }
 
-    /// The folder the indexes live under: the data folder, or this host's own temporary folder when it has none.
-    fn index_base(&self) -> HostResult<PathBuf> {
-        match &self.config.data_dir {
-            Some(data) => index_home::canonical_base(data),
-            None => {
-                let scratch = match self.scratch_indexes.get() {
-                    Some(dir) => dir,
-                    None => {
-                        let dir =
-                            tempfile::Builder::new().prefix("thoth-indexes-").tempdir().map_err(|e| HostError::io(&e, "mkdir", "temporary index folder"))?;
-                        self.scratch_indexes.get_or_init(|| dir)
-                    }
-                };
-                index_home::canonical_base(scratch.path())
+    /// `root`'s index database: in the data folder, or this host's own temporary folder when it has none or the data
+    /// folder cannot hold it (read-only, full, not a folder). The index is a cache, so that does not stop the Private
+    /// Space from opening. A link on the way is still refused, never worked around.
+    fn index_database(&self, root: &Path) -> HostResult<PathBuf> {
+        if let Some(data) = &self.config.data_dir {
+            match index_home::canonical_base(data).and_then(|base| index_home::database(&base, root)) {
+                Ok(db) => return Ok(db),
+                Err(e) if e.code == "UNAVAILABLE" || e.code == "SQLITE_ERROR" => return Err(e),
+                // The code only: the message has the data folder's path in it.
+                Err(e) => log::warn!("The search index is kept in a temporary folder: the data folder cannot hold it ({})", e.code),
             }
         }
+        let scratch = match self.scratch_indexes.get() {
+            Some(dir) => dir,
+            None => {
+                let dir = tempfile::Builder::new().prefix("thoth-indexes-").tempdir().map_err(|e| HostError::io(&e, "mkdir", "temporary index folder"))?;
+                self.scratch_indexes.get_or_init(|| dir)
+            }
+        };
+        index_home::database(&index_home::canonical_base(scratch.path())?, root)
     }
 
     /// Has an owner other than `owner` (another window) a handle open on `root`?

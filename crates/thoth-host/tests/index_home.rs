@@ -203,3 +203,30 @@ fn a_link_at_the_new_index_is_refused_and_an_old_one_is_removed_not_followed() {
     assert!(old_files(&notes).is_empty());
     assert_eq!(std::fs::read(&elsewhere).unwrap(), b"");
 }
+
+/// The index is a cache: a data folder that cannot hold it does not stop a Private Space from opening. The index then
+/// lives in the host's temporary folder, still outside the notes folder, and two windows still share it.
+#[cfg(unix)]
+#[test]
+fn a_data_folder_that_cannot_hold_the_index_falls_back_to_a_temporary_one() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_base, notes, data) = fixture();
+    // Read-only: `indexes/` cannot be made.
+    std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let host = host(notes.parent().unwrap(), Some(&data));
+    let first = open(&host, "main", &notes).unwrap();
+    host.call("sql.exec", &json!({ "vault": first["vault"], "sql": "CREATE TABLE pages (x)" }), None).unwrap();
+    let second = open(&host, "space-1", &notes).unwrap();
+    assert_eq!(sql(&host, &second, "SELECT count(*) AS n FROM sqlite_master WHERE name = 'pages'")["n"], 1.0);
+    assert!(old_files(&notes).is_empty());
+    assert!(!data.join(index_home::DIR).exists());
+    std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+    // Not a folder at all.
+    let file = notes.with_file_name("data-file");
+    std::fs::write(&file, "").unwrap();
+    let host = self::host(notes.parent().unwrap(), Some(&file));
+    open(&host, "main", &notes).unwrap();
+    assert!(old_files(&notes).is_empty());
+    assert_eq!(std::fs::read(&file).unwrap(), b"");
+}

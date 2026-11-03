@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, openApp, screen } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { axeViolations } from "../../../tests/helpers/axe.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -28,6 +29,9 @@ describe("network drive notice", () => {
     const notice = await screen.findByText(NOTICE);
     expect(notice.textContent).toMatch(/Thoth keeps its own data on this computer/);
     expect(notice.textContent).not.toMatch(/vault/i);
+    // A polite live region with a named button, so a screen reader hears it and can dismiss it.
+    expect(notice.closest("[role=status]")).not.toBeNull();
+    expect(await axeViolations(notice.closest("[role=status]") as HTMLElement)).toEqual([]);
     await app.user.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText(NOTICE)).toBeNull();
     cleanup();
