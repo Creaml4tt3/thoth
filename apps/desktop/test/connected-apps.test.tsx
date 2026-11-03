@@ -7,70 +7,10 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings, McpAnswer, McpRequest } from "@thoth/platform";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
+import { FakeConnectedApps, SIDECAR, SOCKET } from "./support/connected-apps.ts";
 import { setLangPreference } from "../src/strings/index.ts";
-
-const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
-const SOCKET = "/Users/someone/Library/Application Support/com.thothnotes.desktop/mcp/thoth.sock";
-
-class FakeConnectedApps implements ConnectedApps {
-  state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], setup: { command: SIDECAR, args: ["--socket", SOCKET] } };
-  calls: unknown[][] = [];
-  answers: { id: string; answer: McpAnswer }[] = [];
-  entries: ConnectedAppsLogEntry[] = [];
-  private readonly requests = new Set<(r: McpRequest) => void>();
-  private readonly pendings = new Set<(apps: string[]) => void>();
-
-  private copy = () => structuredClone(this.state);
-  async settings() {
-    return this.copy();
-  }
-  async configure(change: { enabled?: boolean; spaces?: string[] }) {
-    this.calls.push(["configure", change]);
-    if (change.enabled !== undefined) Object.assign(this.state, { enabled: change.enabled, listening: change.enabled });
-    if (change.spaces) this.state.spaces = change.spaces;
-    return this.copy();
-  }
-  async decide(app: string, allow: boolean) {
-    this.calls.push(["decide", app, allow]);
-    this.state.apps = [...this.state.apps.filter((a) => a.name !== app), { name: app, allowed: allow, decidedAt: "2026-10-26T09:00:00Z" }];
-    this.state.pending = this.state.pending.filter((p) => p !== app);
-    this.emitPending();
-    return this.copy();
-  }
-  async forget(app: string) {
-    this.calls.push(["forget", app]);
-    this.state.apps = this.state.apps.filter((a) => a.name !== app);
-    return this.copy();
-  }
-  async log() {
-    return this.entries;
-  }
-  async answer(id: string, answer: McpAnswer) {
-    this.answers.push({ id, answer });
-  }
-  async onRequest(listener: (r: McpRequest) => void) {
-    this.requests.add(listener);
-    return () => void this.requests.delete(listener);
-  }
-  async onPending(listener: (apps: string[]) => void) {
-    this.pendings.add(listener);
-    return () => void this.pendings.delete(listener);
-  }
-  /** An app connects for the first time. */
-  connect(app: string) {
-    this.state.pending = [...this.state.pending, app];
-    this.emitPending();
-  }
-  emitPending() {
-    for (const l of [...this.pendings]) l([...this.state.pending]);
-  }
-  request(r: McpRequest) {
-    for (const l of [...this.requests]) l(r);
-  }
-}
 
 const dirs = tempDirs();
 let root: string;
@@ -125,7 +65,7 @@ describe("Settings → Connected apps", () => {
   });
 
   it("lists the apps by the names they give, which it says are not checked, and revokes or removes one", async () => {
-    apps.state = { ...apps.state, enabled: true, listening: true, apps: [{ name: "Claude", allowed: true, decidedAt: "2026-10-25T08:00:00Z" }, { name: "<b>Cursor</b>", allowed: false, decidedAt: "2026-10-25T08:00:00Z" }] };
+    apps.state = { ...apps.state, enabled: true, listening: true, apps: [{ name: "Claude", allowed: true, decidedAt: "2026-10-25T08:00:00Z", propose: null }, { name: "<b>Cursor</b>", allowed: false, decidedAt: "2026-10-25T08:00:00Z", propose: null }] };
     const app = await open();
     const section = await openSettings(app);
     expect(section.getByText(/Each app gives its own name.*Thoth cannot check it/)).toBeTruthy();
@@ -171,7 +111,7 @@ describe("Settings → Connected apps", () => {
   });
 
   describe("after the app's identifier changed (ADR-0031)", () => {
-    const decided = [{ name: "Claude", allowed: true, decidedAt: "2026-10-25T08:00:00Z" }];
+    const decided = [{ name: "Claude", allowed: true, decidedAt: "2026-10-25T08:00:00Z", propose: null }];
     const notice = (section: ReturnType<typeof within>) => section.queryByRole("note", { name: "Copy the setup again" });
 
     it("tells someone who set up apps before to copy the setup again, once", async () => {
@@ -299,6 +239,8 @@ describe("A window answers from its open Vault", () => {
     expect(read.result.page.path).toBe("Plan.md");
     expect(read.result.page.markdown).toContain("แผนงานปีหน้า");
     expect(read.result.page.attachments).toEqual(["chart.png"]);
+    // The version a proposal is made from (ADR-0048): the page's content hash.
+    expect((read.result.page as { hash?: string }).hash).toMatch(/^[0-9a-f]{64}$/);
 
     apps.request({ ...base, id: "b", tool: "backlinks", args: { path: "Plan.md", limit: 50 } });
     expect(await answered("b")).toEqual({ result: { page: { id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", path: "Plan.md", title: "Plan" }, links: [{ id: expect.any(String), path: "Log.md", title: "Log", line: 3 }], total: 1 } });

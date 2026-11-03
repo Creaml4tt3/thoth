@@ -82,6 +82,7 @@ pub const COMMANDS: &[&str] = &[
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
+    "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -568,6 +569,18 @@ impl Host {
                 json(self.mcp.decide(str_arg(args, "app")?, allow)?)
             }
             "mcp.forget" => json(self.mcp.forget(str_arg(args, "app")?)?),
+            // Proposed changes (ADR-0048): the per-app switch, the list, one with its text, and a window's report that it
+            // applied one (compare-and-swap, in its Vault), the user declined it, or the page had changed.
+            "mcp.mayPropose" => {
+                let allow = match args.get("allow") {
+                    Some(Value::Bool(b)) => *b,
+                    _ => return Err(HostError::bad_argument("allow must be a boolean")),
+                };
+                json(self.mcp.may_propose(str_arg(args, "app")?, allow)?)
+            }
+            "mcp.proposals" => json(self.mcp.proposals()),
+            "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),
+            "mcp.settle" => json(self.mcp.settle(owner, str_arg(args, "id")?, str_arg(args, "status")?)?),
             "mcp.answer" => {
                 self.mcp.answer(owner, str_arg(args, "id")?, args)?;
                 null()

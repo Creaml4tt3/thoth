@@ -13,6 +13,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 ### Added
 
 - Duplicate pages and folders, in the Private Space and in workspaces: "Duplicate", "Duplicate structure only" (each page keeps only its title, for templates) and "Duplicate to…" in a page's or folder's menu, Cmd/Ctrl+Shift+D on the selected item, and "Duplicate page" in the command palette. A folder is copied with everything in it; links between the copied pages point at the copies, and images a Private Space page shows are copied with it. The copy never replaces anything, and a failure part-way removes what was copied.
+- Connected apps can propose changes to your pages: a new page, an edit (the whole page or exact pieces of text), or an addition at the end or under a heading. Nothing is written until you review the change under the bell and apply it. Each app needs "May propose changes", which is off until you turn it on.
+- The review of proposed changes shows the app, when, the page and a diff, with Apply, Decline and "Apply all from" an app. A page that changed in the meantime is never overwritten: you see the difference against the page as it is now and choose.
 
 ### Changed
 
@@ -20,6 +22,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - In the desktop app, Cmd/Ctrl + and − zoom the window (Cmd/Ctrl 0 resets), and F6 moves focus between the sidebar and each pane. Below 600px wide the sidebar sits above the page.
 - In Members, Trash and Visible to…, focus goes back to the button that asked when a question is cancelled, and "Choose at least one team" is read with the team boxes.
 - The desktop app keeps a Private Space's search index in its own data folder on this computer, no longer in the notes folder, so notes on a network share or a synced drive no longer carry a changing database. The old index there is deleted and rebuilt once. A Private Space on a network drive gets a short notice.
+- `read_page` now gives the page's version, so an app can say which version its proposal is based on.
 
 ## [0.4.0] - 2026-11-02
 

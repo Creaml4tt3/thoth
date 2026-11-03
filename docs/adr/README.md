@@ -54,6 +54,7 @@ trade-off.
 | [0043](0043-manager-rights-and-page-trash.md) | What managers may do, and a Trash for pages | Proposed 2026-11-01 |
 | [0046](0046-index-outside-the-notes-folder.md) | The search index lives outside the notes folder | Accepted 2026-11-02 |
 | [0047](0047-duplicate-pages-and-folders.md) | Duplicating pages and folders | Proposed 2026-11-02 |
+| [0048](0048-connected-apps-propose-changes.md) | Connected apps propose changes, reviewed in Thoth | Accepted 2026-11-02 |
 
 Template: [0000-template.md](0000-template.md).
 

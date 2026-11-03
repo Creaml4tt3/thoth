@@ -108,7 +108,16 @@ fn day_of(name: &str) -> Option<u64> {
 
 /// The time now as `YYYY-MM-DDTHH:MM:SSZ` (UTC).
 pub fn timestamp() -> String {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    iso(now_secs())
+}
+
+/// Seconds since 1970 (UTC).
+pub fn now_secs() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// Seconds since 1970 as `YYYY-MM-DDTHH:MM:SSZ` (UTC).
+pub fn iso(secs: u64) -> String {
     let (y, m, d) = civil((secs / 86_400) as i64);
     let s = secs % 86_400;
     format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", s / 3600, s / 60 % 60, s % 60)

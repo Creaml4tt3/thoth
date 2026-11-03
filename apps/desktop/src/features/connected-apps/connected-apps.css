@@ -32,3 +32,13 @@
 .mcp-prompt { display: grid; gap: var(--thoth-space-2); margin-bottom: var(--thoth-space-4); }
 .mcp-prompt .small { font: var(--thoth-text-small); }
 .mcp-caution { padding: 8px 12px; border-radius: var(--thoth-radius-md); background: color-mix(in srgb, var(--thoth-danger) 8%, transparent); }
+
+/* "May propose changes" per app, and the review of proposed changes (ADR-0048). */
+.mcp-app-propose { display: inline-flex; align-items: center; gap: var(--thoth-space-2); margin: 0; }
+.mcp-review { display: grid; gap: var(--thoth-space-3); }
+.mcp-review p { margin: 0; }
+.mcp-review .muted { color: var(--thoth-ink-secondary); }
+.mcp-review .small { font: var(--thoth-text-small); }
+.mcp-review-app { display: grid; gap: var(--thoth-space-2); }
+.mcp-review-app h3 { font: var(--thoth-text-ui); font-weight: 600; margin: 0; }
+.mcp-proposal { padding-bottom: var(--thoth-space-3); border-bottom: 1px solid var(--thoth-border); }

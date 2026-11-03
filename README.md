@@ -45,8 +45,8 @@ the command-line tools you already have, and nothing they propose is written unt
   changed it, you choose: keep mine, keep theirs, or keep both.
 - **AI edits you review first.** The Agent Hub runs Claude Code or Codex, which you install yourself, on the pages
   you pick. Each proposed change is shown as a diff, and nothing is written until you choose Apply.
-- **Connected apps.** A read-only MCP server lets AI tools such as Claude Desktop or Cursor search and read the
-  pages you share. Off until you switch it on.
+- **Connected apps.** An MCP server lets AI tools such as Claude Desktop or Cursor search and read the pages you
+  share, and propose changes that you review in Thoth before anything is written. Off until you switch it on.
 - **An open protocol.** Clients and servers talk over a documented REST API with an OpenAPI description and a
   conformance suite, so anyone can build another server or client.
 - **English and Thai**, in the apps and on the website.
@@ -145,7 +145,7 @@ apps/
   server/               The reference workspace server: Fastify 5 and PostgreSQL, admin CLI, Containerfile
 crates/
   thoth-host/           Rust host: scoped file access, SQLite, file watcher, agent runner, updates
-  thoth-mcp/            The read-only MCP server for other apps (ADR-0021)
+  thoth-mcp/            The MCP server for other apps (ADR-0021, ADR-0048)
 packages/
   domain/               IDs, paths, hashing, core entity schemas
   content/              Markdown and frontmatter parsing, link resolution and rewriting
