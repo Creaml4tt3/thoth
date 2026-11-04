@@ -18,6 +18,7 @@ import { caretScrollExtension } from "./caret-scroll.ts";
 import { textStylesExtension } from "./selection-toolbar.ts";
 import { calloutKeysExtension } from "./callout-keys.ts";
 import { listKeysExtension } from "./list-keys.ts";
+import { blockJoinKeysExtension } from "./block-join-keys.ts";
 import { pasteLinksExtension } from "./paste-links.ts";
 import { linkCardsExtension } from "./link-cards.ts";
 import { webLinksExtension } from "./web-links.ts";
@@ -90,6 +91,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     Editing,
     calloutKeysExtension(),
     listKeysExtension(),
+    blockJoinKeysExtension(),
     slashExtension(ctx),
     blockHandleExtension(ctx.strings),
     caretScrollExtension(),

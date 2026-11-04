@@ -19,6 +19,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 - Servers report their real version (0.5.0 and on) instead of 0.0.0, so you can tell which release a server runs.
 - A member is no longer told, by a live update, that a page they cannot see (in a folder limited to teams they are not in) has changed.
+- Backspace on the empty line under a list, quote or callout now removes that line, instead of adding an empty list item or line to the block. On a line with text it joins the text to the block's last line, and Delete at the end of a list or quote pulls the next line up the same way.
+- Backspace on the line under a picture, divider or formula now selects it first instead of deleting it at once; a second Backspace deletes it.
 
 ## [0.5.0] - 2026-11-03
 
