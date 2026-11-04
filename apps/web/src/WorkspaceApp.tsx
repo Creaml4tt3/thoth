@@ -55,7 +55,9 @@ import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
 import { FavoritesList } from "@thoth/app-ui/favorites/FavoritesList.tsx";
 import { useWorkspaceFavorites, workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import { createWorkspaceFavorites } from "@thoth/app-ui/favorites/workspace-favorites.ts";
-import { HOME, isPinned } from "@thoth/app-ui/tabs/model.ts";
+import { HOME, TIMELINE, isPinned } from "@thoth/app-ui/tabs/model.ts";
+import { TimelineView } from "@thoth/app-ui/timeline/TimelineView.tsx";
+import { workspaceTimelineSources } from "@thoth/app-ui/timeline/sources.ts";
 import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
 import { createRecentStore, RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
 import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
@@ -171,6 +173,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
   // Home (ADR-0029): one tab, and what a new tab shows. Its recent pages are kept in this browser per account, by id;
   // with no account known they last for the visit.
   const goHome = () => tabs.open(HOME);
+  /** Timeline (ADR-0051): the workspaces' pages by date, one tab like Home. */
+  const openTimeline = () => tabs.open(TIMELINE);
   const recentStore = useMemo(() => createRecentStore(() => (accountId ? (env.localStorage ?? null) : null), `${RECENT_KEY_PREFIX}${accountId ?? ""}`), [env, accountId]);
   const recent = useRecentPages(recentStore, tabs.active);
   useEffect(() => recentStore.prune((ref) => ref.kind === "workspace" && remoteGone(state, ref)), [recentStore, state]);
@@ -275,6 +279,8 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
         return t.tabs.settings;
       case "home":
         return t.home.title;
+      case "timeline":
+        return t.timeline.title;
       default:
         return t.tabs.blank;
     }
@@ -351,6 +357,7 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
     ...(canFeedback ? { sendFeedback: openFeedback } : {}),
     openNotifications: () => setNotificationsOpen(true),
     goHome,
+    openTimeline,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
   });
@@ -427,8 +434,10 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
             if (event.kind === "shown") notifications.push({ kind: "saveConflict", page: remoteTitle(state, current) ?? t.tabs.untitled, open: { kind: "workspacePage", ...current } });
           }}
         />
+      ) : shown.kind === "timeline" ? (
+        <TimelineView sources={workspaceTimelineSources(state, { untitled: t.tabs.untitled, expand: (server, workspace) => directory.expand(server, workspace), open: (ref, o) => openPage(ref, o.newTab ? { newTab: true } : undefined) })} />
       ) : (
-      <HomeView recent={homeRecent} favorites={homeFavorites} />
+      <HomeView recent={homeRecent} favorites={homeFavorites} onTimeline={openTimeline} />
     );
   };
 
@@ -462,6 +471,9 @@ export function WorkspaceApp({ env, directory, capabilities, account, signOut, s
               <kbd aria-hidden="true">⌘K</kbd>
             </button>
           )}
+          <button type="button" className="sidebar-link" aria-current={tabs.active.target.kind === "timeline" ? "page" : undefined} onClick={openTimeline}>
+            {t.timeline.title}
+          </button>
           <nav aria-label={t.web.pages} className="tree-wrap">
             {favorites.items.length > 0 && (
               // The Favorites first, and only when there is one (ADR-0027).

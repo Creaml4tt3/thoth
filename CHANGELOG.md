@@ -8,6 +8,13 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Timeline: your pages by date, newest first, grouped by day, with each page's folder, time and tags. Filter by one or more tags (a page must have all of them), and choose Edited or Dated (the page's `date`, or a daily note's name). Open it from the sidebar, from Home, or with "Open Timeline" in the command palette, in the Private Space and in workspaces.
+- Workspace Timelines show tags and dates on servers from 0.7.0. Self-hosters: update your server to 0.7.0 and run `node src/cli.ts backfill-tags` once so pages written earlier get their tags; an older server lists pages by when they were edited, without a tag filter.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added

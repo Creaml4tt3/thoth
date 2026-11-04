@@ -205,7 +205,7 @@ paths:
       tags:
         - Pages
       summary: Page hierarchy of a workspace
-      description: Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content.
+      description: Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content. A server that lists capability `page-tags` also returns each page's `tags` and frontmatter `date` (ADR-0051).
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
         - $ref: "#/components/parameters/Cursor"
@@ -3143,6 +3143,7 @@ components:
                   - transfers
                   - page-order
                   - page-kind
+                  - page-tags
                   - public-share
                   - members
                   - invite-links
@@ -4730,6 +4731,17 @@ components:
                 - folder
               description: "Kind of page (capability page-kind): a folder page or an ordinary page. Absent or null means unknown, treated as a page."
             - type: "null"
+        tags:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: "null"
+        date:
+          anyOf:
+            - type: string
+              pattern: ^\d{4}-\d{2}-\d{2}$
+            - type: "null"
         revisionId:
           type: string
           minLength: 1
@@ -5077,6 +5089,7 @@ x-thoth-capabilities:
   - transfers
   - page-order
   - page-kind
+  - page-tags
   - public-share
   - members
   - invite-links

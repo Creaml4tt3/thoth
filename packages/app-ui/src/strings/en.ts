@@ -636,6 +636,8 @@ export const en = {
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
       goHome: "Go home",
+      /** Timeline (ADR-0051). */
+      openTimeline: "Open Timeline",
       /** Desktop only: closes this Private Space in this window and shows the picker. */
       leaveSpace: "Back to Private Spaces",
       /** Desktop only: the first-run tour (ADR-0032), again. */
@@ -737,6 +739,38 @@ export const en = {
     startToday: "Start today's page",
     todayTemplate: "Uses Templates/Daily.md when it exists.",
     todayFailed: (reason: string) => `Today's page could not be made: ${reason}`,
+    /** The link to the Timeline (ADR-0051). */
+    timeline: "Timeline",
+  },
+
+  /** Timeline (ADR-0051 rules 14–17): pages by date, newest first, grouped by day. */
+  timeline: {
+    title: "Timeline",
+    /** The sidebar and command palette entry. */
+    open: "Open Timeline",
+    lead: "Your pages by date, newest first.",
+    /** The Edited / Dated choice. */
+    sortBy: "Show pages by",
+    edited: "Edited",
+    editedHint: "When the page was last changed",
+    dated: "Dated",
+    datedHint: "The date in the page: its date field, or a daily note's name",
+    tags: "Filter by tag",
+    tagsHint: "Pages with every selected tag",
+    clearTags: "Clear tags",
+    today: "Today",
+    yesterday: "Yesterday",
+    topLevel: "Top level",
+    /** Said politely after a filter changes. */
+    count: (n: number) => (n === 1 ? "1 page shown" : `${n.toLocaleString("en")} pages shown`),
+    empty: "No pages yet.",
+    emptyFiltered: "No page has all the selected tags.",
+    loading: "Loading pages…",
+    /** A workspace on a server without `page-tags`. */
+    noTags: "This server doesn't share tags or dates, so pages are listed by when they were edited. Its owner can update it to Thoth 0.7.0 or later.",
+    /** Which space the Timeline lists. */
+    space: "Space",
+    privateSpace: "Private Space",
   },
 
   /** The Connections panel under a page (ADR-0050). */

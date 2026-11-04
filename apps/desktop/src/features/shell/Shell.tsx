@@ -58,6 +58,10 @@ import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useFavoritesController } from "../favorites/useFavoritesController.ts";
 import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import { HomeView, type HomeRow, type HomeToday } from "@thoth/app-ui/home/HomeView.tsx";
+import { TimelineView, type TimelineSource } from "@thoth/app-ui/timeline/TimelineView.tsx";
+import { privateTimelineItems } from "@thoth/app-ui/timeline/timeline.ts";
+import { workspaceTimelineSources } from "@thoth/app-ui/timeline/sources.ts";
+import { TIMELINE } from "@thoth/app-ui/tabs/model.ts";
 import { collisionKey } from "@thoth/domain";
 import { msUntilMidnight, openOrStartToday, todayPath } from "./today.ts";
 import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
@@ -161,6 +165,8 @@ export function Shell() {
     if (favoriteHere && favorites.api.can(favoriteHere)) favorites.api.toggle(favoriteHere);
   };
 
+  /** Timeline (ADR-0051): one tab, like Settings. */
+  const openTimeline = () => tabs.open(TIMELINE);
   const toggleSearch = () => setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
   const toggleShortcuts = () => setDialog((d) => (d?.kind === "shortcuts" ? null : { kind: "shortcuts" }));
   const platform = useMemo(() => currentPlatform(), []);
@@ -184,6 +190,8 @@ export function Shell() {
         const record = runs ? agents?.conversation(tab.run)[0] : undefined;
         return record ? taskTitle(record.task.prompt) || sessionTitle : sessionTitle;
       }
+      case "timeline":
+        return strings.timeline.title;
       case "home": // never shown: the desktop drops a saved Home tab
       case "blank":
         return tt.blank;
@@ -345,6 +353,7 @@ export function Shell() {
     sendFeedback: () => setDialog({ kind: "feedback" }),
     openNotifications: () => setNotificationsOpen(true),
     leaveSpace: leave,
+    openTimeline: () => openTimeline(),
     showTour: requestTour,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
@@ -438,6 +447,23 @@ export function Shell() {
       ),
   };
 
+  // Timeline (ADR-0051): the Private Space from its index, then each workspace from its tree.
+  const privateItems = useMemo(() => (pages ? privateTimelineItems(pages) : null), [pages]);
+  const timelineSources: TimelineSource[] = [
+    {
+      id: "private",
+      label: strings.timeline.privateSpace,
+      items: privateItems,
+      tags: true,
+      open: (item, o) => openPage(item.id, o.newTab ? { newTab: true } : undefined),
+    },
+    ...workspaceTimelineSources(directory, {
+      untitled: tt.untitled,
+      expand: (server, workspace) => servers.expand(server, workspace),
+      open: (ref, o) => openWorkspacePage(ref, o.newTab ? { newTab: true } : undefined),
+    }),
+  ];
+
   // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
   const wanted = [
     ...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
@@ -473,8 +499,10 @@ export function Shell() {
       <WorkspacePageView key={`${id}\n${shown.server}\n${shown.workspace}\n${shown.page}`} target={shown} onTransfer={transfer} />
     ) : shown.kind === "page" ? (
       <PageView key={`${id}\n${shown.path}`} path={shown.path} />
+    ) : shown.kind === "timeline" ? (
+      <TimelineView sources={timelineSources} />
     ) : (
-      <HomeView recent={homeRecent} favorites={homeFavorites} today={homeToday} />
+      <HomeView recent={homeRecent} favorites={homeFavorites} today={homeToday} onTimeline={openTimeline} />
     );
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.
@@ -495,7 +523,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
-      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} />
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} onTimeline={openTimeline} timelineOpen={target.kind === "timeline"} />
       <main className="main">
         <Panes
           tabs={tabs}

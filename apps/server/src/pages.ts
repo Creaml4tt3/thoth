@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { parsePage } from "@thoth/content";
 import { PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX, PageIdSchema, pageKindOf, type PageKind, type PageWrite } from "@thoth/workspace-protocol";
 import { ApiError, fieldError } from "./errors.ts";
 import { appendChange } from "./changes.ts";
@@ -14,6 +15,10 @@ export interface PageRow {
   position: string | null;
   /** Page kind (capability `page-kind`, ADR-0017) of the current revision, derived on every write; null = unknown. Page row only. */
   kind: PageKind | null;
+  /** Tags of the current revision (capability `page-tags`, ADR-0051); null = not derived yet (written before migration 018). */
+  tags: string[] | null;
+  /** Frontmatter `date` of the current revision as YYYY-MM-DD; null when it has none or it is not a valid date. */
+  page_date: string | null;
   current_revision_id: string;
   revision_count: number;
   created_at: Date;
@@ -80,6 +85,20 @@ export function pageResource(page: PageRow, rev: RevisionRow, withKind = false) 
       updatedBy: rev.author_id,
     },
   };
+}
+
+/**
+ * The tags and frontmatter `date` of a page (capability `page-tags`, ADR-0051 rule 16), by the same rules as the
+ * clients' `parsePage`. Never throws, so a write can never fail because of its content: a page that cannot be parsed
+ * has no tags and no date.
+ */
+export function pageTagsOf(markdown: string): { tags: string[]; date: string | null } {
+  try {
+    const doc = parsePage("page.md", markdown);
+    return { tags: doc.tags, date: doc.date ?? null };
+  } catch {
+    return { tags: [], date: null };
+  }
 }
 
 export function parsePageId(raw: string | undefined): string {
@@ -159,6 +178,8 @@ export async function writeRevision(
   const position = input.position === undefined ? (existing?.position ?? null) : input.position;
   // ADR-0017: the only frontmatter key the server reads. Never throws: malformed frontmatter is kind null.
   const kind = pageKindOf(input.markdown);
+  // ADR-0051: tags and date for the Timeline, stored on the page row and returned only on (visibility-filtered) tree nodes.
+  const { tags, date } = pageTagsOf(input.markdown);
   const revisionId = opaqueId("rev");
   const revNo = (existing?.revision_count ?? 0) + 1;
   const size = Buffer.byteLength(input.markdown, "utf8");
@@ -167,9 +188,9 @@ export async function writeRevision(
   if (created) {
     // The pages -> page_revisions pointer is deferred, so the page row may precede its first revision.
     await tx.query(
-      `INSERT INTO pages (workspace_id, id, parent_id, title, position, kind, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $9, $8, $9)`,
-      [workspaceId, pageId, pageParentId, input.title, position, kind, revisionId, now, userId],
+      `INSERT INTO pages (workspace_id, id, parent_id, title, position, kind, tags, page_date, current_revision_id, revision_count, created_at, created_by, updated_at, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, $11, $10, $11)`,
+      [workspaceId, pageId, pageParentId, input.title, position, kind, tags, date, revisionId, now, userId],
     );
   }
   await tx.query(
@@ -178,7 +199,7 @@ export async function writeRevision(
     [revisionId, workspaceId, pageId, revNo, previous?.id ?? null, now, userId, input.title, input.markdown, pageParentId, size, contentHash],
   );
   if (!created) {
-    await tx.query("UPDATE pages SET parent_id = $3, title = $4, position = $5, kind = $6, current_revision_id = $7, revision_count = $8, updated_at = $9, updated_by = $10 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, position, kind, revisionId, revNo, now, userId]);
+    await tx.query("UPDATE pages SET parent_id = $3, title = $4, position = $5, kind = $6, tags = $7, page_date = $8, current_revision_id = $9, revision_count = $10, updated_at = $11, updated_by = $12 WHERE workspace_id = $1 AND id = $2", [workspaceId, pageId, pageParentId, input.title, position, kind, tags, date, revisionId, revNo, now, userId]);
   }
   await appendChange(tx, workspaceId, { kind: created ? "page.created" : "page.updated", actorId: userId, pageId, revisionId, parentId: pageParentId, title: input.title, position, pageKind: kind }, now);
 
@@ -190,6 +211,8 @@ export async function writeRevision(
     title: input.title,
     position,
     kind,
+    tags,
+    page_date: date,
     current_revision_id: revisionId,
     revision_count: revNo,
     created_at: existing?.created_at ?? now,
@@ -215,9 +238,22 @@ export async function movePage(tx: Queryable, args: { page: PageRow; parentId: s
   return { ...page, parent_id: parentId, position, updated_at: now, updated_by: userId };
 }
 
-/** The tree node of a page row (`getWorkspaceTree`, `movePage`). `kind` only when `withKind` (the server lists `page-kind`). */
-export function treeNode(p: Pick<PageRow, "id" | "parent_id" | "title" | "position" | "kind" | "current_revision_id" | "updated_at">, withKind = false) {
-  return { id: p.id, parentId: p.parent_id, title: p.title, position: p.position, ...(withKind ? { kind: p.kind } : {}), revisionId: p.current_revision_id, updatedAt: p.updated_at.toISOString() };
+/**
+ * The tree node of a page row (`getWorkspaceTree`, `movePage`). `kind` only when `withKind` (the server lists
+ * `page-kind`); `tags` and `date` only when `withTags` (it lists `page-tags`). Callers return nodes only for pages the
+ * reader may see (ADR-0042), so a hidden page's tags never leave the server.
+ */
+export function treeNode(p: Pick<PageRow, "id" | "parent_id" | "title" | "position" | "kind" | "tags" | "page_date" | "current_revision_id" | "updated_at">, withKind = false, withTags = false) {
+  return {
+    id: p.id,
+    parentId: p.parent_id,
+    title: p.title,
+    position: p.position,
+    ...(withKind ? { kind: p.kind } : {}),
+    ...(withTags ? { tags: p.tags, date: p.page_date } : {}),
+    revisionId: p.current_revision_id,
+    updatedAt: p.updated_at.toISOString(),
+  };
 }
 
 /** Marks a page deleted and records `page.deleted`. Revisions are kept. */

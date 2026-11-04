@@ -51,6 +51,8 @@ export const PageSummarySchema = z.object({
   mtimeMs: z.number(),
   aliases: z.array(z.string()),
   tags: z.array(z.string()),
+  /** Frontmatter `date` as `YYYY-MM-DD` when it is a valid date (ADR-0051 rule 15). */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type PageSummary = z.infer<typeof PageSummarySchema>;
 

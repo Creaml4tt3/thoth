@@ -51,6 +51,9 @@ interface Props {
   onHome(): void;
   /** Opens another Private Space in this window, from the switcher (0.2.6). */
   onSwitch(root: string): void;
+  /** Opens the Timeline (ADR-0051), and whether the current tab shows it. */
+  onTimeline(): void;
+  timelineOpen: boolean;
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -92,7 +95,7 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch }: Props) {
+export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch, onTimeline, timelineOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
@@ -101,6 +104,7 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   const importFrom = useDesktopStrings().settings.importFrom;
   const proposals = useProposalsEntry();
   const hideLabel = useStrings().sidebar.hide;
+  const timelineLabel = useStrings().timeline.title;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
@@ -284,6 +288,9 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
       <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">
         <span>{t.search}</span>
         <kbd>⌘K</kbd>
+      </button>
+      <button type="button" className="sidebar-link" aria-current={timelineOpen ? "page" : undefined} onClick={onTimeline}>
+        {timelineLabel}
       </button>
       <nav aria-label={t.pages} className="tree-wrap">
         <SidebarSections root={connection.root} sections={[...(favoritesSection ? [favoritesSection] : []), privateSection, ...serverSections, ...(agentsSection ? [agentsSection] : [])]} />

@@ -15,8 +15,8 @@ if [ "$#" -eq 0 ]; then
 fi
 for cmd in "$@"; do
   case "$cmd" in
-    migrate | backfill-kind) ;;
-    *) echo "refused: '$cmd' is not an allowed command here (migrate, backfill-kind)" >&2; exit 2 ;;
+    migrate | backfill-kind | backfill-tags) ;;
+    *) echo "refused: '$cmd' is not an allowed command here (migrate, backfill-kind, backfill-tags)" >&2; exit 2 ;;
   esac
 done
 

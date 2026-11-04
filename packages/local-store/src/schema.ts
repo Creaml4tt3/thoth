@@ -4,7 +4,7 @@
  * Everything here is a cache derived from vault files and durable `.thoth/`
  * JSON records; a version mismatch simply drops and rebuilds the index.
  */
-export const INDEX_SCHEMA_VERSION = 2;
+export const INDEX_SCHEMA_VERSION = 3;
 
 export const INDEX_DDL = `
 CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS pages (
   content_hash TEXT NOT NULL,
   size INTEGER NOT NULL,
   mtime_ms REAL NOT NULL,
+  -- Frontmatter \`date\` as YYYY-MM-DD when valid (ADR-0051 rule 15, Timeline "Dated"); NULL otherwise. Added in version 3.
+  page_date TEXT,
   stable_id INTEGER NOT NULL,
   frontmatter_error TEXT,
   indexed_at INTEGER NOT NULL

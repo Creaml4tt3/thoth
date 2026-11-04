@@ -194,7 +194,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     path: "/workspaces/{workspaceId}/tree",
     tag: "Pages",
     summary: "Page hierarchy of a workspace",
-    description: "Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content.",
+    description: "Paginated adjacency list of the pages the principal can read, plus a change cursor to continue from. A server that lists capability `page-kind` also returns each page's `kind` (`page` or `folder`), so a client can draw folders without reading page content. A server that lists capability `page-tags` also returns each page's `tags` and frontmatter `date` (ADR-0051).",
     pathParams: workspaceParams,
     query: PaginationQuerySchema,
     responses: [json(200, "A page of tree nodes.", TreePageSchema)],

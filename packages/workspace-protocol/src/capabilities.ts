@@ -11,6 +11,7 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `transfers`        routes: createTransfer, getTransfer, commitTransfer, abortTransfer
  * - `page-order`       routes: movePage; the optional `position` member of pages, tree nodes and changes
  * - `page-kind`        no routes; the optional `kind` member of tree nodes and page metadata, and `pageKind` of changes (ADR-0017)
+ * - `page-tags`        no routes; the optional `tags` and `date` members of tree nodes, derived from the Markdown (ADR-0051)
  * - `public-share`     routes: createShareLink, listShareLinks, revokeShareLink; plus the unauthenticated, read-only
  *                      HTML pages under `/s/<token>` on the server origin (ADR-0023)
  * - `members`          routes: listMembers, setMemberRole, removeMember (ADR-0024)
@@ -27,7 +28,7 @@ import { PROTOCOL_VERSION } from "./common.ts";
  * - `databases`        reserved, no routes defined in protocol 1.0
  * - `realtime-collab`  reserved, no routes defined in protocol 1.0
  */
-export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "presence", "databases", "realtime-collab"] as const;
+export const KNOWN_CAPABILITIES = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "page-tags", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "presence", "databases", "realtime-collab"] as const;
 export type KnownCapability = (typeof KNOWN_CAPABILITIES)[number];
 
 export const VENDOR_CAPABILITY_PATTERN = /^x-[a-z0-9]+(?:[.-][a-z0-9]+)*$/;

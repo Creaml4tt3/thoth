@@ -94,6 +94,8 @@ export const PageDocumentSchema = z.object({
   aliases: z.array(z.string()),
   /** `thoth_id` from frontmatter when it is a valid stable ID. */
   thothId: z.string().optional(),
+  /** Frontmatter `date` when it is a valid calendar date, as `YYYY-MM-DD` (ADR-0051 rule 15); a time after it is dropped. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   /** Plain text for full-text search. */
   plainText: z.string(),
 });
