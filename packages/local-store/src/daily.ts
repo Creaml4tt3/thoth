@@ -130,9 +130,14 @@ export async function updateDailySettings(
  * missing: `YYYY-MM-DD`) and `template` (a note path, usually without `.md`; "" or missing: none). The result may still
  * have a problem (`dailySettingsProblem`), which the caller shows.
  */
+/** Obsidian's daily notes file is a few hundred bytes; anything over this is ignored, never read. */
+export const OBSIDIAN_DAILY_MAX_BYTES = 64 * 1024;
+
 export async function readObsidianDailySettings(vault: Pick<Vault, "fs">): Promise<DailySettings | undefined> {
   try {
-    if ((await vault.fs.stat(OBSIDIAN_DAILY_PATH))?.kind !== "file") return undefined;
+    const stat = await vault.fs.stat(OBSIDIAN_DAILY_PATH);
+    // Another app's file: a settings file this large is not one, so it is not read at all.
+    if (stat?.kind !== "file" || stat.size > OBSIDIAN_DAILY_MAX_BYTES) return undefined;
     const value: unknown = JSON.parse(decodeText(await vault.fs.readFile(OBSIDIAN_DAILY_PATH)).text);
     if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
     return obsidianDailySettings(value as Record<string, unknown>);

@@ -127,6 +127,11 @@ describe("Obsidian's .obsidian/daily-notes.json, read once", () => {
     expect(await readFile(join(root, ".obsidian/daily-notes.json"), "utf8")).toBe("{broken");
   });
 
+  it("ignores a file too large to be Obsidian's setting, without reading it", async () => {
+    await put(".obsidian/daily-notes.json", JSON.stringify({ folder: "Journal", pad: "x".repeat(70 * 1024) }));
+    expect(await readObsidianDailySettings(vault)).toBeUndefined();
+  });
+
   it("keeps a pattern Thoth cannot make, so the question can show why", async () => {
     await put(".obsidian/daily-notes.json", JSON.stringify({ format: "gggg-[W]ww" }));
     const found = (await readObsidianDailySettings(vault))!;
