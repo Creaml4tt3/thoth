@@ -8,7 +8,7 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
-## [Unreleased]
+## [0.6.0] - 2026-11-04
 
 ### Added
 
@@ -17,7 +17,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Fixed
 
-- Servers report their real version (0.5.0 and on) instead of 0.0.0, so you can tell which release a server runs.
+- Servers report their real version (from 0.6.0) instead of 0.0.0, so you can tell which release a server runs.
 - A member is no longer told, by a live update, that a page they cannot see (in a folder limited to teams they are not in) has changed.
 - Backspace on the empty line under a list, quote or callout now removes that line, instead of adding an empty list item or line to the block. On a line with text it joins the text to the block's last line, and Delete at the end of a list or quote pulls the next line up the same way.
 - Backspace on the line under a picture, divider or formula now selects it first instead of deleting it at once; a second Backspace deletes it.
@@ -270,7 +270,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1
