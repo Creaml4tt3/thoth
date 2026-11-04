@@ -59,7 +59,9 @@ import { useFavoritesController } from "../favorites/useFavoritesController.ts";
 import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
 import { HomeView, type HomeRow, type HomeToday } from "@thoth/app-ui/home/HomeView.tsx";
 import { collisionKey } from "@thoth/domain";
-import { msUntilMidnight, openOrStartToday, todayPath } from "./today.ts";
+import { msUntilMidnight, openOrStartToday } from "./today.ts";
+import { DEFAULT_DAILY, dailyPath, readDailySettings, readObsidianDailySettings, type DailySettings } from "@thoth/local-store";
+import { ObsidianDailyQuestion } from "../settings/DailySettings.tsx";
 import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
 import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
 import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
@@ -345,6 +347,7 @@ export function Shell() {
     sendFeedback: () => setDialog({ kind: "feedback" }),
     openNotifications: () => setNotificationsOpen(true),
     leaveSpace: leave,
+    openToday: () => openToday(),
     showTour: requestTour,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
@@ -352,6 +355,7 @@ export function Shell() {
 
   useShortcuts("desktop", {
     "home.open": leave,
+    "today.open": () => openToday(),
     "sidebar.toggle": side.toggle,
     "palette.open": toggleSearch,
     "shortcuts.open": toggleShortcuts,
@@ -422,20 +426,49 @@ export function Shell() {
     return () => clearTimeout(timer);
   }, [now]);
   const [todayError, setTodayError] = useState<string | null>(null);
-  const todayKey = collisionKey(todayPath(now));
+  // The daily notes setting (ADR-0051), read again whenever the vault changes (Settings → Today saves, then refreshes).
+  const [daily, setDaily] = useState<DailySettings>(DEFAULT_DAILY);
+  useEffect(() => {
+    let live = true;
+    void readDailySettings(vault).then(({ settings }) => live && setDaily(settings));
+    return () => {
+      live = false;
+    };
+  }, [vault, revision]);
+  // Obsidian's daily notes folder, asked about once per folder (ADR-0051 rule 11): only while there is no daily.json.
+  const [obsidianDaily, setObsidianDaily] = useState<DailySettings | null>(null);
+  useEffect(() => {
+    let live = true;
+    void readDailySettings(vault).then(async ({ exists }) => {
+      const found = exists ? undefined : await readObsidianDailySettings(vault);
+      if (live && found) setObsidianDaily(found);
+    });
+    return () => {
+      live = false;
+    };
+  }, [vault]);
+  const todayKey = collisionKey(dailyPath(daily, now));
+  /** Today's page, made on first use (Home's card, Alt+Shift+T, the palette). */
+  const openToday = (o: { newTab: boolean } = { newTab: false }) =>
+    void openOrStartToday(vault, new Date()).then(
+      async ({ path: today, created }) => {
+        setTodayError(null);
+        if (created) await refresh().catch(() => undefined);
+        openPage(today, o.newTab ? { newTab: true } : undefined);
+      },
+      (error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        setTodayError(reason);
+        // Not from Home: the card that would show it is not on screen.
+        if (tabs.active.target.kind !== "blank" && tabs.active.target.kind !== "home") setProblem(strings.home.todayFailed(reason));
+      },
+    );
   const homeToday: HomeToday = {
     date: new Intl.DateTimeFormat(strings.lang, { dateStyle: "full" }).format(now),
     exists: pages?.some((p) => collisionKey(p.path) === todayKey) ?? false,
+    template: daily.template,
     error: todayError,
-    open: (o) =>
-      void openOrStartToday(vault, new Date()).then(
-        async ({ path: today, created }) => {
-          setTodayError(null);
-          if (created) await refresh().catch(() => undefined);
-          openPage(today, o.newTab ? { newTab: true } : undefined);
-        },
-        (error: unknown) => setTodayError(error instanceof Error ? error.message : String(error)),
-      ),
+    open: openToday,
   };
 
   // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
@@ -573,6 +606,16 @@ export function Shell() {
       {dialog?.kind === "feedback" && <DesktopFeedbackDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />}
+      {obsidianDaily && (
+        <ObsidianDailyQuestion
+          found={obsidianDaily}
+          onDone={(next) => {
+            setObsidianDaily(null);
+            void refresh().catch(() => undefined);
+            if (next === "settings") openSettings("today");
+          }}
+        />
+      )}
     </div>
     </FavoritesContext>
     </HintContext>

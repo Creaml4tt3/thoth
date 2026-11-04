@@ -1,3 +1,4 @@
+export * from "./daily.ts";
 export * from "./errors.ts";
 export * from "./favorites.ts";
 export * from "./journal.ts";

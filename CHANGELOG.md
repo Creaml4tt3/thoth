@@ -8,6 +8,15 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Settings → Today: choose the folder, the file name (for example `YYYY/MM/YYYY-MM-DD`, with a preview of today's) and the template of today's page in each Private Space. It is saved in the folder, and nothing changes until you choose.
+- When you open a folder that Obsidian's daily notes already use, Thoth asks once whether Today should use the same folder, file name and template. It never changes Obsidian's settings.
+- `{{date}}`, `{{time}}` and `{{title}}` in a daily template are filled in when today's page is made, also with a format such as `{{date:dddd D MMMM}}`. Text in code is left as written.
+- Open today's page from anywhere with Alt+Shift+T (Option+Shift+T on a Mac) or the command "Open today's page".
+
 ## [0.6.0] - 2026-11-04
 
 ### Added

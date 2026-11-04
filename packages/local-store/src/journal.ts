@@ -90,13 +90,14 @@ export async function readPendingJournal(fs: VaultFs): Promise<PendingJournal> {
 
 /**
  * A durable Thoth record path (ADR-0001 §2): `.thoth/<area>/.../<name>.json`, outside the index files and
- * outside the temp, journal and import staging areas, or one of the two top-level records `.thoth/order.json` (the tree
- * order, ADR-0016 rule 4) and `.thoth/favorites.json` (the starred pages, ADR-0027). Throws for anything else.
+ * outside the temp, journal and import staging areas, or one of the top-level records `.thoth/order.json` (the tree
+ * order, ADR-0016 rule 4), `.thoth/favorites.json` (the starred pages, ADR-0027) and `.thoth/daily.json` (the daily
+ * notes setting, ADR-0051). Throws for anything else.
  */
 export function recordPath(path: string): string {
   const normalized = normalizeVaultPath(path);
   const lower = normalized.toLowerCase();
-  if (lower === ".thoth/order.json" || lower === ".thoth/favorites.json") return normalized;
+  if (lower === ".thoth/order.json" || lower === ".thoth/favorites.json" || lower === ".thoth/daily.json") return normalized;
   const [first, ...rest] = normalized.split("/");
   const area = rest.join("/").toLowerCase();
   const ok =
