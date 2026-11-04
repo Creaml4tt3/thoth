@@ -113,6 +113,45 @@ export const th: DesktopStrings = {
     showTour: "แสดงทัวร์อีกครั้ง",
   },
 
+  // การตั้งค่า → วันนี้ (ADR-0051). REVIEW: ทั้งกลุ่มนี้
+  daily: {
+    title: "วันนี้", // REVIEW
+    note: "ที่ที่การ์ดวันนี้ในหน้าแรกและ Alt+Shift+T ใช้เก็บหน้าของวันนี้ใน Private Space นี้ และหน้าที่ใช้เป็นแม่แบบ บันทึกไว้ในโฟลเดอร์นี้ จึงติดไปกับโฟลเดอร์", // REVIEW
+    folder: "โฟลเดอร์", // REVIEW
+    folderHint: "เว้นว่างไว้เพื่อใช้ระดับบนสุดของ Private Space นี้", // REVIEW
+    pattern: "ชื่อไฟล์", // REVIEW
+    patternHint: "YYYY ปี, YY ปีสองหลัก, MM หรือ M เดือน, MMM หรือ MMMM ชื่อเดือน, DD หรือ D วัน, ddd หรือ dddd ชื่อวัน, [ข้อความ] ใช้ตามที่เขียน, / สำหรับโฟลเดอร์ย่อย ชื่อเดือนและวันเป็นภาษาอังกฤษ ปีเป็น ค.ศ.", // REVIEW
+    template: "แม่แบบ", // REVIEW
+    templateHint: "หน้าที่ใช้เริ่มต้น เช่น Templates/Daily.md เว้นว่างไว้ถ้าไม่ใช้ {{date}}, {{time}} และ {{title}} ในหน้านั้นจะถูกเติมให้", // REVIEW
+    preview: (path) => `หน้าของวันนี้: ${path}`, // REVIEW
+    save: "บันทึก", // REVIEW
+    saved: "บันทึกแล้ว", // REVIEW
+    reset: "ใช้ค่าเริ่มต้นของ Thoth", // REVIEW
+    saveFailed: (reason) => `บันทึกไม่ได้: ${reason}`, // REVIEW
+    problems: {
+      folder: "ใช้ชื่อโฟลเดอร์นี้ไม่ได้ ใช้พาธภายใน Private Space นี้ ที่ไม่มี .thoth, .obsidian หรืออักขระอย่าง : * ?", // REVIEW
+      template: "แม่แบบต้องเป็นหน้า .md ภายใน Private Space นี้", // REVIEW
+      empty: "ใส่รูปแบบชื่อไฟล์", // REVIEW
+      token: (token) => `Thoth สร้าง ${token} ไม่ได้ ใช้ตัวที่ระบุไว้ด้านล่าง หรือใส่ข้อความใน [วงเล็บเหลี่ยม]`, // REVIEW
+      bracket: "มี [ ที่ไม่ได้ปิดด้วย ]", // REVIEW
+      name: "รูปแบบนี้สร้างชื่อไฟล์ที่ใช้ไม่ได้ ใช้ / คั่นระหว่างส่วนเท่านั้น และไม่ใช้อักขระอย่าง : * ?", // REVIEW
+    },
+    obsidian: {
+      title: "ใช้โฟลเดอร์โน้ตรายวันของ Obsidian ไหม", // REVIEW
+      ask: (folder) => `ใช้ ${folder} สำหรับวันนี้ แบบที่ Obsidian ใช้ไหม`, // REVIEW
+      topLevel: "ระดับบนสุดของโฟลเดอร์นี้", // REVIEW
+      folder: "โฟลเดอร์", // REVIEW
+      pattern: "ชื่อไฟล์", // REVIEW
+      template: "แม่แบบ", // REVIEW
+      none: "ไม่มี", // REVIEW
+      once: "Thoth อ่านการตั้งค่าของ Obsidian ครั้งนี้ครั้งเดียว และไม่แก้ไขเลย คุณเปลี่ยนได้ภายหลังที่ การตั้งค่า → วันนี้", // REVIEW
+      cannot: (reason) => `Thoth ใช้ชื่อไฟล์นี้ไม่ได้: ${reason}`, // REVIEW
+      use: "ใช้เลย", // REVIEW
+      keep: "ใช้ของ Thoth", // REVIEW
+      choose: "เลือกในการตั้งค่า", // REVIEW
+    },
+  },
+
   // ทัวร์ครั้งแรก (ADR-0032). REVIEW: ทั้งกลุ่มนี้
   tour: {
     progress: (step, total) => `${count(step)} จาก ${count(total)}`,

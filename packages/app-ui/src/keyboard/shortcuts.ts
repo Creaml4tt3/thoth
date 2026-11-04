@@ -74,6 +74,7 @@ export type ShortcutId =
   | "assistant.ask"
   | "assistant.size"
   | "home.open"
+  | "today.open"
   | "sidebar.toggle";
 
 export type ShortcutGroup = "general" | "assistant" | "tabs" | "tree" | "editor";
@@ -138,6 +139,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "dialog.close", group: "general", scope: "dialog", desktop: [{ key: "Escape" }] },
   // Home (ADR-0029). Cmd/Ctrl+Shift+H is Highlight; by physical key, as Option changes the letter on a Mac (like Pin tab).
   { id: "home.open", group: "general", scope: "global", desktop: [{ code: "KeyH", alt: true, shift: true }] },
+  // Today's page (ADR-0051 rule 13), beside Home; the desktop only, like Today. Not Cmd/Ctrl+Shift+T: a browser reopens a closed tab with it.
+  { id: "today.open", group: "general", scope: "global", only: "desktop", desktop: [{ code: "KeyT", alt: true, shift: true }] },
   // Hide or show the whole sidebar. Not Cmd/Ctrl+B, which is bold. By key and by physical key, like Cmd/Ctrl+/.
   { id: "sidebar.toggle", group: "general", scope: "global", desktop: [{ key: "\\", mod: true }, { code: "Backslash", mod: true }] },
 

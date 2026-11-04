@@ -66,6 +66,8 @@ export interface CommandActions {
   openNotifications?(): void;
   /** Home (ADR-0029): recent pages and favorites (the web). */
   goHome?(): void;
+  /** Today's page in the Private Space (the desktop only, ADR-0051 rule 13). */
+  openToday?(): void;
   /** Back to the Private Space picker, on the same shortcut as Home (the desktop, ADR-0029 amendment of 2026-10-28). */
   leaveSpace?(): void;
   /** The first-run tour of the basic tools (the desktop only, ADR-0032), shown again. */
@@ -143,6 +145,7 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.openAssistantSettings) add("assistant.settings", t.assistantSettings, a.openAssistantSettings, { keywords: "agent hub ai claude codex history usage permissions mascot preferences" });
   if (a.openNotifications) add("notifications.open", t.notifications, a.openNotifications, { keywords: "bell notification unread alerts done failed" });
   if (a.goHome) add("home.open", t.goHome, a.goHome, { ...key("home.open"), keywords: "home start recent favorites dashboard" });
+  if (a.openToday) add("today.open", t.openToday, a.openToday, { ...key("today.open"), keywords: "today daily journal note date diary" });
   if (a.leaveSpace) add("space.leave", t.leaveSpace, a.leaveSpace, { ...key("home.open"), keywords: "home close switch change open other private space folder vault picker" });
   if (a.showTour) add("tour.show", t.showTour, a.showTour, { keywords: "tour help guide welcome getting started onboarding tips" });
   if (a.sidebar) add("sidebar.toggle", a.sidebar.hidden ? t.showSidebar : t.hideSidebar, a.sidebar.toggle, { ...key("sidebar.toggle"), keywords: "sidebar collapse expand hide show panel focus full width" });
