@@ -430,7 +430,11 @@ export function Shell() {
   const [daily, setDaily] = useState<DailySettings>(DEFAULT_DAILY);
   useEffect(() => {
     let live = true;
-    void readDailySettings(vault).then(({ settings }) => live && setDaily(settings));
+    // Read again on every vault change, but a setting equal to the one shown keeps its object: no re-render of the
+    // whole shell after each write elsewhere.
+    void readDailySettings(vault).then(({ settings }) => {
+      if (live) setDaily((shown) => (JSON.stringify(shown) === JSON.stringify(settings) ? shown : settings));
+    });
     return () => {
       live = false;
     };
