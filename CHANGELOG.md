@@ -8,6 +8,13 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Fixed
+
+- Backspace on the empty line under a list, quote or callout now removes that line, instead of adding an empty list item or line to the block. On a line with text it joins the text to the block's last line, and Delete at the end of a list or quote pulls the next line up the same way.
+- Backspace on the line under a picture, divider or formula now selects it first instead of deleting it at once; a second Backspace deletes it.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added
