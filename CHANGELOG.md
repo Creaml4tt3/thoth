@@ -10,8 +10,15 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ## [Unreleased]
 
+### Added
+
+- Connections, under every page: the pages it links to, its backlinks, and unlinked mentions (pages that name it without a link, Thai included). One click on Link turns a mention into a link; the other page is written only if it has not changed meanwhile, so nothing is overwritten. In a workspace it lists only pages you may see.
+- Today, on Home in the desktop app: one click opens today's page, `Daily/YYYY-MM-DD.md` in your Private Space, made on first use from `Templates/Daily.md` when you have one.
+
 ### Fixed
 
+- Servers report their real version (0.5.0 and on) instead of 0.0.0, so you can tell which release a server runs.
+- A member is no longer told, by a live update, that a page they cannot see (in a folder limited to teams they are not in) has changed.
 - Backspace on the empty line under a list, quote or callout now removes that line, instead of adding an empty list item or line to the block. On a line with text it joins the text to the block's last line, and Delete at the end of a list or quote pulls the next line up the same way.
 - Backspace on the line under a picture, divider or formula now selects it first instead of deleting it at once; a second Backspace deletes it.
 
@@ -263,6 +270,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Creaml4tt3/thoth/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Creaml4tt3/thoth/compare/v0.3.0...v0.3.1

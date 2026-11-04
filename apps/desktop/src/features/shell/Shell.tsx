@@ -57,7 +57,9 @@ import { isPinned } from "@thoth/app-ui/tabs/model.ts";
 import type { MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useFavoritesController } from "../favorites/useFavoritesController.ts";
 import { workspaceRefOf } from "@thoth/app-ui/favorites/useWorkspaceFavorites.ts";
-import { HomeView, type HomeRow } from "@thoth/app-ui/home/HomeView.tsx";
+import { HomeView, type HomeRow, type HomeToday } from "@thoth/app-ui/home/HomeView.tsx";
+import { collisionKey } from "@thoth/domain";
+import { msUntilMidnight, openOrStartToday, todayPath } from "./today.ts";
 import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
 import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
 import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
@@ -94,7 +96,7 @@ export const NETWORK_NOTICE_KEY_PREFIX = "thoth.desktop.networkNotice.";
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
-  const { platform: host, vault, connection, revision, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
+  const { platform: host, vault, connection, revision, refresh, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
   const t = useDesktopStrings().shell;
   const sessionTitle = useDesktopStrings().agents.session.tab;
   // Session tabs are named by their run's task.
@@ -413,6 +415,29 @@ export function Shell() {
     return { id: item.key, title: item.title, space: item.hint ?? "", ...(ref ? {} : { local: true }), ...(folder ? { folder } : {}), ...(item.unavailable ? { unavailable: true } : {}), open: (o) => favorites.open(item.key, o) };
   });
 
+  // Today (ADR-0050): the local date, renewed at local midnight; the page is made on the first click of the day.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(new Date()), msUntilMidnight(now) + 50);
+    return () => clearTimeout(timer);
+  }, [now]);
+  const [todayError, setTodayError] = useState<string | null>(null);
+  const todayKey = collisionKey(todayPath(now));
+  const homeToday: HomeToday = {
+    date: new Intl.DateTimeFormat(strings.lang, { dateStyle: "full" }).format(now),
+    exists: pages?.some((p) => collisionKey(p.path) === todayKey) ?? false,
+    error: todayError,
+    open: (o) =>
+      void openOrStartToday(vault, new Date()).then(
+        async ({ path: today, created }) => {
+          setTodayError(null);
+          if (created) await refresh().catch(() => undefined);
+          openPage(today, o.newTab ? { newTab: true } : undefined);
+        },
+        (error: unknown) => setTodayError(error instanceof Error ? error.message : String(error)),
+      ),
+  };
+
   // Titles of background workspace tabs and recent workspace pages come from their trees, so those trees load.
   const wanted = [
     ...everyTab.flatMap((tab) => (tab.target.kind === "workspace" ? [`${tab.target.server}\n${tab.target.workspace}`] : [])),
@@ -449,7 +474,7 @@ export function Shell() {
     ) : shown.kind === "page" ? (
       <PageView key={`${id}\n${shown.path}`} path={shown.path} />
     ) : (
-      <HomeView recent={homeRecent} favorites={homeFavorites} />
+      <HomeView recent={homeRecent} favorites={homeFavorites} today={homeToday} />
     );
 
   // Unsaved edits are written first, so the transfer sends (and hashes) what is on screen.

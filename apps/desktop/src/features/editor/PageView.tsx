@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { basename, stripExtension } from "@thoth/domain";
 import { PageFrame } from "@thoth/app-ui/editor/PageFrame.tsx";
 import { FavoriteButton } from "@thoth/app-ui/favorites/FavoriteButton.tsx";
@@ -7,7 +7,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { PRIVATE_SECTION } from "../shell/sections.ts";
 import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
-import { Backlinks } from "./Backlinks.tsx";
+import { PrivateConnections } from "./PrivateConnections.tsx";
 import { loadLinkLookup, vaultPageStore } from "./vault-store.ts";
 import { vaultPageMedia } from "./vault-media.ts";
 
@@ -23,6 +23,13 @@ function focusWhenShown(find: () => HTMLElement | null, tries = 40): void {
 /** A page of the Private Space: a Markdown file in the vault. */
 export function PageView({ path }: { path: string }) {
   const { vault, connection, revision, openPage, openFolder, refresh, notifications } = useSession();
+  // The title Connections looks for (frontmatter `title`, else the file name), from the index.
+  const [title, setTitle] = useState(() => stripExtension(basename(path)));
+  useEffect(() => {
+    let live = true;
+    void vault.pageByPath(path).then((p) => live && p && setTitle(p.title), () => undefined);
+    return () => void (live = false);
+  }, [vault, path, revision]);
   const strings = useDesktopStrings();
   const t = strings.page;
   const store = useMemo(() => vaultPageStore(vault, path), [vault, path]);
@@ -70,7 +77,7 @@ export function PageView({ path }: { path: string }) {
       onConflict={onConflict}
       readOnlyNote={t.readOnly}
       missing={{ title: t.goneTitle, detail: t.goneDetail(path) }}
-      footer={<Backlinks path={path} />}
+      footer={<PrivateConnections path={path} title={title} />}
       actions={
         <span className="page-actions">
           <FavoriteButton target={{ kind: "private", path }} />

@@ -88,7 +88,7 @@ describe("node views", () => {
   it("shows backlinks and navigates through them", async () => {
     const { app, box } = await openRich();
     await app.user.click(box.querySelector<HTMLElement>("a.wikilink")!);
-    const panel = await screen.findByRole("region", { name: /backlinks/i });
+    const panel = await screen.findByRole("region", { name: "Connections" });
     const link = await within(panel).findByRole("button", { name: /Rich/ });
     await app.user.click(link);
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Rich" })).toBeTruthy());

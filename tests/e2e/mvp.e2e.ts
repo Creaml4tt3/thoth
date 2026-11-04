@@ -229,7 +229,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await expect(rowAt(page, `${HANDBOOK}/Engineering/Deep Dive.md`)).toBeVisible();
     // Deep Dive's backlink is the Engineering page that links to it.
     await rowAt(page, `${HANDBOOK}/Engineering/Deep Dive.md`).click();
-    await expect(page.getByRole("region", { name: /^Backlinks/ })).toContainText("Engineering");
+    await expect(page.getByRole("region", { name: "Connections" })).toContainText("Engineering");
     await closeApp();
 
     // On disk: the attachment bytes, the provenance and the CSV are the export's; the export itself is untouched.
@@ -267,7 +267,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await expect(rowAt(page, "Obsidian/Projects/Beta.md")).toBeVisible();
     await expect(rowAt(page, "Obsidian/บันทึก/การประชุม 🚀.md")).toBeVisible();
     await rowAt(page, "Obsidian/Home.md").click();
-    const backlinks = page.getByRole("region", { name: /^Backlinks/ });
+    const backlinks = page.getByRole("region", { name: "Connections" });
     await expect(backlinks).toContainText("Beta");
     await expect(backlinks).toContainText("การประชุม 🚀");
     await closeApp();
