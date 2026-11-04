@@ -146,3 +146,96 @@ describe("the web client's change-hint reader against this server (ADR-0041)", (
     }
   });
 });
+
+// ADR-0042 rule 4 and ADR-0041: a hint's timing must not tell a member that a page hidden from them changed.
+describe("hints, presence and the feed on a page limited to a team", () => {
+  let env: TestEnv;
+  let owner: TestPrincipal;
+  let insider: TestPrincipal;
+  let outsider: TestPrincipal;
+  let ws: string;
+  let team: string;
+  let folder: string;
+  let secret: string;
+  let rev: string;
+  beforeAll(async () => {
+    env = await startTestEnv();
+    owner = await env.user("Olive");
+    insider = await env.user("Ian");
+    outsider = await env.user("Otto");
+    ws = await env.workspace("W", { members: { [owner.userId]: "owner", [insider.userId]: "editor", [outsider.userId]: "editor" } });
+    team = (await env.api(owner, "POST", `/workspaces/${ws}/teams`, { json: { name: "Finance" } })).json.id as string;
+    await env.api(owner, "PUT", `/workspaces/${ws}/teams/${team}/members/${insider.userId}`);
+    folder = (await createPage(env, owner, ws, { title: "Finance", markdown: "---\nthoth_kind: folder\n---\n" })).id;
+    const page = await createPage(env, owner, ws, { title: "Salaries", parentId: folder });
+    secret = page.id;
+    rev = page.revisionId;
+  });
+  afterAll(() => env.close());
+
+  const limit = async (teamIds: string[] | null) => expect((await env.api(owner, "PUT", `/workspaces/${ws}/pages/${folder}/visibility`, { json: { teamIds } })).status).toBe(200);
+  const edit = async () => {
+    const res = await env.api(owner, "PUT", `/workspaces/${ws}/pages/${secret}`, { headers: { "if-match": `"${rev}"` }, json: { title: "Salaries", markdown: `# ${uuid()}\n` } });
+    expect(res.status).toBe(200);
+    rev = res.json.revision.id as string;
+  };
+  /** Opens a stream and waits for its connect hint, so later hints are the ones under test. */
+  const connected = async (who: TestPrincipal) => {
+    const stream = await openEvents(env, who, ws);
+    await stream.until((e) => e.length > 0, 1000);
+    return stream;
+  };
+  const hintsAfter = async (stream: Awaited<ReturnType<typeof connected>>, seen: number, wait: number) => (await stream.until((e) => e.length > seen, wait)).length - seen;
+
+  it("an edit reaches a member in the team, and neither hint, feed entry, title nor presence reaches one outside it", async () => {
+    await limit([team]);
+    const inside = await connected(insider);
+    const outside = await connected(outsider);
+    const [i0, o0] = [inside.received.length, outside.received.length];
+    const before = (await env.api(outsider, "GET", `/workspaces/${ws}/changes`)).json.cursor as string;
+    await env.api(owner, "PUT", `/workspaces/${ws}/pages/${secret}/presence`);
+    await edit();
+    expect(await hintsAfter(inside, i0, 3000)).toBeGreaterThan(0);
+    expect(await hintsAfter(outside, o0, 1000)).toBe(0);
+    inside.close();
+    outside.close();
+
+    const feed = await env.api(outsider, "GET", `/workspaces/${ws}/changes`, { query: { cursor: before } });
+    expect(feed.status).toBe(200);
+    expect(JSON.stringify(feed.json)).not.toContain(secret);
+    expect(JSON.stringify(feed.json)).not.toContain("Salaries");
+    expect((await env.api(insider, "GET", `/workspaces/${ws}/changes`, { query: { cursor: before } })).json.entries.map((e: { pageId?: string }) => e.pageId)).toContain(secret);
+
+    expect((await env.api(outsider, "PUT", `/workspaces/${ws}/pages/${secret}/presence`)).status).toBe(404);
+    expect((await env.api(insider, "PUT", `/workspaces/${ws}/pages/${secret}/presence`)).json.items).toEqual([{ userId: owner.userId, displayName: "Olive" }]);
+  });
+
+  it("follows a limit set while the member is connected", async () => {
+    await limit(null);
+    const outside = await connected(outsider);
+    let seen = outside.received.length;
+    await edit();
+    expect(await hintsAfter(outside, seen, 3000)).toBeGreaterThan(0); // visible: hinted
+    seen = outside.received.length;
+    await limit([team]); // a visibility entry, which every member is told about so it reads the tree again
+    await outside.until((e) => e.length > seen, 3000);
+    seen = outside.received.length;
+    await edit();
+    expect(await hintsAfter(outside, seen, 1000)).toBe(0); // hidden now: nothing
+    outside.close();
+  });
+
+  it("hides a page whose teams were all deleted from every member but owners and managers", async () => {
+    await limit([team]);
+    expect((await env.api(owner, "DELETE", `/workspaces/${ws}/teams/${team}`)).status).toBe(204);
+    const inside = await connected(insider);
+    const own = await connected(owner);
+    const [i0, w0] = [inside.received.length, own.received.length];
+    await edit();
+    expect(await hintsAfter(own, w0, 3000)).toBeGreaterThan(0);
+    expect(await hintsAfter(inside, i0, 1000)).toBe(0);
+    inside.close();
+    own.close();
+    expect((await env.api(insider, "PUT", `/workspaces/${ws}/pages/${secret}/presence`)).status).toBe(404);
+  });
+});

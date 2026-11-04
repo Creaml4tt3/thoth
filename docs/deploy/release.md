@@ -46,9 +46,11 @@ website's private repository (`Creaml4tt3/thoth-site`) holds the post, its pictu
    - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`).
    - Check the notes: `node scripts/release-notes.ts vx.y.z --no-post` prints what the GitHub release will say
      (without `--no-post`, the post link appears once the website serves the post).
-1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json` and
-   `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`). The publish step
-   refuses installers whose version differs from `tauri.conf.json`.
+1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json`,
+   `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`) and `apps/server/package.json`
+   (the version servers report in `GET /capabilities`). `tests/release/versions.test.ts` refuses the four when they
+   differ, the publish step refuses installers whose version differs from `tauri.conf.json`, and `server-image.yml`
+   refuses a tag that differs from `apps/server/package.json`.
 2. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS,
    Windows and Linux, runs the Windows host tests (`test-windows`), and uploads the installers only if every
    build and those tests pass. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
