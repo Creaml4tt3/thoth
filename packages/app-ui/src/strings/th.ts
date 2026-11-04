@@ -662,6 +662,32 @@ export const th: Strings = {
     favorites: "รายการโปรด",
     favoritesEmpty: "ติดดาวให้หน้าเพื่อเก็บไว้ที่นี่", // REVIEW
     topLevel: "ระดับบนสุด", // REVIEW
+    today: "วันนี้", // REVIEW
+    openToday: "เปิดหน้าของวันนี้", // REVIEW
+    startToday: "เริ่มหน้าของวันนี้", // REVIEW
+    todayTemplate: "ใช้ Templates/Daily.md เป็นแม่แบบ ถ้ามีไฟล์นี้", // REVIEW
+    todayFailed: (reason) => `สร้างหน้าของวันนี้ไม่ได้: ${reason}`, // REVIEW
+  },
+
+  connections: {
+    title: "การเชื่อมโยง", // REVIEW
+    links: "ลิงก์จากหน้านี้", // REVIEW
+    noLinks: "หน้านี้ยังไม่ได้ลิงก์ไปหน้าอื่น", // REVIEW
+    backlinks: "ลิงก์ย้อนกลับ",
+    noBacklinks: "ยังไม่มีหน้าไหนลิงก์มาที่นี่",
+    mentions: "ถูกพูดถึงแต่ยังไม่มีลิงก์", // REVIEW
+    searching: "กำลังค้นหา…", // REVIEW
+    noMentions: "ไม่มีหน้าไหนพูดถึงหน้านี้โดยไม่มีลิงก์", // REVIEW
+    mentionsUnavailable: "ค้นหาการพูดถึงที่นี่ไม่ได้", // REVIEW
+    mentionsCapped: "แสดงเฉพาะรายการแรก ๆ", // REVIEW
+    titleTooShort: "ชื่อหน้านี้สั้นเกินกว่าจะค้นหาได้", // REVIEW
+    mentionsFound: (n) => `พบ ${count(n)} ที่ที่พูดถึงโดยไม่มีลิงก์`, // REVIEW
+    link: "ใส่ลิงก์", // REVIEW
+    linkLabel: (page) => `ใส่ลิงก์ที่การพูดถึงใน ${page}`, // REVIEW
+    linked: (page) => `ใส่ลิงก์ใน ${page} แล้ว`, // REVIEW
+    linkChanged: (page) => `${page} เปลี่ยนไปแล้ว จึงยังไม่ได้เขียนอะไร ลองอีกครั้ง`, // REVIEW
+    linkGone: (page) => `ไม่พบการพูดถึงใน ${page} แล้ว`, // REVIEW
+    linkFailed: (page) => `เขียน ${page} ไม่สำเร็จ`, // REVIEW
   },
 
   // Notifications (ADR-0018).

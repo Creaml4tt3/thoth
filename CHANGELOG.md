@@ -10,6 +10,11 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ## [Unreleased]
 
+### Added
+
+- Connections, under every page: the pages it links to, its backlinks, and unlinked mentions (pages that name it without a link, Thai included). One click on Link turns a mention into a link; the other page is written only if it has not changed meanwhile, so nothing is overwritten. In a workspace it lists only pages you may see.
+- Today, on Home in the desktop app: one click opens today's page, `Daily/YYYY-MM-DD.md` in your Private Space, made on first use from `Templates/Daily.md` when you have one.
+
 ### Fixed
 
 - Servers report their real version (0.5.0 and on) instead of 0.0.0, so you can tell which release a server runs.

@@ -100,8 +100,6 @@ export const en = {
     readOnly: "This file is not valid UTF-8, so Thoth shows it read-only and will never write to it. Open it in another editor to change it.",
     goneTitle: "This page is gone",
     goneDetail: (path: string) => `${path} no longer exists on disk.`,
-    backlinks: "Backlinks",
-    noBacklinks: "No page links here yet.",
   },
 
   settings: {
