@@ -9,7 +9,7 @@
 //! the host; and the live index database files cannot be mutated through fs.
 use crate::at::{self, WalkError, file_type, kind_name, mtime_ms};
 use crate::error::{HostError, HostResult};
-use crate::paths::{is_reserved_first_segment, vault_segments};
+use crate::paths::{is_reserved_first_segment, refuse_obsidian_settings, vault_segments};
 use rustix::fs::{AtFlags, FileType, Mode, OFlags, linkat, mkdirat, openat, renameat, statat, unlinkat};
 use rustix::io::Errno;
 use serde_json::{Value, json};
@@ -105,6 +105,7 @@ impl VaultFs {
 
     pub fn mkdirp(&self, raw: &str) -> HostResult<()> {
         let segments = vault_segments(raw, true)?;
+        refuse_obsidian_settings(&segments, raw)?;
         let last = segments.len().saturating_sub(1);
         let mut current: Option<OwnedFd> = None;
         for (i, segment) in segments.iter().enumerate() {
@@ -226,6 +227,7 @@ fn walk_error(e: WalkError, raw: &str, op: &str) -> HostError {
 /// The live SQLite files are owned by the host's connection; the webview reaches them only through SQL.
 fn refuse_index_files(raw: &str) -> HostResult<()> {
     let segments = vault_segments(raw, false)?;
+    refuse_obsidian_settings(&segments, raw)?;
     let protected = match segments.as_slice() {
         [first] => is_reserved_first_segment(first),
         [first, name] => is_reserved_first_segment(first) && name.to_lowercase().starts_with("index.sqlite"),

@@ -18,6 +18,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "links");
 /** A 240×160 PNG: a dusk gradient with a moon, so the card's picture is a real image. */
@@ -97,7 +98,7 @@ test.beforeEach(async ({ page, context }) => {
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 });
 
 test.afterEach(async ({ page }) => {
@@ -175,7 +176,7 @@ test("a pasted address becomes a link with its preview card, and the card comes 
 
   // A reload is a new session: the card comes back from the host's cache, and the page server is not asked again.
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await openNotes(page);
   await expect(page.getByRole("group", { name: "Link preview: How Thoth keeps notes & links" })).toBeVisible({ timeout: 10_000 });
   expect(served).toEqual(["/article", "/cover.png"]);

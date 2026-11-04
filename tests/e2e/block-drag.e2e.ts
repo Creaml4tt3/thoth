@@ -12,6 +12,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "block-drag");
 const LONG = "Birds excrete nitrogen as uric acid, a white paste that saves water, which matters for animals that fly far.";
@@ -47,7 +48,7 @@ test.beforeEach(async ({ page }) => {
     }).observe(document, { subtree: true, childList: true });
   });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 });
 
 test.afterEach(async ({ page }) => {

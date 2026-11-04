@@ -12,10 +12,17 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Added
 
+- Open a folder you already use: the first screen and the space switcher open any folder of Markdown files where it is, nothing copied. Before a folder that already has notes opens, a short note says what Thoth does there.
+- Pictures written as `![[photo.png]]` now show as pictures in both editor modes; `![[photo.png|300]]` sets the width. The text of the page is not changed.
+- Unlinked mentions also find a page's aliases, and say which one matched; Link keeps the words as written as the link's label.
 - Settings → Today: choose the folder, the file name (for example `YYYY/MM/YYYY-MM-DD`, with a preview of today's) and the template of today's page in each Private Space. It is saved in the folder, and nothing changes until you choose.
 - When you open a folder that Obsidian's daily notes already use, Thoth asks once whether Today should use the same folder, file name and template. It never changes Obsidian's settings.
 - `{{date}}`, `{{time}}` and `{{title}}` in a daily template are filled in when today's page is made, also with a format such as `{{date:dddd D MMMM}}`. Text in code is left as written.
 - Open today's page from anywhere with Alt+Shift+T (Option+Shift+T on a Mac) or the command "Open today's page".
+
+### Changed
+
+- Thoth never writes into a folder's `.obsidian` settings folder, so Obsidian can keep using the same folder.
 
 ## [0.6.0] - 2026-11-04
 

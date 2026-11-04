@@ -14,6 +14,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "page-images");
 
@@ -94,7 +95,7 @@ test.beforeEach(async ({ page, context }) => {
   );
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 });
 
 test.afterEach(async ({ page }) => {
@@ -127,6 +128,57 @@ async function openBirds(page: Page) {
 }
 
 const naturalWidth = (page: Page, name: string) => page.getByRole("img", { name, exact: true }).evaluate((img) => (img as HTMLImageElement).naturalWidth);
+
+test("an Obsidian folder: the note before it opens, then ![[…]] pictures show and the source stays as written (ADR-0051)", async ({ page }) => {
+  // The vault becomes a folder someone already uses with Obsidian: Markdown, pictures embedded Obsidian's way, and
+  // its settings folder, which Thoth must leave exactly as it is.
+  await page.close();
+  const fresh = await page.context().newPage();
+  await mkdir(join(vault, ".obsidian"));
+  const settings = '{"folder":"Daily"}';
+  await writeFile(join(vault, ".obsidian", "daily-notes.json"), settings);
+  const trip = "# Trip\n\n![[shore at dusk.png|240]]\n\n![[Birds]]\n\nLast line.\n";
+  await writeFile(join(vault, "Zoo", "Trip.md"), trip);
+  // A folder Thoth has not opened before (this test's beforeEach opened it: forget that).
+  await rm(join(vault, ".thoth"), { recursive: true, force: true });
+  await fresh.addInitScript(bridge.initScript);
+  await fresh.goto(bridge.url);
+  await fresh.getByRole("button", { name: "Open a folder you already use" }).click();
+  const note = fresh.getByRole("dialog", { name: "Open this folder where it is?" });
+  await expect(note).toContainText("changes a file only when you edit it");
+  await expect(note).toContainText("Thoth never changes Obsidian's settings.");
+  await expectAccessible(fresh, ".modal");
+  await note.getByRole("button", { name: "Open", exact: true }).click();
+
+  const tree = fresh.getByRole("tree", { name: "Pages in this Private Space" });
+  const start = fresh.getByRole("button", { name: /start writing/i });
+  await expect(tree.or(start)).toBeVisible();
+  if (await start.isVisible()) await start.click();
+  // Its daily notes setting brings the one-time Today question (ADR-0051 rule 11); this test keeps Thoth's.
+  const daily = fresh.getByRole("dialog", { name: "Use Obsidian's daily notes folder?" });
+  await daily.getByRole("button", { name: "Keep Thoth's" }).click();
+  await expect(daily).toBeHidden();
+  const folder = tree.getByRole("treeitem", { name: "Zoo", exact: true });
+  if ((await folder.getAttribute("aria-expanded")) !== "true") await folder.click();
+  await tree.getByRole("treeitem", { name: "Trip", exact: true }).click();
+  const box = fresh.getByRole("textbox", { name: /page content/i });
+  const picture = box.getByRole("img", { name: "shore at dusk.png", exact: true });
+  await expect(picture).toHaveAttribute("src", /^blob:/);
+  await expect.poll(() => picture.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBe(480);
+  expect(Math.round((await picture.boundingBox())!.width)).toBe(240);
+  await expect(box.getByRole("link", { name: /Embed · Birds/ })).toBeVisible();
+  await expectAccessible(fresh, ".ProseMirror");
+
+  // An edit elsewhere on the page: the embeds are written back as they were, and .obsidian is untouched.
+  await box.getByText("Last line.").click();
+  await fresh.keyboard.press("End");
+  await fresh.keyboard.type(" Typed.");
+  await fresh.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => readFile(join(vault, "Zoo", "Trip.md"), "utf8")).toBe(trip.replace("Last line.", "Last line. Typed."));
+  expect(await readFile(join(vault, ".obsidian", "daily-notes.json"), "utf8")).toBe(settings);
+  expect(await readdir(join(vault, ".obsidian"))).toEqual(["daily-notes.json"]);
+  await fresh.close();
+});
 
 test("images next to the page show; a missing one names its file; a web one is a link and is never requested", async ({ page }) => {
   const box = await openBirds(page);

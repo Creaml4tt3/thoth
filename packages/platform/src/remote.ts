@@ -372,6 +372,7 @@ export function createRemotePlatform(transport: Transport, kind: Platform["kind"
     kind,
     pickVaultFolder: () => transport.call("vault.pick", {}),
     recentVaults: () => transport.call("vault.recent", {}),
+    inspectFolder: (root) => transport.call("vault.inspect", { root }),
     openVault: (root) => openRemoteVault(transport, root),
     pickImportSource: (sourceKind) => transport.call("source.pick", { kind: sourceKind }),
     openImportSource: (location) => RemoteSourceHost.open(transport, location),

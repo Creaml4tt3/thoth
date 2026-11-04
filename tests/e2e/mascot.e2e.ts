@@ -15,6 +15,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { axe, bubble, layer, mascot, openAssistantSettings, openBubble, openReview, pickOnly, writeAndStart } from "./assistant.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "mascot");
 const PLAN = "# Plan\n\nWe have a cat.\n";
@@ -35,7 +36,7 @@ async function launch(page: Page, context: BrowserContext) {
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
   await expect(mascot(page)).toBeVisible();
 }

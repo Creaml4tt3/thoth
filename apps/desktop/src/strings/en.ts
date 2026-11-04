@@ -19,9 +19,19 @@ export const en = {
     /** "Meet <mark> Thoth": the mark sits between the two parts. */
     meet: { before: "Meet", after: "Thoth" },
     lede: "A private place for everything you know. Your files stay on your computer as Markdown, in a folder you choose. No account, no cloud.",
-    choose: "Choose or create a Private Space",
+    /** The two ways in (ADR-0051 rule 3): both open the chosen folder where it is; nothing is copied. */
+    startNew: "Start a new Private Space",
+    openExisting: "Open a folder you already use",
     opening: "Opening…",
-    hint: "Pick an existing folder of Markdown files, or create a new empty folder in the dialog. Thoth keeps its search index on this computer, not in the folder, and can always rebuild it from your files.",
+    hint: "Both open the folder where it is, and nothing is copied. For a new Private Space, choose or create an empty folder. Thoth keeps its search index on this computer, not in the folder.",
+    /** Said before a folder that already holds Markdown is opened (ADR-0051 rule 4). Obsidian is named only here. */
+    folderNote: {
+      title: "Open this folder where it is?",
+      body: "Thoth opens these files where they are and changes a file only when you edit it. It keeps a small .thoth folder here for its own records.",
+      obsidian: "Obsidian can keep using the same files. Thoth never changes Obsidian's settings.",
+      open: "Open",
+      another: "Choose another folder",
+    },
     recent: "Recent",
     ready: "Ready",
     /** "<b>folder</b> is now a Private Space. …" */
@@ -69,7 +79,7 @@ export const en = {
       label: (space: string) => `Thoth, Private Space ${space}: switch spaces`,
       tip: "Switch Private Space or workspace",
       menu: "Switch space",
-      openFolder: "Open folder…",
+      openFolder: "Open a folder you already use…",
       workspaceOn: (workspace: string, server: string) => `${workspace} · ${server}`,
       all: "All Private Spaces",
     },

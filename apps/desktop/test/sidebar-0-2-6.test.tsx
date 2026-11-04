@@ -132,12 +132,13 @@ describe("the space switcher", () => {
       [other.split("/").pop(), "false"],
     ]);
     expect(within(menu).getByRole("menuitem", { name: "Design" })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: "Open a folder you already use…" })).toBeTruthy();
     expect(within(menu).getByRole("menuitem", { name: /^All Private Spaces/ })).toBeTruthy();
     expect(await axeViolations(menu)).toEqual([]);
 
     await app.user.click(spaces[1]!);
     await waitFor(() => expect(within(screen.getByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name: "Elsewhere" })).toBeTruthy());
-    expect(screen.queryByRole("button", { name: /choose or create a private space/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /start a new private space/i })).toBeNull();
   });
 
   it("a workspace in the menu opens it in the sidebar and puts focus on its row", async () => {

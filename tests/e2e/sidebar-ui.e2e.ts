@@ -14,6 +14,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -49,7 +50,7 @@ test.beforeEach(async ({ page, context }) => {
   await page.addInitScript(bridge.initScript);
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 });
 
@@ -116,7 +117,7 @@ test("the drag handle resizes the sidebar by pointer and keyboard, is remembered
 
   // Remembered per Private Space: it is still there after a reload, and only the width is stored.
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(handle(page)).toHaveAttribute("aria-valuenow", "232");
   expect(await sidebarWidth(page)).toBe(232);
   const stored = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith("thoth.desktop.sidebar.")));

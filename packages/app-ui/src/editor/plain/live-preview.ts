@@ -1,6 +1,6 @@
 /**
  * Live preview for Plain mode (Obsidian-style): Markdown markup is hidden on
- * lines the cursor is not on, wikilinks become chips, task markers become
+ * lines the cursor is not on, wikilinks become chips (a picture embed, `![[photo.png]]`, the picture), task markers become
  * checkboxes and a callout's `[!kind]` marker becomes its label. `==x==`, `<u>x</u>` and palette colour spans
  * (`<span data-color="red">x</span>`, ADR-0016) show as highlighted, underlined and coloured text with their
  * markers hidden. It is display only. The document is never rewritten to show it,
@@ -18,6 +18,7 @@ import { linkHint, webLinkOpens } from "../link-open.ts";
 import { openWebLink } from "../web-links.ts";
 import { isPasteLinkHref } from "../paste-links.ts";
 import { followLink, paintLinkChip } from "../node-views.ts";
+import { embedPicture, embedPictureAttrs, pictureEmbedPath } from "../image-views.ts";
 
 /** Dispatched when the link index changes, so chips re-resolve. */
 export const refreshLinks = StateEffect.define<null>();
@@ -59,6 +60,36 @@ class WikilinkChip extends WidgetType {
   }
   override ignoreEvent(): boolean {
     return true;
+  }
+}
+
+/** `![[photo.png]]` off the cursor's line (ADR-0051 rule 6): the picture, loaded as a Markdown image is. */
+class EmbedPicture extends WidgetType {
+  readonly ctx: EditorContext;
+  readonly path: string;
+  readonly alt: string;
+  readonly width: number | null;
+  private shown: { destroy(): void } | null = null;
+  constructor(ctx: EditorContext, path: string, attrs: { alt: string; width: number | null }) {
+    super();
+    this.ctx = ctx;
+    this.path = path;
+    this.alt = attrs.alt;
+    this.width = attrs.width;
+  }
+  override eq(other: EmbedPicture): boolean {
+    return other.path === this.path && other.alt === this.alt && other.width === this.width;
+  }
+  toDOM(): HTMLElement {
+    const picture = embedPicture(this.ctx, this.path, { alt: this.alt, width: this.width }, "span");
+    this.shown = picture;
+    return picture.dom;
+  }
+  override destroy(): void {
+    this.shown?.destroy();
+  }
+  override get estimatedHeight(): number {
+    return 200;
   }
 }
 
@@ -372,7 +403,13 @@ function build(view: EditorView, ctx: EditorContext): DecorationSet {
             const embed = raw.startsWith("!");
             const { target, fragment, label } = parseWikiInner(raw.slice(embed ? 3 : 2, -2));
             const shown = label ?? (fragment ? `${target}#${fragment}` : null);
-            replace(node.from, node.to, Decoration.replace({ widget: new WikilinkChip(ctx, target, shown, embed, ctx.lookup().resolve(target)) }));
+            const result = ctx.lookup().resolve(target);
+            const picture = embed ? pictureEmbedPath(ctx, result, fragment) : null;
+            if (picture !== null) {
+              replace(node.from, node.to, Decoration.replace({ widget: new EmbedPicture(ctx, picture, embedPictureAttrs(target, label)) }));
+              return false;
+            }
+            replace(node.from, node.to, Decoration.replace({ widget: new WikilinkChip(ctx, target, shown, embed, result) }));
             return false;
           }
         }

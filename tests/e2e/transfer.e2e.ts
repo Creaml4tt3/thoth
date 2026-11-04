@@ -18,6 +18,7 @@ import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import { newStableId } from "@thoth/domain";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let ref: ReferenceServer;
@@ -66,7 +67,7 @@ test.describe("transfers", () => {
     await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
     await page.addInitScript(bridge.initScript);
     await page.goto(bridge.url);
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
     await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
   });
 

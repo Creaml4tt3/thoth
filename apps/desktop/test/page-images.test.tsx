@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
+import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { newStableId } from "@thoth/domain";
 import { FakeServers } from "../../../tests/helpers/fake-servers.ts";
 
@@ -46,6 +47,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.restoreAllMocks();
+  setDefaultEditorMode("blocks");
   localStorage.clear();
   cleanup();
   await dirs.cleanup();
@@ -181,6 +183,60 @@ describe("images in a Private Space page", () => {
     const cm = EditorView.findFromDOM((await editorBox()).closest(".cm-editor") as HTMLElement)!;
     expect(cm.state.doc.toString()).toBe(PAGE);
     expect(await app.read("Zoo/Birds.md")).toBe(PAGE);
+  });
+});
+
+describe("pictures from ![[…]] (ADR-0051 rule 6)", () => {
+  const EMBEDS = "# Trip\n\n![[my photo.png]]\n\n![[bird-uric-acid.svg|300]]\n\n![[my photo.png|Morning at the shore]]\n\n![[Notes]]\n\n![[gone.png]]\n\nLast line.\n";
+
+  async function openTrip(mode: "blocks" | "plain" = "blocks"): Promise<Harness> {
+    await seed(root, { "Zoo/Trip.md": EMBEDS });
+    if (mode === "plain") setDefaultEditorMode("plain");
+    const app = await openApp(root, {}, createNodePlatform({ vault: root }));
+    const tree = within(await screen.findByRole("tree"));
+    await app.user.click(tree.getByRole("treeitem", { name: "Zoo" }));
+    await app.user.click(await tree.findByRole("treeitem", { name: "Trip" }));
+    return app;
+  }
+
+  it("Blocks: an image embed is the picture (file name or label as alt, a number as width); a page embed stays a chip", async () => {
+    const app = await openTrip();
+    const box = await editorBox();
+    const photo = await within(box).findByRole("img", { name: "my photo.png" });
+    expect(photo.tagName).toBe("IMG");
+    expect(photo.getAttribute("src")).toMatch(/^blob:/);
+    expect(blobs.get(photo.getAttribute("src")!)!.type).toBe("image/png");
+    const sized = await within(box).findByRole("img", { name: "bird-uric-acid.svg" });
+    expect(sized.style.width).toBe("300px");
+    expect(await within(box).findByRole("img", { name: "Morning at the shore" })).toBeTruthy();
+    // A page embed opens the page; an image that is not there stays an unresolved chip, never a broken picture.
+    expect(within(box).getByRole("link", { name: /Embed · Notes/ })).toBeTruthy();
+    expect(within(box).getByRole("link", { name: /Embed · gone\.png/ })).toBeTruthy();
+    expect(box.querySelectorAll("img")).toHaveLength(3);
+
+    // An edit elsewhere on the page saves only that edit: every embed is written back as it was.
+    const editor = editorOf(box);
+    caretAt(editor, endOf(editor, "Last line."));
+    type(editor, " Typed.");
+    await save(app);
+    await waitFor(async () => expect(await app.read("Zoo/Trip.md")).toBe(EMBEDS.replace("Last line.", "Last line. Typed.")));
+  });
+
+  it("Plain: off the caret's line an image embed is the picture, the source stays as written", async () => {
+    await openTrip("plain");
+    const box = await editorBox();
+    const view = EditorView.findFromDOM(box.closest(".cm-editor") as HTMLElement)!;
+    await waitFor(() => expect(view.state.doc.toString()).toBe(EMBEDS));
+    view.focus();
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    const photo = await within(view.contentDOM).findByRole("img", { name: "my photo.png" });
+    expect(photo.getAttribute("src")).toMatch(/^blob:/);
+    expect((await within(view.contentDOM).findByRole("img", { name: "bird-uric-acid.svg" })).style.width).toBe("300px");
+    expect(view.contentDOM.textContent).toContain("Embed · Notes");
+    // On the caret's line the exact source shows.
+    view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf("![[my photo.png]]") + 3 } });
+    await waitFor(() => expect(view.contentDOM.textContent).toContain("![[my photo.png]]"));
+    expect(view.state.doc.toString()).toBe(EMBEDS);
   });
 });
 

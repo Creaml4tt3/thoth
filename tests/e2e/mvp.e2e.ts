@@ -36,6 +36,7 @@ import { desktopOnlyIn } from "../../apps/web/test/bundle.ts";
 import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import { newPrivatePage } from "./new-page.ts";
+import { pickSpace, START } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let ref: ReferenceServer;
@@ -86,7 +87,7 @@ async function openApp(vault: string, options: { source?: string } = {}): Promis
   page = await context.newPage();
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   return page;
 }
 
@@ -599,7 +600,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
       // The desktop UI itself, on the bridge's own origin, but without the bridge's script and token.
       const plain = await outside.newPage();
       await plain.goto(bridge!.url);
-      await plain.getByRole("button", { name: /choose or create a private space/i }).click();
+      await plain.getByRole("button", { name: START }).click();
       await expect(plain.getByText(/No Thoth host is connected/)).toBeVisible();
       expect(await plain.evaluate(() => "__THOTH_PLATFORM__" in window)).toBe(false);
       await expect(mascot(plain)).toHaveCount(0);

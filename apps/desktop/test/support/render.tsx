@@ -28,7 +28,7 @@ export async function openApp(root: string, options: Partial<AppOptions> = {}, p
   const user = userEvent.setup();
   render(<App platform={platform} options={{ ...DEFAULT_OPTIONS, ...TEST_OPTIONS, ...options }} />);
   // English or Thai, whichever the test set up.
-  await user.click(await screen.findByRole("button", { name: /choose or create a private space|เลือกหรือสร้าง Private Space/i }));
+  await user.click(await screen.findByRole("button", { name: /start a new private space|เริ่ม Private Space ใหม่/i }));
   return {
     platform,
     root,

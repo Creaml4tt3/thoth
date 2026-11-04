@@ -9,6 +9,7 @@ import type { LinkTarget } from "./links.ts";
 import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
 import { linkHint, pageLinkOpens } from "./link-open.ts";
 import { PAGE_LINK_PREFIX } from "@thoth/transfer";
+import { embedPicture, embedPictureAttrs, pictureEmbedPath } from "./image-views.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -201,7 +202,10 @@ export const mentionView = (ctx: EditorContext): NodeViewRenderer => ({ node }) 
   return { dom };
 };
 
-/** `![[Target]]` on its own line: shown as a chip; embedding is not rendered in v1. */
+/**
+ * `![[Target]]` on its own line. A picture (ADR-0051 rule 6: it resolves to an image file) is drawn as the picture;
+ * anything else (a page, a heading, a block, a PDF) is a chip that opens the target. Display only: the source stays.
+ */
 export const embedView = (ctx: EditorContext): NodeViewRenderer => ({ node }) => {
   const dom = el("div", "embed");
   dom.setAttribute("contenteditable", "false");
@@ -209,12 +213,26 @@ export const embedView = (ctx: EditorContext): NodeViewRenderer => ({ node }) =>
   chip.tabIndex = 0;
   chip.setAttribute("role", "link");
   const target = node.attrs["target"] as string;
+  const label = node.attrs["label"] as string | null;
+  const fragment = node.attrs["fragment"] as string | null;
+  let picture: { path: string; dom: HTMLElement; destroy(): void } | null = null;
   const paint = (): void => {
     const result = ctx.lookup().resolve(target);
-    chip.textContent = `${ctx.strings.embed}${labelOf(target, node.attrs["label"] as string | null, node.attrs["fragment"] as string | null)}`;
+    const path = pictureEmbedPath(ctx, result, fragment);
+    if (path !== null) {
+      if (picture?.path === path) return;
+      picture?.destroy();
+      picture = { path, ...embedPicture(ctx, path, embedPictureAttrs(target, label)) };
+      dom.replaceChildren(picture.dom);
+      return;
+    }
+    picture?.destroy();
+    picture = null;
+    chip.textContent = `${ctx.strings.embed}${labelOf(target, label, fragment)}`;
     chip.dataset["state"] = result.state;
     chip.dataset["target"] = result.state === "resolved" ? result.path : "";
     setLinkTip(chip, result.state === "resolved" ? result.path : "", result.state === "resolved" ? linkHint(ctx.strings, "page") : null);
+    if (dom.firstChild !== chip) dom.replaceChildren(chip);
   };
   const open = (event: Event): void => {
     event.preventDefault();
@@ -227,11 +245,18 @@ export const embedView = (ctx: EditorContext): NodeViewRenderer => ({ node }) =>
   chip.addEventListener("keydown", (event) => {
     if (event.key === "Enter") open(event);
   });
-  dom.append(chip);
   const handle = { refresh: paint };
   ctx.views.add(handle);
   paint();
-  return { dom, stopEvent: (event) => event.type === "click", destroy: () => void ctx.views.delete(handle) };
+  return {
+    dom,
+    stopEvent: (event) => event.type === "click" && picture === null,
+    ignoreMutation: () => true,
+    destroy: () => {
+      picture?.destroy();
+      ctx.views.delete(handle);
+    },
+  };
 };
 
 /** Task item with a real checkbox; read-only editors cannot toggle it. */

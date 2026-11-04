@@ -30,7 +30,7 @@ const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
 const current = () => screen.queryAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const row = async (name: string) => within(await screen.findByRole("tree", { name: "Pages in this Private Space" })).getByRole("treeitem", { name });
 const leaf = () => root.split("/").pop()!;
-const picker = () => screen.findByRole("button", { name: "Choose or create a Private Space" });
+const picker = () => screen.findByRole("button", { name: "Start a new Private Space" });
 const recentSpaces = async () => within(await screen.findByRole("region", { name: "Recent" })).getAllByRole("button");
 
 async function start(): Promise<Harness> {
@@ -104,7 +104,7 @@ describe("Back to Private Spaces", () => {
     await app.user.click(screen.getByRole("button", { name: "Back to Private Spaces" }));
     await screen.findByRole("dialog", { name: /changed on disk/i });
     expect(await screen.findByText(/this Private Space stays open/i)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Choose or create a Private Space" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start a new Private Space" })).toBeNull();
     expect(tabNames()).toEqual(["Alpha"]);
     expect(box.textContent).toContain("Typed before leaving.");
   });

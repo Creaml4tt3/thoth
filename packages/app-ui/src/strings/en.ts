@@ -755,6 +755,8 @@ export const en = {
     mentionsUnavailable: "Mentions can't be looked for here.",
     mentionsCapped: "Only the first ones are shown.",
     titleTooShort: "This page's title is too short to look for.",
+    /** Under a mention found by one of the page's aliases (ADR-0051 rule 12). */
+    matchedAlias: (name: string) => `Alias: ${name}`,
     mentionsFound: (n: number) => (n === 1 ? "1 unlinked mention." : `${n} unlinked mentions.`),
     link: "Link",
     linkLabel: (page: string) => `Link the mention in ${page}`,

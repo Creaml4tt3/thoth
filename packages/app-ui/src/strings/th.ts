@@ -684,6 +684,7 @@ export const th: Strings = {
     mentionsUnavailable: "ค้นหาการพูดถึงที่นี่ไม่ได้", // REVIEW
     mentionsCapped: "แสดงเฉพาะรายการแรก ๆ", // REVIEW
     titleTooShort: "ชื่อหน้านี้สั้นเกินกว่าจะค้นหาได้", // REVIEW
+    matchedAlias: (name) => `ชื่อเรียกอื่น: ${name}`, // REVIEW
     mentionsFound: (n) => `พบ ${count(n)} ที่ที่พูดถึงโดยไม่มีลิงก์`, // REVIEW
     link: "ใส่ลิงก์", // REVIEW
     linkLabel: (page) => `ใส่ลิงก์ที่การพูดถึงใน ${page}`, // REVIEW

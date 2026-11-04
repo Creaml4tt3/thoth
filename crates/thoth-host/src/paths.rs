@@ -79,6 +79,14 @@ pub fn is_reserved_first_segment(segment: &str) -> bool {
     segment.nfc().collect::<String>().to_lowercase() == ".thoth"
 }
 
+/// Obsidian's settings folder, anywhere in the path: Thoth may read it but never writes it (ADR-0051 rule 5).
+pub fn refuse_obsidian_settings(segments: &[String], raw: &str) -> HostResult<()> {
+    if segments.iter().any(|s| s.nfc().collect::<String>().to_lowercase() == ".obsidian") {
+        return Err(HostError::not_allowed(format!("{raw} belongs to Obsidian's settings, which Thoth never changes")));
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 pub use crate::win::paths::check_root_policy;
 
@@ -154,6 +162,16 @@ mod tests {
         }
         // NFD input is normalized to NFC.
         assert_eq!(vault_segments("cafe\u{301}.md", false).unwrap(), vec!["caf\u{e9}.md"]);
+    }
+
+    #[test]
+    fn obsidian_settings_are_refused_in_any_letter_case() {
+        for bad in [".obsidian", ".obsidian/daily-notes.json", ".Obsidian/app.json", "Sub/.OBSIDIAN/x.json"] {
+            assert_eq!(refuse_obsidian_settings(&vault_segments(bad, false).unwrap(), bad).unwrap_err().code, "NOT_ALLOWED", "{bad}");
+        }
+        for good in ["obsidian.md", ".obsidian.md", "Notes/obsidian/x.md"] {
+            assert!(refuse_obsidian_settings(&vault_segments(good, false).unwrap(), good).is_ok(), "{good}");
+        }
     }
 
     #[test]

@@ -7,6 +7,7 @@ import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
+import { axeViolations } from "../../../tests/helpers/axe.ts";
 
 const tauriPlatform = createNodePlatform();
 vi.mock("../src/platform/load-tauri.ts", () => ({ loadTauriPlatform: async () => tauriPlatform }));
@@ -45,8 +46,64 @@ describe("onboarding", () => {
     const { userEvent } = await import("@testing-library/user-event");
     const { App } = await import("../src/app/App.tsx");
     render(<App platform={platform} />);
-    await userEvent.setup().click(await screen.findByRole("button", { name: /choose or create/i }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: /start a new private space/i }));
     expect((await screen.findByRole("alert")).textContent).toContain("Folder is locked");
+  });
+
+  it("offers a new Private Space and a folder you already use, both opening the picked folder in place", async () => {
+    const platform = createNodePlatform({ vault: root });
+    const opened: string[] = [];
+    const openVault = platform.openVault.bind(platform);
+    platform.openVault = async (picked) => (opened.push(picked), openVault(picked));
+    const { render } = await import("@testing-library/react");
+    const { userEvent } = await import("@testing-library/user-event");
+    const { App } = await import("../src/app/App.tsx");
+    render(<App platform={platform} />);
+    expect(await screen.findByRole("button", { name: "Start a new Private Space" })).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Open a folder you already use" }));
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    expect(opened).toEqual([root]);
+  });
+
+  it("before opening a folder of Markdown, says what Thoth does there; Obsidian only when .obsidian is there", async () => {
+    const platform = createNodePlatform({ vault: root });
+    platform.folderContents = { markdown: true, obsidian: false, thoth: false };
+    const { render } = await import("@testing-library/react");
+    const { userEvent } = await import("@testing-library/user-event");
+    const { App } = await import("../src/app/App.tsx");
+    render(<App platform={platform} />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Open a folder you already use" }));
+    let note = await screen.findByRole("dialog", { name: "Open this folder where it is?" });
+    expect(note.textContent).toContain("changes a file only when you edit it");
+    expect(note.textContent).not.toContain("Obsidian");
+    // Choose another folder picks again; Escape goes back to the two choices, nothing opened.
+    platform.folderContents = { markdown: true, obsidian: true, thoth: false };
+    await user.click(within(note).getByRole("button", { name: "Choose another folder" }));
+    note = await screen.findByRole("dialog", { name: "Open this folder where it is?" });
+    expect(note.textContent).toContain("Thoth never changes Obsidian's settings.");
+    expect(document.activeElement).toBe(within(note).getByRole("button", { name: "Open" }));
+    expect(await axeViolations(note)).toEqual([]);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(platform.connections).toHaveLength(0);
+    // Open opens it.
+    await user.click(screen.getByRole("button", { name: "Start a new Private Space" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Open" }));
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    expect(platform.connections.map((c) => c.root)).toEqual([root]);
+  });
+
+  it("opens a folder Thoth opened before without the note", async () => {
+    const platform = createNodePlatform({ vault: root });
+    platform.folderContents = { markdown: true, obsidian: true, thoth: true };
+    const { render } = await import("@testing-library/react");
+    const { userEvent } = await import("@testing-library/user-event");
+    const { App } = await import("../src/app/App.tsx");
+    render(<App platform={platform} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Open a folder you already use" }));
+    await screen.findByRole("tree", { name: "Pages in this Private Space" });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

@@ -22,6 +22,7 @@ import type { AddressInfo } from "node:net";
 import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "update");
 /** The fixed time the host's update clock starts at (Unix seconds), and a day and an hour later. */
@@ -93,7 +94,7 @@ async function launch(browser: Browser, now: number, port?: number): Promise<{ p
   await context.addInitScript(bridge.initScript);
   const page = await context.newPage();
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
   const start = page.getByRole("button", { name: /start writing/i });
   await expect(tree.or(start)).toBeVisible();

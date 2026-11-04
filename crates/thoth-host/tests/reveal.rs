@@ -177,3 +177,62 @@ fn trashes_a_file_or_folder_inside_the_vault_and_nothing_else() {
     }
     assert_eq!(recorder.1.lock().unwrap().len(), 2);
 }
+
+/// ADR-0051 rule 5: Obsidian's settings folder can be read through the file API but never written, renamed into or out
+/// of, removed or created, in any letter case.
+#[test]
+fn the_file_api_reads_obsidian_settings_and_never_writes_them() {
+    let base = tempfile::tempdir().unwrap();
+    let vault = base.path().join("Notes");
+    std::fs::create_dir_all(vault.join(".obsidian")).unwrap();
+    std::fs::write(vault.join(".obsidian/daily-notes.json"), r#"{"folder":"Daily"}"#).unwrap();
+    std::fs::write(vault.join("Page.md"), "# Page\n").unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let host = host(&vault, data.path(), Arc::new(Recorder::default()));
+    let handle = host.call("vault.open", &json!({ "root": vault.to_string_lossy() }), None).unwrap().0["vault"].as_str().unwrap().to_owned();
+
+    let read = host.call("fs.read", &json!({ "vault": handle, "path": ".obsidian/daily-notes.json" }), None).unwrap().1.unwrap();
+    assert_eq!(read, br#"{"folder":"Daily"}"#);
+
+    let refused = [
+        ("fs.write", json!({ "vault": handle, "path": ".obsidian/daily-notes.json", "exclusive": false })),
+        ("fs.write", json!({ "vault": handle, "path": ".Obsidian/new.json", "exclusive": true })),
+        ("fs.mkdirp", json!({ "vault": handle, "dir": ".obsidian/plugins" })),
+        ("fs.rename", json!({ "vault": handle, "from": "Page.md", "to": ".obsidian/Page.md", "noReplace": true })),
+        ("fs.rename", json!({ "vault": handle, "from": ".obsidian/daily-notes.json", "to": "x.json", "noReplace": true })),
+        ("fs.remove", json!({ "vault": handle, "path": ".OBSIDIAN" })),
+    ];
+    for (command, args) in refused {
+        let bytes: Option<&[u8]> = if command == "fs.write" { Some(b"{}") } else { None };
+        assert_eq!(host.call(command, &args, bytes).unwrap_err().code, "NOT_ALLOWED", "{command} {args}");
+    }
+    assert_eq!(std::fs::read_to_string(vault.join(".obsidian/daily-notes.json")).unwrap(), r#"{"folder":"Daily"}"#);
+    assert!(vault.join("Page.md").exists());
+}
+
+/// ADR-0051 rule 4: before a picked folder is opened, the host says what it holds (Markdown anywhere the index walks,
+/// Obsidian's settings, Thoth's folder) and writes nothing, not even `.thoth/`.
+#[test]
+fn inspects_a_folder_before_it_is_opened_and_writes_nothing() {
+    let base = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let host = host(base.path(), data.path(), Arc::new(Recorder::default()));
+    let inspect = |dir: &Path| host.call("vault.inspect", &json!({ "root": dir.to_string_lossy() }), None).map(|r| r.0);
+
+    let empty = base.path().join("Empty");
+    std::fs::create_dir_all(empty.join(".obsidian")).unwrap();
+    std::fs::write(empty.join(".obsidian/Hidden.md"), "# not a page\n").unwrap();
+    std::fs::write(empty.join("photo.png"), b"png").unwrap();
+    assert_eq!(inspect(&empty).unwrap(), json!({ "markdown": false, "obsidian": true, "thoth": false }));
+    assert!(!empty.join(".thoth").exists());
+
+    let notes = base.path().join("Notes");
+    std::fs::create_dir_all(notes.join("Deep/Deeper")).unwrap();
+    std::fs::write(notes.join("Deep/Deeper/Idea.MD"), "# Idea\n").unwrap();
+    assert_eq!(inspect(&notes).unwrap(), json!({ "markdown": true, "obsidian": false, "thoth": false }));
+    assert!(!notes.join(".thoth").exists());
+
+    // Outside what the user picked or the embedder trusts: refused, like `vault.open`.
+    let other = tempfile::tempdir().unwrap();
+    assert_eq!(inspect(other.path()).unwrap_err().code, "NOT_ALLOWED");
+}

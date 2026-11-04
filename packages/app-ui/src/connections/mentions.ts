@@ -1,6 +1,7 @@
 /**
- * Unlinked mentions (ADR-0050 rules 4 and 5): where a page's text names another page's title without linking it, and
- * how one such mention becomes a link. Pure: no store, no React.
+ * Unlinked mentions (ADR-0050 rules 4 and 5): where a page's text names another page's title (or, in the Private
+ * Space, one of its aliases, ADR-0051 rule 12) without linking it, and how one such mention becomes a link. Pure: no
+ * store, no React. Every name is looked for with the same rules.
  *
  * - Matched on the Markdown source of plain text only: never in a link, an image, code, HTML or the frontmatter.
  * - Case-insensitive; a space in the title matches spaces or tabs, never a line break.
@@ -21,6 +22,8 @@ export interface Mention {
   end: number;
   /** The text as written. */
   text: string;
+  /** The name it matched: the title or one of the aliases, as the page gives it. */
+  name: string;
   /** How many earlier mentions on the page have the same text: finds it again after the page changed. */
   occurrence: number;
   /** In a table cell, where a wikilink's `|` is written `\|`. */
@@ -102,32 +105,47 @@ const lineContext = (source: string, start: number, end: number) => {
   return { before: (from > lineStart ? "…" : "") + source.slice(from, start).trimStart(), after: source.slice(end, to).trimEnd() + (to < lineStop ? "…" : "") };
 };
 
-/** Every unlinked mention of `title` in `source`, in order; at most `limit`. */
-export function findMentions(source: string, title: string, limit = Number.POSITIVE_INFINITY): Mention[] {
-  const pattern = mentionPattern(title);
-  if (!pattern) return [];
-  const seen = new Map<string, number>();
-  const out: Mention[] = [];
+/** True when none of `names` is long enough to look for. */
+export const allTooShort = (names: readonly string[]) => names.every(isTooShort);
+
+/**
+ * Every unlinked mention in `source` of `names` (a title, or a title and its aliases), in order; at most `limit`.
+ * Where two names match overlapping text, the one that starts first wins, then the longer one ("Bangkok Office"
+ * over "Bangkok"), so the same words are never listed twice.
+ */
+export function findMentions(source: string, names: string | readonly string[], limit = Number.POSITIVE_INFINITY): Mention[] {
+  const patterns = (typeof names === "string" ? [names] : names).flatMap((name) => {
+    const pattern = mentionPattern(name);
+    return pattern ? [{ name, pattern }] : [];
+  });
+  if (patterns.length === 0) return [];
+  const found: { start: number; end: number; text: string; name: string; inTable: boolean }[] = [];
   for (const run of textRuns(source)) {
     const text = source.slice(run.start, run.end).normalize("NFC");
     // NFC can change lengths; such a run is matched only when it was already NFC, so offsets stay exact.
     if (text !== source.slice(run.start, run.end)) continue;
-    for (const m of text.matchAll(pattern)) {
-      if (out.length >= limit) return out;
-      const start = run.start + m.index;
-      const end = start + m[0].length;
-      const key = m[0].toLocaleLowerCase();
-      const occurrence = seen.get(key) ?? 0;
-      seen.set(key, occurrence + 1);
-      out.push({ start, end, text: m[0], occurrence, inTable: run.inTable, ...lineContext(source, start, end) });
-    }
+    for (const { name, pattern } of patterns)
+      for (const m of text.matchAll(pattern)) found.push({ start: run.start + m.index, end: run.start + m.index + m[0].length, text: m[0], name, inTable: run.inTable });
+  }
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const seen = new Map<string, number>();
+  const out: Mention[] = [];
+  let reached = -1;
+  for (const f of found) {
+    if (f.start < reached) continue;
+    if (out.length >= limit) break;
+    reached = f.end;
+    const key = f.text.toLocaleLowerCase();
+    const occurrence = seen.get(key) ?? 0;
+    seen.set(key, occurrence + 1);
+    out.push({ ...f, occurrence, ...lineContext(source, f.start, f.end) });
   }
   return out;
 }
 
 /** The same mention in `source` after the page may have changed: same place and text, else the same occurrence of that text. */
-export function relocate(source: string, title: string, mention: Pick<Mention, "start" | "text" | "occurrence">): Mention | undefined {
-  const now = findMentions(source, title);
+export function relocate(source: string, names: string | readonly string[], mention: Pick<Mention, "start" | "text" | "occurrence">): Mention | undefined {
+  const now = findMentions(source, names);
   return now.find((m) => m.start === mention.start && m.text === mention.text) ?? now.find((m) => m.text.toLocaleLowerCase() === mention.text.toLocaleLowerCase() && m.occurrence === mention.occurrence);
 }
 
@@ -151,11 +169,11 @@ export interface MentionStore {
  * its characters, written with compare-and-swap on what was read. One conflict reads again and retries; a second, or
  * a mention no longer there, writes nothing.
  */
-export async function linkMention(store: MentionStore, title: string, mention: Pick<Mention, "start" | "text" | "occurrence">, linkText: (found: Mention) => string): Promise<LinkOutcome> {
+export async function linkMention(store: MentionStore, names: string | readonly string[], mention: Pick<Mention, "start" | "text" | "occurrence">, linkText: (found: Mention) => string): Promise<LinkOutcome> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const page = await store.read();
     if (!page) return "gone";
-    const found = relocate(page.source, title, mention);
+    const found = relocate(page.source, names, mention);
     if (!found) return "gone";
     const next = page.source.slice(0, found.start) + linkText(found) + page.source.slice(found.end);
     try {
