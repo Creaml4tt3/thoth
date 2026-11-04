@@ -155,7 +155,7 @@ test("an Obsidian folder: the note before it opens, then ![[…]] pictures show 
   await expect(tree.or(start)).toBeVisible();
   if (await start.isVisible()) await start.click();
   // Its daily notes setting brings the one-time Today question (ADR-0051 rule 11); this test keeps Thoth's.
-  const daily = fresh.getByRole("dialog", { name: /as Obsidian does\?$/ });
+  const daily = fresh.getByRole("dialog", { name: "Use Obsidian's daily notes folder?" });
   await daily.getByRole("button", { name: "Keep Thoth's" }).click();
   await expect(daily).toBeHidden();
   const folder = tree.getByRole("treeitem", { name: "Zoo", exact: true });
