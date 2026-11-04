@@ -156,6 +156,17 @@ describe("the shortcut table", () => {
     expect(shortcutFor({ key: "∏", code: "KeyP", metaKey: false, ctrlKey: false, altKey: true, shiftKey: true }, "desktop", "mac")).toEqual({ id: "tab.pin" });
   });
 
+  it("opens today's page with Alt/Option+Shift+T, beside Home, on the desktop only (ADR-0051 rule 13)", () => {
+    const today = shortcutById("today.open" as never)!;
+    expect(today.scope).toBe("global");
+    expect(today.only).toBe("desktop");
+    expect(today.desktop).toEqual([{ code: "KeyT", alt: true, shift: true }]);
+    expect(formatShortcut(today, "desktop", "mac")).toBe("Option+Shift+T");
+    expect(formatShortcut(today, "desktop", "other")).toBe("Alt+Shift+T");
+    expect(shortcutFor({ key: "ˇ", code: "KeyT", metaKey: false, ctrlKey: false, altKey: true, shiftKey: true }, "desktop", "mac")).toEqual({ id: "today.open" });
+    expect(shortcutFor({ key: "T", code: "KeyT", metaKey: false, ctrlKey: false, altKey: true, shiftKey: true }, "web", "other")).toBeNull();
+  });
+
   it("reads Tiptap's notation", () => {
     expect(chordFromKeymap("Mod-Shift-s")).toEqual({ mod: true, shift: true, key: "s" });
     expect(chordFromKeymap("Mod-Alt-t")).toEqual({ mod: true, alt: true, code: "KeyT" });

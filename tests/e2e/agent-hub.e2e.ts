@@ -26,6 +26,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { REPO } from "../ports/harness.ts";
 import { axe, bubble, mascot, openAssistantSettings, openBubble, openReview, picker, pickOnly, writeAndStart } from "./assistant.ts";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -66,7 +67,7 @@ test.beforeEach(async ({ page, context }) => {
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 });
 
@@ -392,7 +393,7 @@ test("a review that was waiting when the app closed comes back after a real rest
   const again = await context.newPage();
   await again.addInitScript(bridge.initScript);
   await again.goto(bridge.url);
-  await again.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(again);
   await expect(again.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 
   // The mascot asks for the waiting review.
@@ -517,7 +518,7 @@ test("a question gets its answer in the bubble, opens in a tab, is listed in the
   const again = await context.newPage();
   await again.addInitScript(bridge.initScript);
   await again.goto(bridge.url);
-  await again.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(again);
   await expect(again.getByRole("tab", { selected: true })).toHaveText("What content is on this page?", { timeout: 15_000 });
   await expect(again.getByRole("tabpanel").getByRole("region", { name: "Answer" }).getByTestId("agent-answer")).toHaveText("The page is a plan with one line: “We have a cat.”\nNothing else is on it.");
 
@@ -621,7 +622,7 @@ test("a follow-up in the session tab: the CLI is given the first question and an
   const again = await context.newPage();
   await again.addInitScript(bridge.initScript);
   await again.goto(bridge.url);
-  await again.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(again);
   await expect(again.getByRole("tab", { selected: true })).toHaveText("What content is on this page?", { timeout: 15_000 });
   const restored = again.getByRole("tabpanel");
   await expect(restored.getByTestId("agent-answer")).toHaveCount(2);

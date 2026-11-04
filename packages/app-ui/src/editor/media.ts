@@ -123,6 +123,11 @@ export interface ImageFile {
 /** What a page's space offers for its images. */
 export interface PageMedia {
   load(src: string): Promise<ImageLoad>;
+  /**
+   * Loads the image at a vault path that a `![[…]]` embed resolved to (ADR-0051 rule 6), with the same checks and
+   * limits as `load`. Absent where embeds do not resolve to files (a workspace): an embed stays a chip.
+   */
+  loadPath?(path: string): Promise<ImageLoad>;
   /** Keeps `file` for this page and returns how the page refers to it. Absent: the space cannot take files. */
   add?(file: ImageFile): Promise<{ src: string; alt: string }>;
 }
@@ -177,18 +182,24 @@ export async function loadPageImage(space: ImageSpace, page: string, src: string
   const target = resolveImageSrc(src, page);
   if (target.kind === "remote") return { state: "remote", url: target.url };
   if (target.kind !== "vault") return { state: target.kind === "refused" && target.reason === "no-folder" ? "missing" : "refused" };
-  const mimeType = imageMimeType(target.path);
+  return loadVaultImage(space, target.path);
+}
+
+/** Loads the image at vault path `path` (an embed's resolved target): only a safe path outside `.thoth/`, at most 20 MB. */
+export async function loadVaultImage(space: ImageSpace, path: string): Promise<ImageLoad> {
+  if (!isSafeVaultPath(path) || isReservedPath(path)) return { state: "refused" };
+  const mimeType = imageMimeType(path);
   if (!mimeType) return { state: "not-image" };
   let size: number | undefined;
   try {
-    size = await space.size(target.path);
+    size = await space.size(path);
   } catch {
     return { state: "unreadable" };
   }
   if (size === undefined) return { state: "missing" };
   if (size > MAX_IMAGE_BYTES) return { state: "too-large" };
   try {
-    const bytes = await space.read(target.path);
+    const bytes = await space.read(path);
     if (bytes.length > MAX_IMAGE_BYTES) return { state: "too-large" };
     return { state: "ready", bytes, mimeType };
   } catch (error) {

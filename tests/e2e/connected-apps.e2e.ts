@@ -15,6 +15,7 @@ import { REPO, buildMcpServer } from "../ports/harness.ts";
 import { McpClient } from "../helpers/mcp-client.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace, START } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "mcp");
 const PLAN = "---\nthoth_id: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b\n---\n# Plan for 2027\n\nแผนงานปีหน้า: a garden, and a quieter inbox.\n\nSecret line that stays out of the log.\n";
@@ -46,7 +47,7 @@ test.beforeEach(async ({ page, context }) => {
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 });
 
@@ -165,7 +166,7 @@ test("after the identifier change, someone with apps set up is told once to copy
   await page.goto(bridge.url);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).first().click();
@@ -181,7 +182,7 @@ test("after the identifier change, someone with apps set up is told once to copy
   await expect(notice).toBeHidden();
   // Not again after a reload (the page may come back on the Private Space, or ask for it).
   await page.reload();
-  const choose = page.getByRole("button", { name: /choose or create a private space/i });
+  const choose = page.getByRole("button", { name: START });
   const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
   await expect(choose.or(tree)).toBeVisible();
   if (await choose.isVisible()) await choose.click();

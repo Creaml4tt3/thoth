@@ -21,6 +21,7 @@ import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import { REPO } from "../ports/harness.ts";
 import { newStableId } from "@thoth/domain";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "cross-space-dnd");
 
@@ -111,7 +112,7 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await page.setViewportSize({ width: 1180, height: 760 });
     await page.addInitScript(bridge.initScript);
     await page.goto(bridge.url);
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
     await expect(localTree(page)).toBeVisible();
   });
 

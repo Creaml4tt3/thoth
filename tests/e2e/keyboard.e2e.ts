@@ -16,6 +16,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
 import { welcomeDone } from "./welcome.ts";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -130,7 +131,7 @@ async function typeAtEnd(page: Page, text: string) {
 }
 
 test("with the keyboard only: create, rename, move, format, switch tab, change theme, open Settings, and come back to the same tabs", async ({ page }) => {
-  await press(page, /choose or create a private space/i);
+  await pickSpace(page, { keyboard: true });
   await press(page, /start writing/i);
   await expect(page.getByRole("heading", { level: 1, name: "Welcome back" })).toBeVisible(); // an empty Private Space: a new tab
   expect(await tabNames(page)).toEqual(["New tab"]);
@@ -259,7 +260,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   // 9. Restart: the same tabs come back for this Private Space, the same one is current, and so is the theme.
   await page.reload();
   expect(await theme(page)).toBe("system");
-  await press(page, /choose or create a private space/i);
+  await pickSpace(page, { keyboard: true });
   await expect(page.getByRole("tab")).toHaveCount(3);
   expect(await tabNames(page)).toEqual(["Roadmap", "Settings", "Old"]);
   await expect(current(page)).toHaveText("Settings");

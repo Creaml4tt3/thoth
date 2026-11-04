@@ -635,6 +635,7 @@ export const en = {
       assistantSize: "Shrink or expand the assistant",
       assistantSettings: "Open the assistant settings",
       notifications: "Show notifications",
+      openToday: "Open today's page",
       goHome: "Go home",
       /** Timeline (ADR-0051). */
       openTimeline: "Open Timeline",
@@ -705,6 +706,7 @@ export const en = {
       "dialog.close": "Close a dialog or menu",
       "assistant.ask": "Ask Thoth (open the assistant's bubble)",
       "assistant.size": "Shrink or expand the assistant",
+      "today.open": "Open today's page",
       "home.open": "Back to Private Spaces (closes this one in this window)",
       "sidebar.toggle": "Hide or show the sidebar",
     } satisfies Record<ShortcutId, string>,
@@ -737,7 +739,8 @@ export const en = {
     today: "Today",
     openToday: "Open today's page",
     startToday: "Start today's page",
-    todayTemplate: "Uses Templates/Daily.md when it exists.",
+    todayTemplate: (path: string) => `Uses ${path} when it exists.`,
+    todayNoTemplate: "Starts with the date as its title. Choose a template in Settings → Today.",
     todayFailed: (reason: string) => `Today's page could not be made: ${reason}`,
     /** The link to the Timeline (ADR-0051). */
     timeline: "Timeline",
@@ -786,6 +789,8 @@ export const en = {
     mentionsUnavailable: "Mentions can't be looked for here.",
     mentionsCapped: "Only the first ones are shown.",
     titleTooShort: "This page's title is too short to look for.",
+    /** Under a mention found by one of the page's aliases (ADR-0051 rule 12). */
+    matchedAlias: (name: string) => `Alias: ${name}`,
     mentionsFound: (n: number) => (n === 1 ? "1 unlinked mention." : `${n} unlinked mentions.`),
     link: "Link",
     linkLabel: (page: string) => `Link the mention in ${page}`,

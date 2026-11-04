@@ -17,6 +17,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { axe, bubble, mascot, openBubble, pickOnly, writeAndStart } from "./assistant.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "notifications");
 const PLAN = "# Plan\n\nWe have a cat.\n";
@@ -52,7 +53,7 @@ async function launch(page: Page, context: BrowserContext) {
   await page.addInitScript(PLUGIN_SPY);
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
   await expect(mascot(page)).toBeVisible();
 }
@@ -151,7 +152,7 @@ test("Settings → Notifications: switches that are kept, and pass axe in light 
     await section.screenshot({ path: join(SHOTS, `settings-${dark ? "dark" : "light"}.png`) });
   }
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByTestId("notification-settings").getByRole("checkbox", { name: "Save conflict" })).not.toBeChecked();
   await expect(page.getByTestId("notification-settings").getByRole("checkbox", { name: "Changes ready for review" })).toBeChecked();

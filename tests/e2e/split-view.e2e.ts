@@ -14,6 +14,7 @@ import { axe } from "./assistant.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = process.env["THOTH_SPLIT_SHOTS"] ?? "/Users/user/Desktop/Creaml4tt3/thoth/.tmp/split-shots";
 let built: { dist: string; bridgeDir: string; binary: string };
@@ -62,7 +63,7 @@ async function shots(page: Page, name: string) {
 async function open(page: Page) {
   await page.setViewportSize({ width: 1400, height: 820 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tab", { selected: true })).toHaveText("Alpha"); // nothing was open: the first page
   await row(page, "Alpha").click();
   await row(page, "Beta").click({ modifiers: ["ControlOrMeta"] });
@@ -166,7 +167,7 @@ test("split from the menu, resize from the keyboard, the same layout after a res
     await again.addInitScript(bridge.initScript);
     const main = await again.newPage();
     await main.goto(bridge.url);
-    await main.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(main);
     await expect.poll(() => names(main, "Open pages, right")).toEqual(["Beta"]);
     expect(await names(main, "Open pages, left")).toEqual(["Alpha"]);
     await expect(main.getByRole("separator", { name: "Resize panes" })).toHaveAttribute("aria-valuenow", chosen!);

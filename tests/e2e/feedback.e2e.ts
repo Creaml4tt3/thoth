@@ -19,6 +19,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { actAsBrowser, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "feedback");
 const HOST_LIB = readFileSync(join(REPO, "crates/thoth-host/src/lib.rs"), "utf8");
@@ -60,7 +61,7 @@ test.describe("Send feedback in the desktop app (ADR-0033)", () => {
     await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
     await page.addInitScript(bridge.initScript);
     await page.goto(bridge.url);
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
   });
   test.afterEach(async ({ page }) => {
     await page.close();

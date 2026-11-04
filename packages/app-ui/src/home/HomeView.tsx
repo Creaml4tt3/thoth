@@ -71,6 +71,8 @@ function Rows({ rows, label }: { rows: readonly HomeRow[]; label: string }) {
 export interface HomeToday {
   date: string;
   exists: boolean;
+  /** The template today's page starts from (ADR-0051), or null for none. */
+  template?: string | null;
   /** Set when the last try to make the page failed. */
   error?: string | null;
   open(options: { newTab: boolean }): void;
@@ -97,7 +99,7 @@ function TodayCard({ today }: { today: HomeToday }) {
         <span className="home-row-title">{today.date}</span>
         <span className="home-row-meta">{today.exists ? t.openToday : t.startToday}</span>
       </button>
-      <p id="home-today-template" className="muted home-empty">{t.todayTemplate}</p>
+      <p id="home-today-template" className="muted home-empty">{today.template === null ? t.todayNoTemplate : t.todayTemplate(today.template ?? "Templates/Daily.md")}</p>
       {today.error && (
         <p className="home-empty" role="alert">
           {t.todayFailed(today.error)}

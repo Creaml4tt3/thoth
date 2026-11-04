@@ -15,6 +15,7 @@
     "notification:allow-notify",
     "allow-vault-pick",
     "allow-vault-recent",
+    "allow-vault-inspect",
     "allow-vault-open",
     "allow-vault-close",
     "allow-vault-reveal",

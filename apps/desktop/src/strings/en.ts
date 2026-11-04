@@ -19,9 +19,19 @@ export const en = {
     /** "Meet <mark> Thoth": the mark sits between the two parts. */
     meet: { before: "Meet", after: "Thoth" },
     lede: "A private place for everything you know. Your files stay on your computer as Markdown, in a folder you choose. No account, no cloud.",
-    choose: "Choose or create a Private Space",
+    /** The two ways in (ADR-0051 rule 3): both open the chosen folder where it is; nothing is copied. */
+    startNew: "Start a new Private Space",
+    openExisting: "Open a folder you already use",
     opening: "Opening…",
-    hint: "Pick an existing folder of Markdown files, or create a new empty folder in the dialog. Thoth keeps its search index on this computer, not in the folder, and can always rebuild it from your files.",
+    hint: "Both open the folder where it is, and nothing is copied. For a new Private Space, choose or create an empty folder. Thoth keeps its search index on this computer, not in the folder.",
+    /** Said before a folder that already holds Markdown is opened (ADR-0051 rule 4). Obsidian is named only here. */
+    folderNote: {
+      title: "Open this folder where it is?",
+      body: "Thoth opens these files where they are and changes a file only when you edit it. It keeps a small .thoth folder here for its own records.",
+      obsidian: "Obsidian can keep using the same files. Thoth never changes Obsidian's settings.",
+      open: "Open",
+      another: "Choose another folder",
+    },
     recent: "Recent",
     ready: "Ready",
     /** "<b>folder</b> is now a Private Space. …" */
@@ -69,7 +79,7 @@ export const en = {
       label: (space: string) => `Thoth, Private Space ${space}: switch spaces`,
       tip: "Switch Private Space or workspace",
       menu: "Switch space",
-      openFolder: "Open folder…",
+      openFolder: "Open a folder you already use…",
       workspaceOn: (workspace: string, server: string) => `${workspace} · ${server}`,
       all: "All Private Spaces",
     },
@@ -136,6 +146,45 @@ export const en = {
     gettingStarted: "Getting started",
     tourNote: "A short tour of the sidebar, search, the editor, tabs and getting back to your Private Spaces.",
     showTour: "Show the tour again",
+  },
+
+  /** Settings → Today (ADR-0051 rules 7, 8 and 11): where Today's page goes and what it starts from. */
+  daily: {
+    title: "Today",
+    note: "Where Home's Today card and Alt+Shift+T put today's page in this Private Space, and what it starts from. Saved in this folder, so it comes with it.",
+    folder: "Folder",
+    folderHint: "Leave empty for the top level of this Private Space.",
+    pattern: "File name",
+    patternHint: "YYYY year, YY two digits, MM or M month, MMM or MMMM month name, DD or D day, ddd or dddd weekday name, [text] as written, / for a subfolder.",
+    template: "Template",
+    templateHint: "A page to start from, for example Templates/Daily.md. Leave empty for none. {{date}}, {{time}} and {{title}} in it are filled in.",
+    preview: (path: string) => `Today's page: ${path}`,
+    save: "Save",
+    saved: "Saved.",
+    reset: "Use Thoth's defaults",
+    saveFailed: (reason: string) => `Could not save: ${reason}`,
+    problems: {
+      folder: "This folder name cannot be used. Use a path inside this Private Space, without .thoth, .obsidian or characters like : * ?.",
+      template: "The template must be a .md page inside this Private Space.",
+      empty: "Write a file name pattern.",
+      token: (token: string) => `${token} is not a token Thoth can make. Use the tokens listed below, or put text in [brackets].`,
+      bracket: "A [ is never closed with ].",
+      name: "This pattern makes a file name that cannot be used. Use / only between parts, and no characters like : * ?.",
+    },
+    obsidian: {
+      title: "Use Obsidian's daily notes folder?",
+      ask: (folder: string) => `Use ${folder} for Today, as Obsidian does?`,
+      topLevel: "the top level of this folder",
+      folder: "Folder",
+      pattern: "File name",
+      template: "Template",
+      none: "None",
+      once: "Thoth reads Obsidian's setting this once and never changes it. You can change this later in Settings → Today.",
+      cannot: (reason: string) => `Thoth cannot use this file name: ${reason}`,
+      use: "Use it",
+      keep: "Keep Thoth's",
+      choose: "Choose in Settings",
+    },
   },
 
   /** The first-run tour (ADR-0032). */

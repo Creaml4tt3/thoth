@@ -88,6 +88,24 @@ describe("Connections", () => {
     expect(src.mentions).not.toHaveBeenCalled();
   });
 
+  it("shows which alias a mention matched (ADR-0051 rule 12)", async () => {
+    const user = userEvent.setup();
+    const byAlias: MentionRow = { page: { ref: "Trip.md", title: "Trip" }, mention: findMentions("Flew to BKK.", ["Bangkok Office", "BKK"])[0]! };
+    render(<Connections source={source({ title: "Bangkok Office", aliases: ["BKK"], mentions: vi.fn(async () => ({ rows: [byAlias], capped: false })) })} />);
+    await user.click(screen.getByRole("button", { name: /Unlinked mentions/ }));
+    const row = await screen.findByRole("button", { name: /^Trip/ });
+    expect(row.querySelector("mark")?.textContent).toBe("BKK");
+    expect(row.textContent).toContain("Alias: BKK");
+  });
+
+  it("looks for a short title's mentions when an alias is long enough", async () => {
+    const user = userEvent.setup();
+    const src = source({ title: "AI", aliases: ["Artificial intelligence"] });
+    render(<Connections source={src} />);
+    await user.click(screen.getByRole("button", { name: /Unlinked mentions/ }));
+    await waitFor(() => expect(src.mentions).toHaveBeenCalled());
+  });
+
   it("speaks Thai", async () => {
     render(
       <StringsContext.Provider value={th}>

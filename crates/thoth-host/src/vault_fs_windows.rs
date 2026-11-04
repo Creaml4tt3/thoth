@@ -20,7 +20,7 @@
 //!   cannot flush a directory handle; NTFS journals the rename itself.
 //! - The live index database files cannot be mutated through fs.
 use crate::error::{HostError, HostResult};
-use crate::paths::{is_reserved_first_segment, vault_segments};
+use crate::paths::{is_reserved_first_segment, refuse_obsidian_settings, vault_segments};
 use crate::win::names::segment_problem;
 use crate::win::nt::{self, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN, Kind, OsError};
 use crate::win::walk::{self, WalkError, disk_name};
@@ -171,6 +171,7 @@ impl VaultFs {
 
     pub fn mkdirp(&self, raw: &str) -> HostResult<()> {
         let segments = creatable(raw, true)?;
+        refuse_obsidian_settings(&segments, raw)?;
         let last = segments.len().saturating_sub(1);
         let mut current: Option<OwnedHandle> = None;
         for (i, segment) in segments.iter().enumerate() {
@@ -338,6 +339,7 @@ fn mkdir_error(e: WalkError, last: bool, raw: &str) -> HostError {
 /// The live SQLite files are owned by the host's connection; the webview reaches them only through SQL.
 fn refuse_index_files(raw: &str) -> HostResult<()> {
     let segments = vault_segments(raw, false)?;
+    refuse_obsidian_settings(&segments, raw)?;
     let protected = match segments.as_slice() {
         [first] => is_reserved_first_segment(first),
         [first, name] => is_reserved_first_segment(first) && name.to_lowercase().starts_with("index.sqlite"),

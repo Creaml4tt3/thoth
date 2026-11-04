@@ -58,6 +58,13 @@ async function whileBusy<T>(step: () => Promise<T>): Promise<T> {
 /** Directories never indexed: Thoth metadata, other tools' metadata, VCS. */
 const IGNORED_DIRS = new Set([".thoth", ".obsidian", ".git", ".trash", "node_modules"]);
 
+/** Obsidian's settings folder, anywhere in the path: read, never written (ADR-0051 rule 5). The host refuses it too. */
+function refuseObsidianSettings(...paths: string[]): void {
+  if (paths.some((path) => path.split("/").some((segment) => collisionKey(segment) === ".obsidian"))) {
+    throw new Error("Refusing to write into .obsidian/: Thoth never changes Obsidian's settings");
+  }
+}
+
 
 /** Deterministic duplicate-ID owner: shortest path, then lexicographic. Stable across rebuilds. */
 export function claimOwner(paths: readonly string[]): string {
@@ -668,6 +675,7 @@ export class Vault {
   private async writeFileAtomicNow(path: string, data: Uint8Array, options: WriteOptions, reconcile = true): Promise<string> {
     const normalized = normalizeVaultPath(path);
     if (isReservedPath(normalized)) throw new Error("Refusing to write vault content into .thoth/");
+    refuseObsidianSettings(normalized);
     const currentHash = await this.currentHash(normalized);
     if (currentHash !== options.expectedHash) throw new ConflictError(normalized, options.expectedHash, currentHash);
 
@@ -723,6 +731,7 @@ export class Vault {
     return this.exclusive(async () => {
       const normalized = normalizeVaultPath(path);
       if (isReservedPath(normalized)) throw new Error("Refusing to delete Thoth metadata through the content API");
+      refuseObsidianSettings(normalized);
       const before = await this.currentHash(normalized);
       if (before !== options.expectedHash) throw new ConflictError(normalized, options.expectedHash, before);
       const id = newStableId(this.now());
@@ -784,6 +793,7 @@ export class Vault {
       const src = normalizeVaultPath(from);
       const dst = normalizeVaultPath(to);
       if (isReservedPath(src) || isReservedPath(dst)) throw new Error("Refusing to move Thoth metadata (.thoth/)");
+      refuseObsidianSettings(src, dst);
       if (src === dst) throw new Error("The source and the destination are the same");
       const stat = await this.fs.stat(src);
       if (!stat) throw new NotFoundError(`"${src}"`);
@@ -914,6 +924,7 @@ export class Vault {
   private async createFolderNow(path: string): Promise<string> {
     const normalized = normalizeVaultPath(path);
     if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
+    refuseObsidianSettings(normalized);
     // Every segment is compared the way the vault compares names (case and Unicode form), not the way the disk does:
     // on a case-sensitive disk (Linux) "Inbox/welcome.MD/x" would otherwise make a folder beside the page welcome.md.
     // A folder on the way that exists under another case is reused, as macOS and Windows do.
@@ -939,6 +950,7 @@ export class Vault {
     return this.exclusive(async () => {
       const normalized = normalizeVaultPath(path);
       if (isReservedPath(normalized)) throw new Error("The .thoth folder is reserved for Thoth");
+      refuseObsidianSettings(normalized);
       const stat = await this.fs.stat(normalized);
       if (!stat) return;
       if (stat.kind !== "directory") throw new Error(`"${normalized}" is not a folder`);

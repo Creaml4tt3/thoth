@@ -66,7 +66,7 @@ use watch::Watcher;
 /// Every command name in the contract (`Commands` in ipc.ts).
 #[rustfmt::skip] // grouped by family, one family per line
 pub const COMMANDS: &[&str] = &[
-    "vault.pick", "vault.recent", "vault.open", "vault.close", "vault.reveal", "vault.shared", "vault.trash",
+    "vault.pick", "vault.recent", "vault.inspect", "vault.open", "vault.close", "vault.reveal", "vault.shared", "vault.trash",
     "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
     "sql.exec", "sql.run", "sql.all", "sql.get",
     "watch.start", "watch.stop",
@@ -305,6 +305,7 @@ impl Host {
         match command {
             "vault.pick" => json(self.pick_vault()),
             "vault.recent" => json(json!(self.recent())),
+            "vault.inspect" => json(self.inspect_folder(str_arg(args, "root")?)?),
             "vault.open" => json(self.open_vault(owner, str_arg(args, "root")?)?),
             "vault.close" => {
                 self.close_vault(str_arg(args, "vault")?)?;
@@ -620,6 +621,46 @@ impl Host {
 
     fn vault_allowed(&self, root: &Path) -> bool {
         self.state().picked_vaults.contains(root) || self.allow_roots.iter().any(|r| root.starts_with(r)) || self.recent().iter().any(|r| Path::new(r) == root)
+    }
+
+    /// What a picked folder already holds, before it is opened (ADR-0051 rule 4): a Markdown file (looked for in the
+    /// folders the index walks, at most `INSPECT_DIRS` of them), Obsidian's settings, Thoth's own folder. Reads only.
+    fn inspect_folder(&self, raw: &str) -> HostResult<Value> {
+        const INSPECT_DIRS: usize = 2000;
+        const SKIPPED: [&str; 5] = [".thoth", ".obsidian", ".git", ".trash", "node_modules"];
+        let root = canonical(raw)?;
+        if !self.vault_allowed(&root) {
+            return Err(HostError::not_allowed(format!("{raw} was not picked by the user")));
+        }
+        check_root_policy(&root, self.home.as_deref(), self.config.data_dir.as_deref())?;
+        let fs = VaultFs::new(open_root_dir(&root)?, true);
+        let entries = |dir: &str| -> Vec<(String, String)> {
+            let listed = fs.list(dir).unwrap_or(Value::Null);
+            let rows = listed.as_array().map(Vec::as_slice).unwrap_or_default();
+            rows.iter().filter_map(|e| Some((e.get("name")?.as_str()?.to_owned(), e.get("kind")?.as_str()?.to_owned()))).collect()
+        };
+        let top = entries("");
+        let has_dir = |wanted: &str| top.iter().any(|(name, kind)| kind == "directory" && name.to_lowercase() == wanted);
+        let mut markdown = false;
+        let mut queue = std::collections::VecDeque::from([String::new()]);
+        let mut walked = 0;
+        'walk: while let Some(dir) = queue.pop_front() {
+            walked += 1;
+            if walked > INSPECT_DIRS {
+                break;
+            }
+            for (name, kind) in if dir.is_empty() { top.clone() } else { entries(&dir) } {
+                let lower = name.to_lowercase();
+                if kind == "file" && (lower.ends_with(".md") || lower.ends_with(".markdown")) {
+                    markdown = true;
+                    break 'walk;
+                }
+                if kind == "directory" && !SKIPPED.contains(&lower.as_str()) {
+                    queue.push_back(if dir.is_empty() { name } else { format!("{dir}/{name}") });
+                }
+            }
+        }
+        Ok(json!({ "markdown": markdown, "obsidian": has_dir(".obsidian"), "thoth": has_dir(".thoth") }))
     }
 
     fn open_vault(&self, owner: &str, raw: &str) -> HostResult<Value> {

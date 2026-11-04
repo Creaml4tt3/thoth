@@ -18,6 +18,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { welcomeDone } from "./welcome.ts";
 import { newPrivatePage } from "./new-page.ts";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -38,7 +39,7 @@ test.beforeEach(async ({ page, context }) => {
   await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 });
 
 test.afterEach(async ({ page }) => {

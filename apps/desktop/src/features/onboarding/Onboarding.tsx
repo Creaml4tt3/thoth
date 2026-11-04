@@ -5,6 +5,7 @@ import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { displayPath } from "../settings/path.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { useFolderPicker } from "./FolderNote.tsx";
 
 interface Props {
   platform: Platform;
@@ -21,7 +22,6 @@ const leaf = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop()
 export function Onboarding({ platform, busy, error, left = null, onOpen }: Props) {
   const t = useDesktopStrings().onboarding;
   const [recent, setRecent] = useState<string[]>([]);
-  const [pickError, setPickError] = useState<string | null>(null);
   const choose = useRef<HTMLButtonElement>(null);
   // Back from a Private Space: focus was on a control that is gone.
   useEffect(() => {
@@ -39,17 +39,8 @@ export function Onboarding({ platform, busy, error, left = null, onOpen }: Props
     };
   }, [platform]);
 
-  const pick = async () => {
-    setPickError(null);
-    try {
-      const root = await platform.pickVaultFolder();
-      if (root) onOpen(root);
-    } catch (e) {
-      setPickError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const shown = error ?? pickError;
+  const picker = useFolderPicker(platform, onOpen, "night");
+  const shown = error ?? picker.error;
   const listed = left === null ? recent : [left, ...recent.filter((root) => root !== left)];
 
   return (
@@ -60,8 +51,12 @@ export function Onboarding({ platform, busy, error, left = null, onOpen }: Props
         </h1>
         <p className="lede">{t.lede}</p>
         <div className="ctas">
-          <Button ref={choose} variant="primary" onClick={() => void pick()} disabled={busy} data-autofocus>
-            {busy ? t.opening : t.choose}
+          {/* The same in-place picker behind both (ADR-0051 rule 3); the words say what each person is doing. */}
+          <Button ref={choose} variant="primary" onClick={() => void picker.pick()} disabled={busy} data-autofocus>
+            {busy ? t.opening : t.startNew}
+          </Button>
+          <Button variant="ghost" onClick={() => void picker.pick()} disabled={busy}>
+            {t.openExisting}
           </Button>
         </div>
         <p className="muted onboarding-hint">{t.hint}</p>
@@ -88,6 +83,7 @@ export function Onboarding({ platform, busy, error, left = null, onOpen }: Props
           </section>
         )}
       </div>
+      {picker.dialog}
     </main>
   );
 }

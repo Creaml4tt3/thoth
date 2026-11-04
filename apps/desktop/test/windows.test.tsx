@@ -141,7 +141,7 @@ describe("a window opened on a Private Space", () => {
     await launched("space-0000000000000001", [page("Beta.md")]);
     await waitFor(() => expect(tabNames()).toEqual(["Beta"]));
     expect(await screen.findByRole("heading", { level: 1, name: "Beta" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /choose or create a private space/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /start a new private space/i })).toBeNull();
     await waitFor(() => expect(storedTabs(localStorage.getItem(tabsKey(root, "space-0000000000000001")))).toEqual([{ k: "page", path: "Beta.md" }]));
     expect(localStorage.getItem(tabsKey(root))).toBeNull(); // the main window's list is not touched
     expect(windowsOn(root)).toEqual(["space-0000000000000001"]);
@@ -240,7 +240,7 @@ describe("the window's close button", () => {
 
   it("closes a window that has no Private Space open at once", async () => {
     render(<App platform={createNodePlatform({ vault: root, windows })} options={{ ...DEFAULT_OPTIONS, ...TEST_OPTIONS }} />);
-    await screen.findByRole("button", { name: /choose or create a private space/i });
+    await screen.findByRole("button", { name: /start a new private space/i });
     windows.emitCloseRequested();
     await waitFor(() => expect(windows.closed).toBe(1));
   });

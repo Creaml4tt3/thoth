@@ -11,9 +11,17 @@ export const th: DesktopStrings = {
   onboarding: {
     meet: { before: "พบกับ", after: "Thoth" },
     lede: "ที่เก็บทุกสิ่งที่คุณรู้แบบส่วนตัว ไฟล์ของคุณอยู่ในคอมพิวเตอร์เป็น Markdown ในโฟลเดอร์ที่คุณเลือกเอง ไม่ต้องมีบัญชี ไม่ต้องใช้คลาวด์",
-    choose: "เลือกหรือสร้าง Private Space",
+    startNew: "เริ่ม Private Space ใหม่", // REVIEW
+    openExisting: "เปิดโฟลเดอร์ที่คุณใช้อยู่", // REVIEW
     opening: "กำลังเปิด…",
-    hint: "เลือกโฟลเดอร์ไฟล์ Markdown ที่มีอยู่แล้ว หรือสร้างโฟลเดอร์ว่างใหม่ในหน้าต่างเลือกไฟล์ Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์ และสร้างดัชนีใหม่จากไฟล์ของคุณได้เสมอ", // REVIEW
+    hint: "ทั้งสองแบบเปิดโฟลเดอร์ตรงที่อยู่เดิม ไม่มีการคัดลอกไฟล์ ถ้าจะเริ่ม Private Space ใหม่ ให้เลือกหรือสร้างโฟลเดอร์ว่าง Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์", // REVIEW
+    folderNote: {
+      title: "เปิดโฟลเดอร์นี้ตรงที่อยู่เดิมไหม", // REVIEW
+      body: "Thoth เปิดไฟล์เหล่านี้ตรงที่อยู่เดิม และแก้ไฟล์เฉพาะตอนที่คุณแก้เท่านั้น Thoth เก็บโฟลเดอร์ .thoth เล็ก ๆ ไว้ที่นี่สำหรับข้อมูลของตัวเอง", // REVIEW
+      obsidian: "Obsidian ยังใช้ไฟล์ชุดเดียวกันนี้ต่อได้ Thoth ไม่เปลี่ยนการตั้งค่าของ Obsidian", // REVIEW
+      open: "เปิด", // REVIEW
+      another: "เลือกโฟลเดอร์อื่น", // REVIEW
+    },
     recent: "ล่าสุด",
     ready: "พร้อมแล้ว",
     readyLede: " เป็น Private Space แล้ว ทุกอย่างที่คุณเขียนที่นี่คือไฟล์ Markdown ในโฟลเดอร์นั้น",
@@ -48,7 +56,7 @@ export const th: DesktopStrings = {
       label: (space) => `Thoth, Private Space ${space}: สลับพื้นที่`, // REVIEW
       tip: "สลับ Private Space หรือเวิร์กสเปซ", // REVIEW
       menu: "สลับพื้นที่", // REVIEW
-      openFolder: "เปิดโฟลเดอร์…", // REVIEW
+      openFolder: "เปิดโฟลเดอร์ที่คุณใช้อยู่…", // REVIEW
       workspaceOn: (workspace, server) => `${workspace} · ${server}`,
       all: "Private Space ทั้งหมด", // REVIEW
     },
@@ -111,6 +119,45 @@ export const th: DesktopStrings = {
     gettingStarted: "เริ่มต้นใช้งาน",
     tourNote: "ทัวร์สั้น ๆ ของแถบด้านข้าง การค้นหา ตัวแก้ไข แท็บ และการกลับไปที่ Private Space", // REVIEW
     showTour: "แสดงทัวร์อีกครั้ง",
+  },
+
+  // การตั้งค่า → วันนี้ (ADR-0051). REVIEW: ทั้งกลุ่มนี้
+  daily: {
+    title: "วันนี้", // REVIEW
+    note: "ที่ที่การ์ดวันนี้ในหน้าแรกและ Alt+Shift+T ใช้เก็บหน้าของวันนี้ใน Private Space นี้ และหน้าที่ใช้เป็นแม่แบบ บันทึกไว้ในโฟลเดอร์นี้ จึงติดไปกับโฟลเดอร์", // REVIEW
+    folder: "โฟลเดอร์", // REVIEW
+    folderHint: "เว้นว่างไว้เพื่อใช้ระดับบนสุดของ Private Space นี้", // REVIEW
+    pattern: "ชื่อไฟล์", // REVIEW
+    patternHint: "YYYY ปี, YY ปีสองหลัก, MM หรือ M เดือน, MMM หรือ MMMM ชื่อเดือน, DD หรือ D วัน, ddd หรือ dddd ชื่อวัน, [ข้อความ] ใช้ตามที่เขียน, / สำหรับโฟลเดอร์ย่อย ชื่อเดือนและวันเป็นภาษาอังกฤษ ปีเป็น ค.ศ.", // REVIEW
+    template: "แม่แบบ", // REVIEW
+    templateHint: "หน้าที่ใช้เริ่มต้น เช่น Templates/Daily.md เว้นว่างไว้ถ้าไม่ใช้ {{date}}, {{time}} และ {{title}} ในหน้านั้นจะถูกเติมให้", // REVIEW
+    preview: (path) => `หน้าของวันนี้: ${path}`, // REVIEW
+    save: "บันทึก", // REVIEW
+    saved: "บันทึกแล้ว", // REVIEW
+    reset: "ใช้ค่าเริ่มต้นของ Thoth", // REVIEW
+    saveFailed: (reason) => `บันทึกไม่ได้: ${reason}`, // REVIEW
+    problems: {
+      folder: "ใช้ชื่อโฟลเดอร์นี้ไม่ได้ ใช้พาธภายใน Private Space นี้ ที่ไม่มี .thoth, .obsidian หรืออักขระอย่าง : * ?", // REVIEW
+      template: "แม่แบบต้องเป็นหน้า .md ภายใน Private Space นี้", // REVIEW
+      empty: "ใส่รูปแบบชื่อไฟล์", // REVIEW
+      token: (token) => `Thoth สร้าง ${token} ไม่ได้ ใช้ตัวที่ระบุไว้ด้านล่าง หรือใส่ข้อความใน [วงเล็บเหลี่ยม]`, // REVIEW
+      bracket: "มี [ ที่ไม่ได้ปิดด้วย ]", // REVIEW
+      name: "รูปแบบนี้สร้างชื่อไฟล์ที่ใช้ไม่ได้ ใช้ / คั่นระหว่างส่วนเท่านั้น และไม่ใช้อักขระอย่าง : * ?", // REVIEW
+    },
+    obsidian: {
+      title: "ใช้โฟลเดอร์โน้ตรายวันของ Obsidian ไหม", // REVIEW
+      ask: (folder) => `ใช้ ${folder} สำหรับวันนี้ แบบที่ Obsidian ใช้ไหม`, // REVIEW
+      topLevel: "ระดับบนสุดของโฟลเดอร์นี้", // REVIEW
+      folder: "โฟลเดอร์", // REVIEW
+      pattern: "ชื่อไฟล์", // REVIEW
+      template: "แม่แบบ", // REVIEW
+      none: "ไม่มี", // REVIEW
+      once: "Thoth อ่านการตั้งค่าของ Obsidian ครั้งนี้ครั้งเดียว และไม่แก้ไขเลย คุณเปลี่ยนได้ภายหลังที่ การตั้งค่า → วันนี้", // REVIEW
+      cannot: (reason) => `Thoth ใช้ชื่อไฟล์นี้ไม่ได้: ${reason}`, // REVIEW
+      use: "ใช้เลย", // REVIEW
+      keep: "ใช้ของ Thoth", // REVIEW
+      choose: "เลือกในการตั้งค่า", // REVIEW
+    },
   },
 
   // ทัวร์ครั้งแรก (ADR-0032). REVIEW: ทั้งกลุ่มนี้

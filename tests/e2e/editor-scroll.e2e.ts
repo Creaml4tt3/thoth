@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const line = (i: number) => `Line ${i} of a long page, with enough words to read like a sentence.`;
 // A divider half way down: ArrowDown selects it as a block, the next one leaves it.
@@ -34,7 +35,7 @@ test.beforeEach(async ({ page }) => {
   bridge = await startBridge({ dist: built.dist, bridgeDir: built.bridgeDir, host: { binary: built.binary, pickVault: vault, dataDir: join(scratch, "data") } });
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 });
 
 test.afterEach(async ({ page }) => {
