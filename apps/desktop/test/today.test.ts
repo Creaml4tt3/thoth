@@ -1,12 +1,13 @@
-// Today (ADR-0050 rules 11–15), on a real vault without a window: the date and its file name, the template with its
-// links rewritten, an existing page opened and never changed, and a name that differs only in case.
+// Today (ADR-0050 rules 11–15, ADR-0051 rules 7–10), on a real vault without a window: the date and its file name, the
+// template with its links rewritten and its placeholders filled, an existing page opened and never changed, a name that
+// differs only in case, and the daily notes setting followed.
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openNodeVault } from "@thoth/local-store/node";
-import type { Vault } from "@thoth/local-store";
-import { isoDate, msUntilMidnight, openOrStartToday, todayPath } from "../src/features/shell/today.ts";
+import { DEFAULT_DAILY, dailyPath, updateDailySettings, type Vault } from "@thoth/local-store";
+import { msUntilMidnight, openOrStartToday } from "../src/features/shell/today.ts";
 
 let root: string;
 let vault: Vault | undefined;
@@ -30,10 +31,10 @@ const open = async () => (vault = (await openNodeVault(root)).vault);
 
 describe("dates", () => {
   it("uses the local calendar date, zero-padded, so files sort", () => {
-    expect(isoDate(NOV_4)).toBe("2026-11-04");
-    expect(isoDate(new Date(2027, 0, 1, 0, 0, 1))).toBe("2027-01-01");
-    expect(isoDate(new Date(2026, 10, 4, 23, 59, 59))).toBe("2026-11-04");
-    expect(todayPath(new Date(987, 2, 9))).toBe("Daily/0987-03-09.md");
+    expect(dailyPath(DEFAULT_DAILY, NOV_4)).toBe("Daily/2026-11-04.md");
+    expect(dailyPath(DEFAULT_DAILY, new Date(2027, 0, 1, 0, 0, 1))).toBe("Daily/2027-01-01.md");
+    expect(dailyPath(DEFAULT_DAILY, new Date(2026, 10, 4, 23, 59, 59))).toBe("Daily/2026-11-04.md");
+    expect(dailyPath(DEFAULT_DAILY, new Date(987, 2, 9))).toBe("Daily/0987-03-09.md");
   });
 
   it("knows how long until local midnight", () => {
@@ -82,5 +83,42 @@ describe("openOrStartToday", () => {
     const first = await read("Daily/2026-11-04.md");
     expect(await openOrStartToday(vault!, new Date(2026, 10, 4, 23, 59))).toEqual({ path: "Daily/2026-11-04.md", created: false });
     expect(await read("Daily/2026-11-04.md")).toBe(first);
+  });
+
+  it("fills the template's placeholders, but not in code", async () => {
+    await put("Templates/Daily.md", "# {{date:dddd D MMMM YYYY}}\n\nMade at {{time}} for {{title}}. {{weather}}\n\n`{{date}}`\n");
+    await open();
+    await openOrStartToday(vault!, NOV_4);
+    expect(await read("Daily/2026-11-04.md")).toMatch(/\n# Wednesday 4 November 2026\n\nMade at 09:30 for 2026-11-04\. \{\{weather\}\}\n\n`\{\{date\}\}`\n$/);
+  });
+});
+
+describe("openOrStartToday with a daily notes setting (ADR-0051)", () => {
+  it("follows the folder, the pattern with subfolders, and the template", async () => {
+    await put("Journal/Template.md", "---\ntags: [journal]\n---\n# Template\n\nSee [[Atlas]] on {{date:ddd}}.\n");
+    await open();
+    await updateDailySettings(vault!, () => ({ folder: "Journal", pattern: "YYYY/MM/[Day] YYYY-MM-DD", template: "Journal/Template.md" }));
+    expect(await openOrStartToday(vault!, NOV_4)).toEqual({ path: "Journal/2026/11/Day 2026-11-04.md", created: true });
+    const text = await read("Journal/2026/11/Day 2026-11-04.md");
+    expect(text).toMatch(/^---\ntags: \[journal\]\nthoth_id: \S+\n---\n# Day 2026-11-04\n\nSee \[\[Atlas\]\] on Wed\.\n$/);
+    // Opened, never changed, on the next call.
+    expect(await openOrStartToday(vault!, NOV_4)).toEqual({ path: "Journal/2026/11/Day 2026-11-04.md", created: false });
+    expect(await read("Journal/2026/11/Day 2026-11-04.md")).toBe(text);
+  });
+
+  it("makes pages at the top level with no template", async () => {
+    await put("Templates/Daily.md", "# Daily\n\nUnused.\n");
+    await open();
+    await updateDailySettings(vault!, () => ({ folder: "", pattern: "D MMM YYYY", template: null }));
+    expect(await openOrStartToday(vault!, NOV_4)).toEqual({ path: "4 Nov 2026.md", created: true });
+    expect(await read("4 Nov 2026.md")).toMatch(/^---\nthoth_id: \S+\n---\n# 4 Nov 2026\n$/);
+  });
+
+  it("opens an existing page in another letter case under the setting's folder", async () => {
+    await put("journal/2026-11-04.md", "# Mine\n");
+    await open();
+    await updateDailySettings(vault!, () => ({ ...DEFAULT_DAILY, folder: "Journal" }));
+    expect(await openOrStartToday(vault!, NOV_4)).toEqual({ path: "journal/2026-11-04.md", created: false });
+    expect(await read("journal/2026-11-04.md")).toBe("# Mine\n");
   });
 });

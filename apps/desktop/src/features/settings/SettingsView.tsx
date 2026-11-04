@@ -9,6 +9,7 @@ import { AgentSettings } from "../agents/AgentSettings.tsx";
 import { NotificationSettings } from "../notifications/NotificationSettings.tsx";
 import { ConnectedAppsSettings } from "../connected-apps/ConnectedAppsSettings.tsx";
 import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
+import { DailySettingsSection } from "./DailySettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
 import { SettingsLayout, scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
@@ -23,9 +24,9 @@ type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages
 
 /**
  * Settings, most used first: Appearance (theme, language), Editor, the Private Space (its folder and search index),
- * Import, Servers, the assistant, Connected apps, Notifications, Updates, and Help and feedback (with the tour).
+ * Today (the daily notes setting), Import, Servers, the assistant, Connected apps, Notifications, Updates, and Help and feedback (with the tour).
  */
-export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import"; request?: object }) {
+export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import" | "today"; request?: object }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder, platform } = useSession();
   const previews = usePageHost().links;
   const t = useDesktopStrings().settings;
@@ -73,6 +74,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
     { id: "set-appearance", label: t.appearance },
     { id: "set-editor", label: t.editor },
     { id: "set-vault", label: t.privateSpace },
+    { id: "set-today", label: d.daily.title },
     { id: "set-import", label: t.importExport },
     { id: "set-servers", label: d.servers.title },
     { id: "set-agents", label: d.agents.title },
@@ -186,6 +188,8 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
           )}
         </div>
       </section>
+
+      <DailySettingsSection focus={section === "today"} />
 
       <section ref={importSection} aria-labelledby="set-import" className="set-section">
         <h2 id="set-import">{t.importExport}</h2>

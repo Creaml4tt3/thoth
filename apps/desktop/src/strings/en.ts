@@ -148,6 +148,45 @@ export const en = {
     showTour: "Show the tour again",
   },
 
+  /** Settings → Today (ADR-0051 rules 7, 8 and 11): where Today's page goes and what it starts from. */
+  daily: {
+    title: "Today",
+    note: "Where Home's Today card and Alt+Shift+T put today's page in this Private Space, and what it starts from. Saved in this folder, so it comes with it.",
+    folder: "Folder",
+    folderHint: "Leave empty for the top level of this Private Space.",
+    pattern: "File name",
+    patternHint: "YYYY year, YY two digits, MM or M month, MMM or MMMM month name, DD or D day, ddd or dddd weekday name, [text] as written, / for a subfolder.",
+    template: "Template",
+    templateHint: "A page to start from, for example Templates/Daily.md. Leave empty for none. {{date}}, {{time}} and {{title}} in it are filled in.",
+    preview: (path: string) => `Today's page: ${path}`,
+    save: "Save",
+    saved: "Saved.",
+    reset: "Use Thoth's defaults",
+    saveFailed: (reason: string) => `Could not save: ${reason}`,
+    problems: {
+      folder: "This folder name cannot be used. Use a path inside this Private Space, without .thoth, .obsidian or characters like : * ?.",
+      template: "The template must be a .md page inside this Private Space.",
+      empty: "Write a file name pattern.",
+      token: (token: string) => `${token} is not a token Thoth can make. Use the tokens listed below, or put text in [brackets].`,
+      bracket: "A [ is never closed with ].",
+      name: "This pattern makes a file name that cannot be used. Use / only between parts, and no characters like : * ?.",
+    },
+    obsidian: {
+      title: "Use Obsidian's daily notes folder?",
+      ask: (folder: string) => `Use ${folder} for Today, as Obsidian does?`,
+      topLevel: "the top level of this folder",
+      folder: "Folder",
+      pattern: "File name",
+      template: "Template",
+      none: "None",
+      once: "Thoth reads Obsidian's setting this once and never changes it. You can change this later in Settings → Today.",
+      cannot: (reason: string) => `Thoth cannot use this file name: ${reason}`,
+      use: "Use it",
+      keep: "Keep Thoth's",
+      choose: "Choose in Settings",
+    },
+  },
+
   /** The first-run tour (ADR-0032). */
   tour: {
     progress: (step: number, total: number) => `${step} of ${total}`,

@@ -174,7 +174,7 @@ describe("settings", () => {
     const nav = await screen.findByRole("navigation", { name: "Settings sections" });
     const links = within(nav).getAllByRole("link").map((a) => a.textContent);
     // Most used first; the folder's own upkeep (the search index) and the tour are parts of their sections now.
-    expect(links.slice(0, 5)).toEqual(["Appearance", "Editor", "Private Space", "Import notes", "Servers"]);
+    expect(links.slice(0, 6)).toEqual(["Appearance", "Editor", "Private Space", "Today", "Import notes", "Servers"]);
     expect(links.at(-1)).toBe("Help and feedback");
     expect(links).not.toContain("Search index");
     // Every link goes to a heading on the page.

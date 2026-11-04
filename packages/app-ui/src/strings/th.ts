@@ -574,6 +574,7 @@ export const th: Strings = {
       assistantSize: "ย่อหรือขยายผู้ช่วย",
       assistantSettings: "เปิดการตั้งค่าผู้ช่วย",
       notifications: "แสดงการแจ้งเตือน",
+      openToday: "เปิดหน้าของวันนี้", // REVIEW
       goHome: "ไปหน้าแรก", // REVIEW
       leaveSpace: "กลับไปที่ Private Space", // REVIEW
       showTour: "แสดงทัวร์", // REVIEW
@@ -638,6 +639,7 @@ export const th: Strings = {
       "dialog.close": "ปิดกล่องโต้ตอบหรือเมนู",
       "assistant.ask": "ถาม Thoth (เปิดกล่องข้อความของผู้ช่วย)",
       "assistant.size": "ย่อหรือขยายผู้ช่วย",
+      "today.open": "เปิดหน้าของวันนี้", // REVIEW
       "home.open": "กลับไปที่ Private Space (ปิด Private Space นี้ในหน้าต่างนี้)", // REVIEW
       "sidebar.toggle": "ซ่อนหรือแสดงแถบด้านข้าง",
     },
@@ -665,7 +667,8 @@ export const th: Strings = {
     today: "วันนี้", // REVIEW
     openToday: "เปิดหน้าของวันนี้", // REVIEW
     startToday: "เริ่มหน้าของวันนี้", // REVIEW
-    todayTemplate: "ใช้ Templates/Daily.md เป็นแม่แบบ ถ้ามีไฟล์นี้", // REVIEW
+    todayTemplate: (path) => `ใช้ ${path} เป็นแม่แบบ ถ้ามีไฟล์นี้`, // REVIEW
+    todayNoTemplate: "เริ่มด้วยวันที่เป็นชื่อหน้า เลือกแม่แบบได้ที่ การตั้งค่า → วันนี้", // REVIEW
     todayFailed: (reason) => `สร้างหน้าของวันนี้ไม่ได้: ${reason}`, // REVIEW
   },
 

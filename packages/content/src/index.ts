@@ -5,3 +5,5 @@ export * from "./rewrite.ts";
 export * from "./schema.ts";
 export * from "./resolve.ts";
 export * from "./text.ts";
+export * from "./dates.ts";
+export * from "./placeholders.ts";
