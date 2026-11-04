@@ -27,6 +27,7 @@ import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const HOST_LIB = readFileSync(join(REPO, "crates/thoth-host/src/lib.rs"), "utf8");
 const HOST_HAS_SERVERS = /"server\.add"/.test(HOST_LIB) && /"api\.call"/.test(HOST_LIB);
@@ -90,7 +91,7 @@ test.describe("workspace servers", () => {
     await context.route((url) => !url.href.startsWith(bridge.url), (route) => route.abort());
     await page.addInitScript(bridge.initScript);
     await page.goto(bridge.url);
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
     await page.getByRole("button", { name: /start writing/i }).click();
   });
 

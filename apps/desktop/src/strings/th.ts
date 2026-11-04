@@ -11,9 +11,17 @@ export const th: DesktopStrings = {
   onboarding: {
     meet: { before: "พบกับ", after: "Thoth" },
     lede: "ที่เก็บทุกสิ่งที่คุณรู้แบบส่วนตัว ไฟล์ของคุณอยู่ในคอมพิวเตอร์เป็น Markdown ในโฟลเดอร์ที่คุณเลือกเอง ไม่ต้องมีบัญชี ไม่ต้องใช้คลาวด์",
-    choose: "เลือกหรือสร้าง Private Space",
+    startNew: "เริ่ม Private Space ใหม่", // REVIEW
+    openExisting: "เปิดโฟลเดอร์ที่คุณใช้อยู่", // REVIEW
     opening: "กำลังเปิด…",
-    hint: "เลือกโฟลเดอร์ไฟล์ Markdown ที่มีอยู่แล้ว หรือสร้างโฟลเดอร์ว่างใหม่ในหน้าต่างเลือกไฟล์ Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์ และสร้างดัชนีใหม่จากไฟล์ของคุณได้เสมอ", // REVIEW
+    hint: "ทั้งสองแบบเปิดโฟลเดอร์ตรงที่อยู่เดิม ไม่มีการคัดลอกไฟล์ ถ้าจะเริ่ม Private Space ใหม่ ให้เลือกหรือสร้างโฟลเดอร์ว่าง Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์", // REVIEW
+    folderNote: {
+      title: "เปิดโฟลเดอร์นี้ตรงที่อยู่เดิมไหม", // REVIEW
+      body: "Thoth เปิดไฟล์เหล่านี้ตรงที่อยู่เดิม และแก้ไฟล์เฉพาะตอนที่คุณแก้เท่านั้น Thoth เก็บโฟลเดอร์ .thoth เล็ก ๆ ไว้ที่นี่สำหรับข้อมูลของตัวเอง", // REVIEW
+      obsidian: "Obsidian ยังใช้ไฟล์ชุดเดียวกันนี้ต่อได้ Thoth ไม่เปลี่ยนการตั้งค่าของ Obsidian", // REVIEW
+      open: "เปิด", // REVIEW
+      another: "เลือกโฟลเดอร์อื่น", // REVIEW
+    },
     recent: "ล่าสุด",
     ready: "พร้อมแล้ว",
     readyLede: " เป็น Private Space แล้ว ทุกอย่างที่คุณเขียนที่นี่คือไฟล์ Markdown ในโฟลเดอร์นั้น",
@@ -48,7 +56,7 @@ export const th: DesktopStrings = {
       label: (space) => `Thoth, Private Space ${space}: สลับพื้นที่`, // REVIEW
       tip: "สลับ Private Space หรือเวิร์กสเปซ", // REVIEW
       menu: "สลับพื้นที่", // REVIEW
-      openFolder: "เปิดโฟลเดอร์…", // REVIEW
+      openFolder: "เปิดโฟลเดอร์ที่คุณใช้อยู่…", // REVIEW
       workspaceOn: (workspace, server) => `${workspace} · ${server}`,
       all: "Private Space ทั้งหมด", // REVIEW
     },

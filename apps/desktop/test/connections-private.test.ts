@@ -59,6 +59,22 @@ describe("Private Space connections", () => {
     expect((await vault.backlinks("Projects/Atlas.md")).map((b) => b.sourcePath)).toContain("Notes/Meeting.md");
   });
 
+  it("finds mentions under the page's aliases too (Thai included) and links them as [[Title|words as written]]", async () => {
+    await put("Bangkok Office.md", "---\naliases: [BKK, สำนักงานกรุงเทพ]\n---\n# Bangkok Office\n");
+    await put("Trip.md", "# Trip\n\nFlew to bkk on Monday.\n");
+    await put("บันทึก.md", "# บันทึก\n\nวันนี้ไปสำนักงานกรุงเทพแล้ว\n");
+    await vault.reconcile();
+    const page = (await vault.listPages()).find((p) => p.path === "Bangkok Office.md")!;
+    const office = privateConnectionsSource(vault, page.path, page.title, { revision: 0, open: () => undefined, flushAll: async () => true }, page.aliases);
+    const { rows } = await office.mentions()!;
+    expect(rows.map((r) => [r.page.ref, r.mention.text, r.mention.name]).sort()).toEqual([
+      ["Trip.md", "bkk", "BKK"],
+      ["บันทึก.md", "สำนักงานกรุงเทพ", "สำนักงานกรุงเทพ"],
+    ]);
+    expect(await office.link!(rows.find((r) => r.page.ref === "Trip.md")!)).toBe("linked");
+    expect(await read("Trip.md")).toBe("# Trip\n\nFlew to [[Bangkok Office|bkk]] on Monday.\n");
+  });
+
   it("writes nothing when an open page's edits could not be written first", async () => {
     const atlas = source("Projects/Atlas.md", "Atlas", async () => false);
     const [row] = (await atlas.mentions()!).rows;

@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -42,6 +42,8 @@ export interface Platform {
   /** Native folder picker. Returns null when the user cancels. */
   pickVaultFolder(): Promise<string | null>;
   recentVaults(): Promise<string[]>;
+  /** What a picked folder already holds, read before it is opened (ADR-0051 rule 4). Absent where the host cannot tell. */
+  inspectFolder?(root: string): Promise<FolderContents>;
   /** Opens a vault root the user picked (or one from `recentVaults`); the host refuses any other path. */
   openVault(root: string): Promise<VaultConnection>;
   /** Native picker for an import source: an archive file or a folder. */

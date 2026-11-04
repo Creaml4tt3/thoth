@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent
 import { useStrings } from "../strings/index.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import type { OpenOptions } from "../tabs/model.ts";
-import { isTooShort, type LinkOutcome, type Mention } from "./mentions.ts";
+import { allTooShort, type LinkOutcome, type Mention } from "./mentions.ts";
 
 export interface ConnectedPage {
   /** Opens it: a vault path or a page ID. */
@@ -25,6 +25,8 @@ export interface MentionRow {
 export interface ConnectionsSource {
   /** The open page's title: what mentions are looked for. */
   title: string;
+  /** Its aliases, looked for too (the Private Space, ADR-0051 rule 12); a workspace has none. */
+  aliases?: readonly string[];
   /** Changes whenever the lists may have changed (index revision, the workspace tree). */
   tick: unknown;
   links(): Promise<ConnectedPage[]>;
@@ -108,7 +110,7 @@ export function Connections({ source }: { source: ConnectionsSource }) {
   const [busy, setBusy] = useState<string | null>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
-  const short = isTooShort(source.title);
+  const short = allTooShort([source.title, ...(source.aliases ?? [])]);
 
   // The count is said when the part opens, not when the lists refresh (that would talk over "Linked in …").
   const announce = useRef(false);
@@ -135,7 +137,7 @@ export function Connections({ source }: { source: ConnectionsSource }) {
     );
     return () => void (live = false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, short, source.tick, source.title]);
+  }, [open, short, source.tick, source.title, source.aliases?.join("\n")]);
 
   const link = async (row: MentionRow, index: number) => {
     if (!source.link || busy) return;
@@ -199,6 +201,8 @@ export function Connections({ source }: { source: ConnectionsSource }) {
                         <mark>{row.mention.text}</mark>
                         {row.mention.after}
                       </span>
+                      {/* Which name it matched, when that is an alias and not the title. */}
+                      {row.mention.name !== source.title && <span className="muted connection-name">{t.matchedAlias(row.mention.name)}</span>}
                     </PageButton>
                     {source.link && (
                       <button type="button" className="btn btn-sm btn-ghost connection-link" aria-label={t.linkLabel(row.page.title)} disabled={busy !== null} onClick={() => void link(row, index)}>

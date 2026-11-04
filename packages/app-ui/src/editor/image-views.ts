@@ -14,7 +14,8 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import { NodeSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { EditorContext } from "./context.ts";
-import type { ImageLoad } from "./media.ts";
+import type { LinkTarget } from "./links.ts";
+import { imageMimeType, type ImageLoad } from "./media.ts";
 
 /** Dispatched on an image's DOM to open its alt text field (the block menu and the Enter key do). */
 export const EDIT_ALT_EVENT = "thoth-edit-alt";
@@ -50,6 +51,92 @@ const heightsOf = (ctx: EditorContext): Map<string, number> => {
 
 let altIds = 0;
 
+/** A picture that is loading or could not be shown: its file name and why, never a broken image. */
+function placeholder(state: string, text: string, aria: string): HTMLElement {
+  const box = el("span", "page-image-placeholder");
+  box.setAttribute("role", "img");
+  box.setAttribute("aria-label", aria);
+  box.title = aria;
+  const icon = el("span", "page-image-icon", state === "loading" ? "" : "⌧");
+  icon.setAttribute("aria-hidden", "true");
+  box.append(icon, el("span", "page-image-text", text));
+  return box;
+}
+
+/** What a picture that is not shown says: "Image not found: bird.png" and the like. */
+function failureText(t: EditorContext["strings"]["image"], state: ImageLoad["state"], name: string): string {
+  return state === "missing" ? t.missing(name) : state === "refused" ? t.refused(name) : state === "not-image" ? t.notImage(name) : state === "too-large" ? t.tooLarge(name) : t.unreadable(name);
+}
+
+/**
+ * `![[photo.png]]` / `![[photo.png|300]]` (ADR-0051 rule 6): what the text after `|` means for a picture. A whole
+ * number is the width in pixels, as in Obsidian; anything else is the alt text. Without it, the file name is the alt text.
+ */
+export function embedPictureAttrs(target: string, label: string | null): { alt: string; width: number | null } {
+  const text = label?.trim() ?? "";
+  if (/^\d{1,5}$/.test(text) && Number(text) > 0) return { alt: imageDisplayName(target), width: Number(text) };
+  return { alt: text || imageDisplayName(target), width: null };
+}
+
+/** The vault path when an embed resolved to a picture both editors draw: a file (not a page, a heading or a block) of an image type. */
+export function pictureEmbedPath(ctx: EditorContext, result: LinkTarget, fragment: string | null): string | null {
+  return result.state === "resolved" && !result.folder && fragment === null && imageMimeType(result.path) !== null && ctx.media()?.loadPath ? result.path : null;
+}
+
+/**
+ * The picture of a `![[…]]` embed, loaded from the vault path it resolved to through the page's media (the same checks,
+ * 20 MB limit and `blob:` URL as a Markdown image). Read-only: the Markdown source is never touched.
+ */
+export function embedPicture(ctx: EditorContext, path: string, attrs: { alt: string; width: number | null }, tag: "div" | "span" = "div"): { dom: HTMLElement; destroy(): void } {
+  const t = ctx.strings.image;
+  const dom = el(tag, "page-image embed-image");
+  dom.setAttribute("contenteditable", "false");
+  const frame = el("span", "page-image-frame");
+  dom.append(frame);
+  const name = imageDisplayName(path);
+  let url: string | null = null;
+  let alive = true;
+  const release = (): void => {
+    if (url) URL.revokeObjectURL(url);
+    url = null;
+  };
+  const fail = (state: ImageLoad["state"]): void => {
+    release();
+    dom.dataset["imageState"] = state;
+    const text = failureText(t, state, name);
+    frame.replaceChildren(placeholder(state, text, `${text} (${attrs.alt})`));
+  };
+  dom.dataset["imageState"] = "loading";
+  dom.setAttribute("aria-busy", "true");
+  frame.replaceChildren(placeholder("loading", attrs.alt, t.loading(attrs.alt)));
+  const media = ctx.media();
+  void (media?.loadPath ? media.loadPath(path) : Promise.resolve<ImageLoad>({ state: "missing" })).then(
+    (result) => {
+      if (!alive) return;
+      dom.removeAttribute("aria-busy");
+      if (result.state !== "ready") return fail(result.state === "remote" ? "refused" : result.state);
+      dom.dataset["imageState"] = "ready";
+      url = URL.createObjectURL(new Blob([result.bytes as BlobPart], { type: result.mimeType }));
+      const img = el("img", "page-image-img");
+      img.alt = attrs.alt;
+      img.draggable = false;
+      img.decoding = "async";
+      if (attrs.width !== null) img.style.width = `${attrs.width}px`;
+      img.addEventListener("error", () => alive && fail("unreadable"));
+      img.src = url;
+      frame.replaceChildren(img);
+    },
+    () => alive && fail("unreadable"),
+  );
+  return {
+    dom,
+    destroy() {
+      alive = false;
+      release();
+    },
+  };
+}
+
 type Shown = ImageLoad | { state: "loading" };
 
 export const imageView =
@@ -76,17 +163,6 @@ export const imageView =
     const release = (): void => {
       if (url) URL.revokeObjectURL(url);
       url = null;
-    };
-
-    const placeholder = (state: string, text: string, aria: string): HTMLElement => {
-      const box = el("span", "page-image-placeholder");
-      box.setAttribute("role", "img");
-      box.setAttribute("aria-label", aria);
-      box.title = aria;
-      const icon = el("span", "page-image-icon", state === "loading" ? "" : "⌧");
-      icon.setAttribute("aria-hidden", "true");
-      box.append(icon, el("span", "page-image-text", text));
-      return box;
     };
 
     const show = (next: Shown): void => {
@@ -150,8 +226,7 @@ export const imageView =
           return;
         }
         default: {
-          const n = name();
-          const text = next.state === "missing" ? t.missing(n) : next.state === "refused" ? t.refused(n) : next.state === "not-image" ? t.notImage(n) : next.state === "too-large" ? t.tooLarge(n) : t.unreadable(n);
+          const text = failureText(t, next.state, name());
           frame.replaceChildren(placeholder(next.state, text, alt().trim() ? `${text} (${alt().trim()})` : text));
         }
       }

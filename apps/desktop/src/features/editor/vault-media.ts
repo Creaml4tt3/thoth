@@ -2,7 +2,7 @@
  * A Private Space page's images (ADR-0028): read through the vault's host-backed filesystem (paths inside the vault
  * only), and added next to the page through the vault's compare-and-swap write, so an existing file is never replaced.
  */
-import { addPageImage, loadPageImage, type ImageSpace, type PageMedia } from "@thoth/app-ui/editor/media.ts";
+import { addPageImage, loadPageImage, loadVaultImage, type ImageSpace, type PageMedia } from "@thoth/app-ui/editor/media.ts";
 import { ConflictError, type Vault } from "@thoth/local-store";
 
 export function vaultImageSpace(vault: Vault): ImageSpace {
@@ -29,6 +29,7 @@ export function vaultPageMedia(vault: Vault, page: string): PageMedia {
   const space = vaultImageSpace(vault);
   return {
     load: (src) => loadPageImage(space, page, src),
+    loadPath: (path) => loadVaultImage(space, path),
     async add(file) {
       const { src, alt } = await addPageImage(space, page, file);
       return { src, alt };

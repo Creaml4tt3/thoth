@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { START } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -56,7 +57,7 @@ test.afterEach(async ({ page }) => {
 
 test("a Thai system gets the Thai UI with the bundled fonts, and Settings changes the language", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "th");
-  await page.getByRole("button", { name: "เลือกหรือสร้าง Private Space" }).click();
+  await page.getByRole("button", { name: "เริ่ม Private Space ใหม่" }).click();
   await page.getByRole("button", { name: "เริ่มเขียน" }).click();
   // Since 0.2.6 New page makes "ไม่มีชื่อ" (Untitled) and starts its rename in the tree.
   await page.getByRole("button", { name: "หน้าใหม่", exact: true }).click();
@@ -86,14 +87,14 @@ test("a Thai system gets the Thai UI with the bundled fonts, and Settings change
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await page.reload();
-  await page.getByRole("button", { name: "Choose or create a Private Space" }).click();
+  await page.getByRole("button", { name: START }).click();
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("combobox", { name: "Language" }).selectOption("system");
   await expect(page.getByRole("heading", { level: 1, name: "การตั้งค่า" })).toBeVisible();
 });
 
 test("Settings shows the folder shortened with the full path as a tooltip, and Show in reaches the host", async ({ page }) => {
-  await page.getByRole("button", { name: "เลือกหรือสร้าง Private Space" }).click();
+  await page.getByRole("button", { name: "เริ่ม Private Space ใหม่" }).click();
   await page.getByRole("button", { name: "เริ่มเขียน" }).click();
   await page.getByRole("button", { name: "การตั้งค่า" }).click();
   const location = page.getByTestId("vault-location");

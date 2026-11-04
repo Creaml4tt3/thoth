@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -39,7 +40,7 @@ test.beforeEach(async ({ page, context }) => {
   await page.addInitScript(bridge.initScript);
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 });
 

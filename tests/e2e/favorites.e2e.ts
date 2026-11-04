@@ -16,6 +16,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { startDrag } from "./drag.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "favorites");
 let built: { dist: string; bridgeDir: string; binary: string };
@@ -57,14 +58,14 @@ const theme = (page: Page, dark: boolean) => page.evaluate((night) => document.d
 async function open(page: Page) {
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await row(page, "Alpha").click();
   await expect(current(page)).toHaveText("Alpha");
 }
 
 async function restart(page: Page) {
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
 }
 
 test("pages starred from the header and the tree are listed first in the sidebar, open from there, and survive a rename and a restart", async ({ page }) => {

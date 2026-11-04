@@ -60,6 +60,15 @@ export interface HostError {
   message: string;
 }
 
+export interface FolderContents {
+  /** A Markdown file somewhere in the folders the index walks. */
+  markdown: boolean;
+  /** Obsidian's settings folder, `.obsidian/`, at the top. */
+  obsidian: boolean;
+  /** Thoth's own `.thoth/` folder: it was a Private Space before. */
+  thoth: boolean;
+}
+
 export interface VaultChangedEvent {
   vault: string;
   /** Vault-relative paths that changed; may be empty when `rescan` is set. */
@@ -73,6 +82,8 @@ type Bytes = Uint8Array;
 export interface Commands {
   "vault.pick": { args: Record<string, never>; result: string | null };
   "vault.recent": { args: Record<string, never>; result: string[] };
+  /** What a picked (or recent) folder already holds, read before it is opened (ADR-0051 rule 4). Writes nothing. */
+  "vault.inspect": { args: { root: string }; result: FolderContents };
   /**
    * `shared`: another handle (another window) already has this folder open (ADR-0019); that window ran recovery.
    * `network`: the folder is on a network drive (ADR-0046); the app says that Thoth keeps its own data on this computer.

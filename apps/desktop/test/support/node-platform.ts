@@ -5,7 +5,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ConnectedApps, Links, Platform, Updates, VaultChangedEvent, VaultConnection, Windows } from "@thoth/platform";
+import type { ConnectedApps, FolderContents, Links, Platform, Updates, VaultChangedEvent, VaultConnection, Windows } from "@thoth/platform";
 import { NodeSqlDriver, NodeVaultFs } from "@thoth/local-store/node";
 import { openNodeSourceHost } from "@thoth/importer-core/node";
 import { NodeAgentHost } from "@thoth/agent-core/node";
@@ -21,6 +21,8 @@ export interface NodePlatform extends Platform {
   pickedImage: { name: string; bytes: Uint8Array } | null;
   imagePicks: number;
   recent: string[];
+  /** What `inspectFolder` says the picked folder holds; unset, a folder with nothing to say (no note is shown). */
+  folderContents?: FolderContents;
   /** Fires the watcher listeners like the host would. */
   emit(event?: Partial<Omit<VaultChangedEvent, "vault">>): void;
   /** Number of live watchers. */
@@ -112,6 +114,9 @@ export function createNodePlatform(options: { vault?: string | null; servers?: F
     },
     async recentVaults() {
       return platform.recent;
+    },
+    async inspectFolder() {
+      return platform.folderContents ?? { markdown: false, obsidian: false, thoth: false };
     },
     async openVault(root) {
       const fs = new NodeVaultFs(root);

@@ -68,6 +68,38 @@ describe("findMentions", () => {
   });
 });
 
+describe("findMentions with aliases (ADR-0051 rule 12)", () => {
+  it("looks for the title and every alias with the same rules, and says which name matched", () => {
+    const source = "Met at bkk today. The Bangkok Office is busy; BKKs are not it.\n";
+    const found = findMentions(source, ["Bangkok Office", "BKK"]);
+    expect(found.map((m) => [m.text, m.name])).toEqual([
+      ["bkk", "BKK"],
+      ["Bangkok Office", "Bangkok Office"],
+    ]);
+  });
+
+  it("finds a Thai alias inside Thai text", () => {
+    const found = findMentions("วันนี้ไปสำนักงานกรุงเทพแล้วกลับบ้าน", ["Bangkok Office", "สำนักงานกรุงเทพ"]);
+    expect(found.map((m) => [m.text, m.name])).toEqual([["สำนักงานกรุงเทพ", "สำนักงานกรุงเทพ"]]);
+  });
+
+  it("lists overlapping words once, under the longer name; short names are not looked for", () => {
+    const found = findMentions("The Bangkok Office and Bangkok.", ["Bangkok", "Bangkok Office", "BK"]);
+    expect(found.map((m) => [m.text, m.name])).toEqual([
+      ["Bangkok Office", "Bangkok Office"],
+      ["Bangkok", "Bangkok"],
+    ]);
+  });
+
+  it("links an alias mention with the words as written, and finds it again by that name", async () => {
+    const store = memoryStore("Intro.\n\nSee BKK soon.\n", ["Changed intro.\n\nSee BKK soon.\n"]);
+    const [m] = findMentions(store.text, ["Bangkok Office", "BKK"]);
+    expect(m!.name).toBe("BKK");
+    expect(await linkMention(store, ["Bangkok Office", "BKK"], m!, (f) => wikilinkFor("Bangkok Office", f.text, f.inTable))).toBe("linked");
+    expect(store.text).toBe("Changed intro.\n\nSee [[Bangkok Office|BKK]] soon.\n");
+  });
+});
+
 describe("wikilinkFor", () => {
   it("adds a label only when the text differs, escaping the pipe in a table", () => {
     expect(wikilinkFor("Atlas", "Atlas", false)).toBe("[[Atlas]]");

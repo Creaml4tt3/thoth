@@ -13,6 +13,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SHOTS = process.env.THOTH_SHOTS ?? join(REPO, "tests", ".tmp", "first-run");
 const WELCOME = join(REPO, "apps", "desktop", "src", "features", "onboarding", "welcome");
@@ -37,7 +38,7 @@ test.beforeEach(async ({ page, context }) => {
   await context.route((url) => !url.href.startsWith(bridge.url) && !url.href.startsWith("blob:") && !url.href.startsWith("data:"), (route) => route.abort());
   await page.addInitScript(bridge.initScript);
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await page.getByRole("button", { name: /start writing/i }).click();
 });
 
@@ -152,7 +153,7 @@ test("the tour, by keyboard from the first step to Done, light and dark; then it
   expect(await readFile(join(vault, "Welcome to Thoth.md"), "utf8")).toBe(await readFile(join(WELCOME, "en", "welcome.md"), "utf8"));
   // Reloaded, the tour does not come back.
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("textbox", { name: /page content/i })).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(500);
   await expect(tour(page)).toHaveCount(0);

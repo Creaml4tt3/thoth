@@ -185,6 +185,22 @@ describe("Vault writes", () => {
     await expect(vault.writeFileAtomic(".thoth/config.json", new Uint8Array(), { expectedHash: null })).rejects.toThrow(/\.thoth/);
   });
 
+  it("reads Obsidian's settings and never writes, moves, deletes or makes folders in .obsidian (ADR-0051 rule 5)", async () => {
+    const settings = '{"folder":"Daily"}';
+    await put(".obsidian/daily-notes.json", settings);
+    expect((await vault.readPage(".obsidian/daily-notes.json")).source).toBe(settings);
+    const hash = sha256Hex(new TextEncoder().encode(settings));
+    await expect(vault.writeFileAtomic(".obsidian/daily-notes.json", new Uint8Array(), { expectedHash: hash })).rejects.toThrow(/\.obsidian/);
+    await expect(vault.writeFileAtomic("Sub/.Obsidian/x.json", new Uint8Array(), { expectedHash: null })).rejects.toThrow(/\.obsidian/);
+    await expect(vault.writePage(".OBSIDIAN/Note.md", "x", { expectedHash: null })).rejects.toThrow(/\.obsidian/);
+    await expect(vault.deleteFileAtomic(".obsidian/daily-notes.json", { expectedHash: hash })).rejects.toThrow(/\.obsidian/);
+    await expect(vault.move("Inbox/Welcome.md", ".obsidian/Welcome.md")).rejects.toThrow(/\.obsidian/);
+    await expect(vault.move(".obsidian/daily-notes.json", "daily.json")).rejects.toThrow(/\.obsidian/);
+    await expect(vault.createFolder(".obsidian/plugins")).rejects.toThrow(/\.obsidian/);
+    await expect(vault.removeEmptyFolder(".obsidian")).rejects.toThrow(/\.obsidian/);
+    expect(await readFile(join(root, ".obsidian/daily-notes.json"), "utf8")).toBe(settings);
+  });
+
   it("recovers from a crash between temp write and rename without touching content", async () => {
     // Simulate a crash: a well-formed journal entry + its temp file exist, target untouched.
     const original = await readFile(join(root, "Inbox/Welcome.md"), "utf8");

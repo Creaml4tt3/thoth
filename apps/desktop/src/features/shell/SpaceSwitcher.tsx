@@ -10,6 +10,7 @@ import { useSession } from "../../app/context.ts";
 import { loadSidebarLayout, saveSectionCollapsed } from "../../app/sidebar-store.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { serverSection } from "./sections.ts";
+import { useFolderPicker } from "../onboarding/FolderNote.tsx";
 
 const leaf = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 /** How many recent Private Spaces the menu lists; the picker has them all. */
@@ -17,7 +18,7 @@ const SHOWN = 6;
 
 /**
  * The logo row (0.2.6): "Thoth · <this Private Space> ▾". It opens one short menu to move between spaces: the recent
- * Private Spaces (this one checked), Open folder…, the workspaces (their section opens and the row takes focus), and
+ * Private Spaces (this one checked), Open a folder you already use…, the workspaces (their section opens and the row takes focus), and
  * All Private Spaces, the full picker that the logo used to open (ADR-0029, amendment of 2026-10-29).
  */
 export function SpaceSwitcher({ onHome, onSwitch }: { onHome(): void; onSwitch(root: string): void }) {
@@ -27,22 +28,12 @@ export function SpaceSwitcher({ onHome, onSwitch }: { onHome(): void; onSwitch(r
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const button = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; recent: string[] } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const picker = useFolderPicker(platform, (root) => root !== connection.root && onSwitch(root));
 
   const open = async () => {
     const r = button.current!.getBoundingClientRect();
     const recent = await platform.recentVaults().catch(() => [] as string[]);
     setMenu({ at: { x: r.left, y: r.bottom + 4 }, recent: [connection.root, ...recent.filter((root) => root !== connection.root)].slice(0, SHOWN) });
-  };
-
-  const pick = async () => {
-    setError(null);
-    try {
-      const root = await platform.pickVaultFolder();
-      if (root && root !== connection.root) onSwitch(root);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
-    }
   };
 
   /** Shows a workspace in the sidebar: its server's section and the workspace open, focus on its row. */
@@ -60,7 +51,7 @@ export function SpaceSwitcher({ onHome, onSwitch }: { onHome(): void; onSwitch(r
     const many = new Set(workspaces.map((w) => w.server)).size > 1;
     return [
       ...recent.map((root) => ({ id: `space:${root}`, label: leaf(root), checked: root === connection.root, onSelect: () => root !== connection.root && onSwitch(root) })),
-      { id: "open-folder", label: t.switcher.openFolder, onSelect: () => void pick() },
+      { id: "open-folder", label: t.switcher.openFolder, onSelect: () => void picker.pick() },
       ...workspaces.map((w, i) => ({
         id: `ws:${w.server}:${w.workspace.id}`,
         label: many ? t.switcher.workspaceOn(w.workspace.name, w.serverLabel) : w.workspace.name,
@@ -104,11 +95,12 @@ export function SpaceSwitcher({ onHome, onSwitch }: { onHome(): void; onSwitch(r
           }}
         />
       )}
-      {error && (
+      {picker.error && (
         <p role="alert" className="tree-note tree-error">
-          {error}
+          {picker.error}
         </p>
       )}
+      {picker.dialog}
     </>
   );
 }

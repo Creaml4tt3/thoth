@@ -14,6 +14,7 @@ import { REPO } from "../ports/harness.ts";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace, START } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -49,7 +50,7 @@ test.beforeEach(async ({ page, context }) => {
   await page.addInitScript(bridge.initScript);
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 });
 
@@ -95,7 +96,7 @@ test("the whole sidebar hides with Cmd/Ctrl+\\ and its button: the page takes th
   // Remembered for this Private Space.
   await show.or(sidebar.getByRole("button", { name: "Hide sidebar" })).first().click();
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect(page.getByRole("button", { name: "Show sidebar" })).toBeVisible();
 });
 
@@ -182,7 +183,7 @@ for (const scheme of ["light", "dark"] as const) {
     expect(await axe(page, ".ctx-menu")).toEqual([]);
     await page.screenshot({ path: join(SHOTS, `switcher-${scheme}.png`), clip: { x: 0, y: 0, width: 420, height: 320 } });
     await switcher.getByRole("menuitem", { name: /^All Private Spaces/ }).click();
-    const choose = page.getByRole("button", { name: /choose or create a private space/i });
+    const choose = page.getByRole("button", { name: START });
     await expect(choose).toBeFocused();
     await expect(page.getByRole("tablist")).toHaveCount(0);
     expect(await readFile(join(vault, "Beta.md"), "utf8")).toContain("Written before leaving.");

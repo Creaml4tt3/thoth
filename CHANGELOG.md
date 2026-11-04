@@ -8,6 +8,18 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Added
+
+- Open a folder you already use: the first screen and the space switcher open any folder of Markdown files where it is, nothing copied. Before a folder that already has notes opens, a short note says what Thoth does there.
+- Pictures written as `![[photo.png]]` now show as pictures in both editor modes; `![[photo.png|300]]` sets the width. The text of the page is not changed.
+- Unlinked mentions also find a page's aliases, and say which one matched; Link keeps the words as written as the link's label.
+
+### Changed
+
+- Thoth never writes into a folder's `.obsidian` settings folder, so Obsidian can keep using the same folder.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added

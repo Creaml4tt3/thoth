@@ -23,11 +23,19 @@ function focusWhenShown(find: () => HTMLElement | null, tries = 40): void {
 /** A page of the Private Space: a Markdown file in the vault. */
 export function PageView({ path }: { path: string }) {
   const { vault, connection, revision, openPage, openFolder, refresh, notifications } = useSession();
-  // The title Connections looks for (frontmatter `title`, else the file name), from the index.
+  // The title and aliases Connections looks for (frontmatter `title`, else the file name; `aliases`), from the index.
   const [title, setTitle] = useState(() => stripExtension(basename(path)));
+  const [aliases, setAliases] = useState<readonly string[]>([]);
   useEffect(() => {
     let live = true;
-    void vault.pageByPath(path).then((p) => live && p && setTitle(p.title), () => undefined);
+    void vault.pageByPath(path).then(
+      (p) => {
+        if (!live || !p) return;
+        setTitle(p.title);
+        setAliases(p.aliases);
+      },
+      () => undefined,
+    );
     return () => void (live = false);
   }, [vault, path, revision]);
   const strings = useDesktopStrings();
@@ -77,7 +85,7 @@ export function PageView({ path }: { path: string }) {
       onConflict={onConflict}
       readOnlyNote={t.readOnly}
       missing={{ title: t.goneTitle, detail: t.goneDetail(path) }}
-      footer={<PrivateConnections path={path} title={title} />}
+      footer={<PrivateConnections path={path} title={title} aliases={aliases} />}
       actions={
         <span className="page-actions">
           <FavoriteButton target={{ kind: "private", path }} />

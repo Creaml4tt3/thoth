@@ -28,6 +28,7 @@ import { expectIndicator, indicators, rowByName, rowNames, startDrag } from "./d
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
 import { welcomeDone } from "./welcome.ts";
+import { pickSpace } from "./pick-space.ts";
 
 const SUBJECT = "sub-e2e-dnd";
 
@@ -174,7 +175,7 @@ test.describe("workspace tree drag and drop", () => {
     await page.addInitScript(bridge.initScript);
     await page.setViewportSize({ width: 1200, height: 800 });
     await page.goto(bridge.url);
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
     await page.getByRole("button", { name: /start writing/i }).click();
     await page.getByRole("button", { name: "Settings" }).click();
     const servers = page.getByRole("region", { name: "Servers" });
@@ -326,7 +327,7 @@ test.describe("workspace tree drag and drop", () => {
 
     // Restart: the order comes back.
     await page.reload();
-    await page.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(page);
     await page.getByRole("button", { name: /start writing/i }).click(); // the vault holds no page, so it is "Ready" again
     await expect(page.getByRole("region", { name: /^Server / })).toBeVisible({ timeout: 15_000 });
     await expect.poll(sections).toEqual(["Server", "Private"]);

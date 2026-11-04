@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
+import { START } from "./pick-space.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -46,7 +47,7 @@ test.afterEach(async ({ page }) => {
 });
 
 async function openVault(page: Page) {
-  const choose = page.getByRole("button", { name: /choose or create a private space/i });
+  const choose = page.getByRole("button", { name: START });
   await choose.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();

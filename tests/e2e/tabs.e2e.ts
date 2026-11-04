@@ -19,6 +19,7 @@ import { startBridge, type Bridge } from "./bridge.ts";
 import { startDrag } from "./drag.ts";
 import { settled } from "./settled.ts";
 import { buildAll } from "./setup.ts";
+import { pickSpace, START } from "./pick-space.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "tabs");
 let built: { dist: string; bridgeDir: string; binary: string };
@@ -58,7 +59,7 @@ const theme = (page: Page, dark: boolean) => page.evaluate((night) => document.d
 async function open(page: Page) {
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.goto(bridge.url);
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await row(page, "Alpha").click();
   await expect(current(page)).toHaveText("Alpha");
 }
@@ -143,7 +144,7 @@ test("tabs are dragged to a new place with a real pointer, and come back in that
   await expect(current(page)).toHaveText("Gamma");
   // Restart: the order comes back, and the same tab is current.
   await page.reload();
-  await page.getByRole("button", { name: /choose or create a private space/i }).click();
+  await pickSpace(page);
   await expect.poll(() => tabNames(page)).toEqual(["Beta", "Gamma", "Alpha"]);
   await expect(current(page)).toHaveText("Gamma");
 });
@@ -183,7 +184,7 @@ test("a tab dragged out opens in a second window on the same Private Space; edit
   await expect(current(second)).toHaveText("Beta");
   expect(await tabNames(second)).toEqual(["Beta"]);
   await expect(row(second, "Gamma")).toBeVisible();
-  await expect(second.getByRole("button", { name: /choose or create a private space/i })).toHaveCount(0);
+  await expect(second.getByRole("button", { name: START })).toHaveCount(0);
   const url = new URL(second.url());
   expect(url.searchParams.get("window")).toMatch(/^space-[a-z0-9]{16}$/);
   expect(url.searchParams.get("root")).toBe(vault);
@@ -212,7 +213,7 @@ test("a tab dragged out opens in a second window on the same Private Space; edit
     const main = await again.newPage();
     await main.goto(bridge.url);
     const reopened = again.waitForEvent("page");
-    await main.getByRole("button", { name: /choose or create a private space/i }).click();
+    await pickSpace(main);
     await expect.poll(() => tabNames(main)).toEqual(["Alpha", "Beta"]);
     const back = await reopened;
     await expect.poll(() => tabNames(back)).toEqual(["Beta"]);
