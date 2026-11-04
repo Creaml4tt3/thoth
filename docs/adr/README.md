@@ -60,6 +60,7 @@ trade-off.
 | [0048](0048-connected-apps-propose-changes.md) | Connected apps propose changes, reviewed in Thoth | Accepted 2026-11-02 |
 | [0049](0049-at-links-to-pages-folders-and-people.md) | "@" to link pages, folders and people | Proposed 2026-11-01 |
 | [0050](0050-connections-and-today.md) | Connections and Today | Proposed 2026-11-03 |
+| [0051](0051-timeline-folders-you-use-and-daily-notes.md) | Timeline, a folder you already use, and daily notes your way | Proposed 2026-11-04 |
 
 Template: [0000-template.md](0000-template.md).
 
