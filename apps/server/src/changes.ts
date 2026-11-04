@@ -66,7 +66,8 @@ export function changeEntryOf(row: ChangeRow, withKind = false): ChangeEntry {
 
 export const changeCursorOf = (workspaceId: string, seq: number): string => encodeCursor("c", workspaceId, String(seq));
 
-type Listener = (hint: { cursor?: string }) => void;
+/** `seq` is the feed head the hint announces; none after a reconnect, when anything may have been missed. */
+type Listener = (hint: { cursor?: string; seq?: number }) => void;
 
 export interface Logger {
   info(obj: object | string, msg?: string): void;
@@ -153,7 +154,7 @@ export class ChangeHub {
     const cursor = changeCursorOf(parsed.w, parsed.s);
     for (const listener of [...set]) {
       try {
-        listener({ cursor });
+        listener({ cursor, seq: parsed.s });
       } catch (error) {
         this.#log.error({ err: error instanceof Error ? error.message : String(error) }, "change listener failed");
       }

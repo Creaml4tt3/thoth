@@ -36,7 +36,8 @@ Teams that share one workspace want some folders seen by some people only (for e
    - absent from the tree, search (also `withinPageId`) and `from_workspace` transfers;
    - a transfer created by another member that names it is 404 to this member;
    - its change-feed entries are left out, though the cursor still moves past them.
-   Event hints (SSE) carry no page data, so they need nothing.
+   Event hints (SSE) carry no page data, but their timing would say that a hidden page changed: a stream sends a
+   hint only when the new entries include one the member may see (a page not hidden from them, or no page).
 5. **One definition.** The SQL function `thoth_hidden_pages(workspace, user)` (migration 015) returns every page
    the account may not see, with one recursive CTE: the limited pages whose teams do not include the account (none
    for an owner), and everything below them, deleted pages included. Every route above filters with it (`id NOT IN
