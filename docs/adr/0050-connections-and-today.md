@@ -166,7 +166,7 @@ What exists:
   nothing until asked for.
 - **A server-side link index for workspace backlinks**: exact and fast, but a protocol and server change; search by
   `thoth:page/<id>` gives the same answer for the pages the reader may see.
-- **"Duplicate structure only" for Today** (ADR-0045's words): it keeps only the title, so a template's headings and
+- **"Duplicate structure only" for Today** (ADR-0045's words; owner chose the full text, 2026-11-04): it keeps only the title, so a template's headings and
   checklists would be lost; Today copies the template's text and reuses Duplicate's link rewriting instead. It also
   does not copy images, which Duplicate does, so a template's picture is not copied once a day.
 - **The daily folder named in the UI language** ("วันนี้"): a language switch would start a second folder.
@@ -178,10 +178,8 @@ The ADRs it refines; no section of the architecture handoff changes.
 
 ## Open questions
 
-- **Template from "Duplicate structure only"?** ADR-0045 says Today is "built on Duplicate structure only". This ADR
-  copies the template's text instead (rule 13), since structure only keeps nothing but the title. Owner to confirm.
-- **The `Daily` folder and `Templates/Daily.md`**: fixed in 0.6.0. A setting (and reading an existing Obsidian daily
-  notes folder) is proposed for "Open a folder you already use". Blocks nothing now.
+- **The `Daily` folder and `Templates/Daily.md`**: fixed in 0.6.0 (owner, 2026-11-04). A setting (and reading an
+  existing Obsidian daily notes folder) is proposed for "Open a folder you already use".
 - **Template placeholders** such as `{{date}}` and `{{title}}` (Obsidian's core templates have them) are not filled
   in. Worth adding if people moving their templates ask.
 - **Aliases** as mention text: not matched yet; adding them is a small change to `findMentions`' input.
