@@ -14,8 +14,11 @@ export async function pickSpace(page: Page, options: { keyboard?: boolean } = {}
     await page.keyboard.press("Enter");
   } else await start.click();
   const note = page.getByRole("dialog", { name: /open this folder where it is/i });
-  // Either the note is shown, or the folder is opening ("Opening…") or open: the button is gone.
-  await expect.poll(async () => (await note.isVisible()) || !(await start.isVisible()), { timeout: 20_000 }).toBe(true);
+  // Wait for one of the ends: the note, the "Ready" screen of an empty folder, or the space open (its tree). The button
+  // going away is not enough: it also hides while the folder is looked at, before the note.
+  const ready = page.getByRole("heading", { name: "Ready", level: 1 });
+  const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
+  await expect(note.or(ready).or(tree)).toBeVisible({ timeout: 20_000 });
   if (!(await note.isVisible())) return;
   const open = note.getByRole("button", { name: "Open", exact: true });
   if (options.keyboard) {
