@@ -120,6 +120,12 @@ describe("items from the index and the tree", () => {
     ]);
   });
 
+  it("Private Space: a daily note is dated by the space's own daily setting, not only the default", () => {
+    const journal = { id: "j", path: "Journal/2026/11/05.md", title: "05", contentHash: "", size: 0, mtimeMs: 1, aliases: [], tags: [] };
+    expect(privateTimelineItems([journal])[0]!.date).toBeUndefined();
+    expect(privateTimelineItems([journal], { folder: "Journal", pattern: "YYYY/MM/DD" })[0]!.date).toBe("2026-11-05");
+  });
+
   it("workspace: leaves folders out, names the parent, and reads tags and dates when present", () => {
     const node = (id: string, extra: Partial<TreeNode> = {}): TreeNode => ({ id, parentId: null, title: id, revisionId: "rev_1", updatedAt: "2026-11-05T10:00:00Z", ...extra });
     const nodes = [node("f"), node("p", { parentId: "f", tags: ["x"], date: "2026-01-01" }), node("q", { tags: null }), node("bad", { updatedAt: "nope" })];

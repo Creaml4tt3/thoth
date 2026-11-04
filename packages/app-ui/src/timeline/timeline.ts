@@ -102,7 +102,7 @@ export const timeLabel = (ms: number, lang: string): string => new Intl.DateTime
  * (`PageSummary.date`), else the date in a daily note's name, else the edit (`groupTimeline` falls back to it).
  */
 export function privateTimelineItems(pages: readonly PageSummary[], daily: { folder: string; pattern: string } = DEFAULT_DAILY): TimelineItem[] {
-  // ADR-0051 rule 15: use the daily setting (`.thoth/daily.json`) here once it exists; until then 0.6.0's defaults.
+  // `daily` is the Private Space's daily setting (`.thoth/daily.json`, ADR-0051 rule 15); the defaults are 0.6.0's.
   return pages.map((page) => {
     const folder = folderOf(page.path);
     const date = page.date ?? dateFromDailyName(page.path, daily.folder, daily.pattern);
