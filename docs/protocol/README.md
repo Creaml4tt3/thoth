@@ -42,8 +42,9 @@ when either is stale.
   revisions) or of the raw bytes (attachments).
 - **Markdown is the wire content.** Pages travel as Markdown source (ADR-0001, ADR-0002),
   including any frontmatter. The server stores and returns it byte-for-byte as UTF-8. The
-  protocol never carries a block tree. Page content is opaque to the protocol, with one exception: a server
-  that lists `page-kind` reads the frontmatter key `thoth_kind` (section 7).
+  protocol never carries a block tree. Page content is opaque to the protocol, with two exceptions: a server
+  that lists `page-kind` reads the frontmatter key `thoth_kind`, and one that lists `page-tags` reads the page's tags
+  and frontmatter `date` (section 7).
 
 ## 2. Versioning
 
@@ -93,6 +94,7 @@ HTML pages under `/s/<token>`, outside `/api/v1`, without credentials; section 1
 | `transfers` | `createTransfer`, `getTransfer`, `commitTransfer`, `abortTransfer` | a server that accepts `attachmentIds` in transfers also lists `attachments` |
 | `page-order` | `movePage` | the optional `position` member of pages, tree nodes and change entries; section 7 |
 | `page-kind` | none | the optional `kind` member of tree nodes and page metadata, and `pageKind` of change entries, derived from frontmatter `thoth_kind`; section 7, ADR-0017 |
+| `page-tags` | none | the optional `tags` and `date` members of tree nodes, derived from the Markdown on every write; section 7, ADR-0051 |
 | `public-share` | `createShareLink`, `listShareLinks`, `revokeShareLink` | public read-only links to a page and its sub-pages, served as HTML at `/s/<token>`; section 10, ADR-0023 |
 | `members` | `listMembers`, `setMemberRole`, `removeMember` | every member reads the list; owners change roles and remove; anyone leaves; one owner is always kept; section 10, ADR-0024 |
 | `invite-links` | `createInviteLink`, `listInviteLinks`, `revokeInviteLink`, `acceptInvite` | owners' links that let people join with a role, opened as HTML at `/i/<token>`; section 10, ADR-0024 |
@@ -360,6 +362,21 @@ frontmatter key, `thoth_kind`.** Nothing else in the Markdown is read.
 - **Revisions.** `GET ...?revision=<id>` reports the kind of the revision returned, from that revision's own
   frontmatter. The current revision's `kind` is the stored value, the same one the tree shows.
 - **Clients.** With the capability, a client draws folders from `kind` and does not download child pages to find them.
+
+### Page tags and date (capability `page-tags`)
+
+ADR-0051 rule 16. A server that lists `page-tags` reads a page's tags and its frontmatter `date`, for the Timeline.
+
+- **The members.** Tree nodes gain `tags` (an array of strings) and `date` (`YYYY-MM-DD`). `null` or absent `tags`
+  means the server has not derived them (a page written before the capability, until the operator's backfill);
+  `null` or absent `date` means the page names no valid date. Nothing else carries them: not page metadata, not the
+  change feed. A client reads the tree again to see a changed tag.
+- **Derivation.** On every write that stores Markdown, with the clients' rules (`parsePage` in `@thoth/content`):
+  frontmatter `tags`/`tag` (a list or a comma-separated string, a leading `#` dropped) and inline `#tags` outside code
+  and HTML; `date` when it is a calendar date, or a date and time whose day is kept. A write is never refused because of
+  its content. `movePage` keeps them.
+- **Visibility.** They appear only on tree nodes, which leave out pages the reader may not see (ADR-0042), so a hidden
+  page's tags and date never reach a member who cannot see it.
   Without it, a client has to read each child page and look for `thoth_kind: folder` itself (ADR-0016 rule 3).
 - **Existing data.** A server that gains the capability on existing data reports `null` for pages written earlier
   until it has filled them in. The reference server does this with `node src/cli.ts backfill-kind` (see

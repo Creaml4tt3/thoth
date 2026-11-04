@@ -52,8 +52,8 @@ Domains used below (change them when you buy your own domain):
    edited pages are correct at once.
 
    On macOS, `scripts/prod-db.sh migrate backfill-kind` does the same through a private dialog (hidden
-   input; the URL is kept in memory only, redacted from output and not saved). It accepts only `migrate` and
-   `backfill-kind` and refuses the pooled URL.
+   input; the URL is kept in memory only, redacted from output and not saved). It accepts only `migrate`,
+   `backfill-kind` and `backfill-tags`, and refuses the pooled URL.
 
    Migration `010_share_links.sql` (ADR-0023, public share links) adds one new
    table and needs no backfill. **Apply it to Neon before you deploy the server
@@ -102,6 +102,17 @@ Domains used below (change them when you buy your own domain):
    every page read, so without them every page request fails. 016 gives pages
    that were deleted before it 30 days from the migration, after which the
    daily maintenance removes them.
+
+   Migration `018_page_tags.sql` (ADR-0051, tags in workspace Timelines) only
+   adds two nullable columns (`pages.tags`, `pages.page_date`). It is additive
+   and safe while the old build runs, which never reads them. **Apply it to Neon
+   before you deploy the server build that contains it**: that build writes the
+   columns on every page save, so without them every save fails. Then, once,
+   fill in the tags of pages written before it (safe while serving, safe to
+   repeat): `node apps/server/src/cli.ts backfill-tags` with the direct URL, or
+   `scripts/prod-db.sh migrate backfill-tags`. It prints
+   `{"pages":{"scanned":…,"updated":…}}`. Until then, older pages show in a
+   workspace Timeline without tags; new and edited pages are correct at once.
 
 Free-plan facts to keep in mind:
 - 1 GB of storage.

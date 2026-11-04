@@ -27,6 +27,8 @@ export type TabTarget =
   | { kind: "agent-run"; run: string }
   /** Home (ADR-0029): recent pages and favorites. One tab at most. */
   | { kind: "home" }
+  /** Timeline (ADR-0051): pages by date. One tab at most, like Home. */
+  | { kind: "timeline" }
   /** A new tab: it shows the Home view too, so a new tab is never empty. */
   | { kind: "blank" };
 
@@ -57,6 +59,7 @@ export const MAX_TABS = 30;
 
 export const BLANK: TabTarget = { kind: "blank" };
 export const HOME: TabTarget = { kind: "home" };
+export const TIMELINE: TabTarget = { kind: "timeline" };
 
 const makeId = (seq: number): string => `t${seq}`;
 
@@ -93,6 +96,8 @@ export function sameTarget(a: TabTarget, b: TabTarget): boolean {
       return b.kind === "agent-run" && a.run === b.run;
     case "home":
       return b.kind === "home";
+    case "timeline":
+      return b.kind === "timeline";
     case "blank":
       return b.kind === "blank";
   }
@@ -118,7 +123,7 @@ export function retarget(state: TabsState, id: string, target: TabTarget): TabsS
 
 /** Opens `target` in the current tab, or in a new one next to it. */
 export function open(state: TabsState, target: TabTarget, options: OpenOptions = {}): TabsState {
-  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home") {
+  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home" || target.kind === "timeline") {
     const existing = state.tabs.find((t) => (target.kind === "settings" ? t.target.kind === "settings" : sameTarget(t.target, target)));
     if (existing) return { ...retarget(state, existing.id, target), active: existing.id };
     return activeTab(state).target.kind === "blank" ? retarget(state, state.active, target) : insertAfterActive(state, target);
@@ -295,6 +300,8 @@ function storedTarget(target: TabTarget): unknown {
       return { k: "run", run: target.run };
     case "home":
       return { k: "home" };
+    case "timeline":
+      return { k: "timeline" };
     case "blank":
       return { k: "blank" };
   }
@@ -315,6 +322,8 @@ function targetFromStored(value: unknown): TabTarget | null {
     // The old single review tab ({ k: "agents" }) showed the current run; no run is current at start, so it is dropped.
     case "home":
       return HOME;
+    case "timeline":
+      return TIMELINE;
     case "blank":
       return BLANK;
     default:

@@ -19,6 +19,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - When you open a folder that Obsidian's daily notes already use, Thoth asks once whether Today should use the same folder, file name and template. It never changes Obsidian's settings.
 - `{{date}}`, `{{time}}` and `{{title}}` in a daily template are filled in when today's page is made, also with a format such as `{{date:dddd D MMMM}}`. Text in code is left as written.
 - Open today's page from anywhere with Alt+Shift+T (Option+Shift+T on a Mac) or the command "Open today's page".
+- Timeline: your pages by date, newest first, grouped by day, with each page's folder, time and tags. Filter by one or more tags (a page must have all of them), and choose Edited or Dated (the page's `date`, or a daily note's name). Open it from the sidebar, from Home, or with "Open Timeline" in the command palette, in the Private Space and in workspaces.
+- Workspace Timelines show tags and dates on servers from 0.7.0. Self-hosters: update your server to 0.7.0 and run `node src/cli.ts backfill-tags` once so pages written earlier get their tags; an older server lists pages by when they were edited, without a tag filter.
 
 ### Changed
 

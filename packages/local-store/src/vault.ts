@@ -480,8 +480,8 @@ export class Vault {
     // Insert under a provisional ID; `settleClaims` assigns the claimed ID afterwards.
     const id = provisionalPageId(path);
     await this.sql.run(
-      "INSERT INTO pages (id, claimed_id, path, path_key, title, content_hash, size, mtime_ms, stable_id, frontmatter_error, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, claimed, path, collisionKey(path), doc.title, hash, size, mtimeMs, isStableId(id) ? 1 : 0, doc.frontmatterError ?? null, this.now()],
+      "INSERT INTO pages (id, claimed_id, path, path_key, title, content_hash, size, mtime_ms, page_date, stable_id, frontmatter_error, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, claimed, path, collisionKey(path), doc.title, hash, size, mtimeMs, doc.date ?? null, isStableId(id) ? 1 : 0, doc.frontmatterError ?? null, this.now()],
     );
     for (const alias of doc.aliases) await this.sql.run("INSERT INTO page_aliases (page_id, alias) VALUES (?, ?)", [id, alias]);
     for (const tag of doc.tags) await this.sql.run("INSERT INTO page_tags (page_id, tag) VALUES (?, ?)", [id, tag]);
@@ -550,9 +550,22 @@ export class Vault {
   // ------------------------------------------------------------------ reads
 
   async listPages(): Promise<PageSummary[]> {
-    const rows = await this.sql.all<PageRow>("SELECT id, path, title, content_hash, size, mtime_ms FROM pages ORDER BY path");
+    // `page_date` is NULL for a page with no valid frontmatter `date` (ADR-0051 rule 15).
+    const rows = await this.sql.all<{ id: string; path: string; title: string; content_hash: string; size: number; mtime_ms: number; page_date: string | null }>("SELECT id, path, title, content_hash, size, mtime_ms, page_date FROM pages ORDER BY path");
     const aliases = await this.sql.all<{ page_id: string; alias: string }>("SELECT page_id, alias FROM page_aliases");
     const tags = await this.sql.all<{ page_id: string; tag: string }>("SELECT page_id, tag FROM page_tags");
+    // Grouped once: filtering both lists per page is quadratic in a large Private Space, and Timeline lists them all.
+    const byPage = <T extends { page_id: string }>(list: T[], value: (row: T) => string) => {
+      const map = new Map<string, string[]>();
+      for (const row of list) {
+        const values = map.get(row.page_id);
+        if (values) values.push(value(row));
+        else map.set(row.page_id, [value(row)]);
+      }
+      return map;
+    };
+    const aliasesOf = byPage(aliases, (a) => a.alias);
+    const tagsOf = byPage(tags, (t) => t.tag);
     return rows.map((r) => ({
       id: r.id,
       path: r.path,
@@ -560,8 +573,9 @@ export class Vault {
       contentHash: r.content_hash,
       size: r.size,
       mtimeMs: r.mtime_ms,
-      aliases: aliases.filter((a) => a.page_id === r.id).map((a) => a.alias),
-      tags: tags.filter((t) => t.page_id === r.id).map((t) => t.tag),
+      aliases: aliasesOf.get(r.id) ?? [],
+      tags: tagsOf.get(r.id) ?? [],
+      ...(r.page_date ? { date: r.page_date } : {}),
     }));
   }
 

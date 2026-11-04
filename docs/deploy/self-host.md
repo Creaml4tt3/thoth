@@ -132,6 +132,10 @@ docker compose pull && docker compose up -d     # add -f compose.external.yaml f
 The server applies new database migrations at start (all so far are additive). With `MIGRATE_ON_START=false`, run
 `node src/cli.ts migrate` with the direct URL first. A pinned `THOTH_VERSION` moves only when you change it.
 
+Some updates also ask you to run a command once after the migration; `migrate` prints a hint when one applies. From
+0.7.0, `node src/cli.ts backfill-tags` fills in the tags and dates of pages written earlier, for workspace Timelines
+(`docker compose exec server node src/cli.ts backfill-tags`; safe to repeat and to run while the server is serving).
+
 ## A web client for your server
 
 The web app on thothnotes.com talks only to the demo server. To serve one for yours, build it with your server's

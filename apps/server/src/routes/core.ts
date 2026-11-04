@@ -53,6 +53,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
   const { db, config } = deps;
   // ADR-0017: `kind` and `pageKind` are reported only when the server lists the capability (older clients ignore them either way).
   const withKind = config.capabilities.includes("page-kind");
+  // ADR-0051: `tags` and `date` on tree nodes only when the server lists `page-tags`.
+  const withTags = config.capabilities.includes("page-tags");
 
   app.get(`${API_BASE_PATH}/capabilities`, { config: { public: true } }, async (_request, reply) =>
     send(
@@ -123,8 +125,8 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       afterId = id;
       head = Number(seq);
     }
-    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; kind: PageKind | null; current_revision_id: string; updated_at: Date }>(
-      `SELECT id, parent_id, title, position, kind, current_revision_id, updated_at FROM pages
+    const { rows } = await db.query<{ id: string; parent_id: string | null; title: string; position: string | null; kind: PageKind | null; tags: string[] | null; page_date: string | null; current_revision_id: string; updated_at: Date }>(
+      `SELECT id, parent_id, title, position, kind, tags, page_date, current_revision_id, updated_at FROM pages
         WHERE workspace_id = $1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id > $2) AND id NOT IN ${HIDDEN("$1", "$4")}
         ORDER BY id LIMIT $3`,
       [ws.id, afterId, limit + 1, me.id],
@@ -134,7 +136,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       reply,
       jsonReply(200, {
         workspaceId: ws.id,
-        items: page.map((row) => treeNode(row, withKind)),
+        items: page.map((row) => treeNode(row, withKind, withTags)),
         nextCursor: rows.length > limit ? encodeCursor("t", ws.id, `${page[page.length - 1]!.id}:${head}`) : null,
         changeCursor: changeCursorOf(ws.id, head),
       }),
@@ -220,7 +222,7 @@ export function registerCoreRoutes(app: FastifyInstance, deps: Deps): void {
       await assertVisibleParent(tx, ws.id, me.id, parsed.data.parentId);
       const moved = await movePage(tx, { page, parentId: parsed.data.parentId, position: parsed.data.position, userId: me.id, now });
       if (moved.parent_id !== page.parent_id && (await hasLimits(tx, ws.id))) await visibilityChanged(tx, ws.id, me.id, now);
-      return jsonReply(200, treeNode(moved, withKind), { etag: formatEtag(moved.current_revision_id) });
+      return jsonReply(200, treeNode(moved, withKind, withTags), { etag: formatEtag(moved.current_revision_id) });
     }),
   );
 

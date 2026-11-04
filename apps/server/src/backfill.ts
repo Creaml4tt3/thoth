@@ -1,5 +1,6 @@
 import { pageKindOf, type PageKind } from "@thoth/workspace-protocol";
 import type { Database } from "./db.ts";
+import { pageTagsOf } from "./pages.ts";
 
 export const BACKFILL_BATCH_DEFAULT = 200;
 export const BACKFILL_BATCH_MAX = 1000;
@@ -111,6 +112,53 @@ export async function backfillPageKind(db: Database, options: BackfillKindOption
     options.onBatch?.({ table: "changes", scanned: result.changes.scanned, updated: result.changes.updated });
     const last = rows[rows.length - 1]!;
     afterChange = { workspace: last.workspace_id, seq: last.seq };
+    if (rows.length < batch) break;
+  }
+  return result;
+}
+
+export interface BackfillTagsResult {
+  pages: { scanned: number; updated: number };
+}
+
+/**
+ * Fills in the tags and frontmatter `date` (ADR-0051 rule 16, migration 018) of pages written before the columns
+ * existed (`tags IS NULL`), from each page's current revision, exactly as `putPage` derives them (`pageTagsOf`).
+ *
+ * Safe to repeat and to run while the server is serving, with no workspace lock, for the reasons `backfillPageKind`
+ * gives: rows are visited by key in batches; a row is updated only while `tags` is still NULL and it is still at the
+ * revision that was read, so a concurrent write is never overwritten; only `tags` and `page_date` change (`updated_at`,
+ * revisions and the change feed are untouched, so clients see no new change). Every page gets an array (possibly
+ * empty), so a second run finds nothing to do.
+ */
+export async function backfillPageTags(db: Database, options: Omit<BackfillKindOptions, "onBatch"> & { onBatch?: (progress: { scanned: number; updated: number }) => void } = {}): Promise<BackfillTagsResult> {
+  const batch = options.batchSize ?? BACKFILL_BATCH_DEFAULT;
+  if (!Number.isInteger(batch) || batch < 1 || batch > BACKFILL_BATCH_MAX) throw new RangeError(`batch size must be an integer from 1 to ${BACKFILL_BATCH_MAX}`);
+  const result: BackfillTagsResult = { pages: { scanned: 0, updated: 0 } };
+  let after: { workspace: string; id: string } | null = null;
+  for (;;) {
+    const page: { rows: PageBatchRow[] } = await db.query<PageBatchRow>(
+      `SELECT p.workspace_id, p.id, p.current_revision_id, r.markdown
+         FROM pages p JOIN page_revisions r ON r.id = p.current_revision_id
+        WHERE p.tags IS NULL AND ($1::text IS NULL OR (p.workspace_id, p.id) > ($1, $2::uuid))
+        ORDER BY p.workspace_id, p.id LIMIT $3`,
+      [after?.workspace ?? null, after?.id ?? null, batch],
+    );
+    const rows = page.rows;
+    if (rows.length === 0) break;
+    const derived = rows.map((row) => pageTagsOf(row.markdown));
+    // One JSON array per row: unnest cannot take an array of arrays of different lengths.
+    const res = await db.query(
+      `UPDATE pages p SET tags = ARRAY(SELECT jsonb_array_elements_text(v.tags)), page_date = v.page_date
+         FROM unnest($1::text[], $2::uuid[], $3::text[], $4::jsonb[], $5::text[]) AS v(workspace_id, id, revision_id, tags, page_date)
+        WHERE p.workspace_id = v.workspace_id AND p.id = v.id AND p.current_revision_id = v.revision_id AND p.tags IS NULL`,
+      [rows.map((r) => r.workspace_id), rows.map((r) => r.id), rows.map((r) => r.current_revision_id), derived.map((d) => JSON.stringify(d.tags)), derived.map((d) => d.date)],
+    );
+    result.pages.scanned += rows.length;
+    result.pages.updated += res.rowCount ?? 0;
+    options.onBatch?.({ scanned: result.pages.scanned, updated: result.pages.updated });
+    const last = rows[rows.length - 1]!;
+    after = { workspace: last.workspace_id, id: last.id };
     if (rows.length < batch) break;
   }
   return result;

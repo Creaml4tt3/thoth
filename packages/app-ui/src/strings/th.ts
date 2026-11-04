@@ -576,6 +576,7 @@ export const th: Strings = {
       notifications: "แสดงการแจ้งเตือน",
       openToday: "เปิดหน้าของวันนี้", // REVIEW
       goHome: "ไปหน้าแรก", // REVIEW
+      openTimeline: "เปิดไทม์ไลน์", // REVIEW
       leaveSpace: "กลับไปที่ Private Space", // REVIEW
       showTour: "แสดงทัวร์", // REVIEW
       hideSidebar: "ซ่อนแถบด้านข้าง",
@@ -670,6 +671,31 @@ export const th: Strings = {
     todayTemplate: (path) => `ใช้ ${path} เป็นแม่แบบ ถ้ามีไฟล์นี้`, // REVIEW
     todayNoTemplate: "เริ่มด้วยวันที่เป็นชื่อหน้า เลือกแม่แบบได้ที่ การตั้งค่า → วันนี้", // REVIEW
     todayFailed: (reason) => `สร้างหน้าของวันนี้ไม่ได้: ${reason}`, // REVIEW
+    timeline: "ไทม์ไลน์", // REVIEW
+  },
+
+  timeline: {
+    title: "ไทม์ไลน์", // REVIEW
+    open: "เปิดไทม์ไลน์", // REVIEW
+    lead: "หน้าของคุณเรียงตามวันที่ ล่าสุดอยู่บน", // REVIEW
+    sortBy: "แสดงหน้าตาม", // REVIEW
+    edited: "แก้ไขล่าสุด", // REVIEW
+    editedHint: "เวลาที่แก้ไขหน้านี้ครั้งล่าสุด", // REVIEW
+    dated: "ตามวันที่", // REVIEW
+    datedHint: "วันที่ในหน้า: ช่อง date หรือชื่อของบันทึกประจำวัน", // REVIEW
+    tags: "กรองตามแท็ก", // REVIEW
+    tagsHint: "หน้าที่มีแท็กที่เลือกครบทุกแท็ก", // REVIEW
+    clearTags: "ล้างแท็ก", // REVIEW
+    today: "วันนี้", // REVIEW
+    yesterday: "เมื่อวาน", // REVIEW
+    topLevel: "ระดับบนสุด", // REVIEW
+    count: (n) => `แสดง ${count(n)} หน้า`, // REVIEW
+    empty: "ยังไม่มีหน้า", // REVIEW
+    emptyFiltered: "ไม่มีหน้าที่มีแท็กที่เลือกครบทุกแท็ก", // REVIEW
+    loading: "กำลังโหลดหน้า…", // REVIEW
+    noTags: "เซิร์ฟเวอร์นี้ไม่ได้ส่งแท็กหรือวันที่มา จึงเรียงหน้าตามเวลาที่แก้ไข เจ้าของเซิร์ฟเวอร์อัปเดตเป็น Thoth 0.7.0 ขึ้นไปได้", // REVIEW
+    space: "พื้นที่", // REVIEW
+    privateSpace: "Private Space",
   },
 
   connections: {

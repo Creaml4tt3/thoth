@@ -258,6 +258,10 @@ describe("migration 009_page_kind and the backfill", () => {
       expect((await cli(["backfill-kind", "--batch", "0"], fresh.url)).code).toBe(2);
       expect((await cli(["backfill-kind", "--batch", "5000"], fresh.url)).code).toBe(2);
       expect((await cli(["backfill-kind", "--batch", "abc"], fresh.url)).code).toBe(2);
+      // ADR-0051: migration 018 hints at backfill-tags the same way, and it prints its counts.
+      expect(first.stdout).toMatch(/hint: .*backfill-tags/);
+      expect(JSON.parse((await cli(["backfill-tags"], fresh.url)).stdout)).toEqual({ pages: { scanned: 0, updated: 0 } });
+      expect((await cli(["backfill-tags", "--batch", "0"], fresh.url)).code).toBe(2);
     } finally {
       await fresh.drop();
     }

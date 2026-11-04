@@ -215,6 +215,7 @@ export function parsePage(path: string, source: string): PageDocument {
   const data = fm.data;
   const fmTitle = typeof data["title"] === "string" ? data["title"].trim() : "";
   const thothId = typeof data["thoth_id"] === "string" && isStableId(data["thoth_id"]) ? data["thoth_id"] : undefined;
+  const date = pageDateOf(data["date"]);
 
   return {
     schemaVersion: CONTENT_SCHEMA_VERSION,
@@ -230,8 +231,26 @@ export function parsePage(path: string, source: string): PageDocument {
     tags: [...new Set([...stringList(data["tags"] ?? data["tag"]).map((t) => t.replace(/^#/, "")), ...inlineTags])],
     aliases: stringList(data["aliases"] ?? data["alias"]),
     ...(thothId !== undefined ? { thothId } : {}),
+    ...(date !== undefined ? { date } : {}),
     plainText: toString(tree, { includeHtml: false }),
   };
+}
+
+/**
+ * A frontmatter `date` as `YYYY-MM-DD` when it names a real calendar day (ADR-0051 rule 15): `2026-11-05`, or the same
+ * followed by a time (`2026-11-05T09:30`, `2026-11-05 09:30`), whose time is dropped. Anything else is no date.
+ */
+export function pageDateOf(value: unknown): string | undefined {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : value.toISOString().slice(0, 10);
+  if (typeof value !== "string") return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.exec(value.trim());
+  return m && isCalendarDay(Number(m[1]), Number(m[2]), Number(m[3])) ? `${m[1]}-${m[2]}-${m[3]}` : undefined;
+}
+
+/** True when year, month (1–12) and day name a day that exists (no 30 February). */
+export function isCalendarDay(year: number, month: number, day: number): boolean {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return year >= 1 && d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
 }
 
 /** Accepts YAML lists or comma-separated strings, as Obsidian does. */

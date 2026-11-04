@@ -109,7 +109,7 @@ function TodayCard({ today }: { today: HomeToday }) {
   );
 }
 
-export function HomeView({ recent, favorites, today }: { recent: readonly HomeRow[]; favorites: readonly HomeRow[]; today?: HomeToday }) {
+export function HomeView({ recent, favorites, today, onTimeline }: { recent: readonly HomeRow[]; favorites: readonly HomeRow[]; today?: HomeToday; onTimeline?: () => void }) {
   const t = useStrings().home;
   return (
     <div className="home" data-testid="home">
@@ -118,6 +118,12 @@ export function HomeView({ recent, favorites, today }: { recent: readonly HomeRo
           <Mark size={40} />
           <h1>{t.greeting}</h1>
           <p className="muted">{t.lead}</p>
+          {onTimeline && (
+            // Timeline (ADR-0051 rule 14): opened from Home too.
+            <button type="button" className="sec-link home-timeline" onClick={onTimeline}>
+              {t.timeline}
+            </button>
+          )}
         </header>
         {today && <TodayCard today={today} />}
         <div className="home-section">
