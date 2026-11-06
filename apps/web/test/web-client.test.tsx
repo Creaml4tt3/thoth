@@ -216,8 +216,9 @@ describe("workspaces", () => {
     await waitFor(() => expect(document.querySelector(".save-status")!.textContent).toBe("Saved"));
 
     await browser.user.click(screen.getByRole("button", { name: "Plain" }));
+    // The Plain editor loads the first time it is used, so the switch lands a moment later.
+    await waitFor(async () => expect((await editorBox()).closest("[data-editor-mode]")!.getAttribute("data-editor-mode")).toBe("plain"));
     const plain = await editorBox();
-    expect(plain.closest("[data-editor-mode]")!.getAttribute("data-editor-mode")).toBe("plain");
     expect(plain.textContent).toContain("Plan");
     plain.focus();
     await browser.user.keyboard("{Control>}{End}{/Control}{Enter}{Enter}Written in Plain.");
