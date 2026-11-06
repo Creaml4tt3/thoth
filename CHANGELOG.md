@@ -8,6 +8,14 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.7.1] - 2026-11-06
+
+### Changed
+
+- Saving a page is faster in a large Private Space: Thoth now updates only the links whose target changed, and no longer checks the whole folder again after its own save.
+- The download is smaller: the Mac app's core is about half its earlier size, with the same safety when something goes wrong inside it.
+- The app framework (Tauri 2.12.5) and the editor (TipTap 3.32.2) are updated, along with other libraries.
+
 ## [0.7.0] - 2026-11-05
 
 ### Added
@@ -288,7 +296,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Creaml4tt3/thoth/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...v0.5.0
