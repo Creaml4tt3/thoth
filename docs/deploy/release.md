@@ -58,7 +58,8 @@ about 12 hours in which saves could fail. Check before every merge, not only a r
      `[Unreleased]` only when there is something in it (the parser refuses an empty section), and update the compare links at the bottom.
      Entries are user-facing, one line each, under Added, Changed or Fixed; links only as absolute `https` URLs.
    - Do the same in `CHANGELOG.th.md`: same versions, dates, sections and number of entries (a test checks).
-   - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`).
+   - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`). A small
+     update (x.y.z with z > 0) may go without a post; minor and major releases need one, or the website's build fails.
    - Check the notes: `node scripts/release-notes.ts vx.y.z --no-post` prints what the GitHub release will say
      (without `--no-post`, the post link appears once the website serves the post).
 1. If anything since the last release added a migration and it is not on Neon yet, apply it now (above), before
