@@ -137,5 +137,9 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          docker buildx imagetools inspect "ghcr.io/creaml4tt3/thoth-server:${VERSION}" --format '{{json .Manifest}}' > manifest.json
-          for arch in amd64 arm64; do grep -q "\"architecture\":\"$arch\"" manifest.json || { echo "::error::no $arch image"; exit 1; }; done
+          # The raw index: one entry per image, plus the build's attestations (platform unknown/unknown).
+          docker buildx imagetools inspect --raw "ghcr.io/creaml4tt3/thoth-server:${VERSION}" > index.json
+          for arch in amd64 arm64; do
+            jq -e --arg arch "$arch" '[.manifests[].platform | select(.os == "linux" and .architecture == $arch)] | length == 1' index.json > /dev/null \
+              || { echo "::error::no linux/$arch image"; exit 1; }
+          done
