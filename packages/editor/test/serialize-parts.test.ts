@@ -78,7 +78,8 @@ describe("checking a page in parts", () => {
         expect(docToMarkdown(next, { frontmatter }), `seed ${seed}`).toBe(whole);
       }
     }
-  });
+    // About 3 s on a laptop; CI's shared runners are several times slower under the full parallel run.
+  }, 180_000);
 
   it("re-parses only the part that changed on a long page", () => {
     const sections = Array.from({ length: 200 }, (_, i) => `## Section ${i}\n\n${"Some text in this section. ".repeat(20)}\n\n- item\n- item`);
