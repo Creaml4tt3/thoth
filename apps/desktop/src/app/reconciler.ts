@@ -1,7 +1,9 @@
 /**
  * Turns watcher events into `vault.reconcile()` calls (ADR-001: the watcher is
  * only a trigger). Bursts coalesce into one reconcile; a `rescan` upgrades it
- * to a full one; events during a reconcile queue exactly one more run.
+ * to a full one; events during a reconcile queue exactly one more run. The
+ * changed paths go along, so a burst the index already reflects (Thoth's own
+ * save) costs a few stats instead of a walk of the whole vault.
  */
 import type { ReconcileReport, Vault } from "@thoth/local-store";
 
@@ -14,13 +16,15 @@ export interface ReconcilerOptions {
 }
 
 export interface Reconciler {
-  trigger(event: { rescan: boolean }): void;
+  trigger(event: { rescan: boolean; paths?: readonly string[] }): void;
   /** Resolves once nothing is scheduled or running. */
   idle(): Promise<void>;
   dispose(): void;
 }
 
 export function createReconciler(vault: Pick<Vault, "reconcile">, options: ReconcilerOptions): Reconciler {
+  /** Paths named since the last run; `undefined` once an event came without them (then nothing is skipped). */
+  let changed: Set<string> | undefined = new Set();
   const maxWait = options.maxWaitMs ?? options.debounceMs * 10;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let firstAt: number | undefined;
@@ -38,9 +42,11 @@ export function createReconciler(vault: Pick<Vault, "reconcile">, options: Recon
       return;
     }
     const wantFull = full;
+    const paths = changed;
     full = false;
+    changed = new Set();
     running = vault
-      .reconcile(wantFull ? { full: true } : {})
+      .reconcile(wantFull ? { full: true } : paths && paths.size > 0 ? { changed: [...paths] } : {})
       .then(
         (report) => {
           if (!disposed) options.onReconciled(report);
@@ -62,6 +68,8 @@ export function createReconciler(vault: Pick<Vault, "reconcile">, options: Recon
     trigger(event) {
       if (disposed) return;
       if (event.rescan) full = true;
+      if (event.paths && event.paths.length > 0) for (const path of event.paths) changed?.add(path);
+      else changed = undefined;
       const now = Date.now();
       firstAt ??= now;
       if (timer) clearTimeout(timer);

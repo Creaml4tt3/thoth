@@ -49,8 +49,11 @@ export interface Session {
   importService: ImportService;
   /** Bumped after any change to the index (save, reconcile, import) so views re-query. */
   revision: number;
-  /** Call after mutating the vault outside the shell (e.g. an import) to refresh views. */
-  refresh(): Promise<void>;
+  /**
+   * Call after mutating the vault outside the shell (e.g. an import) to refresh views. `changed` names the only paths
+   * touched, so an index that already has them (a save reindexes itself) is not checked against the whole vault again.
+   */
+  refresh(changed?: readonly string[]): Promise<void>;
   /** Opens a page in the current tab, or in a new one (`newTab`: Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter). */
   openPage(path: string, options?: OpenOptions): void;
   /** Opens Settings as a tab (one only), optionally scrolled to a section. */

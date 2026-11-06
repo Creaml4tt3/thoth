@@ -207,7 +207,8 @@ describe("external changes", () => {
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     await new Promise((r) => setTimeout(r, 80));
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0]![0] ?? {}).toEqual({});
+    // The burst's paths go along: none is in the index, so this still checks the whole vault.
+    expect(spy.mock.calls[0]![0]).toEqual({ changed: Array.from({ length: 8 }, (_, i) => `x${i}.md`) });
     spy.mockClear();
     app.platform.emit({ rescan: true });
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ full: true }));

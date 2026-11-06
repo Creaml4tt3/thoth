@@ -51,7 +51,7 @@ export function PageView({ path }: { path: string }) {
     },
     [openFolder],
   );
-  const onWritten = useCallback(() => void refresh().catch(() => undefined), [refresh]);
+  const onWritten = useCallback(() => void refresh([path]).catch(() => undefined), [refresh, path]);
   // A save conflict is a notification (ADR-0018): the page's name and where it is, nothing of its text.
   const onConflict = useCallback(
     (event: { kind: "shown" } | { kind: "resolved" }) => {

@@ -29,6 +29,8 @@ interface Props {
 export function PageEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
   const frontmatter = useRef("");
   const loading = useRef(false);
+  /** The last `markdown()` result and what it was made from: a ProseMirror doc never changes in place, so the same doc is the same text. */
+  const lastText = useRef<{ doc: unknown; frontmatter: string; text: string } | null>(null);
   const edit = useRef(onEdit);
   const save = useRef(onSaveShortcut);
   edit.current = onEdit;
@@ -61,7 +63,13 @@ export function PageEditor({ ctx, onEdit, onSaveShortcut, handleRef }: Props) {
     (): PageEditorHandle => ({
       markdown() {
         if (!editor) return "";
-        return docToMarkdown(editor.getJSON() as JSONContent, { frontmatter: frontmatter.current });
+        // An autosave asks twice (before and after the write) and a split view asks again; serializing a long page is slow.
+        const doc = editor.state.doc;
+        const last = lastText.current;
+        if (last && last.doc === doc && last.frontmatter === frontmatter.current) return last.text;
+        const text = docToMarkdown(doc.toJSON() as JSONContent, { frontmatter: frontmatter.current });
+        lastText.current = { doc, frontmatter: frontmatter.current, text };
+        return text;
       },
       load(source) {
         if (!editor) return;

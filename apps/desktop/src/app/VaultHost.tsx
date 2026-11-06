@@ -150,7 +150,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       onError: (error) => setWatchError(error instanceof Error ? error.message : String(error)),
     });
     connection
-      .watch((event) => reconciler.trigger({ rescan: event.rescan }))
+      .watch((event) => reconciler.trigger({ rescan: event.rescan, paths: event.paths }))
       .then((stopper) => {
         if (cancelled) void stopper().catch(() => undefined);
         else stop = stopper;
@@ -348,8 +348,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       options,
       importService,
       revision,
-      refresh: async () => {
-        await vault.reconcile();
+      refresh: async (changed) => {
+        await vault.reconcile(changed ? { changed } : {});
         bump();
       },
       openPage: (path, options) => {
