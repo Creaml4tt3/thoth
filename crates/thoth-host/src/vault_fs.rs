@@ -19,6 +19,8 @@ use unicode_normalization::UnicodeNormalization;
 /// Largest file the host reads or writes in one call (the importer's 1 GiB entry limit).
 pub const MAX_FILE_BYTES: usize = 1024 * 1024 * 1024;
 const MAX_REMOVE_DEPTH: usize = 256;
+/// Deepest folder `scan` enters; deeper is an error rather than a stack overflow.
+const MAX_SCAN_DEPTH: usize = 256;
 
 pub struct VaultFs {
     root: OwnedFd,
@@ -101,6 +103,16 @@ impl VaultFs {
         let dir = at::open_dir(self.root.as_fd(), &segments).map_err(|e| walk_error(e, raw, "scandir"))?;
         let entries = at::read_dir(dir.as_fd()).map_err(|e| HostError::errno(e, "scandir", raw))?;
         Ok(Value::Array(entries.into_iter().map(|(name, ft)| json!({ "name": name.nfc().collect::<String>(), "kind": kind_name(ft) })).collect()))
+    }
+
+    /// Every entry under the root in one call (`VaultFs.scan`): what walking `list` from "" gives, with each file's size
+    /// and mtime as `stat` reports them when `stats`. Names are NFC; directories named in `skip` are neither entered nor
+    /// listed; symlinks are reported, never followed, and a directory swapped for one mid-walk is reported as one.
+    pub fn scan(&self, skip: &[String], stats: bool) -> HostResult<Value> {
+        let mut out = Vec::new();
+        let root = at::reopen(self.root.as_fd()).map_err(|e| HostError::errno(e, "scandir", ""))?;
+        scan_dir(root.as_fd(), "", skip, stats, 0, &mut out)?;
+        Ok(Value::Array(out))
     }
 
     pub fn mkdirp(&self, raw: &str) -> HostResult<()> {
@@ -292,6 +304,37 @@ fn copy_exclusive(src: &Target, dst: &Target, link_error: Errno) -> Result<(), E
 }
 
 /// Recursive delete that never follows a symlink: directories are opened with O_NOFOLLOW, everything else is unlinked.
+fn scan_dir(dir: BorrowedFd<'_>, prefix: &str, skip: &[String], stats: bool, depth: usize, out: &mut Vec<Value>) -> HostResult<()> {
+    if depth > MAX_SCAN_DEPTH {
+        return Err(HostError::new("ELOOP", format!("Folders nested deeper than {MAX_SCAN_DEPTH} levels: {prefix}")));
+    }
+    for (name, ft) in at::read_dir(dir).map_err(|e| HostError::errno(e, "scandir", prefix))? {
+        let nfc: String = name.nfc().collect();
+        let path = if prefix.is_empty() { nfc.clone() } else { format!("{prefix}/{nfc}") };
+        match ft {
+            FileType::Directory if skip.contains(&nfc) => {}
+            FileType::Directory => match at::open_child_dir(dir, &name) {
+                Ok(child) => {
+                    out.push(json!({ "path": path, "kind": "directory" }));
+                    scan_dir(child.as_fd(), &path, skip, stats, depth + 1, out)?;
+                }
+                Err(WalkError::Symlink) => out.push(json!({ "path": path, "kind": "symlink" })),
+                // Gone since the listing: left out, as a walk a moment later would.
+                Err(WalkError::Errno(Errno::NOENT)) => {}
+                Err(e) => return Err(walk_error(e, &path, "scandir")),
+            },
+            FileType::RegularFile if !stats => out.push(json!({ "path": path, "kind": "file" })),
+            FileType::RegularFile => match statat(dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(st) => out.push(json!({ "path": path, "kind": kind_name(file_type(&st)), "size": st.st_size, "mtimeMs": mtime_ms(&st) })),
+                Err(Errno::NOENT) => {}
+                Err(e) => return Err(HostError::errno(e, "lstat", &path)),
+            },
+            other => out.push(json!({ "path": path, "kind": kind_name(other) })),
+        }
+    }
+    Ok(())
+}
+
 fn remove_tree(parent: BorrowedFd<'_>, name: &str, depth: usize) -> Result<(), Errno> {
     if depth > MAX_REMOVE_DEPTH {
         return Err(Errno::LOOP);

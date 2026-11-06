@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { basename, stripExtension, type PageSummary } from "@thoth/domain";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
@@ -14,10 +14,9 @@ import { onSpaceDrop } from "@thoth/app-ui/order/space-drag.ts";
 import { transferTargetFor } from "./space-drop.ts";
 import { HintContext } from "@thoth/app-ui/keyboard/hints.ts";
 import { WorkspacePageView } from "../servers/WorkspacePageView.tsx";
-import { TransferDialog, type TransferTarget } from "../transfer/TransferDialog.tsx";
-import { AgentSessionView } from "../agents/AgentSessionView.tsx";
+import type { TransferTarget } from "../transfer/TransferDialog.tsx";
 import { taskTitle } from "../agents/parts.tsx";
-import { MascotLayer } from "../mascot/Mascot.tsx";
+import { MascotLayer } from "../mascot/MascotLayer.tsx";
 import { UpdateNotice } from "../updates/UpdateNotice.tsx";
 import { Tour } from "../tour/Tour.tsx";
 import { requestTour } from "../tour/store.ts";
@@ -99,6 +98,10 @@ function RecoveryNotice() {
 
 /** The network drive notice of a Private Space was dismissed: this prefix and its folder, in localStorage. */
 export const NETWORK_NOTICE_KEY_PREFIX = "thoth.desktop.networkNotice.";
+
+// Loaded when first shown, not at startup: most sessions never open them.
+const AgentSessionView = lazy(() => import("../agents/AgentSessionView.tsx").then((m) => ({ default: m.AgentSessionView })));
+const TransferDialog = lazy(() => import("../transfer/TransferDialog.tsx").then((m) => ({ default: m.TransferDialog })));
 
 /** The Paper shell: sidebar on the left; tabs, and the page or settings of the current tab, on the right. */
 export function Shell() {
@@ -532,7 +535,9 @@ export function Shell() {
     shown.kind === "settings" ? (
       <SettingsView section={shown.section ?? "top"} request={shown} />
     ) : shown.kind === "agent-run" ? (
-      <AgentSessionView key={`${id}\n${shown.run}`} run={shown.run} />
+      <Suspense key={`${id}\n${shown.run}`} fallback={null}>
+        <AgentSessionView run={shown.run} />
+      </Suspense>
     ) : shown.kind === "workspace" ? (
       <WorkspacePageView key={`${id}\n${shown.server}\n${shown.workspace}\n${shown.page}`} target={shown} onTransfer={transfer} />
     ) : shown.kind === "page" ? (
@@ -638,7 +643,11 @@ export function Shell() {
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
       {dialog?.kind === "feedback" && <DesktopFeedbackDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
-      {dialog?.kind === "transfer" && <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "transfer" && (
+        <Suspense fallback={null}>
+          <TransferDialog target={dialog.target} onClose={() => setDialog(null)} />
+        </Suspense>
+      )}
       {obsidianDaily && (
         <ObsidianDailyQuestion
           found={obsidianDaily}

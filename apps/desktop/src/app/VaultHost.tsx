@@ -146,7 +146,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     let stop: (() => Promise<void>) | undefined;
     const reconciler = createReconciler(vault, {
       debounceMs: options.reconcileDebounceMs,
-      onReconciled: bump,
+      // The echo of this window's own write: the index and the views already have it.
+      onReconciled: (report) => report.echo || bump(),
       onError: (error) => setWatchError(error instanceof Error ? error.message : String(error)),
     });
     connection

@@ -6,5 +6,6 @@ export * from "./mime.ts";
 export * from "./names.ts";
 export * from "./order.ts";
 export * from "./ports.ts";
+export * from "./scan.ts";
 export * from "./schema.ts";
 export * from "./vault.ts";

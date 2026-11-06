@@ -19,7 +19,22 @@ export interface DirEntry {
   kind: EntryKind;
 }
 
+/** One entry of `VaultFs.scan`: a vault path, with the size and mtime of a file. */
+export interface ScanEntry {
+  path: string;
+  kind: EntryKind;
+  size?: number;
+  mtimeMs?: number;
+}
+
 export interface VaultFs {
+  /**
+   * Every entry under the vault root in one call, without following symlinks and without entering a directory whose
+   * name is in `skipDirs`: what walking `list` from "" gives, in any order, with each file's `stat` when `stats` is set.
+   * Optional: the vault walks with `list` and `stat` when a port has none (on desktop that is one round trip per folder
+   * and per file).
+   */
+  scan?(skipDirs: readonly string[], stats: boolean): Promise<ScanEntry[]>;
   stat(path: string): Promise<FileStat | undefined>;
   readFile(path: string): Promise<Uint8Array>;
   list(dir: string): Promise<DirEntry[]>;

@@ -143,6 +143,40 @@ export function vaultFsContract(runtime: PortRuntime): void {
       await expect(fx.fs.list("missing")).rejects.toMatchObject({ code: "ENOENT" });
     });
 
+    it("scans the whole tree in one call, as list and stat would, skipping named folders and following no symlink", async () => {
+      expect(fx.fs.scan).toBeTypeOf("function");
+      await mkdir(join(fx.root, "a/b"), { recursive: true });
+      await writeFile(join(fx.root, "a/b/café.md"), "12345");
+      await writeFile(join(fx.root, "top.md"), "x");
+      await mkdir(join(fx.root, "skip/inner"), { recursive: true });
+      await writeFile(join(fx.root, "skip/inner/hidden.md"), "h");
+      await mkdir(join(fx.root, "a/skip"), { recursive: true });
+      await writeFile(join(fx.root, "a/skip/also.md"), "h");
+      await symlink(outside, join(fx.root, "a/sym"));
+      const when = new Date("2024-01-02T03:04:05.678Z");
+      await utimes(join(fx.root, "a/b/café.md"), when, when);
+
+      const entries = (await fx.fs.scan!(["skip", ".thoth"], true)).sort((x, y) => x.path.localeCompare(y.path));
+      expect(entries.map(({ path, kind }) => ({ path, kind }))).toEqual([
+        { path: "a", kind: "directory" },
+        { path: "a/b", kind: "directory" },
+        { path: "a/b/café.md", kind: "file" },
+        { path: "a/sym", kind: "symlink" },
+        { path: "top.md", kind: "file" },
+      ]);
+      // A file's size and mtime are exactly what `stat` reports, so the index's fast path agrees with either.
+      for (const entry of entries.filter((e) => e.kind === "file")) {
+        const st = await fx.fs.stat(entry.path);
+        expect({ size: entry.size, mtimeMs: entry.mtimeMs }).toEqual({ size: st!.size, mtimeMs: st!.mtimeMs });
+      }
+      expect(entries.find((e) => e.path === "a/b/café.md")).toMatchObject({ size: 5 });
+      // Nothing outside the vault was reached through the symlink.
+      expect(entries.some((e) => e.path.includes("secret"))).toBe(false);
+      // Without stats: the same entries, no sizes.
+      const bare = (await fx.fs.scan!(["skip", ".thoth"], false)).sort((x, y) => x.path.localeCompare(y.path));
+      expect(bare).toEqual(entries.map(({ path, kind }) => ({ path, kind })));
+    });
+
     it("mkdirp is idempotent and refuses a file in the way", async () => {
       await fx.fs.mkdirp("x/y/z");
       await fx.fs.mkdirp("x/y/z");

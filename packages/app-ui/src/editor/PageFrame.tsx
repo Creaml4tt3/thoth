@@ -15,7 +15,7 @@ import { usePageSession } from "./usePageSession.ts";
 import { usePageHost } from "./host.ts";
 import type { PageStore, SaveStatus } from "./page-session.ts";
 import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode } from "./mode.ts";
-import { PlainEditor } from "./plain/PlainEditor.tsx";
+import { loadPlainEditor, plainEditorNow } from "./plain/load.ts";
 import { pageKey } from "./session-pool.ts";
 import { usePaneActive } from "../tabs/pane.ts";
 import type { OpenOptions } from "../tabs/model.ts";
@@ -159,13 +159,31 @@ export interface PageFrameProps {
   changeNotice?: { text(by: string | null): string | null; dismiss: string };
 }
 
-/** One open page: breadcrumbs, the Blocks or Plain editor, save status and the conflict dialog. Where the page lives is the store's business. */
+/**
+ * One open page: breadcrumbs, the Blocks or Plain editor, save status and the conflict dialog. Where the page lives is
+ * the store's business. A page that opens in Plain mode waits for the Plain editor to load before its session starts,
+ * so the text it reads always has an editor to go into.
+ */
 export function PageFrame(props: PageFrameProps) {
+  const plain = pageEditorMode(props.modeKey.space, props.modeKey.page) === "plain";
+  const [ready, setReady] = useState(() => !plain || plainEditorNow() !== undefined);
+  useEffect(() => {
+    if (ready) return;
+    let live = true;
+    // If it cannot load, the page opens in Blocks: the person still gets their page.
+    const done = () => live && setReady(true);
+    loadPlainEditor().then(done, done);
+    return () => void (live = false);
+  }, [ready]);
+  return ready ? <PageFrameReady {...props} /> : <section className="page-view" aria-label={props.label} aria-busy="true" />;
+}
+
+function PageFrameReady(props: PageFrameProps) {
   const { store, modeKey, loadLinks } = props;
   const strings = useStrings();
   const t = strings.editor;
   const handle = useRef<PageEditorHandle>(null);
-  const [mode, setMode] = useState<EditorMode>(() => pageEditorMode(modeKey.space, modeKey.page));
+  const [mode, setMode] = useState<EditorMode>(() => (pageEditorMode(modeKey.space, modeKey.page) === "plain" && plainEditorNow() ? "plain" : "blocks"));
   /** The text carried from the editor being replaced into the one being mounted, unsaved edits included. */
   const carried = useRef<string | null>(null);
   const lookup = useRef<LinkLookup>(EMPTY_LOOKUP);
@@ -252,12 +270,21 @@ export function PageFrame(props: PageFrameProps) {
   }, [state.save, t.status.saved]);
 
   const canSwitch = state.phase === "ready" && !state.conflict;
+  const switching = useRef(false);
   const switchMode = useCallback(
     (next: EditorMode) => {
-      if (next === mode || !canSwitch) return;
-      carried.current = handle.current?.markdown() ?? null;
-      rememberPageEditorMode(modeKey.space, modeKey.page, next);
-      setMode(next);
+      if (next === mode || !canSwitch || switching.current) return;
+      const swap = () => {
+        // Read when the swap happens, not when it was asked for: typing while the Plain editor loaded is kept.
+        carried.current = handle.current?.markdown() ?? null;
+        rememberPageEditorMode(modeKey.space, modeKey.page, next);
+        setMode(next);
+      };
+      if (next === "blocks" || plainEditorNow()) return swap();
+      switching.current = true;
+      void loadPlainEditor()
+        .then(swap, () => undefined)
+        .finally(() => void (switching.current = false));
     },
     [mode, canSwitch, modeKey.space, modeKey.page],
   );
@@ -301,6 +328,7 @@ export function PageFrame(props: PageFrameProps) {
 
   // `edited` also tells the session; `focused` brings the other pane's last edit here before anything is typed.
   const editorProps = { ctx, handleRef: handle, onEdit: () => member?.edited(), onSaveShortcut: saveNow };
+  const Plain = plainEditorNow();
 
   return (
     <section className="page-view" aria-label={props.label}>
@@ -360,7 +388,7 @@ export function PageFrame(props: PageFrameProps) {
             </>
           )}
           <div hidden={state.phase !== "ready"} data-editor-mode={mode} onFocus={() => member?.focused()}>
-            {mode === "blocks" ? <PageEditor key="blocks" {...editorProps} /> : <PlainEditor key="plain" {...editorProps} />}
+            {mode === "plain" && Plain ? <Plain key="plain" {...editorProps} /> : <PageEditor key="blocks" {...editorProps} />}
           </div>
           {state.phase === "ready" && props.footer}
         </div>

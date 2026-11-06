@@ -344,10 +344,7 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
   );
 }
 
-/** Mount once in the shell. Nothing on the web, nothing where agents cannot run, nothing when switched off. */
-export function MascotLayer() {
-  const { agents, assistant } = useSession();
-  const prefs = useSyncExternalStore(assistant?.prefs.subscribe ?? (() => () => undefined), () => assistant?.prefs.get() ?? null);
-  if (!agents || !assistant || !prefs?.show) return null;
+/** The mascot and its bubble, once `MascotLayer` (MascotLayer.tsx) has decided it is shown. */
+export function MascotShown({ agents, assistant }: { agents: AgentsService; assistant: AssistantController }) {
   return <Layer agents={agents} assistant={assistant} />;
 }

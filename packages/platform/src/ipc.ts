@@ -12,7 +12,7 @@
  * the host's own recent list), and every path argument is vault- or
  * source-relative.
  */
-import type { DirEntry, FileStat } from "@thoth/local-store";
+import type { DirEntry, FileStat, ScanEntry } from "@thoth/local-store";
 import type { SourceDirEntry } from "@thoth/importer-core";
 import type { AgentProbe, HostEventBatch, HostHistoryRun } from "@thoth/agent-core";
 
@@ -104,6 +104,7 @@ export interface Commands {
   "fs.stat": { args: { vault: string; path: string }; result: FileStat | null };
   "fs.read": { args: { vault: string; path: string }; result: Bytes };
   "fs.list": { args: { vault: string; dir: string }; result: DirEntry[] };
+  "fs.scan": { args: { vault: string; skipDirs: string[]; stats: boolean }; result: ScanEntry[] };
   "fs.mkdirp": { args: { vault: string; dir: string }; result: null };
   /** Request bytes: the file content. */
   "fs.write": { args: { vault: string; path: string; exclusive: boolean }; result: null };

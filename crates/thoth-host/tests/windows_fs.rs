@@ -142,6 +142,11 @@ fn a_junction_is_never_followed_in_any_component() {
     assert_eq!(code(f.write("j/new.md", b"x", false)), "UNSAFE_PATH");
     assert_eq!(code(f.write("j/new.md", b"x", true)), "UNSAFE_PATH");
     assert_eq!(code(f.call("fs.list", json!({ "dir": "j" }))), "UNSAFE_PATH");
+    // The whole-vault scan reports the junction and does not enter it.
+    let scanned = f.call("fs.scan", json!({ "skipDirs": [".thoth"], "stats": true })).unwrap();
+    let scanned = scanned.as_array().unwrap();
+    assert!(scanned.iter().any(|e| e["path"] == json!("j") && e["kind"] == json!("symlink")));
+    assert!(!scanned.iter().any(|e| e["path"].as_str().unwrap().starts_with("j/")));
     assert_eq!(code(f.call("fs.mkdirp", json!({ "dir": "j/sub" }))), "UNSAFE_PATH");
     assert_eq!(code(f.call("fs.stat", json!({ "path": "j/secret.md" }))), "UNSAFE_PATH");
     assert_eq!(code(f.rename("j/secret.md", "stolen.md", false)), "UNSAFE_PATH");

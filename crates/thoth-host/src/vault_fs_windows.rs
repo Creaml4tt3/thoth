@@ -33,6 +33,8 @@ use windows_sys::Win32::Foundation as f;
 /// Largest file the host reads or writes in one call (the importer's 1 GiB entry limit).
 pub const MAX_FILE_BYTES: usize = 1024 * 1024 * 1024;
 const MAX_REMOVE_DEPTH: usize = 256;
+/// Deepest folder `scan` enters; deeper is an error rather than a stack overflow.
+const MAX_SCAN_DEPTH: usize = 256;
 
 pub struct VaultFs {
     root: OwnedHandle,
@@ -167,6 +169,16 @@ impl VaultFs {
         let dir = walk::open_dir(&self.root, &segments).map_err(|e| walk_error(e, raw, "scandir"))?;
         let entries = nt::read_dir(&dir).map_err(|e| os(e, "scandir", raw))?;
         Ok(Value::Array(entries.into_iter().map(|e| json!({ "name": e.name.nfc().collect::<String>(), "kind": nt::kind_name(e.kind) })).collect()))
+    }
+
+    /// Every entry under the root in one call (`VaultFs.scan`), as in vault_fs.rs. A file's size and mtime come from
+    /// its handle, as `stat` reads them: NTFS updates the copies in folder listings lazily, and a value that differs
+    /// from `stat`'s would make every save look like an outside change.
+    pub fn scan(&self, skip: &[String], stats: bool) -> HostResult<Value> {
+        let mut out = Vec::new();
+        let root = walk::reopen(&self.root).map_err(|e| os(e, "scandir", ""))?;
+        scan_dir(&root, "", skip, stats, 0, &mut out)?;
+        Ok(Value::Array(out))
     }
 
     pub fn mkdirp(&self, raw: &str) -> HostResult<()> {
@@ -319,6 +331,42 @@ impl VaultFs {
         }
         result
     }
+}
+
+fn scan_dir(dir: &OwnedHandle, prefix: &str, skip: &[String], stats: bool, depth: usize, out: &mut Vec<Value>) -> HostResult<()> {
+    if depth > MAX_SCAN_DEPTH {
+        return Err(HostError::new("ELOOP", format!("Folders nested deeper than {MAX_SCAN_DEPTH} levels: {prefix}")));
+    }
+    for entry in nt::read_dir(dir).map_err(|e| os(e, "scandir", prefix))? {
+        let nfc: String = entry.name.nfc().collect();
+        let path = if prefix.is_empty() { nfc.clone() } else { format!("{prefix}/{nfc}") };
+        match entry.kind {
+            Kind::Directory if skip.contains(&nfc) => {}
+            Kind::Directory => match walk::open_child_dir_wide(dir, &entry.wide) {
+                Ok(child) => {
+                    out.push(json!({ "path": path, "kind": "directory" }));
+                    scan_dir(&child, &path, skip, stats, depth + 1, out)?;
+                }
+                Err(WalkError::Symlink) => out.push(json!({ "path": path, "kind": "symlink" })),
+                Err(WalkError::Os(e)) if e.is_not_found() => {}
+                Err(e) => return Err(walk_error(e, &path, "scandir")),
+            },
+            Kind::File if !stats => out.push(json!({ "path": path, "kind": "file" })),
+            Kind::File => match nt::open_at_wide(dir, &entry.wide, nt::ATTR_ACCESS, FILE_OPEN, 0) {
+                Ok(handle) => {
+                    let fail = |e: OsError| os(e, "lstat", &path);
+                    let kind = nt::kind(&handle).map_err(fail)?;
+                    let size = nt::size(&handle).map_err(fail)?;
+                    let mtime = nt::mtime_ms(&handle).map_err(fail)?;
+                    out.push(json!({ "path": path, "kind": nt::kind_name(kind), "size": size, "mtimeMs": mtime }));
+                }
+                Err(e) if e.is_not_found() => {}
+                Err(e) => return Err(os(e, "lstat", &path)),
+            },
+            other => out.push(json!({ "path": path, "kind": nt::kind_name(other) })),
+        }
+    }
+    Ok(())
 }
 
 fn walk_error(e: WalkError, raw: &str, op: &str) -> HostError {
