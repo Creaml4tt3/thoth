@@ -63,3 +63,11 @@ tauri-plugin-log = "=2.10.0"
 trash = "=5.2.9"
 # Only to name the updater's redirect policy (no redirects) and TLS rule: the version tauri and the updater already lock.
 reqwest = { version = "=0.13.5", default-features = false }
+
+# Smaller, faster release builds (0.7.1): the default profile left the app's binary at about 21 MB per architecture; this
+# measured 12.3 MB. `panic` stays "unwind": a panic in one host call is caught and answered as an error (apps/desktop
+# src-tauri lib.rs, "Host call panicked") instead of closing the app with unsaved work.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

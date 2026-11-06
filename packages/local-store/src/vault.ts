@@ -27,7 +27,7 @@ import {
   type JournalEntry,
 } from "./journal.ts";
 import { mimeTypeFor } from "./mime.ts";
-import type { SqlDriver, VaultFs } from "./ports.ts";
+import type { FileStat, SqlDriver, VaultFs } from "./ports.ts";
 import { INDEX_DDL, INDEX_SCHEMA_VERSION } from "./schema.ts";
 import { tokenize, trigramMatch, wordMatch } from "./search-query.ts";
 
@@ -278,8 +278,34 @@ export class Vault {
    * path and the content hash as the authority. Safe to call at any time; the
    * filesystem watcher only needs to trigger it.
    */
-  async reconcile(options: { full?: boolean } = {}): Promise<ReconcileReport> {
-    return this.exclusive(() => this.reconcileNow(options));
+  async reconcile(options: { full?: boolean; changed?: readonly string[] } = {}): Promise<ReconcileReport> {
+    return this.exclusive(async () => {
+      // A watcher event for Thoth's own save arrives after the save already reindexed: a few stats instead of the walk.
+      if (!options.full && options.changed && (await this.indexMatches(options.changed)))
+        return { added: [], updated: [], removed: [], unchanged: options.changed.length, warnings: [], recoveredJournalEntries: 0 };
+      return this.reconcileNow(options);
+    });
+  }
+
+  /**
+   * True when every path is a file the index already has at its current size and mtime: the same fast path a reconcile
+   * takes, so a reconcile would change nothing for them. Anything else (gone, a folder, not indexed) means walk.
+   */
+  private async indexMatches(paths: readonly string[]): Promise<boolean> {
+    if (paths.length === 0) return false;
+    for (const path of paths) {
+      let stat: FileStat | undefined;
+      try {
+        stat = await this.fs.stat(path);
+      } catch {
+        return false;
+      }
+      if (!stat || stat.kind !== "file") return false;
+      const table = isMarkdownPath(path) ? "pages" : "attachments";
+      const row = await this.sql.get<{ size: number; mtime_ms: number }>(`SELECT size, mtime_ms FROM ${table} WHERE path = ?`, [path]);
+      if (!row || row.size !== stat.size || row.mtime_ms !== stat.mtimeMs) return false;
+    }
+    return true;
   }
 
   /** Runs `task` after every earlier mutation has settled, so the watcher, saves and imports never overlap. */
@@ -522,8 +548,8 @@ export class Vault {
       [...pages.map((p) => p.path), ...attachments.map((a) => a.path)],
       pages.map((p) => ({ path: p.path, aliases: aliases.get(p.path) ?? [] })),
     );
-    const refs = await this.sql.all<{ source_page_id: string; ord: number; syntax: string; target: string; external: number }>(
-      "SELECT source_page_id, ord, syntax, target, external FROM refs",
+    const refs = await this.sql.all<{ source_page_id: string; ord: number; syntax: string; target: string; external: number; resolution: string; target_path: string | null }>(
+      "SELECT source_page_id, ord, syntax, target, external, resolution, target_path FROM refs",
     );
     for (const ref of refs) {
       const from = pathById.get(ref.source_page_id);
@@ -533,9 +559,12 @@ export class Vault {
         target: ref.target,
         external: ref.external === 1,
       });
+      const targetPath = result.state === "resolved" ? result.path : null;
+      // Most links resolve as they did; on desktop each write is a round trip to the host, so only the changed ones go.
+      if (result.state === ref.resolution && targetPath === ref.target_path) continue;
       await this.sql.run("UPDATE refs SET resolution = ?, target_path = ? WHERE source_page_id = ? AND ord = ?", [
         result.state,
-        result.state === "resolved" ? result.path : null,
+        targetPath,
         ref.source_page_id,
         ref.ord,
       ]);
