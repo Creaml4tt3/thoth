@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@thoth/content": "workspace:*",
-    "@tiptap/core": "^3.32.0",
-    "@tiptap/pm": "^3.32.0"
+    "@tiptap/core": "^3.32.2",
+    "@tiptap/pm": "^3.32.2"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4"

@@ -16,6 +16,13 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Opening a Private Space you have opened before is faster: Thoth reads the whole folder in one step instead of one file at a time.
 - The app starts with less to load: the Plain editor, Agent Hub sessions, import, transfer and the mascot load the first time you use them.
 - Typing in a long page with headings is faster: autosave checks only the section you changed, not the whole page.
+## [0.7.1] - 2026-11-06
+
+### Changed
+
+- Saving a page is faster in a large Private Space: Thoth now updates only the links whose target changed, and no longer checks the whole folder again after its own save.
+- The download is smaller: the Mac app's core is about half its earlier size, with the same safety when something goes wrong inside it.
+- The app framework (Tauri 2.12.5) and the editor (TipTap 3.32.2) are updated, along with other libraries.
 
 ## [0.7.0] - 2026-11-05
 
@@ -297,7 +304,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Creaml4tt3/thoth/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Creaml4tt3/thoth/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Creaml4tt3/thoth/compare/v0.4.0...v0.5.0

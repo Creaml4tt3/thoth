@@ -38,20 +38,38 @@ downloads page; nothing needs to change on the old one.
 A release spans two repositories (ADR-0039): this one holds the changelog, the versions, the tag and the build; the
 website's private repository (`Creaml4tt3/thoth-site`) holds the post, its picture and the downloads list.
 
+**Database changes go first, before the merge.** Every push to `main` deploys the demo server (`thoth-api` on Vercel,
+`docs/deploy/trial.md`) within minutes, and it runs with `MIGRATE_ON_START=false`, so it never migrates itself. A pull
+request that adds a file under `apps/server/migrations/` therefore needs, in this order:
+
+1. Apply the migration to Neon with the direct URL: `scripts/prod-db.sh migrate` (or `node apps/server/src/cli.ts
+   migrate`, `docs/deploy/trial.md`), and any backfill the migration's notes name (`backfill-kind`, `backfill-tags`).
+   Migrations are additive, so the server already running keeps working.
+2. Only then merge the pull request (or push to `main`).
+3. Check the demo server: `curl -s https://api.thothnotes.com/api/v1/capabilities` reports the new version, and saving a page in the
+   web app works.
+
+Merging first means the new server code runs against the old database until someone migrates: for 0.7.0 that was
+about 12 hours in which saves could fail. Check before every merge, not only a release merge:
+`git diff --name-only origin/main...<branch> -- apps/server/migrations`.
+
 0. **Changelog, before the tag** (ADR-0026; the release job fails without it):
    - In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - yyyy-mm-dd`, keep only what ships, add a new
      `[Unreleased]` only when there is something in it (the parser refuses an empty section), and update the compare links at the bottom.
      Entries are user-facing, one line each, under Added, Changed or Fixed; links only as absolute `https` URLs.
    - Do the same in `CHANGELOG.th.md`: same versions, dates, sections and number of entries (a test checks).
-   - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`).
+   - Write the version's post and picture in the website's repository, as a draft (its `RELEASING.md`). A small
+     update (x.y.z with z > 0) may go without a post; minor and major releases need one, or the website's build fails.
    - Check the notes: `node scripts/release-notes.ts vx.y.z --no-post` prints what the GitHub release will say
      (without `--no-post`, the post link appears once the website serves the post).
-1. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json`,
+1. If anything since the last release added a migration and it is not on Neon yet, apply it now (above), before
+   merging the release pull request.
+2. Set the version in `apps/desktop/package.json`, `apps/desktop/src-tauri/tauri.conf.json`,
    `apps/desktop/src-tauri/Cargo.toml` (then `cargo update -p thoth-desktop --offline`) and `apps/server/package.json`
    (the version servers report in `GET /capabilities`). `tests/release/versions.test.ts` refuses the four when they
    differ, the publish step refuses installers whose version differs from `tauri.conf.json`, and `server-image.yml`
    refuses a tag that differs from `apps/server/package.json`.
-2. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS,
+3. Commit, then tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The workflow builds macOS,
    Windows and Linux, runs the Windows host tests (`test-windows`), and uploads the installers only if every
    build and those tests pass. `workflow_dispatch` (Actions → Release desktop → Run workflow) does the same
    without a tag; untick "Upload to R2" to build only. On a tag, the `github-release` job then creates (or edits)
@@ -64,15 +82,15 @@ website's private repository (`Creaml4tt3/thoth-site`) holds the post, its pictu
    Faster builds: a tag's run can only use the Rust caches saved on `main`, and only a run on `main` saves them. When
    `Cargo.lock` or the Rust version changed, first warm them: `gh workflow run release-desktop.yml --ref main -f
    publish=false` (it builds and tests, uploads nothing), then tag once it has finished.
-3. **The website**, in its repository, once the workflow has passed: publish the post, copy the published
+4. **The website**, in its repository, once the workflow has passed: publish the post, copy the published
    `latest.json` into its download manifest, and push; Vercel deploys the website with the new post, the
    changelog entry (read from this repository's `main`) and the feeds. Then tell search engines (IndexNow); the
    steps are in the website's `RELEASING.md`.
-4. **Link the post from the GitHub release:** once the post is live, run the `github-release` job again
+5. **Link the post from the GitHub release:** once the post is live, run the `github-release` job again
    (Actions → the tag's run → Re-run jobs → "GitHub release notes", or `gh run rerun <run id> --job <job id>`). It
    edits the release, and the notes now link the post.
-5. **winget and the AUR**, once the files are on R2: see "Package managers" below.
-6. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
+6. **winget and the AUR**, once the files are on R2: see "Package managers" below.
+7. To rewrite the notes of an earlier release: `node scripts/release-notes.ts v0.1.3 > notes.md && gh release
    edit v0.1.3 --notes-file notes.md`.
 
 ## Windows

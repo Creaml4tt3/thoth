@@ -1,6 +1,6 @@
 {
   "name": "@thoth/server",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -14,12 +14,12 @@
     "@thoth/content": "workspace:*",
     "@thoth/domain": "workspace:*",
     "@thoth/workspace-protocol": "workspace:*",
-    "fastify": "5.12.7",
+    "fastify": "5.12.8",
     "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/mdast": "4.0.4",
     "@types/pg": "8.23.1",
-    "rolldown": "1.2.14"
+    "rolldown": "1.2.16"
   }
 }

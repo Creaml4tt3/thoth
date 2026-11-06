@@ -5,8 +5,11 @@
 # node_modules, so the workspace packages (which export .ts) must stay at their real paths:
 # the image keeps the pnpm workspace layout instead of using `pnpm deploy`.
 
+# The base is pinned by digest: a new node:24-alpine build (2026-11-06) crashed with "Illegal instruction" in `pnpm
+# install` under the arm64 emulator, and 0.7.1's image failed. Update the digest on purpose and check both platforms
+# build (`gh workflow run server-image.yml`).
 # ---- stage 1: production dependencies only ---------------------------------------------------
-FROM docker.io/library/node:24-alpine AS deps
+FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY . .
@@ -15,7 +18,7 @@ RUN pnpm install --frozen-lockfile --prod --filter "@thoth/server..." \
  && pnpm store prune
 
 # ---- stage 2: runtime ------------------------------------------------------------------------
-FROM docker.io/library/node:24-alpine AS runtime
+FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runtime
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080 \
