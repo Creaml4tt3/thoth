@@ -2,7 +2,7 @@
 # The upstream .deb from download.thothnotes.com, unpacked as it is (AUR rules: prebuilt packages end in -bin).
 # "thoth" and "thoth-bin" on the AUR are an unrelated terminal scratchpad (jooaf/thoth); no file clashes with it.
 pkgname=thoth-notes-bin
-pkgver=0.6.0
+pkgver=0.7.1
 pkgrel=1
 pkgdesc="Notes in plain Markdown files on your computer, with shared workspaces you can host yourself"
 arch=('x86_64')
@@ -11,7 +11,7 @@ license=('Apache-2.0')
 depends=('cairo' 'dbus' 'gdk-pixbuf2' 'glib2' 'glibc' 'gtk3' 'hicolor-icon-theme' 'libgcc' 'libsoup3' 'webkit2gtk-4.1')
 options=('!strip' '!debug')
 source=("https://download.thothnotes.com/v${pkgver}/Thoth_${pkgver}_amd64.deb")
-sha256sums=('cdbd7c1a7f27b5497de608529b984ce3a446ff4147a60aa36cbccd83f7a59b4d')
+sha256sums=('d3adf8bdabd2f9c1c78f940c4aa61519d6c267b5a514b523e1204fa973e26ccf')
 
 package() {
   # makepkg has already unpacked the .deb (an ar archive) into data.tar.gz and control.tar.gz.
