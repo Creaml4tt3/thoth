@@ -1,4 +1,6 @@
-# Publishes the workspace server's container image to GitHub Container Registry, for linux/amd64 and linux/arm64:
+# Publishes the workspace server's container image to GitHub Container Registry, for linux/amd64 and linux/arm64.
+# Each platform builds on its own kind of runner, with no emulator: under QEMU, `pnpm install` for arm64 died with
+# "Illegal instruction" (0.7.1 and 0.8.0). The two images are pushed by digest, then one manifest names both.
 #
 #   ghcr.io/creaml4tt3/thoth-server:0.2.7    one release
 #   ghcr.io/creaml4tt3/thoth-server:0.2      the newest release of 0.2
@@ -29,8 +31,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  image:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -46,7 +56,58 @@ jobs:
         run: |
           version=$(node -p "require('./apps/server/package.json').version")
           if [ "v$version" != "$TAG" ]; then echo "::error::apps/server/package.json says $version, the tag is $TAG"; exit 1; fi
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/creaml4tt3/thoth-server
+          labels: |
+            org.opencontainers.image.title=Thoth server
+            org.opencontainers.image.description=Thoth workspace server: Node.js 24 and PostgreSQL
+            org.opencontainers.image.licenses=Apache-2.0
+      # Pushed by digest only: the tags go on the manifest that `merge` makes.
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/server/Containerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=ghcr.io/creaml4tt3/thoth-server,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+      - name: Keep the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.runner }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: digests
+          pattern: digest-*
+          merge-multiple: true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -63,17 +124,18 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
             type=raw,value=latest,enable=${{ !contains(env.TAG, '-') }}
           flavor: latest=false
-          labels: |
-            org.opencontainers.image.title=Thoth server
-            org.opencontainers.image.description=Thoth workspace server: Node.js 24 and PostgreSQL
-            org.opencontainers.image.licenses=Apache-2.0
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: apps/server/Containerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: One manifest for both platforms
+        working-directory: digests
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          test "$(ls | wc -l)" -eq 2
+          args=()
+          while read -r tag; do [ -n "$tag" ] && args+=(-t "$tag"); done <<< "$TAGS"
+          docker buildx imagetools create "${args[@]}" $(printf 'ghcr.io/creaml4tt3/thoth-server@sha256:%s ' *)
+      - name: Both platforms are there
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          docker buildx imagetools inspect "ghcr.io/creaml4tt3/thoth-server:${VERSION}" --format '{{json .Manifest}}' > manifest.json
+          for arch in amd64 arm64; do grep -q "\"architecture\":\"$arch\"" manifest.json || { echo "::error::no $arch image"; exit 1; }; done
