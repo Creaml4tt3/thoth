@@ -2,7 +2,8 @@ import { constants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as nodePath from "node:path";
 import { normalizeVaultPath, sha256Hex, UnsafePathError } from "@thoth/domain";
-import type { DirEntry, EntryKind, FileStat, VaultFs } from "../ports.ts";
+import type { DirEntry, EntryKind, FileStat, ScanEntry, VaultFs } from "../ports.ts";
+import { scanByListing } from "../scan.ts";
 
 function kindOf(s: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean }): EntryKind {
   if (s.isSymbolicLink()) return "symlink";
@@ -79,6 +80,11 @@ export class NodeVaultFs implements VaultFs {
     } finally {
       await handle.close();
     }
+  }
+
+  /** In-process, so the walk costs no round trips; the Rust host's `fs.scan` walks the same way. */
+  scan(skipDirs: readonly string[], stats: boolean): Promise<ScanEntry[]> {
+    return scanByListing(this, skipDirs, stats);
   }
 
   async list(dir: string): Promise<DirEntry[]> {

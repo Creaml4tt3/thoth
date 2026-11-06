@@ -127,8 +127,8 @@ describe("the session tab", () => {
     await app.user.click(icon);
     await waitFor(() => expect(currentTab()).toBe("What is on this page?"));
     expect(screen.queryByRole("dialog", { name: "Ask Thoth" })).toBeNull();
-    // Live while it runs: the transcript and Cancel.
-    expect(within(session()).getByRole("heading", { level: 1, name: "What is on this page?" })).toBeTruthy();
+    // Live while it runs: the transcript and Cancel. The session view loads the first time a session tab opens.
+    expect(await within(session()).findByRole("heading", { level: 1, name: "What is on this page?" })).toBeTruthy();
     expect(within(session()).getByRole("button", { name: "Cancel" })).toBeTruthy();
     // Then the answer, in the tab.
     const answer = await within(session()).findByRole("region", { name: "Answer" }, { timeout: 15_000 });

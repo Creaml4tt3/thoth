@@ -26,6 +26,7 @@
     "allow-fs-stat",
     "allow-fs-read",
     "allow-fs-list",
+    "allow-fs-scan",
     "allow-fs-mkdirp",
     "allow-fs-write",
     "allow-fs-rename",

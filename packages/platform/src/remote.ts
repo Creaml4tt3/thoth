@@ -5,7 +5,7 @@
  */
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
-import type { DirEntry, FileStat, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
+import type { DirEntry, FileStat, ScanEntry, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
 import type { ConnectedApps, Diagnostics, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
 import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
 
@@ -89,6 +89,11 @@ export class RemoteVaultFs implements VaultFs {
 
   list(dir: string): Promise<DirEntry[]> {
     return this.transport.call("fs.list", { vault: this.vault, dir });
+  }
+
+  /** The whole walk in one round trip, instead of one per folder and per file. */
+  scan(skipDirs: readonly string[], stats: boolean): Promise<ScanEntry[]> {
+    return this.transport.call("fs.scan", { vault: this.vault, skipDirs: [...skipDirs], stats });
   }
 
   async mkdirp(dir: string): Promise<void> {

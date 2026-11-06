@@ -67,7 +67,7 @@ use watch::Watcher;
 #[rustfmt::skip] // grouped by family, one family per line
 pub const COMMANDS: &[&str] = &[
     "vault.pick", "vault.recent", "vault.inspect", "vault.open", "vault.close", "vault.reveal", "vault.shared", "vault.trash",
-    "fs.stat", "fs.read", "fs.list", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
+    "fs.stat", "fs.read", "fs.list", "fs.scan", "fs.mkdirp", "fs.write", "fs.rename", "fs.remove",
     "sql.exec", "sql.run", "sql.all", "sql.get",
     "watch.start", "watch.stop",
     "source.pick", "source.open", "source.list", "source.file.open", "source.file.read", "source.file.close",
@@ -342,6 +342,22 @@ impl Host {
             "fs.stat" => json(self.vault(args)?.fs.stat(str_arg(args, "path")?)?),
             "fs.read" => Ok((Value::Null, Some(self.vault(args)?.fs.read(str_arg(args, "path")?)?))),
             "fs.list" => json(self.vault(args)?.fs.list(str_arg(args, "dir")?)?),
+            "fs.scan" => {
+                let skip = match args.get("skipDirs") {
+                    None | Some(Value::Null) => Vec::new(),
+                    Some(Value::Array(names)) => names
+                        .iter()
+                        .map(|n| n.as_str().map(str::to_owned).ok_or_else(|| HostError::bad_argument("skipDirs must be strings")))
+                        .collect::<HostResult<Vec<_>>>()?,
+                    Some(_) => return Err(HostError::bad_argument("skipDirs must be an array")),
+                };
+                let stats = match args.get("stats") {
+                    None | Some(Value::Null) => true,
+                    Some(Value::Bool(b)) => *b,
+                    Some(_) => return Err(HostError::bad_argument("stats must be a boolean")),
+                };
+                json(self.vault(args)?.fs.scan(&skip, stats)?)
+            }
             "fs.mkdirp" => {
                 self.vault(args)?.fs.mkdirp(str_arg(args, "dir")?)?;
                 null()

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Mark } from "@thoth/app-ui/ui/Mark.tsx";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
-import { ImportWizard } from "../import/ImportWizard.tsx";
+import { ImportWizard } from "../import/LazyImportWizard.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { seedWelcome } from "./welcome.ts";

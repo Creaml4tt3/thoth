@@ -3,7 +3,7 @@ import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { STRINGS, useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
 import { LANG_PREFERENCES, LangPreferenceContext, useDesktopStrings, type LangPreference } from "../../strings/index.ts";
-import { ImportWizard } from "../import/ImportWizard.tsx";
+import { ImportWizard } from "../import/LazyImportWizard.tsx";
 import { ServersSettings } from "../servers/ServersSettings.tsx";
 import { AgentSettings } from "../agents/AgentSettings.tsx";
 import { NotificationSettings } from "../notifications/NotificationSettings.tsx";

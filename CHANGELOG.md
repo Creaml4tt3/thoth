@@ -8,6 +8,14 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- Saving a page takes the same time however many pages your Private Space has: Thoth checks only the page it saved, instead of every file in the folder.
+- Opening a Private Space you have opened before is faster: Thoth reads the whole folder in one step instead of one file at a time.
+- The app starts with less to load: the Plain editor, Agent Hub sessions, import, transfer and the mascot load the first time you use them.
+- Typing in a long page with headings is faster: autosave checks only the section you changed, not the whole page.
 ## [0.7.1] - 2026-11-06
 
 ### Changed

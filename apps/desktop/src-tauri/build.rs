@@ -5,7 +5,7 @@
 #[rustfmt::skip] // grouped by family, one family per line
 pub const TAURI_COMMANDS: &[&str] = &[
     "vault_pick", "vault_recent", "vault_inspect", "vault_open", "vault_close", "vault_reveal", "vault_shared", "vault_trash",
-    "fs_stat", "fs_read", "fs_list", "fs_mkdirp", "fs_write", "fs_rename", "fs_remove",
+    "fs_stat", "fs_read", "fs_list", "fs_scan", "fs_mkdirp", "fs_write", "fs_rename", "fs_remove",
     "sql_exec", "sql_run", "sql_all", "sql_get",
     "watch_start", "watch_stop",
     "source_pick", "source_open", "source_list", "source_file_open", "source_file_read", "source_file_close",

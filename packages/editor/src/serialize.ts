@@ -44,6 +44,8 @@ interface Composed {
   body: string;
   /** Emitted text of each non-empty block. */
   texts: string[];
+  /** Where each of `texts` starts in `body`. */
+  starts: number[];
   /** Entry index of each emitted block. */
   emitted: number[];
 }
@@ -51,6 +53,7 @@ interface Composed {
 function compose(entries: Entry[], flags: Flags[], eol: "\n" | "\r\n", trailer: string | null, leadingBlank: boolean): Composed {
   const safe = eol + eol;
   const texts: string[] = [];
+  const starts: number[] = [];
   const emitted: number[] = [];
   let body = "";
   let prev: Entry | undefined;
@@ -72,14 +75,16 @@ function compose(entries: Entry[], flags: Flags[], eol: "\n" | "\r\n", trailer: 
     } else {
       sep = safe;
     }
-    body += sep + text;
+    body += sep;
+    starts.push(body.length);
+    body += text;
     texts.push(text);
     emitted.push(i);
     prev = e;
     prevFamily = family;
     prevMarker = family ? listMarkerOf(text) : undefined;
   });
-  return { body: body + (trailer ?? (texts.length ? eol : "")), texts, emitted };
+  return { body: body + (trailer ?? (texts.length ? eol : "")), texts, starts, emitted };
 }
 
 /** Index of the first emitted block whose boundaries changed on re-parse, or -1. */
@@ -94,9 +99,75 @@ function firstMismatch(body: string, texts: string[]): number {
   return Math.min(n, texts.length - 1);
 }
 
+/**
+ * A one-line ATX heading at the start of a line. Parsed as a top-level heading, it closes on its own line with nothing
+ * else open (it is a leaf, and every block before it was closed to start it), and a closed block never opens again: what
+ * comes after it parses as a document of its own would. That makes it a safe place to cut the check below.
+ */
+const ATX = /^#{1,6}(?:[ \t][^\r\n]*)?$/;
+
+/** Parts already shown to parse into their blocks, by their text and their blocks' places: a long page re-checks only what changed. */
+const verified = new Map<string, true>();
+let verifiedChars = 0;
+const VERIFIED_MAX_CHARS = 8_000_000;
+
+function remember(key: string): void {
+  verified.set(key, true);
+  verifiedChars += key.length;
+  for (const [old] of verified) {
+    if (verifiedChars <= VERIFIED_MAX_CHARS) break;
+    verified.delete(old);
+    verifiedChars -= old.length;
+  }
+}
+
+/** True when `part` parses into exactly the blocks `texts` at `starts` (relative to the part), the last a heading when `heading`. */
+function partMatches(part: string, texts: string[], starts: number[], heading: boolean): boolean {
+  const key = `${heading ? "h" : "e"}${starts.map((s, j) => `${s}+${texts[j]!.length}`).join(",")}\u0000${part}`;
+  if (verified.has(key)) return true;
+  const kids = parseMarkdownTree(part).children;
+  if (kids.length !== texts.length) return false;
+  for (let j = 0; j < kids.length; j++) {
+    const p = kids[j]!.position;
+    if (p?.start.offset === undefined || p.end.offset === undefined || part.slice(p.start.offset, p.end.offset) !== texts[j]) return false;
+  }
+  if (heading && kids.at(-1)!.type !== "heading") return false;
+  remember(key);
+  return true;
+}
+
+/**
+ * True only when `firstMismatch` would find no mismatch, checked part by part: the body is cut after each block that is
+ * a one-line ATX heading and parses as one, each part is parsed alone, and a part seen before is not parsed again.
+ * False means "not shown": the caller then checks the whole body as before, so a false never changes the result.
+ */
+function allMatchInParts(body: string, texts: string[], starts: number[]): boolean {
+  let from = 0;
+  let first = 0;
+  for (let i = 0; i <= texts.length; i++) {
+    const last = i === texts.length;
+    if (!last && !ATX.test(texts[i]!)) continue;
+    const end = last ? body.length : starts[i]! + texts[i]!.length;
+    const count = last ? texts.length - first : i + 1 - first;
+    if (count > 0 || end > from) {
+      const part = body.slice(from, end);
+      const local = starts.slice(first, first + count).map((s) => s - from);
+      if (!partMatches(part, texts.slice(first, first + count), local, !last)) return false;
+    }
+    from = end;
+    first = i + 1;
+  }
+  return true;
+}
+
 const MODELED_RAW = new Set(["raw", "html", "math"]);
 
 export function docToMarkdown(doc: JSONContent, options: SerializeOptions = {}): string {
+  return serialize(doc, options, true);
+}
+
+/** `docToMarkdown`; `inParts` false checks the whole body every time, as before 0.8.0 (tests compare the two). */
+export function serialize(doc: JSONContent, options: SerializeOptions, inParts: boolean): string {
   if (doc.type !== "doc") throw new Error(`Expected a "doc" node, got "${String(doc.type)}"`);
   const frontmatter = options.frontmatter ?? "";
   const { eol, trailer } = readAttrs(DocAttrsSchema, doc);
@@ -105,8 +176,9 @@ export function docToMarkdown(doc: JSONContent, options: SerializeOptions = {}):
   const leadingBlank = frontmatter.replace(/^﻿/, "") !== "";
 
   for (let round = 0; ; round++) {
-    const { body, texts, emitted } = compose(entries, flags, eol, trailer, leadingBlank);
+    const { body, texts, starts, emitted } = compose(entries, flags, eol, trailer, leadingBlank);
     if (options.verify === false || texts.length === 0 || round > entries.length * 3 + 3) return frontmatter + body;
+    if (inParts && allMatchInParts(body, texts, starts)) return frontmatter + body;
     const j = firstMismatch(body, texts);
     if (j < 0) return frontmatter + body;
     // The block after the mismatch usually glued itself to its predecessor; the block itself is the fallback.

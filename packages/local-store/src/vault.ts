@@ -27,7 +27,8 @@ import {
   type JournalEntry,
 } from "./journal.ts";
 import { mimeTypeFor } from "./mime.ts";
-import type { FileStat, SqlDriver, VaultFs } from "./ports.ts";
+import type { FileStat, ScanEntry, SqlDriver, SqlValue, VaultFs } from "./ports.ts";
+import { scanByListing } from "./scan.ts";
 import { INDEX_DDL, INDEX_SCHEMA_VERSION } from "./schema.ts";
 import { tokenize, trigramMatch, wordMatch } from "./search-query.ts";
 
@@ -57,6 +58,25 @@ async function whileBusy<T>(step: () => Promise<T>): Promise<T> {
 
 /** Directories never indexed: Thoth metadata, other tools' metadata, VCS. */
 const IGNORED_DIRS = new Set([".thoth", ".obsidian", ".git", ".trash", "node_modules"]);
+
+/** A directory no walk of the vault enters: `IGNORED_DIRS`, and Thoth's own in any letter case or Unicode form. */
+const skippedDir = (name: string): boolean => IGNORED_DIRS.has(name) || isReservedPath(name);
+
+/** True for a path a walk of the vault reaches and indexes as a file: not inside a skipped directory, not `.DS_Store`. */
+function walkedFile(path: string): boolean {
+  const segments = path.split("/");
+  return segments.at(-1) !== ".DS_Store" && !segments.slice(0, -1).some(skippedDir);
+}
+
+/** Rows per multi-row INSERT: well under SQLite's 32,766 parameters for the widest table here (8 columns). */
+const INSERT_BATCH = 500;
+
+/** What a walk found: files sorted, entries it does not follow, and each file's stat when the port gave it. */
+interface Scanned {
+  files: string[];
+  skipped: { path: string; reason: string }[];
+  stats?: Map<string, FileStat>;
+}
 
 /** Obsidian's settings folder, anywhere in the path: read, never written (ADR-0051 rule 5). The host refuses it too. */
 function refuseObsidianSettings(...paths: string[]): void {
@@ -89,6 +109,12 @@ export interface ReconcileReport {
   unchanged: number;
   warnings: { path: string; code: string; message: string }[];
   recoveredJournalEntries: number;
+  /**
+   * Set when every path the reconcile was given is a file exactly as this vault last wrote and indexed it: the event was
+   * the echo of its own write, nothing was walked and nothing changed, so views have nothing new to show. Never set for
+   * another window's write to the same folder (ADR-0019), which the index already has too but this window has not shown.
+   */
+  echo?: true;
 }
 
 export interface SearchHit {
@@ -154,6 +180,8 @@ export class Vault {
   /** Serializes index mutations: the SQL port is one connection, and BEGIN/COMMIT must not interleave. */
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
+  /** The size and mtime of the files this vault wrote and indexed last, newest last (`ReconcileReport.echo`). */
+  private readonly written = new Map<string, FileStat>();
 
   private constructor(options: VaultOptions) {
     this.fs = options.fs;
@@ -250,24 +278,40 @@ export class Vault {
 
   // ---------------------------------------------------------------- scanning
 
-  /** Lists vault files, skipping ignored directories and never following symlinks. */
-  async scanFiles(): Promise<{ files: string[]; skipped: { path: string; reason: string }[] }> {
+  /**
+   * Every entry under the root that a walk of the vault reaches: one `scan` call when the port has it (the desktop host
+   * does), else `list` per folder. Skipped directories are neither entered nor listed; symlinks are not followed.
+   */
+  private async entries(stats = false): Promise<ScanEntry[]> {
+    const skip = [...IGNORED_DIRS];
+    // Without the port's scan, files are stated where they are read (`reconcileFiles`), one at a time as before.
+    const all = this.fs.scan ? await this.fs.scan(skip, stats) : await scanByListing(this.fs, skip, false);
+    // The port skips by exact name; Thoth's folder in another letter case or form is skipped here, with all under it.
+    return all.filter((entry) => {
+      const segments = entry.path.split("/");
+      return !(entry.kind === "directory" ? segments : segments.slice(0, -1)).some(skippedDir);
+    });
+  }
+
+  /** The files a reconcile reads, with their stats when the port gives them in the same call. */
+  private async scanNow(withStats = true): Promise<Scanned> {
     const files: string[] = [];
     const skipped: { path: string; reason: string }[] = [];
-    const walk = async (dir: string): Promise<void> => {
-      for (const entry of await this.fs.list(dir)) {
-        const path = dir ? `${dir}/${entry.name}` : entry.name;
-        if (entry.kind === "directory") {
-          if (!IGNORED_DIRS.has(entry.name) && !isReservedPath(entry.name)) await walk(path);
-        } else if (entry.kind === "file") {
-          if (entry.name !== ".DS_Store") files.push(path);
-        } else {
-          skipped.push({ path, reason: entry.kind === "symlink" ? "symlink not followed" : "not a regular file" });
-        }
-      }
-    };
-    await walk("");
+    const stats = new Map<string, FileStat>();
+    for (const entry of await this.entries(withStats)) {
+      if (entry.kind === "file") {
+        if (basename(entry.path) === ".DS_Store") continue;
+        files.push(entry.path);
+        if (entry.size !== undefined && entry.mtimeMs !== undefined) stats.set(entry.path, { kind: "file", size: entry.size, mtimeMs: entry.mtimeMs });
+      } else if (entry.kind !== "directory") skipped.push({ path: entry.path, reason: entry.kind === "symlink" ? "symlink not followed" : "not a regular file" });
+    }
     files.sort();
+    return { files, skipped, stats };
+  }
+
+  /** Lists vault files, skipping ignored directories and never following symlinks. */
+  async scanFiles(): Promise<{ files: string[]; skipped: { path: string; reason: string }[] }> {
+    const { files, skipped } = await this.scanNow(false);
     return { files, skipped };
   }
 
@@ -281,31 +325,42 @@ export class Vault {
   async reconcile(options: { full?: boolean; changed?: readonly string[] } = {}): Promise<ReconcileReport> {
     return this.exclusive(async () => {
       // A watcher event for Thoth's own save arrives after the save already reindexed: a few stats instead of the walk.
-      if (!options.full && options.changed && (await this.indexMatches(options.changed)))
-        return { added: [], updated: [], removed: [], unchanged: options.changed.length, warnings: [], recoveredJournalEntries: 0 };
+      const stats = !options.full && options.changed ? await this.indexMatches(options.changed) : undefined;
+      if (stats) {
+        const report: ReconcileReport = { added: [], updated: [], removed: [], unchanged: stats.size, warnings: [], recoveredJournalEntries: 0 };
+        const own = [...stats].every(([path, stat]) => {
+          const mine = this.written.get(path);
+          return mine !== undefined && mine.size === stat.size && mine.mtimeMs === stat.mtimeMs;
+        });
+        if (own) report.echo = true;
+        return report;
+      }
       return this.reconcileNow(options);
     });
   }
 
   /**
-   * True when every path is a file the index already has at its current size and mtime: the same fast path a reconcile
-   * takes, so a reconcile would change nothing for them. Anything else (gone, a folder, not indexed) means walk.
+   * Each path's stat when every one is a file the index already has at its current size and mtime: the same fast path a
+   * reconcile takes, so a reconcile would change nothing for them. Undefined for anything else (gone, a folder, not
+   * indexed): then walk.
    */
-  private async indexMatches(paths: readonly string[]): Promise<boolean> {
-    if (paths.length === 0) return false;
+  private async indexMatches(paths: readonly string[]): Promise<Map<string, FileStat> | undefined> {
+    if (paths.length === 0) return undefined;
+    const stats = new Map<string, FileStat>();
     for (const path of paths) {
       let stat: FileStat | undefined;
       try {
         stat = await this.fs.stat(path);
       } catch {
-        return false;
+        return undefined;
       }
-      if (!stat || stat.kind !== "file") return false;
+      if (!stat || stat.kind !== "file") return undefined;
       const table = isMarkdownPath(path) ? "pages" : "attachments";
       const row = await this.sql.get<{ size: number; mtime_ms: number }>(`SELECT size, mtime_ms FROM ${table} WHERE path = ?`, [path]);
-      if (!row || row.size !== stat.size || row.mtime_ms !== stat.mtimeMs) return false;
+      if (!row || row.size !== stat.size || row.mtime_ms !== stat.mtimeMs) return undefined;
+      stats.set(path, stat);
     }
-    return true;
+    return stats;
   }
 
   /** Runs `task` after every earlier mutation has settled, so the watcher, saves and imports never overlap. */
@@ -317,8 +372,53 @@ export class Vault {
   }
 
   private async reconcileNow(options: { full?: boolean } = {}): Promise<ReconcileReport> {
-    const scanned = await this.scanFiles();
+    const scanned = await this.scanNow();
     return this.inIndexTransaction(() => this.reconcileFiles(scanned, options));
+  }
+
+  /**
+   * A reconcile of just `paths`, files Thoth itself has just written or deleted: the rest of the vault is as the index
+   * has it, so a save costs the same however big the Private Space is. Anything the index cannot settle from these paths
+   * alone walks: a folder, or a path not indexed as such while another one differs from it only in letter case or
+   * Unicode form (on some disks they are the same file). Paths a walk would not index stay out.
+   */
+  private async reconcilePathsNow(paths: readonly string[]): Promise<ReconcileReport> {
+    const files: string[] = [];
+    const stats = new Map<string, FileStat>();
+    for (const path of paths) {
+      if (!walkedFile(path)) continue;
+      const stat = await this.fs.stat(path);
+      if (stat && stat.kind !== "file") return this.reconcileNow();
+      if (stat) {
+        files.push(path);
+        stats.set(path, stat);
+      }
+      if (!(await this.indexedAs(path)) && (await this.indexedLike(path))) return this.reconcileNow();
+    }
+    const report = await this.inIndexTransaction(() => this.reconcileFiles({ files: files.sort(), skipped: [], stats }, {}, paths));
+    for (const [path, stat] of stats) {
+      this.written.delete(path);
+      this.written.set(path, stat);
+    }
+    // Only the latest few matter: the watcher's event for a write arrives within moments of it.
+    for (const path of this.written.keys()) {
+      if (this.written.size <= 256) break;
+      this.written.delete(path);
+    }
+    return report;
+  }
+
+  private async indexedAs(path: string): Promise<boolean> {
+    const table = isMarkdownPath(path) ? "pages" : "attachments";
+    return (await this.sql.get(`SELECT 1 AS found FROM ${table} WHERE path = ?`, [path])) !== undefined;
+  }
+
+  /** True when the index has another path that differs from `path` only in letter case or Unicode form. */
+  private async indexedLike(path: string): Promise<boolean> {
+    const key = collisionKey(path);
+    if (await this.sql.get("SELECT 1 AS found FROM pages WHERE path_key = ? AND path <> ?", [key, path])) return true;
+    // Attachments keep no key; one call, compared here. Only for a path new to the index, which is rare for a write.
+    return (await this.sql.all<{ path: string }>("SELECT path FROM attachments")).some((a) => a.path !== path && collisionKey(a.path) === key);
   }
 
   /**
@@ -348,15 +448,26 @@ export class Vault {
    * The body of a reconcile, inside the caller's transaction. What the index knows is read here, under the write lock:
    * another window's reconcile that committed just before cannot leave this one working from rows that changed.
    */
-  private async reconcileFiles({ files, skipped }: { files: string[]; skipped: { path: string; reason: string }[] }, options: { full?: boolean }): Promise<ReconcileReport> {
+  private async reconcileFiles({ files, skipped, stats }: Scanned, options: { full?: boolean }, only?: readonly string[]): Promise<ReconcileReport> {
     const report: ReconcileReport = { added: [], updated: [], removed: [], unchanged: 0, warnings: [], recoveredJournalEntries: 0 };
     for (const s of skipped) report.warnings.push({ path: s.path, code: "skipped_entry", message: s.reason });
 
+    // With `only`, the index rows of those paths alone: one of them that is no longer a file is the only thing removed.
     const known = new Map<string, PageRow>();
-    for (const row of await this.sql.all<PageRow>("SELECT id, path, title, content_hash, size, mtime_ms FROM pages")) known.set(row.path, row);
     const knownAttachments = new Map<string, { hash: string; size: number; mtime_ms: number }>();
-    for (const row of await this.sql.all<{ path: string; hash: string; size: number; mtime_ms: number }>("SELECT path, hash, size, mtime_ms FROM attachments"))
-      knownAttachments.set(row.path, row);
+    if (only) {
+      for (const path of only) {
+        const page = await this.sql.get<PageRow>("SELECT id, path, title, content_hash, size, mtime_ms FROM pages WHERE path = ?", [path]);
+        if (page) known.set(path, page);
+        const attachment = await this.sql.get<{ path: string; hash: string; size: number; mtime_ms: number }>("SELECT path, hash, size, mtime_ms FROM attachments WHERE path = ?", [path]);
+        if (attachment) knownAttachments.set(path, attachment);
+      }
+    } else {
+      for (const row of await this.sql.all<PageRow>("SELECT id, path, title, content_hash, size, mtime_ms FROM pages")) known.set(row.path, row);
+      for (const row of await this.sql.all<{ path: string; hash: string; size: number; mtime_ms: number }>("SELECT path, hash, size, mtime_ms FROM attachments"))
+        knownAttachments.set(row.path, row);
+    }
+    const statOf = async (path: string) => stats?.get(path) ?? (await this.fs.stat(path));
 
     const markdown = files.filter(isMarkdownPath);
     const others = files.filter((f) => !isMarkdownPath(f));
@@ -368,7 +479,7 @@ export class Vault {
       known.delete(path);
       // One unreadable or pathological file must never make the vault unusable.
       try {
-        const stat = await this.fs.stat(path);
+        const stat = await statOf(path);
         if (!stat) continue;
         if (!options.full && prev && prev.size === stat.size && prev.mtime_ms === stat.mtimeMs) {
           report.unchanged++;
@@ -407,7 +518,7 @@ export class Vault {
       let stat;
       let hash: string;
       try {
-        stat = await this.fs.stat(path);
+        stat = await statOf(path);
         if (!stat) continue;
         if (!options.full && prev && prev.size === stat.size && prev.mtime_ms === stat.mtimeMs) continue;
         hash = sha256Hex(await this.fs.readFile(path));
@@ -445,7 +556,7 @@ export class Vault {
       this.inIndexTransaction(async () => {
         for (const table of ["pages", "page_aliases", "page_tags", "blocks", "refs", "attachments", "search_content", "search_trigram", "index_warnings"])
           await this.sql.exec(`DELETE FROM ${table}`);
-        return this.reconcileFiles(await this.scanFiles(), { full: true });
+        return this.reconcileFiles(await this.scanNow(), { full: true });
       }),
     );
   }
@@ -509,29 +620,29 @@ export class Vault {
       "INSERT INTO pages (id, claimed_id, path, path_key, title, content_hash, size, mtime_ms, page_date, stable_id, frontmatter_error, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [id, claimed, path, collisionKey(path), doc.title, hash, size, mtimeMs, doc.date ?? null, isStableId(id) ? 1 : 0, doc.frontmatterError ?? null, this.now()],
     );
-    for (const alias of doc.aliases) await this.sql.run("INSERT INTO page_aliases (page_id, alias) VALUES (?, ?)", [id, alias]);
-    for (const tag of doc.tags) await this.sql.run("INSERT INTO page_tags (page_id, tag) VALUES (?, ?)", [id, tag]);
-    let ord = 0;
-    for (const block of doc.blocks) {
-      await this.sql.run("INSERT INTO blocks (page_id, ord, type, anchor, start_line, end_line) VALUES (?, ?, ?, ?, ?, ?)", [
-        id,
-        ord++,
-        block.type,
-        block.anchor ?? null,
-        block.range.startLine,
-        block.range.endLine,
-      ]);
-    }
-    ord = 0;
-    for (const ref of doc.references) {
-      await this.sql.run(
-        "INSERT INTO refs (source_page_id, ord, syntax, target, fragment, external, resolution, target_path, line) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)",
-        [id, ord++, ref.syntax, ref.target, ref.fragment ?? null, ref.external ? 1 : 0, ref.external ? "external" : "unresolved", ref.range.startLine],
-      );
-    }
+    // Many rows per statement: on desktop each statement is a round trip, and a long page has a row per block.
+    await this.insertRows("page_aliases (page_id, alias)", doc.aliases.map((alias) => [id, alias]));
+    await this.insertRows("page_tags (page_id, tag)", doc.tags.map((tag) => [id, tag]));
+    await this.insertRows(
+      "blocks (page_id, ord, type, anchor, start_line, end_line)",
+      doc.blocks.map((block, ord) => [id, ord, block.type, block.anchor ?? null, block.range.startLine, block.range.endLine]),
+    );
+    await this.insertRows(
+      "refs (source_page_id, ord, syntax, target, fragment, external, resolution, target_path, line)",
+      doc.references.map((ref, ord) => [id, ord, ref.syntax, ref.target, ref.fragment ?? null, ref.external ? 1 : 0, ref.external ? "external" : "unresolved", null, ref.range.startLine]),
+    );
     const searchable = [doc.title, doc.aliases.join(" "), doc.plainText].join("\n");
     await this.sql.run("INSERT INTO search_content (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
     await this.sql.run("INSERT INTO search_trigram (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
+  }
+
+  /** `INSERT INTO <into> VALUES (…), (…)…`, `INSERT_BATCH` rows per statement, in order. */
+  private async insertRows(into: string, rows: readonly (readonly SqlValue[])[]): Promise<void> {
+    for (let i = 0; i < rows.length; i += INSERT_BATCH) {
+      const batch = rows.slice(i, i + INSERT_BATCH);
+      const tuple = `(${batch[0]!.map(() => "?").join(", ")})`;
+      await this.sql.run(`INSERT INTO ${into} VALUES ${batch.map(() => tuple).join(", ")}`, batch.flat());
+    }
   }
 
   private async resolveAllReferences(): Promise<void> {
@@ -608,8 +719,26 @@ export class Vault {
     }));
   }
 
+  /** One page's summary, as `listPages` gives it, without listing them all. */
   async pageByPath(path: string): Promise<PageSummary | undefined> {
-    return (await this.listPages()).find((p) => p.path === normalizeVaultPath(path));
+    const r = await this.sql.get<{ id: string; path: string; title: string; content_hash: string; size: number; mtime_ms: number; page_date: string | null }>(
+      "SELECT id, path, title, content_hash, size, mtime_ms, page_date FROM pages WHERE path = ?",
+      [normalizeVaultPath(path)],
+    );
+    if (!r) return undefined;
+    const aliases = await this.sql.all<{ alias: string }>("SELECT alias FROM page_aliases WHERE page_id = ?", [r.id]);
+    const tags = await this.sql.all<{ tag: string }>("SELECT tag FROM page_tags WHERE page_id = ?", [r.id]);
+    return {
+      id: r.id,
+      path: r.path,
+      title: r.title,
+      contentHash: r.content_hash,
+      size: r.size,
+      mtimeMs: r.mtime_ms,
+      aliases: aliases.map((a) => a.alias),
+      tags: tags.map((t) => t.tag),
+      ...(r.page_date ? { date: r.page_date } : {}),
+    };
   }
 
   async readPage(path: string): Promise<ReadResult> {
@@ -732,7 +861,7 @@ export class Vault {
       throw error;
     }
     await clearJournalEntry(this.fs, id);
-    if (reconcile) await this.reindexAfterChange();
+    if (reconcile) await this.reindexAfterChange([normalized]);
     return newHash;
   }
 
@@ -741,9 +870,9 @@ export class Vault {
    * example the index stayed busy in another window past SQLite's wait, ADR-0019): the index is a cache, so the failure
    * is not the caller's, and a reconcile is queued to catch up (the watcher triggers more).
    */
-  private async reindexAfterChange(): Promise<void> {
+  private async reindexAfterChange(paths?: readonly string[]): Promise<void> {
     try {
-      await this.reconcileNow();
+      await (paths ? this.reconcilePathsNow(paths) : this.reconcileNow());
     } catch {
       void this.reconcile().catch(() => undefined);
     }
@@ -781,7 +910,7 @@ export class Vault {
       }
       await this.fs.remove(tempPath);
       await clearJournalEntry(this.fs, id);
-      await this.reindexAfterChange();
+      await this.reindexAfterChange([normalized]);
     });
   }
 
@@ -906,17 +1035,10 @@ export class Vault {
 
   /** Every folder in the vault (also empty ones), sorted; the same folders `scanFiles` walks. */
   async listFolders(): Promise<string[]> {
-    const out: string[] = [];
-    const walk = async (dir: string): Promise<void> => {
-      for (const entry of await this.fs.list(dir)) {
-        if (entry.kind !== "directory" || IGNORED_DIRS.has(entry.name) || isReservedPath(entry.name)) continue;
-        const path = dir ? `${dir}/${entry.name}` : entry.name;
-        out.push(path);
-        await walk(path);
-      }
-    };
-    await walk("");
-    return out.sort();
+    return (await this.entries())
+      .filter((entry) => entry.kind === "directory")
+      .map((entry) => entry.path)
+      .sort();
   }
 
   /**
