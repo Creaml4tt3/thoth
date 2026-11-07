@@ -4,7 +4,8 @@
  * Private Spaces shared, the apps and their self-reported names, "Copy the setup", the request log), the Allow / Deny
  * question when a new app connects, and a window answering an app's request from its open Vault.
  */
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { DEFAULT_DAILY, dailyPath } from "@thoth/local-store";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
@@ -350,6 +351,41 @@ describe("A window answers from its open Vault", () => {
     expect(await answered("f1")).toEqual({ result: { pages: 1, thoth: true } }); // About me
     apps.request({ ...base, id: "f2", tool: "memory_folder", args: { folder: ".thoth" } });
     expect(await answered("f2")).toEqual({ error: { code: "BAD_ARGUMENT", message: expect.any(String) } });
+  });
+
+  it("lists and reads skills, and names today's note or how it would start (ADR-0052)", async () => {
+    await mkdir(join(root, "Skills/weekly-update/references"), { recursive: true });
+    await writeFile(join(root, "Skills/weekly-update/SKILL.md"), "---\nname: weekly-update\ndescription: Writes the weekly\n  update.\n---\nBlockers first.\n");
+    await writeFile(join(root, "Skills/weekly-update/references/style.md"), "Short lines.\n");
+    await writeFile(join(root, "Skills/weekly-update/run.sh"), "echo hi\n");
+    await mkdir(join(root, "Skills/notes-only"));
+    await writeFile(join(root, "Skills/notes-only/README.md"), "Not a skill: no SKILL.md.\n");
+    const { root: shown } = await seeded();
+    const base = { owner: "main", root: shown, space: "Notes" } as const;
+
+    apps.request({ ...base, id: "k1", tool: "list_skills", args: {} });
+    expect(await answered("k1")).toEqual({ result: { skills: [{ name: "weekly-update", description: "Writes the weekly update.", path: "Skills/weekly-update/SKILL.md" }] } });
+    apps.request({ ...base, id: "k2", tool: "get_skill", args: { name: "Weekly-Update" } });
+    expect(await answered("k2")).toEqual({
+      result: { skill: { name: "weekly-update", path: "Skills/weekly-update/SKILL.md", text: expect.stringContaining("Blockers first."), files: ["references/style.md", "run.sh"] } },
+    });
+    apps.request({ ...base, id: "k3", tool: "get_skill", args: { name: "weekly-update", file: "run.sh" } });
+    expect(await answered("k3")).toMatchObject({ result: { skill: { path: "Skills/weekly-update/run.sh", text: "echo hi\n", files: ["references/style.md", "SKILL.md"] } } });
+    for (const [id, args] of [["k4", { name: "notes-only" }], ["k5", { name: "weekly-update", file: "nope.md" }]] as const) {
+      apps.request({ ...base, id, tool: "get_skill", args });
+      expect(await answered(id)).toEqual({ result: { skill: null } });
+    }
+
+    // No note for today yet: where it goes and how it starts; nothing is written.
+    const today = dailyPath(DEFAULT_DAILY, new Date());
+    apps.request({ ...base, id: "d1", tool: "read_page", args: { today: true } });
+    expect(await answered("d1")).toEqual({ result: { page: null, today: { path: today, markdown: expect.stringContaining(`# ${today.split("/").pop()!.replace(/\.md$/, "")}`) } } });
+    await expect(readFile(join(root, today), "utf8")).rejects.toThrow();
+    // Once it is there, it is read like any page.
+    await mkdir(join(root, today, ".."), { recursive: true });
+    await writeFile(join(root, today), "# Today\n\n- one\n");
+    apps.request({ ...base, id: "d2", tool: "read_page", args: { today: true } });
+    expect(await answered("d2")).toMatchObject({ result: { page: { path: today, markdown: "# Today\n\n- one\n" } } });
   });
 
   it("answers only what was sent to this window, for its own Private Space", async () => {

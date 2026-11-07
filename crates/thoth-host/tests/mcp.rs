@@ -26,6 +26,8 @@ fn window_answer(tool: &str, args: &Value) -> Value {
         "read_page" if args["path"] == "Plan.md" || args["id"] == "p1" => {
             json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan", "markdown": PLAN, "attachments": ["chart.png"], "hash": PLAN_HASH } } })
         }
+        // Today's note (ADR-0051) is not there yet: the window says where it goes and how it would start.
+        "read_page" if args["today"] == true => json!({ "result": { "page": null, "today": { "path": "Daily/2026-11-07.md", "markdown": "# 2026-11-07\n" } } }),
         "read_page" | "backlinks" if args["path"] != "Plan.md" => json!({ "error": { "code": "NOT_FOUND", "message": "No page Nope.md" } }),
         "backlinks" => {
             json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan" }, "links": [{ "id": "p2", "path": "Log.md", "title": "Log", "line": 3 }], "total": 1 } })
@@ -39,6 +41,13 @@ fn window_answer(tool: &str, args: &Value) -> Value {
             "memories": [memory(false), memory(true)], "total": 2
         } }),
         "list_memories" => json!({ "result": { "memories": [memory(false), memory(true), memory(false)], "total": 3 } }),
+        "list_skills" => json!({ "result": { "skills": [
+            { "name": "weekly-update", "description": "Writes the weekly update. Use it on Fridays.", "path": "Skills/weekly-update/SKILL.md", "secret": "never shown" }
+        ] } }),
+        "get_skill" if args["name"] == "weekly-update" && args.get("file").is_none() => json!({ "result": { "skill": {
+            "name": "weekly-update", "path": "Skills/weekly-update/SKILL.md", "text": "---\nname: weekly-update\n---\nBlockers first.\n", "files": ["references/style.md"]
+        } } }),
+        "get_skill" => json!({ "result": { "skill": null } }),
         _ => json!({ "error": { "code": "INTERNAL", "message": "?" } }),
     }
 }
@@ -1022,4 +1031,68 @@ fn an_unanswered_memory_folder_question_times_out_and_a_folder_thoth_set_up_is_n
     let _ = ask(&socket(&f), "Claude", "recall", json!({}));
     assert_eq!(f.relay.settings()["memoryFolders"], json!({ NOTES: "Memory" }));
     assert_eq!(f.relay.settings()["folders"], json!([]));
+}
+
+#[test]
+fn skills_are_listed_and_read_and_never_a_memory_folder() {
+    let f = fixture(fast());
+    ready(&f, "Claude");
+    let socket = socket(&f);
+    let listed = ask(&socket, "Claude", "list_skills", json!({}));
+    assert_eq!(listed["ok"], true, "{listed}");
+    assert_eq!(
+        listed["result"]["structured"]["skills"],
+        json!([{ "space": "Notes", "name": "weekly-update", "description": "Writes the weekly update. Use it on Fridays.", "path": "Skills/weekly-update/SKILL.md" }])
+    );
+    assert!(listed["result"]["text"].as_str().unwrap().contains("- weekly-update: Writes the weekly update."));
+
+    let read = ask(&socket, "Claude", "get_skill", json!({ "name": "weekly-update" }));
+    assert_eq!(read["result"]["text"], "---\nname: weekly-update\n---\nBlockers first.\n", "{read}");
+    assert_eq!(read["result"]["structured"]["files"], json!(["references/style.md"]));
+    let asked = f.requests.lock().unwrap().last().cloned().unwrap();
+    assert_eq!((asked["tool"].clone(), asked["args"].clone()), (json!("get_skill"), json!({ "name": "weekly-update" })));
+    assert_eq!(error_code(&ask(&socket, "Claude", "get_skill", json!({ "name": "nope" }))), "NOT_FOUND");
+    for (name, file) in [("../x", None), (".hidden", None), ("a/b", None), ("", None), ("ok", Some("../SKILL.md")), ("ok", Some(".env"))] {
+        let mut args = json!({ "name": name });
+        if let Some(file) = file {
+            args["file"] = json!(file);
+        }
+        assert_eq!(error_code(&ask(&socket, "Claude", "get_skill", args)), "BAD_ARGUMENT", "{name} {file:?}");
+    }
+
+    // Skills are always reviewed: the memory folder can never be in Skills/.
+    for folder in ["Skills", "skills/Memory"] {
+        assert_eq!(f.relay.memory_folder("main", NOTES, folder).unwrap_err().code, "BAD_ARGUMENT", "{folder}");
+    }
+}
+
+#[test]
+fn an_addition_to_todays_note_is_a_proposal_and_starts_the_note_when_there_is_none() {
+    let f = fixture(fast());
+    may_propose(&f, "Claude");
+    let socket = socket(&f);
+    // None yet: a new page, as the window would start it, with the addition.
+    let made = ask(&socket, "Claude", "propose_append", json!({ "today": true, "markdown": "- Shipped the memory view" }));
+    assert_eq!(made["result"]["structured"]["path"], "Daily/2026-11-07.md", "{made}");
+    let asked = f.requests.lock().unwrap().last().cloned().unwrap();
+    assert_eq!((asked["tool"].clone(), asked["args"].clone()), (json!("read_page"), json!({ "today": true })));
+    let id = made["result"]["structured"]["id"].as_str().unwrap();
+    let kept = f.relay.proposal(id).unwrap();
+    assert_eq!((kept["kind"].clone(), kept["before"].clone(), kept["baseHash"].clone()), (json!("create"), Value::Null, Value::Null));
+    assert_eq!(kept["after"], "# 2026-11-07\n\n- Shipped the memory view\n");
+
+    // There: an addition to it, like any page.
+    *f.answer_with.lock().unwrap() = Some(
+        json!({ "result": { "page": { "id": "d1", "path": "Daily/2026-11-07.md", "title": "2026-11-07", "markdown": "# 2026-11-07\n", "attachments": [], "hash": "d0" } } }),
+    );
+    let again = ask(&socket, "Claude", "propose_append", json!({ "today": true, "markdown": "- More" }));
+    let kept = f.relay.proposal(again["result"]["structured"]["id"].as_str().unwrap()).unwrap();
+    assert_eq!((kept["kind"].clone(), kept["baseHash"].clone()), (json!("append"), json!("d0")));
+    *f.answer_with.lock().unwrap() = None;
+
+    // A path the window gave that is not a page is refused; today with a path is a mistake.
+    *f.answer_with.lock().unwrap() = Some(json!({ "result": { "page": null, "today": { "path": "../x.md", "markdown": "" } } }));
+    assert_eq!(error_code(&ask(&socket, "Claude", "propose_append", json!({ "today": true, "markdown": "x" }))), "INTERNAL");
+    *f.answer_with.lock().unwrap() = None;
+    assert_eq!(error_code(&ask(&socket, "Claude", "propose_append", json!({ "today": true, "path": "Plan.md", "markdown": "x" }))), "BAD_ARGUMENT");
 }

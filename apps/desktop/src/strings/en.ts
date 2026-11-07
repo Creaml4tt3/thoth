@@ -359,6 +359,8 @@ export const en = {
       update_memory: "Change a memory",
       forget: "Forget a memory",
       list_memories: "List memories",
+      list_skills: "List skills",
+      get_skill: "Read a skill",
       unknown: "Something unknown",
     } satisfies Record<string, string>,
     answered: "Answered",

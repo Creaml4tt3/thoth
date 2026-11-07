@@ -732,12 +732,23 @@ impl Inner {
     /// and answers at once with its id. Nothing is written: the user reviews it in a window.
     fn propose(&self, app: &str, call: &Call, target: &Target, found: &Value) -> HostResult<tools::Answer> {
         let malformed = || HostError::internal("Thoth's window sent an answer it should not have");
+        // The text an addition to a new page goes after (today's note as the window would start it).
+        let mut start_text: Option<String> = None;
         let (kind, path, page_id, base_hash, before) = match call {
             Call::ProposeCreate { path, .. } => {
                 if !found.is_null() {
                     return Err(HostError::new("EXISTS", format!("{path} is already a page: propose an edit instead, or another path")));
                 }
                 (Kind::Create, path.clone(), None, None, None)
+            }
+            // Today's note does not exist yet: a new page, as the window would start it (its template), with the addition.
+            Call::ProposeAppend { page: tools::PageRef::Today, .. } if found.get("page").is_some_and(Value::is_null) => {
+                let today = found.get("today").ok_or_else(malformed)?;
+                let path = today.get("path").and_then(Value::as_str).map(str::to_owned).ok_or_else(malformed)?;
+                let start = today.get("markdown").and_then(Value::as_str).map(str::to_owned).ok_or_else(malformed)?;
+                tools::check_new_page(&path).map_err(|_| malformed())?;
+                start_text = Some(start);
+                (Kind::Create, path, None, None, None)
             }
             _ => {
                 let page = found.get("page").ok_or_else(malformed)?;
@@ -759,7 +770,7 @@ impl Inner {
         {
             return Err(HostError::new("CONFLICT", format!("{path} changed since version {expected}: read it again, then propose the change again")));
         }
-        let after = tools::proposed_text(call, before.as_deref())?;
+        let after = tools::proposed_text(call, before.as_deref().or(start_text.as_deref()))?;
         if after.len() > tools::MAX_MARKDOWN {
             return Err(HostError::new("TOO_LARGE", "The page would be over 1 MB: propose a smaller change"));
         }
@@ -779,6 +790,7 @@ impl Inner {
         })?;
         self.emit_proposals();
         let what = match kind {
+            Kind::Create if start_text.is_some() => "today's note, new,",
             Kind::Create => "a new page",
             Kind::Edit => "a change to",
             Kind::Append => "an addition to",

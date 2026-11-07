@@ -19,11 +19,14 @@ import {
   planRemember,
   planUpdate,
   recallMemories,
+  listSkills,
+  readSkill,
   type Memory,
   type Vault,
 } from "@thoth/local-store";
 import type { McpAnswer, McpRequest } from "@thoth/platform";
 import type { PageSummary } from "@thoth/domain";
+import { planToday } from "../shell/today.ts";
 
 class NotFound extends Error {}
 
@@ -55,7 +58,15 @@ async function run(vault: Vault, request: McpRequest, now: Date, options: Answer
       return { pages: pages.slice(0, request.args.limit).map(summary), total: pages.length };
     }
     case "read_page": {
-      const page = await find(vault, request, request.args);
+      let args = request.args;
+      if ("today" in args) {
+        const today = await planToday(vault, now);
+        // Not there yet: the host proposes it as a new page, started as Today would start it.
+        if (!today.existing) return { page: null, today: { path: today.path, markdown: today.text } };
+        await vault.reconcile({ changed: [today.path] }).catch(() => undefined);
+        args = { path: today.path };
+      }
+      const page = await find(vault, request, args);
       const read = await vault.readPage(page.path);
       const attachments = new Set((await vault.listAttachments()).map((a) => a.path));
       const linked = (await vault.outgoingLinks(page.path)).flatMap((l) => (l.targetPath !== null && attachments.has(l.targetPath) ? [l.targetPath] : []));
@@ -95,6 +106,10 @@ async function run(vault: Vault, request: McpRequest, now: Date, options: Answer
     }
     case "memory_folder":
       return memoryFolderUse(vault, checkMemoryFolder(request.args.folder));
+    case "list_skills":
+      return { skills: await listSkills(vault) };
+    case "get_skill":
+      return { skill: await readSkill(vault, request.args.name, request.args.file) };
   }
 }
 

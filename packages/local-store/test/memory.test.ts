@@ -241,7 +241,7 @@ describe("the memory folder chosen (ADR-0052 rule 1)", () => {
   it("is a folder in the Private Space, never the top level or a hidden one", () => {
     expect(checkMemoryFolder(" /Agents/Memory/ ")).toBe("Agents/Memory");
     expect(checkMemoryFolder("ความจำ")).toBe("ความจำ");
-    for (const bad of ["", "/", ".thoth", "Agents/.hidden", "a/../b", "a//b", "a\\b", "a\u0000", "x".repeat(201)]) expect(() => checkMemoryFolder(bad), bad).toThrow(MemoryError);
+    for (const bad of ["", "/", ".thoth", "Agents/.hidden", "a/../b", "a//b", "a\\b", "a\u0000", "x".repeat(201), "Skills", "skills/Memory"]) expect(() => checkMemoryFolder(bad), bad).toThrow(MemoryError);
     expect(inMemoryFolder("Agents/Memory/a.md", "Agents/Memory")).toBe(true);
     expect(inMemoryFolder("Agents/Memory.md", "Agents/Memory")).toBe(false);
     expect(inMemoryFolder("Agents/Memoryx/a.md", "Agents/Memory")).toBe(false);
