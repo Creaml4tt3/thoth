@@ -16,6 +16,7 @@ import { FeedbackRequestSchema } from "./feedback.ts";
 import { LimitedPageListSchema, PageVisibilitySchema, PageVisibilityWriteSchema, TeamIdSchema, TeamListSchema, TeamPageListSchema, TeamSchema, TeamWriteSchema } from "./teams.ts";
 import { TrashListSchema, TrashRestoredSchema } from "./trash.ts";
 import { PresenceListSchema } from "./presence.ts";
+import { TeamMemoryListQuerySchema, TeamMemoryProposalIdSchema, TeamMemoryProposalListSchema, TeamMemoryProposalSchema, TeamMemoryProposalTextSchema, TeamMemoryProposeSchema, TeamMemoryReviewWriteSchema, TeamMemorySettingsSchema } from "./team-memory.ts";
 
 /**
  * Route registry: the single typed table the OpenAPI document, the conformance suite
@@ -105,6 +106,7 @@ const workspaceParams = { workspaceId: WorkspaceIdSchema } as const;
 const pageParams = { workspaceId: WorkspaceIdSchema, pageId: PageIdSchema } as const;
 const memberParams = { workspaceId: WorkspaceIdSchema, userId: OpaqueIdSchema } as const;
 const teamParams = { workspaceId: WorkspaceIdSchema, teamId: TeamIdSchema } as const;
+const proposalParams = { workspaceId: WorkspaceIdSchema, proposalId: TeamMemoryProposalIdSchema } as const;
 const teamMemberParams = { workspaceId: WorkspaceIdSchema, teamId: TeamIdSchema, userId: OpaqueIdSchema } as const;
 
 interface RouteInit {
@@ -734,6 +736,100 @@ export const ROUTES: readonly RouteDefinition[] = [
     pathParams: workspaceParams,
     responses: [json(200, "The limited pages.", LimitedPageListSchema)],
     errors: ["forbidden", "not_found"],
+  }),
+  route({
+    operationId: "getTeamMemory",
+    method: "get",
+    path: "/workspaces/{workspaceId}/team-memory",
+    tag: "Team memory",
+    summary: "The workspace's Team memory setting and folder",
+    description: "ADR-0052 rule 8. Every member. `review` is \"Agents' memories need review\" (on by default). `folderId` is the top-level folder titled `Team memory` when there is one the caller sees, else null.",
+    capability: "team-memory",
+    pathParams: workspaceParams,
+    responses: [json(200, "The setting and the folder.", TeamMemorySettingsSchema)],
+    errors: ["validation_failed", "not_found"],
+  }),
+  route({
+    operationId: "setTeamMemoryReview",
+    method: "put",
+    path: "/workspaces/{workspaceId}/team-memory/review",
+    tag: "Team memory",
+    summary: "Turn review of agents' memories on or off",
+    description: "ADR-0052 rule 8. Owners and managers (403 for other members). Off: a memory from an editor or above is applied at once; proposals already waiting stay until someone settles them.",
+    capability: "team-memory",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: TeamMemoryReviewWriteSchema, required: true, description: "The setting." },
+    responses: [json(200, "The setting and the folder.", TeamMemorySettingsSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "proposeTeamMemory",
+    method: "post",
+    path: "/workspaces/{workspaceId}/team-memory/proposals",
+    tag: "Team memory",
+    summary: "An agent's memory for the workspace",
+    description:
+      "ADR-0052 rule 8. Editors and above (403 for viewers). A new memory page in the Team memory folder, or, with `pageId` and `baseRevision`, a new text for a page in it (404 for a page outside it or one the caller cannot see). With review on it waits (201, status pending); with review off it is applied at once (200, status applied), as a write by the caller, and a stale `baseRevision` is 412 `revision_conflict`. The page is at most 16 KB (413). At most 500 proposals wait per workspace (409 `quota_exceeded`).",
+    capability: "team-memory",
+    pathParams: workspaceParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    requestBody: { contentType: JSON_CT, schema: TeamMemoryProposeSchema, required: true, description: "The memory." },
+    responses: [json(201, "Waiting for review.", TeamMemoryProposalSchema), json(200, "Applied at once (review off).", TeamMemoryProposalSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "quota_exceeded", "revision_conflict", "payload_too_large", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "listTeamMemoryProposals",
+    method: "get",
+    path: "/workspaces/{workspaceId}/team-memory/proposals",
+    tag: "Team memory",
+    summary: "Agents' memories: waiting, applied, declined, expired",
+    description:
+      "ADR-0052 rule 8. Editors see those their own agents wrote; owners and managers see every member's, and applied ones are the Team memory activity (the agent, the author, who applied it, when). Viewers get 403. Proposals about pages the caller cannot see are left out. Newest first.",
+    capability: "team-memory",
+    pathParams: workspaceParams,
+    query: TeamMemoryListQuerySchema,
+    responses: [json(200, "A page of proposals.", TeamMemoryProposalListSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "cursor_invalid"],
+  }),
+  route({
+    operationId: "getTeamMemoryProposal",
+    method: "get",
+    path: "/workspaces/{workspaceId}/team-memory/proposals/{proposalId}",
+    tag: "Team memory",
+    summary: "One proposal, with its text while it waits",
+    description: "ADR-0052 rule 8. Its author, owners and managers (404 for anyone else, as in listTeamMemoryProposals).",
+    capability: "team-memory",
+    pathParams: proposalParams,
+    responses: [json(200, "The proposal.", TeamMemoryProposalTextSchema)],
+    errors: ["validation_failed", "forbidden", "not_found"],
+  }),
+  route({
+    operationId: "applyTeamMemoryProposal",
+    method: "post",
+    path: "/workspaces/{workspaceId}/team-memory/proposals/{proposalId}/apply",
+    tag: "Team memory",
+    summary: "Apply an agent's memory",
+    description:
+      "ADR-0052 rule 8. Its author (while an editor or above), owners and managers; the write is the caller's, with their role and what they may see. A new memory is made in the Team memory folder (the folder is made at the top level when there is none). A new text for a page that changed since `baseRevision` is 412 `revision_conflict`, and the proposal keeps waiting. A settled or expired proposal is 404.",
+    capability: "team-memory",
+    pathParams: proposalParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [json(200, "Applied.", TeamMemoryProposalSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "quota_exceeded", "revision_conflict", "idempotency_key_reused"],
+  }),
+  route({
+    operationId: "declineTeamMemoryProposal",
+    method: "post",
+    path: "/workspaces/{workspaceId}/team-memory/proposals/{proposalId}/decline",
+    tag: "Team memory",
+    summary: "Decline an agent's memory",
+    description: "ADR-0052 rule 8. Its author, owners and managers. Nothing is written; its text is forgotten. A settled or expired proposal is 404.",
+    capability: "team-memory",
+    pathParams: proposalParams,
+    requestHeaders: [idempotencyHeader("optional")],
+    responses: [json(200, "Declined.", TeamMemoryProposalSchema)],
+    errors: ["validation_failed", "forbidden", "not_found", "idempotency_key_reused"],
   }),
   route({
     operationId: "listTrash",

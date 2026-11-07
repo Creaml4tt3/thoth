@@ -113,7 +113,7 @@ export interface SignInConfig {
   sessionMaxDays: number;
 }
 
-export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "page-tags", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "presence"];
+export const DEFAULT_CAPABILITIES: CapabilityId[] = ["attachments", "search", "events.sse", "transfers", "page-order", "page-kind", "page-tags", "public-share", "members", "invite-links", "workspace-management", "feedback", "teams", "trash", "presence", "team-memory"];
 
 /** ADR-0024: invite pages and joins are rate limited per client IP on every server unless the operator says otherwise. */
 export const INVITE_DEFAULTS = { opensPerIp: 60, acceptsPerIp: 20 } as const;

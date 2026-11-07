@@ -15,6 +15,7 @@ import { registerShareRoutes } from "./routes/shares.ts";
 import { registerMemberRoutes } from "./routes/members.ts";
 import { registerTeamRoutes } from "./routes/teams.ts";
 import { registerTrashRoutes } from "./routes/trash.ts";
+import { registerTeamMemoryRoutes } from "./routes/team-memory.ts";
 import { registerWorkspaceRoutes } from "./routes/workspaces.ts";
 import { registerInvitePages } from "./routes/invite-pages.ts";
 import { registerTransferRoutes } from "./routes/transfers.ts";
@@ -84,6 +85,7 @@ const CAPABILITY_ROUTES: { capability: CapabilityId; test: (method: string, path
   { capability: "teams", test: (_m, p) => /^\/workspaces\/[^/]+\/teams(\/[^/]+(\/members\/[^/]+|\/pages)?)?$/.test(p) || /^\/workspaces\/[^/]+\/(pages\/[^/]+\/visibility|limited-pages)$/.test(p) },
   { capability: "trash", test: (_m, p) => /^\/workspaces\/[^/]+\/trash(\/[^/]+(\/restore)?)?$/.test(p) },
   { capability: "presence", test: (_m, p) => /^\/workspaces\/[^/]+\/pages\/[^/]+\/presence$/.test(p) },
+  { capability: "team-memory", test: (_m, p) => /^\/workspaces\/[^/]+\/team-memory(\/review|\/proposals(\/[^/]+(\/(apply|decline))?)?)?$/.test(p) },
   { capability: "invite-links", test: (_m, p) => /^\/workspaces\/[^/]+\/invite-links(\/[^/]+)?$/.test(p) || p === "/invites/accept" },
   // ADR-0025. `GET /workspaces` is a core route and stays open.
   {
@@ -222,6 +224,7 @@ export function buildApp(deps: Deps, options: BuildOptions = {}): FastifyInstanc
   registerMemberRoutes(app, deps);
   registerTeamRoutes(app, deps);
   registerTrashRoutes(app, deps);
+  registerTeamMemoryRoutes(app, deps);
   registerWorkspaceRoutes(app, deps);
   registerFeedbackRoutes(app, deps);
   registerPresenceRoutes(app, deps);

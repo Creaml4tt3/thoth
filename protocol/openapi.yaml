@@ -30,6 +30,7 @@ tags:
   - name: Members
   - name: Workspaces
   - name: Teams
+  - name: Team memory
   - name: Trash
   - name: Presence
   - name: Feedback
@@ -2740,6 +2741,1088 @@ paths:
         - internal_error
         - capability_not_supported
         - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory:
+    get:
+      operationId: getTeamMemory
+      tags:
+        - Team memory
+      summary: The workspace's Team memory setting and folder
+      description: |-
+        ADR-0052 rule 8. Every member. `review` is "Agents' memories need review" (on by default). `folderId` is the top-level folder titled `Team memory` when there is one the caller sees, else null.
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          description: The setting and the folder.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  review:
+                    type: boolean
+                  folderId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                required:
+                  - review
+                  - folderId
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory/review:
+    put:
+      operationId: setTeamMemoryReview
+      tags:
+        - Team memory
+      summary: Turn review of agents' memories on or off
+      description: |-
+        ADR-0052 rule 8. Owners and managers (403 for other members). Off: a memory from an editor or above is applied at once; proposals already waiting stay until someone settles them.
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The setting.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                review:
+                  type: boolean
+              required:
+                - review
+              additionalProperties: false
+      responses:
+        "200":
+          description: The setting and the folder.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  review:
+                    type: boolean
+                  folderId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                required:
+                  - review
+                  - folderId
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory/proposals:
+    post:
+      operationId: proposeTeamMemory
+      tags:
+        - Team memory
+      summary: An agent's memory for the workspace
+      description: |-
+        ADR-0052 rule 8. Editors and above (403 for viewers). A new memory page in the Team memory folder, or, with `pageId` and `baseRevision`, a new text for a page in it (404 for a page outside it or one the caller cannot see). With review on it waits (201, status pending); with review off it is applied at once (200, status applied), as a write by the caller, and a stale `baseRevision` is 412 `revision_conflict`. The page is at most 16 KB (413). At most 500 proposals wait per workspace (409 `quota_exceeded`).
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      requestBody:
+        required: true
+        description: The memory.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                markdown:
+                  type: string
+                  minLength: 1
+                pageId:
+                  type: string
+                  pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                baseRevision:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: ^[A-Za-z0-9_.~-]+$
+              required:
+                - agent
+                - title
+                - markdown
+              additionalProperties: false
+      responses:
+        "200":
+          description: Applied at once (review off).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: ^[A-Za-z0-9_.~-]+$
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - applied
+                      - declined
+                      - expired
+                  agent:
+                    type: string
+                  authorId:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  authorName:
+                    type:
+                      - string
+                      - "null"
+                  title:
+                    type: string
+                  pageId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  baseRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  expiresAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledBy:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  settledByName:
+                    type:
+                      - string
+                      - "null"
+                  appliedRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                required:
+                  - id
+                  - status
+                  - agent
+                  - authorId
+                  - authorName
+                  - title
+                  - pageId
+                  - baseRevision
+                  - createdAt
+                  - expiresAt
+                  - settledAt
+                  - settledBy
+                  - settledByName
+                  - appliedRevision
+        "201":
+          description: Waiting for review.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: ^[A-Za-z0-9_.~-]+$
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - applied
+                      - declined
+                      - expired
+                  agent:
+                    type: string
+                  authorId:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  authorName:
+                    type:
+                      - string
+                      - "null"
+                  title:
+                    type: string
+                  pageId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  baseRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  expiresAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledBy:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  settledByName:
+                    type:
+                      - string
+                      - "null"
+                  appliedRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                required:
+                  - id
+                  - status
+                  - agent
+                  - authorId
+                  - authorName
+                  - title
+                  - pageId
+                  - baseRevision
+                  - createdAt
+                  - expiresAt
+                  - settledAt
+                  - settledBy
+                  - settledByName
+                  - appliedRevision
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
+        "412":
+          $ref: "#/components/responses/Problem412"
+          description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
+        "413":
+          $ref: "#/components/responses/Problem413"
+          description: "`payload_too_large`: The request body exceeds a server limit advertised in `limits`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - quota_exceeded
+        - revision_conflict
+        - payload_too_large
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+    get:
+      operationId: listTeamMemoryProposals
+      tags:
+        - Team memory
+      summary: "Agents' memories: waiting, applied, declined, expired"
+      description: |-
+        ADR-0052 rule 8. Editors see those their own agents wrote; owners and managers see every member's, and applied ones are the Team memory activity (the agent, the author, who applied it, when). Viewers get 403. Proposals about pages the caller cannot see are left out. Newest first.
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - pending
+              - applied
+              - declined
+              - expired
+      responses:
+        "200":
+          description: A page of proposals.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          minLength: 1
+                          maxLength: 128
+                          pattern: ^[A-Za-z0-9_.~-]+$
+                        status:
+                          type: string
+                          enum:
+                            - pending
+                            - applied
+                            - declined
+                            - expired
+                        agent:
+                          type: string
+                        authorId:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 128
+                              pattern: ^[A-Za-z0-9_.~-]+$
+                            - type: "null"
+                        authorName:
+                          type:
+                            - string
+                            - "null"
+                        title:
+                          type: string
+                        pageId:
+                          anyOf:
+                            - type: string
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                            - type: "null"
+                        baseRevision:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 128
+                              pattern: ^[A-Za-z0-9_.~-]+$
+                            - type: "null"
+                        createdAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        expiresAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        settledAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        settledBy:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 128
+                              pattern: ^[A-Za-z0-9_.~-]+$
+                            - type: "null"
+                        settledByName:
+                          type:
+                            - string
+                            - "null"
+                        appliedRevision:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 128
+                              pattern: ^[A-Za-z0-9_.~-]+$
+                            - type: "null"
+                      required:
+                        - id
+                        - status
+                        - agent
+                        - authorId
+                        - authorName
+                        - title
+                        - pageId
+                        - baseRevision
+                        - createdAt
+                        - expiresAt
+                        - settledAt
+                        - settledBy
+                        - settledByName
+                        - appliedRevision
+                  nextCursor:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 2048
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                        description: Opaque cursor. Clients must not parse or construct it.
+                      - type: "null"
+                required:
+                  - items
+                  - nextCursor
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`cursor_invalid`: The cursor is malformed, was not issued by this server for this collection, or does not decode. `validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - cursor_invalid
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory/proposals/{proposalId}:
+    get:
+      operationId: getTeamMemoryProposal
+      tags:
+        - Team memory
+      summary: One proposal, with its text while it waits
+      description: |-
+        ADR-0052 rule 8. Its author, owners and managers (404 for anyone else, as in listTeamMemoryProposals).
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/ProposalId"
+      responses:
+        "200":
+          description: The proposal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: ^[A-Za-z0-9_.~-]+$
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - applied
+                      - declined
+                      - expired
+                  agent:
+                    type: string
+                  authorId:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  authorName:
+                    type:
+                      - string
+                      - "null"
+                  title:
+                    type: string
+                  pageId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  baseRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  expiresAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledBy:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  settledByName:
+                    type:
+                      - string
+                      - "null"
+                  appliedRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  markdown:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - id
+                  - status
+                  - agent
+                  - authorId
+                  - authorName
+                  - title
+                  - pageId
+                  - baseRevision
+                  - createdAt
+                  - expiresAt
+                  - settledAt
+                  - settledBy
+                  - settledByName
+                  - appliedRevision
+                  - markdown
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory/proposals/{proposalId}/apply:
+    post:
+      operationId: applyTeamMemoryProposal
+      tags:
+        - Team memory
+      summary: Apply an agent's memory
+      description: |-
+        ADR-0052 rule 8. Its author (while an editor or above), owners and managers; the write is the caller's, with their role and what they may see. A new memory is made in the Team memory folder (the folder is made at the top level when there is none). A new text for a page that changed since `baseRevision` is 412 `revision_conflict`, and the proposal keeps waiting. A settled or expired proposal is 404.
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/ProposalId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: ^[A-Za-z0-9_.~-]+$
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - applied
+                      - declined
+                      - expired
+                  agent:
+                    type: string
+                  authorId:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  authorName:
+                    type:
+                      - string
+                      - "null"
+                  title:
+                    type: string
+                  pageId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  baseRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  expiresAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledBy:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  settledByName:
+                    type:
+                      - string
+                      - "null"
+                  appliedRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                required:
+                  - id
+                  - status
+                  - agent
+                  - authorId
+                  - authorName
+                  - title
+                  - pageId
+                  - baseRevision
+                  - createdAt
+                  - expiresAt
+                  - settledAt
+                  - settledBy
+                  - settledByName
+                  - appliedRevision
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "409":
+          $ref: "#/components/responses/Problem409"
+          description: "`quota_exceeded`: The request is valid and permitted, but would exceed a quota of the workspace, the account or the server. Freeing space or waiting can make the same request succeed. The body may carry `quota`, `limit` and `current`."
+        "412":
+          $ref: "#/components/responses/Problem412"
+          description: "`revision_conflict`: A conditional write did not match the current revision. The body carries `currentRevision`."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - quota_exceeded
+        - revision_conflict
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
+  /api/v1/workspaces/{workspaceId}/team-memory/proposals/{proposalId}/decline:
+    post:
+      operationId: declineTeamMemoryProposal
+      tags:
+        - Team memory
+      summary: Decline an agent's memory
+      description: |-
+        ADR-0052 rule 8. Its author, owners and managers. Nothing is written; its text is forgotten. A settled or expired proposal is 404.
+
+        Requires capability `team-memory`.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/ProposalId"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Opaque key of 1 to 255 visible ASCII characters (a UUID is recommended). A replay with the same key and request returns the original response; the same key with a different request is 422 idempotency_key_reused.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[\x21-\x7e]+$
+      responses:
+        "200":
+          description: Declined.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: ^[A-Za-z0-9_.~-]+$
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - applied
+                      - declined
+                      - expired
+                  agent:
+                    type: string
+                  authorId:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  authorName:
+                    type:
+                      - string
+                      - "null"
+                  title:
+                    type: string
+                  pageId:
+                    anyOf:
+                      - type: string
+                        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                      - type: "null"
+                  baseRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  expiresAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledAt:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                  settledBy:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                  settledByName:
+                    type:
+                      - string
+                      - "null"
+                  appliedRevision:
+                    anyOf:
+                      - type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: ^[A-Za-z0-9_.~-]+$
+                      - type: "null"
+                required:
+                  - id
+                  - status
+                  - agent
+                  - authorId
+                  - authorName
+                  - title
+                  - pageId
+                  - baseRevision
+                  - createdAt
+                  - expiresAt
+                  - settledAt
+                  - settledBy
+                  - settledByName
+                  - appliedRevision
+        "400":
+          $ref: "#/components/responses/Problem400"
+          description: "`validation_failed`: The request is malformed or a field, header, or query parameter is invalid."
+        "401":
+          $ref: "#/components/responses/Problem401"
+          description: "`unauthenticated`: Credentials are missing, malformed, expired, or revoked."
+        "403":
+          $ref: "#/components/responses/Problem403"
+          description: "`forbidden`: The principal can see the resource but its role does not allow the action."
+        "404":
+          $ref: "#/components/responses/Problem404"
+          description: "`not_found`: The route or resource does not exist, or the principal may not know that it exists."
+        "422":
+          $ref: "#/components/responses/Problem422"
+          description: "`idempotency_key_reused`: The Idempotency-Key was already used with a different request."
+        "429":
+          $ref: "#/components/responses/Problem429"
+          description: "`rate_limited`: Too many requests. Honor the Retry-After header."
+        "500":
+          $ref: "#/components/responses/Problem500"
+          description: "`internal_error`: Unexpected server failure."
+        "501":
+          $ref: "#/components/responses/Problem501"
+          description: "`capability_not_supported`: The route belongs to a capability this server does not list."
+        "503":
+          $ref: "#/components/responses/Problem503"
+          description: "`service_unavailable`: The server is temporarily unable to handle the request."
+      x-thoth-capability: team-memory
+      x-thoth-error-codes:
+        - validation_failed
+        - unauthenticated
+        - forbidden
+        - not_found
+        - idempotency_key_reused
+        - rate_limited
+        - internal_error
+        - capability_not_supported
+        - service_unavailable
   /api/v1/workspaces/{workspaceId}/trash:
     get:
       operationId: listTrash
@@ -3152,6 +4235,7 @@ components:
                   - teams
                   - trash
                   - presence
+                  - team-memory
                   - databases
                   - realtime-collab
               - type: string
@@ -4954,6 +6038,15 @@ components:
         minLength: 1
         maxLength: 128
         pattern: ^[A-Za-z0-9_.~-]+$
+    ProposalId:
+      name: proposalId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9_.~-]+$
   responses:
     Problem400:
       description: Problem details (RFC 9457). The `code` member is a stable machine-readable identifier; see the `x-thoth-error-codes` list of the operation.
@@ -5098,5 +6191,6 @@ x-thoth-capabilities:
   - teams
   - trash
   - presence
+  - team-memory
   - databases
   - realtime-collab
