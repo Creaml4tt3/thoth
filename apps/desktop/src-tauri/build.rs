@@ -29,6 +29,8 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",
     // Proposed changes (ADR-0048): the per-app switch, the proposals, and a window's report after it applied one.
     "mcp_mayPropose", "mcp_proposals", "mcp_proposal", "mcp_settle",
+    // Agents' memory (ADR-0052): the per-app "Save memories without asking" and a window's choice of memory folder.
+    "mcp_mayRemember", "mcp_memoryFolder",
     // Problem reports (ADR-0040): the webview reports its uncaught errors to the host's local log and reads the redacted
     // log back; no log plugin permission.
     "diag_report", "diag_collect", "diag_settings",

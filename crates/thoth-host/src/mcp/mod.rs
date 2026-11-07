@@ -27,7 +27,7 @@ use proposals::{Kind, Proposals, Status};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use socket::Listener;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -40,7 +40,7 @@ pub const DIR: &str = "mcp";
 /// `{ id, owner, root, space, tool, args }`; only the window `owner` may answer.
 pub const REQUEST_EVENT: &str = "mcp.request";
 /// Sent to the windows when the apps waiting for an answer change (Allow or Deny, or "May propose changes"). Payload:
-/// `{ apps: [name], proposers: [name] }`.
+/// `{ apps: [name], proposers: [name], folders: [root] }`.
 pub const PENDING_EVENT: &str = "mcp.pending";
 /// Sent to the windows when proposals are added or settled. Payload: `{ open }`, how many wait for review.
 pub const PROPOSALS_EVENT: &str = "mcp.proposals";
@@ -106,11 +106,15 @@ struct Settings {
     /// "Agents save memories without asking" (ADR-0052 rule 5): on by default.
     #[serde(default = "on")]
     memories: bool,
+    /// The memory folder of each Private Space (canonical root → folder), recorded the first time an app used memory
+    /// there (ADR-0052 rule 1).
+    #[serde(default)]
+    memory_folders: BTreeMap<String, String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true }
+        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true, memory_folders: BTreeMap::new() }
     }
 }
 
@@ -143,6 +147,8 @@ struct State {
     pending: Vec<String>,
     /// Allowed apps that proposed a change and wait for "May propose changes", oldest first.
     proposers: Vec<String>,
+    /// Private Spaces (canonical roots) whose `Memory` folder is the user's own: a window asks which folder agents use.
+    folders: Vec<String>,
     /// Requests sent to a window, by id.
     waiting: HashMap<String, Waiting>,
     /// Why listening failed, when it did.
@@ -193,7 +199,7 @@ impl Relay {
         let log = Log::new(dir.as_deref());
         let proposals = Proposals::new(dir.as_deref(), Arc::new(log::now_secs));
         let history = History::new(dir.as_deref(), Arc::new(log::now_secs));
-        let state = State { settings, pending: Vec::new(), proposers: Vec::new(), waiting: HashMap::new(), error: None };
+        let state = State { settings, pending: Vec::new(), proposers: Vec::new(), folders: Vec::new(), waiting: HashMap::new(), error: None };
         let relay = Self {
             inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log, proposals, history }),
             listener: Mutex::new(None),
@@ -225,6 +231,8 @@ impl Relay {
             "pending": state.pending,
             "proposers": state.proposers,
             "memories": state.settings.memories,
+            "memoryFolders": state.settings.memory_folders,
+            "folders": state.folders,
             "setup": self.setup(),
         })
     }
@@ -345,6 +353,24 @@ impl Relay {
             known.remember = Some(allow);
             self.inner.save(&state.settings)?;
         }
+        Ok(self.settings())
+    }
+
+    /// `mcp.memoryFolder { root, folder }` from the window `owner`, which must have that Private Space open: the folder
+    /// agents use for memory there (ADR-0052 rule 1), the user's answer when Thoth found a `Memory` folder of their own.
+    pub fn memory_folder(&self, owner: &str, root: &str, folder: &str) -> HostResult<Value> {
+        let folder = tools::memory_folder(folder)?;
+        if !(self.inner.spaces)().iter().any(|s| s.owner == owner && s.root.to_string_lossy() == root) {
+            return Err(HostError::not_allowed("Only a window with this Private Space open can choose its memory folder"));
+        }
+        {
+            let mut state = self.inner.state();
+            state.settings.memory_folders.insert(root.to_owned(), folder);
+            state.folders.retain(|r| r != root);
+            self.inner.save(&state.settings)?;
+        }
+        self.inner.decided.notify_all();
+        self.inner.emit_pending();
         Ok(self.settings())
     }
 
@@ -494,11 +520,11 @@ impl Inner {
     }
 
     fn emit_pending(&self) {
-        let (apps, proposers) = {
+        let (apps, proposers, folders) = {
             let state = self.state();
-            (state.pending.clone(), state.proposers.clone())
+            (state.pending.clone(), state.proposers.clone(), state.folders.clone())
         };
-        (self.events)(PENDING_EVENT, json!({ "apps": apps, "proposers": proposers }));
+        (self.events)(PENDING_EVENT, json!({ "apps": apps, "proposers": proposers, "folders": folders }));
     }
 
     fn emit_proposals(&self) {
@@ -509,9 +535,10 @@ impl Inner {
     fn end_waits(&self) {
         let had = {
             let mut state = self.state();
-            let had = !state.pending.is_empty() || !state.proposers.is_empty();
+            let had = !state.pending.is_empty() || !state.proposers.is_empty() || !state.folders.is_empty();
             state.pending.clear();
             state.proposers.clear();
+            state.folders.clear();
             had
         };
         self.decided.notify_all();
@@ -562,16 +589,27 @@ impl Inner {
         }
         let targets = self.targets(&call)?;
         entry.spaces = targets.iter().map(|t| t.label.clone()).collect();
+        let mut folders = Vec::new();
+        if call.is_memory() {
+            for target in &targets {
+                folders.push(self.memory_folder_of(target)?);
+            }
+        }
         if call.is_memory_write() {
-            let answer = self.memory_write(&app, &call, &targets[0])?;
+            tools::check_memory_page(&call, &folders[0])?;
+            let answer = self.memory_write(&app, &call, &targets[0], &folders[0])?;
             entry.paths = answer.paths.clone();
             return Ok(answer);
         }
 
         let deadline = Instant::now() + self.options.answer_timeout;
         let mut asked: Vec<(String, Receiver<HostResult<Value>>)> = Vec::new();
-        for target in &targets {
-            match self.ask(target, &call) {
+        for (i, target) in targets.iter().enumerate() {
+            let mut args = call.window_args();
+            if let Some(folder) = folders.get(i) {
+                args["folder"] = json!(folder);
+            }
+            match self.ask_window(target, call.window_tool(), args) {
                 Ok(waiting) => asked.push(waiting),
                 Err(error) => {
                     self.forget_waits(&asked);
@@ -663,7 +701,9 @@ impl Inner {
                     // It was waiting and is gone without a decision: forgotten, or Connected apps went off.
                     return Err(gone());
                 }
-                if state.pending.len() + state.proposers.len() >= MAX_PENDING || state.settings.apps.len() + state.pending.len() >= MAX_APPS {
+                if state.pending.len() + state.proposers.len() + state.folders.len() >= MAX_PENDING
+                    || state.settings.apps.len() + state.pending.len() >= MAX_APPS
+                {
                     return Err(HostError::new(
                         "BUSY",
                         "Too many apps are waiting for an answer in Thoth: answer them, or remove some under Settings → Connected apps",
@@ -814,10 +854,6 @@ impl Inner {
     }
 
     /// Sends one request to the window that holds `target`.
-    fn ask(&self, target: &Target, call: &Call) -> HostResult<(String, Receiver<HostResult<Value>>)> {
-        self.ask_window(target, call.window_tool(), call.window_args())
-    }
-
     fn ask_window(&self, target: &Target, tool: &str, args: Value) -> HostResult<(String, Receiver<HostResult<Value>>)> {
         let id = new_handle("mcp")?;
         let (tx, rx) = sync_channel(1);
@@ -834,10 +870,44 @@ impl Inner {
         answer.unwrap_or_else(|_| Err(HostError::new("TIMEOUT", "Thoth did not answer in time: try again")))
     }
 
+    /// The memory folder of `target` (ADR-0052 rule 1). The first time, `Memory` is recorded if it is empty or Thoth set
+    /// it up; if it holds pages of the user's own, the windows ask which folder agents should use, and the request waits
+    /// for that answer (up to `prompt_timeout`) as it waits for Allow or Deny.
+    fn memory_folder_of(&self, target: &Target) -> HostResult<String> {
+        let recorded = |settings: &Settings| settings.memory_folders.get(&target.root).cloned();
+        if let Some(folder) = recorded(&self.state().settings) {
+            return Ok(folder);
+        }
+        let found = self.request(target, "memory_folder", json!({ "folder": tools::MEMORY_FOLDER }))?;
+        let pages = found.get("pages").and_then(Value::as_u64).ok_or_else(|| HostError::internal("Thoth's window sent an answer it should not have"))?;
+        let thoth = found.get("thoth").and_then(Value::as_bool).unwrap_or(false);
+        if pages == 0 || thoth {
+            let mut state = self.state();
+            let folder = state.settings.memory_folders.entry(target.root.clone()).or_insert_with(|| tools::MEMORY_FOLDER.to_owned()).clone();
+            self.save(&state.settings)?;
+            return Ok(folder);
+        }
+        let space = &target.label;
+        self.wait_for(
+            &target.root,
+            |settings| recorded(settings).map(|_| Ok(())),
+            |state| &mut state.folders,
+            || HostError::not_allowed(format!("Thoth asked which folder agents may use for memory in {space}, and it was not answered: try again")),
+            || {
+                HostError::not_allowed(format!(
+                    "{space} already has a Memory folder of the user's own: Thoth is asking which folder agents should use. Tell the user to answer in Thoth's window, then try again"
+                ))
+            },
+        )?;
+        recorded(&self.state().settings).ok_or_else(|| HostError::internal("The memory folder was not recorded"))
+    }
+
     /// `remember`, `update_memory` or `forget` (ADR-0052 rules 5 and 6): the window works the change out, the host checks
     /// it, then has the window write it without review if the user's switches allow it, or keeps it as a proposal.
-    fn memory_write(&self, app: &str, call: &Call, target: &Target) -> HostResult<tools::Answer> {
-        let change = tools::memory_change(&self.request(target, "memory_change", call.memory_change_args(app))?)?;
+    fn memory_write(&self, app: &str, call: &Call, target: &Target, folder: &str) -> HostResult<tools::Answer> {
+        let mut args = call.memory_change_args(app);
+        args["folder"] = json!(folder);
+        let change = tools::memory_change(&self.request(target, "memory_change", args)?, folder)?;
         let paths = vec![change.path.clone()];
         if change.before == change.after {
             let structured = json!({ "status": "unchanged", "space": target.label, "path": change.path, "id": change.id });
@@ -881,8 +951,8 @@ impl Inner {
             ));
         }
         let commit = match &change.after {
-            Some(after) => json!({ "op": "write", "path": change.path, "text": after, "expected": change.base_hash }),
-            None => json!({ "op": "trash", "path": change.path, "expected": change.base_hash }),
+            Some(after) => json!({ "op": "write", "path": change.path, "text": after, "expected": change.base_hash, "folder": folder }),
+            None => json!({ "op": "trash", "path": change.path, "expected": change.base_hash, "folder": folder }),
         };
         let written = self.request(target, "memory_commit", commit)?;
         let after_hash = match change.after {

@@ -161,9 +161,26 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
             <span className="mono muted small mcp-space-path" title={root}>
               {displayPath(root)}
             </span>
+            {settings.spaces.includes(root) && settings.memoryFolders?.[root] && <span className="muted small mcp-space-memory">{t.memoryFolder(settings.memoryFolders[root])}</span>}
           </label>
         ))}
       </fieldset>
+
+      {/* ADR-0052 rule 5: on by default; off, every memory waits for review as a proposal. */}
+      <div className="set-toggle">
+        <input
+          id="mcp-memories"
+          type="checkbox"
+          role="switch"
+          checked={settings.memories !== false}
+          onChange={(e) => void change(() => connectedApps.configure({ memories: e.target.checked }))}
+          aria-describedby="mcp-memories-hint"
+        />
+        <label htmlFor="mcp-memories">{t.memories}</label>
+        <small id="mcp-memories-hint" className="muted">
+          {t.memoriesHint}
+        </small>
+      </div>
 
       <h3 id="set-mcp-apps">{t.apps}</h3>
       <p className="muted small">{t.selfReported}</p>
@@ -197,6 +214,19 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
                   />
                   <label htmlFor={`mcp-propose-${i}`}>{t.mayPropose}</label>
                   {settings.proposers.includes(app.name) && <span className="badge">{t.waiting}</span>}
+                </span>
+              )}
+              {app.allowed && settings.memories !== false && (
+                <span className="set-toggle mcp-app-propose">
+                  <input
+                    id={`mcp-remember-${i}`}
+                    type="checkbox"
+                    role="switch"
+                    checked={app.remember !== false}
+                    onChange={(e) => void change(() => connectedApps.mayRemember(app.name, e.target.checked))}
+                    aria-describedby="mcp-memories-hint"
+                  />
+                  <label htmlFor={`mcp-remember-${i}`}>{t.mayRemember}</label>
                 </span>
               )}
               <span className="mcp-app-actions">

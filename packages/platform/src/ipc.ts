@@ -248,7 +248,7 @@ export interface Commands {
    * Switches Connected apps on or off (the host starts or stops listening), and/or replaces the shared Private Spaces
    * (canonical roots; each must be one the user opened). `UNAVAILABLE` or `BUSY` when it cannot listen.
    */
-  "mcp.configure": { args: { enabled?: boolean; spaces?: string[] }; result: ConnectedAppsSettings };
+  "mcp.configure": { args: { enabled?: boolean; spaces?: string[]; memories?: boolean }; result: ConnectedAppsSettings };
   /** The user's Allow or Deny for an app that asked (or a change of mind later). */
   "mcp.decide": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
   /** Removes an app: it is asked about again the next time it connects. */
@@ -259,6 +259,13 @@ export interface Commands {
   "mcp.log": { args: Record<string, never>; result: ConnectedAppsLogEntry[] };
   /** "May propose changes" for an app that connected (ADR-0048); also the answer when it first proposes. */
   "mcp.mayPropose": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
+  /** "Save memories without asking" for an app that connected (ADR-0052 rule 5). */
+  "mcp.mayRemember": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
+  /**
+   * The memory folder for a Private Space this window has open: the user's answer to `folders`, `Memory` or another.
+   * `NOT_ALLOWED` unless this window has it open; `BAD_ARGUMENT` for the top level or a hidden folder.
+   */
+  "mcp.memoryFolder": { args: { root: string; folder: string }; result: ConnectedAppsSettings };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
   "mcp.proposals": { args: Record<string, never>; result: { proposals: ConnectedAppProposal[]; open: number } };
   /** One proposal with the page as it was and as proposed (both null once it is settled). */
@@ -360,13 +367,23 @@ export interface ConnectedAppsSettings {
   spaces: string[];
   /**
    * Apps the user allowed or denied; `name` is what the app calls itself (MCP `clientInfo.name`), not verified.
-   * `propose`: "May propose changes" (ADR-0048); null until the user answered.
+   * `propose`: "May propose changes" (ADR-0048); null until the user answered. `remember`: "Save memories without
+   * asking" (ADR-0052), on unless the user turned it off.
    */
-  apps: { name: string; allowed: boolean; decidedAt: string; propose: boolean | null }[];
+  apps: { name: string; allowed: boolean; decidedAt: string; propose: boolean | null; remember?: boolean }[];
   /** Apps waiting for Allow or Deny, oldest first. */
   pending: string[];
   /** Allowed apps that proposed a change and wait for "May propose changes", oldest first. */
   proposers: string[];
+  /** "Agents save memories without asking" (ADR-0052 rule 5); on by default. */
+  memories?: boolean;
+  /** The memory folder recorded for each Private Space (canonical root → folder), once an app first used memory there. */
+  memoryFolders?: Record<string, string>;
+  /**
+   * Private Spaces (canonical roots) whose `Memory` folder holds pages Thoth did not set up: a window asks the user
+   * whether agents may use it or which folder they should use instead (`mcp.memoryFolder`).
+   */
+  folders?: string[];
   /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
   setup: { command: string; args: string[] } | null;
 }
@@ -425,15 +442,17 @@ export type McpRequest = {
   | { tool: "list_pages"; args: { folder: string; limit: number } }
   | { tool: "read_page"; args: { path: string } | { id: string } }
   | { tool: "backlinks"; args: ({ path: string } | { id: string }) & { limit: number } }
-  // Agents' memory (ADR-0052): read, work out a change (`memory_change`), then write it (`memory_commit`) once the
-  // host has checked it and the user's switches let it skip review.
-  | { tool: "recall"; args: McpMemoryFilter & { query?: string; limit: number } }
-  | { tool: "list_memories"; args: McpMemoryFilter & { source?: string; limit: number } }
-  | { tool: "memory_change"; args: McpMemoryChange }
+  // Agents' memory (ADR-0052), always in `folder`, the memory folder the host recorded for this Private Space: read,
+  // work out a change (`memory_change`), then write it (`memory_commit`) once the host has checked it and the user's
+  // switches let it skip review. `memory_folder` says what a folder holds before the host records it.
+  | { tool: "recall"; args: McpMemoryFilter & { folder: string; query?: string; limit: number } }
+  | { tool: "list_memories"; args: McpMemoryFilter & { folder: string; source?: string; limit: number } }
+  | { tool: "memory_change"; args: McpMemoryChange & { folder: string } }
   | {
       tool: "memory_commit";
-      args: { op: "write"; path: string; text: string; expected: string | null } | { op: "trash"; path: string; expected: string };
+      args: { folder: string } & ({ op: "write"; path: string; text: string; expected: string | null } | { op: "trash"; path: string; expected: string });
     }
+  | { tool: "memory_folder"; args: { folder: string } }
 );
 
 export interface McpMemoryFilter {

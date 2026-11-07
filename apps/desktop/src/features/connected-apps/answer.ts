@@ -3,12 +3,14 @@
  * The host checked the arguments and chose this window; only pages in the index are found (never `.thoth/`, an
  * attachment or a path outside the Private Space), and attachments are named, never read.
  *
- * Memory tools (ADR-0052) read and change only the memory folder (`@thoth/local-store`'s memory module checks the
- * path again): a change is worked out first and written only when the host asks with `memory_commit`.
+ * Memory tools (ADR-0052) read and change only the memory folder the host names (`@thoth/local-store`'s memory module
+ * checks it and the path again): a change is worked out first and written only when the host asks with `memory_commit`.
  */
 import {
   MemoryError,
   ageDays,
+  checkMemoryFolder,
+  memoryFolderUse,
   commitForget,
   commitMemory,
   isStale,
@@ -70,26 +72,29 @@ async function run(vault: Vault, request: McpRequest, now: Date, options: Answer
       };
     }
     case "recall": {
-      const found = await recallMemories(vault, request.args, now);
+      const found = await recallMemories(vault, { ...request.args, folder: checkMemoryFolder(request.args.folder) }, now);
       return { about: found.about && memoryOut(found.about, now, true), memories: found.memories.map((m) => memoryOut(m, now, true)), total: found.total };
     }
     case "list_memories": {
-      const found = await listMemories(vault, request.args);
+      const found = await listMemories(vault, { ...request.args, folder: checkMemoryFolder(request.args.folder) });
       return { memories: found.memories.map((m) => memoryOut(m, now, false)), total: found.total };
     }
     case "memory_change": {
-      const args = request.args;
+      const args = { ...request.args, folder: checkMemoryFolder(request.args.folder) };
       if (args.op === "remember") return planRemember(vault, args, now);
       if (args.op === "update") return planUpdate(vault, args, now);
-      return planForget(vault, args.page);
+      return planForget(vault, args.page, args.folder);
     }
     case "memory_commit": {
       const args = request.args;
-      if (args.op === "write") return { hash: await commitMemory(vault, args.path, args.text, args.expected, now) };
+      const folder = checkMemoryFolder(args.folder);
+      if (args.op === "write") return { hash: await commitMemory(vault, args.path, args.text, args.expected, now, folder) };
       if (!options.trash) throw new Error("This window cannot move files to the Trash");
-      await commitForget(vault, options.trash, args.path, args.expected, now);
+      await commitForget(vault, options.trash, args.path, args.expected, now, folder);
       return {};
     }
+    case "memory_folder":
+      return memoryFolderUse(vault, checkMemoryFolder(request.args.folder));
   }
 }
 

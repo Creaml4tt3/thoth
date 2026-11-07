@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ConnectedApps } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import { checkMemoryFolder } from "@thoth/local-store";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { answerRequest } from "./answer.ts";
@@ -10,7 +11,9 @@ import { folderName } from "./names.ts";
 /**
  * Connected apps in one window (ADR-0021): answers the requests the host sends this window, from its open Vault, and
  * asks Allow or Deny when an app connects for the first time, and "May propose changes" when an allowed app first
- * proposes one (ADR-0048). Every window shows the question; the first answer closes it everywhere (the host tells them).
+ * proposes one (ADR-0048). When an app first uses memory in this Private Space and its `Memory` folder holds pages of
+ * the user's own, it asks which folder agents should use (ADR-0052 rule 1). Every window shows the question; the first
+ * answer closes it everywhere (the host tells them).
  */
 export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedApps }) {
   const { vault, connection, windowId } = useSession();
@@ -18,6 +21,7 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
   const [pending, setPending] = useState<string[]>([]);
   const [proposers, setProposers] = useState<string[]>([]);
   const [shared, setShared] = useState<string[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -41,11 +45,12 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
   useEffect(() => {
     let live = true;
     let stop: (() => void) | undefined;
-    const shown = (s: { pending: string[]; proposers?: string[]; spaces: string[] }) => {
+    const shown = (s: { pending: string[]; proposers?: string[]; spaces: string[]; folders?: string[] }) => {
       if (!live) return;
       setPending(s.pending);
       setProposers(s.proposers ?? []);
       setShared(s.spaces);
+      setFolders(s.folders ?? []);
     };
     // Who waits for which question is in the settings.
     const show = () => void connectedApps.settings().then(shown, () => undefined);
@@ -63,13 +68,83 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
     return <AllowPrompt key={app} app={app} shared={shared} onAnswer={(allow) => void connectedApps.decide(app, allow).then((s) => setPending(s.pending), () => setPending((p) => p.filter((a) => a !== app)))} />;
   }
   const proposer = proposers[0];
-  if (proposer === undefined) return null;
+  if (proposer === undefined) {
+    if (!folders.includes(connection.root)) return null;
+    return (
+      <FolderPrompt
+        key={connection.root}
+        space={folderName(connection.root)}
+        onAnswer={(folder) => connectedApps.memoryFolder(connection.root, folder).then((s) => setFolders(s.folders ?? []))}
+      />
+    );
+  }
   return (
     <ProposePrompt
       key={proposer}
       app={proposer}
       onAnswer={(allow) => void connectedApps.mayPropose(proposer, allow).then((s) => setProposers(s.proposers), () => setProposers((p) => p.filter((a) => a !== proposer)))}
     />
+  );
+}
+
+/**
+ * Asked once per Private Space, when an app first uses memory there and `Memory/` holds pages Thoth did not set up
+ * (ADR-0052 rule 1). Focus starts on the other folder: agents change pages in their folder without asking.
+ */
+function FolderPrompt({ space, onAnswer }: { space: string; onAnswer: (folder: string) => Promise<unknown> }) {
+  const t = useDesktopStrings().connectedApps.folderPrompt;
+  const [folder, setFolder] = useState("Agent memory");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const answer = async (chosen: string) => {
+    setFailure(null);
+    let checked: string;
+    try {
+      checked = checkMemoryFolder(chosen);
+    } catch (error) {
+      setFailure(t.failed(error instanceof Error ? error.message : String(error)));
+      return;
+    }
+    setBusy(true);
+    try {
+      await onAnswer(checked);
+    } catch (error) {
+      setFailure(t.failed(error instanceof Error ? error.message : String(error)));
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title={t.title}>
+      <form
+        className="mcp-prompt"
+        data-testid="mcp-folder-prompt"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void answer(folder);
+        }}
+      >
+        <p>{t.body(space)}</p>
+        <label htmlFor="mcp-memory-folder">{t.other}</label>
+        <input id="mcp-memory-folder" className="input" value={folder} disabled={busy} data-autofocus aria-describedby="mcp-memory-folder-hint" onChange={(e) => setFolder(e.target.value)} />
+        <p id="mcp-memory-folder-hint" className="muted small">
+          {t.otherHint}
+        </p>
+        {failure && (
+          <p role="alert" className="alert alert-danger">
+            {failure}
+          </p>
+        )}
+        <p className="muted small">{t.later}</p>
+        <div className="modal-actions">
+          <Button type="button" variant="quiet" disabled={busy} onClick={() => void answer("Memory")}>
+            {t.useMemory}
+          </Button>
+          <Button type="submit" variant="primary" disabled={busy}>
+            {t.useOther}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

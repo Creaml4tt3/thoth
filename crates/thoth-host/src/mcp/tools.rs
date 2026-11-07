@@ -74,9 +74,10 @@ pub struct MemoryFilter {
     pub since: Option<String>,
 }
 
-/// The memory folder of every Private Space (ADR-0052 rule 1; a choice of folder comes later).
+/// The memory folder of a Private Space unless the user chose another (ADR-0052 rule 1).
 pub const MEMORY_FOLDER: &str = "Memory";
-pub const MEMORY_README: &str = "Memory/README.md";
+/// Longest memory folder, in characters.
+const MAX_FOLDER: usize = 200;
 /// The six kinds of memory (ADR-0052 rule 3).
 pub const KINDS: &[&str] = &["profile", "preference", "work", "people", "reference", "note"];
 pub const RECALL_LIMIT: Limit = Limit { default: 10, max: 50 };
@@ -215,11 +216,11 @@ impl Call {
                     Edit::Markdown(text) => no_secret([text.as_str()])?,
                     Edit::Replace(list) => no_secret(list.iter().map(|r| r.replace.as_str()))?,
                 }
-                Ok(Call::UpdateMemory { page: memory_page(page_ref(args)?)?, edit, expected: expected(args)?, certainty: certainty(args)?, space })
+                Ok(Call::UpdateMemory { page: writable(page_ref(args)?)?, edit, expected: expected(args)?, certainty: certainty(args)?, space })
             }
             "forget" => {
                 optional_text(args, "reason", MAX_HEADING * 4)?;
-                Ok(Call::Forget { page: memory_page(page_ref(args)?)?, space })
+                Ok(Call::Forget { page: writable(page_ref(args)?)?, space })
             }
             _ => Err(HostError::bad_argument(format!("Unknown tool {tool:?}"))),
         }
@@ -277,6 +278,11 @@ impl Call {
     /// Search and the page list look in every shared Private Space; one page is read from, or proposed for, one.
     pub fn one_space(&self) -> bool {
         matches!(self, Call::ReadPage { .. } | Call::Backlinks { .. }) || self.is_proposal() || self.is_memory_write()
+    }
+
+    /// The five memory tools: they work in the memory folder the host recorded for the Private Space (ADR-0052).
+    pub fn is_memory(&self) -> bool {
+        self.is_memory_write() || matches!(self, Call::Recall { .. } | Call::ListMemories { .. })
     }
 
     /// `remember`, `update_memory` and `forget`: written to the memory folder without review when the user's switches
@@ -385,7 +391,6 @@ impl Call {
             | Call::ProposeCreate { path, .. }
             | Call::UpdateMemory { page: PageRef::Path(path), .. }
             | Call::Forget { page: PageRef::Path(path), .. } => vec![path.clone()],
-            Call::Recall { .. } | Call::ListMemories { .. } | Call::Remember { .. } => vec![format!("{MEMORY_FOLDER}/")],
             _ => Vec::new(),
         }
     }
@@ -720,7 +725,7 @@ pub struct MemoryChange {
     pub base_hash: Option<String>,
 }
 
-pub fn memory_change(value: &Value) -> HostResult<MemoryChange> {
+pub fn memory_change(value: &Value, folder: &str) -> HostResult<MemoryChange> {
     let maybe = |key: &str| match value.get(key) {
         Some(Value::String(s)) => Ok(Some(s.clone())),
         Some(Value::Null) => Ok(None),
@@ -742,7 +747,7 @@ pub fn memory_change(value: &Value) -> HostResult<MemoryChange> {
         "forget" => change.before.is_some() && change.after.is_none() && change.base_hash.is_some(),
         _ => false,
     };
-    if !shape || !is_memory_path(&change.path) {
+    if !shape || !is_memory_path(&change.path, folder) {
         return Err(malformed());
     }
     if change.after.as_ref().is_some_and(|a| a.len() > MAX_MEMORY_FILE) {
@@ -751,21 +756,39 @@ pub fn memory_change(value: &Value) -> HostResult<MemoryChange> {
     Ok(change)
 }
 
-/// A Markdown file in the memory folder, not hidden and not its README (ADR-0052 rule 5).
-pub fn is_memory_path(path: &str) -> bool {
-    let parts: Vec<&str> = path.split('/').collect();
-    parts.len() > 1 && parts[0] == MEMORY_FOLDER && confined_page(path).is_ok() && safe_parts(path) && !path.eq_ignore_ascii_case(MEMORY_README)
+/// A Markdown file in `folder`, not hidden and not the folder's README (ADR-0052 rule 5).
+pub fn is_memory_path(path: &str, folder: &str) -> bool {
+    path.strip_prefix(folder).and_then(|rest| rest.strip_prefix('/')).is_some_and(|rest| !rest.is_empty() && !rest.eq_ignore_ascii_case("README.md"))
+        && confined_page(path).is_ok()
+        && safe_parts(path)
 }
 
-fn memory_page(page: PageRef) -> HostResult<PageRef> {
-    if let PageRef::Path(path) = &page
-        && !is_memory_path(path)
+/// A page `update_memory` or `forget` names by path must be in the memory folder.
+pub fn check_memory_page(call: &Call, folder: &str) -> HostResult<()> {
+    if let Call::UpdateMemory { page: PageRef::Path(path), .. } | Call::Forget { page: PageRef::Path(path), .. } = call
+        && !is_memory_path(path, folder)
     {
         return Err(HostError::bad_argument(format!(
-            "path must be a memory in {MEMORY_FOLDER}/, such as {MEMORY_FOLDER}/About me.md: change other pages with propose_edit_page"
+            "path must be a memory in the memory folder ({folder}/), such as {folder}/About me.md: change other pages with propose_edit_page"
         )));
     }
-    Ok(page)
+    Ok(())
+}
+
+/// A folder agents' memory may live in (ADR-0052 rule 1): in the Private Space, never its top level, hidden or Thoth's
+/// own. Returned without leading or trailing `/`.
+pub fn memory_folder(raw: &str) -> HostResult<String> {
+    let bad =
+        || HostError::bad_argument("The memory folder must be a folder in the Private Space, such as Agents/Memory, not the top level or a hidden folder");
+    let folder = raw.trim().trim_matches('/');
+    if folder.is_empty() || folder.chars().count() > MAX_FOLDER || !safe_parts(folder) {
+        return Err(bad());
+    }
+    let parts: Vec<&str> = folder.split('/').map(str::trim).collect();
+    if parts.iter().any(|p| p.is_empty() || p.starts_with('.')) {
+        return Err(bad());
+    }
+    Ok(parts.join("/"))
 }
 
 impl MemoryFilter {

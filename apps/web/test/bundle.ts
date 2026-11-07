@@ -65,6 +65,8 @@ export const DESKTOP_ONLY = [
   "propose_create_page",
   // Agents' memory written without review (ADR-0052): the desktop window's, never the web client's.
   "memory_commit",
+  "mcp.memoryFolder",
+  "mcp.mayRemember",
 ];
 
 export function files(dir: string): string[] {
