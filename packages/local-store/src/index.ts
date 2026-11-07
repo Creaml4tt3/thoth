@@ -9,4 +9,5 @@ export * from "./order.ts";
 export * from "./ports.ts";
 export * from "./scan.ts";
 export * from "./schema.ts";
+export * from "./skills.ts";
 export * from "./vault.ts";

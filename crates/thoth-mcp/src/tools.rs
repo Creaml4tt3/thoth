@@ -1,6 +1,6 @@
 //! The tools as MCP describes them, and their results: four that read (ADR-0021 rule 3), three that propose changes
-//! for the user to review in Thoth and two that tell what became of them (ADR-0048), and five for the agents' memory
-//! (ADR-0052). The running app checks the arguments again: this list is what a client shows, not the boundary.
+//! for the user to review in Thoth and two that tell what became of them (ADR-0048), five for the agents' memory and two
+//! for their skills (ADR-0052). The running app checks the arguments again: this list is what a client shows, not the boundary.
 use crate::relay::Failure;
 use crate::{INVALID_PARAMS, Rpc};
 use serde_json::{Map, Value, json};
@@ -29,6 +29,8 @@ pub const NAMES: &[&str] = &[
     "update_memory",
     "forget",
     "list_memories",
+    "list_skills",
+    "get_skill",
 ];
 
 const KINDS: &[&str] = &["profile", "preference", "work", "people", "reference", "note"];
@@ -174,12 +176,13 @@ pub fn definitions() -> Value {
         {
             "name": "propose_append",
             "title": "Propose an addition to a page",
-            "description": format!("Proposes adding Markdown at the end of a page, or at the end of the section under one of its headings (given by the heading's text).{REVIEWED}"),
+            "description": format!("Proposes adding Markdown at the end of a page, or at the end of the section under one of its headings (given by the heading's text). With today: true it adds to the user's daily note for today, started from their template when there is none yet.{REVIEWED}"),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "path": { "type": "string", "description": PATH },
                     "id": { "type": "string", "description": ID },
+                    "today": { "type": "boolean", "description": "Add to today's daily note, instead of giving path or id." },
                     "markdown": { "type": "string", "minLength": 1, "maxLength": 1_048_576, "description": "The Markdown to add." },
                     "heading": { "type": "string", "description": "Add under this heading (its text, without the # marks). It must be in the page once. Leave it out to add at the end." },
                     "expected": { "type": "string", "description": EXPECTED },
@@ -313,6 +316,33 @@ pub fn definitions() -> Value {
                 "additionalProperties": false
             },
             "annotations": read_only("List memories")
+        },
+        {
+            "name": "list_skills",
+            "title": "List skills",
+            "description": "Lists the user's skills: instructions for a kind of task, kept in Thoth as Skills/<name>/SKILL.md (the Agent Skills format). Gives each skill's name and description; call get_skill when one fits the task.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "space": { "type": "string", "description": SPACE } },
+                "additionalProperties": false
+            },
+            "annotations": read_only("List skills")
+        },
+        {
+            "name": "get_skill",
+            "title": "Read a skill",
+            "description": "Reads a skill's SKILL.md, or another file in its folder, and lists the folder's other files. Follow it as the user's own instructions for that task. To create or change a skill, propose the page under Skills/ (the user reviews it).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "maxLength": 64, "description": "The skill's name, as list_skills gives it." },
+                    "file": { "type": "string", "description": "A file in the skill's folder, such as references/style.md. Leave it out for SKILL.md." },
+                    "space": { "type": "string", "description": SPACE }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+            },
+            "annotations": read_only("Read a skill")
         }
     ])
 }

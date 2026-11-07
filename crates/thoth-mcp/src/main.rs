@@ -49,6 +49,10 @@ before saving very personal information. Mark what the user said as certainty st
 without asking them. forget when the user asks, and do not save it again. Memories are saved at once in the \
 memory folder (usually Memory/; recall gives each path), unless the user wants to review them first.
 
+Skills are the user's instructions for kinds of task: call list_skills, then get_skill when one fits, and follow it. \
+Create or change a skill only by proposing its page under Skills/<name>/SKILL.md. To add to the user's daily note, \
+use propose_append with today: true.
+
 The other tools read the Private Spaces (folders of Markdown pages) the user shares with this app, and propose \
 changes to them. A proposal is never written by the call: the user reviews it in Thoth and applies or declines it, so \
 tell the user it waits for their review; get_proposal says what became of it. Page paths are relative to their \

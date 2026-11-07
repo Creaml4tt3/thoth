@@ -142,7 +142,9 @@ fn the_2025_11_25_handshake_then_the_read_tools_and_the_ones_that_only_propose()
             "remember",
             "update_memory",
             "forget",
-            "list_memories"
+            "list_memories",
+            "list_skills",
+            "get_skill"
         ]
     );
     for tool in tools.as_array().unwrap() {
@@ -191,7 +193,7 @@ fn the_2026_07_28_requests_carry_their_version_and_client_in_meta() {
 
     let list = server.call(2, "tools/list", json!({ "_meta": meta("Cursor") }));
     assert_eq!(list["result"]["resultType"], "complete");
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 14);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 16);
     assert!(list["result"]["ttlMs"].is_u64());
 
     let call = server.call(3, "tools/call", json!({ "_meta": meta("Cursor"), "name": "search", "arguments": { "query": "แผน" } }));

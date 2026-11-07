@@ -480,7 +480,9 @@ export type McpRequest = {
 } & (
   | { tool: "search"; args: { query: string; limit: number } }
   | { tool: "list_pages"; args: { folder: string; limit: number } }
-  | { tool: "read_page"; args: { path: string } | { id: string } }
+  // `today`: the daily note for today (ADR-0051), for `propose_append` (ADR-0052). When it does not exist yet the answer
+  // is `{ page: null, today: { path, markdown } }`: where it would go and how it would start.
+  | { tool: "read_page"; args: { path: string } | { id: string } | { today: true } }
   | { tool: "backlinks"; args: ({ path: string } | { id: string }) & { limit: number } }
   // Agents' memory (ADR-0052), always in `folder`, the memory folder the host recorded for this Private Space: read,
   // work out a change (`memory_change`), then write it (`memory_commit`) once the host has checked it and the user's
@@ -493,6 +495,9 @@ export type McpRequest = {
       args: { folder: string } & ({ op: "write"; path: string; text: string; expected: string | null } | { op: "trash"; path: string; expected: string });
     }
   | { tool: "memory_folder"; args: { folder: string } }
+  // Skills (ADR-0052 rule 7): `Skills/<name>/SKILL.md`; `get_skill` answers `{ skill: null }` when there is none.
+  | { tool: "list_skills"; args: Record<string, never> }
+  | { tool: "get_skill"; args: { name: string; file?: string } }
 );
 
 export interface McpMemoryFilter {

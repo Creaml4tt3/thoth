@@ -328,6 +328,8 @@ export const th: DesktopStrings = {
       update_memory: "แก้ไขความจำ", // REVIEW
       forget: "ลืมความจำ", // REVIEW
       list_memories: "รายการความจำ", // REVIEW
+      list_skills: "รายการสกิล", // REVIEW
+      get_skill: "อ่านสกิล", // REVIEW
       unknown: "สิ่งที่ไม่รู้จัก",
     },
     answered: "ตอบแล้ว",

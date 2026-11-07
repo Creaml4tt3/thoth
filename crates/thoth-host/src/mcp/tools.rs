@@ -1,5 +1,5 @@
-//! The tools of Connected apps: four that read (ADR-0021 rule 3), the proposals (ADR-0048) and the memory tools
-//! (ADR-0052). What a request may ask is checked here at the trust boundary (the socket), and the answer is built from
+//! The tools of Connected apps: four that read (ADR-0021 rule 3), the proposals (ADR-0048), and the memory and skill
+//! tools (ADR-0052). What a request may ask is checked here at the trust boundary (the socket), and the answer is built from
 //! what the windows' vaults found.
 //!
 //! The webview runs the queries on its open `Vault`; the host decides which Private Spaces are asked, cuts every list
@@ -31,6 +31,8 @@ pub struct Limit {
 pub enum PageRef {
     Path(String),
     Id(String),
+    /// Today's daily note (ADR-0051), which the window names: `propose_append` with `today: true` (ADR-0052 rule 6).
+    Today,
 }
 
 /// One exact-text replacement of `propose_edit_page`: `find` must occur exactly once.
@@ -64,6 +66,8 @@ pub enum Call {
     Remember { text: String, kind: String, title: Option<String>, topic: Option<String>, tags: Option<Vec<String>>, certainty: String, space: Option<String> },
     UpdateMemory { page: PageRef, edit: Edit, expected: Option<String>, certainty: Option<String>, space: Option<String> },
     Forget { page: PageRef, space: Option<String> },
+    ListSkills { space: Option<String> },
+    GetSkill { name: String, file: Option<String>, space: Option<String> },
 }
 
 /// What `recall` and `list_memories` may filter by.
@@ -91,6 +95,13 @@ const MAX_TOPIC: usize = 200;
 const MAX_TAGS: usize = 20;
 const MAX_TAG: usize = 64;
 const MAX_SOURCE: usize = 64;
+/// Where a Private Space keeps its skills: `Skills/<name>/SKILL.md` (ADR-0052 rule 7).
+pub const SKILLS_FOLDER: &str = "Skills";
+/// The most skills `list_skills` gives, and the longest description it keeps, in characters (the Agent Skills limit).
+pub const MAX_SKILLS: usize = 200;
+const MAX_SKILL_DESCRIPTION: usize = 1024;
+/// Longest skill name (a folder under Skills/), in characters.
+const MAX_SKILL_NAME: usize = 64;
 
 pub const TOOLS: &[&str] = &[
     "search",
@@ -107,6 +118,8 @@ pub const TOOLS: &[&str] = &[
     "update_memory",
     "forget",
     "list_memories",
+    "list_skills",
+    "get_skill",
 ];
 /// The largest proposed page or added text, in bytes: the same as an answer (ADR-0021 rule 3).
 pub const MAX_MARKDOWN: usize = 1024 * 1024;
@@ -158,7 +171,13 @@ impl Call {
                 let markdown =
                     markdown(args, "markdown")?.filter(|m| !m.trim().is_empty()).ok_or_else(|| HostError::bad_argument("markdown must be the text to add"))?;
                 let heading = optional_text(args, "heading", MAX_HEADING)?.map(|h| heading_text(&h)).filter(|h| !h.is_empty());
-                Ok(Call::ProposeAppend { page: writable(page_ref(args)?)?, markdown, heading, expected: expected(args)?, space })
+                let page = match args.get("today") {
+                    None | Some(Value::Null | Value::Bool(false)) => writable(page_ref(args)?)?,
+                    Some(Value::Bool(true)) if ["path", "id"].iter().all(|k| args.get(*k).is_none_or(Value::is_null)) => PageRef::Today,
+                    Some(Value::Bool(true)) => return Err(HostError::bad_argument("Give today: true, or the page's path or id, not both")),
+                    Some(_) => return Err(HostError::bad_argument("today must be true or false")),
+                };
+                Ok(Call::ProposeAppend { page, markdown, heading, expected: expected(args)?, space })
             }
             "list_proposals" => {
                 let status = optional_text(args, "status", 32)?;
@@ -222,6 +241,20 @@ impl Call {
                 optional_text(args, "reason", MAX_HEADING * 4)?;
                 Ok(Call::Forget { page: writable(page_ref(args)?)?, space })
             }
+            "list_skills" => Ok(Call::ListSkills { space }),
+            "get_skill" => {
+                let name = optional_text(args, "name", MAX_SKILL_NAME * 4)?.map(|n| n.trim().to_owned()).unwrap_or_default();
+                if name.is_empty() || name.chars().count() > MAX_SKILL_NAME || name.contains('/') || name.starts_with('.') || !safe_parts(&name) {
+                    return Err(HostError::bad_argument("name must be a skill's name, as list_skills gives it"));
+                }
+                let file = optional_text(args, "file", MAX_PATH)?.map(|f| f.trim().trim_matches('/').to_owned()).filter(|f| !f.is_empty());
+                if let Some(file) = &file
+                    && (!safe_parts(file) || file.split('/').any(|part| part.starts_with('.')))
+                {
+                    return Err(HostError::bad_argument("file must be a file in the skill's folder, such as references/style.md"));
+                }
+                Ok(Call::GetSkill { name, file, space })
+            }
             _ => Err(HostError::bad_argument(format!("Unknown tool {tool:?}"))),
         }
     }
@@ -242,6 +275,8 @@ impl Call {
             Call::Remember { .. } => "remember",
             Call::UpdateMemory { .. } => "update_memory",
             Call::Forget { .. } => "forget",
+            Call::ListSkills { .. } => "list_skills",
+            Call::GetSkill { .. } => "get_skill",
         }
     }
 
@@ -270,7 +305,9 @@ impl Call {
             | Call::ListMemories { space, .. }
             | Call::Remember { space, .. }
             | Call::UpdateMemory { space, .. }
-            | Call::Forget { space, .. } => space.as_deref(),
+            | Call::Forget { space, .. }
+            | Call::ListSkills { space }
+            | Call::GetSkill { space, .. } => space.as_deref(),
             Call::ListProposals { .. } | Call::GetProposal { .. } => None,
         }
     }
@@ -306,6 +343,7 @@ impl Call {
         let page = |page: &PageRef| match page {
             PageRef::Path(path) => json!({ "path": path }),
             PageRef::Id(id) => json!({ "id": id }),
+            PageRef::Today => json!({ "today": true }),
         };
         match self {
             Call::Search { query, limit, .. } => json!({ "query": query, "limit": limit }),
@@ -334,7 +372,16 @@ impl Call {
                 }
                 args
             }
-            Call::ListProposals { .. } | Call::GetProposal { .. } | Call::Remember { .. } | Call::UpdateMemory { .. } | Call::Forget { .. } => json!({}),
+            Call::GetSkill { name, file, .. } => match file {
+                Some(file) => json!({ "name": name, "file": file }),
+                None => json!({ "name": name }),
+            },
+            Call::ListProposals { .. }
+            | Call::GetProposal { .. }
+            | Call::Remember { .. }
+            | Call::UpdateMemory { .. }
+            | Call::Forget { .. }
+            | Call::ListSkills { .. } => json!({}),
         }
     }
 
@@ -343,6 +390,7 @@ impl Call {
         let page = |page: &PageRef| match page {
             PageRef::Path(path) => json!({ "path": path }),
             PageRef::Id(id) => json!({ "id": id }),
+            PageRef::Today => json!({ "today": true }),
         };
         let mut args = match self {
             Call::Remember { text, kind, title, topic, tags, certainty, .. } => {
@@ -391,6 +439,8 @@ impl Call {
             | Call::ProposeCreate { path, .. }
             | Call::UpdateMemory { page: PageRef::Path(path), .. }
             | Call::Forget { page: PageRef::Path(path), .. } => vec![path.clone()],
+            Call::GetSkill { name, file, .. } => vec![format!("{SKILLS_FOLDER}/{name}/{}", file.as_deref().unwrap_or("SKILL.md"))],
+            Call::ListSkills { .. } => vec![format!("{SKILLS_FOLDER}/")],
             _ => Vec::new(),
         }
     }
@@ -582,6 +632,46 @@ pub fn answer(call: &Call, found: &[Found<'_>]) -> HostResult<Answer> {
         | Call::Remember { .. }
         | Call::UpdateMemory { .. }
         | Call::Forget { .. } => Err(HostError::internal("Changes are answered by the host")),
+        Call::ListSkills { .. } => {
+            let mut skills = Vec::new();
+            for f in found {
+                for skill in list(f.value, "skills")? {
+                    let description: String = text(skill, "description")?.chars().take(MAX_SKILL_DESCRIPTION).collect();
+                    skills.push(json!({ "space": f.space, "name": text(skill, "name")?, "description": description, "path": text(skill, "path")? }));
+                }
+            }
+            skills.truncate(MAX_SKILLS);
+            let several = found.len() > 1;
+            let text = if skills.is_empty() {
+                format!("No skills yet. A skill is {SKILLS_FOLDER}/<name>/SKILL.md in a Private Space; propose one with propose_create_page.")
+            } else {
+                let lines: Vec<String> = skills
+                    .iter()
+                    .map(|s| {
+                        let name = s["name"].as_str().unwrap_or_default();
+                        let space = if several { format!(" ({})", s["space"].as_str().unwrap_or_default()) } else { String::new() };
+                        format!("- {name}{space}: {}", s["description"].as_str().unwrap_or_default())
+                    })
+                    .collect();
+                format!("{} skills. Call get_skill with a name when one fits the task.\n{}", skills.len(), lines.join("\n"))
+            };
+            let paths = paths_of(&skills);
+            Ok(Answer { text, structured: json!({ "skills": skills }), paths })
+        }
+        Call::GetSkill { name, .. } => {
+            // The first shared Private Space that has it, in the order they were asked.
+            for f in found {
+                let skill = f.value.get("skill").ok_or_else(malformed)?;
+                if skill.is_null() {
+                    continue;
+                }
+                let files: Vec<&str> = list(skill, "files")?.iter().map(|p| p.as_str().ok_or_else(malformed)).collect::<HostResult<_>>()?;
+                let path = text(skill, "path")?.to_owned();
+                let structured = json!({ "space": f.space, "name": name, "path": path, "files": files });
+                return Ok(Answer { text: text(skill, "text")?.to_owned(), structured, paths: vec![path] });
+            }
+            Err(HostError::new("NOT_FOUND", format!("No skill {name}, or no such file in it: list_skills gives the skills' names")))
+        }
         Call::Recall { limit, .. } => {
             let mut about = Vec::new();
             let mut memories = Vec::new();
@@ -788,6 +878,10 @@ pub fn memory_folder(raw: &str) -> HostResult<String> {
     if parts.iter().any(|p| p.is_empty() || p.starts_with('.')) {
         return Err(bad());
     }
+    // Skills are always reviewed (rule 7): agents may never write there without asking.
+    if parts[0].to_lowercase() == SKILLS_FOLDER.to_lowercase() {
+        return Err(HostError::bad_argument("The memory folder cannot be in Skills/: agents change skills only as proposals the user reviews"));
+    }
     Ok(parts.join("/"))
 }
 
@@ -974,6 +1068,14 @@ fn writable(page: PageRef) -> HostResult<PageRef> {
         confined_page(path)?;
     }
     Ok(page)
+}
+
+/// A page path a window named for a new page (today's note): a Markdown page in the Private Space, nothing hidden.
+pub fn check_new_page(path: &str) -> HostResult<()> {
+    if path.len() > MAX_PATH || !safe_parts(path) || path.starts_with('/') {
+        return Err(HostError::bad_argument("Not a page path"));
+    }
+    confined_page(path)
 }
 
 fn confined_page(path: &str) -> HostResult<()> {

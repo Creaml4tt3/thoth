@@ -98,6 +98,8 @@ export function checkMemoryFolder(raw: string): string {
   if (trimmed === "" || [...trimmed].length > MAX_FOLDER || /[\u0000-\u001f\u007f\\]/.test(trimmed)) throw bad();
   const parts = trimmed.split("/").map((p) => p.trim());
   if (parts.some((p) => p === "" || p === "." || p === ".." || p.startsWith("."))) throw bad();
+  // Skills are always reviewed (rule 7): agents never write there without asking.
+  if (collisionKey(parts[0]!) === collisionKey("Skills")) throw new MemoryError("BAD_ARGUMENT", "The memory folder cannot be in Skills/: agents change skills only as proposals the user reviews");
   return parts.join("/");
 }
 

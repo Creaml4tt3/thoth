@@ -37,17 +37,24 @@ async function todayText(vault: Vault, settings: DailySettings, path: string, no
   return updateFrontmatter(text, { thoth_id: newStableId() });
 }
 
-/** Today's page, made when missing. Returns its path and whether this call made it. */
-export async function openOrStartToday(vault: Vault, now: Date): Promise<{ path: string; created: boolean }> {
+/** Today's page: the existing one, or where it would go and the text it would start with. Nothing is written. */
+export async function planToday(vault: Vault, now: Date): Promise<{ path: string; existing: true } | { path: string; existing: false; text: string }> {
   const { settings } = await readDailySettings(vault);
   const wanted = dailyPath(settings, now);
   const existing = await findExisting(vault, wanted);
-  if (existing) return { path: existing, created: false };
+  if (existing) return { path: existing, existing: true };
   // A folder that differs only in case (`daily` for `Daily`) is that folder: no second one beside it.
   const folders = new Map((await vault.listFolders()).map((f) => [collisionKey(f), f]));
   const segments = wanted.split("/");
   const path = segments.map((s, i) => (i < segments.length - 1 ? (folders.get(collisionKey(segments.slice(0, i + 1).join("/")))?.split("/")[i] ?? s) : s)).join("/");
-  const text = await todayText(vault, settings, path, now);
+  return { path, existing: false, text: await todayText(vault, settings, path, now) };
+}
+
+/** Today's page, made when missing. Returns its path and whether this call made it. */
+export async function openOrStartToday(vault: Vault, now: Date): Promise<{ path: string; created: boolean }> {
+  const planned = await planToday(vault, now);
+  if (planned.existing) return { path: planned.path, created: false };
+  const { path, text } = planned;
   try {
     await vault.writePage(path, text, { expectedHash: null });
     return { path, created: true };
