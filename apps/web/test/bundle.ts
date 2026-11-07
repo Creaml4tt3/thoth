@@ -68,6 +68,7 @@ export const DESKTOP_ONLY = [
   "mcp.memoryFolder",
   "mcp.mayRemember",
   "mcp.memoryHistory",
+  "mcp.skillLinks",
   "thoth:mcp-memories",
   "mcp-memories",
 ];

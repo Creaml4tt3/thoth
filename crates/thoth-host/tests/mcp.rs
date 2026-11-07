@@ -1096,3 +1096,49 @@ fn an_addition_to_todays_note_is_a_proposal_and_starts_the_note_when_there_is_no
     *f.answer_with.lock().unwrap() = None;
     assert_eq!(error_code(&ask(&socket, "Claude", "propose_append", json!({ "today": true, "path": "Plan.md", "markdown": "x" }))), "BAD_ARGUMENT");
 }
+
+#[test]
+fn skills_are_linked_into_the_home_folder_and_nothing_there_is_ever_replaced() {
+    let f = fixture(fast());
+    let made = tempfile::Builder::new().prefix("skills").tempdir_in("/tmp").unwrap();
+    let base = std::fs::canonicalize(made.path()).unwrap();
+    let (root, home) = (base.join("Notes"), base.join("home"));
+    let skill = |name: &str| {
+        std::fs::create_dir_all(root.join("Skills").join(name)).unwrap();
+        std::fs::write(root.join("Skills").join(name).join("SKILL.md"), format!("---\nname: {name}\n---\n")).unwrap();
+    };
+    skill("weekly-update");
+    skill("taken");
+    skill(".hidden");
+    std::fs::create_dir_all(root.join("Skills/no-skill-file")).unwrap();
+    std::fs::create_dir_all(home.join(".claude")).unwrap();
+    // The user's own folder with a skill's name: never replaced.
+    std::fs::create_dir_all(home.join(".agents/skills/taken")).unwrap();
+    f.open.lock().unwrap().push(OpenSpace { root: root.clone(), owner: "space-a".into() });
+    let at = root.to_string_lossy().into_owned();
+
+    let report = f.relay.skill_links("space-a", &at, Some(true), Some(&home)).unwrap();
+    assert_eq!((report["on"].clone(), report["linked"].clone(), report["skipped"].clone()), (json!(true), json!(["taken", "weekly-update"]), json!(["taken"])));
+    for dir in [".agents/skills", ".claude/skills"] {
+        assert_eq!(std::fs::read_link(home.join(dir).join("weekly-update")).unwrap(), root.join("Skills/weekly-update"), "{dir}");
+        assert!(!home.join(dir).join("no-skill-file").exists() && !home.join(dir).join(".hidden").exists());
+    }
+    assert!(std::fs::symlink_metadata(home.join(".agents/skills/taken")).unwrap().is_dir(), "the user's folder stays");
+    assert_eq!(std::fs::read_link(home.join(".claude/skills/taken")).unwrap(), root.join("Skills/taken"));
+    assert_eq!(f.relay.settings()["skillLinks"], json!([at]));
+
+    // Brought up to date: a new skill is linked, a skill that went is unlinked.
+    skill("review");
+    std::fs::remove_dir_all(root.join("Skills/weekly-update")).unwrap();
+    let report = f.relay.skill_links("space-a", &at, None, Some(&home)).unwrap();
+    assert_eq!(report["linked"], json!(["review", "taken"]));
+    assert!(std::fs::symlink_metadata(home.join(".claude/skills/weekly-update")).is_err());
+
+    // Off: Thoth's links go, nothing else does. Only a window with the Private Space open may ask.
+    f.relay.skill_links("space-a", &at, Some(false), Some(&home)).unwrap();
+    for dir in [".agents/skills", ".claude/skills"] {
+        let left: Vec<String> = std::fs::read_dir(home.join(dir)).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(left, if dir == ".agents/skills" { vec!["taken".to_owned()] } else { Vec::new() }, "{dir}");
+    }
+    assert_eq!(f.relay.skill_links("main", &at, Some(true), Some(&home)).unwrap_err().code, "NOT_ALLOWED");
+}

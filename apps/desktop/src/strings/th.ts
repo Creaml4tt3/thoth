@@ -369,6 +369,15 @@ export const th: DesktopStrings = {
       "เปิดอยู่เป็นค่าเริ่มต้น แอปที่อนุญาตแล้วจะบันทึก แก้ไข และลืมความจำได้เฉพาะในโฟลเดอร์ความจำของ Private Space ที่แชร์ไว้ ถ้าปิด ความจำแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง เหมือนการเสนอการแก้ไข", // REVIEW
     mayRemember: "บันทึกความจำได้โดยไม่ต้องถาม", // REVIEW
     memoryFolder: (folder) => `โฟลเดอร์ความจำ: ${folder}`, // REVIEW
+    skills: {
+      title: "สกิล", // REVIEW
+      toggle: "ใช้สกิลของ Private Space นี้ใน Claude Code และ Codex", // REVIEW
+      hint: "ลิงก์แต่ละสกิลใน Skills/ (โฟลเดอร์ที่มี SKILL.md) ไปไว้ที่ ~/.agents/skills และ ~/.claude/skills เพื่อให้เอเจนต์ใช้ได้แม้ปิด Thoth อยู่ Thoth จะไม่แทนที่ไฟล์หรือโฟลเดอร์ที่มีอยู่แล้ว", // REVIEW
+      linked: (names) => (names.length === 0 ? "ยังไม่มีสกิลให้ลิงก์" : `ลิงก์แล้ว ${count(names.length)} สกิล: ${names.join(", ")}`), // REVIEW
+      skipped: (names) => `ไม่ได้ลิงก์ เพราะมีชื่อเดียวกันอยู่แล้ว: ${names.join(", ")}`, // REVIEW
+      off: "ลบลิงก์แล้ว", // REVIEW
+      failed: (message) => `ลิงก์สกิลไม่ได้: ${message}`, // REVIEW
+    },
     folderPrompt: {
       title: "จะให้เอเจนต์ใช้โฟลเดอร์ไหนเก็บความจำ", // REVIEW
       body: (space) =>

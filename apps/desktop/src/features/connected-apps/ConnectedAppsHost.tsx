@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConnectedApps } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
-import { checkMemoryFolder } from "@thoth/local-store";
+import { checkMemoryFolder, listSkills } from "@thoth/local-store";
 import { REPEAT_MS } from "@thoth/app-ui/notifications/core.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
@@ -17,12 +17,15 @@ import { folderName } from "./names.ts";
  * answer closes it everywhere (the host tells them). The bell says what agents saved without review.
  */
 export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedApps }) {
-  const { vault, connection, windowId, notifications, notificationPrefs } = useSession();
+  const { vault, connection, windowId, notifications, notificationPrefs, revision } = useSession();
   const trash = connection.trash?.bind(connection);
   const [pending, setPending] = useState<string[]>([]);
   const [proposers, setProposers] = useState<string[]>([]);
   const [shared, setShared] = useState<string[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
+  const [linksOn, setLinksOn] = useState(false);
+  /** The skills the links were last brought up to date with (ADR-0052 rule 7). */
+  const linkedSkills = useRef<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -71,12 +74,13 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
   useEffect(() => {
     let live = true;
     let stop: (() => void) | undefined;
-    const shown = (s: { pending: string[]; proposers?: string[]; spaces: string[]; folders?: string[] }) => {
+    const shown = (s: { pending: string[]; proposers?: string[]; spaces: string[]; folders?: string[]; skillLinks?: string[] }) => {
       if (!live) return;
       setPending(s.pending);
       setProposers(s.proposers ?? []);
       setShared(s.spaces);
       setFolders(s.folders ?? []);
+      setLinksOn((s.skillLinks ?? []).includes(connection.root));
     };
     // Who waits for which question is in the settings.
     const show = () => void connectedApps.settings().then(shown, () => undefined);
@@ -87,7 +91,27 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       live = false;
       stop?.();
     };
-  }, [connectedApps]);
+  }, [connectedApps, connection.root]);
+
+  // With the skills linked, a skill added, renamed or removed here is linked or unlinked too.
+  useEffect(() => {
+    if (!linksOn) {
+      linkedSkills.current = null;
+      return;
+    }
+    let live = true;
+    void listSkills(vault)
+      .then((skills) => {
+        const key = skills.map((s) => s.path).join("\n");
+        if (!live || key === linkedSkills.current) return;
+        linkedSkills.current = key;
+        return connectedApps.skillLinks(connection.root).then(() => undefined);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [connectedApps, connection.root, vault, linksOn, revision]);
 
   const app = pending[0];
   if (app !== undefined) {
