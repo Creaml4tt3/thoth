@@ -25,7 +25,7 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       .onRequest((request) => {
         // Every window hears every request: answer only the ones for this window and its Private Space.
         if (request.owner !== windowId || request.root !== connection.root) return;
-        void answerRequest(vault, request)
+        void answerRequest(vault, request, connection.trash ? { trash: connection.trash.bind(connection) } : {})
           .then((answer) => connectedApps.answer(request.id, answer))
           .catch(() => undefined);
       })
@@ -34,7 +34,7 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       live = false;
       stop?.();
     };
-  }, [connectedApps, vault, connection.root, windowId]);
+  }, [connectedApps, vault, connection, windowId]);
 
   useEffect(() => {
     let live = true;

@@ -2,23 +2,46 @@
  * A window's answer to a connected app's request (ADR-0021): the app's tool call, run on this window's open Vault.
  * The host checked the arguments and chose this window; only pages in the index are found (never `.thoth/`, an
  * attachment or a path outside the Private Space), and attachments are named, never read.
+ *
+ * Memory tools (ADR-0052) read and change only the memory folder (`@thoth/local-store`'s memory module checks the
+ * path again): a change is worked out first and written only when the host asks with `memory_commit`.
  */
-import type { Vault } from "@thoth/local-store";
+import {
+  MemoryError,
+  ageDays,
+  commitForget,
+  commitMemory,
+  isStale,
+  listMemories,
+  planForget,
+  planRemember,
+  planUpdate,
+  recallMemories,
+  type Memory,
+  type Vault,
+} from "@thoth/local-store";
 import type { McpAnswer, McpRequest } from "@thoth/platform";
 import type { PageSummary } from "@thoth/domain";
 
 class NotFound extends Error {}
 
-export async function answerRequest(vault: Vault, request: McpRequest): Promise<McpAnswer> {
+export interface AnswerOptions {
+  /** Moves a file to the system Trash (`forget`); absent where there is none. */
+  trash?: (path: string) => Promise<void>;
+  now?: () => Date;
+}
+
+export async function answerRequest(vault: Vault, request: McpRequest, options: AnswerOptions = {}): Promise<McpAnswer> {
   try {
-    return { result: await run(vault, request) };
+    return { result: await run(vault, request, options.now?.() ?? new Date(), options) };
   } catch (error) {
     if (error instanceof NotFound) return { error: { code: "NOT_FOUND", message: error.message } };
+    if (error instanceof MemoryError) return { error: { code: error.code, message: error.message } };
     return { error: { code: "INTERNAL", message: error instanceof Error ? error.message : String(error) } };
   }
 }
 
-async function run(vault: Vault, request: McpRequest): Promise<unknown> {
+async function run(vault: Vault, request: McpRequest, now: Date, options: AnswerOptions): Promise<unknown> {
   switch (request.tool) {
     case "search": {
       const hits = await vault.search(request.args.query, request.args.limit);
@@ -46,7 +69,48 @@ async function run(vault: Vault, request: McpRequest): Promise<unknown> {
         total: links.length,
       };
     }
+    case "recall": {
+      const found = await recallMemories(vault, request.args, now);
+      return { about: found.about && memoryOut(found.about, now, true), memories: found.memories.map((m) => memoryOut(m, now, true)), total: found.total };
+    }
+    case "list_memories": {
+      const found = await listMemories(vault, request.args);
+      return { memories: found.memories.map((m) => memoryOut(m, now, false)), total: found.total };
+    }
+    case "memory_change": {
+      const args = request.args;
+      if (args.op === "remember") return planRemember(vault, args, now);
+      if (args.op === "update") return planUpdate(vault, args, now);
+      return planForget(vault, args.page);
+    }
+    case "memory_commit": {
+      const args = request.args;
+      if (args.op === "write") return { hash: await commitMemory(vault, args.path, args.text, args.expected, now) };
+      if (!options.trash) throw new Error("This window cannot move files to the Trash");
+      await commitForget(vault, options.trash, args.path, args.expected, now);
+      return {};
+    }
   }
+}
+
+/** A memory as the host builds answers from it; `text` only for recall. */
+function memoryOut(m: Memory, now: Date, withText: boolean) {
+  const out = {
+    path: m.path,
+    id: m.id,
+    kind: m.kind,
+    title: m.title,
+    source: m.source,
+    created: m.created,
+    updated: m.updated,
+    updatedBy: m.updatedBy,
+    topic: m.topic,
+    tags: m.tags,
+    certainty: m.certainty,
+    ageDays: ageDays(m, now),
+    stale: isStale(m, now),
+  };
+  return withText ? { ...out, text: m.text } : out;
 }
 
 function summary(page: PageSummary): { id: string; path: string; title: string } {

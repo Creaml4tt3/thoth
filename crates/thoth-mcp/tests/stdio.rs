@@ -128,14 +128,31 @@ fn the_2025_11_25_handshake_then_the_read_tools_and_the_ones_that_only_propose()
     let names: Vec<&str> = tools.as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
         names,
-        ["search", "list_pages", "read_page", "backlinks", "propose_create_page", "propose_edit_page", "propose_append", "list_proposals", "get_proposal"]
+        [
+            "search",
+            "list_pages",
+            "read_page",
+            "backlinks",
+            "propose_create_page",
+            "propose_edit_page",
+            "propose_append",
+            "list_proposals",
+            "get_proposal",
+            "recall",
+            "remember",
+            "update_memory",
+            "forget",
+            "list_memories"
+        ]
     );
     for tool in tools.as_array().unwrap() {
         assert_eq!(tool["inputSchema"]["type"], "object");
         // A proposal writes nothing until the user applies it in Thoth (ADR-0048): not read-only, never destructive.
-        let proposes = tool["name"].as_str().unwrap().starts_with("propose_");
-        assert_eq!(tool["annotations"]["readOnlyHint"], !proposes, "{tool}");
-        assert_eq!(tool["annotations"]["destructiveHint"], false, "{tool}");
+        // Memories are written at once (ADR-0052); changing or forgetting one replaces what was there.
+        let name = tool["name"].as_str().unwrap();
+        let writes = name.starts_with("propose_") || ["remember", "update_memory", "forget"].contains(&name);
+        assert_eq!(tool["annotations"]["readOnlyHint"], !writes, "{tool}");
+        assert_eq!(tool["annotations"]["destructiveHint"], name == "update_memory" || name == "forget", "{tool}");
         assert_eq!(tool["annotations"]["openWorldHint"], false);
     }
     assert_eq!(tools[0]["inputSchema"]["required"], json!(["query"]));
@@ -174,7 +191,7 @@ fn the_2026_07_28_requests_carry_their_version_and_client_in_meta() {
 
     let list = server.call(2, "tools/list", json!({ "_meta": meta("Cursor") }));
     assert_eq!(list["result"]["resultType"], "complete");
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 14);
     assert!(list["result"]["ttlMs"].is_u64());
 
     let call = server.call(3, "tools/call", json!({ "_meta": meta("Cursor"), "name": "search", "arguments": { "query": "แผน" } }));
