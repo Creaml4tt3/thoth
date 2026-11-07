@@ -358,6 +358,8 @@ export function remoteConnectedApps(transport: Transport, events: Pick<Connected
     log: () => transport.call("mcp.log", {}),
     answer: async (id, answer) => void (await transport.call("mcp.answer", { id, ...answer })),
     mayPropose: (app, allow) => transport.call("mcp.mayPropose", { app, allow }),
+    mayRemember: (app, allow) => transport.call("mcp.mayRemember", { app, allow }),
+    memoryFolder: (root, folder) => transport.call("mcp.memoryFolder", { root, folder }),
     proposals: () => transport.call("mcp.proposals", {}),
     proposal: (id) => transport.call("mcp.proposal", { id }),
     settle: (id, status) => transport.call("mcp.settle", { id, status }),

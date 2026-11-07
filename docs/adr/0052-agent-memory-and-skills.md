@@ -38,8 +38,11 @@ Constraints:
 
 1. **One memory folder per Private Space, `Memory/` by default.**
    - Its name is `Memory` in every language; only the view's title is translated. Settings can choose another
-     folder, never the top level or a hidden one. (Implementation, 2026-11-07: 0.9.0 ships with `Memory/` fixed, so
-     the host checks every path against one name; the choice of folder comes in a later release.)
+     folder, never the top level or a hidden one. (Owner, 2026-11-07: in 0.9.0 the folder is chosen once per Private
+     Space, the first time an app uses memory there. `Memory/` is used without a question when it is empty or Thoth
+     set it up (its README is Thoth's). When it already holds pages of the user's own, a window asks which folder
+     agents should use, `Memory/` or another, because agents change pages in their folder without review. The host
+     records the answer and checks every path against it. Changing the folder later comes in a later release.)
    - `Memory/About me.md` is a short summary, at most 8 KB, that agents read first.
    - `Memory/README.md` explains the format and rules for agents that read the folder directly.
    - Each memory is one file, `Memory/<slug>.md`. Its kind is in the frontmatter, so changing it never moves the file.

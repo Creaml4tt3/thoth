@@ -115,13 +115,17 @@ export interface Updates {
 /** Connected apps (ADR-0021): the user's settings, and the requests the host sends a window to answer. */
 export interface ConnectedApps {
   settings(): Promise<ConnectedAppsSettings>;
-  configure(change: { enabled?: boolean; spaces?: string[] }): Promise<ConnectedAppsSettings>;
+  configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean }): Promise<ConnectedAppsSettings>;
   decide(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
   forget(app: string): Promise<ConnectedAppsSettings>;
   log(): Promise<ConnectedAppsLogEntry[]>;
   answer(id: string, answer: McpAnswer): Promise<void>;
   /** "May propose changes" for an app (ADR-0048). */
   mayPropose(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
+  /** "Save memories without asking" for an app (ADR-0052). */
+  mayRemember(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
+  /** The memory folder for a Private Space this window has open (ADR-0052 rule 1). */
+  memoryFolder(root: string, folder: string): Promise<ConnectedAppsSettings>;
   proposals(): Promise<{ proposals: ConnectedAppProposal[]; open: number }>;
   proposal(id: string): Promise<ConnectedAppProposalText>;
   settle(id: string, status: "applied" | "declined" | "conflicted"): Promise<ConnectedAppProposal>;
@@ -129,7 +133,7 @@ export interface ConnectedApps {
   onProposals(listener: (open: number) => void): Promise<() => void>;
   /** A request for some window (each window answers only those whose `owner` is its own id). Returns the remover. */
   onRequest(listener: (request: McpRequest) => void): Promise<() => void>;
-  /** The apps waiting for an answer (Allow or Deny, or "May propose changes") changed. Returns the remover. */
+  /** The questions waiting for an answer (Allow or Deny, "May propose changes", the memory folder) changed. Returns the remover. */
   onPending(listener: (apps: string[]) => void): Promise<() => void>;
 }
 

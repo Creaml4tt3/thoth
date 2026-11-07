@@ -3,9 +3,10 @@
  * frontmatter, plus `Memory/About me.md` (the summary agents read first) and `Memory/README.md` (the rules, for agents
  * that read the folder directly).
  *
- * The folder is `Memory` in every language and, for 0.9.0, in every Private Space: the host checks paths against it
- * before anything is written (ADR-0052 rule 5). A memory written by hand with missing fields is still a memory: its
- * kind is `note`, its certainty `stated`, its dates the file's.
+ * The folder is `Memory` in every language unless the user chose another when Thoth found a `Memory` folder of their
+ * own (ADR-0052 rule 1). The host records it for each Private Space and sends it with every request; it checks paths
+ * against it before anything is written, and so does this module (rule 5). A memory written by hand with missing fields
+ * is still a memory: its kind is `note`, its certainty `stated`, its dates the file's.
  *
  * Changes are worked out first (`planRemember`, `planUpdate`, `planForget`), then written (`commitMemory`,
  * `commitForget`) with compare-and-swap on the version they were planned from, so the host can check the path, the
@@ -20,10 +21,15 @@ import { collisionKey, newStableId, normalizeVaultPath, sha256Hex, type PageSumm
 import { ConflictError } from "./errors.ts";
 import type { Vault } from "./vault.ts";
 
+/** The memory folder unless the user chose another. */
 export const MEMORY_FOLDER = "Memory";
-export const ABOUT_ME_PATH = `${MEMORY_FOLDER}/About me.md`;
-export const MEMORY_README_PATH = `${MEMORY_FOLDER}/README.md`;
+export const ABOUT_ME = "About me.md";
+export const MEMORY_README = "README.md";
 export const MEMORY_RECORD_PATH = ".thoth/memory.json";
+export const aboutMePath = (folder: string) => `${folder}/${ABOUT_ME}`;
+export const readmePath = (folder: string) => `${folder}/${MEMORY_README}`;
+/** Longest memory folder path, in characters. */
+const MAX_FOLDER = 200;
 
 export const MEMORY_KINDS = ["profile", "preference", "work", "people", "reference", "note"] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
@@ -82,8 +88,21 @@ export interface Memory {
   hash: string;
 }
 
-/** True for a page that may be a memory, About me or the README: a Markdown file under `Memory/`, nothing hidden. */
-export function inMemoryFolder(path: string): boolean {
+/**
+ * A folder agents' memory may live in: a folder in the Private Space, `/`-separated, never the top level, hidden or
+ * Thoth's own. Returns it without leading or trailing `/`; throws `MemoryError` otherwise.
+ */
+export function checkMemoryFolder(raw: string): string {
+  const bad = () => new MemoryError("BAD_ARGUMENT", "The memory folder must be a folder in the Private Space, such as Agents/Memory, not the top level or a hidden folder");
+  const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
+  if (trimmed === "" || [...trimmed].length > MAX_FOLDER || /[\u0000-\u001f\u007f\\]/.test(trimmed)) throw bad();
+  const parts = trimmed.split("/").map((p) => p.trim());
+  if (parts.some((p) => p === "" || p === "." || p === ".." || p.startsWith("."))) throw bad();
+  return parts.join("/");
+}
+
+/** True for a page that may be a memory, About me or the README: a Markdown file under `folder/`, nothing hidden. */
+export function inMemoryFolder(path: string, folder: string = MEMORY_FOLDER): boolean {
   let normalized: string;
   try {
     normalized = normalizeVaultPath(path);
@@ -91,11 +110,16 @@ export function inMemoryFolder(path: string): boolean {
     return false;
   }
   const parts = normalized.split("/");
-  return parts.length > 1 && parts[0] === MEMORY_FOLDER && /\.md$/i.test(normalized) && parts.every((p) => p !== "" && !p.startsWith("."));
+  return (
+    normalized.startsWith(`${folder}/`) &&
+    parts.length > folder.split("/").length &&
+    /\.md$/i.test(normalized) &&
+    parts.every((p) => p !== "" && !p.startsWith("."))
+  );
 }
 
-const isReadme = (path: string) => collisionKey(path) === collisionKey(MEMORY_README_PATH);
-const isAboutMe = (path: string) => collisionKey(path) === collisionKey(ABOUT_ME_PATH);
+const isReadme = (path: string, folder: string) => collisionKey(path) === collisionKey(readmePath(folder));
+const isAboutMe = (path: string, folder: string) => collisionKey(path) === collisionKey(aboutMePath(folder));
 
 export const isMemoryKind = (value: unknown): value is MemoryKind => typeof value === "string" && (MEMORY_KINDS as readonly string[]).includes(value);
 
@@ -132,7 +156,7 @@ export function cleanTags(tags: unknown): string[] {
  * The memory a file holds. `fileTime`: the file's modified time (ISO), for dates it does not give; `id`: the index's
  * id, for a file without `thoth_id`.
  */
-export function parseMemory(path: string, source: string, hash: string, fallback: { id: string; fileTime: string }): Memory {
+export function parseMemory(path: string, source: string, hash: string, fallback: { id: string; fileTime: string }, folder: string = MEMORY_FOLDER): Memory {
   const fm = parseFrontmatter(source);
   const data = fm.data;
   const body = fm.split.present ? source.slice(fm.split.bodyOffset) : source.slice(fm.split.bomLength);
@@ -141,7 +165,7 @@ export function parseMemory(path: string, source: string, hash: string, fallback
   return {
     path,
     id: text(data.thoth_id) ?? fallback.id,
-    kind: isMemoryKind(data.kind) ? data.kind : isAboutMe(path) ? "profile" : "note",
+    kind: isMemoryKind(data.kind) ? data.kind : isAboutMe(path, folder) ? "profile" : "note",
     title: text(data.title) ?? name,
     source: text(data.source) ?? "",
     created,
@@ -193,8 +217,8 @@ const bytes = (s: string) => encodeText(s).length;
 
 // ------------------------------------------------------------------ reading
 
-/** Memories already read, by path, with the index version they were read at: a recall reads only what changed. */
-const cache = new WeakMap<object, Map<string, { hash: string; memory: Memory }>>();
+/** Memories already read, by folder and path, with the index version they were read at: a recall reads only what changed. */
+const cache = new WeakMap<object, Map<string, Map<string, { hash: string; memory: Memory }>>>();
 
 export interface MemoryFolder {
   about: Memory | null;
@@ -204,11 +228,13 @@ export interface MemoryFolder {
 
 type Reader = Pick<Vault, "listPages" | "readPage">;
 
-/** About me and every memory in the Private Space, as the index lists them. */
-export async function loadMemories(vault: Reader): Promise<MemoryFolder> {
-  const pages = (await vault.listPages()).filter((p) => inMemoryFolder(p.path) && !isReadme(p.path));
-  let known = cache.get(vault);
-  if (!known) cache.set(vault, (known = new Map()));
+/** About me and every memory in `folder`, as the index lists them. */
+export async function loadMemories(vault: Reader, folder: string = MEMORY_FOLDER): Promise<MemoryFolder> {
+  const pages = (await vault.listPages()).filter((p) => inMemoryFolder(p.path, folder) && !isReadme(p.path, folder));
+  let folders = cache.get(vault);
+  if (!folders) cache.set(vault, (folders = new Map()));
+  let known = folders.get(folder);
+  if (!known) folders.set(folder, (known = new Map()));
   const seen = new Set<string>();
   let about: Memory | null = null;
   const memories: Memory[] = [];
@@ -217,22 +243,33 @@ export async function loadMemories(vault: Reader): Promise<MemoryFolder> {
     let memory = known.get(page.path)?.hash === page.contentHash ? known.get(page.path)!.memory : undefined;
     if (!memory) {
       try {
-        memory = await readMemory(vault, page);
+        memory = await readMemory(vault, page, folder);
       } catch {
         continue; // gone since the index listed it
       }
       known.set(page.path, { hash: page.contentHash, memory });
     }
-    if (isAboutMe(page.path)) about = memory;
+    if (isAboutMe(page.path, folder)) about = memory;
     else memories.push(memory);
   }
   for (const path of known.keys()) if (!seen.has(path)) known.delete(path);
   return { about, memories };
 }
 
-async function readMemory(vault: Pick<Vault, "readPage">, page: Pick<PageSummary, "path" | "id" | "mtimeMs">): Promise<Memory> {
+async function readMemory(vault: Pick<Vault, "readPage">, page: Pick<PageSummary, "path" | "id" | "mtimeMs">, folder: string): Promise<Memory> {
   const read = await vault.readPage(page.path);
-  return parseMemory(read.path, read.source, read.hash, { id: page.id, fileTime: localIso(new Date(page.mtimeMs)) });
+  return parseMemory(read.path, read.source, read.hash, { id: page.id, fileTime: localIso(new Date(page.mtimeMs)) }, folder);
+}
+
+/**
+ * What is in `folder` now: its pages other than the README, and whether Thoth set it up (its README is Thoth's).
+ * A folder with pages Thoth did not set up is the user's own: the host asks before agents may change it.
+ */
+export async function memoryFolderUse(vault: Reader, folder: string): Promise<{ pages: number; thoth: boolean }> {
+  const pages = (await vault.listPages()).filter((p) => p.path.startsWith(`${folder}/`));
+  const readme = pages.find((p) => isReadme(p.path, folder));
+  const thoth = readme !== undefined && (await vault.readPage(readme.path).then((r) => r.source.includes(README_MARK), () => false));
+  return { pages: pages.filter((p) => p !== readme).length, thoth };
 }
 
 export interface MemoryFilter {
@@ -262,10 +299,10 @@ const newestFirst = (a: Memory, b: Memory) => Date.parse(b.updated) - Date.parse
  */
 export async function recallMemories(
   vault: Reader & Pick<Vault, "search">,
-  args: MemoryFilter & { query?: string; limit: number },
+  args: MemoryFilter & { query?: string; limit: number; folder?: string },
   now: Date,
 ): Promise<{ about: Memory | null; memories: Memory[]; total: number }> {
-  const folder = await loadMemories(vault);
+  const folder = await loadMemories(vault, args.folder);
   let found: Memory[];
   let about = folder.about;
   if (args.query) {
@@ -283,8 +320,8 @@ export async function recallMemories(
 }
 
 /** `list_memories`: every memory that matches, newest first; the first `limit` of them. */
-export async function listMemories(vault: Reader, args: MemoryFilter & { limit: number }): Promise<{ memories: Memory[]; total: number }> {
-  const found = (await loadMemories(vault)).memories.filter((m) => matches(m, args)).sort(newestFirst);
+export async function listMemories(vault: Reader, args: MemoryFilter & { limit: number; folder?: string }): Promise<{ memories: Memory[]; total: number }> {
+  const found = (await loadMemories(vault, args.folder)).memories.filter((m) => matches(m, args)).sort(newestFirst);
   return { memories: found.slice(0, args.limit), total: found.length };
 }
 
@@ -352,6 +389,8 @@ export interface RememberInput {
   certainty: Certainty;
   /** The app saving it (self-reported). */
   app: string;
+  /** The memory folder; `Memory` when left out. */
+  folder?: string;
 }
 
 type Planner = Reader & Pick<Vault, "readRecordText">;
@@ -368,7 +407,8 @@ export async function planRemember(vault: Planner, input: RememberInput, now: Da
   if (forgotten.some((f) => f.hash === hash || sameTopic(f.topic, topic))) {
     throw new MemoryError("FORGOTTEN", "The user asked to forget this memory. Do not save it again; if they want it back, they can add it in Thoth.");
   }
-  const folder = await loadMemories(vault);
+  const dir = input.folder ?? MEMORY_FOLDER;
+  const folder = await loadMemories(vault, dir);
   const title = (input.title?.trim() || firstLine(body)).slice(0, MAX_TITLE);
   const tags = input.tags === undefined ? undefined : cleanTags(input.tags);
   const stamp = localIso(now);
@@ -390,10 +430,10 @@ export async function planRemember(vault: Planner, input: RememberInput, now: Da
     throw new MemoryError("TOO_MANY", `The memory folder has ${MAX_MEMORIES} memories, the most it holds: update or forget old ones first.`);
   }
   const taken = new Set((await vault.listPages()).map((p) => collisionKey(p.path)));
-  for (const reserved of [ABOUT_ME_PATH, MEMORY_README_PATH]) taken.add(collisionKey(reserved));
+  for (const reserved of [aboutMePath(dir), readmePath(dir)]) taken.add(collisionKey(reserved));
   const slug = memorySlug(topic ?? title);
-  let path = `${MEMORY_FOLDER}/${slug}.md`;
-  for (let n = 2; taken.has(collisionKey(path)); n++) path = `${MEMORY_FOLDER}/${slug}-${n}.md`;
+  let path = `${dir}/${slug}.md`;
+  for (let n = 2; taken.has(collisionKey(path)); n++) path = `${dir}/${slug}-${n}.md`;
   const id = newStableId(now.getTime());
   const fields: Record<string, unknown> = { kind: input.kind, title, source: input.app, created: stamp, updated: stamp, updated_by: input.app };
   if (topic) fields.topic = topic;
@@ -411,15 +451,17 @@ export interface UpdateInput {
   expected?: string;
   certainty?: Certainty;
   app: string;
+  folder?: string;
 }
 
 /** `update_memory`: new text for a memory or About me, with the same rules as `remember`. */
 export async function planUpdate(vault: Planner, input: UpdateInput, now: Date): Promise<MemoryChange> {
-  const { memory, read } = await findMemory(vault, input.page, { aboutMe: true });
+  const folder = input.folder ?? MEMORY_FOLDER;
+  const { memory, read } = await findMemory(vault, input.page, { aboutMe: true, folder });
   if (input.expected !== undefined && input.expected !== read.hash) {
     throw new MemoryError("CONFLICT", `${read.path} changed since version ${input.expected}: recall it again, then update it.`);
   }
-  const about = isAboutMe(read.path);
+  const about = isAboutMe(read.path, folder);
   if (!about && memory.certainty === "stated" && input.certainty !== "stated") throw stated(read.path);
   let body: string;
   if (input.text !== undefined) body = input.text;
@@ -441,8 +483,8 @@ export async function planUpdate(vault: Planner, input: UpdateInput, now: Date):
 }
 
 /** `forget`: the memory goes to the system Trash when written. About me and the README are edited, never forgotten. */
-export async function planForget(vault: Planner, page: { path: string } | { id: string }): Promise<MemoryChange> {
-  const { memory, read } = await findMemory(vault, page, { aboutMe: false });
+export async function planForget(vault: Planner, page: { path: string } | { id: string }, folder: string = MEMORY_FOLDER): Promise<MemoryChange> {
+  const { memory, read } = await findMemory(vault, page, { aboutMe: false, folder });
   return { op: "forget", path: read.path, id: memory.id, kind: memory.kind, title: memory.title, before: read.source, after: null, baseHash: read.hash };
 }
 
@@ -450,9 +492,16 @@ export async function planForget(vault: Planner, page: { path: string } | { id: 
  * Writes a planned memory with compare-and-swap (`expected`: the version it was planned from, null for a new file).
  * The first write also adds the README and an empty About me. Returns the new version.
  */
-export async function commitMemory(vault: Pick<Vault, "writePage" | "readPage">, path: string, source: string, expected: string | null, now: Date): Promise<string> {
-  if (!inMemoryFolder(path) || isReadme(path)) throw new MemoryError("BAD_ARGUMENT", `${path} is not in the memory folder`);
-  await setUpFolder(vault, now);
+export async function commitMemory(
+  vault: Pick<Vault, "writePage" | "readPage">,
+  path: string,
+  source: string,
+  expected: string | null,
+  now: Date,
+  folder: string = MEMORY_FOLDER,
+): Promise<string> {
+  if (!inMemoryFolder(path, folder) || isReadme(path, folder)) throw new MemoryError("BAD_ARGUMENT", `${path} is not in the memory folder`);
+  await setUpFolder(vault, now, folder);
   try {
     return await vault.writePage(path, source, { expectedHash: expected });
   } catch (error) {
@@ -471,23 +520,24 @@ export async function commitForget(
   path: string,
   expected: string,
   now: Date,
+  folder: string = MEMORY_FOLDER,
 ): Promise<void> {
-  if (!inMemoryFolder(path) || isReadme(path) || isAboutMe(path)) throw new MemoryError("BAD_ARGUMENT", `${path} is not a memory`);
+  if (!inMemoryFolder(path, folder) || isReadme(path, folder) || isAboutMe(path, folder)) throw new MemoryError("BAD_ARGUMENT", `${path} is not a memory`);
   const read = await vault.readPage(path).catch(() => {
     throw new MemoryError("NOT_FOUND", `No memory ${path}`);
   });
   if (read.hash !== expected) throw new MemoryError("CONFLICT", `${path} changed meanwhile: recall it again, then forget it`);
-  const memory = parseMemory(read.path, read.source, read.hash, { id: "", fileTime: localIso(now) });
+  const memory = parseMemory(read.path, read.source, read.hash, { id: "", fileTime: localIso(now) }, folder);
   await addForgotten(vault, { topic: memory.topic, hash: memoryTextHash(memory.text), at: localIso(now) });
   await trash(read.path);
   await vault.reconcile({ changed: [read.path] }).catch(() => undefined);
 }
 
 /** README and About me, when the folder has none yet. Best effort: another window may add them at the same moment. */
-export async function setUpFolder(vault: Pick<Vault, "writePage" | "readPage">, now: Date): Promise<void> {
+export async function setUpFolder(vault: Pick<Vault, "writePage" | "readPage">, now: Date, folder: string = MEMORY_FOLDER): Promise<void> {
   for (const [path, source] of [
-    [MEMORY_README_PATH, MEMORY_README],
-    [ABOUT_ME_PATH, updateFrontmatter("\n", { kind: "profile", title: "About me", updated: localIso(now), thoth_id: newStableId(now.getTime()) })],
+    [readmePath(folder), MEMORY_README_TEXT],
+    [aboutMePath(folder), updateFrontmatter("\n", { kind: "profile", title: "About me", updated: localIso(now), thoth_id: newStableId(now.getTime()) })],
   ] as const) {
     const exists = await vault.readPage(path).then(
       () => true,
@@ -497,18 +547,19 @@ export async function setUpFolder(vault: Pick<Vault, "writePage" | "readPage">, 
   }
 }
 
-async function findMemory(vault: Planner, page: { path: string } | { id: string }, options: { aboutMe: boolean }) {
-  const folder = await loadMemories(vault);
+async function findMemory(vault: Planner, page: { path: string } | { id: string }, options: { aboutMe: boolean; folder: string }) {
+  const folder = await loadMemories(vault, options.folder);
   const all = folder.about ? [folder.about, ...folder.memories] : folder.memories;
   const named = "path" in page ? page.path : page.id;
   const found = "path" in page ? all.find((m) => collisionKey(m.path) === collisionKey(page.path)) : all.find((m) => m.id === page.id);
-  if (!found && "path" in page && !inMemoryFolder(page.path)) throw new MemoryError("BAD_ARGUMENT", `${page.path} is not in the memory folder (${MEMORY_FOLDER}/)`);
+  if (!found && "path" in page && !inMemoryFolder(page.path, options.folder))
+    throw new MemoryError("BAD_ARGUMENT", `${page.path} is not in the memory folder (${options.folder}/)`);
   if (!found) throw new MemoryError("NOT_FOUND", `No memory ${named}`);
-  if (!options.aboutMe && isAboutMe(found.path)) throw new MemoryError("BAD_ARGUMENT", "About me is never forgotten: update it with update_memory instead");
+  if (!options.aboutMe && isAboutMe(found.path, options.folder)) throw new MemoryError("BAD_ARGUMENT", "About me is never forgotten: update it with update_memory instead");
   const read = await vault.readPage(found.path).catch(() => {
     throw new MemoryError("NOT_FOUND", `No memory ${named}`);
   });
-  return { memory: parseMemory(read.path, read.source, read.hash, { id: found.id, fileTime: found.created }), read };
+  return { memory: parseMemory(read.path, read.source, read.hash, { id: found.id, fileTime: found.created }, options.folder), read };
 }
 
 /** The frontmatter changed as `changes` say and the body replaced; refused for frontmatter Thoth cannot edit safely. */
@@ -543,10 +594,13 @@ function stated(path: string): MemoryError {
   );
 }
 
-/** `Memory/README.md`: how the folder works, for agents that read it directly (ADR-0052 rule 9). */
-export const MEMORY_README = `# Memory
+/** The sentence that marks a README as Thoth's: a folder whose README has it was set up by Thoth. */
+const README_MARK = "This folder is the memory the user's AI agents share.";
 
-This folder is the memory the user's AI agents share. Thoth keeps it; any agent may read it.
+/** The memory folder's `README.md`: how the folder works, for agents that read it directly (ADR-0052 rule 9). */
+export const MEMORY_README_TEXT = `# Memory
+
+${README_MARK} Thoth keeps it; any agent may read it.
 
 - \`About me.md\` is a short summary of the user. Read it first.
 - Every other file is one memory: frontmatter, then one fact or decision with its reason and source.

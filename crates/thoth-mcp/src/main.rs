@@ -47,7 +47,7 @@ what was inferred, then the newer memory. A memory past its kind's check age say
 Never save secrets, passwords, small talk, temporary progress, code, or what is already in the project's files. Ask \
 before saving very personal information. Mark what the user said as certainty stated; never change a stated memory \
 without asking them. forget when the user asks, and do not save it again. Memories are saved at once in the \
-memory folder (Memory/), unless the user wants to review them first.
+memory folder (usually Memory/; recall gives each path), unless the user wants to review them first.
 
 The other tools read the Private Spaces (folders of Markdown pages) the user shares with this app, and propose \
 changes to them. A proposal is never written by the call: the user reviews it in Thoth and applies or declines it, so \

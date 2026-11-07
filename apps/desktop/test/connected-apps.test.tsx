@@ -213,6 +213,65 @@ async function userClick(element: HTMLElement) {
   await Promise.resolve();
 }
 
+describe("Agents' memory (ADR-0052)", () => {
+  it("asks which folder agents use when Memory holds pages of the user's own, and keeps their answer", async () => {
+    apps.state = { ...apps.state, enabled: true, listening: true, spaces: [root] };
+    const app = await open();
+    const shown = app.platform.connections[0]!.root;
+    apps.asksForFolder(shown);
+    const dialog = within(await screen.findByRole("dialog", { name: "Which folder should agents use for memory?" }));
+    expect(dialog.getByText(/already has a folder called Memory/)).toBeTruthy();
+    const field = dialog.getByRole("textbox", { name: "Folder for agents' memory" }) as HTMLInputElement;
+    expect(field.value).toBe("Agent memory");
+    // The top level or a hidden folder is refused before the host is asked.
+    await app.user.clear(field);
+    await app.user.type(field, ".hidden");
+    await app.user.click(dialog.getByRole("button", { name: "Use this folder" }));
+    expect((await dialog.findByRole("alert")).textContent).toMatch(/not the top level or a hidden folder/);
+    expect(apps.calls.some((c) => c[0] === "memoryFolder")).toBe(false);
+    await app.user.clear(field);
+    await app.user.type(field, "/AI/Memory/");
+    await app.user.click(dialog.getByRole("button", { name: "Use this folder" }));
+    expect(apps.calls).toContainEqual(["memoryFolder", shown, "AI/Memory"]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("“Use Memory anyway” is an answer too, and a question for another Private Space is not shown here", async () => {
+    apps.state = { ...apps.state, enabled: true, listening: true, spaces: [root] };
+    const app = await open();
+    apps.asksForFolder("/elsewhere");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    apps.asksForFolder(app.platform.connections[0]!.root);
+    await app.user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Use Memory anyway" }));
+    expect(apps.calls).toContainEqual(["memoryFolder", app.platform.connections[0]!.root, "Memory"]);
+  });
+
+  it("Settings has the switch for every app, one per app, and shows each shared Private Space's memory folder", async () => {
+    apps.state = {
+      ...apps.state,
+      enabled: true,
+      listening: true,
+      spaces: [root],
+      memoryFolders: { [root]: "AI/Memory" },
+      apps: [{ name: "Claude", allowed: true, decidedAt: "2026-11-07T09:00:00Z", propose: null, remember: true }],
+    };
+    const app = await open();
+    const section = await openSettings(app);
+    expect(section.getByText("Memory folder: AI/Memory")).toBeTruthy();
+    const all = section.getByRole("switch", { name: "Agents save memories without asking" });
+    expect(checked(all)).toBe(true);
+    const claude = within(section.getByRole("listitem", { name: "Claude" })).getByRole("switch", { name: "Save memories without asking" });
+    expect(checked(claude)).toBe(true);
+    await app.user.click(claude);
+    expect(apps.calls).toContainEqual(["mayRemember", "Claude", false]);
+    await app.user.click(all);
+    expect(apps.calls).toContainEqual(["configure", { memories: false }]);
+    // With the global switch off, the per-app one has nothing to say.
+    await waitFor(() => expect(within(section.getByRole("listitem", { name: "Claude" })).queryByRole("switch", { name: "Save memories without asking" })).toBeNull());
+  });
+});
+
 describe("A window answers from its open Vault", () => {
   async function seeded() {
     const app = await open();
@@ -258,33 +317,39 @@ describe("A window answers from its open Vault", () => {
   it("works out a memory, writes it when the host asks, recalls it and forgets it into the Trash (ADR-0052)", async () => {
     const { app, root: shown } = await seeded();
     const base = { owner: "main", root: shown, space: "Notes" } as const;
-    apps.request({ ...base, id: "c1", tool: "memory_change", args: { op: "remember", text: "Put blockers first.", kind: "preference", topic: "updates/format", certainty: "stated", app: "Claude" } });
+    apps.request({ ...base, id: "c1", tool: "memory_change", args: { op: "remember", text: "Put blockers first.", kind: "preference", topic: "updates/format", certainty: "stated", app: "Claude", folder: "Memory" } });
     const change = ((await answered("c1")) as { result: { op: string; path: string; after: string; baseHash: null } }).result;
     expect(change).toMatchObject({ op: "create", path: "Memory/updates-format.md", baseHash: null });
     expect(change.after).toContain("source: Claude");
 
     // Nothing is written until the host commits it.
-    apps.request({ ...base, id: "q0", tool: "recall", args: { limit: 10 } });
+    apps.request({ ...base, id: "q0", tool: "recall", args: { limit: 10, folder: "Memory" } });
     expect(((await answered("q0")) as { result: { total: number } }).result.total).toBe(0);
-    apps.request({ ...base, id: "w1", tool: "memory_commit", args: { op: "write", path: change.path, text: change.after, expected: null } });
+    apps.request({ ...base, id: "w1", tool: "memory_commit", args: { op: "write", path: change.path, text: change.after, expected: null, folder: "Memory" } });
     expect(await answered("w1")).toEqual({ result: { hash: expect.stringMatching(/^[0-9a-f]{64}$/) } });
 
-    apps.request({ ...base, id: "q1", tool: "recall", args: { limit: 10 } });
+    apps.request({ ...base, id: "q1", tool: "recall", args: { limit: 10, folder: "Memory" } });
     const recalled = ((await answered("q1")) as { result: { memories: { path: string; kind: string; text: string; stale: boolean; certainty: string }[] } }).result;
     expect(recalled.memories).toEqual([expect.objectContaining({ path: change.path, kind: "preference", text: "Put blockers first.", stale: false, certainty: "stated" })]);
 
     // A stated memory is not replaced by an inferred one, and the window says so by its code.
-    apps.request({ ...base, id: "c2", tool: "memory_change", args: { op: "remember", text: "Maybe risks first.", kind: "preference", topic: "updates/format", certainty: "inferred", app: "Codex" } });
+    apps.request({ ...base, id: "c2", tool: "memory_change", args: { op: "remember", text: "Maybe risks first.", kind: "preference", topic: "updates/format", certainty: "inferred", app: "Codex", folder: "Memory" } });
     expect(await answered("c2")).toEqual({ error: { code: "STATED", message: expect.stringContaining("Ask the user") } });
     // Never written outside the memory folder.
-    apps.request({ ...base, id: "w2", tool: "memory_commit", args: { op: "write", path: "Plan.md", text: "x", expected: null } });
+    apps.request({ ...base, id: "w2", tool: "memory_commit", args: { op: "write", path: "Plan.md", text: "x", expected: null, folder: "Memory" } });
     expect(await answered("w2")).toEqual({ error: { code: "BAD_ARGUMENT", message: expect.any(String) } });
 
-    apps.request({ ...base, id: "c3", tool: "memory_change", args: { op: "forget", page: { path: change.path } } });
+    apps.request({ ...base, id: "c3", tool: "memory_change", args: { op: "forget", page: { path: change.path }, folder: "Memory" } });
     const forget = ((await answered("c3")) as { result: { op: string; baseHash: string } }).result;
-    apps.request({ ...base, id: "t1", tool: "memory_commit", args: { op: "trash", path: change.path, expected: forget.baseHash } });
+    apps.request({ ...base, id: "t1", tool: "memory_commit", args: { op: "trash", path: change.path, expected: forget.baseHash, folder: "Memory" } });
     expect(await answered("t1")).toEqual({ result: {} });
     expect(app.platform.trashed).toEqual([change.path]);
+
+    // What a folder holds, before the host records it: Thoth set this one up.
+    apps.request({ ...base, id: "f1", tool: "memory_folder", args: { folder: "Memory" } });
+    expect(await answered("f1")).toEqual({ result: { pages: 1, thoth: true } }); // About me
+    apps.request({ ...base, id: "f2", tool: "memory_folder", args: { folder: ".thoth" } });
+    expect(await answered("f2")).toEqual({ error: { code: "BAD_ARGUMENT", message: expect.any(String) } });
   });
 
   it("answers only what was sent to this window, for its own Private Space", async () => {

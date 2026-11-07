@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseFrontmatter } from "@thoth/content";
 import {
-  ABOUT_ME_PATH,
-  MEMORY_README_PATH,
   MEMORY_RECORD_PATH,
+  aboutMePath,
+  checkMemoryFolder,
+  memoryFolderUse,
+  readmePath,
   MemoryError,
   commitForget,
   commitMemory,
@@ -26,6 +28,8 @@ import {
 } from "../src/index.ts";
 import { openNodeVault } from "../src/node/index.ts";
 
+const ABOUT_ME_PATH = aboutMePath("Memory");
+const MEMORY_README_PATH = readmePath("Memory");
 let root: string;
 let vault: Vault;
 const now = new Date("2026-11-07T03:12:00Z");
@@ -195,6 +199,42 @@ describe("remember, update and forget", () => {
     const plan = await remember("A", { topic: "a" });
     await put(plan.path, "someone else\n");
     expect(await code(commitMemory(vault, plan.path, plan.after!, plan.baseHash, now))).toBe("CONFLICT");
+  });
+});
+
+describe("the memory folder chosen (ADR-0052 rule 1)", () => {
+  it("is a folder in the Private Space, never the top level or a hidden one", () => {
+    expect(checkMemoryFolder(" /Agents/Memory/ ")).toBe("Agents/Memory");
+    expect(checkMemoryFolder("ความจำ")).toBe("ความจำ");
+    for (const bad of ["", "/", ".thoth", "Agents/.hidden", "a/../b", "a//b", "a\\b", "a\u0000", "x".repeat(201)]) expect(() => checkMemoryFolder(bad), bad).toThrow(MemoryError);
+    expect(inMemoryFolder("Agents/Memory/a.md", "Agents/Memory")).toBe(true);
+    expect(inMemoryFolder("Agents/Memory.md", "Agents/Memory")).toBe(false);
+    expect(inMemoryFolder("Agents/Memoryx/a.md", "Agents/Memory")).toBe(false);
+  });
+
+  it("tells a folder of the user's own from one Thoth set up", async () => {
+    expect(await memoryFolderUse(vault, "Memory")).toEqual({ pages: 0, thoth: false });
+    await put("Memory/Grandma.md", "Her recipes.\n");
+    await vault.reconcile();
+    expect(await memoryFolderUse(vault, "Memory")).toEqual({ pages: 1, thoth: false });
+    await save(await remember("A", { topic: "a" }));
+    expect(await memoryFolderUse(vault, "Memory")).toEqual({ pages: 3, thoth: true }); // Grandma, About me, the memory
+  });
+
+  it("saves, recalls and forgets in another folder, and never touches Memory/ then", async () => {
+    await put("Memory/Grandma.md", "Her recipes.\n");
+    await vault.reconcile();
+    const folder = "Agents/Memory";
+    const change = await planRemember(vault, { text: "Prefers tea.", kind: "preference", certainty: "stated", app: "Claude", topic: "drinks", folder }, now);
+    expect(change.path).toBe("Agents/Memory/drinks.md");
+    await commitMemory(vault, change.path, change.after!, null, now, folder);
+    expect(await readFile(join(root, "Agents/Memory/README.md"), "utf8")).toContain("agents share");
+    expect((await recallMemories(vault, { limit: 10, folder }, now)).memories.map((m) => m.path)).toEqual(["Agents/Memory/drinks.md"]);
+    expect((await listMemories(vault, { limit: 10 })).memories.map((m) => m.path)).toEqual(["Memory/Grandma.md"]);
+    expect(await code(planUpdate(vault, { page: { path: "Memory/Grandma.md" }, text: "x", app: "Claude", folder }, now))).toBe("BAD_ARGUMENT");
+    expect(await code(commitMemory(vault, "Memory/Grandma.md", "x", null, now, folder))).toBe("BAD_ARGUMENT");
+    const forget = await planForget(vault, { path: change.path }, folder);
+    expect(await code(commitForget(vault, async () => undefined, "Memory/Grandma.md", forget.baseHash!, now, folder))).toBe("BAD_ARGUMENT");
   });
 });
 

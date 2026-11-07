@@ -11,6 +11,7 @@
 .mcp-space > input { margin: 0; accent-color: var(--thoth-accent); align-self: center; }
 .mcp-space-name { font-weight: 550; }
 .mcp-space-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-space-memory { grid-column: 3; }
 .mcp-apps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
 .mcp-app { display: flex; align-items: center; gap: var(--thoth-space-3); flex-wrap: wrap; padding: 8px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); }
 .mcp-app-name { font-weight: 550; overflow-wrap: anywhere; min-width: 0; }

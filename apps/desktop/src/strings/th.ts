@@ -321,6 +321,11 @@ export const th: DesktopStrings = {
       propose_append: "เสนอการเพิ่มเนื้อหา", // REVIEW
       list_proposals: "ข้อเสนอของแอป", // REVIEW
       get_proposal: "ข้อเสนอหนึ่งรายการ", // REVIEW
+      recall: "เรียกดูความจำ", // REVIEW
+      remember: "บันทึกความจำ", // REVIEW
+      update_memory: "แก้ไขความจำ", // REVIEW
+      forget: "ลืมความจำ", // REVIEW
+      list_memories: "รายการความจำ", // REVIEW
       unknown: "สิ่งที่ไม่รู้จัก",
     },
     answered: "ตอบแล้ว",
@@ -336,6 +341,10 @@ export const th: DesktopStrings = {
       BUSY: "ไม่ว่าง",
       EXISTS: "ปฏิเสธ: มีหน้านี้อยู่แล้ว", // REVIEW
       CONFLICT: "ปฏิเสธ: หน้าถูกแก้ไขไปแล้ว", // REVIEW
+      FORGOTTEN: "ปฏิเสธ: คุณให้ลืมเรื่องนี้ไปแล้ว", // REVIEW
+      STATED: "ปฏิเสธ: คุณบอกไว้ไม่ตรงกัน", // REVIEW
+      LOOKS_LIKE_SECRET: "ปฏิเสธ: ดูเหมือนข้อมูลลับ", // REVIEW
+      TOO_MANY: "ปฏิเสธ: โฟลเดอร์ความจำเต็ม", // REVIEW
     },
     failed: (code) => `ไม่สำเร็จ (${code})`,
     prompt: {
@@ -350,6 +359,23 @@ export const th: DesktopStrings = {
     // REVIEW: the strings below, for proposed changes (ADR-0048).
     mayPropose: "เสนอการแก้ไขได้", // REVIEW
     mayProposeHint: "ปิดอยู่จนกว่าคุณจะเปิด การแก้ไขแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้", // REVIEW
+    // REVIEW: the strings below, for agents' memory (ADR-0052).
+    memories: "ให้เอเจนต์บันทึกความจำได้โดยไม่ต้องถาม", // REVIEW
+    memoriesHint:
+      "เปิดอยู่เป็นค่าเริ่มต้น แอปที่อนุญาตแล้วจะบันทึก แก้ไข และลืมความจำได้เฉพาะในโฟลเดอร์ความจำของ Private Space ที่แชร์ไว้ ถ้าปิด ความจำแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง เหมือนการเสนอการแก้ไข", // REVIEW
+    mayRemember: "บันทึกความจำได้โดยไม่ต้องถาม", // REVIEW
+    memoryFolder: (folder) => `โฟลเดอร์ความจำ: ${folder}`, // REVIEW
+    folderPrompt: {
+      title: "จะให้เอเจนต์ใช้โฟลเดอร์ไหนเก็บความจำ", // REVIEW
+      body: (space) =>
+        `${space} มีโฟลเดอร์ชื่อ Memory ที่มีหน้าของคุณเองอยู่แล้ว เอเจนต์แก้ไขและลืมหน้าในโฟลเดอร์ความจำได้โดยไม่ต้องถามคุณ จึงควรเลือกโฟลเดอร์ที่จะให้เอเจนต์ใช้`, // REVIEW
+      other: "โฟลเดอร์สำหรับความจำของเอเจนต์", // REVIEW
+      otherHint: "โฟลเดอร์ใน Private Space นี้ เช่น Agent memory หรือ AI/Memory Thoth จะสร้างให้ตอนที่เอเจนต์บันทึกความจำครั้งแรก", // REVIEW
+      useOther: "ใช้โฟลเดอร์นี้", // REVIEW
+      useMemory: "ใช้ Memory ต่อไป", // REVIEW
+      later: "Thoth จะจำคำตอบของคุณไว้สำหรับ Private Space นี้", // REVIEW
+      failed: (message) => `ใช้โฟลเดอร์นั้นไม่ได้: ${message}`, // REVIEW
+    },
     proposePrompt: {
       title: (app) => `ให้ “${app}” เสนอการแก้ไขไหม`, // REVIEW
       body: "แอปนี้ต้องการเสนอการแก้ไขหน้าของคุณ การแก้ไขแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง เป็นส่วนที่ต่างกันซึ่งคุณกดใช้หรือปฏิเสธได้ ไม่มีอะไรถูกเขียนจนกว่าคุณจะกดใช้", // REVIEW

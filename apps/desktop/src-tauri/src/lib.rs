@@ -1082,8 +1082,8 @@ mod tests {
         let text = include_str!("../capabilities/main.json");
         assert!(!text.contains("updater"), "no updater plugin permission");
         assert!(include_str!("../Cargo.toml").contains("tauri-plugin-updater"));
-        // Connected apps (ADR-0021, ADR-0048) add exactly their ten commands and no plugin: the socket and the proposals
-        // are the host's.
+        // Connected apps (ADR-0021, ADR-0048, ADR-0052) add exactly their twelve commands and no plugin: the socket, the
+        // proposals and the memory history are the host's.
         let mcp: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.starts_with("allow-mcp-")).collect();
         assert_eq!(
             mcp,
@@ -1097,7 +1097,9 @@ mod tests {
                 "allow-mcp-mayPropose",
                 "allow-mcp-proposals",
                 "allow-mcp-proposal",
-                "allow-mcp-settle"
+                "allow-mcp-settle",
+                "allow-mcp-mayRemember",
+                "allow-mcp-memoryFolder"
             ])
         );
     }

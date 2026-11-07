@@ -83,6 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
+    "mcp.mayRemember", "mcp.memoryFolder",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -595,6 +596,16 @@ impl Host {
                 };
                 json(self.mcp.may_propose(str_arg(args, "app")?, allow)?)
             }
+            // Agents' memory (ADR-0052): the per-app "Save memories without asking", and a window's answer naming the
+            // memory folder of a Private Space it has open.
+            "mcp.mayRemember" => {
+                let allow = match args.get("allow") {
+                    Some(Value::Bool(b)) => *b,
+                    _ => return Err(HostError::bad_argument("allow must be a boolean")),
+                };
+                json(self.mcp.may_remember(str_arg(args, "app")?, allow)?)
+            }
+            "mcp.memoryFolder" => json(self.mcp.memory_folder(owner, str_arg(args, "root")?, str_arg(args, "folder")?)?),
             "mcp.proposals" => json(self.mcp.proposals()),
             "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),
             "mcp.settle" => json(self.mcp.settle(owner, str_arg(args, "id")?, str_arg(args, "status")?)?),

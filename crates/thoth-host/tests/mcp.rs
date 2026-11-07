@@ -31,6 +31,8 @@ fn window_answer(tool: &str, args: &Value) -> Value {
             json!({ "result": { "page": { "id": "p1", "path": "Plan.md", "title": "Plan" }, "links": [{ "id": "p2", "path": "Log.md", "title": "Log", "line": 3 }], "total": 1 } })
         }
         "memory_change" => memory_change(args),
+        // An empty memory folder: the host records it without asking.
+        "memory_folder" => json!({ "result": { "pages": 0, "thoth": false } }),
         "memory_commit" => json!({ "result": if args["op"] == "write" { json!({ "hash": "h2" }) } else { json!({}) } }),
         "recall" => json!({ "result": {
             "about": { "path": "Memory/About me.md", "id": "a1", "updated": "2026-11-01T09:00:00+07:00", "text": "Ploy, a designer in Chiang Mai." },
@@ -57,7 +59,7 @@ fn memory_change(args: &Value) -> Value {
     if text.contains("forgotten") {
         return json!({ "error": { "code": "FORGOTTEN", "message": "The user asked to forget this memory." } });
     }
-    let path = if text == "outside" { "Notes/Plan.md" } else { "Memory/blockers-first.md" };
+    let path = if text == "outside" { "Notes/Plan.md".to_owned() } else { format!("{}/blockers-first.md", args["folder"].as_str().unwrap()) };
     let change = match args["op"].as_str().unwrap() {
         "remember" => {
             json!({ "op": "create", "before": null, "after": format!("---\nkind: {}\n---\n{text}\n", args["kind"].as_str().unwrap()), "baseHash": null })
@@ -783,16 +785,20 @@ fn an_allowed_app_saves_a_memory_without_review_and_the_host_keeps_its_history()
     let made = &saved["result"]["structured"];
     assert_eq!((made["status"].clone(), made["path"].clone(), made["version"].clone()), (json!("saved"), json!("Memory/blockers-first.md"), json!("h2")));
 
-    // Worked out first, then written over the version it was worked out from, with the app as its source.
+    // The first time, the host looks at the Memory folder (empty here) and records it.
     let requests = f.requests.lock().unwrap().clone();
-    assert_eq!(tools_asked(&f), ["memory_change", "memory_commit"]);
+    assert_eq!(tools_asked(&f), ["memory_folder", "memory_change", "memory_commit"]);
+    assert_eq!(requests[0]["args"], json!({ "folder": "Memory" }));
+    assert_eq!(f.relay.settings()["memoryFolders"], json!({ NOTES: "Memory" }));
+    // Worked out, then written over the version it was worked out from, with the app as its source.
     assert_eq!(
-        requests[0]["args"],
-        json!({ "op": "remember", "text": "Put blockers first.", "kind": "preference", "topic": "updates/format", "tags": ["writing"], "certainty": "inferred", "app": "Claude" })
+        requests[1]["args"],
+        json!({ "op": "remember", "text": "Put blockers first.", "kind": "preference", "topic": "updates/format", "tags": ["writing"], "certainty": "inferred", "app": "Claude", "folder": "Memory" })
     );
-    assert_eq!(requests[1]["args"]["op"], "write");
-    assert_eq!(requests[1]["args"]["expected"], Value::Null);
-    assert_eq!(requests[1]["args"]["path"], "Memory/blockers-first.md");
+    assert_eq!(requests[2]["args"]["op"], "write");
+    assert_eq!(requests[2]["args"]["expected"], Value::Null);
+    assert_eq!(requests[2]["args"]["path"], "Memory/blockers-first.md");
+    assert_eq!(requests[2]["args"]["folder"], "Memory");
 
     // Kept for Undo, outside the notes, owner-only; the windows hear of it for the bell.
     let history = f.relay.memory_history(None).unwrap();
@@ -816,7 +822,7 @@ fn an_allowed_app_saves_a_memory_without_review_and_the_host_keeps_its_history()
     let forgot = ask(&socket(&f), "Claude", "forget", json!({ "id": "m1", "reason": "the user asked" }));
     assert_eq!(forgot["result"]["structured"]["status"], "forgotten", "{forgot}");
     let commits: Vec<Value> = f.requests.lock().unwrap().iter().filter(|r| r["tool"] == "memory_commit").map(|r| r["args"].clone()).collect();
-    assert_eq!(commits[2], json!({ "op": "trash", "path": "Memory/blockers-first.md", "expected": "h1" }));
+    assert_eq!(commits[2], json!({ "op": "trash", "path": "Memory/blockers-first.md", "expected": "h1", "folder": "Memory" }));
     assert_eq!(f.relay.memory_history(None).unwrap()["changes"][0]["action"], "forgot", "newest first");
 
     // Nothing to change: nothing written.
@@ -885,12 +891,13 @@ fn memory_writes_are_checked_before_anything_is_written() {
     assert_eq!(error_code(&call("remember", json!({ "text": "x".repeat(4097), "kind": "note" }))), "TOO_LARGE");
     assert_eq!(error_code(&call("remember", json!({ "text": "x", "kind": "note", "certainty": "sure" }))), "BAD_ARGUMENT");
     assert_eq!(error_code(&call("update_memory", json!({ "path": "Memory/a.md" }))), "BAD_ARGUMENT");
-    // Only memories in Memory/, never its README or a page elsewhere.
-    for path in ["Plan.md", "Notes/Memory/a.md", "Memory/README.md", "Memory/.hidden/a.md", "Memory/a.txt", "Memory/../Plan.md", "Memory"] {
+    // Only memories in the memory folder, never its README or a page elsewhere.
+    for path in ["Plan.md", "Notes/Memory/a.md", "Memory/README.md", "Memory/.hidden/a.md", "Memory/a.txt", "Memory/../Plan.md", "Memory", "Memoryx/a.md"] {
         assert_eq!(error_code(&call("update_memory", json!({ "path": path, "text": "x" }))), "BAD_ARGUMENT", "{path}");
         assert_eq!(error_code(&call("forget", json!({ "path": path }))), "BAD_ARGUMENT", "{path}");
     }
-    assert!(f.requests.lock().unwrap().is_empty(), "no window was asked");
+    assert_eq!(tools_asked(&f), ["memory_folder"], "only the folder was looked at, once");
+    f.requests.lock().unwrap().clear();
 
     // A window's change outside the folder is never written; its refusals reach the app.
     assert_eq!(error_code(&call("remember", json!({ "text": "outside", "kind": "note" }))), "INTERNAL");
@@ -918,7 +925,7 @@ fn recall_and_list_memories_answer_from_the_fields_the_host_knows() {
     let recalled = ask(&socket(&f), "Claude", "recall", json!({ "kind": "work", "tags": ["#writing"], "since": "2026-10-01", "limit": 5 }));
     assert_eq!(recalled["ok"], true, "{recalled}");
     let asked = f.requests.lock().unwrap().last().cloned().unwrap();
-    assert_eq!(asked["args"], json!({ "kind": "work", "tags": ["writing"], "since": "2026-10-01", "limit": 5 }));
+    assert_eq!(asked["args"], json!({ "kind": "work", "tags": ["writing"], "since": "2026-10-01", "limit": 5, "folder": "Memory" }));
     let found = &recalled["result"]["structured"];
     assert_eq!(found["about"][0]["text"], "Ploy, a designer in Chiang Mai.");
     assert_eq!(found["memories"].as_array().unwrap().len(), 2);
@@ -945,4 +952,71 @@ fn recall_and_list_memories_answer_from_the_fields_the_host_knows() {
     // A window's memory with a kind that is not one of the six is not passed on.
     *f.answer_with.lock().unwrap() = Some(json!({ "result": { "memories": [{ "kind": "secret" }], "total": 1 } }));
     assert_eq!(error_code(&ask(&socket(&f), "Claude", "list_memories", json!({}))), "INTERNAL");
+}
+
+/// Waits for the windows to hear that `roots` wait for the memory folder question.
+fn folders_asked(f: &Fixture, roots: Value) {
+    loop {
+        let heard = f.pending.recv_timeout(Duration::from_secs(5)).expect("the windows hear the question");
+        if heard["folders"] == roots {
+            return;
+        }
+    }
+}
+
+#[test]
+fn a_memory_folder_of_the_users_own_is_used_only_once_they_say_which_folder_agents_may_use() {
+    let f = fixture(fast());
+    ready(&f, "Claude");
+    // Memory/ holds pages Thoth did not set up.
+    *f.answer_with.lock().unwrap() = Some(json!({ "result": { "pages": 3, "thoth": false } }));
+    let asking = {
+        let socket = socket(&f);
+        std::thread::spawn(move || ask(&socket, "Claude", "remember", json!({ "text": "Put blockers first.", "kind": "preference" })))
+    };
+    folders_asked(&f, json!([NOTES]));
+    *f.answer_with.lock().unwrap() = None;
+    assert_eq!(f.relay.settings()["folders"], json!([NOTES]));
+    assert_eq!(f.relay.settings()["memoryFolders"], json!({}), "nothing recorded before the answer");
+
+    // Only a window with that Private Space open answers, with a folder agents may use.
+    assert_eq!(f.relay.memory_folder("space-other", NOTES, "Agents/Memory").unwrap_err().code, "NOT_ALLOWED");
+    for bad in ["", "/", ".thoth", "Agents/.x", "../Out", "a//b"] {
+        assert_eq!(f.relay.memory_folder("main", NOTES, bad).unwrap_err().code, "BAD_ARGUMENT", "{bad}");
+    }
+    f.relay.memory_folder("main", NOTES, "/Agents/Memory/").unwrap();
+    folders_asked(&f, json!([]));
+    let saved = asking.join().unwrap();
+    assert_eq!(saved["result"]["structured"]["path"], "Agents/Memory/blockers-first.md", "{saved}");
+    let commit = f.requests.lock().unwrap().iter().rev().find(|r| r["tool"] == "memory_commit").cloned().unwrap();
+    assert_eq!(commit["args"]["folder"], "Agents/Memory");
+
+    // Recorded, also after a restart: not asked again, and Memory/ is not a memory folder.
+    let again = Relay::new(Some(f.dir.clone()), Arc::new(|_: &str, _: Value| {}), Arc::new(Vec::new), fast());
+    assert_eq!(again.settings()["memoryFolders"], json!({ NOTES: "Agents/Memory" }));
+    drop(again);
+    f.requests.lock().unwrap().clear();
+    assert_eq!(error_code(&ask(&socket(&f), "Claude", "forget", json!({ "path": "Memory/Grandma.md" }))), "BAD_ARGUMENT");
+    assert!(f.requests.lock().unwrap().is_empty());
+    let recalled = ask(&socket(&f), "Claude", "recall", json!({}));
+    assert_eq!(f.requests.lock().unwrap().last().unwrap()["args"]["folder"], "Agents/Memory", "{recalled}");
+}
+
+#[test]
+fn an_unanswered_memory_folder_question_times_out_and_a_folder_thoth_set_up_is_not_asked_about() {
+    let f = fixture(McpOptions { prompt_timeout: Duration::from_millis(300), ..fast() });
+    ready(&f, "Claude");
+    *f.answer_with.lock().unwrap() = Some(json!({ "result": { "pages": 3, "thoth": false } }));
+    let waited = ask(&socket(&f), "Claude", "recall", json!({}));
+    assert_eq!(error_code(&waited), "NOT_ALLOWED");
+    assert!(waited["error"]["message"].as_str().unwrap().contains("answer in Thoth"), "{waited}");
+    assert_eq!(f.relay.settings()["memoryFolders"], json!({}));
+
+    // Thoth's own README is there: the folder is Thoth's, recorded without a question.
+    *f.answer_with.lock().unwrap() = Some(json!({ "result": { "pages": 3, "thoth": true } }));
+    f.relay.configure(&json!({ "enabled": false }), &[]).unwrap();
+    f.relay.configure(&json!({ "enabled": true }), &[]).unwrap();
+    let _ = ask(&socket(&f), "Claude", "recall", json!({}));
+    assert_eq!(f.relay.settings()["memoryFolders"], json!({ NOTES: "Memory" }));
+    assert_eq!(f.relay.settings()["folders"], json!([]));
 }

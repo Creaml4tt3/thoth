@@ -35,7 +35,7 @@ const KINDS: &[&str] = &["profile", "preference", "work", "people", "reference",
 const KIND: &str = "profile: stable facts about the user (role, expertise, languages, goals). preference: how they want things done, corrections (tag correction) and approaches they confirmed. work: projects, deadlines and decisions in progress, with the reason. people: one person they deal with, and how to work with them. reference: where something lives outside the notes (a link, tracker or account name, never a secret). note: a lasting fact that fits no other kind.";
 const CERTAINTY: &str = "stated: the user said it. inferred: you concluded it (the default). An inferred memory never replaces a stated one.";
 const MEMORY_ID: &str = "The memory's id, as recall and list_memories give it. Instead of path.";
-const MEMORY_PATH: &str = "The memory's path, such as Memory/blockers-first.md or Memory/About me.md.";
+const MEMORY_PATH: &str = "The memory's path, as recall and list_memories give it, such as Memory/blockers-first.md.";
 const MEMORY_SPACE: &str = "The memory's Private Space. Needed when more than one is shared.";
 
 /// What `tools/list` answers.
@@ -233,7 +233,7 @@ pub fn definitions() -> Value {
         {
             "name": "remember",
             "title": "Save a memory",
-            "description": "Saves one memory for the user's agents: one fact or decision, its reason and where it came from. Save when the user states a preference, corrects you, or decides something another agent would need. Give topic to update the memory on that topic instead of adding one. Never save secrets, passwords, small talk, temporary progress or code. Saved at once in the user's memory folder (Memory/), unless the user wants to review memories first: then the answer is a pending proposal.",
+            "description": "Saves one memory for the user's agents: one fact or decision, its reason and where it came from. Save when the user states a preference, corrects you, or decides something another agent would need. Give topic to update the memory on that topic instead of adding one. Never save secrets, passwords, small talk, temporary progress or code. Saved at once in the user's memory folder (usually Memory/), unless the user wants to review memories first: then the answer is a pending proposal.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -253,7 +253,7 @@ pub fn definitions() -> Value {
         {
             "name": "update_memory",
             "title": "Change a memory",
-            "description": "Changes one memory, or About me (Memory/About me.md, at most 8 KB), by its path or id: the whole new text, or replacements, each an exact piece of its text (find, once) and what replaces it. A memory the user stated is changed only with certainty stated: ask the user first.",
+            "description": "Changes one memory, or About me (About me.md in the memory folder, at most 8 KB), by its path or id: the whole new text, or replacements, each an exact piece of its text (find, once) and what replaces it. A memory the user stated is changed only with certainty stated: ask the user first.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

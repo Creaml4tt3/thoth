@@ -92,6 +92,8 @@
     "allow-mcp-proposals",
     "allow-mcp-proposal",
     "allow-mcp-settle",
+    "allow-mcp-mayRemember",
+    "allow-mcp-memoryFolder",
     "allow-diag-report",
     "allow-diag-collect",
     "allow-diag-settings"

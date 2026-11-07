@@ -8,7 +8,7 @@ export const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
 export const SOCKET = "/Users/someone/Library/Application Support/com.thothnotes.desktop/mcp/thoth.sock";
 
 export class FakeConnectedApps implements ConnectedApps {
-  state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], proposers: [], setup: { command: SIDECAR, args: ["--socket", SOCKET] } };
+  state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], proposers: [], memories: true, memoryFolders: {}, folders: [], setup: { command: SIDECAR, args: ["--socket", SOCKET] } };
   calls: unknown[][] = [];
   answers: { id: string; answer: McpAnswer }[] = [];
   entries: ConnectedAppsLogEntry[] = [];
@@ -22,8 +22,9 @@ export class FakeConnectedApps implements ConnectedApps {
   async settings() {
     return this.copy();
   }
-  async configure(change: { enabled?: boolean; spaces?: string[] }) {
+  async configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean }) {
     this.calls.push(["configure", change]);
+    if (change.memories !== undefined) this.state.memories = change.memories;
     if (change.enabled !== undefined) Object.assign(this.state, { enabled: change.enabled, listening: change.enabled });
     if (change.spaces) this.state.spaces = change.spaces;
     return this.copy();
@@ -53,6 +54,23 @@ export class FakeConnectedApps implements ConnectedApps {
     this.state.proposers = this.state.proposers.filter((p) => p !== app);
     this.emitPending();
     return this.copy();
+  }
+  async mayRemember(app: string, allow: boolean) {
+    this.calls.push(["mayRemember", app, allow]);
+    this.state.apps = this.state.apps.map((a) => (a.name === app ? { ...a, remember: allow } : a));
+    return this.copy();
+  }
+  async memoryFolder(root: string, folder: string) {
+    this.calls.push(["memoryFolder", root, folder]);
+    this.state.memoryFolders = { ...this.state.memoryFolders, [root]: folder };
+    this.state.folders = (this.state.folders ?? []).filter((r) => r !== root);
+    this.emitPending();
+    return this.copy();
+  }
+  /** An app first uses memory in a Private Space whose Memory folder holds the user's own pages. */
+  asksForFolder(root: string) {
+    this.state.folders = [...(this.state.folders ?? []), root];
+    this.emitPending();
   }
   async proposals() {
     const proposals: ConnectedAppProposal[] = this.kept.map(({ before: _b, after: _a, ...summary }) => summary);
