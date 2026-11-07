@@ -12,6 +12,7 @@
 //! An app is known by the name it gives (MCP `clientInfo.name`). That name is self-reported: any program of this
 //! user can give any name. Allow and Deny are the user's consent for a name, not proof of who connects; the socket
 //! being the user's own (`0600` in a `0700` folder) is what keeps other users out.
+pub mod install;
 pub mod log;
 pub mod memory;
 pub mod proposals;
@@ -377,6 +378,17 @@ impl Relay {
         self.inner.decided.notify_all();
         self.inner.emit_pending();
         Ok(self.settings())
+    }
+
+    /// `mcp.install { app, replace? }`: adds `thoth-mcp` to an app's own MCP settings (ADR-0052 rule 10). `claude` runs
+    /// the Claude Code CLI.
+    pub fn install(&self, app: &str, replace: bool, home: Option<&Path>, claude: install::RunClaude<'_>) -> HostResult<Value> {
+        let setup = self.setup();
+        let command =
+            setup.get("command").and_then(Value::as_str).ok_or_else(|| HostError::new("UNAVAILABLE", "Connected apps are not available on this computer"))?;
+        let args = setup.get("args").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+        let home = home.ok_or_else(|| HostError::new("UNAVAILABLE", "Thoth could not find your home folder"))?;
+        install::install(app, replace, &install::Setup { command: command.to_owned(), args }, home, claude)
     }
 
     /// `mcp.skillLinks { root, on? }` from the window `owner`, which must have that Private Space open: "Use my skills in

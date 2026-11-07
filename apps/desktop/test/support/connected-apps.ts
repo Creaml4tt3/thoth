@@ -105,6 +105,14 @@ export class FakeConnectedApps implements ConnectedApps {
     const { before: _b, after: _a, ...summary } = found;
     return summary;
   }
+  /** Apps that already have another thoth server; `install` refuses them with EEXIST unless replacing. */
+  taken = new Set<string>();
+  async install(app: string, replace?: boolean) {
+    this.calls.push(replace ? ["install", app, true] : ["install", app]);
+    if (this.taken.has(app) && !replace) throw Object.assign(new Error(`${app} already has a server called thoth`), { code: "EEXIST" });
+    const replaced = this.taken.delete(app);
+    return { status: replaced ? ("replaced" as const) : ("added" as const), file: `/Users/someone/.${app}/config`, backup: null };
+  }
   /** What `skillLinks` answers (its `on` follows the settings). */
   linkReport: Omit<SkillLinksReport, "on"> = { linked: [], skipped: [], folders: ["/Users/someone/.agents/skills"] };
   async skillLinks(root: string, on?: boolean) {
