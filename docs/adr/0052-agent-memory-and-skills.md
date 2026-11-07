@@ -181,7 +181,9 @@ and ADR-0048 refine.
 
 ## Open questions
 
-- Whether the server keeps YAML frontmatter on workspace pages as written. Blocks rule 8; checked first.
+- ~~Whether the server keeps YAML frontmatter on workspace pages as written.~~ Resolved 2026-11-07: it stores the Markdown
+  byte for byte (`apps/server/src/pages.ts`, `page_revisions.markdown`) and already reads frontmatter for tags, dates
+  and folders (`pageTagsOf`, `thoth_kind`).
 - A remote MCP endpoint on the workspace server for ChatGPT on the web, claude.ai and phones. Not in 0.9.0.
 - A tidy-up pass that merges duplicate memories and flags contradicting ones. Not in 0.9.0.
 - Importing Claude Code, Codex, ChatGPT or Notion memories, using the mapping in rule 3. Not in 0.9.0.
