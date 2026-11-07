@@ -89,6 +89,7 @@ export async function purgeWorkspaceIn(tx: Queryable, workspaceId: string, actor
   // Cascades to transfer_items (staged pages and pinned revisions).
   await tx.query("DELETE FROM transfers WHERE workspace_id = $1", [workspaceId]);
   await tx.query("DELETE FROM changes WHERE workspace_id = $1", [workspaceId]);
+  await tx.query("DELETE FROM memory_proposals WHERE workspace_id = $1", [workspaceId]);
   // The one other way past the immutability trigger besides revision pruning (migration 006), for this transaction only.
   await tx.query("SELECT set_config('thoth.pruning', 'on', true)");
   await tx.query("DELETE FROM page_revisions WHERE workspace_id = $1", [workspaceId]);

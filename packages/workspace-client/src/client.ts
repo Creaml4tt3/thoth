@@ -25,6 +25,10 @@ import {
   TeamListSchema,
   TeamPageListSchema,
   LimitedPageListSchema,
+  TeamMemoryProposalListSchema,
+  TeamMemoryProposalSchema,
+  TeamMemoryProposalTextSchema,
+  TeamMemorySettingsSchema,
   TrashListSchema,
   TrashRestoredSchema,
   TeamSchema,
@@ -55,6 +59,11 @@ import {
   type Team,
   type TeamPageList,
   type LimitedPageList,
+  type TeamMemoryPropose,
+  type TeamMemoryProposal,
+  type TeamMemoryProposalText,
+  type TeamMemorySettings,
+  type TeamMemoryStatus,
   type TrashItem,
   type InviteLink,
   type InviteLinkCreateRequest,
@@ -413,6 +422,44 @@ export class WorkspaceClient {
   /** Owners and managers: deletes a page in the Trash for good, now. It cannot be undone. */
   async purgeTrashedPage(workspaceId: string, pageId: string): Promise<void> {
     await this.request(null, { method: "DELETE", path: `/workspaces/${seg(workspaceId)}/trash/${seg(pageId)}`, ok: [204] });
+  }
+
+  /** Team memory (capability `team-memory`, ADR-0052 rule 8): the setting and the folder. */
+  async getTeamMemory(workspaceId: string): Promise<TeamMemorySettings> {
+    return (await this.request(TeamMemorySettingsSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/team-memory` })).data;
+  }
+
+  /** Owners and managers: "Agents' memories need review" on or off. */
+  async setTeamMemoryReview(workspaceId: string, review: boolean): Promise<TeamMemorySettings> {
+    return (await this.request(TeamMemorySettingsSchema, { method: "PUT", path: `/workspaces/${seg(workspaceId)}/team-memory/review`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify({ review })) })).data;
+  }
+
+  /** An agent's memory: waits for review (`pending`), or is applied at once when review is off (`applied`). */
+  async proposeTeamMemory(workspaceId: string, memory: TeamMemoryPropose): Promise<TeamMemoryProposal> {
+    return (await this.request(TeamMemoryProposalSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/team-memory/proposals`, headers: JSON_HEADERS, body: encoder.encode(JSON.stringify(memory)), ok: [200, 201] })).data;
+  }
+
+  /** Agents' memories, newest first: an editor's own, everyone's for owners and managers. */
+  async listTeamMemoryProposals(workspaceId: string, status?: TeamMemoryStatus): Promise<TeamMemoryProposal[]> {
+    const out: TeamMemoryProposal[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < this.maxPages; i++) {
+      const query: Record<string, string> = { ...(status ? { status } : {}), ...(cursor === null ? {} : { cursor }) };
+      const { data } = await this.request(TeamMemoryProposalListSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/team-memory/proposals`, query });
+      out.push(...data.items);
+      if (data.nextCursor === null) return out;
+      cursor = data.nextCursor;
+    }
+    return out;
+  }
+
+  async getTeamMemoryProposal(workspaceId: string, proposalId: string): Promise<TeamMemoryProposalText> {
+    return (await this.request(TeamMemoryProposalTextSchema, { method: "GET", path: `/workspaces/${seg(workspaceId)}/team-memory/proposals/${seg(proposalId)}` })).data;
+  }
+
+  /** Applies (`apply`) or declines (`decline`) an agent's memory that waits. */
+  async settleTeamMemoryProposal(workspaceId: string, proposalId: string, action: "apply" | "decline"): Promise<TeamMemoryProposal> {
+    return (await this.request(TeamMemoryProposalSchema, { method: "POST", path: `/workspaces/${seg(workspaceId)}/team-memory/proposals/${seg(proposalId)}/${action}` })).data;
   }
 
   /** Adds (`true`) or removes (`false`) a member of the workspace to or from a team. */
