@@ -5,6 +5,7 @@
  */
 import type { System } from "../features/import/model.ts";
 import type { NotificationKind } from "@thoth/app-ui/notifications/core.ts";
+import type { MemoryKind } from "@thoth/local-store";
 import { en as shared } from "@thoth/app-ui/strings/en.ts";
 
 type Phase = "staging" | "verifying" | "committing";
@@ -222,10 +223,13 @@ export const en = {
       importFailed: "Import finished with errors",
       saveConflict: "Save conflict",
       update: "A new version is out",
+      memories: "Agents saved memories",
     } satisfies Record<NotificationKind, string>,
     groups: { agent: "Thoth assistant", transfer: "Copy and move", import: "Import", editor: "Editing" },
     /** The new-version switch is not about system notifications (there are none for it): it adds an entry to the list. */
     updateEntry: "Add a new version to the list under the bell",
+    /** Like the new-version switch: memories never show as system notifications (ADR-0052). */
+    memoriesEntry: "Add the memories agents save to the list under the bell",
     privacy: "A notification names pages, folders, workspaces and the agent. It never shows what a page or the agent wrote, or your task.",
     click: "Clicking one brings Thoth to the front. What it is about is at the top of the list under the bell.",
   },
@@ -429,6 +433,44 @@ export const en = {
       conflictExists: "A file is at this path now, so this new page cannot be made. Decline it, and ask the app for another path.",
       applied: (path: string) => `Applied to ${path}.`,
       failed: (message: string) => `Could not apply it: ${message}`,
+    },
+    /** The Memories view (ADR-0052): what agents remember, by kind, and their recent writes with Undo. */
+    memoriesView: {
+      title: "Memories",
+      open: "Show memories",
+      lede: (folder: string) => `What your agents remember, kept as pages in ${folder}. Agents read them when they start working. Edit or delete them as any page.`,
+      loading: "Loading…",
+      none: "No memories yet. When an app you allowed saves one, it shows here.",
+      app: "App",
+      allApps: "All apps",
+      aboutMe: "About me",
+      aboutMeHint: "The short summary agents read first.",
+      kinds: {
+        profile: "About you",
+        preference: "Preferences",
+        work: "Work in progress",
+        people: "People",
+        reference: "References",
+        note: "Notes",
+      } satisfies Record<MemoryKind, string>,
+      byYou: "you",
+      meta: (by: string, date: Date) => `${by} · updated ${date.toLocaleDateString("en", { dateStyle: "medium" })}`,
+      inferred: "Inferred",
+      inferredHint: "The agent concluded this; you did not say it.",
+      stale: (days: number) => `Updated ${days.toLocaleString("en")} days ago: check it is still true`,
+      recent: "Recent changes",
+      recentHint: "What apps saved, changed or forgot without asking in the last 30 days. Undo puts the earlier text back.",
+      actions: {
+        created: (app: string, title: string) => `${app} saved “${title}”`,
+        updated: (app: string, title: string) => `${app} changed “${title}”`,
+        forgot: (app: string, title: string) => `${app} forgot “${title}”`,
+      },
+      when: (date: Date) => date.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }),
+      undo: "Undo",
+      undoLabel: (title: string) => `Undo the change to ${title}`,
+      changedSince: "Changed since",
+      undone: (title: string) => `Undid the change to ${title}.`,
+      undoFailed: (message: string) => `Could not undo it: ${message}`,
     },
   },
 

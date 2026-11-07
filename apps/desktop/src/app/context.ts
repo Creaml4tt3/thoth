@@ -99,6 +99,8 @@ export interface Session {
   notificationPrefs: NotificationPrefsStore;
   /** Opens what a notification is about: a run's review or outcome, a page, a folder. */
   openNotification(target: NotificationTarget): void;
+  /** Opens the Memories view (ADR-0052); nothing where there are no Connected apps. */
+  openMemories(): void;
   /** The notice that a new desktop version is out (ADR-0022); null where the host has none. */
   updates: UpdateService | null;
   /**

@@ -26,6 +26,7 @@ import { createWindowPresence } from "../platform/notifier.ts";
 import { MAIN_WINDOW, newWindowId } from "./windows.ts";
 import { initialTabs, serializeTabs } from "@thoth/app-ui/tabs/model.ts";
 import { ConnectedAppsHost } from "../features/connected-apps/ConnectedAppsHost.tsx";
+import { MemoriesView } from "../features/connected-apps/MemoriesView.tsx";
 import { forgetWindow, rememberWindow, windowsOn } from "./windows-store.ts";
 import { requestShowSidebar } from "@thoth/app-ui/ui/sidebar-hidden.ts";
 import { createRecentStore } from "@thoth/app-ui/home/recent.ts";
@@ -56,6 +57,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(intro);
+  /** The Memories view (ADR-0052), from the bell or Settings → Connected apps. */
+  const [memoriesOpen, setMemoriesOpen] = useState(false);
 
   const flushers = useRef(new Set<() => Promise<boolean>>());
   const registerFlush = useCallback((flush: () => Promise<boolean>) => {
@@ -336,6 +339,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
           return openRun(target.runId);
         case "update":
           return updates?.show();
+        case "memories":
+          return setMemoriesOpen(true);
       }
     },
     [tabs, openFolder, openRun, updates],
@@ -385,6 +390,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       notifications,
       notificationPrefs,
       openNotification,
+      openMemories: () => setMemoriesOpen(true),
       updates,
       reveal,
       registerFlush,
@@ -424,6 +430,7 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
         )}
         {/* Connected apps (ADR-0021): this window answers apps' requests for its Private Space, and asks Allow or Deny. */}
         {platform.connectedApps && <ConnectedAppsHost connectedApps={platform.connectedApps} />}
+        {platform.connectedApps && memoriesOpen && <MemoriesView connectedApps={platform.connectedApps} onClose={() => setMemoriesOpen(false)} />}
       </PageHostContext.Provider>
     </SessionContext.Provider>
   );

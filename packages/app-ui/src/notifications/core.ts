@@ -11,7 +11,7 @@ import type { Strings } from "../strings/en.ts";
 
 export type NotificationStrings = Strings["notifications"];
 
-export const NOTIFICATION_KINDS = ["agentReview", "agentFinished", "agentFailed", "agentLimit", "transferDone", "transferFailed", "importDone", "importFailed", "saveConflict", "update"] as const;
+export const NOTIFICATION_KINDS = ["agentReview", "agentFinished", "agentFailed", "agentLimit", "transferDone", "transferFailed", "importDone", "importFailed", "saveConflict", "update", "memories"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** What an entry opens. */
@@ -21,7 +21,9 @@ export type NotificationTarget =
   | { kind: "workspacePage"; server: string; workspace: string; page: string }
   | { kind: "folder"; path: string }
   /** The popup for a new desktop version (ADR-0022). */
-  | { kind: "update" };
+  | { kind: "update" }
+  /** The Memories view (ADR-0052). */
+  | { kind: "memories" };
 
 /** Why a run failed, in words Thoth chose (never the CLI's message). */
 export type AgentFailure = "notSignedIn" | "billing" | "rateLimit" | "modelNotFound" | "error";
@@ -42,7 +44,12 @@ export type NotificationEvent =
   | { kind: "importDone" | "importFailed"; jobId: string; folder: string; pages: number }
   | { kind: "saveConflict"; page: string; open: NotificationTarget }
   /** A new desktop version is out (ADR-0022). Only in the list: it is never a system notification. */
-  | { kind: "update"; version: string };
+  | { kind: "update"; version: string }
+  /**
+   * A connected app saved or forgot memories without review (ADR-0052 rule 5): how many in a row, with their titles.
+   * Only in the list, like `update`: an agent saves memories while Thoth is in the background, so never the system's.
+   */
+  | ({ kind: "memories"; app: string; saved: number; forgot: number } & Pages);
 
 export interface NotificationEntry {
   id: string;
@@ -170,6 +177,8 @@ function target(t: NotificationTarget): NotificationTarget {
       return { kind: "workspacePage", server: id(t.server), workspace: id(t.workspace), page: id(t.page) };
     case "update":
       return { kind: "update" };
+    case "memories":
+      return { kind: "memories" };
   }
 }
 
@@ -195,6 +204,8 @@ export function normalizeEvent(e: NotificationEvent): NotificationEvent {
       return { kind: e.kind, page: safeName(e.page), open: target(e.open) };
     case "update":
       return { kind: e.kind, version: safeName(e.version) };
+    case "memories":
+      return { kind: e.kind, app: safeName(e.app), saved: count(e.saved), forgot: count(e.forgot), ...pages(e) };
   }
 }
 
@@ -211,6 +222,8 @@ export function notificationTarget(e: NotificationEvent): NotificationTarget {
       return { kind: "folder", path: e.folder };
     case "update":
       return { kind: "update" };
+    case "memories":
+      return { kind: "memories" };
     default:
       return e.open;
   }
@@ -219,8 +232,10 @@ export function notificationTarget(e: NotificationEvent): NotificationTarget {
 /** Repeats of the same thing: the same kind about the same run, transfer, import or page. */
 function keyOf(e: NotificationEvent): string {
   if (e.kind === "update") return `update\n${e.version}`;
+  // One entry per app: its next memories within `REPEAT_MS` join it, with the counts so far.
+  if (e.kind === "memories") return `memories\n${e.app}`;
   const t = notificationTarget(e);
-  const about = t.kind === "workspacePage" ? `${t.server}\n${t.workspace}\n${t.page}` : t.kind === "agentRun" ? t.runId : t.kind === "update" ? "" : t.path;
+  const about = t.kind === "workspacePage" ? `${t.server}\n${t.workspace}\n${t.page}` : t.kind === "agentRun" ? t.runId : t.kind === "update" || t.kind === "memories" ? "" : t.path;
   const subject = "transferId" in e ? e.transferId : "jobId" in e ? e.jobId : about;
   return `${e.kind}\n${subject}`;
 }
@@ -250,6 +265,8 @@ export function describeNotification(e: NotificationEvent, t: NotificationString
       return { title: t.saveConflict(e.page), body: t.saveConflictBody };
     case "update":
       return { title: t.update(e.version), body: t.updateBody };
+    case "memories":
+      return { title: t.memories(e.app, e.saved, e.forgot), body: e.pages.length > 0 ? list(e) : t.memoriesBody };
   }
 }
 
@@ -295,7 +312,8 @@ export function createNotificationCenter(options: NotificationCenterOptions): No
 
   const system = (event: NotificationEvent, text: SystemNotification) => {
     // A new version is told in the app only (ADR-0022): the list and its popup, never the system's notification centre.
-    if (event.kind === "update") return;
+    // So are memories agents saved (ADR-0052): they come while the user works in the agent's app, and would pile up.
+    if (event.kind === "update" || event.kind === "memories") return;
     const settings = options.settings?.() ?? DEFAULT_NOTIFICATION_SETTINGS;
     if (!settings.system || settings.kinds[event.kind] === false) return;
     if (!(options.background?.() ?? false)) return;

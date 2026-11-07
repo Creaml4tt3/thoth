@@ -67,6 +67,9 @@ export const DESKTOP_ONLY = [
   "memory_commit",
   "mcp.memoryFolder",
   "mcp.mayRemember",
+  "mcp.memoryHistory",
+  "thoth:mcp-memories",
+  "mcp-memories",
 ];
 
 export function files(dir: string): string[] {

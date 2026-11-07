@@ -39,7 +39,7 @@ function markNoticeSeen() {
  * log. An app's name is the one it gave; the section says so.
  */
 export function ConnectedAppsSettings({ connectedApps }: { connectedApps: ConnectedApps }) {
-  const { platform, connection } = useSession();
+  const { platform, connection, openMemories } = useSession();
   const t = useDesktopStrings().connectedApps;
   const [settings, setSettings] = useState<Settings | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -180,6 +180,11 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
         <small id="mcp-memories-hint" className="muted">
           {t.memoriesHint}
         </small>
+      </div>
+      <div className="set-actions">
+        <Button variant="ghost" small onClick={openMemories}>
+          {t.memoriesView.open}
+        </Button>
       </div>
 
       <h3 id="set-mcp-apps">{t.apps}</h3>

@@ -43,3 +43,13 @@
 .mcp-review-app { display: grid; gap: var(--thoth-space-2); }
 .mcp-review-app h3 { font: var(--thoth-text-ui); font-weight: 600; margin: 0; }
 .mcp-proposal { padding-bottom: var(--thoth-space-3); border-bottom: 1px solid var(--thoth-border); }
+
+/* The Memories view (ADR-0052). */
+.mcp-memories .link-button { all: unset; cursor: pointer; color: var(--thoth-ink-primary); font-weight: 550; overflow-wrap: anywhere; }
+.mcp-memories .link-button:hover { text-decoration: underline; }
+.mcp-memories .link-button:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; border-radius: 2px; }
+.mcp-memories-filter { display: inline-flex; align-items: center; gap: var(--thoth-space-2); }
+.mcp-memory-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-1); }
+.mcp-memory { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--thoth-space-2); padding: 6px 0; border-bottom: 1px solid var(--thoth-border); min-width: 0; }
+.mcp-memory .btn { margin-left: auto; }
+.mcp-memory-stale { flex-basis: 100%; }

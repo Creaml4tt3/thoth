@@ -14,7 +14,7 @@ const GROUPS: { id: "agent" | "transfer" | "import" | "editor"; kinds: Notificat
 
 /** Settings → Notifications (ADR-0018): system notifications on or off, and per kind. The user's own settings. */
 export function NotificationSettings() {
-  const { notificationPrefs: store, agents } = useSession();
+  const { notificationPrefs: store, agents, platform } = useSession();
   const t = useDesktopStrings().notifications;
   const prefs = useSyncExternalStore(store.subscribe, store.get);
   return (
@@ -47,6 +47,12 @@ export function NotificationSettings() {
         <input type="checkbox" checked={prefs.kinds.update} onChange={(e) => store.setKind("update", e.target.checked)} />
         <span>{t.updateEntry}</span>
       </label>
+      {platform.connectedApps && (
+        <label className="notif-kind notif-update">
+          <input type="checkbox" checked={prefs.kinds.memories} onChange={(e) => store.setKind("memories", e.target.checked)} />
+          <span>{t.memoriesEntry}</span>
+        </label>
+      )}
       <p className="muted small">{t.privacy}</p>
       <p className="muted small">{t.click}</p>
     </section>

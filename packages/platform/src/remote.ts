@@ -7,7 +7,7 @@ import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, ScanEntry, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
 import type { ConnectedApps, Diagnostics, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
-import type { HostErrorCode, Transport, WireRow, WireValue } from "./ipc.ts";
+import type { HostErrorCode, MemoryHistoryChange, MemoryHistoryText, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
 export class HostCallError extends Error {
@@ -349,7 +349,7 @@ export function remoteUpdates(transport: Transport, events: Pick<Updates, "onPro
 }
 
 /** Connected apps (ADR-0021) over the `mcp.*` commands; the events come from the platform's own event channel. */
-export function remoteConnectedApps(transport: Transport, events: Pick<ConnectedApps, "onRequest" | "onPending" | "onProposals">): ConnectedApps {
+export function remoteConnectedApps(transport: Transport, events: Pick<ConnectedApps, "onRequest" | "onPending" | "onProposals" | "onMemories">): ConnectedApps {
   return {
     settings: () => transport.call("mcp.settings", {}),
     configure: (change) => transport.call("mcp.configure", change),
@@ -360,12 +360,15 @@ export function remoteConnectedApps(transport: Transport, events: Pick<Connected
     mayPropose: (app, allow) => transport.call("mcp.mayPropose", { app, allow }),
     mayRemember: (app, allow) => transport.call("mcp.mayRemember", { app, allow }),
     memoryFolder: (root, folder) => transport.call("mcp.memoryFolder", { root, folder }),
+    memoryHistory: async () => ((await transport.call("mcp.memoryHistory", {})) as { changes: MemoryHistoryChange[] }).changes,
+    memoryChange: async (id) => (await transport.call("mcp.memoryHistory", { id })) as MemoryHistoryText,
     proposals: () => transport.call("mcp.proposals", {}),
     proposal: (id) => transport.call("mcp.proposal", { id }),
     settle: (id, status) => transport.call("mcp.settle", { id, status }),
     onRequest: (listener) => events.onRequest(listener),
     onPending: (listener) => events.onPending(listener),
     onProposals: (listener) => events.onProposals(listener),
+    onMemories: (listener) => events.onMemories(listener),
   };
 }
 

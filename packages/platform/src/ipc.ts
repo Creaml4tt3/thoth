@@ -266,6 +266,11 @@ export interface Commands {
    * `NOT_ALLOWED` unless this window has it open; `BAD_ARGUMENT` for the top level or a hidden folder.
    */
   "mcp.memoryFolder": { args: { root: string; folder: string }; result: ConnectedAppsSettings };
+  /**
+   * The memory writes without review of the last 30 days in the Private Spaces this window has open, newest first (no
+   * text); with `id`, one of them with the file before and after, for Undo. `NOT_ALLOWED` for another Private Space's.
+   */
+  "mcp.memoryHistory": { args: { id?: string }; result: { changes: MemoryHistoryChange[] } | MemoryHistoryText };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
   "mcp.proposals": { args: Record<string, never>; result: { proposals: ConnectedAppProposal[]; open: number } };
   /** One proposal with the page as it was and as proposed (both null once it is settled). */
@@ -427,6 +432,41 @@ export interface ConnectedAppProposalText extends ConnectedAppProposal {
   before: string | null;
   /** The page as proposed (null once settled). */
   after: string | null;
+}
+
+/** A memory an app saved, changed or forgot without review (ADR-0052 rule 5), as the host's history keeps it for 30 days. */
+export interface MemoryHistoryChange {
+  id: string;
+  /** The app's own name (not verified). */
+  app: string;
+  action: "created" | "updated" | "forgot";
+  /** The Private Space's canonical root, and its name as the app saw it. */
+  root: string;
+  space: string;
+  path: string;
+  pageId: string;
+  title: string;
+  /** The file's version before (null: it was new) and after (null: forgotten). */
+  beforeHash: string | null;
+  afterHash: string | null;
+  /** UTC, `YYYY-MM-DDTHH:MM:SSZ`. */
+  createdAt: string;
+}
+
+export interface MemoryHistoryText extends MemoryHistoryChange {
+  /** The file before (null: it was new) and after (null: forgotten). */
+  before: string | null;
+  after: string | null;
+}
+
+/** The host's `mcp.memories` event: one memory written without review. */
+export interface MemoryWritten {
+  app: string;
+  action: MemoryHistoryChange["action"];
+  root: string;
+  space: string;
+  path: string;
+  title: string;
 }
 
 /** The host asks a window to answer an app's tool call from its open Vault (event `mcp.request`). */

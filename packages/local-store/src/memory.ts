@@ -348,11 +348,15 @@ export async function readForgotten(vault: Pick<Vault, "readRecordText">): Promi
   }
 }
 
-async function addForgotten(vault: Pick<Vault, "readRecordText" | "writeRecordIfUnchanged">, entry: Forgotten): Promise<void> {
+const addForgotten = (vault: Pick<Vault, "readRecordText" | "writeRecordIfUnchanged">, entry: Forgotten) =>
+  changeForgotten(vault, (list) => [...list.filter((f) => f.hash !== entry.hash), entry].slice(-MAX_FORGOTTEN));
+
+/** The forgotten list as `change` says, with compare-and-swap against another window writing it at the same moment. */
+async function changeForgotten(vault: Pick<Vault, "readRecordText" | "writeRecordIfUnchanged">, change: (list: Forgotten[]) => Forgotten[]): Promise<void> {
   let last: unknown;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const now = await readForgotten(vault);
-    const forgotten = [...now.forgotten.filter((f) => f.hash !== entry.hash), entry].slice(-MAX_FORGOTTEN);
+    const forgotten = change(now.forgotten);
     try {
       await vault.writeRecordIfUnchanged(MEMORY_RECORD_PATH, ForgottenSchema.parse({ version: 1, forgotten }), now.hash);
       return;
@@ -531,6 +535,57 @@ export async function commitForget(
   await addForgotten(vault, { topic: memory.topic, hash: memoryTextHash(memory.text), at: localIso(now) });
   await trash(read.path);
   await vault.reconcile({ changed: [read.path] }).catch(() => undefined);
+}
+
+/** A write without review, as the host's history gives it back for Undo. */
+export interface WrittenMemory {
+  action: "created" | "updated" | "forgot";
+  path: string;
+  /** The file after the write (null: forgotten), and before it (null: it was new). */
+  afterHash: string | null;
+  before: string | null;
+}
+
+/** Whether Undo can still put `change` back: the file is as the write left it (for a forget, no file is there). */
+export async function canUndoMemory(vault: Pick<Vault, "readPage">, change: Pick<WrittenMemory, "action" | "path" | "afterHash">): Promise<boolean> {
+  const hash = await vault.readPage(change.path).then(
+    (r) => r.hash,
+    () => null,
+  );
+  return change.action === "forgot" ? hash === null : hash !== null && hash === change.afterHash;
+}
+
+/**
+ * Undo (ADR-0052 rule 5): the earlier text written back with compare-and-swap, so a memory changed since is never
+ * overwritten (`CONFLICT`). A new memory goes to the system Trash; a forgotten one comes back, and may be saved again.
+ */
+export async function undoMemory(
+  vault: Pick<Vault, "readPage" | "writePage" | "readRecordText" | "writeRecordIfUnchanged" | "reconcile">,
+  trash: ((path: string) => Promise<void>) | undefined,
+  change: WrittenMemory,
+  folder: string = MEMORY_FOLDER,
+): Promise<void> {
+  if (!inMemoryFolder(change.path, folder) || isReadme(change.path, folder)) throw new MemoryError("BAD_ARGUMENT", `${change.path} is not in the memory folder`);
+  const changed = () => new MemoryError("CONFLICT", `${change.path} changed since: open it to edit it`);
+  if (change.action === "created") {
+    if (!trash) throw new Error("This window cannot move files to the Trash");
+    if (!(await canUndoMemory(vault, change))) throw changed();
+    await trash(change.path);
+    await vault.reconcile({ changed: [change.path] }).catch(() => undefined);
+    return;
+  }
+  if (change.before === null) throw new MemoryError("NOT_FOUND", "The earlier text is no longer kept");
+  try {
+    await vault.writePage(change.path, change.before, { expectedHash: change.action === "forgot" ? null : change.afterHash });
+  } catch (error) {
+    if (error instanceof ConflictError) throw changed();
+    throw error;
+  }
+  if (change.action === "forgot") {
+    const memory = parseMemory(change.path, change.before, "", { id: "", fileTime: "" }, folder);
+    const hash = memoryTextHash(memory.text);
+    await changeForgotten(vault, (list) => list.filter((f) => f.hash !== hash && !sameTopic(f.topic, memory.topic)));
+  }
 }
 
 /** README and About me, when the folder has none yet. Best effort: another window may add them at the same moment. */

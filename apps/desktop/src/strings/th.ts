@@ -195,9 +195,11 @@ export const th: DesktopStrings = {
       importFailed: "นำเข้าเสร็จแล้ว แต่มีข้อผิดพลาด",
       saveConflict: "การบันทึกขัดกัน",
       update: "มีเวอร์ชันใหม่ออกแล้ว",
+      memories: "เอเจนต์บันทึกความจำ", // REVIEW
     },
     groups: { agent: "ผู้ช่วย Thoth", transfer: "คัดลอกและย้าย", import: "นำเข้า", editor: "การแก้ไข" },
     updateEntry: "เพิ่มเวอร์ชันใหม่ลงในรายการใต้กระดิ่ง",
+    memoriesEntry: "เพิ่มความจำที่เอเจนต์บันทึกลงในรายการใต้กระดิ่ง", // REVIEW
     privacy: "การแจ้งเตือนจะบอกชื่อหน้า โฟลเดอร์ เวิร์กสเปซ และเอเจนต์เท่านั้น ไม่แสดงเนื้อหาของหน้า สิ่งที่เอเจนต์เขียน หรืองานที่คุณสั่ง",
     click: "คลิกการแจ้งเตือนเพื่อนำ Thoth ขึ้นมาด้านหน้า เรื่องที่แจ้งอยู่บนสุดของรายการใต้กระดิ่ง",
   },
@@ -402,6 +404,43 @@ export const th: DesktopStrings = {
       conflictExists: "ตอนนี้มีไฟล์อยู่ที่ตำแหน่งนี้แล้ว จึงสร้างหน้าใหม่นี้ไม่ได้ ให้ปฏิเสธ แล้วขอให้แอปใช้ตำแหน่งอื่น", // REVIEW
       applied: (path) => `ใช้กับ ${path} แล้ว`, // REVIEW
       failed: (message) => `ใช้ไม่ได้: ${message}`, // REVIEW
+    },
+    memoriesView: {
+      title: "ความจำ", // REVIEW
+      open: "ดูความจำ", // REVIEW
+      lede: (folder) => `สิ่งที่เอเจนต์ของคุณจำไว้ เก็บเป็นหน้าใน ${folder} เอเจนต์อ่านสิ่งเหล่านี้เมื่อเริ่มทำงาน แก้ไขหรือลบได้เหมือนหน้าอื่น ๆ`, // REVIEW
+      loading: "กำลังโหลด…",
+      none: "ยังไม่มีความจำ เมื่อแอปที่คุณอนุญาตบันทึกความจำ จะแสดงที่นี่", // REVIEW
+      app: "แอป", // REVIEW
+      allApps: "ทุกแอป", // REVIEW
+      aboutMe: "เกี่ยวกับฉัน", // REVIEW
+      aboutMeHint: "สรุปสั้น ๆ ที่เอเจนต์อ่านเป็นอย่างแรก", // REVIEW
+      kinds: {
+        profile: "เกี่ยวกับคุณ",
+        preference: "สิ่งที่ชอบ",
+        work: "งานที่กำลังทำ",
+        people: "บุคคล",
+        reference: "ข้อมูลอ้างอิง",
+        note: "บันทึก",
+      }, // REVIEW
+      byYou: "คุณ", // REVIEW
+      meta: (by, date) => `${by} · อัปเดต ${date.toLocaleDateString("th-TH", { dateStyle: "medium" })}`, // REVIEW
+      inferred: "อนุมานเอง", // REVIEW
+      inferredHint: "เอเจนต์สรุปเอง คุณไม่ได้บอกไว้", // REVIEW
+      stale: (days) => `อัปเดตเมื่อ ${count(days)} วันก่อน ตรวจดูว่ายังถูกต้องอยู่`, // REVIEW
+      recent: "การเปลี่ยนแปลงล่าสุด", // REVIEW
+      recentHint: "สิ่งที่แอปบันทึก แก้ไข หรือลืมโดยไม่ถามในช่วง 30 วันที่ผ่านมา ย้อนกลับจะนำข้อความเดิมกลับมา", // REVIEW
+      actions: {
+        created: (app, title) => `${app} บันทึก “${title}”`,
+        updated: (app, title) => `${app} แก้ไข “${title}”`,
+        forgot: (app, title) => `${app} ลืม “${title}”`,
+      }, // REVIEW
+      when: (date) => date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }),
+      undo: "ย้อนกลับ", // REVIEW
+      undoLabel: (title) => `ย้อนกลับการเปลี่ยนแปลงของ ${title}`, // REVIEW
+      changedSince: "ถูกแก้ไขหลังจากนั้น", // REVIEW
+      undone: (title) => `ย้อนกลับการเปลี่ยนแปลงของ ${title} แล้ว`, // REVIEW
+      undoFailed: (message) => `ย้อนกลับไม่ได้: ${message}`, // REVIEW
     },
   },
 

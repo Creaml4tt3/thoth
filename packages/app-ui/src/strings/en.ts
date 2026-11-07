@@ -838,6 +838,14 @@ export const en = {
     /** A new desktop version is out (ADR-0022). */
     update: (version: string) => `Thoth ${version} is out`,
     updateBody: "Open to download it, read what is new, or skip it.",
+    /** A connected app saved or forgot memories without review (ADR-0052): "Claude Code saved 3 memories". */
+    memories: (app: string, saved: number, forgot: number) =>
+      saved > 0 && forgot > 0
+        ? `${app} saved ${plural(saved, "memory", "memories")} and forgot ${forgot.toLocaleString()}`
+        : forgot > 0
+          ? `${app} forgot ${plural(forgot, "memory", "memories")}`
+          : `${app} saved ${plural(saved, "memory", "memories")}`,
+    memoriesBody: "Open to see them, or undo.",
   },
 
   /** Favorites (ADR-0027): starred pages, at the top of the sidebar. */

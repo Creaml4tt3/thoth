@@ -6,6 +6,7 @@ import { parseFrontmatter } from "@thoth/content";
 import {
   MEMORY_RECORD_PATH,
   aboutMePath,
+  canUndoMemory,
   checkMemoryFolder,
   memoryFolderUse,
   readmePath,
@@ -23,6 +24,7 @@ import {
   planUpdate,
   readAtStart,
   recallMemories,
+  undoMemory,
   type MemoryChange,
   type Vault,
 } from "../src/index.ts";
@@ -191,6 +193,39 @@ describe("remember, update and forget", () => {
     const plan = await planForget(vault, { path: m.path });
     await put(m.path, "edited by hand\n");
     expect(await code(commitForget(vault, async () => undefined, plan.path, plan.baseHash!, now))).toBe("CONFLICT");
+  });
+
+  it("undoes a save, an update and a forget, and never over a memory changed since", async () => {
+    const trash = async (p: string) => void (await rm(join(root, p)));
+    // A new memory goes to the Trash.
+    const made = await save(await remember("Prefers tea.", { topic: "drink" }));
+    const madeHash = (await vault.readPage(made.path)).hash;
+    const created = { action: "created" as const, path: made.path, afterHash: madeHash, before: null };
+    expect(await canUndoMemory(vault, created)).toBe(true);
+    await undoMemory(vault, trash, created);
+    expect((await loadMemories(vault)).memories).toEqual([]);
+    expect(await canUndoMemory(vault, created)).toBe(false);
+
+    // An update gets its earlier text back, only while the file is as the update left it.
+    const first = await save(await remember("Prefers coffee.", { topic: "drink" }));
+    const before = (await vault.readPage(first.path)).source;
+    const second = await save(await planUpdate(vault, { page: { path: first.path }, text: "Prefers green tea.", app: "Claude Code" }, now));
+    const updated = { action: "updated" as const, path: second.path, afterHash: (await vault.readPage(second.path)).hash, before };
+    await undoMemory(vault, trash, updated);
+    expect((await vault.readPage(first.path)).source).toBe(before);
+    expect(await code(undoMemory(vault, trash, updated))).toBe("CONFLICT");
+
+    // A forgotten memory comes back, and may be saved again.
+    const plan = await planForget(vault, { path: first.path });
+    await commitForget(vault, trash, plan.path, plan.baseHash!, now);
+    expect(await code(remember("Prefers coffee.", { topic: "drink" }))).toBe("FORGOTTEN");
+    const forgot = { action: "forgot" as const, path: plan.path, afterHash: null, before: plan.before };
+    expect(await canUndoMemory(vault, forgot)).toBe(true);
+    await undoMemory(vault, trash, forgot);
+    expect((await vault.readPage(first.path)).source).toBe(before);
+    expect(await code(remember("Prefers coffee and tea.", { topic: "drink" }))).toBe("none");
+    expect(await code(undoMemory(vault, trash, forgot))).toBe("CONFLICT");
+    expect(await code(undoMemory(vault, trash, { ...forgot, path: "Notes/x.md" }))).toBe("BAD_ARGUMENT");
   });
 
   it("refuses to write outside the folder, or over a file that appeared meanwhile", async () => {
