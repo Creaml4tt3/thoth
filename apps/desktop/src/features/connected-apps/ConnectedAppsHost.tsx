@@ -14,6 +14,7 @@ import { folderName } from "./names.ts";
  */
 export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedApps }) {
   const { vault, connection, windowId } = useSession();
+  const trash = connection.trash?.bind(connection);
   const [pending, setPending] = useState<string[]>([]);
   const [proposers, setProposers] = useState<string[]>([]);
   const [shared, setShared] = useState<string[]>([]);
@@ -25,7 +26,7 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       .onRequest((request) => {
         // Every window hears every request: answer only the ones for this window and its Private Space.
         if (request.owner !== windowId || request.root !== connection.root) return;
-        void answerRequest(vault, request, connection.trash ? { trash: connection.trash.bind(connection) } : {})
+        void answerRequest(vault, request, trash ? { trash } : {})
           .then((answer) => connectedApps.answer(request.id, answer))
           .catch(() => undefined);
       })
@@ -34,7 +35,8 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       live = false;
       stop?.();
     };
-  }, [connectedApps, vault, connection, windowId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `trash` is bound anew each render; the connection's root names it
+  }, [connectedApps, vault, connection.root, windowId]);
 
   useEffect(() => {
     let live = true;
