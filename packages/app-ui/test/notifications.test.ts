@@ -27,6 +27,7 @@ const EVENTS = {
   importFailed: { kind: "importFailed", jobId: "j2", folder: "Imported/Obsidian", pages: 3 },
   saveConflict: { kind: "saveConflict", page: "Alpha", open: { kind: "page", path: "Alpha.md" } },
   update: { kind: "update", version: "0.2.0" },
+  memories: { kind: "memories", app: "Claude Code", saved: 3, forgot: 0, pages: ["Blockers first", "Tea"] },
 } satisfies { [K in NotificationKind]: NotificationEvent & { kind: K } };
 
 function center(options: Partial<NotificationCenterOptions> = {}) {
@@ -56,6 +57,7 @@ describe("notification center: entries", () => {
       importFailed: { title: "Import finished with errors", body: "3 pages in Imported/Obsidian" },
       saveConflict: { title: "Alpha changed elsewhere while you were editing it", body: "Choose which version to keep." },
       update: { title: "Thoth 0.2.0 is out", body: "Open to download it, read what is new, or skip it." },
+      memories: { title: "Claude Code saved 3 memories", body: "Blockers first and 1 more page" },
     });
   });
 
@@ -205,6 +207,21 @@ describe("notification center: system notifications", () => {
     c.push({ kind: "update", version: "0.2.0" });
     expect(c.getState().entries).toHaveLength(1);
     c.push({ kind: "update", version: "0.3.0" });
+    expect(c.getState().entries).toHaveLength(2);
+  });
+
+  it("tells memories agents saved in the list only, one entry per app (ADR-0052)", () => {
+    const { c, notifier, tick } = center({ background: () => true });
+    const entry = c.push({ kind: "memories", app: "Claude Code", saved: 1, forgot: 0, pages: ["Tea"] });
+    expect(notifier.show).not.toHaveBeenCalled();
+    expect(notificationTarget(entry.event)).toEqual({ kind: "memories" });
+    // The next ones from the same app within a minute join it, with the counts so far.
+    tick(10_000);
+    c.push({ kind: "memories", app: "Claude Code", saved: 1, forgot: 1, pages: ["Old plan", "Tea"] });
+    expect(c.getState().entries).toHaveLength(1);
+    expect(describeNotification(c.getState().entries[0]!.event, en.notifications).title).toBe("Claude Code saved 1 memory and forgot 1");
+    c.push({ kind: "memories", app: "Cursor", saved: 0, forgot: 2, pages: [] });
+    expect(describeNotification(c.getState().entries[0]!.event, en.notifications)).toEqual({ title: "Cursor forgot 2 memories", body: "Open to see them, or undo." });
     expect(c.getState().entries).toHaveLength(2);
   });
 

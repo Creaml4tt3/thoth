@@ -801,17 +801,20 @@ fn an_allowed_app_saves_a_memory_without_review_and_the_host_keeps_its_history()
     assert_eq!(requests[2]["args"]["folder"], "Memory");
 
     // Kept for Undo, outside the notes, owner-only; the windows hear of it for the bell.
-    let history = f.relay.memory_history(None).unwrap();
+    let history = f.relay.memory_history("main", None).unwrap();
     let change = &history["changes"][0];
     assert_eq!((change["app"].clone(), change["action"].clone(), change["afterHash"].clone()), (json!("Claude"), json!("created"), json!("h2")));
-    let one = f.relay.memory_history(change["id"].as_str()).unwrap();
+    let one = f.relay.memory_history("main", change["id"].as_str()).unwrap();
     assert_eq!(one["before"], Value::Null);
     assert!(one["after"].as_str().unwrap().contains("Put blockers first."));
+    // Only for a window with that Private Space open.
+    assert!(f.relay.memory_history("space-other", None).unwrap()["changes"].as_array().unwrap().is_empty());
+    assert_eq!(f.relay.memory_history("space-other", change["id"].as_str()).unwrap_err().code, "NOT_ALLOWED");
     let file = f.dir.join("memory").join(format!("{}.json", change["id"].as_str().unwrap()));
     assert_eq!(std::fs::metadata(file).unwrap().permissions().mode() & 0o777, 0o600);
     assert_eq!(
         memories_heard(&f, 1)[0],
-        json!({ "app": "Claude", "action": "created", "space": "Notes", "path": "Memory/blockers-first.md", "title": "Blockers first" })
+        json!({ "app": "Claude", "action": "created", "root": NOTES, "space": "Notes", "path": "Memory/blockers-first.md", "title": "Blockers first" })
     );
     assert_eq!(f.relay.proposals()["open"], 0, "no proposal, and no “May propose changes” question");
 
@@ -823,7 +826,7 @@ fn an_allowed_app_saves_a_memory_without_review_and_the_host_keeps_its_history()
     assert_eq!(forgot["result"]["structured"]["status"], "forgotten", "{forgot}");
     let commits: Vec<Value> = f.requests.lock().unwrap().iter().filter(|r| r["tool"] == "memory_commit").map(|r| r["args"].clone()).collect();
     assert_eq!(commits[2], json!({ "op": "trash", "path": "Memory/blockers-first.md", "expected": "h1", "folder": "Memory" }));
-    assert_eq!(f.relay.memory_history(None).unwrap()["changes"][0]["action"], "forgot", "newest first");
+    assert_eq!(f.relay.memory_history("main", None).unwrap()["changes"][0]["action"], "forgot", "newest first");
 
     // Nothing to change: nothing written.
     f.requests.lock().unwrap().clear();
@@ -858,7 +861,7 @@ fn with_saving_without_asking_off_a_memory_waits_for_review() {
     let edit = ask(&socket(&f), "Claude", "update_memory", json!({ "id": "m1", "text": "Blockers, then risks." }));
     assert_eq!(edit["result"]["structured"]["status"], "pending", "{edit}");
     assert_eq!(f.relay.proposals()["proposals"][1]["baseHash"], "h1");
-    assert!(f.relay.memory_history(None).unwrap()["changes"].as_array().unwrap().is_empty());
+    assert!(f.relay.memory_history("main", None).unwrap()["changes"].as_array().unwrap().is_empty());
 }
 
 #[test]

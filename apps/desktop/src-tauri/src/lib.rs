@@ -225,6 +225,8 @@ pub const MCP_REQUEST_EVENT: &str = "thoth:mcp-request";
 pub const MCP_PENDING_EVENT: &str = "thoth:mcp-pending";
 /// Proposed changes from connected apps were added or settled (the host's `mcp.proposals`, ADR-0048).
 pub const MCP_PROPOSALS_EVENT: &str = "thoth:mcp-proposals";
+/// An app saved, changed or forgot a memory without review (the host's `mcp.memories`, ADR-0052).
+pub const MCP_MEMORIES_EVENT: &str = "thoth:mcp-memories";
 /// In-app updates (ADR-0034): the host's `update.progress`, to every window.
 pub const UPDATE_PROGRESS_EVENT: &str = "thoth:update-progress";
 
@@ -844,6 +846,7 @@ pub fn run() {
                         },
                         thoth_host::mcp::PENDING_EVENT => emitter.emit(MCP_PENDING_EVENT, payload),
                         thoth_host::mcp::PROPOSALS_EVENT => emitter.emit(MCP_PROPOSALS_EVENT, payload),
+                        thoth_host::mcp::MEMORIES_EVENT => emitter.emit(MCP_MEMORIES_EVENT, payload),
                         thoth_host::install::PROGRESS_EVENT => emitter.emit(UPDATE_PROGRESS_EVENT, payload),
                         _ => emitter.emit(VAULT_CHANGED_EVENT, payload),
                     };
@@ -1082,7 +1085,7 @@ mod tests {
         let text = include_str!("../capabilities/main.json");
         assert!(!text.contains("updater"), "no updater plugin permission");
         assert!(include_str!("../Cargo.toml").contains("tauri-plugin-updater"));
-        // Connected apps (ADR-0021, ADR-0048, ADR-0052) add exactly their twelve commands and no plugin: the socket, the
+        // Connected apps (ADR-0021, ADR-0048, ADR-0052) add exactly their thirteen commands and no plugin: the socket, the
         // proposals and the memory history are the host's.
         let mcp: BTreeSet<&str> = granted.iter().map(String::as_str).filter(|p| p.starts_with("allow-mcp-")).collect();
         assert_eq!(
@@ -1099,7 +1102,8 @@ mod tests {
                 "allow-mcp-proposal",
                 "allow-mcp-settle",
                 "allow-mcp-mayRemember",
-                "allow-mcp-memoryFolder"
+                "allow-mcp-memoryFolder",
+                "allow-mcp-memoryHistory"
             ])
         );
     }

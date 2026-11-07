@@ -5,7 +5,7 @@
  * browser can drive the real UI against the real Rust host.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, InstallState, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, Transport, VaultChangedEvent } from "./ipc.ts";
 import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
 
 export class HttpTransport implements Transport {
@@ -102,6 +102,7 @@ function bridgeConnectedApps(transport: HttpTransport, on: BridgeEvents): Connec
     onRequest: (listener) => on<McpRequest>("mcp.request", listener),
     onPending: (listener) => on<{ apps: string[] }>("mcp.pending", (payload) => listener(payload.apps)),
     onProposals: (listener) => on<{ open: number }>("mcp.proposals", (payload) => listener(payload.open)),
+    onMemories: (listener) => on<MemoryWritten>("mcp.memories", listener),
   });
 }
 

@@ -45,7 +45,7 @@ pub const PENDING_EVENT: &str = "mcp.pending";
 /// Sent to the windows when proposals are added or settled. Payload: `{ open }`, how many wait for review.
 pub const PROPOSALS_EVENT: &str = "mcp.proposals";
 /// Sent to the windows when an app saved, changed or forgot a memory without review (ADR-0052 rule 5). Payload:
-/// `{ app, action, space, path, title }`.
+/// `{ app, action, root, space, path, title }`.
 pub const MEMORIES_EVENT: &str = "mcp.memories";
 /// Longest request line from `thoth-mcp`: a proposed page of 1 MB (ADR-0048), JSON-escaped, and the rest of the call.
 pub const MAX_REQUEST: usize = 2 * MAX_RESPONSE + 64 * 1024;
@@ -374,14 +374,19 @@ impl Relay {
         Ok(self.settings())
     }
 
-    /// The memory writes of the last 30 days, newest first (without text); with `id`, one of them with the text before
-    /// and after, for Undo.
-    pub fn memory_history(&self, id: Option<&str>) -> HostResult<Value> {
+    /// `mcp.memoryHistory { id? }` from the window `owner`: the memory writes of the last 30 days in the Private Spaces
+    /// it has open, newest first (without text); with `id`, one of them with the text before and after, for Undo.
+    pub fn memory_history(&self, owner: &str, id: Option<&str>) -> HostResult<Value> {
+        let open: Vec<String> = (self.inner.spaces)().iter().filter(|s| s.owner == owner).map(|s| s.root.to_string_lossy().into_owned()).collect();
         let Some(id) = id else {
             let list = self.inner.history.list();
-            return Ok(json!({ "changes": list.iter().rev().map(memory::Change::to_json).collect::<Vec<_>>() }));
+            let mine = list.iter().rev().filter(|c| open.contains(&c.root));
+            return Ok(json!({ "changes": mine.map(memory::Change::to_json).collect::<Vec<_>>() }));
         };
         let (change, before, after) = self.inner.history.get(id)?;
+        if !open.contains(&change.root) {
+            return Err(HostError::not_allowed("Only a window with this Private Space open can read its memory history"));
+        }
         let mut out = change.to_json();
         out["before"] = json!(before);
         out["after"] = json!(after);
@@ -984,7 +989,10 @@ impl Inner {
             before: change.before.clone(),
             after: change.after.clone(),
         });
-        (self.events)(MEMORIES_EVENT, json!({ "app": app, "action": action, "space": target.label, "path": change.path, "title": change.title }));
+        (self.events)(
+            MEMORIES_EVENT,
+            json!({ "app": app, "action": action, "root": target.root, "space": target.label, "path": change.path, "title": change.title }),
+        );
         let (status, said) = match action {
             memory::Action::Created => ("saved", "Saved"),
             memory::Action::Updated => ("saved", "Updated"),

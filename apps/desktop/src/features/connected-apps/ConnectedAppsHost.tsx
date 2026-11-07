@@ -3,6 +3,7 @@ import type { ConnectedApps } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { checkMemoryFolder } from "@thoth/local-store";
+import { REPEAT_MS } from "@thoth/app-ui/notifications/core.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { answerRequest } from "./answer.ts";
@@ -13,10 +14,10 @@ import { folderName } from "./names.ts";
  * asks Allow or Deny when an app connects for the first time, and "May propose changes" when an allowed app first
  * proposes one (ADR-0048). When an app first uses memory in this Private Space and its `Memory` folder holds pages of
  * the user's own, it asks which folder agents should use (ADR-0052 rule 1). Every window shows the question; the first
- * answer closes it everywhere (the host tells them).
+ * answer closes it everywhere (the host tells them). The bell says what agents saved without review.
  */
 export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedApps }) {
-  const { vault, connection, windowId } = useSession();
+  const { vault, connection, windowId, notifications, notificationPrefs } = useSession();
   const trash = connection.trash?.bind(connection);
   const [pending, setPending] = useState<string[]>([]);
   const [proposers, setProposers] = useState<string[]>([]);
@@ -41,6 +42,31 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `trash` is bound anew each render; the connection's root names it
   }, [connectedApps, vault, connection.root, windowId]);
+
+  // ADR-0052 rule 5: "Claude Code saved 3 memories", one entry per app; its next memories within a minute join it.
+  useEffect(() => {
+    let live = true;
+    let stop: (() => void) | undefined;
+    const runs = new Map<string, { saved: number; forgot: number; pages: string[]; at: number }>();
+    void connectedApps
+      .onMemories((written) => {
+        if (written.root !== connection.root || !notificationPrefs.get().kinds.memories) return;
+        const at = Date.now();
+        const last = runs.get(written.app);
+        const run = last && at - last.at <= REPEAT_MS ? last : { saved: 0, forgot: 0, pages: [], at };
+        if (written.action === "forgot") run.forgot++;
+        else run.saved++;
+        run.pages = [written.title, ...run.pages.filter((p) => p !== written.title)];
+        run.at = at;
+        runs.set(written.app, run);
+        notifications.push({ kind: "memories", app: written.app, saved: run.saved, forgot: run.forgot, pages: run.pages });
+      })
+      .then((remove) => (live ? (stop = remove) : remove()));
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [connectedApps, connection.root, notifications, notificationPrefs]);
 
   useEffect(() => {
     let live = true;

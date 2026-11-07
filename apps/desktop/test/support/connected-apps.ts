@@ -2,7 +2,17 @@
  * A fake of the host's Connected apps (ADR-0021, ADR-0048) for the desktop tests: the settings, the questions, the
  * requests a window answers, and the proposals the host keeps.
  */
-import type { ConnectedAppProposal, ConnectedAppProposalText, ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings, McpAnswer, McpRequest } from "@thoth/platform";
+import type {
+  ConnectedAppProposal,
+  ConnectedAppProposalText,
+  ConnectedApps,
+  ConnectedAppsLogEntry,
+  ConnectedAppsSettings,
+  McpAnswer,
+  McpRequest,
+  MemoryHistoryText,
+  MemoryWritten,
+} from "@thoth/platform";
 
 export const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
 export const SOCKET = "/Users/someone/Library/Application Support/com.thothnotes.desktop/mcp/thoth.sock";
@@ -14,9 +24,12 @@ export class FakeConnectedApps implements ConnectedApps {
   entries: ConnectedAppsLogEntry[] = [];
   /** The proposals kept, with their text. */
   kept: ConnectedAppProposalText[] = [];
+  /** The memory writes without review, newest first, with their text. */
+  history: MemoryHistoryText[] = [];
   private readonly requests = new Set<(r: McpRequest) => void>();
   private readonly pendings = new Set<(apps: string[]) => void>();
   private readonly proposalListeners = new Set<(open: number) => void>();
+  private readonly memoryListeners = new Set<(written: MemoryWritten) => void>();
 
   private copy = () => structuredClone(this.state);
   async settings() {
@@ -90,6 +103,23 @@ export class FakeConnectedApps implements ConnectedApps {
     this.emitProposals();
     const { before: _b, after: _a, ...summary } = found;
     return summary;
+  }
+  async memoryHistory() {
+    return this.history.map(({ before: _b, after: _a, ...change }) => change);
+  }
+  async memoryChange(id: string) {
+    const found = this.history.find((c) => c.id === id);
+    if (!found) throw Object.assign(new Error(`No memory change ${id}`), { code: "NOT_FOUND" });
+    return structuredClone(found);
+  }
+  async onMemories(listener: (written: MemoryWritten) => void) {
+    this.memoryListeners.add(listener);
+    return () => void this.memoryListeners.delete(listener);
+  }
+  /** An app wrote a memory without review: the host keeps it and tells the windows. */
+  wrote(change: MemoryHistoryText) {
+    this.history.unshift(change);
+    for (const l of [...this.memoryListeners]) l({ app: change.app, action: change.action, root: change.root, space: change.space, path: change.path, title: change.title });
   }
   async onRequest(listener: (r: McpRequest) => void) {
     this.requests.add(listener);

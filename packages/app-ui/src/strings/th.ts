@@ -753,6 +753,13 @@ export const th: Strings = {
     saveConflictBody: "เลือกฉบับที่จะเก็บไว้",
     update: (version) => `Thoth ${version} ออกแล้ว`,
     updateBody: "เปิดเพื่อดาวน์โหลด ดูว่ามีอะไรใหม่ หรือข้ามเวอร์ชันนี้",
+    memories: (app, saved, forgot) =>
+      saved > 0 && forgot > 0
+        ? `${app} บันทึกความจำ ${count(saved)} รายการ และลืม ${count(forgot)} รายการ`
+        : forgot > 0
+          ? `${app} ลืมความจำ ${count(forgot)} รายการ`
+          : `${app} บันทึกความจำ ${count(saved)} รายการ`, // REVIEW
+    memoriesBody: "เปิดเพื่อดู หรือย้อนกลับ", // REVIEW
   },
 
   download: {

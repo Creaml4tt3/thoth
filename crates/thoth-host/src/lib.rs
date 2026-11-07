@@ -83,7 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
-    "mcp.mayRemember", "mcp.memoryFolder",
+    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -606,6 +606,14 @@ impl Host {
                 json(self.mcp.may_remember(str_arg(args, "app")?, allow)?)
             }
             "mcp.memoryFolder" => json(self.mcp.memory_folder(owner, str_arg(args, "root")?, str_arg(args, "folder")?)?),
+            "mcp.memoryHistory" => {
+                let id = match args.get("id") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(id)) => Some(id.as_str()),
+                    _ => return Err(HostError::bad_argument("id must be a memory change's id")),
+                };
+                json(self.mcp.memory_history(owner, id)?)
+            }
             "mcp.proposals" => json(self.mcp.proposals()),
             "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),
             "mcp.settle" => json(self.mcp.settle(owner, str_arg(args, "id")?, str_arg(args, "status")?)?),

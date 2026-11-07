@@ -11,7 +11,7 @@
  * call. The app may pass those functions instead via `createTauriPlatform(api)`.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, InstallState, McpRequest, Transport, VaultChangedEvent } from "./ipc.ts";
+import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, Transport, VaultChangedEvent } from "./ipc.ts";
 import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
 
 /** Header carrying the JSON arguments when the body is raw bytes. */
@@ -25,6 +25,7 @@ export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
 export const MCP_REQUEST_EVENT = "thoth:mcp-request";
 export const MCP_PENDING_EVENT = "thoth:mcp-pending";
 export const MCP_PROPOSALS_EVENT = "thoth:mcp-proposals";
+export const MCP_MEMORIES_EVENT = "thoth:mcp-memories";
 /** In-app updates (ADR-0034): the host's `update.progress`. */
 export const UPDATE_PROGRESS_EVENT = "thoth:update-progress";
 
@@ -152,6 +153,10 @@ export function tauriConnectedApps(transport: Transport, api: TauriApi = interna
     },
     async onProposals(listener) {
       const unlisten = await api.listen<{ open: number }>(MCP_PROPOSALS_EVENT, (e) => listener(e.payload.open));
+      return () => void unlisten();
+    },
+    async onMemories(listener) {
+      const unlisten = await api.listen<MemoryWritten>(MCP_MEMORIES_EVENT, (e) => listener(e.payload));
       return () => void unlisten();
     },
   });
