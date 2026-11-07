@@ -1,7 +1,8 @@
 # ADR-0045: Switching from Obsidian, on Thoth's own terms
 
 - **Status:** Accepted (owner, 2026-11-02): the direction, the brand rules and the order. Each step gets its own ADR
-  or PR when it is built.
+  or PR when it is built. "AI edits you review first" amended by ADR-0052 (2026-11-07): agents' memories in the
+  memory folder are written without review.
 - **Date:** 2026-11-02
 - **Deciders:** owner
 
