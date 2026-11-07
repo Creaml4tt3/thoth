@@ -398,6 +398,16 @@ export const en = {
       "On by default. Allowed apps save, change and forget memories in the memory folder of each shared Private Space, and nowhere else. Off: each memory waits for your review under the bell, as a proposed change.",
     mayRemember: "Save memories without asking",
     memoryFolder: (folder: string) => `Memory folder: ${folder}`,
+    /** ADR-0052 rule 7: this Private Space's Skills/ folders, linked into the home folder. */
+    skills: {
+      title: "Skills",
+      toggle: "Use this Private Space's skills in Claude Code and Codex",
+      hint: "Links each skill in Skills/ (a folder with a SKILL.md) into ~/.agents/skills and ~/.claude/skills, so agents use them even while Thoth is closed. Thoth never replaces a file or folder that is already there.",
+      linked: (names: string[]) => (names.length === 0 ? "No skills to link yet." : names.length === 1 ? `Linked ${names[0]}.` : `Linked ${names.length.toLocaleString("en")} skills: ${names.join(", ")}.`),
+      skipped: (names: string[]) => `Not linked, because something with the same name is already there: ${names.join(", ")}.`,
+      off: "The links are removed.",
+      failed: (message: string) => `Could not link the skills: ${message}`,
+    },
     folderPrompt: {
       title: "Which folder should agents use for memory?",
       body: (space: string) =>

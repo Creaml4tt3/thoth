@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SkillLinksReport, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -126,6 +126,8 @@ export interface ConnectedApps {
   mayRemember(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
   /** The memory folder for a Private Space this window has open (ADR-0052 rule 1). */
   memoryFolder(root: string, folder: string): Promise<ConnectedAppsSettings>;
+  /** Links this window's Private Space's skills into the home folder (`on`), or only brings the links up to date. */
+  skillLinks(root: string, on?: boolean): Promise<SkillLinksReport>;
   /** Memory writes without review in this window's Private Spaces, newest first (ADR-0052). */
   memoryHistory(): Promise<MemoryHistoryChange[]>;
   /** One of them with the file before and after, for Undo. */

@@ -83,7 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
-    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory",
+    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -613,6 +613,14 @@ impl Host {
                     _ => return Err(HostError::bad_argument("id must be a memory change's id")),
                 };
                 json(self.mcp.memory_history(owner, id)?)
+            }
+            "mcp.skillLinks" => {
+                let on = match args.get("on") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::Bool(b)) => Some(*b),
+                    _ => return Err(HostError::bad_argument("on must be a boolean")),
+                };
+                json(self.mcp.skill_links(owner, str_arg(args, "root")?, on, self.home.as_deref())?)
             }
             "mcp.proposals" => json(self.mcp.proposals()),
             "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),

@@ -12,6 +12,7 @@ import type {
   McpRequest,
   MemoryHistoryText,
   MemoryWritten,
+  SkillLinksReport,
 } from "@thoth/platform";
 
 export const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
@@ -103,6 +104,17 @@ export class FakeConnectedApps implements ConnectedApps {
     this.emitProposals();
     const { before: _b, after: _a, ...summary } = found;
     return summary;
+  }
+  /** What `skillLinks` answers (its `on` follows the settings). */
+  linkReport: Omit<SkillLinksReport, "on"> = { linked: [], skipped: [], folders: ["/Users/someone/.agents/skills"] };
+  async skillLinks(root: string, on?: boolean) {
+    this.calls.push(on === undefined ? ["skillLinks", root] : ["skillLinks", root, on]);
+    if (on !== undefined) {
+      this.state.skillLinks = [...(this.state.skillLinks ?? []).filter((r) => r !== root), ...(on ? [root] : [])];
+      this.emitPending();
+    }
+    const linked = (this.state.skillLinks ?? []).includes(root);
+    return { on: linked, ...(linked ? this.linkReport : { linked: [], skipped: [] , folders: [] }) };
   }
   async memoryHistory() {
     return this.history.map(({ before: _b, after: _a, ...change }) => change);

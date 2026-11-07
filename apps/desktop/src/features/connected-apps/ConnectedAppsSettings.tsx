@@ -187,6 +187,8 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
         </Button>
       </div>
 
+      <SkillLinks connectedApps={connectedApps} on={settings.skillLinks?.includes(connection.root) ?? false} onChange={() => void reload()} />
+
       <h3 id="set-mcp-apps">{t.apps}</h3>
       <p className="muted small">{t.selfReported}</p>
       <p id="mcp-propose-hint" className="muted small">
@@ -317,5 +319,48 @@ function RequestLog({ entries }: { entries: ConnectedAppsLogEntry[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * "Use this Private Space's skills in Claude Code and Codex" (ADR-0052 rule 7): the host links each `Skills/<name>`
+ * folder into the home folder's skills folders, never over anything there, and says what it linked.
+ */
+function SkillLinks({ connectedApps, on, onChange }: { connectedApps: ConnectedApps; on: boolean; onChange(): void }) {
+  const { connection } = useSession();
+  const t = useDesktopStrings().connectedApps.skills;
+  const [said, setSaid] = useState<{ text: string; alert?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const turn = async (next: boolean) => {
+    setBusy(true);
+    try {
+      const report = await connectedApps.skillLinks(connection.root, next);
+      setSaid({ text: report.on ? [t.linked(report.linked), report.skipped.length > 0 ? t.skipped(report.skipped) : ""].filter(Boolean).join(" ") : t.off });
+    } catch (error) {
+      setSaid({ text: t.failed(error instanceof Error ? error.message : String(error)), alert: true });
+    } finally {
+      setBusy(false);
+      onChange();
+    }
+  };
+  return (
+    <>
+      <h3 id="set-mcp-skills">{t.title}</h3>
+      <div className="set-toggle">
+        <input id="mcp-skill-links" type="checkbox" role="switch" checked={on} disabled={busy} onChange={(e) => void turn(e.target.checked)} aria-describedby="mcp-skill-links-hint" />
+        <label htmlFor="mcp-skill-links">{t.toggle}</label>
+        <small id="mcp-skill-links-hint" className="muted">
+          {t.hint}
+        </small>
+      </div>
+      <p role="status" className="muted small">
+        {said && !said.alert ? said.text : ""}
+      </p>
+      {said?.alert && (
+        <p role="alert" className="alert alert-danger small">
+          {said.text}
+        </p>
+      )}
+    </>
   );
 }

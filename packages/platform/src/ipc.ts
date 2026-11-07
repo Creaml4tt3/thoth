@@ -270,6 +270,11 @@ export interface Commands {
    * The memory writes without review of the last 30 days in the Private Spaces this window has open, newest first (no
    * text); with `id`, one of them with the file before and after, for Undo. `NOT_ALLOWED` for another Private Space's.
    */
+  /**
+   * "Use my skills in Claude Code and Codex" for a Private Space this window has open (`on`), and its links brought up to
+   * date with its `Skills/` folders (without `on`, only that). `NOT_ALLOWED` unless this window has it open.
+   */
+  "mcp.skillLinks": { args: { root: string; on?: boolean }; result: SkillLinksReport };
   "mcp.memoryHistory": { args: { id?: string }; result: { changes: MemoryHistoryChange[] } | MemoryHistoryText };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
   "mcp.proposals": { args: Record<string, never>; result: { proposals: ConnectedAppProposal[]; open: number } };
@@ -389,6 +394,8 @@ export interface ConnectedAppsSettings {
    * whether agents may use it or which folder they should use instead (`mcp.memoryFolder`).
    */
   folders?: string[];
+  /** Private Spaces whose skills are linked into the home folder (ADR-0052 rule 7). */
+  skillLinks?: string[];
   /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
   setup: { command: string; args: string[] } | null;
 }
@@ -432,6 +439,14 @@ export interface ConnectedAppProposalText extends ConnectedAppProposal {
   before: string | null;
   /** The page as proposed (null once settled). */
   after: string | null;
+}
+
+/** What `mcp.skillLinks` did: the skills linked, those not linked (a file or folder of that name was there), and where. */
+export interface SkillLinksReport {
+  on: boolean;
+  linked: string[];
+  skipped: string[];
+  folders: string[];
 }
 
 /** A memory an app saved, changed or forgot without review (ADR-0052 rule 5), as the host's history keeps it for 30 days. */

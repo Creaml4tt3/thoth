@@ -95,6 +95,7 @@
     "allow-mcp-mayRemember",
     "allow-mcp-memoryFolder",
     "allow-mcp-memoryHistory",
+    "allow-mcp-skillLinks",
     "allow-diag-report",
     "allow-diag-collect",
     "allow-diag-settings"

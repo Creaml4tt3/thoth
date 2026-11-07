@@ -15,6 +15,7 @@
 pub mod log;
 pub mod memory;
 pub mod proposals;
+pub mod skills;
 mod socket;
 pub mod tools;
 
@@ -110,11 +111,14 @@ struct Settings {
     /// there (ADR-0052 rule 1).
     #[serde(default)]
     memory_folders: BTreeMap<String, String>,
+    /// Private Spaces (canonical roots) whose skills are linked into the home folder's skills folders (ADR-0052 rule 7).
+    #[serde(default)]
+    skill_links: Vec<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true, memory_folders: BTreeMap::new() }
+        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true, memory_folders: BTreeMap::new(), skill_links: Vec::new() }
     }
 }
 
@@ -233,6 +237,7 @@ impl Relay {
             "memories": state.settings.memories,
             "memoryFolders": state.settings.memory_folders,
             "folders": state.folders,
+            "skillLinks": state.settings.skill_links,
             "setup": self.setup(),
         })
     }
@@ -372,6 +377,34 @@ impl Relay {
         self.inner.decided.notify_all();
         self.inner.emit_pending();
         Ok(self.settings())
+    }
+
+    /// `mcp.skillLinks { root, on? }` from the window `owner`, which must have that Private Space open: "Use my skills in
+    /// Claude Code and Codex" on or off (`on`), and the links brought up to date with its skills (ADR-0052 rule 7). Without
+    /// `on`, only brought up to date (a window does so when its skills change). Returns what was linked.
+    pub fn skill_links(&self, owner: &str, root: &str, on: Option<bool>, home: Option<&Path>) -> HostResult<Value> {
+        if !(self.inner.spaces)().iter().any(|s| s.owner == owner && s.root.to_string_lossy() == root) {
+            return Err(HostError::not_allowed("Only a window with this Private Space open can link its skills"));
+        }
+        let home = home.ok_or_else(|| HostError::new("UNAVAILABLE", "Thoth could not find your home folder"))?;
+        let linked = {
+            let mut state = self.inner.state();
+            if let Some(on) = on {
+                state.settings.skill_links.retain(|r| r != root);
+                if on {
+                    state.settings.skill_links.push(root.to_owned());
+                }
+                self.inner.save(&state.settings)?;
+            }
+            state.settings.skill_links.iter().any(|r| r == root)
+        };
+        if on.is_some() {
+            // Every window reads the settings again, and a window on this Private Space keeps the links up to date.
+            self.inner.emit_pending();
+        }
+        let mut report = skills::sync(home, Path::new(root), linked)?;
+        report["on"] = json!(linked);
+        Ok(report)
     }
 
     /// `mcp.memoryHistory { id? }` from the window `owner`: the memory writes of the last 30 days in the Private Spaces

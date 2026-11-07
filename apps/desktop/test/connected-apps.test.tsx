@@ -90,7 +90,7 @@ describe("Settings → Connected apps", () => {
     await app.user.click(section.getByRole("button", { name: "Copy the setup" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(JSON.parse(writeText.mock.calls[0]![0])).toEqual({ mcpServers: { thoth: { command: SIDECAR, args: ["--socket", SOCKET] } } });
-    expect(section.getByRole("status").textContent).toContain("Copied");
+    expect(section.getAllByRole("status").map((s) => s.textContent)).toContain("Copied.");
     expect(section.getByTestId("mcp-setup").textContent).toContain(SIDECAR);
   });
 
@@ -270,6 +270,30 @@ describe("Agents' memory (ADR-0052)", () => {
     expect(apps.calls).toContainEqual(["configure", { memories: false }]);
     // With the global switch off, the per-app one has nothing to say.
     await waitFor(() => expect(within(section.getByRole("listitem", { name: "Claude" })).queryByRole("switch", { name: "Save memories without asking" })).toBeNull());
+  });
+});
+
+describe("Skills (ADR-0052 rule 7)", () => {
+  it("links this Private Space's skills from Settings, says what it did, and keeps them up to date", async () => {
+    await mkdir(join(root, "Skills/weekly-update"), { recursive: true });
+    await writeFile(join(root, "Skills/weekly-update/SKILL.md"), "---\nname: weekly-update\ndescription: x\n---\n");
+    const app = await open();
+    const shown = app.platform.connections[0]!.root;
+    apps.linkReport = { linked: ["review", "weekly-update"], skipped: ["taken"], folders: ["/Users/someone/.agents/skills"] };
+    const section = await openSettings(app);
+    const toggle = section.getByRole("switch", { name: "Use this Private Space's skills in Claude Code and Codex" });
+    expect(checked(toggle)).toBe(false);
+    await app.user.click(toggle);
+    await waitFor(() => expect(checked(toggle)).toBe(true));
+    expect(apps.calls).toContainEqual(["skillLinks", shown, true]);
+    expect(section.getByText("Linked 2 skills: review, weekly-update. Not linked, because something with the same name is already there: taken.")).toBeTruthy();
+    // The window then keeps the links up to date with its skills, without turning anything on or off.
+    await waitFor(() => expect(apps.calls).toContainEqual(["skillLinks", shown]));
+
+    await app.user.click(toggle);
+    await waitFor(() => expect(checked(toggle)).toBe(false));
+    expect(apps.calls).toContainEqual(["skillLinks", shown, false]);
+    expect(section.getByText("The links are removed.")).toBeTruthy();
   });
 });
 
