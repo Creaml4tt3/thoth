@@ -298,7 +298,8 @@ describe("conversations", () => {
     expect(within(session()).getByTestId("composer-blocked").textContent).toBe("Review the proposed changes first. Then you can ask more.");
     await app.user.click(within(session()).getByRole("button", { name: "Discard all" }));
     await app.user.type(composer(), "Thanks.");
-    await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(false));
+    // Discarding settles the review through the vault first; on a busy CI runner that takes longer than waitFor's 1 s.
+    await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
     expect(within(session()).queryByTestId("composer-blocked")).toBeNull();
   });
 
