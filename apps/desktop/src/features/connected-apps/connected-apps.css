@@ -53,3 +53,8 @@
 .mcp-memory { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--thoth-space-2); padding: 6px 0; border-bottom: 1px solid var(--thoth-border); min-width: 0; }
 .mcp-memory .btn { margin-left: auto; }
 .mcp-memory-stale { flex-basis: 100%; }
+
+/* Set up an app (ADR-0052 rule 10): one card per app. */
+.mcp-cards { list-style: none; margin: 0 0 var(--thoth-space-3); padding: 0; display: grid; gap: var(--thoth-space-2); }
+.mcp-card { display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); min-width: 0; overflow-wrap: anywhere; }
+.mcp-card p { margin: 0; }

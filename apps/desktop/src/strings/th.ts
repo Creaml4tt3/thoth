@@ -297,6 +297,30 @@ export const th: DesktopStrings = {
     setup: "ตั้งค่าแอป",
     setupHint: "วางข้อความนี้ในการตั้งค่า MCP ของแอป (Claude Desktop: claude_desktop_config.json, Cursor: mcp.json) ข้อความนี้จะเปิด thoth-mcp ที่มากับ Thoth",
     copySetup: "คัดลอกการตั้งค่า",
+    cards: {
+      lede: "Thoth เพิ่มตัวเองลงในแอปเหล่านี้ให้ได้ แต่ละแอปบอกว่าจะเปลี่ยนอะไร ไฟล์ที่แก้จะถูกสำรองไว้ก่อน", // REVIEW
+      apps: {
+        "claude-code": { name: "Claude Code", what: "รัน claude mcp add --scope user thoth เพื่อให้ Claude Code ทุกเซสชันใช้ Thoth ได้" },
+        codex: { name: "Codex และแอป ChatGPT", what: "เพิ่ม Thoth ลงใน ~/.codex/config.toml ที่ Codex และแอป ChatGPT บนเดสก์ท็อปใช้ร่วมกัน" },
+        "claude-desktop": { name: "Claude Desktop", what: "เพิ่ม Thoth ลงใน claude_desktop_config.json แล้วเปิด Claude Desktop ใหม่" },
+        cursor: { name: "Cursor", what: "เพิ่ม Thoth ลงใน ~/.cursor/mcp.json โดย Cursor จะแสดงไว้ใน Settings → MCP" },
+      }, // REVIEW
+      setUp: "ตั้งค่า", // REVIEW
+      replace: "แทนที่", // REVIEW
+      added: (name) => `เพิ่ม Thoth ลงใน ${name} แล้ว`, // REVIEW
+      replaced: (name) => `แทนที่เซิร์ฟเวอร์ thoth ใน ${name} แล้ว`, // REVIEW
+      already: (name) => `${name} ตั้งค่าไว้แล้ว`, // REVIEW
+      backup: (path) => `ไฟล์เดิมเก็บไว้ที่ ${path}`, // REVIEW
+      exists: (name) => `${name} มีเซิร์ฟเวอร์ชื่อ thoth อยู่แล้ว อาจมาจากการตั้งค่าครั้งก่อน แทนที่ด้วยอันนี้ไหม`, // REVIEW
+      notThere: (name) => `ยังไม่ได้ตั้งค่า ${name} ในเครื่องนี้ เปิดแอปนั้นสักครั้งแล้วลองอีกครั้ง`, // REVIEW
+      failed: (message) => `ตั้งค่าไม่ได้: ${message}`, // REVIEW
+      copyCommand: "คัดลอกคำสั่ง", // REVIEW
+      other: "เอเจนต์อื่น ๆ", // REVIEW
+      otherWhat: "คัดลอกพรอมต์นี้ไปวางในเอเจนต์ แล้วเอเจนต์จะตั้งค่า Thoth ตามคู่มือ", // REVIEW
+      otherPrompt: "ช่วยตั้งค่า Thoth ให้เป็นความจำของฉัน ตามคู่มือนี้: https://thothnotes.com/agents/setup", // REVIEW
+      copyPrompt: "คัดลอกพรอมต์", // REVIEW
+      copied: "คัดลอกแล้ว", // REVIEW
+    },
     // REVIEW
     setupMoved: {
       title: "คัดลอกการตั้งค่าอีกครั้ง",

@@ -248,6 +248,17 @@ impl Agents {
         (None, dirs)
     }
 
+    /// Runs the provider's CLI once with `args` (a short command, such as Claude Code's `mcp add`): `{ code, stdout,
+    /// stderr, timedOut }`, or None when it is not installed.
+    pub fn run_once(&self, provider: &str, args: &[String]) -> Option<Value> {
+        let (found, _) = self.resolve(Provider::parse(provider).ok()?);
+        let bin = found?;
+        let cwd = std::env::temp_dir();
+        let env = child_env(&bin, &cwd, &[]);
+        let args: Vec<OsString> = args.iter().map(OsString::from).collect();
+        Some(probe(&bin, &args, &cwd, &env))
+    }
+
     /// Finds the binary and runs its fixed probes. Parsing (version, flags, login) is the adapter's job.
     pub fn detect(&self, provider: &str, exclude: &[PathBuf]) -> HostResult<Value> {
         let provider = Provider::parse(provider)?;

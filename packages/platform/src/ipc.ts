@@ -274,6 +274,11 @@ export interface Commands {
    * "Use my skills in Claude Code and Codex" for a Private Space this window has open (`on`), and its links brought up to
    * date with its `Skills/` folders (without `on`, only that). `NOT_ALLOWED` unless this window has it open.
    */
+  /**
+   * Adds thoth-mcp to an app's own MCP settings (ADR-0052 rule 10), backing up any file it edits. `UNAVAILABLE` when
+   * the app is not set up on this computer; `EEXIST` when it has another `thoth` server, unless `replace`.
+   */
+  "mcp.install": { args: { app: SetupApp; replace?: boolean }; result: { status: "added" | "already" | "replaced"; file?: string; backup?: string | null } };
   "mcp.skillLinks": { args: { root: string; on?: boolean }; result: SkillLinksReport };
   "mcp.memoryHistory": { args: { id?: string }; result: { changes: MemoryHistoryChange[] } | MemoryHistoryText };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
@@ -440,6 +445,9 @@ export interface ConnectedAppProposalText extends ConnectedAppProposal {
   /** The page as proposed (null once settled). */
   after: string | null;
 }
+
+/** The apps Thoth sets up itself (ADR-0052 rule 10). */
+export type SetupApp = "claude-code" | "codex" | "claude-desktop" | "cursor";
 
 /** What `mcp.skillLinks` did: the skills linked, those not linked (a file or folder of that name was there), and where. */
 export interface SkillLinksReport {

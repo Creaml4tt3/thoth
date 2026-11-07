@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings as Settings } from "@thoth/platform";
+import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings as Settings, SetupApp } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { copyText } from "@thoth/app-ui/editor/link-cards.ts";
 import { useSession } from "../../app/context.ts";
@@ -252,6 +252,7 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
       {setup && (
         <>
           <h3>{t.setup}</h3>
+          {settings.setup && <SetupCards connectedApps={connectedApps} setup={settings.setup} />}
           <p className="muted small">{t.setupHint}</p>
           <pre className="mcp-setup mono" data-testid="mcp-setup" tabIndex={0}>
             {setup}
@@ -361,6 +362,99 @@ function SkillLinks({ connectedApps, on, onChange }: { connectedApps: ConnectedA
           {said.text}
         </p>
       )}
+    </>
+  );
+}
+
+const SETUP_APPS: SetupApp[] = ["claude-code", "codex", "claude-desktop", "cursor"];
+
+/** A word for a POSIX shell: as it is when it is safe, else in single quotes. */
+const shellWord = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, "'\\''")}'`);
+
+/**
+ * Set up an app (ADR-0052 rule 10): one card per app, each saying what it changes; the host edits the app's own
+ * settings (backing up the file first) or runs Claude Code's own command. A `thoth` server already there is replaced
+ * only when the user says so. Any other agent gets a prompt to copy.
+ */
+function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; setup: { command: string; args: string[] } }) {
+  const t = useDesktopStrings().connectedApps.cards;
+  const [said, setSaid] = useState<Partial<Record<SetupApp | "other", { text: string; alert?: boolean; replace?: boolean }>>>({});
+  const [busy, setBusy] = useState<SetupApp | null>(null);
+  const command = ["claude", "mcp", "add", "--scope", "user", "thoth", "--", setup.command, ...setup.args].map(shellWord).join(" ");
+  const say = (app: SetupApp | "other", text: string, more: { alert?: boolean; replace?: boolean } = {}) => setSaid((s) => ({ ...s, [app]: { text, ...more } }));
+  const run = async (app: SetupApp, replace = false) => {
+    const name = t.apps[app].name;
+    setBusy(app);
+    try {
+      const done = await connectedApps.install(app, replace);
+      const text = done.status === "already" ? t.already(name) : done.status === "replaced" ? t.replaced(name) : t.added(name);
+      say(app, done.backup ? `${text} ${t.backup(done.backup)}` : text);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "EEXIST") say(app, t.exists(name), { replace: true });
+      else if (code === "UNAVAILABLE") say(app, t.notThere(name), { alert: true });
+      else say(app, t.failed(error instanceof Error ? error.message : String(error)), { alert: true });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const copy = (key: SetupApp | "other", text: string) =>
+    void copyText(text).then(
+      () => say(key, t.copied),
+      () => say(key, t.failed(""), { alert: true }),
+    );
+  const result = (key: SetupApp | "other") => {
+    const r = said[key];
+    return (
+      <>
+        <p role="status" className="muted small">
+          {r && !r.alert ? r.text : ""}
+        </p>
+        {r?.alert && (
+          <p role="alert" className="alert alert-danger small">
+            {r.text}
+          </p>
+        )}
+      </>
+    );
+  };
+  return (
+    <>
+      <p className="muted small">{t.lede}</p>
+      <ul className="mcp-cards" data-testid="mcp-setup-cards">
+        {SETUP_APPS.map((app) => (
+          <li key={app} className="mcp-card" aria-labelledby={`mcp-card-${app}`}>
+            <b id={`mcp-card-${app}`}>{t.apps[app].name}</b>
+            <span className="muted small">{t.apps[app].what}</span>
+            <div className="set-actions">
+              <Button variant="primary" small disabled={busy !== null} onClick={() => void run(app)} aria-describedby={`mcp-card-${app}`}>
+                {t.setUp}
+              </Button>
+              {said[app]?.replace && (
+                <Button variant="ghost" small disabled={busy !== null} onClick={() => void run(app, true)}>
+                  {t.replace}
+                </Button>
+              )}
+              {app === "claude-code" && (
+                <Button variant="ghost" small onClick={() => copy(app, command)}>
+                  {t.copyCommand}
+                </Button>
+              )}
+            </div>
+            {result(app)}
+          </li>
+        ))}
+        <li className="mcp-card" aria-labelledby="mcp-card-other">
+          <b id="mcp-card-other">{t.other}</b>
+          <span className="muted small">{t.otherWhat}</span>
+          <div className="set-actions">
+            <Button variant="ghost" small onClick={() => copy("other", t.otherPrompt)}>
+              {t.copyPrompt}
+            </Button>
+          </div>
+          {result("other")}
+        </li>
+      </ul>
     </>
   );
 }

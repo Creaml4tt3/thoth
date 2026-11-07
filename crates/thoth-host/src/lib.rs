@@ -83,7 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
-    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks",
+    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks", "mcp.install",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -621,6 +621,11 @@ impl Host {
                     _ => return Err(HostError::bad_argument("on must be a boolean")),
                 };
                 json(self.mcp.skill_links(owner, str_arg(args, "root")?, on, self.home.as_deref())?)
+            }
+            "mcp.install" => {
+                let replace = matches!(args.get("replace"), Some(Value::Bool(true)));
+                let claude = |a: &[String]| self.agents.run_once("claude", a);
+                json(self.mcp.install(str_arg(args, "app")?, replace, self.home.as_deref(), &claude)?)
             }
             "mcp.proposals" => json(self.mcp.proposals()),
             "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),

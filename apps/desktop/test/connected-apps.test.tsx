@@ -273,6 +273,33 @@ describe("Agents' memory (ADR-0052)", () => {
   });
 });
 
+describe("Set up an app (ADR-0052 rule 10)", () => {
+  it("sets up each app from its card, replaces another thoth server only when asked, and copies the command", async () => {
+    const app = await open();
+    const writeText = vi.fn(async (_text: string) => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    apps.taken.add("codex");
+    const section = await openSettings(app);
+    const card = (name: string) => within(section.getByRole("listitem", { name }));
+
+    await app.user.click(card("Cursor").getByRole("button", { name: /^Set up/ }));
+    expect(await card("Cursor").findByText("Added Thoth to Cursor.")).toBeTruthy();
+    expect(apps.calls).toContainEqual(["install", "cursor"]);
+
+    await app.user.click(card("Codex and the ChatGPT app").getByRole("button", { name: /^Set up/ }));
+    expect(await card("Codex and the ChatGPT app").findByText(/already has a server called thoth/)).toBeTruthy();
+    await app.user.click(card("Codex and the ChatGPT app").getByRole("button", { name: "Replace it" }));
+    expect(await card("Codex and the ChatGPT app").findByText("Replaced the thoth server in Codex and the ChatGPT app.")).toBeTruthy();
+    expect(apps.calls).toContainEqual(["install", "codex", true]);
+
+    await app.user.click(card("Claude Code").getByRole("button", { name: "Copy the command" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0]![0]).toBe(`claude mcp add --scope user thoth -- ${SIDECAR} --socket '${SOCKET}'`);
+    await app.user.click(card("Any other agent").getByRole("button", { name: "Copy the prompt" }));
+    await waitFor(() => expect(writeText.mock.calls[1]![0]).toContain("thothnotes.com/agents/setup"));
+  });
+});
+
 describe("Skills (ADR-0052 rule 7)", () => {
   it("links this Private Space's skills from Settings, says what it did, and keeps them up to date", async () => {
     await mkdir(join(root, "Skills/weekly-update"), { recursive: true });
