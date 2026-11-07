@@ -1,6 +1,7 @@
 # ADR-0048: Connected apps propose changes, reviewed in Thoth
 
-- **Status:** Accepted (owner, 2026-11-02: ADR-0045 step 3, "Connected apps can write, with review")
+- **Status:** Accepted (owner, 2026-11-02: ADR-0045 step 3, "Connected apps can write, with review"). Rule 4 amended by
+  ADR-0052 (2026-11-07): agents' memories in the memory folder are written without review.
 - **Date:** 2026-11-02
 - **Deciders:** project owner (the direction and the requirements); the details marked "(this ADR)" were decided
   while implementing them.
@@ -68,7 +69,7 @@ Constraints:
    switch "May propose changes" must be on. The switch is off until the user turns it on. The first time an allowed
    app proposes, every window asks "Let “app” propose changes?" (focus on "Don’t allow", Escape does not answer), and
    the call waits up to 60 seconds, as the first Allow does. The answer is remembered; Settings → Connected apps shows
-   the switch per app. **There is no mode that applies without review** (ADR-0045).
+   the switch per app. **There is no mode that applies without review** (ADR-0045), except agents' memories in the memory folder (ADR-0052 rule 5).
 5. **Review in the window, from the bell.** The bell's list starts with "N proposed changes to review" while any
    wait for this window's Private Space, and the bell's count includes them. It opens the review:
    - per app ("From “app”"), each proposal with the app, when, the page, its kind and a diff (the Agent Hub's
