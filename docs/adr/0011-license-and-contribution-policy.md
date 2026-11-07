@@ -29,6 +29,9 @@ The project owner chose **Option 1: Apache-2.0 for everything** (2026-10-22).
    BSD, ISC, Zlib, Unicode-3.0, CC0 or dual-licensed with one of these, plus
    five MPL-2.0 crates (file-level copyleft, compatible with Apache-2.0 when
    unmodified). No GPL/AGPL-only dependency. A CI license check is still to do.
+   Proprietary (closed-source) packages are not added to this repository (owner, 2026-11-07, about the Clayzo
+   animation engine). Media exported by such tools, such as video, WebP or SVG files, may be committed as assets:
+   they are the project's own and need none of the tool's code to build or run.
 4. Hosted closed forks are permitted. The owner accepted this trade-off for
    simplicity and adoption.
 5. Contributions use the **DCO 1.1** (owner decision 2026-10-22): every commit
