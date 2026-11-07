@@ -7,7 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
-import { MascotArt, STAGE } from "./MascotArt.tsx";
+import { MascotArt, SMALL_STAGE, STAGE } from "./MascotArt.tsx";
 import { MASCOT_MOTIONS, MASCOT_SIZES, SCALE_MAX, SCALE_MIN, SCALE_STEP } from "./prefs.ts";
 import { boxSize } from "./placement.ts";
 import { useReducedMotion } from "./hooks.ts";
@@ -106,7 +106,7 @@ export function MascotSettings() {
         <figure className="mascot-preview" aria-label={t.preview}>
           <div className="mascot-preview-stage" style={{ width: stage, height: stage }}>
             <div style={{ width: stage, height: stage, transform: version === "compact" ? `translateY(${-(stage - box) / 2}px)` : undefined }}>
-              <MascotArt state="idle" version={version} motion={reduced ? "off" : prefs.motion} />
+              <MascotArt state="idle" version={version} motion={reduced ? "off" : prefs.motion} tiny={stage < SMALL_STAGE} />
             </div>
           </div>
         </figure>
