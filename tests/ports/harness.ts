@@ -4,8 +4,8 @@
  * `openNodeSourceHost`) and Rust (`Remote*` over `StdioTransport`).
  */
 import { execFileSync } from "node:child_process";
-import { rmSync } from "node:fs";
-import { chmod, copyFile, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { SourceHost } from "@thoth/importer-core";
@@ -22,22 +22,61 @@ const BUILT = join(REPO, "target", "debug", `thoth-host-stdio${EXE}`);
 
 let built: Promise<string> | undefined;
 
+/** Where the copies live: one folder per binary, one file per build (by content), shared by every test file. */
+const COPIES = join(tmpdir(), "thoth-test-bins");
+/** Copies older than this are deleted; a run in progress refreshes its copy's time when it starts. */
+const COPY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 /**
- * `cargo build -p thoth-host` (incremental; slow only on the first run), then
- * copies the binary to a private path. Test files build in parallel and cargo
- * replaces `target/debug/thoth-host-stdio` while doing so, so each file spawns
- * its own copy rather than a path that can briefly disappear.
+ * A copy of `source` that stays put: test files build in parallel and cargo replaces the file under `target/` while it
+ * does, so each spawns a copy rather than a path that can briefly disappear. The copy is named by its content, made
+ * once (written beside it, then renamed into place) and shared, so a run leaves one copy per build instead of one per
+ * test file. Workers are killed without an exit event, so nothing is deleted at exit; old copies are pruned instead.
  */
+export async function stableCopy(source: string, name: string): Promise<string> {
+  const bytes = await readFile(source);
+  const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
+  const dir = join(COPIES, name);
+  await mkdir(dir, { recursive: true });
+  const target = join(dir, `${digest}${EXE}`);
+  const present = await stat(target).catch(() => undefined);
+  if (present?.size !== bytes.length) {
+    const temp = await mkdtemp(join(dir, ".partial-"));
+    await copyFile(source, join(temp, name));
+    await chmod(join(temp, name), 0o755);
+    try {
+      await rename(join(temp, name), target);
+    } catch (error) {
+      // Another test file put the same bytes in place meanwhile (Windows refuses to replace a running file).
+      if ((await stat(target).catch(() => undefined))?.size !== bytes.length) throw error;
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  }
+  // Marks it as in use, so a pruning run elsewhere keeps it.
+  const now = new Date();
+  await utimes(target, now, now).catch(() => undefined);
+  await pruneCopies(dir, target);
+  return target;
+}
+
+async function pruneCopies(dir: string, keep: string): Promise<void> {
+  const now = Date.now();
+  for (const entry of await readdir(dir).catch(() => [] as string[])) {
+    const path = join(dir, entry);
+    if (path === keep) continue;
+    const info = await stat(path).catch(() => undefined);
+    // A copy another run uses was touched within the day; a partial one older than that was left by a crash.
+    if (info && now - info.mtimeMs > COPY_MAX_AGE_MS) await rm(path, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/** `cargo build -p thoth-host` (incremental; slow only on the first run), then `stableCopy`. */
 export function buildHarness(): Promise<string> {
   built ??= (async () => {
     // The e2e global setup has just built it; its workers skip cargo (each call waited on the others' lock).
     if (process.env.THOTH_HARNESS_BUILT !== "1") execFileSync("cargo", ["build", "-p", "thoth-host", "--bin", "thoth-host-stdio"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
-    const dir = await mkdtemp(join(tmpdir(), "thoth-harness-bin-"));
-    const binary = join(dir, `thoth-host-stdio${EXE}`);
-    await copyFile(BUILT, binary);
-    await chmod(binary, 0o755);
-    process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
-    return binary;
+    return stableCopy(BUILT, `thoth-host-stdio${EXE}`);
   })();
   return built;
 }
@@ -51,12 +90,7 @@ let mcpBuilt: Promise<string> | undefined;
 export function buildMcpServer(): Promise<string> {
   mcpBuilt ??= (async () => {
     execFileSync("cargo", ["build", "-p", "thoth-mcp"], { cwd: REPO, stdio: ["ignore", "ignore", "inherit"] });
-    const dir = await mkdtemp(join(tmpdir(), "thoth-mcp-bin-"));
-    const binary = join(dir, `thoth-mcp${EXE}`);
-    await copyFile(join(REPO, "target", "debug", `thoth-mcp${EXE}`), binary);
-    await chmod(binary, 0o755);
-    process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
-    return binary;
+    return stableCopy(join(REPO, "target", "debug", `thoth-mcp${EXE}`), `thoth-mcp${EXE}`);
   })();
   return mcpBuilt;
 }

@@ -74,7 +74,9 @@ describe("folders and the page-kind capability (ADR-0017)", () => {
     server.servers.writeAsOther(ws, { title: "Plan", markdown: "# Plan\n" });
     const browser = fakeBrowser(server);
     await signInThroughUi(browser);
-    const group = await within(screen.getByRole("tree", { name: "Workspaces" })).findByRole("group", { name: "Pages in Notes" });
+    // The tree appears a moment after sign-in, later on a busy machine: wait for it, as `signedIn` does.
+    const tree = await screen.findByRole("tree", { name: "Workspaces" });
+    const group = await within(tree).findByRole("group", { name: "Pages in Notes" });
     return { server, group };
   }
 
