@@ -2,6 +2,7 @@ export * from "./daily.ts";
 export * from "./errors.ts";
 export * from "./favorites.ts";
 export * from "./journal.ts";
+export * from "./memory.ts";
 export * from "./mime.ts";
 export * from "./names.ts";
 export * from "./order.ts";

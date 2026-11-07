@@ -255,6 +255,38 @@ describe("A window answers from its open Vault", () => {
     }
   });
 
+  it("works out a memory, writes it when the host asks, recalls it and forgets it into the Trash (ADR-0052)", async () => {
+    const { app, root: shown } = await seeded();
+    const base = { owner: "main", root: shown, space: "Notes" } as const;
+    apps.request({ ...base, id: "c1", tool: "memory_change", args: { op: "remember", text: "Put blockers first.", kind: "preference", topic: "updates/format", certainty: "stated", app: "Claude" } });
+    const change = ((await answered("c1")) as { result: { op: string; path: string; after: string; baseHash: null } }).result;
+    expect(change).toMatchObject({ op: "create", path: "Memory/updates-format.md", baseHash: null });
+    expect(change.after).toContain("source: Claude");
+
+    // Nothing is written until the host commits it.
+    apps.request({ ...base, id: "q0", tool: "recall", args: { limit: 10 } });
+    expect(((await answered("q0")) as { result: { total: number } }).result.total).toBe(0);
+    apps.request({ ...base, id: "w1", tool: "memory_commit", args: { op: "write", path: change.path, text: change.after, expected: null } });
+    expect(await answered("w1")).toEqual({ result: { hash: expect.stringMatching(/^[0-9a-f]{64}$/) } });
+
+    apps.request({ ...base, id: "q1", tool: "recall", args: { limit: 10 } });
+    const recalled = ((await answered("q1")) as { result: { memories: { path: string; kind: string; text: string; stale: boolean; certainty: string }[] } }).result;
+    expect(recalled.memories).toEqual([expect.objectContaining({ path: change.path, kind: "preference", text: "Put blockers first.", stale: false, certainty: "stated" })]);
+
+    // A stated memory is not replaced by an inferred one, and the window says so by its code.
+    apps.request({ ...base, id: "c2", tool: "memory_change", args: { op: "remember", text: "Maybe risks first.", kind: "preference", topic: "updates/format", certainty: "inferred", app: "Codex" } });
+    expect(await answered("c2")).toEqual({ error: { code: "STATED", message: expect.stringContaining("Ask the user") } });
+    // Never written outside the memory folder.
+    apps.request({ ...base, id: "w2", tool: "memory_commit", args: { op: "write", path: "Plan.md", text: "x", expected: null } });
+    expect(await answered("w2")).toEqual({ error: { code: "BAD_ARGUMENT", message: expect.any(String) } });
+
+    apps.request({ ...base, id: "c3", tool: "memory_change", args: { op: "forget", page: { path: change.path } } });
+    const forget = ((await answered("c3")) as { result: { op: string; baseHash: string } }).result;
+    apps.request({ ...base, id: "t1", tool: "memory_commit", args: { op: "trash", path: change.path, expected: forget.baseHash } });
+    expect(await answered("t1")).toEqual({ result: {} });
+    expect(app.platform.trashed).toEqual([change.path]);
+  });
+
   it("answers only what was sent to this window, for its own Private Space", async () => {
     const { root: shown } = await seeded();
     apps.request({ owner: "space-other", root: shown, space: "Notes", id: "x1", tool: "list_pages", args: { folder: "", limit: 10 } });

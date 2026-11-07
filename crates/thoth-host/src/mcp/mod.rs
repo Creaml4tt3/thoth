@@ -2,7 +2,9 @@
 //! server `thoth-mcp` that they start. `thoth-mcp` opens no vault: it relays each tool call over a local socket to
 //! this host, which checks it, asks the user about an app it has not seen, and has the window that holds the Private
 //! Space answer from its open `Vault` (one index per window, ADR-0019). Apps read, and they may propose changes
-//! (ADR-0048), which the host keeps (`proposals.rs`) until the user reviews them in a window: no tool call writes.
+//! (ADR-0048), which the host keeps (`proposals.rs`) until the user reviews them in a window. The one exception is the
+//! memory folder (ADR-0052): `remember`, `update_memory` and `forget` write there without review while the user's
+//! switches allow it, within limits, and each such write is kept in the history (`memory.rs`) for Undo.
 //!
 //! Off by default. What is shared (the switch, the Private Spaces, each app's Allow or Deny) is kept in
 //! `<data>/mcp/settings.json`; every request is logged in `<data>/mcp/log/` (`log.rs`).
@@ -11,6 +13,7 @@
 //! user can give any name. Allow and Deny are the user's consent for a name, not proof of who connects; the socket
 //! being the user's own (`0600` in a `0700` folder) is what keeps other users out.
 pub mod log;
+pub mod memory;
 pub mod proposals;
 mod socket;
 pub mod tools;
@@ -19,6 +22,7 @@ use crate::EventSink;
 use crate::error::{HostError, HostResult};
 use crate::handles::new_handle;
 use log::Log;
+use memory::History;
 use proposals::{Kind, Proposals, Status};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -40,6 +44,9 @@ pub const REQUEST_EVENT: &str = "mcp.request";
 pub const PENDING_EVENT: &str = "mcp.pending";
 /// Sent to the windows when proposals are added or settled. Payload: `{ open }`, how many wait for review.
 pub const PROPOSALS_EVENT: &str = "mcp.proposals";
+/// Sent to the windows when an app saved, changed or forgot a memory without review (ADR-0052 rule 5). Payload:
+/// `{ app, action, space, path, title }`.
+pub const MEMORIES_EVENT: &str = "mcp.memories";
 /// Longest request line from `thoth-mcp`: a proposed page of 1 MB (ADR-0048), JSON-escaped, and the rest of the call.
 pub const MAX_REQUEST: usize = 2 * MAX_RESPONSE + 64 * 1024;
 /// Largest answer to an app (ADR-0021 rule 3).
@@ -86,7 +93,7 @@ pub struct OpenSpace {
 /// The Private Spaces open right now.
 pub type OpenSpaces = Arc<dyn Fn() -> Vec<OpenSpace> + Send + Sync>;
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Settings {
     #[serde(default)]
@@ -96,6 +103,19 @@ struct Settings {
     spaces: Vec<String>,
     #[serde(default)]
     apps: Vec<App>,
+    /// "Agents save memories without asking" (ADR-0052 rule 5): on by default.
+    #[serde(default = "on")]
+    memories: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true }
+    }
+}
+
+fn on() -> bool {
+    true
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -107,6 +127,9 @@ struct App {
     /// "May propose changes" (ADR-0048): None until the user answers, asked the first time the app proposes.
     #[serde(default)]
     propose: Option<bool>,
+    /// "Save memories without asking" for this app (ADR-0052 rule 5): None is on, the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    remember: Option<bool>,
 }
 
 struct Waiting {
@@ -136,6 +159,7 @@ pub(crate) struct Inner {
     decided: Condvar,
     log: Log,
     proposals: Proposals,
+    history: History,
 }
 
 /// Connected apps: the settings the windows change (`mcp.*` commands) and the socket `thoth-mcp` talks to.
@@ -168,9 +192,10 @@ impl Relay {
         let enabled = settings.enabled;
         let log = Log::new(dir.as_deref());
         let proposals = Proposals::new(dir.as_deref(), Arc::new(log::now_secs));
+        let history = History::new(dir.as_deref(), Arc::new(log::now_secs));
         let state = State { settings, pending: Vec::new(), proposers: Vec::new(), waiting: HashMap::new(), error: None };
         let relay = Self {
-            inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log, proposals }),
+            inner: Arc::new(Inner { dir, events, spaces, options, state: Mutex::new(state), decided: Condvar::new(), log, proposals, history }),
             listener: Mutex::new(None),
         };
         if enabled {
@@ -184,8 +209,12 @@ impl Relay {
     pub fn settings(&self) -> Value {
         let listening = lock(&self.listener).is_some();
         let state = self.inner.state();
-        let apps: Vec<Value> =
-            state.settings.apps.iter().map(|a| json!({ "name": a.name, "allowed": a.allowed, "decidedAt": a.decided_at, "propose": a.propose })).collect();
+        let apps: Vec<Value> = state
+            .settings
+            .apps
+            .iter()
+            .map(|a| json!({ "name": a.name, "allowed": a.allowed, "decidedAt": a.decided_at, "propose": a.propose, "remember": a.remember.unwrap_or(true) }))
+            .collect();
         json!({
             "available": cfg!(unix) && self.inner.dir.is_some(),
             "enabled": state.settings.enabled,
@@ -195,11 +224,12 @@ impl Relay {
             "apps": apps,
             "pending": state.pending,
             "proposers": state.proposers,
+            "memories": state.settings.memories,
             "setup": self.setup(),
         })
     }
 
-    /// `mcp.configure { enabled?, spaces? }`. `spaces` replaces the shared list; each must be in `opened` (the
+    /// `mcp.configure { enabled?, spaces?, memories? }`. `spaces` replaces the shared list; each must be in `opened` (the
     /// Private Spaces the user opened: the host's recent list and the open ones).
     pub fn configure(&self, args: &Value, opened: &[String]) -> HostResult<Value> {
         if let Some(spaces) = args.get("spaces").filter(|v| !v.is_null()) {
@@ -220,6 +250,15 @@ impl Relay {
             let mut state = self.inner.state();
             state.settings.spaces = chosen;
             self.inner.save(&state.settings)?;
+        }
+        match args.get("memories") {
+            None | Some(Value::Null) => {}
+            Some(Value::Bool(on)) => {
+                let mut state = self.inner.state();
+                state.settings.memories = *on;
+                self.inner.save(&state.settings)?;
+            }
+            Some(_) => return Err(HostError::bad_argument("memories must be a boolean")),
         }
         match args.get("enabled") {
             None | Some(Value::Null) => {}
@@ -250,7 +289,7 @@ impl Relay {
                     app.allowed = allow;
                     app.decided_at = log::timestamp();
                 }
-                None => state.settings.apps.push(App { name: name.clone(), allowed: allow, decided_at: log::timestamp(), propose: None }),
+                None => state.settings.apps.push(App { name: name.clone(), allowed: allow, decided_at: log::timestamp(), propose: None, remember: None }),
             }
             state.pending.retain(|p| p != &name);
             if !allow {
@@ -294,6 +333,33 @@ impl Relay {
         self.inner.decided.notify_all();
         self.inner.emit_pending();
         Ok(self.settings())
+    }
+
+    /// The per-app switch "Save memories without asking" (ADR-0052 rule 5). Off, the app's memories wait for review.
+    pub fn may_remember(&self, app: &str, allow: bool) -> HostResult<Value> {
+        let name = app_name(app).ok_or_else(|| HostError::bad_argument("app must be an app's name"))?;
+        {
+            let mut state = self.inner.state();
+            let known =
+                state.settings.apps.iter_mut().find(|a| a.name == name).ok_or_else(|| HostError::bad_argument(format!("No app called {name:?} connected")))?;
+            known.remember = Some(allow);
+            self.inner.save(&state.settings)?;
+        }
+        Ok(self.settings())
+    }
+
+    /// The memory writes of the last 30 days, newest first (without text); with `id`, one of them with the text before
+    /// and after, for Undo.
+    pub fn memory_history(&self, id: Option<&str>) -> HostResult<Value> {
+        let Some(id) = id else {
+            let list = self.inner.history.list();
+            return Ok(json!({ "changes": list.iter().rev().map(memory::Change::to_json).collect::<Vec<_>>() }));
+        };
+        let (change, before, after) = self.inner.history.get(id)?;
+        let mut out = change.to_json();
+        out["before"] = json!(before);
+        out["after"] = json!(after);
+        Ok(out)
     }
 
     /// `mcp.proposals`: every proposal remembered (without text), oldest first, and how many wait for review.
@@ -496,6 +562,11 @@ impl Inner {
         }
         let targets = self.targets(&call)?;
         entry.spaces = targets.iter().map(|t| t.label.clone()).collect();
+        if call.is_memory_write() {
+            let answer = self.memory_write(&app, &call, &targets[0])?;
+            entry.paths = answer.paths.clone();
+            return Ok(answer);
+        }
 
         let deadline = Instant::now() + self.options.answer_timeout;
         let mut asked: Vec<(String, Receiver<HostResult<Value>>)> = Vec::new();
@@ -744,14 +815,120 @@ impl Inner {
 
     /// Sends one request to the window that holds `target`.
     fn ask(&self, target: &Target, call: &Call) -> HostResult<(String, Receiver<HostResult<Value>>)> {
+        self.ask_window(target, call.window_tool(), call.window_args())
+    }
+
+    fn ask_window(&self, target: &Target, tool: &str, args: Value) -> HostResult<(String, Receiver<HostResult<Value>>)> {
         let id = new_handle("mcp")?;
         let (tx, rx) = sync_channel(1);
         self.state().waiting.insert(id.clone(), Waiting { owner: target.owner.clone(), answer: tx });
-        (self.events)(
-            REQUEST_EVENT,
-            json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": call.window_tool(), "args": call.window_args() }),
-        );
+        (self.events)(REQUEST_EVENT, json!({ "id": id, "owner": target.owner, "root": target.root, "space": target.label, "tool": tool, "args": args }));
         Ok((id, rx))
+    }
+
+    /// Asks `target`'s window and waits for its answer.
+    fn request(&self, target: &Target, tool: &str, args: Value) -> HostResult<Value> {
+        let waiting = self.ask_window(target, tool, args)?;
+        let answer = waiting.1.recv_timeout(self.options.answer_timeout);
+        self.forget_waits(std::slice::from_ref(&waiting));
+        answer.unwrap_or_else(|_| Err(HostError::new("TIMEOUT", "Thoth did not answer in time: try again")))
+    }
+
+    /// `remember`, `update_memory` or `forget` (ADR-0052 rules 5 and 6): the window works the change out, the host checks
+    /// it, then has the window write it without review if the user's switches allow it, or keeps it as a proposal.
+    fn memory_write(&self, app: &str, call: &Call, target: &Target) -> HostResult<tools::Answer> {
+        let change = tools::memory_change(&self.request(target, "memory_change", call.memory_change_args(app))?)?;
+        let paths = vec![change.path.clone()];
+        if change.before == change.after {
+            let structured = json!({ "status": "unchanged", "space": target.label, "path": change.path, "id": change.id });
+            return Ok(tools::Answer { text: format!("{} already says this; nothing changed.", change.path), structured, paths });
+        }
+        let without_review = {
+            let state = self.state();
+            state.settings.memories && state.settings.apps.iter().find(|a| a.name == app).is_some_and(|a| a.remember != Some(false))
+        };
+        if !without_review {
+            if change.op == "forget" {
+                return Err(HostError::new(
+                    "DENIED",
+                    format!("Saving memories without asking is off for {app}: ask the user to delete {} in Thoth", change.path),
+                ));
+            }
+            let create = change.op == "create";
+            let record = self.proposals.add(proposals::New {
+                app: app.to_owned(),
+                kind: if create { Kind::Create } else { Kind::Edit },
+                root: target.root.clone(),
+                space: target.label.clone(),
+                path: change.path.clone(),
+                page_id: (!create).then(|| change.id.clone()),
+                base_hash: change.base_hash.clone(),
+                before: change.before.clone(),
+                after: change.after.clone().unwrap_or_default(),
+            })?;
+            self.emit_proposals();
+            let text = format!(
+                "The user reviews memories from {app} before they are saved: this one waits in Thoth as proposal {} (pending). Nothing is saved until they apply it.",
+                record.id
+            );
+            let structured = json!({ "status": "pending", "proposal": record.id, "space": target.label, "path": change.path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS) });
+            return Ok(tools::Answer { text, structured, paths });
+        }
+        if self.history.today(app) >= memory::DAILY_LIMIT {
+            return Err(HostError::new(
+                "BUSY",
+                format!("{app} saved {} memories without review today, the most it may: save only what matters, and try again tomorrow", memory::DAILY_LIMIT),
+            ));
+        }
+        let commit = match &change.after {
+            Some(after) => json!({ "op": "write", "path": change.path, "text": after, "expected": change.base_hash }),
+            None => json!({ "op": "trash", "path": change.path, "expected": change.base_hash }),
+        };
+        let written = self.request(target, "memory_commit", commit)?;
+        let after_hash = match change.after {
+            Some(_) => Some(
+                written
+                    .get("hash")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .ok_or_else(|| HostError::internal("Thoth's window sent an answer it should not have"))?,
+            ),
+            None => None,
+        };
+        let action = match change.op.as_str() {
+            "create" => memory::Action::Created,
+            "update" => memory::Action::Updated,
+            _ => memory::Action::Forgot,
+        };
+        // Written either way: a history that could not be kept only loses Undo for this one.
+        let _ = self.history.add(memory::New {
+            app: app.to_owned(),
+            action,
+            root: target.root.clone(),
+            space: target.label.clone(),
+            path: change.path.clone(),
+            page_id: change.id.clone(),
+            title: change.title.clone(),
+            before_hash: change.base_hash.clone(),
+            after_hash: after_hash.clone(),
+            before: change.before.clone(),
+            after: change.after.clone(),
+        });
+        (self.events)(MEMORIES_EVENT, json!({ "app": app, "action": action, "space": target.label, "path": change.path, "title": change.title }));
+        let (status, said) = match action {
+            memory::Action::Created => ("saved", "Saved"),
+            memory::Action::Updated => ("saved", "Updated"),
+            memory::Action::Forgot => ("forgotten", "Forgot"),
+        };
+        let mut structured = json!({ "status": status, "space": target.label, "path": change.path, "id": change.id });
+        if let Some(hash) = after_hash {
+            structured["version"] = json!(hash);
+        }
+        let text = match action {
+            memory::Action::Forgot => format!("Forgot {}: it is in the system Trash, and will not be saved again.", change.path),
+            _ => format!("{said} {} in {}.", change.path, target.label),
+        };
+        Ok(tools::Answer { text, structured, paths })
     }
 
     fn forget_waits(&self, asked: &[(String, Receiver<HostResult<Value>>)]) {
@@ -781,6 +958,13 @@ fn window_error(error: &Value) -> HostError {
     let message: String = error.get("message").and_then(Value::as_str).unwrap_or("The page could not be read").chars().take(300).collect();
     match error.get("code").and_then(Value::as_str) {
         Some("NOT_FOUND") => HostError::new("NOT_FOUND", message),
+        // The memory tools' refusals (ADR-0052), which tell the app what to do instead.
+        Some("BAD_ARGUMENT") => HostError::new("BAD_ARGUMENT", message),
+        Some("CONFLICT") => HostError::new("CONFLICT", message),
+        Some("FORGOTTEN") => HostError::new("FORGOTTEN", message),
+        Some("STATED") => HostError::new("STATED", message),
+        Some("TOO_LARGE") => HostError::new("TOO_LARGE", message),
+        Some("TOO_MANY") => HostError::new("TOO_MANY", message),
         _ => HostError::internal(message),
     }
 }

@@ -425,10 +425,52 @@ export type McpRequest = {
   | { tool: "list_pages"; args: { folder: string; limit: number } }
   | { tool: "read_page"; args: { path: string } | { id: string } }
   | { tool: "backlinks"; args: ({ path: string } | { id: string }) & { limit: number } }
+  // Agents' memory (ADR-0052): read, work out a change (`memory_change`), then write it (`memory_commit`) once the
+  // host has checked it and the user's switches let it skip review.
+  | { tool: "recall"; args: McpMemoryFilter & { query?: string; limit: number } }
+  | { tool: "list_memories"; args: McpMemoryFilter & { source?: string; limit: number } }
+  | { tool: "memory_change"; args: McpMemoryChange }
+  | {
+      tool: "memory_commit";
+      args: { op: "write"; path: string; text: string; expected: string | null } | { op: "trash"; path: string; expected: string };
+    }
 );
 
+export interface McpMemoryFilter {
+  kind?: "profile" | "preference" | "work" | "people" | "reference" | "note";
+  tags?: string[];
+  /** ISO 8601 date or time. */
+  since?: string;
+}
+
+/** A memory change an app asked for; `app` is its (self-reported) name, written as the memory's source. */
+export type McpMemoryChange =
+  | {
+      op: "remember";
+      text: string;
+      kind: NonNullable<McpMemoryFilter["kind"]>;
+      title?: string;
+      topic?: string;
+      tags?: string[];
+      certainty: "stated" | "inferred";
+      app: string;
+    }
+  | {
+      op: "update";
+      page: { path: string } | { id: string };
+      text?: string;
+      replacements?: { find: string; replace: string }[];
+      expected?: string;
+      certainty?: "stated" | "inferred";
+      app: string;
+    }
+  | { op: "forget"; page: { path: string } | { id: string } };
+
+/** The codes a window's answer may carry; the host passes them to the app. */
+export type McpAnswerCode = "NOT_FOUND" | "INTERNAL" | "BAD_ARGUMENT" | "CONFLICT" | "FORGOTTEN" | "STATED" | "TOO_LARGE" | "TOO_MANY";
+
 /** A window's answer to an `McpRequest`: what its Vault found, or why not. */
-export type McpAnswer = { result: unknown } | { error: { code: "NOT_FOUND" | "INTERNAL"; message: string } };
+export type McpAnswer = { result: unknown } | { error: { code: McpAnswerCode; message: string } };
 
 /** What a page says about itself (ADR-0020). Text is decoded, stripped of control characters and cut. */
 export interface LinkPreview {
