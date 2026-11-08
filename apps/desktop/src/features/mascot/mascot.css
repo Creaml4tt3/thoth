@@ -78,13 +78,20 @@
 
 /* The morph: the figure and the badge move so their moons always lie on each other (the figure's moon, centre 52.2,
    32.3 and radius 21.2, onto the badge's, 21.7, 66.3 and 19.2: the 48 px badge at 1:1 in the 52 px compact box).
-   The incoming drawing fades in first and the outgoing one fades out after it, so the moon never dims halfway. */
-.mascot-art .m-figure, .mascot-art .m-badge { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out), transform var(--m-morph) var(--m-ease-morph); }
+   The incoming moon fades in first and the outgoing one fades out after it, so the moon never dims halfway. The
+   figure's head fades with its moon (on Night the badge's head is a hole in the moon, and the figure's moon under it
+   would fill it). The rest of the bird hangs below and left of the moon, so mid-morph it would stick out of the stage:
+   it leaves at once and comes in only once the figure is nearly in place. */
+.mascot-art .m-figure { transition: transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art .m-badge { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out), transform var(--m-morph) var(--m-ease-morph); }
+.mascot-art .m-figure-moon { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out); }
 .mascot-art .m-badge { transform: translate(30.503px, 1.1432px) scale(1.10176); }
 .mascot-art[data-version="compact"] .m-badge { transform: translate(2px, 38px); }
 .mascot-art[data-version="compact"] .m-figure { transform: translate(-25.6856px, 36.9624px) scale(0.907636); }
-.mascot-art[data-version="compact"] .m-figure,
+.mascot-art[data-version="compact"] .m-figure-moon,
 .mascot-art[data-version="full"] .m-badge { opacity: 0; transition-delay: var(--m-fade), 0s; transition-timing-function: var(--thoth-ease-in, ease-in), var(--m-ease-morph); }
+.mascot-art .m-figure-bird { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out) var(--m-fade); }
+.mascot-art[data-version="compact"] .m-figure-bird { opacity: 0; transition-duration: calc(var(--m-fade) / 2); transition-delay: 0s; }
 
 /* ---------------------------------------------------------------- poses per state */
 
