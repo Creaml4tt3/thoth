@@ -802,6 +802,27 @@ fn recalled(about: &[Value], memories: &[Value], total: u64) -> String {
     out
 }
 
+/// The answer to `remember` or `update_memory` in a workspace's Team memory, from what the window's server call gave:
+/// `{ status: "pending" | "applied", proposal, title, pageId }`.
+pub fn team_answer(space: &str, value: &Value) -> HostResult<Answer> {
+    let status = text(value, "status")?;
+    let proposal = text(value, "proposal")?;
+    let title: String = text(value, "title")?.chars().take(MAX_TITLE).collect();
+    let text = match status {
+        "pending" => format!(
+            "Proposed “{title}” for the Team memory of {space}. It waits for review in Thoth (by the user, or the workspace's owners and managers); nothing is saved until it is applied. Proposal {proposal} (pending)."
+        ),
+        "applied" => format!("Saved “{title}” in the Team memory of {space}."),
+        _ => return Err(malformed()),
+    };
+    let path = format!("{}/{title}", super::TEAM_FOLDER);
+    Ok(Answer {
+        text,
+        structured: json!({ "status": if status == "pending" { "pending" } else { "saved" }, "proposal": proposal, "space": space, "title": title }),
+        paths: vec![path],
+    })
+}
+
 /// A memory change a window worked out (`memory_change`), checked before anything is written: its path must be in
 /// the memory folder.
 #[derive(Debug)]

@@ -24,15 +24,19 @@ import {
   type Memory,
   type Vault,
 } from "@thoth/local-store";
-import type { McpAnswer, McpRequest } from "@thoth/platform";
+import type { McpAnswer, McpAnswerCode, McpRequest } from "@thoth/platform";
 import type { PageSummary } from "@thoth/domain";
+import { ProblemError } from "@thoth/workspace-client";
 import { planToday } from "../shell/today.ts";
+import { teamList, teamRecall, teamRemember, type TeamClient } from "./team.ts";
 
 class NotFound extends Error {}
 
 export interface AnswerOptions {
   /** Moves a file to the system Trash (`forget`); absent where there is none. */
   trash?: (path: string) => Promise<void>;
+  /** The workspace client of a server the user is signed in to, for Team memory (ADR-0052 rule 8). */
+  team?: (server: string) => TeamClient;
   now?: () => Date;
 }
 
@@ -42,6 +46,12 @@ export async function answerRequest(vault: Vault, request: McpRequest, options: 
   } catch (error) {
     if (error instanceof NotFound) return { error: { code: "NOT_FOUND", message: error.message } };
     if (error instanceof MemoryError) return { error: { code: error.code, message: error.message } };
+    // A workspace server's refusal (Team memory), in the codes apps already know.
+    if (error instanceof ProblemError) {
+      const code = ({ forbidden: "DENIED", not_found: "NOT_FOUND", revision_conflict: "CONFLICT", payload_too_large: "TOO_LARGE", quota_exceeded: "TOO_MANY", unauthenticated: "DENIED" } as Record<string, McpAnswerCode>)[error.code];
+      const message = error.code === "unauthenticated" ? "The user is signed out of this workspace's server in Thoth: ask them to sign in again" : error.message;
+      return { error: { code: code ?? "INTERNAL", message } };
+    }
     return { error: { code: "INTERNAL", message: error instanceof Error ? error.message : String(error) } };
   }
 }
@@ -106,6 +116,19 @@ async function run(vault: Vault, request: McpRequest, now: Date, options: Answer
     }
     case "memory_folder":
       return memoryFolderUse(vault, checkMemoryFolder(request.args.folder));
+    case "team_recall":
+    case "team_list":
+    case "team_remember": {
+      if (!options.team) throw new Error("This window cannot reach workspaces");
+      const client = options.team(request.args.server);
+      if (request.tool === "team_remember") return teamRemember(client, request.args, now);
+      if (request.tool === "team_list") {
+        const found = await teamList(client, request.args);
+        return { memories: found.memories.map((m) => memoryOut(m, now, false)), total: found.total };
+      }
+      const found = await teamRecall(client, request.args, now);
+      return { about: null, memories: found.memories.map((m) => memoryOut(m, now, true)), total: found.total };
+    }
     case "list_skills":
       return { skills: await listSkills(vault) };
     case "get_skill":

@@ -115,11 +115,36 @@ struct Settings {
     /// Private Spaces (canonical roots) whose skills are linked into the home folder's skills folders (ADR-0052 rule 7).
     #[serde(default)]
     skill_links: Vec<String>,
+    /// Workspaces whose Team memory apps may use (ADR-0052 rule 8), each ticked by the user in a window.
+    #[serde(default)]
+    workspaces: Vec<SharedWorkspace>,
 }
+
+/// A workspace on a server, as the window named it; `name` is the `space` apps give.
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct SharedWorkspace {
+    server: String,
+    workspace: String,
+    name: String,
+}
+
+/// A workspace's Team memory folder (the protocol's `TEAM_MEMORY_FOLDER`).
+pub const TEAM_FOLDER: &str = "Team memory";
+/// The most workspaces shared.
+const MAX_WORKSPACES: usize = 32;
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { enabled: false, spaces: Vec::new(), apps: Vec::new(), memories: true, memory_folders: BTreeMap::new(), skill_links: Vec::new() }
+        Self {
+            enabled: false,
+            spaces: Vec::new(),
+            apps: Vec::new(),
+            memories: true,
+            memory_folders: BTreeMap::new(),
+            skill_links: Vec::new(),
+            workspaces: Vec::new(),
+        }
     }
 }
 
@@ -184,7 +209,12 @@ struct Target {
     label: String,
     root: String,
     owner: String,
+    /// A workspace's Team memory (ADR-0052 rule 8): the window calls its server as the signed-in user.
+    workspace: Option<SharedWorkspace>,
 }
+
+/// Longest workspace name kept for `space`.
+const MAX_SPACE_NAME: usize = 200;
 
 /// What the log keeps of one request.
 #[derive(Default)]
@@ -239,6 +269,7 @@ impl Relay {
             "memoryFolders": state.settings.memory_folders,
             "folders": state.folders,
             "skillLinks": state.settings.skill_links,
+            "workspaces": state.settings.workspaces,
             "setup": self.setup(),
         })
     }
@@ -263,6 +294,31 @@ impl Relay {
             }
             let mut state = self.inner.state();
             state.settings.spaces = chosen;
+            self.inner.save(&state.settings)?;
+        }
+        if let Some(list) = args.get("workspaces").filter(|v| !v.is_null()) {
+            let bad = || HostError::bad_argument("workspaces must be a list of { server, workspace, name }");
+            let list = list.as_array().ok_or_else(bad)?;
+            let mut chosen: Vec<SharedWorkspace> = Vec::new();
+            for item in list {
+                let field = |key: &str, max: usize| {
+                    item.get(key)
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty() && s.chars().count() <= max && !s.chars().any(char::is_control))
+                        .map(str::to_owned)
+                        .ok_or_else(bad)
+                };
+                let shared = SharedWorkspace { server: field("server", 512)?, workspace: field("workspace", 128)?, name: field("name", MAX_SPACE_NAME)? };
+                if !chosen.iter().any(|c| c.server == shared.server && c.workspace == shared.workspace) {
+                    chosen.push(shared);
+                }
+            }
+            if chosen.len() > MAX_WORKSPACES {
+                return Err(HostError::bad_argument("Too many workspaces"));
+            }
+            let mut state = self.inner.state();
+            state.settings.workspaces = chosen;
             self.inner.save(&state.settings)?;
         }
         match args.get("memories") {
@@ -639,6 +695,11 @@ impl Inner {
         }
         let targets = self.targets(&call)?;
         entry.spaces = targets.iter().map(|t| t.label.clone()).collect();
+        if targets[0].workspace.is_some() {
+            let answer = self.team_memory(&app, &call, &targets[0])?;
+            entry.paths = answer.paths.clone();
+            return Ok(answer);
+        }
         let mut folders = Vec::new();
         if call.is_memory() {
             for target in &targets {
@@ -895,7 +956,24 @@ impl Inner {
                 label = format!("{name} ({n})");
                 n += 1;
             }
-            targets.push(Target { label, root, owner });
+            targets.push(Target { label, root, owner, workspace: None });
+        }
+        // A memory call naming a shared workspace (and no Private Space of that name) goes to its Team memory, through
+        // a window (`main` first), which calls the server as the signed-in user.
+        if let Some(space) = call.space().filter(|s| call.is_memory() && !targets.iter().any(|t| t.label == *s)) {
+            let shared = self.state().settings.workspaces.iter().find(|w| w.name == space).cloned();
+            if let Some(shared) = shared {
+                let mut owners: Vec<String> = open.iter().map(|o| o.owner.clone()).collect();
+                owners.sort_unstable();
+                let owner = owners
+                    .iter()
+                    .find(|o| *o == "main")
+                    .or(owners.first())
+                    .cloned()
+                    .ok_or_else(|| HostError::new("NO_SPACE", "Thoth has no window open: open Thoth to use a workspace's Team memory"))?;
+                let root = format!("workspace:{}/{}", shared.server, shared.workspace);
+                return Ok(vec![Target { label: shared.name.clone(), root, owner, workspace: Some(shared) }]);
+            }
         }
         if targets.is_empty() {
             return Err(HostError::new(
@@ -913,6 +991,34 @@ impl Inner {
             return Err(HostError::bad_argument(format!("Say which Private Space (space): {}", names())));
         }
         Ok(targets)
+    }
+
+    /// A memory call for a workspace's Team memory (ADR-0052 rule 8). Recall and the list read the folder's pages; a
+    /// memory or a change becomes the server's proposal (or is saved at once when the workspace turned review off).
+    /// Nothing is written here and nothing is kept for Undo: the server keeps it, and its review is the safeguard.
+    fn team_memory(&self, app: &str, call: &Call, target: &Target) -> HostResult<tools::Answer> {
+        let shared = target.workspace.as_ref().ok_or_else(|| HostError::internal("Not a workspace"))?;
+        let at = |mut args: Value| {
+            args["server"] = json!(shared.server);
+            args["workspace"] = json!(shared.workspace);
+            args
+        };
+        match call {
+            Call::Recall { .. } | Call::ListMemories { .. } => {
+                let tool = if matches!(call, Call::Recall { .. }) { "team_recall" } else { "team_list" };
+                let value = self.request(target, tool, at(call.window_args()))?;
+                tools::answer(call, &[Found { space: &target.label, value: &value }])
+            }
+            Call::Remember { .. } | Call::UpdateMemory { .. } => {
+                let value = self.request(target, "team_remember", at(call.memory_change_args(app)))?;
+                tools::team_answer(&target.label, &value)
+            }
+            Call::Forget { .. } => Err(HostError::new(
+                "DENIED",
+                format!("Team memories in {} are not forgotten by apps: tell the user to delete the page in Thoth, in the Team memory folder", target.label),
+            )),
+            _ => Err(HostError::internal("Not a memory call")),
+        }
     }
 
     /// Sends one request to the window that holds `target`.
@@ -1100,6 +1206,8 @@ fn window_error(error: &Value) -> HostError {
         Some("STATED") => HostError::new("STATED", message),
         Some("TOO_LARGE") => HostError::new("TOO_LARGE", message),
         Some("TOO_MANY") => HostError::new("TOO_MANY", message),
+        // A workspace server refused the signed-in user (Team memory, ADR-0052 rule 8).
+        Some("DENIED") => HostError::new("DENIED", message),
         _ => HostError::internal(message),
     }
 }

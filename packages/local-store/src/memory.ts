@@ -208,7 +208,7 @@ export function memorySlug(from: string): string {
 }
 
 /** The same topic, however the agent spaced or capitalised it. */
-const sameTopic = (a: string | null, b: string | null) => a !== null && b !== null && a.trim().toLowerCase().replace(/\s+/g, " ") === b.trim().toLowerCase().replace(/\s+/g, " ");
+export const sameMemoryTopic = (a: string | null, b: string | null) => a !== null && b !== null && a.trim().toLowerCase().replace(/\s+/g, " ") === b.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** The hash a forgotten memory is known by: its text, with spacing and case ignored. */
 export function memoryTextHash(body: string): string {
@@ -406,23 +406,23 @@ type Planner = Reader & Pick<Vault, "readRecordText">;
  * (`FORGOTTEN`), when it would replace a stated memory with an inferred one (`STATED`), or when the folder is full.
  */
 export async function planRemember(vault: Planner, input: RememberInput, now: Date): Promise<MemoryChange> {
-  const body = cleanBody(input.text, MAX_MEMORY_BYTES);
+  const body = cleanMemoryText(input.text, MAX_MEMORY_BYTES);
   const topic = input.topic?.trim().slice(0, MAX_TOPIC) || null;
   const forgotten = (await readForgotten(vault)).forgotten;
   const hash = memoryTextHash(body);
-  if (forgotten.some((f) => f.hash === hash || sameTopic(f.topic, topic))) {
+  if (forgotten.some((f) => f.hash === hash || sameMemoryTopic(f.topic, topic))) {
     throw new MemoryError("FORGOTTEN", "The user asked to forget this memory. Do not save it again; if they want it back, they can add it in Thoth.");
   }
   const dir = input.folder ?? MEMORY_FOLDER;
   const folder = await loadMemories(vault, dir);
-  const title = (input.title?.trim() || firstLine(body)).slice(0, MAX_TITLE);
+  const title = (input.title?.trim() || memoryTitleOf(body)).slice(0, MAX_TITLE);
   const tags = input.tags === undefined ? undefined : cleanTags(input.tags);
   const stamp = localIso(now);
-  const existing = topic === null ? undefined : folder.memories.find((m) => sameTopic(m.topic, topic));
+  const existing = topic === null ? undefined : folder.memories.find((m) => sameMemoryTopic(m.topic, topic));
   if (existing) {
-    if (existing.certainty === "stated" && input.certainty !== "stated") throw stated(existing.path);
+    if (existing.certainty === "stated" && input.certainty !== "stated") throw statedMemoryError(existing.path);
     const read = await vault.readPage(existing.path);
-    const after = rewrite(read.source, body, {
+    const after = rewriteMemory(read.source, body, {
       kind: input.kind,
       title,
       updated: stamp,
@@ -468,7 +468,7 @@ export async function planUpdate(vault: Planner, input: UpdateInput, now: Date):
     throw new MemoryError("CONFLICT", `${read.path} changed since version ${input.expected}: recall it again, then update it.`);
   }
   const about = isAboutMe(read.path, folder);
-  if (!about && memory.certainty === "stated" && input.certainty !== "stated") throw stated(read.path);
+  if (!about && memory.certainty === "stated" && input.certainty !== "stated") throw statedMemoryError(read.path);
   let body: string;
   if (input.text !== undefined) body = input.text;
   else {
@@ -480,10 +480,10 @@ export async function planUpdate(vault: Planner, input: UpdateInput, now: Date):
       body = body.slice(0, at) + r.replace + body.slice(at + r.find.length);
     }
   }
-  body = cleanBody(body, about ? MAX_ABOUT_ME_BYTES : MAX_MEMORY_BYTES);
+  body = cleanMemoryText(body, about ? MAX_ABOUT_ME_BYTES : MAX_MEMORY_BYTES);
   const changes: Record<string, unknown> = { updated: localIso(now), updated_by: input.app };
   if (!about && input.certainty) changes.certainty = input.certainty;
-  const after = rewrite(read.source, body, changes);
+  const after = rewriteMemory(read.source, body, changes);
   if (body === memory.text && input.certainty === undefined) throw new MemoryError("BAD_ARGUMENT", "That would not change the memory");
   return { op: "update", path: read.path, id: memory.id, kind: memory.kind, title: memory.title, before: read.source, after, baseHash: read.hash };
 }
@@ -586,7 +586,7 @@ export async function undoMemory(
   if (change.action === "forgot") {
     const memory = parseMemory(change.path, change.before, "", { id: "", fileTime: "" }, folder);
     const hash = memoryTextHash(memory.text);
-    await changeForgotten(vault, (list) => list.filter((f) => f.hash !== hash && !sameTopic(f.topic, memory.topic)));
+    await changeForgotten(vault, (list) => list.filter((f) => f.hash !== hash && !sameMemoryTopic(f.topic, memory.topic)));
   }
 }
 
@@ -620,7 +620,7 @@ async function findMemory(vault: Planner, page: { path: string } | { id: string 
 }
 
 /** The frontmatter changed as `changes` say and the body replaced; refused for frontmatter Thoth cannot edit safely. */
-function rewrite(source: string, body: string, changes: Record<string, unknown>): string {
+export function rewriteMemory(source: string, body: string, changes: Record<string, unknown>): string {
   const split = splitFrontmatter(source);
   const head = split.present ? source.slice(0, split.bodyOffset) : source.slice(0, split.bomLength);
   try {
@@ -631,7 +631,7 @@ function rewrite(source: string, body: string, changes: Record<string, unknown>)
   }
 }
 
-function cleanBody(raw: string, max: number): string {
+export function cleanMemoryText(raw: string, max: number): string {
   const body = raw.replace(/\r\n?/g, "\n").trim();
   if (body === "") throw new MemoryError("BAD_ARGUMENT", "text must be the memory: one fact or decision, its reason and where it came from");
   if (body.startsWith("---")) throw new MemoryError("BAD_ARGUMENT", "text must not start with ---: give the memory's text only; Thoth writes the frontmatter");
@@ -639,12 +639,12 @@ function cleanBody(raw: string, max: number): string {
   return body;
 }
 
-function firstLine(body: string): string {
+export function memoryTitleOf(body: string): string {
   const line = body.split("\n").find((l) => l.trim() !== "") ?? "";
   return line.replace(/^[#>*\-\s]+/, "").trim() || "Memory";
 }
 
-function stated(path: string): MemoryError {
+export function statedMemoryError(path: string): MemoryError {
   return new MemoryError(
     "STATED",
     `${path} is something the user said (certainty: stated). Ask the user before changing it, then call again with certainty: "stated".`,

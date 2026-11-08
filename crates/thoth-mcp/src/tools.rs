@@ -38,7 +38,7 @@ const KIND: &str = "profile: stable facts about the user (role, expertise, langu
 const CERTAINTY: &str = "stated: the user said it. inferred: you concluded it (the default). An inferred memory never replaces a stated one.";
 const MEMORY_ID: &str = "The memory's id, as recall and list_memories give it. Instead of path.";
 const MEMORY_PATH: &str = "The memory's path, as recall and list_memories give it, such as Memory/blockers-first.md.";
-const MEMORY_SPACE: &str = "The memory's Private Space. Needed when more than one is shared.";
+const MEMORY_SPACE: &str = "The memory's Private Space (needed when more than one is shared), or the name of a shared workspace for its Team memory.";
 
 /// What `tools/list` answers.
 pub fn definitions() -> Value {
@@ -53,7 +53,7 @@ pub fn definitions() -> Value {
             "kind": { "type": "string", "enum": KINDS, "description": "Only memories of this kind." },
             "tags": { "type": "array", "items": { "type": "string" }, "maxItems": 20, "description": "Only memories with every one of these tags." },
             "since": { "type": "string", "description": "Only memories updated on or after this date, such as 2026-11-01." },
-            "space": { "type": "string", "description": SPACE }
+            "space": { "type": "string", "description": "One shared Private Space, or the name of a shared workspace for its Team memory. Leave it out to use every shared Private Space." }
         });
         for (key, value) in extra.as_object().into_iter().flatten() {
             properties[key] = value.clone();
