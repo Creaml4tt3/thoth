@@ -32,6 +32,28 @@ const art = (name: string) => {
   const raw = files[`./art/${name}.svg`] ?? "";
   return raw.slice(raw.indexOf(">") + 1, raw.lastIndexOf("</svg>"));
 };
+/**
+ * A figure's top-level elements in paint order, in runs: the moon and the head (they lie on the badge's moon) and the
+ * rest of the bird (body, wing, legs, cue), so the morph can fade the two apart.
+ */
+const figureParts = (drawing: string) => {
+  const parts: { moon: boolean; __html: string }[] = [];
+  let depth = 0;
+  let start = 0;
+  for (const tag of drawing.matchAll(/<(\/?)[^>]*?(\/?)>/g)) {
+    if (tag[1]) depth--;
+    else if (!tag[2]) depth++;
+    if (depth !== 0) continue;
+    const end = tag.index + tag[0].length;
+    const el = drawing.slice(start, end);
+    start = end;
+    const moon = /class="m-(disc|head)-pos"/.test(el);
+    const last = parts.at(-1);
+    if (last?.moon === moon) last.__html += el;
+    else parts.push({ moon, __html: el });
+  }
+  return parts;
+};
 
 interface Props {
   state: MascotState;
@@ -46,7 +68,7 @@ interface Props {
 
 export function MascotArt({ state, version, facing = "right", vertical = "bottom", motion = "full", tiny = false, className }: Props) {
   const id = `m${useId().replace(/[^\w-]/g, "")}-`;
-  const figure = useMemo(() => ({ __html: art(`${state}-${tiny ? 64 : 88}`).replaceAll("__m__", id) }), [state, tiny, id]);
+  const figure = useMemo(() => figureParts(art(`${state}-${tiny ? 64 : 88}`).replaceAll("__m__", id)), [state, tiny, id]);
   const badge = useMemo(() => ({ __html: art(`${state}-48`).replaceAll("__m__", id) }), [state, id]);
   return (
     <svg
@@ -66,7 +88,11 @@ export function MascotArt({ state, version, facing = "right", vertical = "bottom
           <g className="m-rig">
             {/* The figure is drawn in 1040 units to the stage, with its origin 355, 100 units in. */}
             <g className="m-figure" data-part="full" data-state={state}>
-              <g transform="scale(0.0846154) translate(355 100)" dangerouslySetInnerHTML={figure} />
+              <g transform="scale(0.0846154) translate(355 100)">
+                {figure.map(({ moon, __html }, i) => (
+                  <g key={i} className={moon ? "m-figure-moon" : "m-figure-bird"} dangerouslySetInnerHTML={{ __html }} />
+                ))}
+              </g>
             </g>
             {/* The badge is drawn on a 48 px square. */}
             <g className="m-badge" data-part="compact" data-state={state} dangerouslySetInnerHTML={badge} />
