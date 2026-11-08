@@ -15,7 +15,7 @@ interface Props {
    * Something waiting for the person, shown first in the list for as long as it waits and counted in the badge (the
    * desktop's proposed changes from connected apps, ADR-0048). Not a notification: "Mark all read" and "Clear" leave it.
    */
-  pinned?: { count: number; title: string; body: string; onOpen(): void } | null;
+  pinned?: Pinned | null | readonly (Pinned | null)[];
 }
 
 const PANEL_WIDTH = 340;
@@ -27,6 +27,13 @@ const MARGIN = 8;
  * the list is a non-modal dialog right after the bell in the focus order. Arrows move between entries, Esc closes
  * and returns focus to the bell, a click elsewhere or focus leaving closes it.
  */
+interface Pinned {
+  count: number;
+  title: string;
+  body: string;
+  onOpen(): void;
+}
+
 export function NotificationBell({ center, open, onOpenChange, onOpenTarget, pinned }: Props) {
   const strings = useStrings();
   const t = strings.notifications;
@@ -99,8 +106,9 @@ export function NotificationBell({ center, open, onOpenChange, onOpenTarget, pin
   };
 
   const time = new Intl.DateTimeFormat(strings.lang, { hour: "numeric", minute: "2-digit" });
-  const waiting = pinned && pinned.count > 0 ? pinned : null;
-  const count = state.unread + (waiting?.count ?? 0);
+  const waitingList = (Array.isArray(pinned) ? pinned : [pinned]).filter((p): p is Pinned => p !== null && p !== undefined && p.count > 0);
+  const waiting = waitingList.length > 0 ? waitingList : null;
+  const count = state.unread + waitingList.reduce((n, p) => n + p.count, 0);
   const label = count > 0 ? t.bellUnread(count) : t.bell;
 
   return (
@@ -152,21 +160,23 @@ export function NotificationBell({ center, open, onOpenChange, onOpenTarget, pin
           </div>
           {waiting && (
             <ul className="notif-list notif-pinned">
-              <li>
-                <button
-                  type="button"
-                  className="notif-item"
-                  data-kind="pinned"
-                  data-unread
-                  onClick={() => {
-                    onOpenChange(false);
-                    waiting.onOpen();
-                  }}
-                >
-                  <span className="notif-title">{waiting.title}</span>
-                  <span className="notif-body">{waiting.body}</span>
-                </button>
-              </li>
+              {waiting.map((w) => (
+                <li key={w.title}>
+                  <button
+                    type="button"
+                    className="notif-item"
+                    data-kind="pinned"
+                    data-unread
+                    onClick={() => {
+                      onOpenChange(false);
+                      w.onOpen();
+                    }}
+                  >
+                    <span className="notif-title">{w.title}</span>
+                    <span className="notif-body">{w.body}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
           {state.entries.length === 0 ? (

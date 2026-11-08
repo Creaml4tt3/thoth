@@ -7,6 +7,7 @@ import { REPEAT_MS } from "@thoth/app-ui/notifications/core.ts";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { answerRequest } from "./answer.ts";
+import { TEAM_MEMORY_CHANGED } from "./TeamMemory.tsx";
 import { folderName } from "./names.ts";
 
 /**
@@ -17,7 +18,7 @@ import { folderName } from "./names.ts";
  * answer closes it everywhere (the host tells them). The bell says what agents saved without review.
  */
 export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedApps }) {
-  const { vault, connection, windowId, notifications, notificationPrefs, revision } = useSession();
+  const { vault, connection, windowId, notifications, notificationPrefs, revision, servers } = useSession();
   const trash = connection.trash?.bind(connection);
   const [pending, setPending] = useState<string[]>([]);
   const [proposers, setProposers] = useState<string[]>([]);
@@ -32,10 +33,16 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
     let stop: (() => void) | undefined;
     void connectedApps
       .onRequest((request) => {
-        // Every window hears every request: answer only the ones for this window and its Private Space.
-        if (request.owner !== windowId || request.root !== connection.root) return;
-        void answerRequest(vault, request, trash ? { trash } : {})
-          .then((answer) => connectedApps.answer(request.id, answer))
+        // Every window hears every request: answer only the ones for this window and its Private Space, or for a
+        // workspace's Team memory (its root names the workspace), which this window reaches through its servers.
+        const team = request.tool.startsWith("team_");
+        if (request.owner !== windowId || (!team && request.root !== connection.root)) return;
+        void answerRequest(vault, request, { ...(trash ? { trash } : {}), team: (server) => servers.client(server) })
+          .then((answer) => {
+            // The bell counts team memories waiting for review: one more may wait now.
+            if (request.tool === "team_remember") window.dispatchEvent(new Event(TEAM_MEMORY_CHANGED));
+            return connectedApps.answer(request.id, answer);
+          })
           .catch(() => undefined);
       })
       .then((remove) => (live ? (stop = remove) : remove()));
@@ -44,7 +51,7 @@ export function ConnectedAppsHost({ connectedApps }: { connectedApps: ConnectedA
       stop?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `trash` is bound anew each render; the connection's root names it
-  }, [connectedApps, vault, connection.root, windowId]);
+  }, [connectedApps, vault, connection.root, windowId, servers]);
 
   // ADR-0052 rule 5: "Claude Code saved 3 memories", one entry per app; its next memories within a minute join it.
   useEffect(() => {

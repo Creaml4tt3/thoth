@@ -41,6 +41,9 @@ fn window_answer(tool: &str, args: &Value) -> Value {
             "memories": [memory(false), memory(true)], "total": 2
         } }),
         "list_memories" => json!({ "result": { "memories": [memory(false), memory(true), memory(false)], "total": 3 } }),
+        // A workspace's Team memory, as the window found it on the server.
+        "team_recall" => json!({ "result": { "about": null, "memories": [memory(false)], "total": 1 } }),
+        "team_remember" => json!({ "result": { "status": "pending", "proposal": "mem_abc", "title": "Blockers first" } }),
         "list_skills" => json!({ "result": { "skills": [
             { "name": "weekly-update", "description": "Writes the weekly update. Use it on Fridays.", "path": "Skills/weekly-update/SKILL.md", "secret": "never shown" }
         ] } }),
@@ -1141,4 +1144,41 @@ fn skills_are_linked_into_the_home_folder_and_nothing_there_is_ever_replaced() {
         assert_eq!(left, if dir == ".agents/skills" { vec!["taken".to_owned()] } else { Vec::new() }, "{dir}");
     }
     assert_eq!(f.relay.skill_links("main", &at, Some(true), Some(&home)).unwrap_err().code, "NOT_ALLOWED");
+}
+
+#[test]
+fn a_shared_workspaces_team_memory_is_reached_through_a_window_and_never_forgotten_by_apps() {
+    let f = fixture(fast());
+    ready(&f, "Claude");
+    let shared = json!([{ "server": "srv_1", "workspace": "ws_1", "name": "Studio" }]);
+    f.relay.configure(&json!({ "workspaces": shared }), &[]).unwrap();
+    assert_eq!(f.relay.settings()["workspaces"], shared);
+    for bad in [json!([{ "server": "", "workspace": "w", "name": "n" }]), json!([{ "server": "s", "workspace": "w" }]), json!("Studio")] {
+        assert_eq!(f.relay.configure(&json!({ "workspaces": bad }), &[]).unwrap_err().code, "BAD_ARGUMENT", "{bad}");
+    }
+
+    let recalled = ask(&socket(&f), "Claude", "recall", json!({ "space": "Studio" }));
+    assert_eq!(recalled["ok"], true, "{recalled}");
+    assert_eq!(recalled["result"]["structured"]["memories"][0]["space"], "Studio");
+    let asked = f.requests.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(
+        (asked["tool"].clone(), asked["owner"].clone(), asked["args"]["server"].clone(), asked["args"]["workspace"].clone()),
+        (json!("team_recall"), json!("main"), json!("srv_1"), json!("ws_1"))
+    );
+
+    let saved = ask(&socket(&f), "Claude", "remember", json!({ "space": "Studio", "text": "Put blockers first.", "kind": "preference" }));
+    assert_eq!(saved["result"]["structured"], json!({ "status": "pending", "proposal": "mem_abc", "space": "Studio", "title": "Blockers first" }), "{saved}");
+    assert!(saved["result"]["text"].as_str().unwrap().contains("waits for review"));
+    let asked = f.requests.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(
+        (asked["tool"].clone(), asked["args"]["app"].clone(), asked["args"]["op"].clone()),
+        (json!("team_remember"), json!("Claude"), json!("remember"))
+    );
+    assert!(!tools_asked(&f).contains(&"memory_commit".to_owned()), "nothing written locally");
+    assert!(f.relay.memory_history("main", None).unwrap()["changes"].as_array().unwrap().is_empty());
+
+    assert_eq!(error_code(&ask(&socket(&f), "Claude", "forget", json!({ "space": "Studio", "path": "Team memory/x.md" }))), "DENIED");
+    // A workspace is only for the memory tools, and only by its name.
+    assert_eq!(error_code(&ask(&socket(&f), "Claude", "search", json!({ "space": "Studio", "query": "x" }))), "NO_SPACE");
+    assert_eq!(error_code(&ask(&socket(&f), "Claude", "recall", json!({ "space": "Elsewhere" }))), "NO_SPACE");
 }

@@ -248,7 +248,7 @@ export interface Commands {
    * Switches Connected apps on or off (the host starts or stops listening), and/or replaces the shared Private Spaces
    * (canonical roots; each must be one the user opened). `UNAVAILABLE` or `BUSY` when it cannot listen.
    */
-  "mcp.configure": { args: { enabled?: boolean; spaces?: string[]; memories?: boolean }; result: ConnectedAppsSettings };
+  "mcp.configure": { args: { enabled?: boolean; spaces?: string[]; memories?: boolean; workspaces?: { server: string; workspace: string; name: string }[] }; result: ConnectedAppsSettings };
   /** The user's Allow or Deny for an app that asked (or a change of mind later). */
   "mcp.decide": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
   /** Removes an app: it is asked about again the next time it connects. */
@@ -401,6 +401,8 @@ export interface ConnectedAppsSettings {
   folders?: string[];
   /** Private Spaces whose skills are linked into the home folder (ADR-0052 rule 7). */
   skillLinks?: string[];
+  /** Workspaces whose Team memory apps may use (ADR-0052 rule 8); `name` is the `space` apps give. */
+  workspaces?: { server: string; workspace: string; name: string }[];
   /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
   setup: { command: string; args: string[] } | null;
 }
@@ -519,9 +521,20 @@ export type McpRequest = {
     }
   | { tool: "memory_folder"; args: { folder: string } }
   // Skills (ADR-0052 rule 7): `Skills/<name>/SKILL.md`; `get_skill` answers `{ skill: null }` when there is none.
+  // A workspace's Team memory (ADR-0052 rule 8): the window calls the server as the signed-in user. `root` is then
+  // `workspace:<server>/<workspace>`, not a Private Space; the window that was asked answers whatever its Private Space.
+  | { tool: "team_recall"; args: McpMemoryFilter & TeamTarget & { query?: string; limit: number } }
+  | { tool: "team_list"; args: McpMemoryFilter & TeamTarget & { source?: string; limit: number } }
+  | { tool: "team_remember"; args: McpMemoryChange & TeamTarget }
   | { tool: "list_skills"; args: Record<string, never> }
   | { tool: "get_skill"; args: { name: string; file?: string } }
 );
+
+/** A workspace on a server, as the window named it in `mcp.configure { workspaces }`. */
+export interface TeamTarget {
+  server: string;
+  workspace: string;
+}
 
 export interface McpMemoryFilter {
   kind?: "profile" | "preference" | "work" | "people" | "reference" | "note";
@@ -554,7 +567,7 @@ export type McpMemoryChange =
   | { op: "forget"; page: { path: string } | { id: string } };
 
 /** The codes a window's answer may carry; the host passes them to the app. */
-export type McpAnswerCode = "NOT_FOUND" | "INTERNAL" | "BAD_ARGUMENT" | "CONFLICT" | "FORGOTTEN" | "STATED" | "TOO_LARGE" | "TOO_MANY";
+export type McpAnswerCode = "NOT_FOUND" | "INTERNAL" | "BAD_ARGUMENT" | "CONFLICT" | "FORGOTTEN" | "STATED" | "TOO_LARGE" | "TOO_MANY" | "DENIED";
 
 /** A window's answer to an `McpRequest`: what its Vault found, or why not. */
 export type McpAnswer = { result: unknown } | { error: { code: McpAnswerCode; message: string } };

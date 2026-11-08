@@ -6,6 +6,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { displayPath } from "../settings/path.ts";
 import { folderName } from "./names.ts";
+import { TeamMemorySettings } from "./TeamMemory.tsx";
 import "./connected-apps.css";
 
 /**
@@ -186,6 +187,8 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
           {t.memoriesView.open}
         </Button>
       </div>
+
+      <TeamMemorySettings connectedApps={connectedApps} settings={settings} onChange={setSettings} />
 
       <SkillLinks connectedApps={connectedApps} on={settings.skillLinks?.includes(connection.root) ?? false} onChange={() => void reload()} />
 

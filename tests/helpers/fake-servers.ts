@@ -47,6 +47,9 @@ export interface FakeWorkspace {
   /** Teams (capability `teams`, ADR-0042) and the teams each limited page is limited to. Not enforced on reads here. */
   teams: { id: string; name: string; memberIds: string[] }[];
   visibility: Map<string, string[]>;
+  /** Team memory (capability `team-memory`, ADR-0052): the setting and agents' memories. Applying is not simulated as a page write. */
+  memoryReview?: boolean;
+  memoryProposals?: Record<string, unknown>[];
 }
 
 export interface FakeTransfer {
@@ -347,6 +350,41 @@ export class FakeServers implements Servers {
     if (rest === "/members" || rest.startsWith("/members/")) return this.members(server, ws, method, rest, text);
     if (rest === "/invite-links" || rest.startsWith("/invite-links/")) return this.inviteLinks(server, ws, method, rest, text);
     if (rest === "/trash" || rest.startsWith("/trash/")) return this.trash(server, ws, method, rest);
+    if (rest === "/team-memory" || rest.startsWith("/team-memory/")) {
+      if (!this.capable(server, "team-memory")) return fail("capability_not_supported");
+      const proposals = (ws.memoryProposals ??= []);
+      const folder = [...ws.pages.values()].find((p) => !p.deleted && p.parentId === null && p.title === "Team memory");
+      const settings = () => json(200, { review: ws.memoryReview ?? true, folderId: folder?.id ?? null });
+      if (rest === "/team-memory" && method === "GET") return settings();
+      if (rest === "/team-memory/review" && method === "PUT") {
+        if (ws.role !== "owner" && ws.role !== "manager") return fail("forbidden");
+        ws.memoryReview = (JSON.parse(text) as { review: boolean }).review;
+        return settings();
+      }
+      if (rest === "/team-memory/proposals" && method === "GET") {
+        const status = query["status"];
+        return json(200, { items: proposals.filter((p) => status === undefined || p["status"] === status).map(({ markdown: _m, ...p }) => p), nextCursor: null });
+      }
+      if (rest === "/team-memory/proposals" && method === "POST") {
+        if (ws.role === "viewer") return fail("forbidden");
+        const body = JSON.parse(text) as { agent: string; title: string; markdown: string; pageId?: string; baseRevision?: string };
+        const made = { id: `mem_${proposals.length + 1}`, status: "pending", agent: body.agent, authorId: "usr_me", authorName: "Me", title: body.title, pageId: body.pageId ?? null, baseRevision: body.baseRevision ?? null, createdAt: iso(T0), expiresAt: iso(T0 + 30 * 86_400_000), settledAt: null, settledBy: null, settledByName: null, appliedRevision: null, markdown: body.markdown };
+        proposals.unshift(made);
+        const { markdown: _m, ...out } = made;
+        return json(201, out);
+      }
+      const one = /^\/team-memory\/proposals\/([^/]+)(\/apply|\/decline)?$/.exec(rest);
+      const found = one ? proposals.find((p) => p["id"] === decodeURIComponent(one[1]!)) : undefined;
+      if (!one || !found) return fail("not_found");
+      if (!one[2] && method === "GET") return json(200, { ...found, markdown: found["status"] === "pending" ? found["markdown"] : null });
+      if (one[2] && method === "POST") {
+        if (found["status"] !== "pending") return fail("not_found");
+        Object.assign(found, { status: one[2] === "/apply" ? "applied" : "declined", settledAt: iso(T0), settledBy: "usr_me", settledByName: "Me", expiresAt: null });
+        const { markdown: _m, ...out } = found;
+        return json(200, out);
+      }
+      return fail("method_not_allowed");
+    }
     if (rest === "/teams" || rest.startsWith("/teams/") || rest === "/limited-pages" || /^\/pages\/[^/]+\/visibility$/.test(rest)) return this.teams(server, ws, method, rest, text);
     if (rest === "/tree" && method === "GET") {
       const items = [...ws.pages.values()].filter((p) => !p.deleted).map((p) => this.node(server, p));

@@ -393,6 +393,32 @@ export const th: DesktopStrings = {
       "เปิดอยู่เป็นค่าเริ่มต้น แอปที่อนุญาตแล้วจะบันทึก แก้ไข และลืมความจำได้เฉพาะในโฟลเดอร์ความจำของ Private Space ที่แชร์ไว้ ถ้าปิด ความจำแต่ละรายการจะรอให้คุณตรวจดูที่กระดิ่ง เหมือนการเสนอการแก้ไข", // REVIEW
     mayRemember: "บันทึกความจำได้โดยไม่ต้องถาม", // REVIEW
     memoryFolder: (folder) => `โฟลเดอร์ความจำ: ${folder}`, // REVIEW
+    team: {
+      title: "ความจำของทีม", // REVIEW
+      hint: "แอปเรียกดูและบันทึกความจำในโฟลเดอร์ Team memory ของเวิร์กสเปซที่ติ๊กไว้ที่นี่ได้ ในนามของคุณ: เห็นเท่าที่คุณเห็น และตามบทบาทของคุณ ความจำแต่ละรายการรอการตรวจ เว้นแต่เวิร์กสเปซปิดการตรวจไว้", // REVIEW
+      none: "ยังไม่มีเวิร์กสเปซบนเซิร์ฟเวอร์ของคุณที่ใช้ความจำของทีมได้", // REVIEW
+      space: (name) => `แอปเรียกเวิร์กสเปซนี้ว่า “${name}”`, // REVIEW
+      review: "ความจำของเอเจนต์ต้องผ่านการตรวจ", // REVIEW
+      reviewHint: "ใช้กับทุกคนในเวิร์กสเปซนี้ ถ้าปิด ความจำจากผู้แก้ไขขึ้นไปจะถูกบันทึกทันที", // REVIEW
+      entry: (n) => `ความจำของทีม ${count(n)} รายการรอตรวจ`, // REVIEW
+      entryBody: "จากเอเจนต์ สำหรับเวิร์กสเปซของคุณ จะยังไม่บันทึกจนกว่าจะกดใช้", // REVIEW
+      dialog: "ความจำของทีม", // REVIEW
+      lede: "เอเจนต์เสนอความจำเหล่านี้ให้เวิร์กสเปซของคุณ กดใช้เพื่อบันทึกลงในโฟลเดอร์ Team memory เป็นการแก้ไขของคุณเอง", // REVIEW
+      loading: "กำลังโหลด…",
+      empty: "ไม่มีความจำของทีมที่รอตรวจ", // REVIEW
+      from: (agent, author) => (author ? `${agent} ของ ${author}` : agent), // REVIEW
+      changes: "แก้ไขความจำ", // REVIEW
+      adds: "ความจำใหม่", // REVIEW
+      apply: "ใช้", // REVIEW
+      decline: "ปฏิเสธ", // REVIEW
+      applied: (title) => `บันทึก “${title}” ลงในความจำของทีมแล้ว`, // REVIEW
+      declined: (title) => `ปฏิเสธ “${title}” แล้ว`, // REVIEW
+      changed: "ความจำนี้ถูกแก้ไขหลังจากที่เอเจนต์เสนอมา ให้ปฏิเสธ หรือขอให้เอเจนต์เสนอใหม่", // REVIEW
+      failed: (message) => `ทำไม่ได้: ${message}`, // REVIEW
+      activity: "กิจกรรมความจำของทีม", // REVIEW
+      activityLine: (title, agent, author, by) => `“${title}”: ${agent} ของ ${author} ใช้โดย ${by}`, // REVIEW
+      someone: "ใครบางคน", // REVIEW
+    },
     skills: {
       title: "สกิล", // REVIEW
       toggle: "ใช้สกิลของ Private Space นี้ใน Claude Code และ Codex", // REVIEW
