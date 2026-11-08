@@ -114,6 +114,13 @@ Domains used below (change them when you buy your own domain):
    `{"pages":{"scanned":…,"updated":…}}`. Until then, older pages show in a
    workspace Timeline without tags; new and edited pages are correct at once.
 
+   Migration `019_team_memory.sql` (ADR-0052, Team memory) adds one column with
+   a constant default (`workspaces.memory_review`) and one table
+   (`memory_proposals`). It is additive and safe while the old build runs, which
+   never reads them, and needs no backfill. **Apply it to Neon before you deploy
+   the server build that contains it**: that build reads both on every Team
+   memory request.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.

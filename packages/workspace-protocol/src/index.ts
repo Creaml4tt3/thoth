@@ -16,6 +16,7 @@ export * from "./trash.ts";
 export * from "./workspaces.ts";
 export * from "./feedback.ts";
 export * from "./presence.ts";
+export * from "./team-memory.ts";
 export * from "./routes.ts";
 export * from "./schemas.ts";
 export * from "./validate.ts";

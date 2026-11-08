@@ -30,6 +30,7 @@
               "teams",
               "trash",
               "presence",
+              "team-memory",
               "databases",
               "realtime-collab"
             ]

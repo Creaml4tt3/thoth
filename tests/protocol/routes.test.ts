@@ -89,6 +89,13 @@ describe("route registry", () => {
       purgeTrashedPage: "trash",
       heartbeatPresence: "presence",
       leavePresence: "presence",
+      getTeamMemory: "team-memory",
+      setTeamMemoryReview: "team-memory",
+      proposeTeamMemory: "team-memory",
+      listTeamMemoryProposals: "team-memory",
+      getTeamMemoryProposal: "team-memory",
+      applyTeamMemoryProposal: "team-memory",
+      declineTeamMemoryProposal: "team-memory",
     });
   });
 
