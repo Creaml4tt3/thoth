@@ -24,7 +24,7 @@ import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import type { AgentsService } from "../agents/service.ts";
 import type { AssistantController } from "./controller.ts";
-import { COMPACT_BOX, MascotArt, STAGE, type MascotState, type MascotVersion } from "./MascotArt.tsx";
+import { COMPACT_BOX, MascotArt, SMALL_STAGE, STAGE, type MascotState, type MascotVersion } from "./MascotArt.tsx";
 import { Bubble, editorSelection } from "./Bubble.tsx";
 import { useEditorTyping, useMascotState, useReducedMotion, useWindowSize, waitingReviews } from "./hooks.ts";
 import {
@@ -285,7 +285,7 @@ function Layer({ agents, assistant }: { agents: AgentsService; assistant: Assist
           onClick={onClick}
         >
           <span className="mascot-stage" style={{ width: stage, height: stage, left: stageLeft, top: stageTop }}>
-            <MascotArt state={state} version={version} facing={facing} vertical={position.v} motion={motion} />
+            <MascotArt state={state} version={version} facing={facing} vertical={position.v} motion={motion} tiny={stage < SMALL_STAGE} />
           </span>
         </button>
         <button
