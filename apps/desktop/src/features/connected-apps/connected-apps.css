@@ -58,3 +58,5 @@
 .mcp-cards { list-style: none; margin: 0 0 var(--thoth-space-3); padding: 0; display: grid; gap: var(--thoth-space-2); }
 .mcp-card { display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border); min-width: 0; overflow-wrap: anywhere; }
 .mcp-card p { margin: 0; }
+.mcp-starter { display: flex; align-items: center; gap: 8px; }
+.mcp-starter q { flex: 1; min-width: 0; }

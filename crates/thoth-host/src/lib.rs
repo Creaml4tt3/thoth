@@ -622,6 +622,9 @@ impl Host {
                 };
                 json(self.mcp.skill_links(owner, str_arg(args, "root")?, on, self.home.as_deref())?)
             }
+            "mcp.install" if matches!(args.get("instructions"), Some(Value::Bool(true))) => {
+                json(self.mcp.instruct(str_arg(args, "app")?, self.home.as_deref())?)
+            }
             "mcp.install" => {
                 let replace = matches!(args.get("replace"), Some(Value::Bool(true)));
                 let claude = |a: &[String]| self.agents.run_once("claude", a);

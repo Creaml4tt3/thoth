@@ -361,6 +361,7 @@ export function remoteConnectedApps(transport: Transport, events: Pick<Connected
     mayRemember: (app, allow) => transport.call("mcp.mayRemember", { app, allow }),
     memoryFolder: (root, folder) => transport.call("mcp.memoryFolder", { root, folder }),
     install: (app, replace) => transport.call("mcp.install", replace ? { app, replace } : { app }),
+    instruct: (app) => transport.call("mcp.install", { app, instructions: true }),
     skillLinks: (root, on) => transport.call("mcp.skillLinks", on === undefined ? { root } : { root, on }),
     memoryHistory: async () => ((await transport.call("mcp.memoryHistory", {})) as { changes: MemoryHistoryChange[] }).changes,
     memoryChange: async (id) => (await transport.call("mcp.memoryHistory", { id })) as MemoryHistoryText,
