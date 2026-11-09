@@ -1,6 +1,8 @@
 # ตั้งเซิร์ฟเวอร์ Thoth เอง
 
+<!-- repo-only:start -->
 [English](self-host.md) · **ภาษาไทย**
+<!-- repo-only:end -->
 
 เซิร์ฟเวอร์ Thoth เก็บเวิร์กสเปซที่แชร์กัน แอปเดสก์ท็อปใช้งานได้โดยไม่ต้องมีเซิร์ฟเวอร์ ต้องมีก็ต่อเมื่อจะทำงานกับคนอื่น
 เซิร์ฟเวอร์คือคอนเทนเนอร์หนึ่งตัว (Node.js 24) กับฐานข้อมูล PostgreSQL 14 ขึ้นไป ค่าตั้งทั้งหมดอยู่ใน
@@ -16,7 +18,9 @@
 | PostgreSQL ของคุณเอง (แบบ managed หรือไม่ก็ได้) และผู้ให้บริการ OpenID Connect | [`compose.external.yaml`](../../compose.external.yaml): เฉพาะเซิร์ฟเวอร์ | ผู้ให้บริการของคุณ (Keycloak, Authentik, Zitadel, Entra ID...), Google หรือ GitHub |
 | เครื่องที่มี Node.js และไม่ใช้คอนเทนเนอร์ | `node apps/server/src/main.ts` จากโค้ดที่โคลนมา | เหมือนข้างบน |
 
-## อิมเมจ
+<!-- REVIEW -->
+
+## อิมเมจคอนเทนเนอร์
 
 `ghcr.io/creaml4tt3/thoth-server` สำหรับ `linux/amd64` และ `linux/arm64` ออกพร้อมทุกเวอร์ชัน:
 

@@ -1,6 +1,8 @@
 # Hosting your own Thoth server
 
+<!-- repo-only:start -->
 **English** · [ภาษาไทย](self-host.th.md)
+<!-- repo-only:end -->
 
 A Thoth server holds the shared workspaces. The desktop app works without one; you need a server only to work with
 others. It is one container (Node.js 24) and a PostgreSQL 14 or newer database. Every setting is listed in
@@ -16,7 +18,7 @@ Docker and Podman both work. Every command below says `docker compose`; with Pod
 | Your own PostgreSQL (managed or not) and an OpenID Connect provider | [`compose.external.yaml`](../../compose.external.yaml): the server alone | Your provider (Keycloak, Authentik, Zitadel, Entra ID...), Google or GitHub |
 | A Node.js host and no containers | `node apps/server/src/main.ts` from a checkout | Same as above |
 
-## The image
+## The container image
 
 `ghcr.io/creaml4tt3/thoth-server`, for `linux/amd64` and `linux/arm64`, published with every release:
 
