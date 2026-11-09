@@ -758,6 +758,8 @@ export const en = {
     editedHint: "When the page was last changed",
     dated: "Dated",
     datedHint: "The date in the page: its date field, or a daily note's name",
+    /** Dated is on, but no page in the list names a date, so it looks the same as Edited. */
+    noDates: "None of these pages has a date yet, so they are listed by when they were edited. A page gets a date from a line such as date: 2026-11-09 at its top (in Plain mode), or from a daily note's name.",
     tags: "Filter by tag",
     tagsHint: "Pages with every selected tag",
     clearTags: "Clear tags",

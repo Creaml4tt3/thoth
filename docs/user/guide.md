@@ -106,6 +106,19 @@ shortcuts.
 
 In Settings, type in **Search settings** to see only the settings that match.
 
+## Timeline
+
+**Timeline** in the sidebar or the command palette lists the pages of one space by date, newest first, under a
+heading per day. Choose the space at the top.
+
+- **Edited** places each page on the day it was last changed.
+- **Dated** places a page on the date it names: a `date: 2026-11-09` line at the top of the page (add it in Plain
+  mode), or the name of a daily note. Pages without a date stay on the day they were edited. If no page in the list
+  has a date, Timeline says so, and the list looks the same as Edited.
+- Choose tags to see only the pages that have all of them.
+
+A workspace shows tags and dates when its server runs Thoth 0.7.0 or later.
+
 ## Import from Notion and Obsidian
 
 Choose **Import from Notion or Obsidian** in Settings → Import notes, the Import
@@ -188,6 +201,34 @@ two workspaces, on one server or two.
 The dialog shows what will travel before anything is sent. Sub-pages, attachments
 and links between the pages go with them. A move deletes the originals only after
 the other side has every page. A page edited in the meantime is kept.
+
+## Connected apps (MCP)
+
+AI apps on your computer that speak MCP (the Model Context Protocol), such as Claude Code, Codex, the ChatGPT
+desktop app, Claude Desktop or Cursor, can search and read your notes through Thoth. If you let them, they can also
+propose changes, which you review before anything is written, and keep a shared memory of what you tell them. It is
+off until you turn it on, and it is not available on Windows yet.
+
+1. In **Settings → Connected apps**, turn on **Let other apps read my notes**.
+2. Under **Private Spaces apps may read**, tick the ones apps may see. The others stay invisible to apps.
+3. Under **Set up an app**, choose **Set up** on the card for Claude Code, Codex and the ChatGPT app, Claude
+   Desktop or Cursor. Thoth adds itself to that app's settings, says what it changed, and keeps a backup of any file
+   it edits. For another app, choose **Copy the setup** and paste it into the app's MCP settings, or copy the prompt
+   under **Any other agent** into the agent and it sets Thoth up from
+   [the setup guide](https://thothnotes.com/agents/setup).
+4. The first time an app connects, Thoth asks whether it may read your notes. Choose **Allow** or **Deny**. You can
+   change your answer later in the list of apps.
+
+Thoth must be running, with the Private Space open in a window, for an app to read it.
+
+- **Memory.** Agents keep what they learn about you as pages in a `Memory` folder of your Private Space, shared by
+  all of your agents. You can read and edit them like any page, or choose **Show memories** to see them by kind and
+  undo recent changes. Turn off **Agents save memories without asking** to review each one first. With **Let agents
+  use my memory folder while Thoth is closed**, agents can still recall and save memories while Thoth is closed.
+- **Proposed changes.** An app may change pages only when you turn on **May propose changes** for it. Each change
+  waits under the bell until you apply it.
+- **Requests.** **Show requests** lists every request of the last 30 days: when, which app, what it asked for and
+  which pages. It is kept on this computer only, and never holds what a page says or what was searched for.
 
 ## Updates
 

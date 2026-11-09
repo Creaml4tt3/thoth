@@ -50,6 +50,8 @@ export function TimelineView({ sources, now = new Date() }: { sources: readonly 
   const active = wanted.filter((tag) => allTags.includes(tag));
   const days = useMemo(() => (items ? groupTimeline(items, effectiveMode, active) : []), [items, effectiveMode, active.join("\n")]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = days.reduce((n, d) => n + d.rows.length, 0);
+  // Dated moves only pages that name a date; with none, the list is Edited's, and the switch would seem to do nothing.
+  const undated = effectiveMode === "dated" && total > 0 && days.every((d) => d.rows.every((r) => r.timed));
 
   // Said after a filter changes (rule 17), not on every reload of the list.
   useEffect(() => {
@@ -103,6 +105,7 @@ export function TimelineView({ sources, now = new Date() }: { sources: readonly 
           )}
         </div>
         {shown && !tagged && <p className="muted home-empty timeline-note">{t.noTags}</p>}
+        {undated && <p className="muted home-empty timeline-note">{t.noDates}</p>}
         {allTags.length > 0 && (
           <div className="timeline-tags" role="group" aria-label={t.tags} aria-describedby="timeline-tags-hint">
             <span id="timeline-tags-hint" className="sr-only">

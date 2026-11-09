@@ -70,6 +70,23 @@ describe("TimelineView", () => {
     expect(screen.getByRole("list", { name: "Thursday, December 24, 2026" }).textContent).not.toMatch(/\d:\d\d/);
   });
 
+  it("Dated says why the list did not change when no page names a date", async () => {
+    const user = userEvent.setup();
+    render(<TimelineView sources={[source({ items: items.filter((i) => !i.date) })]} now={now} />);
+    const modes = screen.getByRole("group", { name: "Show pages by" });
+    await user.click(within(modes).getByRole("button", { name: "Dated" }));
+    expect(screen.getByText(/None of these pages has a date yet/)).toBeTruthy();
+    await user.click(within(modes).getByRole("button", { name: "Edited" }));
+    expect(screen.queryByText(/None of these pages has a date yet/)).toBeNull();
+  });
+
+  it("Dated shows no such note once a page names a date", async () => {
+    const user = userEvent.setup();
+    render(<TimelineView sources={[source()]} now={now} />);
+    await user.click(within(screen.getByRole("group", { name: "Show pages by" })).getByRole("button", { name: "Dated" }));
+    expect(screen.queryByText(/None of these pages has a date yet/)).toBeNull();
+  });
+
   it("a workspace without page-tags: Edited only, no tag filter, and a note saying why", () => {
     render(<TimelineView sources={[source({ id: "w", label: "Team", tags: false })]} now={now} />);
     expect(screen.queryByRole("group", { name: "Show pages by" })).toBeNull();
