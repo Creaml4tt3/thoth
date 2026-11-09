@@ -30,8 +30,9 @@ Four things should change before anyone builds it.
    - native-library problems on each platform.
 
    A Rust library already exists that runs the same PaddleOCR models through ONNX Runtime: `oar-ocr`, built on the
-   `ort` crate. With it, OCR becomes a small Rust program built in our own pipeline. ONNX Runtime and the model files
-   are the only downloads. The handoff itself names Rust as the long-term target; starting there skips one rewrite.
+   `ort` crate. With it, OCR becomes a small Rust program built in our own pipeline. The model files are the only
+   downloads, plus ONNX Runtime if the pure-Rust engine isn't good enough (§4). The handoff itself names Rust as the
+   long-term target; starting there skips one rewrite.
 3. **A general "Thoth Modules" system is premature.** There is one module. A registry, dependency resolver, signed
    remote manifests and a Modules page are the machinery of a marketplace, and the handoff rules out a marketplace for
    now. Build OCR as the first module, with only the shared parts every module needs (§5). Leave out the registry and
@@ -48,20 +49,28 @@ Four things should change before anyone builds it.
 | --- | --- |
 | PP-OCRv5 has a Thai recognizer | Yes: `th_PP-OCRv5_mobile_rec`. It reads Thai, English and digits. Line accuracy is 82.68% (strict: one wrong character fails the line). About 7.5 MB. [PaddleOCR docs][pp5-multi], [model card][th-card] |
 | "PP-OCRv6 Small should not be assumed to support Thai" | Confirmed: PP-OCRv6 covers about 50 languages (Chinese, English, Japanese and Latin scripts), and Thai is not among them. Thai stays on PP-OCRv5. [PP-OCRv6 docs][pp6] |
-| A Rust/ONNX path exists | `oar-ocr` (GreatV) runs PaddleOCR det/rec and layout models on ONNX Runtime through `ort`. Its license and how active it is still need checking. [docs.rs][oar] |
+| A Rust/ONNX path exists | `oar-ocr` (GreatV) runs PaddleOCR det/rec and layout models on ONNX Runtime through `ort`. It is Apache-2.0 and active (v0.10.2 on 2026-10-26), but small: about 200 stars and one main author. It prepares images with the Rust `image` crates, without OpenCV, and pins `ort` 2.0.0-rc.13. [docs.rs][oar], [GitHub][oar-gh] |
+| The model files exist as ONNX | Yes, in oar-ocr's v0.3.0 release: detection 4.6 MB, the Thai recognizer 7.5 MB, and the Thai dictionary (a small text file). That is three files and about 12 MB. They are conversions made by the oar-ocr project, not files published by PaddlePaddle. [models list][oar-models] |
+| ONNX Runtime runs on every platform Thoth ships | **No.** ONNX Runtime 1.31.1 publishes a macOS build for Apple Silicon only, and none for Intel Macs. Thoth's Mac app is universal (Apple Silicon and Intel). [releases][ort-rel] |
+| OCR needs ONNX Runtime | Not necessarily. `ort` can run on a pure-Rust engine instead (`ort-tract`), with no native library. That backend is young (0.1.0), so its speed and its support for these models are unknown. [ort release notes][ort-alt] |
 | Surya is a candidate | Its code is Apache-2.0, but the weights use a modified OpenRAIL-M license with a revenue limit. That doesn't fit an Apache-2.0 app anyone may use. **Drop it.** [model card][surya] |
-| The OS's built-in OCR could help | Not confirmed for Thai on either system. On macOS, Vision lists its languages at runtime, and no official list includes Thai. On Windows, `Windows.Media.Ocr` has no documented Thai pack. To be checked in Phase 0, not relied on. [Apple forum][vision], [winocr][winocr] |
+| The OS's built-in OCR could help | Not reliable for Thai. On macOS, Vision lists its languages at runtime. A user reported `th-TH` in that list on macOS 14, and another reported Thai missing in a later Vision version; Apple publishes no list. On Windows, `Windows.Media.Ocr` has no documented Thai pack. To be checked in Phase 0, not relied on. [MacScripter][vision-th], [Apple forum][vision-26], [winocr][winocr] |
+| A PDF renderer with a usable license | Two candidates. pdfium has prebuilt libraries for every platform, including a universal Mac build (3.4–7 MB). `hayro` is a pure-Rust PDF renderer (Apache-2.0, active), with no native library. [pdfium-binaries][pdfium], [hayro][hayro] |
 
-Still unverified: the exact download and installed sizes, the PaddleOCR model licenses (expected Apache-2.0),
-`oar-ocr`'s license, and the size of the ONNX Runtime library on each platform. Phase 0 settles them.
+For scale, today's installers are 5.7 MB (Windows), 14.5 MB (macOS) and 8.3 MB (Linux .deb). The models alone are
+12 MB, so downloading OCR on demand is right whichever engine runs them.
+
+Still unverified: the PaddleOCR model licenses (expected Apache-2.0), the size of the ONNX Runtime library alone on
+each platform (its release archives are 10–79 MB and hold more than the library), and the installed sizes. Phase 0
+settles them.
 
 ## 3. What OCR should do in Thoth
 
 | Feature | What the user does | Fit |
 | --- | --- | --- |
-| **A. Text from an image** | Right-click an image in a page → "Copy text" or "Insert text below". | Smallest. The user starts it and sees the result, and nothing runs in the background. **Recommended first.** |
-| **B. Search inside images** | Search finds a page by the words in its screenshots. | The most useful long term, but it OCRs every image in the background (CPU and battery), and the text has to be stored in the search index (`.thoth`, ADR-0046), never in the Markdown. Second. |
-| **C. Scanned PDF to a page** | Import a PDF or an image as a new page of text. | Needs a PDF renderer (pdfium) and reading order. PDFs that already contain text need no OCR at all. Third. |
+| **A. Text from an image** | Right-click an image in a page → "Copy text" or "Insert text below". | Smallest. The user starts it and sees the result, and nothing runs in the background. **First (Phase 1).** |
+| **B. Search inside images** | Search finds a page by the words in its screenshots. | The most useful long term, but it OCRs every image in the background (CPU and battery), and the text has to be stored in the search index (`.thoth`, ADR-0046), never in the Markdown. Later. |
+| **C. Scanned PDF to a page** | Import a PDF or an image as a new page of text. | Needs a PDF renderer and reading order. PDFs that already contain text need no OCR at all. **Second (Phase 2).** |
 | D. Agents read image text | MCP `read_page` includes the text of the page's images. | Comes for free after B. |
 
 Desktop only. The web app stays trial-only and gets no OCR. Workspace images are OCR'd on the desktop when the user
@@ -69,29 +78,54 @@ asks; the server doesn't change.
 
 ## 4. Proposed design
 
-- **The OCR program:** a small Rust binary, `thoth-ocr`, built from this repo and shipped in the installer. Without ONNX
-  Runtime it is a few MB.
-  - It loads ONNX Runtime dynamically (`ort` with `load-dynamic`) from the downloaded files.
+- **The OCR program:** a small Rust binary, `thoth-ocr`, built from this repo and shipped in the installer next to
+  `thoth-mcp`, the same way (Tauri `externalBin`).
   - A crash or a stuck model can't take the app down, because the host runs it as a child process. The host already
-    supervises agent CLIs this way: process groups, a timeout, and a kill when the window closes.
-- **Talking to it:** newline-delimited JSON over stdin and stdout. There is no port, as the handoff prefers.
-  - Requests carry image bytes the host has already read through `VaultFs`, never a path. The OCR program never opens
-    the vault.
+    supervises agent CLIs this way (`crates/thoth-host/src/agent`): process groups, a timeout, and a kill when the
+    window closes.
+- **The inference engine: two candidates, and Phase 0 picks one.**
+
+  | | A. ONNX Runtime, downloaded | B. Pure Rust (`ort-tract`), compiled in |
+  | --- | --- | --- |
+  | What is downloaded | The three model files and a native library | The three model files only: data, never code |
+  | Intel Macs | No official build. OCR would be Apple Silicon only, or we build the library ourselves | Works |
+  | macOS hardened runtime | The downloaded library must be signed, or needs an exception | No issue |
+  | Speed | The reference | Unknown, probably slower |
+  | Risk | Low: it is what oar-ocr is tested on | The backend is young and may not support these models |
+
+  B is preferred if it reads the corpus correctly and is fast enough, because it removes three problems at once. A is
+  the fallback.
+- **Talking to it:** over stdin and stdout. There is no port, as the handoff prefers.
+  - Each request is one line of JSON followed by exactly the number of bytes it names. Nothing is base64, so a large
+    PDF costs no extra memory.
+  - Requests carry the file's bytes, never a path. The host reads them itself: a Private Space file through `VaultFs`,
+    a workspace image from the server. The OCR program never opens the vault.
   - Limits: image size in megapixels, a page count for PDFs, a timeout per job, and one job at a time.
 - **The download:** an "OCR (Thai and English)" card in Settings → Modules, with Download, Remove, and the space
   it uses. The host:
-  1. downloads ONNX Runtime and the two PP-OCRv5 models (detection and Thai recognition) from R2 into
-     `<app-data>/modules/ocr/<version>/`;
+  1. downloads the three model files (detection, Thai recognition and the Thai dictionary), and the native libraries
+     if the engine needs any, from R2 into `<app-data>/modules/ocr/<version>/`;
   2. checks each file against the SHA-256 compiled into the app;
   3. switches over by renaming a folder;
   4. deletes the old version after a test image reads correctly.
 
-  Removing it deletes only that folder.
+  Removing it deletes only that folder. The host checks the hashes again each time it starts the program, which
+  takes well under a second for files this size.
+- **Where the model files come from:** preferably we convert PaddlePaddle's published weights to ONNX ourselves, with
+  a script kept in the repo, so anyone can repeat it. Otherwise we copy oar-ocr's converted files and pin their hashes.
+  Either way the files are hosted on R2, and the app's licenses page names the models, their license and their source.
+- **PDF pages** are rendered inside `thoth-ocr`, so a malformed PDF can only crash the child process. The renderer is
+  pdfium (a native library, downloaded with the module) or `hayro` (pure Rust, compiled in). Phase 0 picks, for the
+  same reasons as the engine.
 - **Output:** text lines with a bounding box and a confidence each, plus plain text in reading order. Tables and layout
-  come later.
+  come later. Two Thai rules apply:
+  - a wrapped line is joined to the next without a space when both sides are Thai, and with a space otherwise;
+  - the text is Unicode-normalized (NFC), so a vowel or tone mark is stored the same way every time.
+- **When OCR isn't downloaded yet,** "Copy text" on an image explains that and offers the download. Nothing is
+  downloaded without the user asking.
 - **macOS:** today's ad-hoc signed app can load a downloaded library. Once the app is signed with a Developer ID and the
-  hardened runtime, the downloaded ONNX Runtime library must be signed too, or the app needs a library-validation
-  exception. Phase 0 tests this.
+  hardened runtime, a downloaded library must be signed too, or the app needs a library-validation exception. This
+  matters only for engine A or pdfium.
 
 ## 5. Modules: what is shared now, what waits
 
@@ -101,9 +135,9 @@ summaries. So OCR is built as the first module, with only the parts every module
 - **Module store (host, Rust).** It downloads to `<app-data>/modules/<id>/<version>/`, checks each file's SHA-256,
   renames the folder to switch versions, keeps the last good version until the new one passes its self-test, removes a
   module, and reports the space used.
-- **Module runner (host, Rust).** It starts the module's program as a child process, one job at a time. It sends
-  newline-delimited JSON over stdio, enforces a time limit and Cancel, and kills the process when the app quits. It
-  reuses the agent-run supervision.
+- **Module runner (host, Rust).** It starts the module's program as a child process, one job at a time. It talks to
+  it over stdio (§4), enforces a time limit and Cancel, and kills the process when the app quits. It reuses the
+  agent-run supervision.
 - **A compiled-in list of modules.** Each entry gives an id, a version, its files per platform with URL, size and
   SHA-256, and the program to run. Adding a module, a language or a model is a new app version.
 - **Settings → Modules.** One card per module, with what it does, its download size, Download, Remove and the space
@@ -118,25 +152,37 @@ Each can be added behind the same store and runner without changing the modules.
 
 ## 6. Phases
 
-**Phase 0 — spike (about 3–4 days), ending in ADR-0053.**
+**Phase 0 — spike (about a week), ending in ADR-0053.**
 - Build a command-line `thoth-ocr` on `oar-ocr`, with PP-OCRv5 mobile detection and `th_PP-OCRv5_mobile_rec`.
-- Render PDF pages with pdfium (prebuilt binaries, Apache-2.0/BSD). Use the PDF's own text where a page has some.
-- Platforms: macOS arm64, Windows x64 and Linux x64, built in CI like the app.
+- Run it on both engines (§4): ONNX Runtime, and pure Rust through `ort-tract`. Compare accuracy, speed and size.
+- Render PDF pages with pdfium and with `hayro`. Use the PDF's own text where a page has some.
+- Platforms: macOS (Apple Silicon and Intel), Windows x64 and Linux x64, built in CI like the app.
 - Test corpus: 40–60 images with checked text, plus a held-out part. It covers Thai, English, mixed lines, app
   screenshots, phone photos, scanned PDFs and two-column pages. Its sources:
   - the owner's own images, kept outside the repo;
   - public images whose license allows it, such as Thai Wikipedia screenshots (CC BY-SA) and public-domain scans;
   - synthetic pages: Thai and English text rendered in free fonts (Noto Sans Thai, Sarabun), then blurred, skewed and
     compressed. Their text is known exactly.
-- Measure: CER on Thai, English and mixed text separately; p50/p95 time per image and per PDF page; peak memory;
-  download size and installed size; cold start.
+- Measure: CER (the share of wrong characters) on Thai, English and mixed text separately; p50/p95 time per image and
+  per PDF page; peak memory; download size and installed size; cold start; and how much `thoth-ocr` adds to each
+  installer. No word error rate: Thai has no spaces between words, so it would measure the word splitter.
 - Compare against the Tesseract `tha` model as a baseline, and macOS Vision if it lists Thai.
-- Check every license: the PaddleOCR models, oar-ocr, ONNX Runtime (MIT) and pdfium.
-- Exit criteria: readable Thai on screenshots and scans, a total download under about 50 MB, and no license blocker.
+- Check every license: the PaddleOCR models, oar-ocr, ONNX Runtime (MIT), pdfium and hayro.
+- Exit criteria. The numbers are targets set before measuring; the ADR records what was reached:
+  - Thai CER of at most 5% on screenshots and synthetic pages, and at most 10% on scans and phone photos;
+  - better than Tesseract `tha` on every group of images;
+  - the owner reads ten outputs next to their images and finds them usable;
+  - p95 of at most 3 seconds for a screenshot on a laptop without a GPU;
+  - a download of at most 50 MB, and no more than about 5 MB added to an installer;
+  - no license blocker.
+
   If Rust fails on a hard blocker, only then try Python.
 
 **Phase 1 — the module store and runner, Settings → Modules, and text from an image.**
-- On an image in a page: "Copy text" and "Insert text below".
+- On an image in a page: "Copy text" and "Insert text below". The editor has no menu on images today, so this phase
+  adds one.
+- The licenses page lists the models and libraries. The privacy notice says what the download request reveals (the
+  same as an update download) and that images never leave the computer.
 - The job shows progress, has Cancel, and reports errors in plain words.
 - The new strings come in English and Thai (marked REVIEW).
 - Tests cover the hash check, an interrupted download, removal, the limits, and a stuck child process being killed.
@@ -159,13 +205,30 @@ Decided by the owner on 2026-11-10:
 - Files on R2 under `download.thothnotes.com/modules/`, with hashes compiled into the app.
 - Test images: some from the owner, the rest public or synthetic.
 
-Proposed in §5, waiting for the owner: build OCR as the first module, with a shared store and runner and Settings →
-Modules, but no registry yet.
+Left out of the handoff on purpose:
+- The install wizard's language and quality choices. There is one pack, Thai and English Lite, so there is nothing to
+  choose yet.
+- A Repair action. Remove and Download do the same.
+- Resumable downloads. At 50 MB or less, a failed download starts again.
+- A test set of 100–200 pages for the spike. It starts at 40–60 and grows before Phase 1 ships.
+- Table and layout scores, until those models are in the plan.
+
+Waiting for the owner:
+- §5: build OCR as the first module, with a shared store and runner and Settings → Modules, but no registry yet.
+- Intel Macs, only if Phase 0 picks ONNX Runtime: offer OCR on Apple Silicon Macs only, or build the library for
+  Intel ourselves.
 
 [pp5-multi]: https://www.paddleocr.ai/latest/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.html
 [th-card]: https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec
 [pp6]: https://www.paddleocr.ai/latest/en/version3.x/algorithm/PP-OCRv6/PP-OCRv6.html
 [oar]: https://docs.rs/crate/oar-ocr
 [surya]: https://huggingface.co/datalab-to/surya-ocr-2
-[vision]: https://developer.apple.com/forums/thread/121048
+[oar-gh]: https://github.com/GreatV/oar-ocr
+[oar-models]: https://docs.rs/crate/oar-ocr/0.6.3/source/docs/models.md
+[ort-rel]: https://github.com/microsoft/onnxruntime/releases/tag/v1.31.1
+[ort-alt]: https://newreleases.io/project/github/pykeio/ort/release/v2.0.0-rc.10
+[vision-th]: https://www.macscripter.net/t/image-png-to-text-through-applescript/74490/27
+[vision-26]: https://developer.apple.com/forums/thread/850452
+[pdfium]: https://github.com/bblanchon/pdfium-binaries
+[hayro]: https://github.com/LaurenzV/hayro
 [winocr]: https://pypi.org/project/winocr/0.0.13
