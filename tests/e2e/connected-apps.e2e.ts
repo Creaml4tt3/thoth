@@ -128,7 +128,7 @@ test("switch on, allow an app, and it searches and reads through thoth-mcp; the 
     expect(outside.isError).toBe(true);
 
     // Settings: the app, allowed, and its requests.
-    await expect(section.getByRole("listitem", { name: "Claude Desktop" })).toContainText("Allowed");
+    await expect(section.getByRole("list", { name: "Apps", exact: true }).getByRole("listitem", { name: "Claude Desktop" })).toContainText("Allowed");
     await section.getByRole("button", { name: "Show requests" }).click();
     const log = section.getByRole("table", { name: "Requests from connected apps" });
     await expect(log.getByRole("row")).toHaveCount(5);
@@ -173,7 +173,7 @@ test("after the identifier change, someone with apps set up is told once to copy
   const section = page.getByTestId("connected-apps-settings");
   const notice = section.getByRole("note", { name: "Copy the setup again" });
   await expect(notice).toContainText("stop connecting");
-  await expect(section.getByRole("listitem", { name: "Claude Desktop" })).toContainText("Allowed");
+  await expect(section.getByRole("list", { name: "Apps", exact: true }).getByRole("listitem", { name: "Claude Desktop" })).toContainText("Allowed");
   await expectAccessible(page, '[data-testid="connected-apps-settings"]');
   await shoot(page, notice, "setup-moved");
   // Keyboard: the dismiss button is reachable and works with Enter.
@@ -188,6 +188,6 @@ test("after the identifier change, someone with apps set up is told once to copy
   if (await choose.isVisible()) await choose.click();
   await expect(tree).toBeVisible();
   await page.getByRole("button", { name: "Settings" }).first().click();
-  await expect(section.getByRole("listitem", { name: "Claude Desktop" })).toBeVisible();
+  await expect(section.getByRole("list", { name: "Apps", exact: true }).getByRole("listitem", { name: "Claude Desktop" })).toBeVisible();
   await expect(section.getByRole("note")).toHaveCount(0);
 });
