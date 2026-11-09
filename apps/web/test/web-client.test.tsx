@@ -22,6 +22,8 @@ describe("sign-in", () => {
     expect(screen.getByText(/A free demo for trying Thoth/)).toBeTruthy();
     expect(screen.getByText("200 pages per workspace")).toBeTruthy();
     expect(screen.getByText("1 workspace per account")).toBeTruthy();
+    // ADR-0014: the warning before an inactive account is deleted.
+    expect(screen.getByText("Accounts with no sign-in for 90 days are deleted, with the workspaces they alone own")).toBeTruthy();
     // Not signed in yet: no protocol request carried a token.
     expect(browser.server.requests.filter((r) => r.url.includes("/api/v1/") && !r.url.endsWith("/capabilities"))).toHaveLength(0);
   });

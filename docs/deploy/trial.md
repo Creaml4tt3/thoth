@@ -121,6 +121,12 @@ Domains used below (change them when you buy your own domain):
    the server build that contains it**: that build reads both on every Team
    memory request.
 
+   Migration `020_deleted_accounts.sql` (ADR-0014, inactive accounts) adds one
+   nullable column (`users.deleted_at`). It is additive and safe while the old
+   build runs, which never reads it, and needs no backfill. **Apply it to Neon
+   before you deploy the server build that contains it**: that build reads it
+   on every sign-up, so without it every new account fails.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.
@@ -226,6 +232,14 @@ redirect means none does).
    | `MAX_WORKSPACES_PER_ACCOUNT` | `3` | Owned workspaces per account. **If the Vercel project sets this variable (for example to `1` from the first launch), it overrides the profile: change it to `3`, or delete it.** One more is `409 quota_exceeded` (`quota: workspacesPerAccount`) |
    | `MAX_WORKSPACE_CREATIONS_PER_DAY` | `10` | Workspaces one account may create per UTC day through the API. One more is `409 quota_exceeded` (`quota: workspaceCreationsPerDay`) |
    | `WORKSPACE_MANAGEMENT` | `on` | `off` hides New workspace, Rename… and Delete… in the apps and answers those calls `501` |
+
+   Inactive accounts are deleted, as the privacy notice says (ADR-0014). The
+   apps show the rule with the trial's limits, at sign-in and in server
+   settings:
+
+   | Variable | Trial default | Meaning |
+   | --- | --- | --- |
+   | `INACTIVE_ACCOUNT_DAYS` | `90` | The daily cron job deletes an account with no sign-in and no use for this many days, with the workspaces it alone owns. An account that alone owns a workspace with other members is skipped (`inactiveAccountsSkipped` in the cron result). `unlimited` turns it off |
 
 5. The daily cron job that calls `/internal/maintenance` is part of the build
    (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.

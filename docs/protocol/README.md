@@ -130,6 +130,7 @@ is 409 `quota_exceeded` (section 5), never 413 (that is the size of one request)
 | `maxMembersPerWorkspace` | Members of one workspace. |
 | `maxWorkspacesPerAccount` | Workspaces one account owns. A deleted workspace counts until it is purged (ADR-0025). |
 | `revisionRetentionDays` | Revisions that are not current are removed after this many days; see section 7. |
+| `inactiveAccountDays` | An account with no sign-in and no use for this many days is deleted, with the workspaces it alone owns. Clients show it so people are warned. |
 
 A server may have further quotas that it does not advertise (for example a server-wide storage
 limit); they surface only as `quota_exceeded`.

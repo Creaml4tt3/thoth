@@ -229,8 +229,9 @@ The token's session is revoked. Always `200`, also for unknown tokens. For
   - refresh tokens and session access tokens that expired more than a day ago;
   - sessions that are revoked or past their maximum age.
 - `users.last_seen_at` is updated at sign-in and refresh (at most once an hour).
-  It feeds the 90-day inactivity rule, whose deletion job is not built yet
-  (ADR-0014 open question on email).
+  It feeds the inactivity rule: with `INACTIVE_ACCOUNT_DAYS` set (trial 90),
+  maintenance deletes an account whose `last_seen_at` and personal access tokens'
+  `last_used_at` are all older than that (apps/server/README.md, Maintenance).
 
 ## 9. Configuration
 

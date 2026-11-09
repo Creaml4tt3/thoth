@@ -17,7 +17,7 @@ describe("configuration", () => {
   it("defaults: no quotas, filesystem blobs, events on, migrations on, nothing rate limited", () => {
     const c = loadConfig(env());
     expect(c).toMatchObject({ profile: "default", blobStore: "fs", migrateOnStart: true, databasePoolMax: 10, trustProxy: false, corsOrigins: [], cronSecret: undefined });
-    for (const k of ["maxWorkspacesPerAccount", "maxMembersPerWorkspace", "maxPagesPerWorkspace", "maxWorkspaceAttachmentBytes", "revisionRetentionDays", "maxTotalAttachmentBytes", "maxAccounts"] as const) expect(c[k], k).toBeUndefined();
+    for (const k of ["maxWorkspacesPerAccount", "maxMembersPerWorkspace", "maxPagesPerWorkspace", "maxWorkspaceAttachmentBytes", "revisionRetentionDays", "inactiveAccountDays", "maxTotalAttachmentBytes", "maxAccounts"] as const) expect(c[k], k).toBeUndefined();
     expect(c.maxAttachmentBytes).toBe(26_214_400);
     expect(c.maxMarkdownBytes).toBe(1_048_576);
     expect(c.rateLimit).toEqual({ perAccount: undefined, perIp: undefined, windowSeconds: 60 });
@@ -25,8 +25,8 @@ describe("configuration", () => {
   });
 
   it("each limit is its own variable", () => {
-    const c = loadConfig(env({ MAX_PAGES_PER_WORKSPACE: "7", MAX_MEMBERS_PER_WORKSPACE: "3", MAX_WORKSPACES_PER_ACCOUNT: "2", MAX_WORKSPACE_ATTACHMENT_BYTES: "1000", REVISION_RETENTION_DAYS: "9", MAX_TOTAL_ATTACHMENT_BYTES: "5000", MAX_ACCOUNTS: "4" }));
-    expect(c).toMatchObject({ maxPagesPerWorkspace: 7, maxMembersPerWorkspace: 3, maxWorkspacesPerAccount: 2, maxWorkspaceAttachmentBytes: 1000, revisionRetentionDays: 9, maxTotalAttachmentBytes: 5000, maxAccounts: 4 });
+    const c = loadConfig(env({ MAX_PAGES_PER_WORKSPACE: "7", MAX_MEMBERS_PER_WORKSPACE: "3", MAX_WORKSPACES_PER_ACCOUNT: "2", MAX_WORKSPACE_ATTACHMENT_BYTES: "1000", REVISION_RETENTION_DAYS: "9", INACTIVE_ACCOUNT_DAYS: "120", MAX_TOTAL_ATTACHMENT_BYTES: "5000", MAX_ACCOUNTS: "4" }));
+    expect(c).toMatchObject({ maxPagesPerWorkspace: 7, maxMembersPerWorkspace: 3, maxWorkspacesPerAccount: 2, maxWorkspaceAttachmentBytes: 1000, revisionRetentionDays: 9, inactiveAccountDays: 120, maxTotalAttachmentBytes: 5000, maxAccounts: 4 });
   });
 
   it("THOTH_PROFILE=trial fills the owner's trial defaults", () => {
@@ -41,6 +41,7 @@ describe("configuration", () => {
       maxWorkspaceAttachmentBytes: 20 * 1_048_576,
       maxTotalAttachmentBytes: 600 * 1_048_576,
       revisionRetentionDays: 30,
+      inactiveAccountDays: 90,
       maxAttachmentBytes: 4 * 1_048_576,
       maxMarkdownBytes: 256 * 1024,
       blobStore: "postgres",
@@ -73,6 +74,7 @@ describe("configuration", () => {
     expect(loadConfig(env({ WORKSPACE_MANAGEMENT: "off" })).capabilities).not.toContain("workspace-management");
     expect(loadConfig(env({ MAX_WORKSPACE_CREATIONS_PER_DAY: "4" })).maxWorkspaceCreationsPerDay).toBe(4);
     expect(loadConfig(env({ THOTH_PROFILE: "trial", MAX_WORKSPACE_CREATIONS_PER_DAY: "unlimited" })).maxWorkspaceCreationsPerDay).toBeUndefined();
+    expect(loadConfig(env({ THOTH_PROFILE: "trial", INACTIVE_ACCOUNT_DAYS: "unlimited" })).inactiveAccountDays).toBeUndefined();
     expect(() => loadConfig(env({ WORKSPACE_MANAGEMENT: "maybe" }))).toThrow(/WORKSPACE_MANAGEMENT/);
   });
 

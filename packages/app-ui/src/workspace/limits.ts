@@ -37,6 +37,9 @@ export function describeLimits(limits: Record<string, number>, t: Strings["limit
       case "revisionRetentionDays":
         out.push(t.retention(n));
         break;
+      case "inactiveAccountDays":
+        out.push(t.inactiveAccounts(n));
+        break;
       case "maxPageSize":
       case "idempotencyWindowSeconds":
         break; // protocol tuning, not something a person plans around

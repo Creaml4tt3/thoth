@@ -44,6 +44,7 @@ node apps/server/src/main.ts
 | `MAX_PAGES_PER_WORKSPACE` | none (trial 200) | Live pages; deleted pages do not count. Advertised. |
 | `MAX_WORKSPACE_ATTACHMENT_BYTES` | none (trial 20 MiB) | Sum of a workspace's attachment sizes. Advertised. |
 | `REVISION_RETENTION_DAYS` | none (trial 30) | Non-current revisions older than this are pruned by maintenance. Advertised. |
+| `INACTIVE_ACCOUNT_DAYS` | none (trial 90) | Maintenance deletes accounts with no sign-in and no use for this many days, with the workspaces they alone own (see Maintenance). `unlimited` turns the trial's 90 off. Advertised as `limits.inactiveAccountDays`, which the apps show as a warning. |
 | `MAX_TOTAL_ATTACHMENT_BYTES` | none (trial 600 MiB) | Server-wide stored attachment bytes. Not advertised. |
 | `MAX_ACCOUNTS` | none (trial 300) | Server-wide number of accounts. Not advertised. |
 | `CORS_ORIGINS` | none | Comma-separated exact origins allowed from a browser (see CORS). |
@@ -107,6 +108,7 @@ SHA-256. Use it as `Authorization: Bearer $(cat ada.token)`.
 | `MAX_ATTACHMENT_BYTES` | **4 MiB** | Vercel Functions reject request bodies above 4.5 MB at the platform, before our code runs. Staying below it means a user sees our clear 413 `payload_too_large` instead of a platform error page. |
 | `MAX_MARKDOWN_BYTES`, `MAX_TRANSFER_BYTES` | 256 KiB, 4 MiB | the same 4.5 MB ceiling applies to `createTransfer` |
 | `REVISION_RETENTION_DAYS` | 30 | owner decision |
+| `INACTIVE_ACCOUNT_DAYS` | 90 | ADR-0014 and the privacy notice |
 | `MAX_TOTAL_ATTACHMENT_BYTES` | 600 MiB | Neon's free plan has 1 GB of storage per project, shared by pages, revisions and (with `BLOB_STORE=postgres`) attachments |
 | `BLOB_STORE` | `postgres` | a function's filesystem is ephemeral |
 | `EVENTS` | `off` | no long-lived SSE on a 300 s function or a database that must be allowed to sleep (ADR-0014) |
@@ -311,7 +313,7 @@ The client IP is the socket address unless `TRUST_PROXY` is set, then `x-real-ip
 ## Maintenance
 
 ```sh
-node apps/server/src/cli.ts maintenance      # prints {"workspacesPurged":..,"trashPagesPurged":..,"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..,"signInRowsDeleted":..,"feedbackDeleted":..,"presenceRowsDeleted":..}
+node apps/server/src/cli.ts maintenance      # prints {"workspacesPurged":..,"trashPagesPurged":..,"revisionsPruned":..,"idempotencyRecordsDeleted":..,"rateLimitRowsDeleted":..,"signInRowsDeleted":..,"feedbackDeleted":..,"presenceRowsDeleted":..,"inactiveAccountsDeleted":..,"inactiveAccountsSkipped":..}
 curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
 ```
 
@@ -320,6 +322,17 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
   (`done`, `failed`, `aborted`). A surviving revision is never modified: if its parent was pruned its `parentId` keeps
   naming it and that revision now answers 404; `listPageRevisions` simply omits what is gone.
 - Purges workspaces deleted more than 30 days ago (ADR-0025), one transaction each, then removes their unused blobs.
+- With `INACTIVE_ACCOUNT_DAYS` set, deletes accounts inactive that long (ADR-0014), up to 100 per run, one transaction
+  each, re-checked under the account's row lock and the row locks of every workspace it is in (so a workspace never
+  loses its last owner to a concurrent run or a co-owner leaving). Inactive means `users.last_seen_at` (set at sign-in
+  and refresh; a sign-in access token lives at most an hour, so any use of a session refreshes it) and every personal
+  access token's `last_used_at` are older than the limit. An account with no `last_seen_at` (made with the CLI, never
+  signed in) is never deleted. The workspaces it alone owns are purged like a deleted workspace, with their blobs; its
+  sign-ins, tokens, memberships and team places go. When revisions or other history in workspaces that stay still name
+  it, its row is kept as "Deleted account" with no email and nothing to sign in with (revisions are immutable), marked
+  `deleted_at` (migration 020) so that it no longer counts toward `MAX_ACCOUNTS`. An account that alone owns a workspace
+  with other members is **skipped** (`inactiveAccountsSkipped`): there is no ownership hand-over yet, so the operator
+  decides.
 - Deletes idempotency records past the 24 h window and expired rate-limit rows.
 - Revisions stay immutable. Migration 006 replaces the trigger so that `UPDATE` is always rejected and `DELETE` is
   allowed only inside a transaction that set `thoth.pruning = on` (transaction-local, so it cannot leak through a
@@ -419,8 +432,10 @@ live on named volumes.
     `client_id` at the token and revoke endpoints is 400 `invalid_client`. `thoth-web` sending a `refresh_token` in the
     body is refused (`invalid_request`) rather than ignored. Google ID tokens may carry `iss` `accounts.google.com`
     (without scheme), as Google documents; that alias is accepted for the Google issuer only.
-11. **Sign-in open points.** Nothing deletes accounts inactive for 90 days yet (`users.last_seen_at` is maintained for
-    it; ADR-0014 open question on email). An auth request row is written before the provider is visited, so without
+11. **Sign-in open points.** Inactive accounts are deleted by maintenance when `INACTIVE_ACCOUNT_DAYS` is set (trial
+    90), but there is no email notice (ADR-0014 open question on email): the warning is the limit line the apps show at
+    sign-in and in server settings. An account that alone owns a workspace with other members is skipped, not deleted,
+    until there is a rule for handing that workspace over. An auth request row is written before the provider is visited, so without
     `RATE_LIMIT_PER_IP` a client can create many short-lived rows (maintenance removes them). Accounts cannot be linked
     across providers. There is no consent screen and no per-client scope: a token grants everything the account can do.
 12. **Share links (ADR-0023).** Revoked and expired rows of `share_links` are kept (an audit trail of what was

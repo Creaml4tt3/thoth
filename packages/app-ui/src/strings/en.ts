@@ -574,6 +574,7 @@ export const en = {
     perAttachment: (size: string) => `${size} per attachment`,
     perPage: (size: string) => `${size} per page`,
     retention: (n: number) => `Old versions of a page are kept for ${plural(n, "day")}`,
+    inactiveAccounts: (n: number) => `Accounts with no sign-in for ${plural(n, "day")} are deleted, with the workspaces they alone own`,
     bytes: (n: number) => plural(n, "byte"),
   },
 
