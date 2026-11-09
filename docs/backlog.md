@@ -72,7 +72,6 @@ something ("later", "no", "yes, next"), write it on the line. New ideas go in th
 - Startup transfer recovery does not retry after signing in (S), `VaultHost.tsx`.
 - A startup sweep for leftover `thoth-import-*` temp folders (S).
 - Import speed and memory: batched commits, streaming CSV (M), implementation-plan.md.
-- The mascot covers the First steps "Copy" buttons in Settings → Connected apps (S).
 - A first-run tour in the web app (S), ADR-0032.
 - A neighbourhood graph picture in Connections (M), ADR-0045.
 
