@@ -231,3 +231,6 @@
 @media (max-width: 720px) { .mascot-settings-grid { grid-template-columns: minmax(0, 1fr); } }
 /* Streamed lines arrive many times a second in a small panel: they appear, they do not rise in. */
 .bubble-log .agents-log > li { animation: none; }
+/* Settings ends with room for the mascot's largest box (140% of 88 px) and its gap, so the last lines can scroll clear of
+   the corner it sits in. */
+body:has(.mascot-layer) .settings { padding-bottom: 160px; }

@@ -279,6 +279,8 @@ export interface Commands {
    * the app is not set up on this computer; `EEXIST` when it has another `thoth` server, unless `replace`.
    */
   "mcp.install": { args: { app: SetupApp; replace?: boolean; instructions?: boolean }; result: { status: "added" | "already" | "replaced"; file?: string; backup?: string | null } };
+  /** What each app already has of this Thoth's setup, read without changing anything and without any file's contents. */
+  "mcp.setupStatus": { args: Record<string, never>; result: Record<SetupApp, SetupState> };
   "mcp.skillLinks": { args: { root: string; on?: boolean }; result: SkillLinksReport };
   "mcp.memoryHistory": { args: { id?: string }; result: { changes: MemoryHistoryChange[] } | MemoryHistoryText };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
@@ -453,6 +455,16 @@ export interface ConnectedAppProposalText extends ConnectedAppProposal {
 
 /** The apps Thoth sets up itself (ADR-0052 rule 10). */
 export type SetupApp = "claude-code" | "codex" | "claude-desktop" | "cursor";
+
+/**
+ * What an app already has (`mcp.setupStatus`). `server`: `unavailable` (the app is not on this computer), `none`, `this`
+ * (exactly this Thoth), `other` (another thoth server, e.g. an older copy) or `unknown` (its file cannot be read).
+ * `instructions`, for Claude Code and Codex: `outdated` is an older version Thoth replaces, `edited` was changed by hand.
+ */
+export interface SetupState {
+  server: "unavailable" | "none" | "this" | "other" | "unknown";
+  instructions?: "unavailable" | "none" | "this" | "outdated" | "edited" | "unknown";
+}
 
 /** What `mcp.skillLinks` did: the skills linked, those not linked (a file or folder of that name was there), and where. */
 export interface SkillLinksReport {

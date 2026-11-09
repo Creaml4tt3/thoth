@@ -339,6 +339,22 @@ export const en = {
         cursor: { name: "Cursor", what: "Adds Thoth to ~/.cursor/mcp.json. Cursor shows it under Settings → MCP." },
       },
       setUp: "Set up",
+      setUpAgain: "Set up again",
+      /** What the app has now, under its name; checked when the section opens and after each button. */
+      server: {
+        this: "Set up",
+        other: "Set up for another copy of Thoth",
+        none: "Not set up",
+        unavailable: "Not on this computer",
+        unknown: "Could not check its settings",
+      },
+      instructionsState: {
+        this: "Instructions added",
+        none: "No instructions yet",
+        outdated: "Older instructions: add them again to update",
+        edited: "Instructions changed by hand",
+        unknown: "Could not check the instructions",
+      },
       replace: "Replace it",
       added: (name: string) => `Added Thoth to ${name}.`,
       replaced: (name: string) => `Replaced the thoth server in ${name}.`,

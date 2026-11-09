@@ -83,7 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
-    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks", "mcp.install",
+    "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks", "mcp.install", "mcp.setupStatus",
     "diag.report", "diag.collect", "diag.settings",
 ];
 
@@ -630,6 +630,7 @@ impl Host {
                 let claude = |a: &[String]| self.agents.run_once("claude", a);
                 json(self.mcp.install(str_arg(args, "app")?, replace, self.home.as_deref(), &claude)?)
             }
+            "mcp.setupStatus" => json(self.mcp.setup_status(self.home.as_deref())?),
             "mcp.proposals" => json(self.mcp.proposals()),
             "mcp.proposal" => json(self.mcp.proposal(str_arg(args, "id")?)?),
             "mcp.settle" => json(self.mcp.settle(owner, str_arg(args, "id")?, str_arg(args, "status")?)?),

@@ -448,12 +448,24 @@ impl Relay {
     /// `mcp.install { app, replace? }`: adds `thoth-mcp` to an app's own MCP settings (ADR-0052 rule 10). `claude` runs
     /// the Claude Code CLI.
     pub fn install(&self, app: &str, replace: bool, home: Option<&Path>, claude: install::RunClaude<'_>) -> HostResult<Value> {
+        let (setup, home) = self.install_setup(home)?;
+        install::install(app, replace, &setup, home, claude)
+    }
+
+    /// `mcp.setupStatus`: what each app already has of this Thoth's setup and instructions, read without writing
+    /// anything and without any file's contents.
+    pub fn setup_status(&self, home: Option<&Path>) -> HostResult<Value> {
+        let (setup, home) = self.install_setup(home)?;
+        Ok(install::status(&setup, home))
+    }
+
+    fn install_setup<'a>(&self, home: Option<&'a Path>) -> HostResult<(install::Setup, &'a Path)> {
         let setup = self.setup();
         let command =
             setup.get("command").and_then(Value::as_str).ok_or_else(|| HostError::new("UNAVAILABLE", "Connected apps are not available on this computer"))?;
         let args = setup.get("args").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
         let home = home.ok_or_else(|| HostError::new("UNAVAILABLE", "Thoth could not find your home folder"))?;
-        install::install(app, replace, &install::Setup { command: command.to_owned(), args }, home, claude)
+        Ok((install::Setup { command: command.to_owned(), args }, home))
     }
 
     /// `mcp.install { app, instructions: true }`: adds the instructions to the app's own instruction file instead.

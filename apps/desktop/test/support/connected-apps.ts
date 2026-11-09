@@ -12,6 +12,8 @@ import type {
   McpRequest,
   MemoryHistoryText,
   MemoryWritten,
+  SetupApp,
+  SetupState,
   SkillLinksReport,
 } from "@thoth/platform";
 
@@ -109,16 +111,28 @@ export class FakeConnectedApps implements ConnectedApps {
   }
   /** Apps that already have another thoth server; `install` refuses them with EEXIST unless replacing. */
   taken = new Set<string>();
-  async install(app: string, replace?: boolean) {
+  /** What each app has now (`setupStatus`); `install` and `instruct` change it as the host would. */
+  setup: Record<SetupApp, SetupState> = {
+    "claude-code": { server: "none", instructions: "none" },
+    codex: { server: "none", instructions: "none" },
+    "claude-desktop": { server: "none" },
+    cursor: { server: "none" },
+  };
+  async install(app: SetupApp, replace?: boolean) {
     this.calls.push(replace ? ["install", app, true] : ["install", app]);
     if (this.taken.has(app) && !replace) throw Object.assign(new Error(`${app} already has a server called thoth`), { code: "EEXIST" });
     const replaced = this.taken.delete(app);
+    this.setup[app].server = "this";
     return { status: replaced ? ("replaced" as const) : ("added" as const), file: `/Users/someone/.${app}/config`, backup: null };
   }
   async instruct(app: "claude-code" | "codex") {
     this.calls.push(["instruct", app]);
+    this.setup[app].instructions = "this";
     const file = app === "codex" ? "/Users/someone/.codex/AGENTS.md" : "/Users/someone/.claude/CLAUDE.md";
     return { status: "added" as const, file, backup: `${file}.thoth.bak` };
+  }
+  async setupStatus() {
+    return structuredClone(this.setup);
   }
   /** What `skillLinks` answers (its `on` follows the settings). */
   linkReport: Omit<SkillLinksReport, "on"> = { linked: [], skipped: [], folders: ["/Users/someone/.agents/skills"] };
