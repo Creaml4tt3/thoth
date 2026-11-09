@@ -138,7 +138,7 @@ contractual safeguards, as the PDPA allows for transfers abroad.
 - **Inactive accounts.** An account with no sign-in or app use for 90 days is deleted,
   together with the workspaces it alone owns. The sign-in page states this rule; there is
   no separate warning before the deletion. An account that alone owns a workspace other
-  people still use is kept. Where the account's edits appear in the history of another
+  people still use is kept. Where a deleted account's edits appear in the history of another
   workspace's pages, they show "Deleted account", without a name or email.
 - **Server logs** are kept for up to 30 days.
   <!-- OWNER: check your Vercel plan's log retention and match this number. -->
