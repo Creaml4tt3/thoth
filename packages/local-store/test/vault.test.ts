@@ -325,6 +325,62 @@ describe("search input hardening", () => {
   });
 });
 
+describe("search with terms under 3 characters", () => {
+  beforeEach(async () => {
+    await put("Thai/วันดี.md", "# วันดี\n\nอากาศสดใส\n");
+    await put("Thai/Trip.md", "# ทริป\n\nพรุ่งนี้เราจะไปทะเลกันนะ ดีมาก\n");
+    await put("Notes/Rates.md", "# Rates\n\nThe fee is 5% of x_y and 50 of xzy.\n");
+    await vault.reconcile();
+  });
+
+  it("finds a two-letter Thai word inside a sentence, with a marked snippet", async () => {
+    const hits = await vault.search("ไป");
+    expect(hits.map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect(hits[0]!.snippet).toContain("[ไป]");
+  });
+
+  it("finds a one-letter Latin term inside a word, title hits first among substring hits", async () => {
+    // "z" only sits inside "xzy" and "ox" only inside "box", so only the substring path finds them.
+    expect((await vault.search("z")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    await put("Notes/Box.md", "# Box\n\nA plain note.\n");
+    await put("Notes/Packing.md", "# Packing\n\nPut it in the box.\n");
+    await vault.reconcile();
+    expect((await vault.search("ox")).map((h) => h.path)).toEqual(["Notes/Box.md", "Notes/Packing.md"]);
+  });
+
+  it("keeps word-index hits ahead of pages that only contain the letters", async () => {
+    // The word index finds "ดีมาก" in Trip; วันดี only contains ดี, so it comes after.
+    expect((await vault.search("ดี")).map((h) => h.path)).toEqual(["Thai/Trip.md", "Thai/วันดี.md"]);
+    await put("Notes/Mention.md", "# Mention\n\nWe talked about AI today.\n");
+    for (let i = 0; i < 6; i++) await put(`Daily/Daily ${i}.md`, `# Daily ${i}\n\nNothing here.\n`);
+    await vault.reconcile();
+    // Six titles contain "ai" (Daily); a small limit must still keep the page the word index found.
+    expect((await vault.search("AI", 5)).map((h) => h.path)[0]).toBe("Notes/Mention.md");
+    expect(await vault.search("AI", 5)).toHaveLength(5);
+  });
+
+  it("needs every term when short and long terms mix", async () => {
+    expect((await vault.search("ไป ทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไป ภูเขา")).map((h) => h.path)).toEqual([]);
+    expect((await vault.search("fee z")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    expect((await vault.search("fee q")).map((h) => h.path)).toEqual([]);
+  });
+
+  it("takes % and _ literally", async () => {
+    expect((await vault.search("%")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    expect((await vault.search("_")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    // Unescaped, "%0%%" would match "50" and "%z_%" would match "zy".
+    expect((await vault.search("0%")).map((h) => h.path)).toEqual([]);
+    expect((await vault.search("z_")).map((h) => h.path)).toEqual([]);
+  });
+
+  it("leaves longer queries to the word and trigram indexes", async () => {
+    expect((await vault.search("ทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไปทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไปภูเขา")).map((h) => h.path)).toEqual([]);
+  });
+});
+
 describe("Vault concurrency", () => {
   it("serializes concurrent saves, reconciles and rebuilds without overlapping transactions", async () => {
     // The watcher, editor saves and imports all run on one SQL connection; overlapping BEGINs would throw.

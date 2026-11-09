@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openNodeVault } from "@thoth/local-store/node";
 import type { Vault } from "@thoth/local-store";
-import { privateConnectionsSource } from "../src/features/editor/PrivateConnections.tsx";
+import { MENTION_PAGES, privateConnectionsSource } from "../src/features/editor/PrivateConnections.tsx";
 
 let root: string;
 let vault: Vault;
@@ -49,6 +49,16 @@ describe("Private Space connections", () => {
   it("finds a Thai title inside Thai text", async () => {
     const { rows } = await source("ทอธ.md", "ทอธ").mentions()!;
     expect(rows.map((r) => r.page.ref)).toEqual(["ไทย.md"]);
+  });
+
+  it("finds a title with a two-letter word even when more pages than it reads contain its letters", async () => {
+    await put("AI Plan.md", "# AI Plan\n");
+    await put("Notes/Talk.md", "# Talk\n\nWe went over the AI plan today.\n");
+    // Every "Daily plan" title contains "ai" and "plan"; they must not take the slots of the page that names AI Plan.
+    for (let i = 0; i <= MENTION_PAGES; i++) await put(`Daily/Daily plan ${i}.md`, `# Daily plan ${i}\n`);
+    await vault.reconcile();
+    const { rows } = await source("AI Plan.md", "AI Plan").mentions()!;
+    expect(rows.map((r) => r.page.ref)).toEqual(["Notes/Talk.md"]);
   });
 
   it("links one mention with the shortest wikilink, keeping the words as written", async () => {
