@@ -18,7 +18,9 @@
 | PostgreSQL ของคุณเอง (แบบ managed หรือไม่ก็ได้) และผู้ให้บริการ OpenID Connect | [`compose.external.yaml`](../../compose.external.yaml): เฉพาะเซิร์ฟเวอร์ | ผู้ให้บริการของคุณ (Keycloak, Authentik, Zitadel, Entra ID...), Google หรือ GitHub |
 | เครื่องที่มี Node.js และไม่ใช้คอนเทนเนอร์ | `node apps/server/src/main.ts` จากโค้ดที่โคลนมา | เหมือนข้างบน |
 
-## อิมเมจ
+<!-- REVIEW -->
+
+## อิมเมจคอนเทนเนอร์
 
 `ghcr.io/creaml4tt3/thoth-server` สำหรับ `linux/amd64` และ `linux/arm64` ออกพร้อมทุกเวอร์ชัน:
 
