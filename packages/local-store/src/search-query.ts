@@ -21,3 +21,14 @@ export function trigramMatch(tokens: string[]): string | undefined {
   if (tokens.length === 0 || tokens.some((t) => [...t].length < 3)) return undefined;
   return tokens.map((t) => `"${t}"`).join(" AND ");
 }
+
+/** A LIKE pattern (with `ESCAPE '\'`) that matches `term` anywhere, taking `%`, `_` and `\` literally. */
+export function likeAnywhere(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/** Brackets each term in `text` the way FTS5 `snippet()` does, so every search path reads the same. */
+export function markTerms(text: string, tokens: string[]): string {
+  const any = new RegExp([...tokens].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "gi");
+  return text.replace(any, "[$&]");
+}

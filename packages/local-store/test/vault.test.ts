@@ -325,6 +325,47 @@ describe("search input hardening", () => {
   });
 });
 
+describe("search with terms under 3 characters", () => {
+  beforeEach(async () => {
+    await put("Thai/วันดี.md", "# วันดี\n\nอากาศสดใส\n");
+    await put("Thai/Trip.md", "# ทริป\n\nพรุ่งนี้เราจะไปทะเลกันนะ ดีมาก\n");
+    await put("Notes/Rates.md", "# Rates\n\nThe fee is 5% of x_y and 50 of xzy.\n");
+    await vault.reconcile();
+  });
+
+  it("finds a two-letter Thai word inside a sentence, with a marked snippet", async () => {
+    const hits = await vault.search("ไป");
+    expect(hits.map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect(hits[0]!.snippet).toContain("[ไป]");
+  });
+
+  it("finds a one-letter Latin term, title hits first", async () => {
+    expect((await vault.search("x")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    // The word index finds "ดีมาก" in Trip first; the title hit still leads.
+    expect((await vault.search("ดี")).map((h) => h.path)).toEqual(["Thai/วันดี.md", "Thai/Trip.md"]);
+  });
+
+  it("needs every term when short and long terms mix", async () => {
+    expect((await vault.search("ไป ทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไป ภูเขา")).map((h) => h.path)).toEqual([]);
+    expect((await vault.search("fee x")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+  });
+
+  it("takes % and _ literally", async () => {
+    expect((await vault.search("5%")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    expect((await vault.search("0%")).map((h) => h.path)).toEqual([]);
+    expect((await vault.search("x_")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+    expect((await vault.search("z_")).map((h) => h.path)).toEqual([]);
+    expect((await vault.search("%")).map((h) => h.path)).toEqual(["Notes/Rates.md"]);
+  });
+
+  it("leaves longer queries to the word and trigram indexes", async () => {
+    expect((await vault.search("ทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไปทะเล")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("ไปภูเขา")).map((h) => h.path)).toEqual([]);
+  });
+});
+
 describe("Vault concurrency", () => {
   it("serializes concurrent saves, reconciles and rebuilds without overlapping transactions", async () => {
     // The watcher, editor saves and imports all run on one SQL connection; overlapping BEGINs would throw.

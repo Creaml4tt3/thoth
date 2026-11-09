@@ -30,7 +30,7 @@ import { mimeTypeFor } from "./mime.ts";
 import type { FileStat, ScanEntry, SqlDriver, SqlValue, VaultFs } from "./ports.ts";
 import { scanByListing } from "./scan.ts";
 import { INDEX_DDL, INDEX_SCHEMA_VERSION } from "./schema.ts";
-import { tokenize, trigramMatch, wordMatch } from "./search-query.ts";
+import { likeAnywhere, markTerms, tokenize, trigramMatch, wordMatch } from "./search-query.ts";
 
 export const THOTH_DIR = ".thoth";
 const CONFIG_PATH = ".thoth/config.json";
@@ -769,12 +769,32 @@ export class Vault {
       ))
         if (!hits.has(row.page_id)) hits.set(row.page_id, { id: row.page_id, path: "", title: "", snippet: row.snippet });
     }
+    // A term under 3 characters has no index (and Thai has no spaces for the word index), so match substrings, as the server does.
+    const short = !tri && tokens.length > 0;
+    if (short) {
+      const patterns = tokens.map(likeAnywhere);
+      const every = (column: string) => patterns.map(() => `${column} LIKE ? ESCAPE '\\'`).join(" AND ");
+      // Cost: a full scan of the search table, only for such queries; LIMIT bounds the rows, not the scan.
+      for (const row of await this.sql.all<{ page_id: string; start: number; part: string; len: number }>(
+        `SELECT s.page_id, max(instr(lower(s.body), lower(?)) - 30, 1) AS start, substr(s.body, max(instr(lower(s.body), lower(?)) - 30, 1), 90) AS part, length(s.body) AS len
+           FROM search_content s JOIN pages p ON p.id = s.page_id
+          WHERE ${every("s.body")}
+          ORDER BY (${every("s.title")}) DESC, p.mtime_ms DESC LIMIT ?`,
+        [tokens[0]!, tokens[0]!, ...patterns, ...patterns, limit],
+      ))
+        if (!hits.has(row.page_id)) {
+          const snippet = `${row.start > 1 ? "…" : ""}${markTerms(row.part.replace(/\s+/g, " ").trim(), tokens)}${row.start + 90 <= row.len ? "…" : ""}`;
+          hits.set(row.page_id, { id: row.page_id, path: "", title: "", snippet });
+        }
+    }
     const results: SearchHit[] = [];
-    for (const hit of [...hits.values()].slice(0, limit)) {
+    for (const hit of short ? hits.values() : [...hits.values()].slice(0, limit)) {
       const page = await this.sql.get<{ path: string; title: string }>("SELECT path, title FROM pages WHERE id = ?", [hit.id]);
       if (page) results.push({ ...hit, path: page.path, title: page.title });
     }
-    return results;
+    if (!short) return results;
+    const inTitle = (hit: SearchHit) => tokens.every((t) => hit.title.toLowerCase().includes(t.toLowerCase()));
+    return results.sort((a, b) => Number(inTitle(b)) - Number(inTitle(a))).slice(0, limit);
   }
 
   async backlinks(path: string): Promise<Backlink[]> {

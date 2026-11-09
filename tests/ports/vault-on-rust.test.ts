@@ -77,6 +77,16 @@ describe("Vault on Rust ports", () => {
     await expect(vault.search('"unbalanced OR NEAR(')).resolves.toBeInstanceOf(Array);
   });
 
+  it("finds terms under 3 characters by substring, % and _ literally", async () => {
+    await put("Thai/Trip.md", "# ทริป\n\nพรุ่งนี้เราจะไปทะเลกันนะ fee 5% of x_y\n");
+    await vault.reconcile();
+    const hits = await vault.search("ไป");
+    expect(hits.map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect(hits[0]!.snippet).toContain("[ไป]");
+    expect((await vault.search("ไป 5% x_")).map((h) => h.path)).toEqual(["Thai/Trip.md"]);
+    expect((await vault.search("0%")).map((h) => h.path)).toEqual([]);
+  });
+
   it("writes with compare-and-swap: a stale hash is a ConflictError", async () => {
     const read = await vault.readPage("Inbox/Welcome.md");
     await put("Inbox/Welcome.md", "edited elsewhere\n");
