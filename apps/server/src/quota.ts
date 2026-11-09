@@ -83,12 +83,13 @@ export async function assertCanOwnAnotherWorkspace(q: Queryable, quotas: Quotas,
 /**
  * Accounts: call inside the transaction that inserts the user, before the insert, in EVERY place that
  * creates users (admin CLI today, sign-in later). Serialized, so concurrent sign-ups cannot overshoot.
- * The quota is server-wide and not advertised, so the reply names no numbers.
+ * The quota is server-wide and not advertised, so the reply names no numbers. A "Deleted account" row kept for shared
+ * history (`deleted_at`, see maintenance) is not an account and frees its place.
  */
 export async function assertCanCreateAccount(q: Queryable, quotas: Quotas): Promise<void> {
   const limit = quotas.maxAccounts;
   if (limit === undefined) return;
   await lock(q, "accounts");
-  const current = await countOf(q, "SELECT count(*) AS n FROM users", []);
+  const current = await countOf(q, "SELECT count(*) AS n FROM users WHERE deleted_at IS NULL", []);
   if (current + 1 > limit) throw quotaExceeded("accounts", "this trial server is not accepting new accounts right now because it is full; nothing is wrong with your request");
 }

@@ -3,10 +3,12 @@
  * deletes an account with no sign-in and no use for INACTIVE_ACCOUNT_DAYS, with the workspaces it alone owns and their
  * attachments; keeps recent accounts, accounts in use and accounts made with the CLI that never signed in; skips an
  * account that alone owns a workspace with other members; keeps an anonymous row when shared history names it; and does
- * nothing when the setting is unset. A session refreshed every day is covered in signin.test.ts.
+ * nothing when the setting is unset; and never leaves a workspace without an owner under concurrency. A session refreshed
+ * every day is covered in signin.test.ts.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runMaintenance } from "../src/maintenance.ts";
+import { createUser } from "../src/admin.ts";
+import { deleteInactiveAccounts, runMaintenance } from "../src/maintenance.ts";
 import { startTestEnv, type TestEnv, type TestPrincipal } from "./helpers.ts";
 import { createPage, uploadAttachment } from "./support.ts";
 
@@ -115,10 +117,62 @@ describe("inactive accounts: INACTIVE_ACCOUNT_DAYS=90", () => {
     expect((await maintenance()).inactiveAccountsDeleted).toBe(1);
     const row = (await env.db.query<{ display_name: string; email: string | null; last_seen_at: Date | null }>("SELECT display_name, email, last_seen_at FROM users WHERE id = $1", [writer.userId])).rows[0];
     expect(row).toEqual({ display_name: "Deleted account", email: null, last_seen_at: null });
+    // The kept row frees its MAX_ACCOUNTS place: a server "full" by raw row count still takes a new account.
+    expect(await count(env, "SELECT count(*) AS n FROM users WHERE id = $1 AND deleted_at IS NOT NULL", [writer.userId])).toBe(1);
+    await createUser(env.db, { name: "After" }, { maxAccounts: await count(env, "SELECT count(*) AS n FROM users") });
     for (const table of ["access_tokens", "memberships"]) expect(await count(env, `SELECT count(*) AS n FROM ${table} WHERE user_id = $1`, [writer.userId]), table).toBe(0);
     expect((await env.api(owner, "GET", `/workspaces/${ws}/pages/${page.id}`)).status).toBe(200);
     // Not picked up again.
     expect((await maintenance()).inactiveAccountsDeleted).toBe(0);
+  });
+});
+
+describe("inactive accounts: concurrency", () => {
+  let env: TestEnv;
+
+  beforeAll(async () => {
+    env = await startTestEnv({ env: { BLOB_STORE: "postgres" } });
+  });
+  afterAll(() => env.close());
+
+  const run = () => deleteInactiveAccounts(env.db, env.server.deps.blobs, 90);
+
+  it("two runs over two inactive co-owners delete both and purge the workspace, never leaving it without an owner", async () => {
+    for (let round = 0; round < 5; round++) {
+      const a = await env.user(`A${round}`);
+      const b = await env.user(`B${round}`);
+      const ws = await env.workspace("Pair", { members: { [a.userId]: "owner", [b.userId]: "owner" } });
+      for (const who of [a, b]) await lastActive(env, who, 100);
+
+      const results = await Promise.all([run(), run()]);
+      expect(results.reduce((n, r) => n + r.deleted, 0), `round ${round}`).toBe(2);
+      expect(await count(env, "SELECT count(*) AS n FROM workspaces WHERE id = $1", [ws]), `round ${round}`).toBe(0);
+      for (const who of [a, b]) expect(await exists(env, who.userId)).toBe(0);
+    }
+  });
+
+  it("waits for a co-owner leaving, then skips the account that is now the only owner", async () => {
+    const inactive = await env.user("Inactive");
+    const leaver = await env.user("Leaver");
+    const editor = await env.user("Editor");
+    const ws = await env.workspace("Team", { members: { [inactive.userId]: "owner", [leaver.userId]: "owner", [editor.userId]: "editor" } });
+    await lastActive(env, inactive, 100);
+    for (const who of [leaver, editor]) await lastActive(env, who, 1);
+
+    let pending!: ReturnType<typeof run>;
+    let settled = false;
+    // The leave route's transaction: the workspace row lock, then the membership gone.
+    await env.db.tx(async (tx) => {
+      await tx.query("SELECT 1 FROM workspaces WHERE id = $1 FOR UPDATE", [ws]);
+      pending = run();
+      void pending.finally(() => (settled = true));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(settled).toBe(false);
+      await tx.query("DELETE FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws, leaver.userId]);
+    });
+    expect(await pending).toEqual({ deleted: 0, skipped: 1 });
+    expect(await exists(env, inactive.userId)).toBe(1);
+    expect(await count(env, "SELECT count(*) AS n FROM memberships WHERE workspace_id = $1 AND role = 'owner'", [ws])).toBe(1);
   });
 });
 

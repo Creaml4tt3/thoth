@@ -323,14 +323,16 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/internal/maintenance
   naming it and that revision now answers 404; `listPageRevisions` simply omits what is gone.
 - Purges workspaces deleted more than 30 days ago (ADR-0025), one transaction each, then removes their unused blobs.
 - With `INACTIVE_ACCOUNT_DAYS` set, deletes accounts inactive that long (ADR-0014), up to 100 per run, one transaction
-  each, re-checked under the account's row lock. Inactive means `users.last_seen_at` (set at sign-in and refresh; a
-  sign-in access token lives at most an hour, so any use of a session refreshes it) and every personal access token's
-  `last_used_at` are older than the limit. An account with no `last_seen_at` (made with the CLI, never signed in) is
-  never deleted. The workspaces it alone owns are purged like a deleted workspace, with their blobs; its sign-ins,
-  tokens, memberships and team places go. When revisions or other history in workspaces that stay still name it, its
-  row is kept as "Deleted account" with no email and nothing to sign in with (revisions are immutable). An account that
-  alone owns a workspace with other members is **skipped** (`inactiveAccountsSkipped`): there is no ownership
-  hand-over yet, so the operator decides.
+  each, re-checked under the account's row lock and the row locks of every workspace it is in (so a workspace never
+  loses its last owner to a concurrent run or a co-owner leaving). Inactive means `users.last_seen_at` (set at sign-in
+  and refresh; a sign-in access token lives at most an hour, so any use of a session refreshes it) and every personal
+  access token's `last_used_at` are older than the limit. An account with no `last_seen_at` (made with the CLI, never
+  signed in) is never deleted. The workspaces it alone owns are purged like a deleted workspace, with their blobs; its
+  sign-ins, tokens, memberships and team places go. When revisions or other history in workspaces that stay still name
+  it, its row is kept as "Deleted account" with no email and nothing to sign in with (revisions are immutable), marked
+  `deleted_at` (migration 020) so that it no longer counts toward `MAX_ACCOUNTS`. An account that alone owns a workspace
+  with other members is **skipped** (`inactiveAccountsSkipped`): there is no ownership hand-over yet, so the operator
+  decides.
 - Deletes idempotency records past the 24 h window and expired rate-limit rows.
 - Revisions stay immutable. Migration 006 replaces the trigger so that `UPDATE` is always rejected and `DELETE` is
   allowed only inside a transaction that set `thoth.pruning = on` (transaction-local, so it cannot leak through a

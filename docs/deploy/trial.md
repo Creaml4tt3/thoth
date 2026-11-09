@@ -121,6 +121,12 @@ Domains used below (change them when you buy your own domain):
    the server build that contains it**: that build reads both on every Team
    memory request.
 
+   Migration `020_deleted_accounts.sql` (ADR-0014, inactive accounts) adds one
+   nullable column (`users.deleted_at`). It is additive and safe while the old
+   build runs, which never reads it, and needs no backfill. **Apply it to Neon
+   before you deploy the server build that contains it**: that build reads it
+   on every sign-up, so without it every new account fails.
+
 Free-plan facts to keep in mind:
 - 1 GB of storage.
 - 100 compute-hours a month.

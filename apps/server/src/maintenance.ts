@@ -79,7 +79,8 @@ const ACCOUNT_ROWS = ["identities", "sessions", "auth_codes", "access_tokens", "
  * re-checked under the account's row lock: a sign-in or refresh in flight holds a lock on it and wins. The workspaces
  * the account alone owns are purged with their attachments. An account that alone owns a workspace with other members
  * is skipped: handing that workspace over is the operator's call. When revisions or other history in workspaces that
- * stay still name the account, its row is kept as "Deleted account" without name, email, sign-in or tokens.
+ * stay still name the account, its row is kept as "Deleted account" without name, email, sign-in or tokens, marked by
+ * `deleted_at` so that it no longer counts toward MAX_ACCOUNTS.
  */
 export async function deleteInactiveAccounts(db: Database, blobs: BlobStore, days: number): Promise<{ deleted: number; skipped: number }> {
   let skipped = Number((await db.query<{ n: string }>(`SELECT count(*) AS n FROM users u WHERE ${INACTIVE} AND ${ALONE_OWNS_SHARED}`, [days])).rows[0]?.n ?? 0);
@@ -89,14 +90,16 @@ export async function deleteInactiveAccounts(db: Database, blobs: BlobStore, day
     const hashes = await db.tx(async (tx) => {
       const locked = await tx.query(`SELECT 1 FROM users u WHERE u.id = $2 AND ${INACTIVE} FOR UPDATE SKIP LOCKED`, [days, id]);
       if (locked.rowCount === 0) return null;
+      // Every workspace it is in, in id order, like a membership change (members.ts): a co-owner leaving, or another
+      // run deleting the other co-owner, waits here, so a workspace never loses its last owner.
+      await tx.query("SELECT w.id FROM workspaces w JOIN memberships m ON m.workspace_id = w.id WHERE m.user_id = $1 ORDER BY w.id FOR UPDATE OF w", [id]);
+      // Fresh statements: they see what committed while the lock above waited.
       const owned = await tx.query<{ id: string }>(
-        `SELECT w.id FROM workspaces w JOIN memberships m ON m.workspace_id = w.id AND m.user_id = $1 AND m.role = 'owner'
-          WHERE NOT EXISTS (SELECT 1 FROM memberships o WHERE o.workspace_id = w.id AND o.user_id <> $1 AND o.role = 'owner')
-          ORDER BY w.id FOR UPDATE OF w`,
+        `SELECT m.workspace_id AS id FROM memberships m WHERE m.user_id = $1 AND m.role = 'owner'
+          AND NOT EXISTS (SELECT 1 FROM memberships o WHERE o.workspace_id = m.workspace_id AND o.user_id <> $1 AND o.role = 'owner')`,
         [id],
       );
       const alone = owned.rows.map((r) => r.id);
-      // Checked again now that the workspace rows are locked: joining one locks it first.
       const others = await tx.query("SELECT 1 FROM memberships WHERE workspace_id = ANY($1) AND user_id <> $2 LIMIT 1", [alone, id]);
       if ((others.rowCount ?? 0) > 0) {
         skipped++;
@@ -112,7 +115,7 @@ export async function deleteInactiveAccounts(db: Database, blobs: BlobStore, day
         if ((error as { code?: string }).code !== "23503") throw error;
         // Immutable revisions (ADR-0005) and other history in shared workspaces reference it: keep an anonymous row.
         await tx.query("ROLLBACK TO SAVEPOINT account_row");
-        await tx.query("UPDATE users SET display_name = 'Deleted account', email = NULL, last_seen_at = NULL WHERE id = $1", [id]);
+        await tx.query("UPDATE users SET display_name = 'Deleted account', email = NULL, last_seen_at = NULL, deleted_at = now() WHERE id = $1", [id]);
       }
       await audit(tx, { actorId: null, action: "account.deleted", detail: { userId: id, reason: "inactive", workspacesPurged: alone.length } });
       return hashes;
