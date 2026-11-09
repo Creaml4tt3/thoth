@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
-import { FakeConnectedApps, SIDECAR, SOCKET } from "./support/connected-apps.ts";
+import { FakeConnectedApps, INSTRUCTIONS, SIDECAR, SOCKET } from "./support/connected-apps.ts";
 import { setLangPreference } from "../src/strings/index.ts";
 
 const dirs = tempDirs();
@@ -303,6 +303,30 @@ describe("Set up an app (ADR-0052 rule 10)", () => {
     expect(writeText.mock.calls[0]![0]).toBe(`claude mcp add --scope user thoth -- ${SIDECAR} --socket '${SOCKET}'`);
     await app.user.click(card("Any other agent").getByRole("button", { name: "Copy the prompt" }));
     await waitFor(() => expect(writeText.mock.calls[1]![0]).toContain("thothnotes.com/agents/setup"));
+  });
+});
+
+describe("Agent instructions and first steps", () => {
+  it("adds the instructions for Claude Code and Codex, copies them for the others, and copies the starter prompts", async () => {
+    const app = await open();
+    const writeText = vi.fn(async (_text: string) => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const section = await openSettings(app);
+    const card = (name: string) => within(section.getByRole("listitem", { name }));
+
+    await app.user.click(card("Claude Code").getByRole("button", { name: "Add the instructions" }));
+    expect(await card("Claude Code").findByText(/^Added the instructions to \/Users\/someone\/\.claude\/CLAUDE\.md\. The file as it was is kept in/)).toBeTruthy();
+    expect(apps.calls).toContainEqual(["instruct", "claude-code"]);
+    await app.user.click(card("Codex and the ChatGPT app").getByRole("button", { name: "Add the instructions" }));
+    await waitFor(() => expect(apps.calls).toContainEqual(["instruct", "codex"]));
+
+    expect(card("Cursor").queryByRole("button", { name: "Add the instructions" })).toBeNull();
+    await app.user.click(card("Cursor").getByRole("button", { name: "Copy the instructions" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(INSTRUCTIONS));
+
+    const first = card("First steps");
+    await app.user.click(first.getAllByRole("button", { name: /^Copy:/ })[1]!);
+    await waitFor(() => expect(writeText.mock.lastCall![0]).toMatch(/^Ask me 5 short questions/));
   });
 });
 

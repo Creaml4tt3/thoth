@@ -320,6 +320,21 @@ export const th: DesktopStrings = {
       otherPrompt: "ช่วยตั้งค่า Thoth ให้เป็นความจำของฉัน ตามคู่มือนี้: https://thothnotes.com/agents/setup", // REVIEW
       copyPrompt: "คัดลอกพรอมต์", // REVIEW
       copied: "คัดลอกแล้ว", // REVIEW
+      instructionsWhat:
+        "คำแนะนำคือข้อความสั้น ๆ ที่บอกให้เอเจนต์เรียกดูและบันทึกความจำใน Thoth โดย Thoth จะเพิ่มลงใน ~/.claude/CLAUDE.md สำหรับ Claude Code และ ~/.codex/AGENTS.md สำหรับ Codex หลังสำรองไฟล์ไว้ก่อน สำหรับ Claude Desktop และ Cursor ให้คัดลอกไปวางในคำแนะนำของแอปเอง (ใน Cursor: Settings → Rules)", // REVIEW
+      addInstructions: "เพิ่มคำแนะนำ", // REVIEW
+      copyInstructions: "คัดลอกคำแนะนำ", // REVIEW
+      instructed: (file) => `เพิ่มคำแนะนำลงใน ${file} แล้ว`, // REVIEW
+      instructedAlready: (file) => `${file} มีคำแนะนำอยู่แล้ว`, // REVIEW
+      instructedReplaced: (file) => `อัปเดตคำแนะนำใน ${file} แล้ว`, // REVIEW
+      instructionsEdited: "ข้อความของ Thoth ในไฟล์นั้นถูกแก้ด้วยมือ Thoth จึงไม่แตะไฟล์ ให้คัดลอกคำแนะนำแล้วใส่เอง", // REVIEW
+      firstSteps: "ขั้นแรก", // REVIEW
+      firstStepsWhat: "เมื่อตั้งค่าแอปแล้ว ลองพิมพ์ข้อความเหล่านี้ในแอปนั้น ข้อแรกเชื่อมต่อกับ Thoth ข้อที่สองบอกเอเจนต์เกี่ยวกับตัวคุณ", // REVIEW
+      starters: [
+        "เชื่อมต่อกับ Thoth แล้วบอกว่าคุณจำอะไรเกี่ยวกับฉันได้บ้าง",
+        "ถามคำถามสั้น ๆ 5 ข้อว่าฉันเป็นใคร ทำงานแบบไหน และกำลังทำอะไรอยู่ แล้วบันทึกคำตอบลงใน Thoth",
+      ], // REVIEW
+      copy: "คัดลอก", // REVIEW
     },
     // REVIEW
     setupMoved: {

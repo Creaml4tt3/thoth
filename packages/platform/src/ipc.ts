@@ -278,7 +278,7 @@ export interface Commands {
    * Adds thoth-mcp to an app's own MCP settings (ADR-0052 rule 10), backing up any file it edits. `UNAVAILABLE` when
    * the app is not set up on this computer; `EEXIST` when it has another `thoth` server, unless `replace`.
    */
-  "mcp.install": { args: { app: SetupApp; replace?: boolean }; result: { status: "added" | "already" | "replaced"; file?: string; backup?: string | null } };
+  "mcp.install": { args: { app: SetupApp; replace?: boolean; instructions?: boolean }; result: { status: "added" | "already" | "replaced"; file?: string; backup?: string | null } };
   "mcp.skillLinks": { args: { root: string; on?: boolean }; result: SkillLinksReport };
   "mcp.memoryHistory": { args: { id?: string }; result: { changes: MemoryHistoryChange[] } | MemoryHistoryText };
   /** Every proposed change remembered (no page text), oldest first, and how many wait for review. */
@@ -406,7 +406,8 @@ export interface ConnectedAppsSettings {
   /** Workspaces whose Team memory apps may use (ADR-0052 rule 8); `name` is the `space` apps give. */
   workspaces?: { server: string; workspace: string; name: string }[];
   /** What an app's MCP settings need: the sidecar's absolute path and its arguments. */
-  setup: { command: string; args: string[] } | null;
+  /** `instructions`: the lines "Add the instructions" writes to an agent's own instruction file, and that the user copies. */
+  setup: { command: string; args: string[]; instructions?: string } | null;
 }
 
 /** One request of a connected app, as logged: never page text or search words. */

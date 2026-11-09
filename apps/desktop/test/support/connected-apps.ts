@@ -17,9 +17,10 @@ import type {
 
 export const SIDECAR = "/Applications/Thoth.app/Contents/MacOS/thoth-mcp";
 export const SOCKET = "/Users/someone/Library/Application Support/com.thothnotes.desktop/mcp/thoth.sock";
+export const INSTRUCTIONS = "## Thoth\nThoth (the MCP server `thoth`) is my memory, shared by all my agents.";
 
 export class FakeConnectedApps implements ConnectedApps {
-  state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], proposers: [], memories: true, memoryFolders: {}, folders: [], setup: { command: SIDECAR, args: ["--socket", SOCKET] } };
+  state: ConnectedAppsSettings = { available: true, enabled: false, listening: false, error: null, spaces: [], apps: [], pending: [], proposers: [], memories: true, memoryFolders: {}, folders: [], setup: { command: SIDECAR, args: ["--socket", SOCKET], instructions: INSTRUCTIONS } };
   calls: unknown[][] = [];
   answers: { id: string; answer: McpAnswer }[] = [];
   entries: ConnectedAppsLogEntry[] = [];
@@ -113,6 +114,11 @@ export class FakeConnectedApps implements ConnectedApps {
     if (this.taken.has(app) && !replace) throw Object.assign(new Error(`${app} already has a server called thoth`), { code: "EEXIST" });
     const replaced = this.taken.delete(app);
     return { status: replaced ? ("replaced" as const) : ("added" as const), file: `/Users/someone/.${app}/config`, backup: null };
+  }
+  async instruct(app: "claude-code" | "codex") {
+    this.calls.push(["instruct", app]);
+    const file = app === "codex" ? "/Users/someone/.codex/AGENTS.md" : "/Users/someone/.claude/CLAUDE.md";
+    return { status: "added" as const, file, backup: `${file}.thoth.bak` };
   }
   /** What `skillLinks` answers (its `on` follows the settings). */
   linkReport: Omit<SkillLinksReport, "on"> = { linked: [], skipped: [], folders: ["/Users/someone/.agents/skills"] };

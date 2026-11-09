@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings as Settings, SetupApp } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { copyText } from "@thoth/app-ui/editor/link-cards.ts";
@@ -100,7 +100,7 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
     const spaces = on ? [...settings.spaces, root] : settings.spaces.filter((s) => s !== root);
     void change(() => connectedApps.configure({ spaces }));
   };
-  const setup = settings.setup ? JSON.stringify({ mcpServers: { thoth: settings.setup } }, null, 2) : null;
+  const setup = settings.setup ? JSON.stringify({ mcpServers: { thoth: { command: settings.setup.command, args: settings.setup.args } } }, null, 2) : null;
   const copySetup = async () => {
     if (!setup) return;
     try {
@@ -394,12 +394,13 @@ const shellWord = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${
  * settings (backing up the file first) or runs Claude Code's own command. A `thoth` server already there is replaced
  * only when the user says so. Any other agent gets a prompt to copy.
  */
-function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; setup: { command: string; args: string[] } }) {
+function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; setup: { command: string; args: string[]; instructions?: string } }) {
   const t = useDesktopStrings().connectedApps.cards;
-  const [said, setSaid] = useState<Partial<Record<SetupApp | "other", { text: string; alert?: boolean; replace?: boolean }>>>({});
+  type Key = SetupApp | "other" | `starter-${number}`;
+  const [said, setSaid] = useState<Partial<Record<Key, { text: string; alert?: boolean; replace?: boolean }>>>({});
   const [busy, setBusy] = useState<SetupApp | null>(null);
   const command = ["claude", "mcp", "add", "--scope", "user", "thoth", "--", setup.command, ...setup.args].map(shellWord).join(" ");
-  const say = (app: SetupApp | "other", text: string, more: { alert?: boolean; replace?: boolean } = {}) => setSaid((s) => ({ ...s, [app]: { text, ...more } }));
+  const say = (app: Key, text: string, more: { alert?: boolean; replace?: boolean } = {}) => setSaid((s) => ({ ...s, [app]: { text, ...more } }));
   const run = async (app: SetupApp, replace = false) => {
     const name = t.apps[app].name;
     setBusy(app);
@@ -416,12 +417,29 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
       setBusy(null);
     }
   };
-  const copy = (key: SetupApp | "other", text: string) =>
+  // Claude Code and Codex read an instruction file Thoth can add to; Claude Desktop and Cursor keep theirs in settings.
+  const instruct = async (app: "claude-code" | "codex") => {
+    setBusy(app);
+    try {
+      const done = await connectedApps.instruct(app);
+      const file = done.file ?? "";
+      const text = done.status === "already" ? t.instructedAlready(file) : done.status === "replaced" ? t.instructedReplaced(file) : t.instructed(file);
+      say(app, done.backup ? `${text} ${t.backup(done.backup)}` : text);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "EEXIST") say(app, t.instructionsEdited, { alert: true });
+      else if (code === "UNAVAILABLE") say(app, t.notThere(t.apps[app].name), { alert: true });
+      else say(app, t.failed(error instanceof Error ? error.message : String(error)), { alert: true });
+    } finally {
+      setBusy(null);
+    }
+  };
+  const copy = (key: Key, text: string) =>
     void copyText(text).then(
       () => say(key, t.copied),
       () => say(key, t.failed(""), { alert: true }),
     );
-  const result = (key: SetupApp | "other") => {
+  const result = (key: Key) => {
     const r = said[key];
     return (
       <>
@@ -439,6 +457,7 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
   return (
     <>
       <p className="muted small">{t.lede}</p>
+      {setup.instructions && <p className="muted small">{t.instructionsWhat}</p>}
       <ul className="mcp-cards" data-testid="mcp-setup-cards">
         {SETUP_APPS.map((app) => (
           <li key={app} className="mcp-card" aria-labelledby={`mcp-card-${app}`}>
@@ -458,6 +477,16 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
                   {t.copyCommand}
                 </Button>
               )}
+              {setup.instructions &&
+                (app === "claude-code" || app === "codex" ? (
+                  <Button variant="ghost" small disabled={busy !== null} onClick={() => void instruct(app)}>
+                    {t.addInstructions}
+                  </Button>
+                ) : (
+                  <Button variant="ghost" small onClick={() => copy(app, setup.instructions!)}>
+                    {t.copyInstructions}
+                  </Button>
+                ))}
             </div>
             {result(app)}
           </li>
@@ -471,6 +500,21 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
             </Button>
           </div>
           {result("other")}
+        </li>
+        <li className="mcp-card" aria-labelledby="mcp-card-first-steps">
+          <b id="mcp-card-first-steps">{t.firstSteps}</b>
+          <span className="muted small">{t.firstStepsWhat}</span>
+          {t.starters.map((prompt, i) => (
+            <Fragment key={i}>
+              <div className="mcp-starter">
+                <q>{prompt}</q>
+                <Button variant="ghost" small onClick={() => copy(`starter-${i}`, prompt)} aria-label={`${t.copy}: ${prompt}`}>
+                  {t.copy}
+                </Button>
+              </div>
+              {result(`starter-${i}`)}
+            </Fragment>
+          ))}
         </li>
       </ul>
     </>

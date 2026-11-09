@@ -456,6 +456,14 @@ impl Relay {
         install::install(app, replace, &install::Setup { command: command.to_owned(), args }, home, claude)
     }
 
+    /// `mcp.install { app, instructions: true }`: adds the instructions to the app's own instruction file instead.
+    pub fn instruct(&self, app: &str, home: Option<&Path>) -> HostResult<Value> {
+        if self.setup().is_null() {
+            return Err(HostError::new("UNAVAILABLE", "Connected apps are not available on this computer"));
+        }
+        install::instruct(app, home.ok_or_else(|| HostError::new("UNAVAILABLE", "Thoth could not find your home folder"))?)
+    }
+
     /// `mcp.skillLinks { root, on? }` from the window `owner`, which must have that Private Space open: "Use my skills in
     /// Claude Code and Codex" on or off (`on`), and the links brought up to date with its skills (ADR-0052 rule 7). Without
     /// `on`, only brought up to date (a window does so when its skills change). Returns what was linked.
@@ -611,7 +619,7 @@ impl Relay {
     fn setup(&self) -> Value {
         let Some(dir) = &self.inner.dir else { return Value::Null };
         let Some(command) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|d| d.join(SIDECAR))) else { return Value::Null };
-        json!({ "command": command, "args": ["--socket", socket::socket_path(dir)] })
+        json!({ "command": command, "args": ["--socket", socket::socket_path(dir)], "instructions": install::INSTRUCTIONS })
     }
 }
 

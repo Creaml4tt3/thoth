@@ -11,6 +11,12 @@
 //! already there is left alone (`EEXIST`, or `already` when it is exactly this one) unless the user asked to replace it. Every
 //! file is backed up as `<name>.thoth.bak` before it is changed, and written whole with a rename; nothing else in it
 //! changes.
+//!
+//! The instructions (`instructions`): a few lines in the agent's own instruction file, `~/.claude/CLAUDE.md` for Claude
+//! Code and `~/.codex/AGENTS.md` for Codex, telling it to use Thoth's memory. Those files weigh more with the agent than
+//! the server's instructions. The lines sit between two markers, so they are added once and replaced in place, and the
+//! rest of the file is the user's and never changes. Claude Desktop and Cursor keep theirs in their own settings, so the
+//! user copies the lines there.
 use crate::error::{HostError, HostResult};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
@@ -20,10 +26,46 @@ const NAME: &str = "thoth";
 /// The largest settings file Thoth edits.
 const MAX_FILE: u64 = 4 * 1024 * 1024;
 
+/// The lines added to an agent's instruction file, and what the user copies for the others.
+pub const INSTRUCTIONS: &str = "## Thoth
+Thoth (the MCP server `thoth`) is my memory, shared by all my agents. At the start of a task that may depend on my preferences, the people I work with or past decisions, call `recall`. When I state a preference, correct you, or make a decision another agent would need, save it with `remember` in Thoth. Check `list_skills` for a skill that fits the task.";
+const START: &str = "<!-- thoth:start (added by Thoth; edit or remove freely) -->";
+const END: &str = "<!-- thoth:end -->";
+
 /// What `thoth-mcp` is started with.
 pub struct Setup {
     pub command: String,
     pub args: Vec<String>,
+}
+
+/// Adds the instructions to `app`'s instruction file. Returns `{ status: "added" | "already" | "replaced", file, backup? }`.
+pub fn instruct(app: &str, home: &Path) -> HostResult<Value> {
+    let path = match app {
+        "claude-code" => app_dir(home, ".claude", "Claude Code")?.join("CLAUDE.md"),
+        "codex" => app_dir(home, ".codex", "Codex")?.join("AGENTS.md"),
+        "claude-desktop" | "cursor" => return Err(HostError::bad_argument("Copy the instructions into the app's own settings")),
+        _ => return Err(HostError::bad_argument(format!("app must be one of {}", APPS.join(", ")))),
+    };
+    let text = read(&path)?.unwrap_or_default();
+    let block = format!("{START}\n{INSTRUCTIONS}\n{END}\n");
+    let (body, status) = match (text.find(START), text.find(END)) {
+        (Some(start), Some(end)) if end > start => {
+            let end = end + END.len();
+            let end = if text[end..].starts_with('\n') { end + 1 } else { end };
+            if text[start..end] == block {
+                return Ok(json!({ "status": "already", "file": path }));
+            }
+            (format!("{}{block}{}", &text[..start], &text[end..]), "replaced")
+        }
+        (None, None) => {
+            let kept = text.trim_end();
+            (if kept.is_empty() { block } else { format!("{kept}\n\n{block}") }, "added")
+        }
+        // One marker without the other: the user edited it; leave the file to them.
+        _ => return Err(HostError::new("EEXIST", format!("{} has Thoth's instructions in a form Thoth cannot update: copy them instead", path.display()))),
+    };
+    let backup = write(&path, (!text.is_empty()).then_some(text.as_str()), &body)?;
+    Ok(json!({ "status": status, "file": path, "backup": backup }))
 }
 
 /// Runs the `claude` CLI with these arguments: `{ code, stdout, stderr, timedOut }`, or None when it is not installed.
@@ -304,5 +346,43 @@ mod tests {
         assert_eq!(code(install("claude-code", false, &setup(), home.path(), &claude)), "EEXIST");
         assert_eq!(install("claude-code", true, &setup(), home.path(), &claude).unwrap()["status"], "replaced");
         assert_eq!(calls.borrow().iter().filter(|c| c[1] == "remove").count(), 1);
+    }
+
+    #[test]
+    fn instructions_go_in_once_between_markers_and_keep_the_users_lines() {
+        let home = tempfile::tempdir().unwrap();
+        assert_eq!(code(instruct("claude-code", home.path())), "UNAVAILABLE");
+        std::fs::create_dir(home.path().join(".claude")).unwrap();
+        let file = home.path().join(".claude/CLAUDE.md");
+        std::fs::write(&file, "# Mine\n\nUse tabs.\n").unwrap();
+        let done = instruct("claude-code", home.path()).unwrap();
+        assert_eq!(done["status"], "added");
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.starts_with("# Mine\n\nUse tabs.\n\n<!-- thoth:start"), "{text}");
+        assert!(text.contains("call `recall`") && text.ends_with("<!-- thoth:end -->\n"));
+        assert_eq!(std::fs::read_to_string(home.path().join(".claude/CLAUDE.md.thoth.bak")).unwrap(), "# Mine\n\nUse tabs.\n");
+        assert_eq!(instruct("claude-code", home.path()).unwrap()["status"], "already");
+
+        // An older version of the lines is replaced where it is; what the user added after it stays.
+        let old = text.replace("call `recall`", "call recall") + "\nMore of mine.\n";
+        std::fs::write(&file, &old).unwrap();
+        assert_eq!(instruct("claude-code", home.path()).unwrap()["status"], "replaced");
+        let now = std::fs::read_to_string(&file).unwrap();
+        assert_eq!(now, text.clone() + "\nMore of mine.\n");
+
+        // A marker the user broke: left alone.
+        std::fs::write(&file, "<!-- thoth:start (added by Thoth; edit or remove freely) -->\nhalf\n").unwrap();
+        assert_eq!(code(instruct("claude-code", home.path())), "EEXIST");
+    }
+
+    #[test]
+    fn codex_gets_agents_md_and_the_others_are_copied() {
+        let home = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".codex")).unwrap();
+        assert_eq!(instruct("codex", home.path()).unwrap()["status"], "added");
+        let text = std::fs::read_to_string(home.path().join(".codex/AGENTS.md")).unwrap();
+        assert!(text.starts_with("<!-- thoth:start") && text.contains(INSTRUCTIONS));
+        assert!(!home.path().join(".codex/AGENTS.md.thoth.bak").exists());
+        assert_eq!(code(instruct("cursor", home.path())), "BAD_ARGUMENT");
     }
 }

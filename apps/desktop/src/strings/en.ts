@@ -353,6 +353,23 @@ export const en = {
       otherPrompt: "Help me set up Thoth as my memory using this guide: https://thothnotes.com/agents/setup",
       copyPrompt: "Copy the prompt",
       copied: "Copied.",
+      /** A few lines in the agent's own instruction file that tell it to use Thoth's memory. */
+      instructionsWhat:
+        "The instructions are a few lines that tell the agent to recall and save memories in Thoth. Thoth adds them to ~/.claude/CLAUDE.md for Claude Code and ~/.codex/AGENTS.md for Codex, after a backup. For Claude Desktop and Cursor, copy them into the app's own instructions (in Cursor: Settings → Rules).",
+      addInstructions: "Add the instructions",
+      copyInstructions: "Copy the instructions",
+      instructed: (file: string) => `Added the instructions to ${file}.`,
+      instructedAlready: (file: string) => `${file} already has the instructions.`,
+      instructedReplaced: (file: string) => `Updated the instructions in ${file}.`,
+      instructionsEdited: "Thoth's lines in that file were changed by hand, so Thoth left it alone. Copy the instructions and put them in yourself.",
+      /** Prompts to try once an app is set up: the first connects (and asks Allow), the second fills in About me. */
+      firstSteps: "First steps",
+      firstStepsWhat: "Once an app is set up, try these in it. The first connects it to Thoth, the second tells it about you.",
+      starters: [
+        "Connect to Thoth and tell me what you remember about me.",
+        "Ask me 5 short questions about who I am, how I work and what I'm working on, then save my answers to Thoth.",
+      ] as readonly string[],
+      copy: "Copy",
     },
     setupMoved: {
       title: "Copy the setup again",

@@ -128,6 +128,8 @@ export interface ConnectedApps {
   memoryFolder(root: string, folder: string): Promise<ConnectedAppsSettings>;
   /** Adds thoth-mcp to an app's own MCP settings (ADR-0052 rule 10). */
   install(app: SetupApp, replace?: boolean): Promise<{ status: "added" | "already" | "replaced"; file?: string; backup?: string | null }>;
+  /** Adds Thoth's instructions to Claude Code's ~/.claude/CLAUDE.md or Codex's ~/.codex/AGENTS.md. */
+  instruct(app: "claude-code" | "codex"): Promise<{ status: "added" | "already" | "replaced"; file?: string; backup?: string | null }>;
   /** Links this window's Private Space's skills into the home folder (`on`), or only brings the links up to date. */
   skillLinks(root: string, on?: boolean): Promise<SkillLinksReport>;
   /** Memory writes without review in this window's Private Spaces, newest first (ADR-0052). */
