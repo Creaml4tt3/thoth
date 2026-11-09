@@ -1,83 +1,16 @@
-# Thoth user guide
+# Using Thoth
 
 <!-- repo-only:start -->
-> The website publishes this file at `/docs/` and the Thai version (`guide.th.md`) at
-> `/th/docs/`. The site leaves out this block (between the `repo-only` markers) and every
-> HTML comment. Each `##` heading becomes an entry in the page's table of contents, so
-> both versions keep the same `##` headings in the same order.
+> The website publishes this page at `/docs/using-thoth/` and its Thai version (`using-thoth.th.md`) at `/th/docs/using-thoth/`.
+> The site leaves out this block (between the `repo-only` markers) and every HTML comment. The `#` heading is the
+> page's title; each `##` heading becomes an entry in "On this page", so both versions keep the same `##` headings in
+> the same order.
 >
-> Write only what a released version does, with the app's exact labels
-> (`packages/app-ui/src/strings/`, `apps/desktop/src/strings/`). If a label or a
-> feature changes, update this guide and its Thai version together.
+> Write only what a released version does, with the app's exact labels (`packages/app-ui/src/strings/`,
+> `apps/desktop/src/strings/`). If a label or a feature changes, update this page and its Thai version together.
 >
-> Links: `https:` and `mailto:` links, and paths on the website such as `/privacy/`.
+> Links: `https:` and `mailto:` links, and paths on the website such as `/privacy/` or `/docs/workspaces/`.
 <!-- repo-only:end -->
-
-Thoth is a notes app. Your notes are Markdown files in a folder on your computer.
-You can also write with other people in workspaces on a Thoth server.
-This guide covers the desktop app, version 0.9.0.
-
-## Install
-
-Download Thoth from the download section of the website. There are versions for
-macOS (Apple silicon and Intel), Windows (x64, as an .exe installer or an .msi
-package) and Linux (an AppImage and a .deb package).
-
-Thoth is not signed with an Apple or Microsoft developer certificate yet, so your
-system warns you the first time:
-
-- **macOS** may say it can't check the app for malicious software. Open System
-  Settings → Privacy & Security and choose **Open Anyway**. You only do this once.
-- **Windows** SmartScreen may warn about an unknown publisher. Choose
-  **More info → Run anyway**.
-- **Linux**: make the AppImage executable, then run it. Install the .deb with your
-  package manager.
-
-You can also try Thoth in your browser at https://thothnotes.com/app/. The web app
-opens workspaces on the free demo server. It has no Private Space.
-
-## First steps
-
-### Your Private Space
-
-A Private Space is a folder of Markdown files on your computer. It works offline,
-with no account.
-
-When Thoth opens, choose **Start a new Private Space** and pick or create an empty folder, or choose **Open a folder
-you already use**, for example an Obsidian vault. Both open the folder where it is: nothing is copied. Before a
-folder that already has notes opens, Thoth says what it does there. It changes a file only when you edit it, keeps a
-small `.thoth` folder there for its own records, and never changes Obsidian's settings, so Obsidian can keep using
-the same files.
-
-Every page you write is a Markdown file in that folder, so other apps can open the same files. Thoth keeps its search
-index on this computer, not in the folder. The index can always be rebuilt from your files (Settings → Private Space
-→ **Rebuild index**).
-
-To open another Private Space or a workspace, click Thoth at the top of the sidebar and pick one, or choose **Open a
-folder you already use…**. **Back to Private Spaces** (Alt/Option+Shift+H) saves your edits and goes back to the
-list of Private Spaces.
-
-### The welcome pages
-
-A new, empty Private Space starts with a few pages in your app's language:
-"Welcome to Thoth" shows every kind of block, "Linking pages" shows links, and
-"Getting started/Keyboard shortcuts" lists the main shortcuts. Change them or
-delete them when you are done. They do not come back.
-
-A short tour of the sidebar, search, the editor and tabs follows. Choose
-**Skip tour** to skip it. To see it again, open Settings → Help and feedback →
-**Show the tour again**.
-
-### Blocks and Plain
-
-Every page has two modes. Both edit the same Markdown file.
-
-- **Blocks**: formatted blocks, like Notion. Type `/` on an empty line for the
-  block menu. Drag the handle at the left of a block to move it.
-- **Plain**: Markdown text with a live preview, like Obsidian.
-
-Switch with the toggle above the page, or press Ctrl/Cmd+Shift+E. Choose the mode
-new pages open in under Settings → Editor → **Default editor mode**.
 
 ## Home and Today
 
@@ -175,96 +108,6 @@ anything that could not come across. Notion does not recreate your workspace fro
 an export, so expect a best-effort migration. Obsidian settings and plugin code are
 not imported.
 
-## Workspaces on a server
-
-A workspace holds pages you share with other people on a Thoth server.
-
-### Sign in
-
-Open Settings → Servers. Choose **Add Thoth demo server**, or enter a server's
-address and choose **Add server**. Then choose **Sign in with** and your provider,
-and finish signing in in your browser. You can also sign in with a personal access
-token. Thoth keeps your sign-in in the system keychain.
-
-The demo server is free, with limits. Accounts unused for 90 days are deleted, and
-the demo may be reset, so keep anything important in your Private Space.
-
-Workspaces appear in the sidebar. To make one, choose **New workspace…**. You
-become its owner.
-
-### Members and invites
-
-Each member has a role:
-
-- **Owner**: everything a manager does, plus making owners and renaming or deleting the workspace.
-- **Manager**: manages members, invite links, teams and the Trash, and sees every page.
-- **Editor**: reads and edits pages.
-- **Viewer**: reads pages.
-
-Open a workspace's menu and choose **Members…**. Owners and managers can change roles, remove members and choose
-**Invite people**. Only an owner can make someone an owner, or change or remove an owner. Pick the role, how long the
-link works and how many people can join with it, then **Create invite link**. Copy it at once: the link is shown only
-once.
-
-To join, open the link in your browser, or paste it under **Join with an invite
-link** in Settings → Servers.
-
-To leave, choose **Leave workspace** in the members dialog.
-
-### Teams
-
-Owners and managers can group members into teams under **Teams** in **Members…** (**Create team**). Then right-click a
-folder or page, choose **Visible to…** and **Only these teams**. Pages inside a limited folder are limited too.
-Members in none of those teams cannot see those pages, search them or open their share links. Owners and managers see
-every page.
-
-### Working together
-
-A workspace page shows who else has it open, for example "Ana is also here", when the server supports it. When someone
-changes a page you have open, the page says so ("Updated by Grace just now.") instead of reloading silently. If you
-have unsaved edits at that moment, Thoth asks which version to keep. A save never overwrites someone else's change.
-
-### Share a page publicly
-
-Owners and editors can right-click a workspace page and choose **Share…**. Anyone
-with the link can read the page and the pages inside it, without signing in. They
-cannot edit or comment. Choose when the link stops working, then **Create link**.
-**Revoke** turns a link off at once.
-
-### Export restrictions
-
-When you create a workspace, you can tick **Do not allow copying or moving pages
-out of it**. This cannot be changed later. In such a workspace, members cannot copy
-or move pages to their Private Space or to another workspace, download them as
-Markdown, or give them to the assistant.
-
-### The workspace Trash
-
-Deleted workspace pages and folders go to the workspace's Trash (**Trash…** in the workspace menu) and stay there 30
-days. Owners and managers can **Restore** anything, or **Delete for good…**. Editors can restore what they deleted.
-
-### Deleting a workspace
-
-An owner can delete a workspace from its menu. For 30 days an owner can restore it,
-with its pages and members, from **Recently deleted…**.
-
-## Moving pages between spaces
-
-You can copy or move pages between your Private Space and a workspace, or between
-two workspaces, on one server or two.
-
-- From your Private Space: right-click a page and choose **Copy to workspace…** or
-  **Move to workspace…**.
-- From a workspace page: use **Copy to Private Space…** or **Move to Private
-  Space…** in the page header, or **Copy to another workspace…** and **Move to
-  another workspace…** in its right-click menu.
-- Or drag pages onto the other space in the sidebar. Dragging moves; hold
-  Alt/Option to copy.
-
-The dialog shows what will travel before anything is sent. Sub-pages, attachments
-and links between the pages go with them. A move deletes the originals only after
-the other side has every page. A page edited in the meantime is kept.
-
 ## The Thoth assistant
 
 The Thoth assistant hands a few pages to an AI tool you already use: Claude Code or Codex, which you install yourself.
@@ -361,13 +204,6 @@ The app keeps a small log of errors and app events on your computer. It leaves o
 page text and titles. To turn it off, untick **Keep an app log on this computer**
 in Settings → Help and feedback. Turning it off deletes the log. **Save
 diagnostics…** saves the same log to a file.
-
-## Self-hosting
-
-Anyone can run their own Thoth server, with their own sign-in, for their own
-workspaces. The desktop app connects to it the same way as to the demo server. The
-[self-hosting guide](https://github.com/Creaml4tt3/thoth/blob/main/docs/deploy/self-host.md)
-explains the setup step by step.
 
 ## Privacy
 
