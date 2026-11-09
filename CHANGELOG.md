@@ -8,6 +8,24 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.9.0] - 2026-11-09
+
+### Added
+
+- Agents' memory: Claude Code, Codex and the other apps you connect save what they learn about you, your preferences and your projects in a `Memory` folder in your Private Space, one Markdown file per memory, and read it back at the start of a task. Every agent shares the same memory, and you can read and edit it like any page.
+- Settings → Connected apps → "Agents save memories without asking" (on by default), with a switch for each app. Off, each memory waits for your review under the bell. Agents write only inside the memory folder, never save what looks like a password or key, and save at most 100 memories a day each.
+- When your Private Space already has a `Memory` folder of your own, Thoth asks which folder agents should use before they write anything.
+- Memories view (Settings → Connected apps → Show memories): your memories by kind, which app saved each and when, which ones are old enough to check, and the changes of the last 30 days with Undo. The bell says which app saved memories, and how many.
+- Skills: a folder in `Skills/` with a `SKILL.md` is a skill your agents can list and follow. Turn on "Use this Private Space's skills in Claude Code and Codex" to link them into `~/.claude/skills` and `~/.agents/skills`. Agents change a skill only by proposing it for your review.
+- Agents can propose an addition to today's daily note; it waits for your review like any proposal.
+- Set up an app from Settings → Connected apps: one card each for Claude Code, Codex (and the ChatGPT desktop app), Claude Desktop and Cursor. Each says what it changes and keeps a backup of any file it edits, and there is a prompt to copy for any other agent.
+- Team memory: tick a workspace in Settings → Connected apps → Team memory, and agents can recall and save memories in its `Team memory` folder, as you, with your role. Each memory an agent saves there waits for review by you or the workspace's owners and managers, unless an owner or manager turns review off. The bell lists the team memories waiting, with Apply and Decline. Self-hosters: update your server to 0.9.0 (it migrates the database at start; with `MIGRATE_ON_START=false`, run `node src/cli.ts migrate` first).
+- "Let agents use my memory folder while Thoth is closed" (off by default): agents can still recall memories, read skills and save new memories while Thoth is not running. Changing or forgetting a memory waits until Thoth is open.
+
+### Changed
+
+- The mascot is the new Moon Crown, an ink ibis before the moon, in the Paper colours on the light theme and Night on the dark theme.
+
 ## [0.8.0] - 2026-11-06
 
 ### Changed
@@ -304,7 +322,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Creaml4tt3/thoth/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Creaml4tt3/thoth/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Creaml4tt3/thoth/compare/v0.6.0...v0.7.0
