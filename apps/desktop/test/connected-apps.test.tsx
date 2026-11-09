@@ -340,6 +340,21 @@ describe("Set up an app (ADR-0052 rule 10)", () => {
 
     await app.user.click(claude.getByRole("button", { name: "Add the instructions" }));
     expect(await claude.findByText("Instructions added")).toBeTruthy();
+    // Set up again when it is exactly this one: already, no replace offered.
+    await app.user.click(claude.getByRole("button", { name: "Set up again" }));
+    expect(await claude.findByText("Claude Code is already set up.")).toBeTruthy();
+    expect(claude.queryByRole("button", { name: "Replace it" })).toBeNull();
+  });
+
+  it("offers no replace for a server written by hand, which the host never replaces", async () => {
+    apps.setup.codex = { server: "edited", instructions: "none" };
+    const app = await open();
+    const section = await openSettings(app);
+    const codex = within(section.getByRole("listitem", { name: "Codex and the ChatGPT app" }));
+    expect(await codex.findByText("Set up by hand in a form Thoth cannot change")).toBeTruthy();
+    await app.user.click(codex.getByRole("button", { name: "Set up" }));
+    expect((await codex.findByRole("alert")).textContent).toContain("Copy the setup and edit its settings yourself");
+    expect(codex.queryByRole("button", { name: "Replace it" })).toBeNull();
   });
 });
 

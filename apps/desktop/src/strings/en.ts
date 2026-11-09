@@ -344,6 +344,7 @@ export const en = {
       server: {
         this: "Set up",
         other: "Set up for another copy of Thoth",
+        edited: "Set up by hand in a form Thoth cannot change",
         none: "Not set up",
         unavailable: "Not on this computer",
         unknown: "Could not check its settings",
@@ -361,6 +362,7 @@ export const en = {
       already: (name: string) => `${name} is already set up.`,
       backup: (path: string) => `The file as it was is kept in ${path}.`,
       exists: (name: string) => `${name} already has a server called thoth, maybe from an earlier setup. Replace it with this one?`,
+      serverEdited: (name: string) => `${name}'s thoth server was written by hand in a form Thoth cannot change. Copy the setup and edit its settings yourself.`,
       notThere: (name: string) => `${name} is not set up on this computer: open it once, then try again.`,
       failed: (message: string) => `Could not set it up: ${message}`,
       copyCommand: "Copy the command",

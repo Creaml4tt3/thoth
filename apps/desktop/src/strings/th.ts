@@ -310,6 +310,7 @@ export const th: DesktopStrings = {
       server: {
         this: "ตั้งค่าแล้ว",
         other: "ตั้งค่าไว้กับ Thoth อีกชุดหนึ่ง",
+        edited: "ตั้งค่าไว้เองด้วยมือในแบบที่ Thoth แก้ไม่ได้",
         none: "ยังไม่ได้ตั้งค่า",
         unavailable: "ไม่มีในเครื่องนี้",
         unknown: "ตรวจการตั้งค่าของแอปไม่ได้",
@@ -327,6 +328,7 @@ export const th: DesktopStrings = {
       already: (name) => `${name} ตั้งค่าไว้แล้ว`, // REVIEW
       backup: (path) => `ไฟล์เดิมเก็บไว้ที่ ${path}`, // REVIEW
       exists: (name) => `${name} มีเซิร์ฟเวอร์ชื่อ thoth อยู่แล้ว อาจมาจากการตั้งค่าครั้งก่อน แทนที่ด้วยอันนี้ไหม`, // REVIEW
+      serverEdited: (name) => `เซิร์ฟเวอร์ thoth ของ ${name} ถูกเขียนเองด้วยมือในแบบที่ Thoth แก้ไม่ได้ ให้คัดลอกการตั้งค่าแล้วแก้ในการตั้งค่าของแอปเอง`, // REVIEW
       notThere: (name) => `ยังไม่ได้ตั้งค่า ${name} ในเครื่องนี้ เปิดแอปนั้นสักครั้งแล้วลองอีกครั้ง`, // REVIEW
       failed: (message) => `ตั้งค่าไม่ได้: ${message}`, // REVIEW
       copyCommand: "คัดลอกคำสั่ง", // REVIEW

@@ -458,11 +458,11 @@ export type SetupApp = "claude-code" | "codex" | "claude-desktop" | "cursor";
 
 /**
  * What an app already has (`mcp.setupStatus`). `server`: `unavailable` (the app is not on this computer), `none`, `this`
- * (exactly this Thoth), `other` (another thoth server, e.g. an older copy) or `unknown` (its file cannot be read).
+ * (exactly this Thoth), `other` (another thoth server, e.g. an older copy), `edited` (written by hand in a form Thoth never replaces) or `unknown` (its file cannot be read).
  * `instructions`, for Claude Code and Codex: `outdated` is an older version Thoth replaces, `edited` was changed by hand.
  */
 export interface SetupState {
-  server: "unavailable" | "none" | "this" | "other" | "unknown";
+  server: "unavailable" | "none" | "this" | "other" | "edited" | "unknown";
   instructions?: "unavailable" | "none" | "this" | "outdated" | "edited" | "unknown";
 }
 

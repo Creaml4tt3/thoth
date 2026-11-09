@@ -415,7 +415,9 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
       say(app, done.backup ? `${text} ${t.backup(done.backup)}` : text);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "EEXIST") say(app, t.exists(name), { replace: true });
+      // A refused replace, or an entry written by hand: replacing again cannot work.
+      if (code === "EEXIST" && (replace || state[app]?.server === "edited")) say(app, t.serverEdited(name), { alert: true });
+      else if (code === "EEXIST") say(app, t.exists(name), { replace: true });
       else if (code === "UNAVAILABLE") say(app, t.notThere(name), { alert: true });
       else say(app, t.failed(error instanceof Error ? error.message : String(error)), { alert: true });
     } finally {

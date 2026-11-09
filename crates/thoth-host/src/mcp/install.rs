@@ -94,8 +94,8 @@ fn marked(text: &str) -> Marked {
 
 /// What is set up in each app, only read: nothing is written and no file's contents are returned (settings files can
 /// hold keys). `server` is `unavailable` (the app is not on this computer), `none`, `this` (exactly this Thoth), `other`
-/// (another thoth server: an older copy, another socket, or one written in a form Thoth cannot edit) or `unknown` (the
-/// file cannot be read); `instructions`, for Claude Code and Codex, is `unavailable`, `none`, `this`, `outdated` (an
+/// (another thoth server: an older copy or another socket, which Thoth replaces when asked), `edited` (a Codex entry
+/// written another way, which Thoth never replaces) or `unknown` (the file cannot be read); `instructions`, for Claude Code and Codex, is `unavailable`, `none`, `this`, `outdated` (an
 /// older version, which Thoth replaces), `edited` (changed by hand) or `unknown`.
 pub fn status(setup: &Setup, home: &Path) -> Value {
     let server = |found: HostResult<Found>| match found {
@@ -117,10 +117,11 @@ pub fn status(setup: &Setup, home: &Path) -> Value {
     };
     let ours = json!({ "command": setup.command, "args": setup.args });
     let json_app = |dir: HostResult<PathBuf>, name: &str| server(dir.and_then(|d| json_config(&d.join(name))).map(|(_, config)| json_found(&config, &ours)));
-    let codex = app_dir(home, ".codex", "Codex").and_then(|d| Ok(codex_found(&read(&d.join("config.toml"))?.unwrap_or_default(), setup).found));
+    let codex = app_dir(home, ".codex", "Codex").and_then(|d| Ok(codex_found(&read(&d.join("config.toml"))?.unwrap_or_default(), setup)));
+    let codex = if codex.as_ref().is_ok_and(|t| t.unusual) { "edited" } else { server(codex.map(|t| t.found)) };
     json!({
         "claude-code": { "server": server(claude_code_found(&ours, home)), "instructions": instructions("claude-code") },
-        "codex": { "server": server(codex), "instructions": instructions("codex") },
+        "codex": { "server": codex, "instructions": instructions("codex") },
         "claude-desktop": { "server": json_app(claude_desktop_dir(home), "claude_desktop_config.json") },
         "cursor": { "server": json_app(app_dir(home, ".cursor", "Cursor"), "mcp.json") },
     })
@@ -132,7 +133,7 @@ pub type RunClaude<'a> = &'a dyn Fn(&[String]) -> Option<Value>;
 /// Sets up `app`. Returns `{ status: "added" | "already" | "replaced", file?, backup? }`.
 pub fn install(app: &str, replace: bool, setup: &Setup, home: &Path, claude: RunClaude<'_>) -> HostResult<Value> {
     match app {
-        "claude-code" => claude_code(replace, setup, claude),
+        "claude-code" => claude_code(replace, setup, home, claude),
         "codex" => codex(replace, setup, &app_dir(home, ".codex", "Codex")?.join("config.toml")),
         "claude-desktop" => json_file(replace, setup, &claude_desktop_dir(home)?.join("claude_desktop_config.json")),
         "cursor" => json_file(replace, setup, &app_dir(home, ".cursor", "Cursor")?.join("mcp.json")),
@@ -156,7 +157,11 @@ fn claude_desktop_dir(home: &Path) -> HostResult<PathBuf> {
     Ok(path)
 }
 
-fn claude_code(replace: bool, setup: &Setup, claude: RunClaude<'_>) -> HostResult<Value> {
+fn claude_code(replace: bool, setup: &Setup, home: &Path, claude: RunClaude<'_>) -> HostResult<Value> {
+    // `claude mcp add` only says "already exists", even when the entry is exactly this one.
+    if !replace && matches!(claude_code_found(&json!({ "command": setup.command, "args": setup.args }), home), Ok(Found::This)) {
+        return Ok(json!({ "status": "already" }));
+    }
     let mut add = vec!["mcp".into(), "add".into(), "--scope".into(), "user".into(), NAME.into(), "--".into(), setup.command.clone()];
     add.extend(setup.args.iter().cloned());
     let not_found = || HostError::new("UNAVAILABLE", "Thoth could not find Claude Code (the claude command): copy the command and run it yourself");
@@ -472,6 +477,15 @@ mod tests {
         assert_eq!(code(install("claude-code", false, &setup(), home.path(), &claude)), "EEXIST");
         assert_eq!(install("claude-code", true, &setup(), home.path(), &claude).unwrap()["status"], "replaced");
         assert_eq!(calls.borrow().iter().filter(|c| c[1] == "remove").count(), 1);
+
+        // Exactly this one in ~/.claude.json: already, without running claude (which would only say "already exists").
+        let ours = json!({ "type": "stdio", "command": setup().command, "args": setup().args, "env": {} });
+        std::fs::write(home.path().join(".claude.json"), json!({ "mcpServers": { "thoth": ours } }).to_string()).unwrap();
+        let ran = calls.borrow().len();
+        assert_eq!(install("claude-code", false, &setup(), home.path(), &claude).unwrap()["status"], "already");
+        assert_eq!(calls.borrow().len(), ran, "claude not run");
+        // Replacing still goes through claude.
+        assert_eq!(install("claude-code", true, &setup(), home.path(), &claude).unwrap()["status"], "replaced");
     }
 
     #[test]
@@ -539,8 +553,15 @@ mod tests {
             [status("claude-code")["server"].clone(), status("codex")["server"].clone(), status("cursor")["server"].clone()],
             [json!("other"), json!("other"), json!("other")]
         );
+        let desktop =
+            h.join(if cfg!(target_os = "macos") { "Library/Application Support/Claude" } else { ".config/Claude" }).join("claude_desktop_config.json");
+        std::fs::write(&desktop, &old).unwrap();
+        assert_eq!(status("claude-desktop")["server"], "other");
+        // Written as a dotted key or an inline table: edited by hand, which Thoth never replaces.
         std::fs::write(h.join(".codex/config.toml"), "mcp_servers.thoth.command = \"x\"\n").unwrap();
-        assert_eq!(status("codex")["server"], "other");
+        assert_eq!(status("codex")["server"], "edited");
+        std::fs::write(h.join(".codex/config.toml"), "[mcp_servers]\nthoth = { command = \"x\" }\n").unwrap();
+        assert_eq!(status("codex")["server"], "edited");
         // An older version of the instructions, and lines changed by hand.
         let claude_md = h.join(".claude/CLAUDE.md");
         std::fs::write(&claude_md, std::fs::read_to_string(&claude_md).unwrap().replace("call `recall`", "call recall")).unwrap();
@@ -553,6 +574,14 @@ mod tests {
         std::fs::write(h.join(".claude.json"), json!({ "mcpServers": [] }).to_string()).unwrap();
         assert_eq!([status("cursor")["server"].clone(), status("claude-code")["server"].clone()], [json!("unknown"), json!("unknown")]);
         assert_eq!(std::fs::read_to_string(h.join(".cursor/mcp.json")).unwrap(), "{ not json");
+        std::fs::write(&desktop, "{ not json").unwrap();
+        assert_eq!(status("claude-desktop")["server"], "unknown");
+        // A folder where the file should be.
+        std::fs::remove_file(h.join(".codex/config.toml")).unwrap();
+        std::fs::create_dir(h.join(".codex/config.toml")).unwrap();
+        std::fs::remove_file(&claude_md).unwrap();
+        std::fs::create_dir(&claude_md).unwrap();
+        assert_eq!([status("codex")["server"].clone(), status("claude-code")["instructions"].clone()], [json!("unknown"), json!("unknown")]);
 
         // Claude Code without ~/.claude but with its file is there; without either it is not.
         std::fs::remove_dir_all(h.join(".claude")).unwrap();

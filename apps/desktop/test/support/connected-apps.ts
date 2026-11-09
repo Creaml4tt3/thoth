@@ -120,7 +120,10 @@ export class FakeConnectedApps implements ConnectedApps {
   };
   async install(app: SetupApp, replace?: boolean) {
     this.calls.push(replace ? ["install", app, true] : ["install", app]);
-    if (this.taken.has(app) && !replace) throw Object.assign(new Error(`${app} already has a server called thoth`), { code: "EEXIST" });
+    const exists = () => Object.assign(new Error(`${app} already has a server called thoth`), { code: "EEXIST" });
+    // As the host: an entry written by hand is never replaced, and exactly this one is left as it is.
+    if (this.setup[app].server === "edited" || (this.taken.has(app) && !replace)) throw exists();
+    if (this.setup[app].server === "this" && !replace) return { status: "already" as const };
     const replaced = this.taken.delete(app);
     this.setup[app].server = "this";
     return { status: replaced ? ("replaced" as const) : ("added" as const), file: `/Users/someone/.${app}/config`, backup: null };
