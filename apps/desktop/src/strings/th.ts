@@ -321,7 +321,7 @@ export const th: DesktopStrings = {
       copyPrompt: "คัดลอกพรอมต์", // REVIEW
       copied: "คัดลอกแล้ว", // REVIEW
       instructionsWhat:
-        "คำแนะนำคือข้อความสั้น ๆ ที่บอกให้เอเจนต์เรียกดูและบันทึกความจำใน Thoth โดย Thoth จะเพิ่มลงใน ~/.claude/CLAUDE.md สำหรับ Claude Code และ ~/.codex/AGENTS.md สำหรับ Codex หลังสำรองไฟล์ไว้ก่อน สำหรับ Claude Desktop และ Cursor ให้คัดลอกไปวางในคำแนะนำของแอปเอง (ใน Cursor: Settings → Rules)", // REVIEW
+        "คำแนะนำคือข้อความสั้น ๆ ที่บอกให้เอเจนต์ค้นและบันทึกความจำใน Thoth โดย Thoth จะเพิ่มลงใน ~/.claude/CLAUDE.md สำหรับ Claude Code และ ~/.codex/AGENTS.md สำหรับ Codex หลังสำรองไฟล์ไว้ก่อน สำหรับ Claude Desktop และ Cursor ให้คัดลอกไปวางในคำแนะนำของแอปเอง (ใน Cursor: Settings → Rules)", // REVIEW
       addInstructions: "เพิ่มคำแนะนำ", // REVIEW
       copyInstructions: "คัดลอกคำแนะนำ", // REVIEW
       instructed: (file) => `เพิ่มคำแนะนำลงใน ${file} แล้ว`, // REVIEW
