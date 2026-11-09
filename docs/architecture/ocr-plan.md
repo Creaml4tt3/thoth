@@ -3,8 +3,7 @@
 - **Status:** Proposal for the owner. Nothing is built yet.
 - **Date:** 2026-11-10
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
-- **Next step:** the owner's answers to "Decisions for the owner" below. After that comes the Phase 0 spike, then
-  ADR-0053.
+- **Next step:** the Phase 0 spike, then ADR-0053. The owner's decisions are in §7.
 
 ## 1. Verdict on the handoff
 
@@ -35,12 +34,13 @@ Four things should change before anyone builds it.
    are the only downloads. The handoff itself names Rust as the long-term target; starting there skips one rewrite.
 3. **A general "Thoth Modules" system is premature.** There is one module. A registry, dependency resolver, signed
    remote manifests and a Modules page are the machinery of a marketplace, and the handoff rules out a marketplace for
-   now. Build one OCR download. Give it a design that a second module could reuse, but no framework.
+   now. Build OCR as the first module, with only the shared parts every module needs (§5). Leave out the registry and
+   the resolver.
 4. **Signing infrastructure can be replaced by hashes compiled into the app.** The app version that offers the
    download already knows the exact files and their SHA-256 hashes. So:
    - there is no remote manifest to sign, and no new key to protect;
    - new models or languages arrive with an app update, which in-app updates (ADR-0034) already deliver safely;
-   - the files are hosted on the R2 bucket we already have, under `download.thothnotes.com/ocr/<version>/`.
+   - the files are hosted on the R2 bucket we already have, under `download.thothnotes.com/modules/ocr/<version>/`.
 
 ## 2. Facts checked (2026-11-10)
 
@@ -55,7 +55,7 @@ Four things should change before anyone builds it.
 Still unverified: the exact download and installed sizes, the PaddleOCR model licenses (expected Apache-2.0),
 `oar-ocr`'s license, and the size of the ONNX Runtime library on each platform. Phase 0 settles them.
 
-## 3. What OCR should do in Thoth (the owner chooses the first)
+## 3. What OCR should do in Thoth
 
 | Feature | What the user does | Fit |
 | --- | --- | --- |
@@ -78,9 +78,10 @@ asks; the server doesn't change.
   - Requests carry image bytes the host has already read through `VaultFs`, never a path. The OCR program never opens
     the vault.
   - Limits: image size in megapixels, a page count for PDFs, a timeout per job, and one job at a time.
-- **The download:** "OCR (Thai and English)" in Settings, with Download, Remove, and the space it uses. The host:
+- **The download:** an "OCR (Thai and English)" card in Settings → Modules, with Download, Remove, and the space
+  it uses. The host:
   1. downloads ONNX Runtime and the two PP-OCRv5 models (detection and Thai recognition) from R2 into
-     `<app-data>/ocr/<version>/`;
+     `<app-data>/modules/ocr/<version>/`;
   2. checks each file against the SHA-256 compiled into the app;
   3. switches over by renaming a folder;
   4. deletes the old version after a test image reads correctly.
@@ -92,39 +93,74 @@ asks; the server doesn't change.
   hardened runtime, the downloaded ONNX Runtime library must be signed too, or the app needs a library-validation
   exception. Phase 0 tests this.
 
-## 5. Phases
+## 5. Modules: what is shared now, what waits
 
-**Phase 0 — spike (about 2–3 days), ending in ADR-0053.**
+Other big local features would follow the same pattern: download large files, check them, and run them in a child
+process. Examples are speech-to-text for voice notes (Whisper), embeddings for search by meaning, and a local model for
+summaries. So OCR is built as the first module, with only the parts every module needs:
+- **Module store (host, Rust).** It downloads to `<app-data>/modules/<id>/<version>/`, checks each file's SHA-256,
+  renames the folder to switch versions, keeps the last good version until the new one passes its self-test, removes a
+  module, and reports the space used.
+- **Module runner (host, Rust).** It starts the module's program as a child process, one job at a time. It sends
+  newline-delimited JSON over stdio, enforces a time limit and Cancel, and kills the process when the app quits. It
+  reuses the agent-run supervision.
+- **A compiled-in list of modules.** Each entry gives an id, a version, its files per platform with URL, size and
+  SHA-256, and the program to run. Adding a module, a language or a model is a new app version.
+- **Settings → Modules.** One card per module, with what it does, its download size, Download, Remove and the space
+  used.
+
+These wait until a real need appears:
+- **A remote, signed registry.** Needed when modules must update faster than the app.
+- **A dependency resolver.** Needed when two modules share a runtime.
+- **Third-party modules.** Never in the plan. They would mean running other people's code.
+
+Each can be added behind the same store and runner without changing the modules.
+
+## 6. Phases
+
+**Phase 0 — spike (about 3–4 days), ending in ADR-0053.**
 - Build a command-line `thoth-ocr` on `oar-ocr`, with PP-OCRv5 mobile detection and `th_PP-OCRv5_mobile_rec`.
+- Render PDF pages with pdfium (prebuilt binaries, Apache-2.0/BSD). Use the PDF's own text where a page has some.
 - Platforms: macOS arm64, Windows x64 and Linux x64, built in CI like the app.
-- Test corpus: 40–60 images from the owner's real use, each with checked text, plus a held-out part. It covers Thai,
-  English, mixed lines, app screenshots, phone photos and scans. That's smaller than the handoff's 100–200, to start.
-- Measure: CER on Thai, English and mixed text separately; p50/p95 time; peak memory; download size and installed
-  size; cold start.
+- Test corpus: 40–60 images with checked text, plus a held-out part. It covers Thai, English, mixed lines, app
+  screenshots, phone photos, scanned PDFs and two-column pages. Its sources:
+  - the owner's own images, kept outside the repo;
+  - public images whose license allows it, such as Thai Wikipedia screenshots (CC BY-SA) and public-domain scans;
+  - synthetic pages: Thai and English text rendered in free fonts (Noto Sans Thai, Sarabun), then blurred, skewed and
+    compressed. Their text is known exactly.
+- Measure: CER on Thai, English and mixed text separately; p50/p95 time per image and per PDF page; peak memory;
+  download size and installed size; cold start.
 - Compare against the Tesseract `tha` model as a baseline, and macOS Vision if it lists Thai.
 - Check every license: the PaddleOCR models, oar-ocr, ONNX Runtime (MIT) and pdfium.
-- Exit criteria: readable Thai on screenshots, a total download under about 40 MB, and no license blocker.
+- Exit criteria: readable Thai on screenshots and scans, a total download under about 50 MB, and no license blocker.
   If Rust fails on a hard blocker, only then try Python.
 
-**Phase 1 — Feature A.** The OCR download in Settings, and "Copy text" / "Insert text below" on images. Also a job
-with progress and Cancel, and errors in plain words. The new strings come in English and Thai (marked REVIEW). Tests
-cover the hash check, an interrupted download, removal, the limits, and a stuck child process being killed.
+**Phase 1 — the module store and runner, Settings → Modules, and text from an image.**
+- On an image in a page: "Copy text" and "Insert text below".
+- The job shows progress, has Cancel, and reports errors in plain words.
+- The new strings come in English and Thai (marked REVIEW).
+- Tests cover the hash check, an interrupted download, removal, the limits, and a stuck child process being killed.
 
-**Phase 2 — Feature B.** Image text in the local search index, built in the background while the app is idle.
-It follows a switch that is off by default, and indexed text is cleared when OCR is removed.
+**Phase 2 — scanned PDF to a page.** "Import → PDF" makes a page of text from a PDF or an image:
+- the PDF's own text where it has some, OCR elsewhere;
+- page breaks kept, and a link to the original file;
+- a limit on the page count, with progress per page.
 
-**Phase 3 — Feature C and more.**
-- PDF import with pdfium, using the PDF's own text where it has some.
+**Later.**
+- Search inside images: image text in the local search index, behind a switch that is off by default.
 - More languages from PP-OCRv6 (Latin scripts, Japanese, Chinese).
-- Optional layout and table models, each a separate download.
+- Layout and table models, each a separate download.
 
-## 6. Decisions for the owner
+## 7. Decisions
 
-1. Which feature first: A (text from an image), B (search inside images) or C (scanned PDF)? Recommended: A.
-2. Rust only (no Python), unless Phase 0 hits a blocker? Recommended: yes.
-3. One OCR download now, rather than a general "Thoth Modules" system? Recommended: yes.
-4. Model files on our R2 under `download.thothnotes.com/ocr/`, with hashes compiled into the app? Recommended: yes.
-5. Will you provide 40–60 real images (screenshots, photos, scans) for the test set? Phase 0 needs them.
+Decided by the owner on 2026-11-10:
+- First features: text from an image, and scanned PDF to a page.
+- Rust only (no Python), unless Phase 0 hits a blocker.
+- Files on R2 under `download.thothnotes.com/modules/`, with hashes compiled into the app.
+- Test images: some from the owner, the rest public or synthetic.
+
+Proposed in §5, waiting for the owner: build OCR as the first module, with a shared store and runner and Settings →
+Modules, but no registry yet.
 
 [pp5-multi]: https://www.paddleocr.ai/latest/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.html
 [th-card]: https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec
