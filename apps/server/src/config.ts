@@ -23,12 +23,14 @@ export interface ServerConfig {
   maxAttachmentBytes: number;
   /** Total JSON body size accepted by `createTransfer`. */
   maxTransferBytes: number;
-  /** Quotas. `undefined` = no limit. The first five are advertised by /capabilities. */
+  /** Quotas. `undefined` = no limit. The first five, and `inactiveAccountDays`, are advertised by /capabilities. */
   maxWorkspacesPerAccount: number | undefined;
   maxMembersPerWorkspace: number | undefined;
   maxPagesPerWorkspace: number | undefined;
   maxWorkspaceAttachmentBytes: number | undefined;
   revisionRetentionDays: number | undefined;
+  /** Accounts with no sign-in and no use for this many days are deleted by maintenance (ADR-0014). `undefined` = never. */
+  inactiveAccountDays: number | undefined;
   /** Server-wide, not advertised: stored attachment bytes (each distinct blob once) and number of accounts. */
   maxTotalAttachmentBytes: number | undefined;
   maxAccounts: number | undefined;
@@ -132,6 +134,8 @@ export const TRIAL_PROFILE = {
   maxWorkspaceAttachmentBytes: 20 * MIB,
   maxTotalAttachmentBytes: 600 * MIB,
   revisionRetentionDays: 30,
+  // ADR-0014 and the privacy notice: an account with no sign-in for 90 days is deleted with the workspaces it alone owns.
+  inactiveAccountDays: 90,
   // Vercel Functions reject request bodies above 4.5 MB before our code runs; stay below it so users get our clear 413.
   maxAttachmentBytes: 4 * MIB,
   maxMarkdownBytes: 256 * KIB,
@@ -361,6 +365,8 @@ function publicUrlFrom(env: NodeJS.ProcessEnv, options: { strict: boolean }): st
  *   MAX_MARKDOWN_BYTES, MAX_ATTACHMENT_BYTES, MAX_TRANSFER_BYTES   size limits
  *   MAX_WORKSPACES_PER_ACCOUNT, MAX_MEMBERS_PER_WORKSPACE, MAX_PAGES_PER_WORKSPACE,
  *   MAX_WORKSPACE_ATTACHMENT_BYTES, REVISION_RETENTION_DAYS   advertised quotas (unset = none)
+ *   INACTIVE_ACCOUNT_DAYS   maintenance deletes accounts with no sign-in or use for this many days, with the
+ *                 workspaces they alone own (trial 90; unset = never); advertised as limits.inactiveAccountDays
  *   MAX_TOTAL_ATTACHMENT_BYTES, MAX_ACCOUNTS   server-wide quotas, not advertised
  *   CORS_ORIGINS  comma-separated exact origins allowed to call the API from a browser
  *   RATE_LIMIT_PER_ACCOUNT, RATE_LIMIT_PER_IP, RATE_LIMIT_WINDOW_SECONDS   fixed-window rate limits (unset = off)
@@ -436,6 +442,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxPagesPerWorkspace: limitFrom(env, "MAX_PAGES_PER_WORKSPACE", trial?.maxPagesPerWorkspace, 100_000_000),
     maxWorkspaceAttachmentBytes: limitFrom(env, "MAX_WORKSPACE_ATTACHMENT_BYTES", trial?.maxWorkspaceAttachmentBytes, 2 ** 40),
     revisionRetentionDays: limitFrom(env, "REVISION_RETENTION_DAYS", trial?.revisionRetentionDays, 36_500),
+    inactiveAccountDays: limitFrom(env, "INACTIVE_ACCOUNT_DAYS", trial?.inactiveAccountDays, 36_500),
     maxTotalAttachmentBytes: limitFrom(env, "MAX_TOTAL_ATTACHMENT_BYTES", trial?.maxTotalAttachmentBytes, 2 ** 40),
     maxAccounts: limitFrom(env, "MAX_ACCOUNTS", trial?.maxAccounts, 100_000_000),
     maxWorkspaceCreationsPerDay: limitFrom(env, "MAX_WORKSPACE_CREATIONS_PER_DAY", trial?.maxWorkspaceCreationsPerDay, 1_000_000),

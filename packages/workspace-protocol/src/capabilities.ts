@@ -55,6 +55,8 @@ export const LimitsSchema = z.object({
   maxWorkspacesPerAccount: z.number().int().positive().optional(),
   /** Non-current revisions older than this many days are removed; `GET ?revision=` of a removed revision is 404. */
   revisionRetentionDays: z.number().int().positive().optional(),
+  /** Accounts with no sign-in and no use for this many days are deleted, with the workspaces they alone own. */
+  inactiveAccountDays: z.number().int().positive().optional(),
 });
 export type Limits = z.infer<typeof LimitsSchema>;
 

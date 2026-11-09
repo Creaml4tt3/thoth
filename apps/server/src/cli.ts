@@ -136,7 +136,7 @@ async function main(argv: string[]): Promise<number> {
       }
       case "maintenance": {
         const blobs = config.blobStore === "postgres" ? new PgBlobStore(db) : new FsBlobStore(config.blobDir);
-        const result = await runMaintenance(db, { revisionRetentionDays: config.revisionRetentionDays, blobs });
+        const result = await runMaintenance(db, { revisionRetentionDays: config.revisionRetentionDays, inactiveAccountDays: config.inactiveAccountDays, blobs });
         console.log(JSON.stringify(result));
         return 0;
       }

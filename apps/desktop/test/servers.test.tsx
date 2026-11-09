@@ -558,10 +558,11 @@ describe("helpers", () => {
   });
 
   it("describes limits in plain words and skips protocol tuning", () => {
-    expect(describeLimits({ maxPagesPerWorkspace: 1, maxWorkspacesPerAccount: 3, revisionRetentionDays: 30, idempotencyWindowSeconds: 86400, maxMarkdownBytes: 1024 * 1024, x: 2 })).toEqual([
+    expect(describeLimits({ maxPagesPerWorkspace: 1, maxWorkspacesPerAccount: 3, revisionRetentionDays: 30, inactiveAccountDays: 90, idempotencyWindowSeconds: 86400, maxMarkdownBytes: 1024 * 1024, x: 2 })).toEqual([
       "1 page per workspace",
       "3 workspaces per account",
       "Old versions of a page are kept for 30 days",
+      "Accounts with no sign-in for 90 days are deleted, with the workspaces they alone own",
       "1 MB per page",
       "x: 2",
     ]);

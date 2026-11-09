@@ -226,6 +226,10 @@ rate limits), 12 (browser sessions, secrets, abuse), 13 (P2 web client).
 - Emailing a notice before an inactive account is deleted needs an email
   sending service. Until one is chosen, the warning is shown in the app at
   sign-in instead. Blocks deleting inactive accounts, not the launch.
+  Built (`INACTIVE_ACCOUNT_DAYS`, trial 90): the warning is the limit line the
+  apps show at sign-in and in server settings, still without email. Open: an
+  inactive account that alone owns a workspace with other members is skipped,
+  not deleted, until the owner picks a hand-over rule.
 - ~~The product name.~~ The owner keeps **Thoth** (2026-10-22). The clash
   with the unrelated voice app at thoth-app.com remains a known risk; buying a
   domain is still open, and moving to it is a configuration change (rule 1).

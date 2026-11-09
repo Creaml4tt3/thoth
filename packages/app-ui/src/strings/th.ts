@@ -520,6 +520,7 @@ export const th: Strings = {
     perAttachment: (size) => `ไฟล์แนบไม่เกิน ${size} ต่อไฟล์`,
     perPage: (size) => `ไม่เกิน ${size} ต่อหน้า`,
     retention: (n) => `เก็บฉบับเก่าของแต่ละหน้าไว้ ${count(n)} วัน`,
+    inactiveAccounts: (n) => `บัญชีที่ไม่ได้ลงชื่อเข้าใช้ ${count(n)} วันจะถูกลบ พร้อมเวิร์กสเปซที่บัญชีนั้นเป็นเจ้าของเพียงผู้เดียว`, // REVIEW
     bytes: (n) => `${count(n)} ไบต์`,
   },
 

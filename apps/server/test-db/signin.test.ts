@@ -522,6 +522,17 @@ describe("refresh tokens", () => {
     expect((await refresh(t3.refresh)).json.error).toBe("invalid_grant");
     expect(await meStatus(t3.access)).toBe(401); // the access token dies with the session's maximum age too
   });
+
+  it("a session in use refreshes last_seen_at, so the inactive-account rule never deletes it", async () => {
+    const t = await desktopTokens();
+    await env.db.query("UPDATE users SET last_seen_at = now() - interval '100 days' WHERE id = $1", [t.userId]);
+    const r = await refresh(t.refresh);
+    expect(r.status).toBe(200);
+    expect(await count("SELECT count(*) AS n FROM users WHERE id = $1 AND last_seen_at > now() - interval '1 minute'", [t.userId])).toBe(1);
+    const result = await runMaintenance(env.db, { revisionRetentionDays: undefined, inactiveAccountDays: 90, blobs: env.server.deps.blobs });
+    expect(result.inactiveAccountsDeleted).toBe(0);
+    expect(await meStatus(r.json.access_token)).toBe(200);
+  });
 });
 
 describe("authorization request", () => {

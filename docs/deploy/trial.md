@@ -227,6 +227,14 @@ redirect means none does).
    | `MAX_WORKSPACE_CREATIONS_PER_DAY` | `10` | Workspaces one account may create per UTC day through the API. One more is `409 quota_exceeded` (`quota: workspaceCreationsPerDay`) |
    | `WORKSPACE_MANAGEMENT` | `on` | `off` hides New workspace, Rename… and Delete… in the apps and answers those calls `501` |
 
+   Inactive accounts are deleted, as the privacy notice says (ADR-0014). The
+   apps show the rule with the trial's limits, at sign-in and in server
+   settings:
+
+   | Variable | Trial default | Meaning |
+   | --- | --- | --- |
+   | `INACTIVE_ACCOUNT_DAYS` | `90` | The daily cron job deletes an account with no sign-in and no use for this many days, with the workspaces it alone owns. An account that alone owns a workspace with other members is skipped (`inactiveAccountsSkipped` in the cron result). `unlimited` turns it off |
+
 5. The daily cron job that calls `/internal/maintenance` is part of the build
    (`0 20 * * *` UTC, 03:00 in Thailand). The Hobby plan allows once a day.
 

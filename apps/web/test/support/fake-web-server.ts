@@ -47,7 +47,7 @@ export class FakeWebServer {
         { id: "google", name: "Google" },
         { id: "github", name: "GitHub" },
       ],
-      limits: { maxPagesPerWorkspace: 200, maxWorkspacesPerAccount: 1, idempotencyWindowSeconds: 86400 },
+      limits: { maxPagesPerWorkspace: 200, maxWorkspacesPerAccount: 1, inactiveAccountDays: 90, idempotencyWindowSeconds: 86400 },
       account: { id: "usr_ada", displayName: "Ada Lovelace", email: "ada@example.org" },
       ...config,
     });
