@@ -770,8 +770,8 @@ export class Vault {
         if (!hits.has(row.page_id)) hits.set(row.page_id, { id: row.page_id, path: "", title: "", snippet: row.snippet });
     }
     // A term under 3 characters has no index (and Thai has no spaces for the word index), so match substrings, as the server does.
-    const short = !tri && tokens.length > 0;
-    if (short) {
+    // Substring hits only fill the slots the word index left, so they never push out a page it found.
+    if (!tri && tokens.length > 0 && hits.size < limit) {
       const patterns = tokens.map(likeAnywhere);
       const every = (column: string) => patterns.map(() => `${column} LIKE ? ESCAPE '\\'`).join(" AND ");
       // Cost: a full scan of the search table, only for such queries; LIMIT bounds the rows, not the scan.
@@ -788,13 +788,11 @@ export class Vault {
         }
     }
     const results: SearchHit[] = [];
-    for (const hit of short ? hits.values() : [...hits.values()].slice(0, limit)) {
+    for (const hit of [...hits.values()].slice(0, limit)) {
       const page = await this.sql.get<{ path: string; title: string }>("SELECT path, title FROM pages WHERE id = ?", [hit.id]);
       if (page) results.push({ ...hit, path: page.path, title: page.title });
     }
-    if (!short) return results;
-    const inTitle = (hit: SearchHit) => tokens.every((t) => hit.title.toLowerCase().includes(t.toLowerCase()));
-    return results.sort((a, b) => Number(inTitle(b)) - Number(inTitle(a))).slice(0, limit);
+    return results;
   }
 
   async backlinks(path: string): Promise<Backlink[]> {
