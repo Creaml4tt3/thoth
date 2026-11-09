@@ -115,7 +115,7 @@ export interface Updates {
 /** Connected apps (ADR-0021): the user's settings, and the requests the host sends a window to answer. */
 export interface ConnectedApps {
   settings(): Promise<ConnectedAppsSettings>;
-  configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean; workspaces?: { server: string; workspace: string; name: string }[] }): Promise<ConnectedAppsSettings>;
+  configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean; closed?: boolean; workspaces?: { server: string; workspace: string; name: string }[] }): Promise<ConnectedAppsSettings>;
   decide(app: string, allow: boolean): Promise<ConnectedAppsSettings>;
   forget(app: string): Promise<ConnectedAppsSettings>;
   log(): Promise<ConnectedAppsLogEntry[]>;

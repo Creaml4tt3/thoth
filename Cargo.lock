@@ -4398,6 +4398,7 @@ dependencies = [
  "rustix",
  "serde_json",
  "tempfile",
+ "thoth-host",
 ]
 
 [[package]]

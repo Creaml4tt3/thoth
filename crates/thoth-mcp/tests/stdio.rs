@@ -247,6 +247,41 @@ fn thoth_not_running_or_switched_off_says_what_to_do() {
     assert!(real.seen.lock().unwrap().is_empty());
 }
 
+/// ADR-0052 rule 9: with Thoth closed and the user's "while Thoth is closed" switch on, the memory tools are answered
+/// from the memory folder; the others still say to open Thoth. A running app is always asked instead.
+#[test]
+fn with_thoth_closed_the_memory_tools_answer_when_the_user_lets_them() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let root = std::fs::canonicalize(dir.path()).unwrap().join("Notes");
+    std::fs::create_dir_all(root.join("Memory")).unwrap();
+    std::fs::write(root.join("Memory/tea.md"), "---\nkind: preference\n---\nLikes tea.\n").unwrap();
+    let settings = json!({
+        "enabled": true, "closed": true, "spaces": [root], "memoryFolders": { root.to_string_lossy(): "Memory" },
+        "apps": [{ "name": "claude-ai", "allowed": true, "decidedAt": "2026-11-01T00:00:00Z" }],
+    });
+    let file = dir.path().join("settings.json");
+    std::fs::write(&file, settings.to_string()).unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    let mut server = Server::start(&dir.path().join("thoth.sock"));
+    server.initialize("claude-ai");
+    let answer = server.call(1, "tools/call", json!({ "name": "recall", "arguments": {} }));
+    assert_eq!(answer["result"]["structuredContent"]["memories"][0]["text"], "Likes tea.", "{answer}");
+    let answer = server.call(2, "tools/call", json!({ "name": "remember", "arguments": { "text": "Works in Bangkok", "kind": "profile" } }));
+    assert_eq!(answer["result"]["structuredContent"]["path"], "Memory/works-in-bangkok.md", "{answer}");
+    assert!(root.join("Memory/works-in-bangkok.md").exists());
+    let answer = server.call(3, "tools/call", json!({ "name": "search", "arguments": { "query": "x" } }));
+    assert_eq!(answer["result"]["isError"], true);
+    assert!(answer["result"]["content"][0]["text"].as_str().unwrap().contains("needs it open"), "{answer}");
+
+    // Off: Thoth is not running, as before.
+    std::fs::write(&file, json!({ "enabled": true, "closed": false }).to_string()).unwrap();
+    let answer = server.call(4, "tools/call", json!({ "name": "recall", "arguments": {} }));
+    assert!(answer["result"]["content"][0]["text"].as_str().unwrap().contains("Open Thoth and switch on Connected apps"), "{answer}");
+}
+
 #[test]
 fn protocol_errors() {
     let app = app(page_answer);

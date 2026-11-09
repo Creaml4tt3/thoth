@@ -4,6 +4,10 @@
 //! seen, and answers from the Private Spaces the user shares; changes are only proposed, for the user's review (ADR-0048),
 //! except memories, which the app saves in the memory folder while the user lets it (ADR-0052).
 //!
+//! With Thoth closed, it answers nothing unless the user ticked "Let agents use my memory folder while Thoth is
+//! closed" (ADR-0052 rule 9): then it serves recall, list_memories, list_skills, get_skill and new memories itself,
+//! from the memory folder and skills the app recorded (`thoth_host::mcp::closed`), and never opens the index.
+//!
 //! The MCP side is hand-written newline-delimited JSON-RPC 2.0 (the stdio transport). It is "dual-era":
 //! - 2026-07-28 (current): every request carries its protocol version and client in `_meta`; `server/discover`.
 //! - 2025-11-25 and earlier: the `initialize` handshake, then requests without that metadata.
@@ -322,7 +326,12 @@ impl Server {
         let server = self.clone();
         let started = key.clone();
         let spawned = std::thread::Builder::new().name("thoth-mcp-call".into()).spawn(move || {
-            let outcome = relay::call(server.socket.as_deref(), era.app().as_deref(), &name, &Value::Object(arguments));
+            let (socket, app, arguments) = (server.socket.as_deref(), era.app(), Value::Object(arguments));
+            let outcome = match relay::call(socket, app.as_deref(), &name, &arguments) {
+                // Thoth is closed: what the user lets agents use then (ADR-0052 rule 9), if anything.
+                Err(failure) if failure.not_running => relay::closed(socket, app.as_deref(), &name, &arguments).unwrap_or(Err(failure)),
+                other => other,
+            };
             let result = era.finish(tools::result(outcome));
             let cancelled = server.calls.lock().unwrap_or_else(|p| p.into_inner()).remove(&key).unwrap_or(false);
             if !cancelled {

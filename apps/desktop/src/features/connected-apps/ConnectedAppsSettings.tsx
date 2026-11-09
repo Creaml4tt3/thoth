@@ -182,6 +182,21 @@ export function ConnectedAppsSettings({ connectedApps }: { connectedApps: Connec
           {t.memoriesHint}
         </small>
       </div>
+      {/* ADR-0052 rule 9: off by default; on, thoth-mcp answers the memory tools itself while Thoth is closed. */}
+      <div className="set-toggle">
+        <input
+          id="mcp-closed"
+          type="checkbox"
+          role="switch"
+          checked={settings.closed === true}
+          onChange={(e) => void change(() => connectedApps.configure({ closed: e.target.checked }))}
+          aria-describedby="mcp-closed-hint"
+        />
+        <label htmlFor="mcp-closed">{t.closed}</label>
+        <small id="mcp-closed-hint" className="muted">
+          {t.closedHint}
+        </small>
+      </div>
       <div className="set-actions">
         <Button variant="ghost" small onClick={openMemories}>
           {t.memoriesView.open}

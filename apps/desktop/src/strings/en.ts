@@ -422,6 +422,10 @@ export const en = {
     memoriesHint:
       "On by default. Allowed apps save, change and forget memories in the memory folder of each shared Private Space, and nowhere else. Off: each memory waits for your review under the bell, as a proposed change.",
     mayRemember: "Save memories without asking",
+    /** ADR-0052 rule 9. */
+    closed: "Let agents use my memory folder while Thoth is closed",
+    closedHint:
+      "Off by default. While Thoth is closed, allowed apps can still recall memories, read skills and save new memories in the memory folder of each shared Private Space. Changing or forgetting a memory, and every other page, wait until Thoth is open. What they save shows under Show memories.",
     memoryFolder: (folder: string) => `Memory folder: ${folder}`,
     /** ADR-0052 rule 8: workspaces whose Team memory apps may use, and the review of agents' memories there. */
     team: {

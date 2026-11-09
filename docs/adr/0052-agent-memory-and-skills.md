@@ -1,7 +1,7 @@
 # ADR-0052: Agent memory and skills in Thoth
 
 - **Status:** Accepted (owner, 2026-11-07: "Thoth as the main memory for people's agents"; the decisions listed under
-  Decision were each confirmed by the owner). Not yet implemented; planned for 0.9.0.
+  Decision were each confirmed by the owner). Implemented for 0.9.0.
 - **Date:** 2026-11-07
 - **Deciders:** project owner (the direction, the review rules, the kinds, the defaults); the details marked
   "(this ADR)" were proposed by the research and accepted with the plan.
@@ -145,6 +145,13 @@ Constraints:
      `list_memories`, `list_skills` and `get_skill` itself, and creates new memory files. It reads only the folder
      recorded for it, serves only apps already allowed, never edits or deletes, and never opens the index (ADR-0019).
      Every other tool answers `NOT_RUNNING`. Off by default.
+   - (this ADR) `thoth-mcp` falls back only when nothing listens at the socket, and reads the switch from
+     `<data>/mcp/settings.json` (`closed`) only when that folder and file are the user's and nobody else may write
+     them. It uses the host's own code (`crates/thoth-host/src/mcp/closed.rs`): the checks, the answers, the
+     `openat` file layer and the history, so a memory saved while Thoth is closed has Undo and counts toward the daily
+     limit when Thoth opens. A `remember` whose topic is already taken would update a memory, so it answers
+     `NOT_RUNNING`; so does `remember` when the user's switches send memories to review. Without the index, a
+     `recall` query keeps the memories that contain its words, most words first, and the dates it writes are UTC.
 
 10. **Setup.** Settings → Connected apps offers a card for each app: Claude Code (`claude mcp add`), Codex and the
     ChatGPT desktop app (`~/.codex/config.toml`), Claude Desktop (its config file), Cursor (its install link), and a
