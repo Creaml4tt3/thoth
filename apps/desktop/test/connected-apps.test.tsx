@@ -270,6 +270,12 @@ describe("Agents' memory (ADR-0052)", () => {
     expect(apps.calls).toContainEqual(["configure", { memories: false }]);
     // With the global switch off, the per-app one has nothing to say.
     await waitFor(() => expect(within(section.getByRole("listitem", { name: "Claude" })).queryByRole("switch", { name: "Save memories without asking" })).toBeNull());
+    // ADR-0052 rule 9: off until the user turns it on.
+    const closed = section.getByRole("switch", { name: "Let agents use my memory folder while Thoth is closed" });
+    expect(checked(closed)).toBe(false);
+    await app.user.click(closed);
+    expect(apps.calls).toContainEqual(["configure", { closed: true }]);
+    await waitFor(() => expect(checked(section.getByRole("switch", { name: "Let agents use my memory folder while Thoth is closed" }))).toBe(true));
   });
 });
 

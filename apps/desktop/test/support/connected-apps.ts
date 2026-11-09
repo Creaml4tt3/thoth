@@ -36,9 +36,10 @@ export class FakeConnectedApps implements ConnectedApps {
   async settings() {
     return this.copy();
   }
-  async configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean }) {
+  async configure(change: { enabled?: boolean; spaces?: string[]; memories?: boolean; closed?: boolean }) {
     this.calls.push(["configure", change]);
     if (change.memories !== undefined) this.state.memories = change.memories;
+    if (change.closed !== undefined) this.state.closed = change.closed;
     if (change.enabled !== undefined) Object.assign(this.state, { enabled: change.enabled, listening: change.enabled });
     if (change.spaces) this.state.spaces = change.spaces;
     return this.copy();

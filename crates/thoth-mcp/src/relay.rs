@@ -17,16 +17,35 @@ const MAX_ANSWER: u64 = 2 * 1024 * 1024;
 #[derive(Debug)]
 pub struct Failure {
     pub message: String,
+    /// Nothing listens at the socket: Thoth is closed, or Connected apps is off.
+    pub not_running: bool,
 }
 
 impl Failure {
-    fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into() }
+    pub fn new(message: impl Into<String>) -> Self {
+        Self { message: message.into(), not_running: false }
+    }
+
+    fn not_running() -> Self {
+        Self { message: NOT_RUNNING.into(), not_running: true }
     }
 
     pub fn busy() -> Self {
         Self::new("Too many requests at once: try again")
     }
+}
+
+/// With Thoth closed, the few tools the user let agents use then (ADR-0052 rule 9), answered from the app data folder
+/// that holds `socket`. `None` when the user has not switched that on.
+#[cfg(unix)]
+pub fn closed(socket: Option<&Path>, app: Option<&str>, tool: &str, arguments: &Value) -> Option<Result<Value, Failure>> {
+    let dir = socket?.parent()?;
+    thoth_host::mcp::closed::serve(dir, app, tool, arguments).map(|answer| answer.map_err(|e| Failure::new(e.message)))
+}
+
+#[cfg(not(unix))]
+pub fn closed(_socket: Option<&Path>, _app: Option<&str>, _tool: &str, _arguments: &Value) -> Option<Result<Value, Failure>> {
+    None
 }
 
 /// The app's usual socket, in its app data folder (the same folder Tauri's `app_data_dir` gives the app).
@@ -45,7 +64,7 @@ pub fn default_socket() -> Option<PathBuf> {
 
 /// One tool call, relayed.
 pub fn call(socket: Option<&Path>, app: Option<&str>, tool: &str, arguments: &Value) -> Result<Value, Failure> {
-    let socket = socket.ok_or_else(|| Failure::new(NOT_RUNNING))?;
+    let socket = socket.ok_or_else(Failure::not_running)?;
     let request = json!({ "v": 1, "app": app, "tool": tool, "arguments": arguments });
     let answer = exchange(socket, &request.to_string())?;
     let answer: Value =
@@ -64,11 +83,11 @@ fn exchange(socket: &Path, line: &str) -> Result<String, Failure> {
     use std::time::Duration;
 
     // Only a socket of this user, at this very path (not a link to one somewhere else).
-    let meta = std::fs::symlink_metadata(socket).map_err(|_| Failure::new(NOT_RUNNING))?;
+    let meta = std::fs::symlink_metadata(socket).map_err(|_| Failure::not_running())?;
     if !meta.file_type().is_socket() || meta.uid() != rustix::process::geteuid().as_raw() {
         return Err(Failure::new(format!("{} is not Thoth's socket for this user", socket.display())));
     }
-    let mut stream = UnixStream::connect(socket).map_err(|_| Failure::new(NOT_RUNNING))?;
+    let mut stream = UnixStream::connect(socket).map_err(|_| Failure::not_running())?;
     // The app may wait up to a minute for the user's Allow, then up to 15 s for its windows.
     let _ = stream.set_read_timeout(Some(Duration::from_secs(90)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(10)));

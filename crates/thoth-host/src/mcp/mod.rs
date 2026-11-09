@@ -12,6 +12,8 @@
 //! An app is known by the name it gives (MCP `clientInfo.name`). That name is self-reported: any program of this
 //! user can give any name. Allow and Deny are the user's consent for a name, not proof of who connects; the socket
 //! being the user's own (`0600` in a `0700` folder) is what keeps other users out.
+#[cfg(unix)]
+pub mod closed;
 pub mod install;
 pub mod log;
 pub mod memory;
@@ -108,6 +110,9 @@ struct Settings {
     /// "Agents save memories without asking" (ADR-0052 rule 5): on by default.
     #[serde(default = "on")]
     memories: bool,
+    /// "Let agents use my memory folder while Thoth is closed" (ADR-0052 rule 9): off by default. `thoth-mcp` reads it.
+    #[serde(default)]
+    closed: bool,
     /// The memory folder of each Private Space (canonical root → folder), recorded the first time an app used memory
     /// there (ADR-0052 rule 1).
     #[serde(default)]
@@ -141,6 +146,7 @@ impl Default for Settings {
             spaces: Vec::new(),
             apps: Vec::new(),
             memories: true,
+            closed: false,
             memory_folders: BTreeMap::new(),
             skill_links: Vec::new(),
             workspaces: Vec::new(),
@@ -266,6 +272,7 @@ impl Relay {
             "pending": state.pending,
             "proposers": state.proposers,
             "memories": state.settings.memories,
+            "closed": state.settings.closed,
             "memoryFolders": state.settings.memory_folders,
             "folders": state.folders,
             "skillLinks": state.settings.skill_links,
@@ -274,7 +281,7 @@ impl Relay {
         })
     }
 
-    /// `mcp.configure { enabled?, spaces?, memories? }`. `spaces` replaces the shared list; each must be in `opened` (the
+    /// `mcp.configure { enabled?, spaces?, memories?, closed?, workspaces? }`. `spaces` replaces the shared list; each must be in `opened` (the
     /// Private Spaces the user opened: the host's recent list and the open ones).
     pub fn configure(&self, args: &Value, opened: &[String]) -> HostResult<Value> {
         if let Some(spaces) = args.get("spaces").filter(|v| !v.is_null()) {
@@ -321,14 +328,16 @@ impl Relay {
             state.settings.workspaces = chosen;
             self.inner.save(&state.settings)?;
         }
-        match args.get("memories") {
-            None | Some(Value::Null) => {}
-            Some(Value::Bool(on)) => {
-                let mut state = self.inner.state();
-                state.settings.memories = *on;
-                self.inner.save(&state.settings)?;
+        for key in ["memories", "closed"] {
+            match args.get(key) {
+                None | Some(Value::Null) => {}
+                Some(Value::Bool(on)) => {
+                    let mut state = self.inner.state();
+                    *(if key == "closed" { &mut state.settings.closed } else { &mut state.settings.memories }) = *on;
+                    self.inner.save(&state.settings)?;
+                }
+                Some(_) => return Err(HostError::bad_argument(format!("{key} must be a boolean"))),
             }
-            Some(_) => return Err(HostError::bad_argument("memories must be a boolean")),
         }
         match args.get("enabled") {
             None | Some(Value::Null) => {}

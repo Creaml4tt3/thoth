@@ -248,7 +248,7 @@ export interface Commands {
    * Switches Connected apps on or off (the host starts or stops listening), and/or replaces the shared Private Spaces
    * (canonical roots; each must be one the user opened). `UNAVAILABLE` or `BUSY` when it cannot listen.
    */
-  "mcp.configure": { args: { enabled?: boolean; spaces?: string[]; memories?: boolean; workspaces?: { server: string; workspace: string; name: string }[] }; result: ConnectedAppsSettings };
+  "mcp.configure": { args: { enabled?: boolean; spaces?: string[]; memories?: boolean; closed?: boolean; workspaces?: { server: string; workspace: string; name: string }[] }; result: ConnectedAppsSettings };
   /** The user's Allow or Deny for an app that asked (or a change of mind later). */
   "mcp.decide": { args: { app: string; allow: boolean }; result: ConnectedAppsSettings };
   /** Removes an app: it is asked about again the next time it connects. */
@@ -392,6 +392,8 @@ export interface ConnectedAppsSettings {
   proposers: string[];
   /** "Agents save memories without asking" (ADR-0052 rule 5); on by default. */
   memories?: boolean;
+  /** "Let agents use my memory folder while Thoth is closed" (ADR-0052 rule 9); off by default. */
+  closed?: boolean;
   /** The memory folder recorded for each Private Space (canonical root → folder), once an app first used memory there. */
   memoryFolders?: Record<string, string>;
   /**
