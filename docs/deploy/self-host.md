@@ -1,6 +1,8 @@
 # Hosting your own Thoth server
 
+<!-- repo-only:start -->
 **English** · [ภาษาไทย](self-host.th.md)
+<!-- repo-only:end -->
 
 A Thoth server holds the shared workspaces. The desktop app works without one; you need a server only to work with
 others. It is one container (Node.js 24) and a PostgreSQL 14 or newer database. Every setting is listed in

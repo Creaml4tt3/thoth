@@ -3,7 +3,8 @@
 <!-- repo-only:start -->
 > The website publishes this file at `/docs/` and the Thai version (`guide.th.md`) at
 > `/th/docs/`. The site leaves out this block (between the `repo-only` markers) and every
-> HTML comment. Each `##` heading becomes an entry in the page's table of contents.
+> HTML comment. Each `##` heading becomes an entry in the page's table of contents, so
+> both versions keep the same `##` headings in the same order.
 >
 > Write only what a released version does, with the app's exact labels
 > (`packages/app-ui/src/strings/`, `apps/desktop/src/strings/`). If a label or a
@@ -14,7 +15,7 @@
 
 Thoth is a notes app. Your notes are Markdown files in a folder on your computer.
 You can also write with other people in workspaces on a Thoth server.
-This guide covers the desktop app, version 0.3.1.
+This guide covers the desktop app, version 0.9.0.
 
 ## Install
 
@@ -42,14 +43,19 @@ opens workspaces on the free demo server. It has no Private Space.
 A Private Space is a folder of Markdown files on your computer. It works offline,
 with no account.
 
-When Thoth opens, choose **Choose or create a Private Space**. Pick a folder you
-already have, or create a new empty folder in the dialog. Every page you write is a
-Markdown file in that folder, so other apps can open the same files. Thoth keeps its
-search index in a hidden `.thoth` folder inside it. The index can always be rebuilt
-from your files (Settings → Private Space → **Rebuild index**).
+When Thoth opens, choose **Start a new Private Space** and pick or create an empty folder, or choose **Open a folder
+you already use**, for example an Obsidian vault. Both open the folder where it is: nothing is copied. Before a
+folder that already has notes opens, Thoth says what it does there. It changes a file only when you edit it, keeps a
+small `.thoth` folder there for its own records, and never changes Obsidian's settings, so Obsidian can keep using
+the same files.
 
-To open another Private Space, click Thoth at the top of the sidebar, or use
-**Back to Private Spaces** (Alt/Option+Shift+H).
+Every page you write is a Markdown file in that folder, so other apps can open the same files. Thoth keeps its search
+index on this computer, not in the folder. The index can always be rebuilt from your files (Settings → Private Space
+→ **Rebuild index**).
+
+To open another Private Space or a workspace, click Thoth at the top of the sidebar and pick one, or choose **Open a
+folder you already use…**. **Back to Private Spaces** (Alt/Option+Shift+H) saves your edits and goes back to the
+list of Private Spaces.
 
 ### The welcome pages
 
@@ -73,6 +79,20 @@ Every page has two modes. Both edit the same Markdown file.
 Switch with the toggle above the page, or press Ctrl/Cmd+Shift+E. Choose the mode
 new pages open in under Settings → Editor → **Default editor mode**.
 
+## Home and Today
+
+**Home** shows your **Recent** pages, your **Favorites** and the **Today** card.
+
+Today's page is one page per day, a daily note. Choose **Open today's page** on Home, press Alt/Option+Shift+T, or
+use the command palette. The first time each day it is made, at `Daily/YYYY-MM-DD.md` unless you choose otherwise,
+from `Templates/Daily.md` when you have one.
+
+In Settings → Today you choose, for each Private Space, the **Folder**, the **File name** (for example
+`YYYY/MM/YYYY-MM-DD`, with a preview of today's) and the **Template**. `{{date}}`, `{{time}}` and `{{title}}` in the
+template are filled in when the page is made, also with a format such as `{{date:dddd D MMMM}}`. The setting is saved
+in the folder, so it comes with it. When you open a folder that Obsidian's daily notes already use, Thoth asks once
+whether Today should use the same folder, file name and template.
+
 ## Pages and folders
 
 - **Create**: choose **New page** (Cmd/Ctrl+N) or **New folder**
@@ -82,19 +102,37 @@ new pages open in under Settings → Editor → **Default editor mode**.
 - **Rename**: press F2, or choose **Rename** in the right-click menu.
 - **Move**: drag a page or folder in the sidebar. From the keyboard, use
   **Move to…** or Alt+Shift+Up/Down.
+- **Duplicate**: in a page's or folder's right-click menu, choose **Duplicate**, **Duplicate structure only** (each
+  page keeps only its title, handy for templates) or **Duplicate to…**. Cmd/Ctrl+Shift+D duplicates the selected
+  item. A folder is copied with everything in it, and links between the copied pages point at the copies. A copy
+  never replaces anything.
 - **Colours**: right-click a folder and choose **Color…**. There are eight colours.
   In a workspace, everyone sees the colour.
 - **Delete**: right-click and choose **Delete…**. Thoth asks first. In your Private
   Space, the page or folder goes to the Trash (the Recycle Bin on Windows), so you
   can put it back from there.
-- **Links**: type `[[` and pick a page to link to it. This works in both modes.
-  The **Backlinks** list under a page shows the pages that link to it.
-  Cmd/Ctrl+click a link to open it in a new tab.
+- **Pictures**: a picture written as `![[photo.png]]` shows as a picture in both modes. `![[photo.png|300]]` sets
+  its width.
 - **Download as Markdown**: the button in the page header, or the item in a page's
   right-click menu, saves the page as a .md file.
 
 Pages open in tabs. Right-click a tab to pin it, or to split it to the right.
 Star a page with **Favorite** to keep it in the sidebar's Favorites.
+
+## Links and Connections
+
+Type `[[` or `@` and pick a page to link to it. This works in both modes. `@` also links a folder: the link shows that
+folder in the sidebar. In a workspace page, `@` can also name a member; nobody is notified. Links keep working after a
+page is renamed or moved. Cmd/Ctrl+click a link to open it in a new tab.
+
+**Connections**, under every page, lists:
+
+- **Links from this page**: the pages it links to.
+- **Backlinks**: the pages that link to it.
+- **Unlinked mentions**: pages that name this one, or one of its aliases, without a link. Choose **Link** to turn a
+  mention into a link. The other page is written only if it has not changed in the meantime.
+
+In a workspace, Connections lists only the pages you may see.
 
 ## Search and the command palette
 
@@ -106,10 +144,12 @@ shortcuts.
 
 In Settings, type in **Search settings** to see only the settings that match.
 
+Cmd/Ctrl + and − zoom the window, and Cmd/Ctrl+0 resets it. F6 moves the focus between the sidebar and each pane.
+
 ## Timeline
 
-**Timeline** in the sidebar or the command palette lists the pages of one space by date, newest first, under a
-heading per day. Choose the space at the top.
+**Timeline** in the sidebar, on Home or in the command palette lists the pages of one space by date, newest first,
+under a heading per day. Choose the space at the top.
 
 - **Edited** places each page on the day it was last changed.
 - **Dated** places a page on the date it names: a `date: 2026-11-09` line at the top of the page (add it in Plain
@@ -126,7 +166,8 @@ button in the sidebar, or the command palette. The import only reads your origin
 
 - **Notion**: in Notion, export your workspace as Markdown & CSV. Pick the ZIP, or
   the folder once extracted.
-- **Obsidian**: pick a vault folder, or a ZIP of one.
+- **Obsidian**: pick a vault folder, or a ZIP of one. To keep using the vault in both apps instead, open it with
+  **Open a folder you already use**.
 
 Thoth shows a preview of what will and will not carry over. Then you choose a
 folder in your Private Space and start the import. At the end, a report lists
@@ -153,18 +194,35 @@ become its owner.
 
 ### Members and invites
 
-Each member has a role: **Owner** (manages members and invite links), **Editor**
-(reads and edits pages) or **Viewer** (reads pages).
+Each member has a role:
 
-Open a workspace's menu and choose **Members…**. An owner can change roles, remove
-members and choose **Invite people**. Pick the role, how long the link works and
-how many people can join with it, then **Create invite link**. Copy it at once: the
-link is shown only once.
+- **Owner**: everything a manager does, plus making owners and renaming or deleting the workspace.
+- **Manager**: manages members, invite links, teams and the Trash, and sees every page.
+- **Editor**: reads and edits pages.
+- **Viewer**: reads pages.
+
+Open a workspace's menu and choose **Members…**. Owners and managers can change roles, remove members and choose
+**Invite people**. Only an owner can make someone an owner, or change or remove an owner. Pick the role, how long the
+link works and how many people can join with it, then **Create invite link**. Copy it at once: the link is shown only
+once.
 
 To join, open the link in your browser, or paste it under **Join with an invite
 link** in Settings → Servers.
 
 To leave, choose **Leave workspace** in the members dialog.
+
+### Teams
+
+Owners and managers can group members into teams under **Teams** in **Members…** (**Create team**). Then right-click a
+folder or page, choose **Visible to…** and **Only these teams**. Pages inside a limited folder are limited too.
+Members in none of those teams cannot see those pages, search them or open their share links. Owners and managers see
+every page.
+
+### Working together
+
+A workspace page shows who else has it open, for example "Ana is also here", when the server supports it. When someone
+changes a page you have open, the page says so ("Updated by Grace just now.") instead of reloading silently. If you
+have unsaved edits at that moment, Thoth asks which version to keep. A save never overwrites someone else's change.
 
 ### Share a page publicly
 
@@ -179,6 +237,11 @@ When you create a workspace, you can tick **Do not allow copying or moving pages
 out of it**. This cannot be changed later. In such a workspace, members cannot copy
 or move pages to their Private Space or to another workspace, download them as
 Markdown, or give them to the assistant.
+
+### The workspace Trash
+
+Deleted workspace pages and folders go to the workspace's Trash (**Trash…** in the workspace menu) and stay there 30
+days. Owners and managers can **Restore** anything, or **Delete for good…**. Editors can restore what they deleted.
 
 ### Deleting a workspace
 
@@ -201,6 +264,15 @@ two workspaces, on one server or two.
 The dialog shows what will travel before anything is sent. Sub-pages, attachments
 and links between the pages go with them. A move deletes the originals only after
 the other side has every page. A page edited in the meantime is kept.
+
+## The Thoth assistant
+
+The Thoth assistant hands a few pages to an AI tool you already use: Claude Code or Codex, which you install yourself.
+It works on copies, and you review every change before anything in your Private Space is written.
+
+Start a task from the mascot in the corner of the window, or press Cmd/Ctrl+J. To give it pages, select them in the
+sidebar and choose **Ask Thoth…**. Settings → Thoth assistant holds the tools it can use, earlier runs and
+permissions.
 
 ## Connected apps (MCP)
 
@@ -225,10 +297,33 @@ Thoth must be running, with the Private Space open in a window, for an app to re
   all of your agents. You can read and edit them like any page, or choose **Show memories** to see them by kind and
   undo recent changes. Turn off **Agents save memories without asking** to review each one first. With **Let agents
   use my memory folder while Thoth is closed**, agents can still recall and save memories while Thoth is closed.
+- **Skills.** A folder in `Skills/` with a `SKILL.md` page is a skill your agents can list and follow. Turn on **Use
+  this Private Space's skills in Claude Code and Codex** to use them there too. Agents change a skill only by
+  proposing it for your review.
+- **Team memory.** Tick a workspace under **Team memory**, and agents can recall and save memories in its `Team
+  memory` folder, as you, with your role. Each memory they save there waits for review, unless an owner or manager
+  turns review off.
 - **Proposed changes.** An app may change pages only when you turn on **May propose changes** for it. Each change
   waits under the bell until you apply it.
 - **Requests.** **Show requests** lists every request of the last 30 days: when, which app, what it asked for and
   which pages. It is kept on this computer only, and never holds what a page says or what was searched for.
+
+### First steps with your agent
+
+Your agent's memory starts empty. Once the app is connected, try these two prompts in it:
+
+- "Connect to Thoth and tell me what you remember about me."
+- "Ask me 5 short questions about who I am, how I work and what I'm working on, then save my answers to Thoth."
+
+The first one checks the connection; Thoth asks you to allow the app if you have not yet. The second one fills in the
+start of your profile, which every agent then reads.
+
+<!-- UNRELEASED: setup-card instructions, remove this comment when the feature ships
+To have your agent use its Thoth memory every time, choose **Add the instructions** on the Claude Code or Codex card.
+It adds a few lines to `~/.claude/CLAUDE.md` (Claude Code) or `~/.codex/AGENTS.md` (Codex) telling the agent to
+recall and save memories in Thoth, after keeping a backup of the file. For Claude Desktop and Cursor, choose **Copy
+the instructions** and paste them into the app's own instructions.
+-->
 
 ## Updates
 
@@ -278,6 +373,8 @@ explains the setup step by step.
 
 Your Private Space stays on your computer. The app sends none of your pages
 anywhere unless you connect it to a server, and it has no analytics. The update
-check sends only the app's version number, and you can turn it off. The
+check sends only the app's version number, and you can turn it off. A link on its own
+line can show a preview card, which Thoth fetches from that site; choose **Off** under
+Settings → Editor → **Link previews** to stop it. The
 [privacy notice](/privacy/) explains what the website, the web app and the demo
 server collect.
