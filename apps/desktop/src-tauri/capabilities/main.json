@@ -97,6 +97,7 @@
     "allow-mcp-memoryHistory",
     "allow-mcp-skillLinks",
     "allow-mcp-install",
+    "allow-mcp-setupStatus",
     "allow-diag-report",
     "allow-diag-collect",
     "allow-diag-settings"

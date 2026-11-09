@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SkillLinksReport, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -130,6 +130,8 @@ export interface ConnectedApps {
   install(app: SetupApp, replace?: boolean): Promise<{ status: "added" | "already" | "replaced"; file?: string; backup?: string | null }>;
   /** Adds Thoth's instructions to Claude Code's ~/.claude/CLAUDE.md or Codex's ~/.codex/AGENTS.md. */
   instruct(app: "claude-code" | "codex"): Promise<{ status: "added" | "already" | "replaced"; file?: string; backup?: string | null }>;
+  /** What each app already has of this Thoth's setup and instructions; changes nothing. */
+  setupStatus(): Promise<Record<SetupApp, SetupState>>;
   /** Links this window's Private Space's skills into the home folder (`on`), or only brings the links up to date. */
   skillLinks(root: string, on?: boolean): Promise<SkillLinksReport>;
   /** Memory writes without review in this window's Private Spaces, newest first (ADR-0052). */

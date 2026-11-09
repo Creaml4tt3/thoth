@@ -17,6 +17,9 @@
 //! the server's instructions. The lines sit between two markers, so they are added once and replaced in place, and the
 //! rest of the file is the user's and never changes. Claude Desktop and Cursor keep theirs in their own settings, so the
 //! user copies the lines there.
+//!
+//! The status (`status`, `mcp.setupStatus`) reads the same files with the same checks as setting up, writes nothing and
+//! returns only a word per app; for Claude Code it reads `~/.claude.json` rather than running `claude`, which is slow.
 use crate::error::{HostError, HostResult};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
@@ -40,32 +43,88 @@ pub struct Setup {
 
 /// Adds the instructions to `app`'s instruction file. Returns `{ status: "added" | "already" | "replaced", file, backup? }`.
 pub fn instruct(app: &str, home: &Path) -> HostResult<Value> {
-    let path = match app {
-        "claude-code" => app_dir(home, ".claude", "Claude Code")?.join("CLAUDE.md"),
-        "codex" => app_dir(home, ".codex", "Codex")?.join("AGENTS.md"),
-        "claude-desktop" | "cursor" => return Err(HostError::bad_argument("Copy the instructions into the app's own settings")),
-        _ => return Err(HostError::bad_argument(format!("app must be one of {}", APPS.join(", ")))),
-    };
+    let path = instruction_file(app, home)?;
     let text = read(&path)?.unwrap_or_default();
     let block = format!("{START}\n{INSTRUCTIONS}\n{END}\n");
-    let (body, status) = match (text.find(START), text.find(END)) {
-        (Some(start), Some(end)) if end > start => {
-            let end = end + END.len();
-            let end = if text[end..].starts_with('\n') { end + 1 } else { end };
-            if text[start..end] == block {
-                return Ok(json!({ "status": "already", "file": path }));
-            }
-            (format!("{}{block}{}", &text[..start], &text[end..]), "replaced")
-        }
-        (None, None) => {
+    let (body, status) = match marked(&text) {
+        Marked::This => return Ok(json!({ "status": "already", "file": path })),
+        Marked::Outdated(start, end) => (format!("{}{block}{}", &text[..start], &text[end..]), "replaced"),
+        Marked::None => {
             let kept = text.trim_end();
             (if kept.is_empty() { block } else { format!("{kept}\n\n{block}") }, "added")
         }
-        // One marker without the other: the user edited it; leave the file to them.
-        _ => return Err(HostError::new("EEXIST", format!("{} has Thoth's instructions in a form Thoth cannot update: copy them instead", path.display()))),
+        Marked::Edited => {
+            return Err(HostError::new("EEXIST", format!("{} has Thoth's instructions in a form Thoth cannot update: copy them instead", path.display())));
+        }
     };
     let backup = write(&path, (!text.is_empty()).then_some(text.as_str()), &body)?;
     Ok(json!({ "status": status, "file": path, "backup": backup }))
+}
+
+fn instruction_file(app: &str, home: &Path) -> HostResult<PathBuf> {
+    match app {
+        "claude-code" => Ok(app_dir(home, ".claude", "Claude Code")?.join("CLAUDE.md")),
+        "codex" => Ok(app_dir(home, ".codex", "Codex")?.join("AGENTS.md")),
+        "claude-desktop" | "cursor" => Err(HostError::bad_argument("Copy the instructions into the app's own settings")),
+        _ => Err(HostError::bad_argument(format!("app must be one of {}", APPS.join(", ")))),
+    }
+}
+
+/// Thoth's lines in an instruction file.
+enum Marked {
+    None,
+    This,
+    /// Between both markers but not today's lines: the block's byte range, its line break included.
+    Outdated(usize, usize),
+    /// One marker without the other: the user edited it, so the file is left to them.
+    Edited,
+}
+
+fn marked(text: &str) -> Marked {
+    match (text.find(START), text.find(END)) {
+        (Some(start), Some(end)) if end > start => {
+            let end = end + END.len();
+            let end = if text[end..].starts_with('\n') { end + 1 } else { end };
+            if text[start..end] == format!("{START}\n{INSTRUCTIONS}\n{END}\n") { Marked::This } else { Marked::Outdated(start, end) }
+        }
+        (None, None) => Marked::None,
+        _ => Marked::Edited,
+    }
+}
+
+/// What is set up in each app, only read: nothing is written and no file's contents are returned (settings files can
+/// hold keys). `server` is `unavailable` (the app is not on this computer), `none`, `this` (exactly this Thoth), `other`
+/// (another thoth server: an older copy or another socket, which Thoth replaces when asked), `edited` (a Codex entry
+/// written another way, which Thoth never replaces) or `unknown` (the file cannot be read); `instructions`, for Claude Code and Codex, is `unavailable`, `none`, `this`, `outdated` (an
+/// older version, which Thoth replaces), `edited` (changed by hand) or `unknown`.
+pub fn status(setup: &Setup, home: &Path) -> Value {
+    let server = |found: HostResult<Found>| match found {
+        Ok(Found::None) => "none",
+        Ok(Found::This) => "this",
+        Ok(Found::Other) => "other",
+        Err(e) if e.code == "UNAVAILABLE" => "unavailable",
+        Err(_) => "unknown",
+    };
+    let instructions = |app: &str| match instruction_file(app, home).and_then(|path| read(&path)) {
+        Ok(text) => match marked(&text.unwrap_or_default()) {
+            Marked::None => "none",
+            Marked::This => "this",
+            Marked::Outdated(..) => "outdated",
+            Marked::Edited => "edited",
+        },
+        Err(e) if e.code == "UNAVAILABLE" => "unavailable",
+        Err(_) => "unknown",
+    };
+    let ours = json!({ "command": setup.command, "args": setup.args });
+    let json_app = |dir: HostResult<PathBuf>, name: &str| server(dir.and_then(|d| json_config(&d.join(name))).map(|(_, config)| json_found(&config, &ours)));
+    let codex = app_dir(home, ".codex", "Codex").and_then(|d| Ok(codex_found(&read(&d.join("config.toml"))?.unwrap_or_default(), setup)));
+    let codex = if codex.as_ref().is_ok_and(|t| t.unusual) { "edited" } else { server(codex.map(|t| t.found)) };
+    json!({
+        "claude-code": { "server": server(claude_code_found(&ours, home)), "instructions": instructions("claude-code") },
+        "codex": { "server": codex, "instructions": instructions("codex") },
+        "claude-desktop": { "server": json_app(claude_desktop_dir(home), "claude_desktop_config.json") },
+        "cursor": { "server": json_app(app_dir(home, ".cursor", "Cursor"), "mcp.json") },
+    })
 }
 
 /// Runs the `claude` CLI with these arguments: `{ code, stdout, stderr, timedOut }`, or None when it is not installed.
@@ -74,7 +133,7 @@ pub type RunClaude<'a> = &'a dyn Fn(&[String]) -> Option<Value>;
 /// Sets up `app`. Returns `{ status: "added" | "already" | "replaced", file?, backup? }`.
 pub fn install(app: &str, replace: bool, setup: &Setup, home: &Path, claude: RunClaude<'_>) -> HostResult<Value> {
     match app {
-        "claude-code" => claude_code(replace, setup, claude),
+        "claude-code" => claude_code(replace, setup, home, claude),
         "codex" => codex(replace, setup, &app_dir(home, ".codex", "Codex")?.join("config.toml")),
         "claude-desktop" => json_file(replace, setup, &claude_desktop_dir(home)?.join("claude_desktop_config.json")),
         "cursor" => json_file(replace, setup, &app_dir(home, ".cursor", "Cursor")?.join("mcp.json")),
@@ -98,7 +157,11 @@ fn claude_desktop_dir(home: &Path) -> HostResult<PathBuf> {
     Ok(path)
 }
 
-fn claude_code(replace: bool, setup: &Setup, claude: RunClaude<'_>) -> HostResult<Value> {
+fn claude_code(replace: bool, setup: &Setup, home: &Path, claude: RunClaude<'_>) -> HostResult<Value> {
+    // `claude mcp add` only says "already exists", even when the entry is exactly this one.
+    if !replace && matches!(claude_code_found(&json!({ "command": setup.command, "args": setup.args }), home), Ok(Found::This)) {
+        return Ok(json!({ "status": "already" }));
+    }
     let mut add = vec!["mcp".into(), "add".into(), "--scope".into(), "user".into(), NAME.into(), "--".into(), setup.command.clone()];
     add.extend(setup.args.iter().cloned());
     let not_found = || HostError::new("UNAVAILABLE", "Thoth could not find Claude Code (the claude command): copy the command and run it yourself");
@@ -121,15 +184,55 @@ fn claude_code(replace: bool, setup: &Setup, claude: RunClaude<'_>) -> HostResul
     Ok(json!({ "status": "replaced" }))
 }
 
+/// Claude Code's user-scope servers: `claude mcp add --scope user` writes them to `mcpServers` in `~/.claude.json`,
+/// Claude Code's own file, which Thoth only reads. Claude Code is there when it has made `~/.claude` or that file.
+fn claude_code_found(ours: &Value, home: &Path) -> HostResult<Found> {
+    let path = home.join(".claude.json");
+    if !path.exists() {
+        app_dir(home, ".claude", "Claude Code")?;
+    }
+    // It also keeps each project's history, so it can be larger than the settings Thoth edits.
+    let (_, config) = json_text(&path, read_up_to(&path, 16 * MAX_FILE)?)?;
+    Ok(json_found(&config, ours))
+}
+
 fn exists(app: &str) -> HostError {
     HostError::new("EEXIST", format!("{app} already has a server called thoth"))
+}
+
+/// A `thoth` server in an app's settings: none, exactly this Thoth, or another.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Found {
+    None,
+    This,
+    Other,
 }
 
 /// `mcpServers.thoth` in a JSON settings file (Claude Desktop, Cursor). Other keys keep their order.
 fn json_file(replace: bool, setup: &Setup, path: &Path) -> HostResult<Value> {
     let ours = json!({ "command": setup.command, "args": setup.args });
-    let text = read(path)?;
-    let mut config: Map<String, Value> = match &text {
+    let (text, mut config) = json_config(path)?;
+    let status = match json_found(&config, &ours) {
+        Found::This => return Ok(json!({ "status": "already", "file": path })),
+        Found::Other if !replace => return Err(exists(&path.display().to_string())),
+        Found::Other => "replaced",
+        Found::None => "added",
+    };
+    if let Some(servers) = config.entry("mcpServers").or_insert_with(|| json!({})).as_object_mut() {
+        servers.insert(NAME.into(), ours);
+    }
+    let body = serde_json::to_string_pretty(&Value::Object(config)).map_err(|e| HostError::internal(e.to_string()))? + "\n";
+    let backup = write(path, text.as_deref(), &body)?;
+    Ok(json!({ "status": status, "file": path, "backup": backup }))
+}
+
+/// A JSON settings file as it is (None when there is none) and its top level, whose `mcpServers`, if any, is a map.
+fn json_config(path: &Path) -> HostResult<(Option<String>, Map<String, Value>)> {
+    json_text(path, read(path)?)
+}
+
+fn json_text(path: &Path, text: Option<String>) -> HostResult<(Option<String>, Map<String, Value>)> {
+    let config = match &text {
         None => Map::new(),
         Some(text) if text.trim().is_empty() => Map::new(),
         Some(text) => match serde_json::from_str(text) {
@@ -137,36 +240,65 @@ fn json_file(replace: bool, setup: &Setup, path: &Path) -> HostResult<Value> {
             _ => return Err(HostError::bad_argument(format!("{} is not a settings file Thoth can read: copy the setup instead", path.display()))),
         },
     };
-    let servers = config.entry("mcpServers").or_insert_with(|| json!({}));
-    let Some(servers) = servers.as_object_mut() else {
+    if config.get("mcpServers").is_some_and(|s| !s.is_object()) {
         return Err(HostError::bad_argument(format!("mcpServers in {} is not a list of servers: copy the setup instead", path.display())));
-    };
-    let status = match servers.get(NAME) {
-        Some(existing) if *existing == ours => return Ok(json!({ "status": "already", "file": path })),
-        Some(_) if !replace => return Err(exists(&path.display().to_string())),
-        Some(_) => "replaced",
-        None => "added",
-    };
-    servers.insert(NAME.into(), ours);
-    let body = serde_json::to_string_pretty(&Value::Object(config)).map_err(|e| HostError::internal(e.to_string()))? + "\n";
-    let backup = write(path, text.as_deref(), &body)?;
-    Ok(json!({ "status": status, "file": path, "backup": backup }))
+    }
+    Ok((text, config))
+}
+
+fn json_found(config: &Map<String, Value>, ours: &Value) -> Found {
+    let Some(existing) = config.get("mcpServers").and_then(|s| s.get(NAME)) else { return Found::None };
+    // Claude Code also writes `type: "stdio"` and an empty `env`, which change nothing.
+    let mut existing = existing.clone();
+    if let Some(entry) = existing.as_object_mut() {
+        if entry.get("type") == Some(&json!("stdio")) {
+            entry.remove("type");
+        }
+        if entry.get("env").and_then(Value::as_object).is_some_and(Map::is_empty) {
+            entry.remove("env");
+        }
+    }
+    if existing == *ours { Found::This } else { Found::Other }
 }
 
 /// `[mcp_servers.thoth]` in Codex's `config.toml`, edited as text: the table (and its sub-tables) replaced or added at
 /// the end, every other line as it was.
 fn codex(replace: bool, setup: &Setup, path: &Path) -> HostResult<Value> {
+    let text = read(path)?.unwrap_or_default();
+    let toml = codex_found(&text, setup);
+    match toml.found {
+        Found::This => return Ok(json!({ "status": "already", "file": path })),
+        Found::Other if toml.unusual || !replace => return Err(exists(&path.display().to_string())),
+        _ => {}
+    }
+    let mut body = toml.kept.trim_end().to_owned();
+    if !body.is_empty() {
+        body.push_str("\n\n");
+    }
+    body.push_str(&toml.block);
+    let backup = write(path, (!text.is_empty()).then_some(text.as_str()), &body)?;
+    Ok(json!({ "status": if toml.found == Found::None { "added" } else { "replaced" }, "file": path, "backup": backup }))
+}
+
+/// What Codex's `config.toml` has: Thoth's table as it would be written, the file without any `thoth` table, the
+/// server found, and whether it is written another way (a dotted key or an inline table), which the user edits.
+struct Toml {
+    block: String,
+    kept: String,
+    found: Found,
+    unusual: bool,
+}
+
+fn codex_found(text: &str, setup: &Setup) -> Toml {
     // A JSON string is a valid TOML basic string.
     let quote = |s: &str| serde_json::to_string(s).unwrap_or_default();
     let args: Vec<String> = setup.args.iter().map(|a| quote(a)).collect();
     let block = format!("[mcp_servers.{NAME}]\ncommand = {}\nargs = [{}]\n", quote(&setup.command), args.join(", "));
-    let text = read(path)?.unwrap_or_default();
     let header = |line: &str| {
         let t = line.trim();
         t.starts_with('[').then(|| t.trim_start_matches('[').trim_end_matches(']').split('#').next().unwrap_or_default().trim().replace(' ', ""))
     };
     let ours = |table: &str| table == format!("mcp_servers.{NAME}") || table.starts_with(&format!("mcp_servers.{NAME}."));
-    // Written another way (a dotted key or an inline table): the user edits it.
     let unusual = text.lines().any(|l| {
         let t = l.trim().replace(' ', "");
         header(l).is_none()
@@ -181,29 +313,28 @@ fn codex(replace: bool, setup: &Setup, path: &Path) -> HostResult<Value> {
         }
         if inside { found.push_str(line) } else { kept.push_str(line) }
     }
-    if found.trim() == block.trim() && !unusual {
-        return Ok(json!({ "status": "already", "file": path }));
-    }
-    if unusual || (!found.is_empty() && !replace) {
-        return Err(exists(&path.display().to_string()));
-    }
-    let mut body = kept.trim_end().to_owned();
-    if !body.is_empty() {
-        body.push_str("\n\n");
-    }
-    body.push_str(&block);
-    let backup = write(path, (!text.is_empty()).then_some(text.as_str()), &body)?;
-    Ok(json!({ "status": if found.is_empty() { "added" } else { "replaced" }, "file": path, "backup": backup }))
+    let found = if unusual || (!found.is_empty() && found.trim() != block.trim()) {
+        Found::Other
+    } else if found.is_empty() {
+        Found::None
+    } else {
+        Found::This
+    };
+    Toml { block, kept, found, unusual }
 }
 
 fn read(path: &Path) -> HostResult<Option<String>> {
+    read_up_to(path, MAX_FILE)
+}
+
+fn read_up_to(path: &Path, max: u64) -> HostResult<Option<String>> {
     match std::fs::symlink_metadata(path) {
         Err(_) => return Ok(None),
         Ok(meta) if !meta.is_file() && !meta.file_type().is_symlink() => return Err(HostError::bad_argument(format!("{} is not a file", path.display()))),
         Ok(_) => {}
     }
     let meta = std::fs::metadata(path).map_err(|e| HostError::io(&e, "stat", &path.to_string_lossy()))?;
-    if meta.len() > MAX_FILE {
+    if meta.len() > max {
         return Err(HostError::bad_argument(format!("{} is too large for Thoth to edit: copy the setup instead", path.display())));
     }
     let bytes = std::fs::read(path).map_err(|e| HostError::io(&e, "read", &path.to_string_lossy()))?;
@@ -346,6 +477,15 @@ mod tests {
         assert_eq!(code(install("claude-code", false, &setup(), home.path(), &claude)), "EEXIST");
         assert_eq!(install("claude-code", true, &setup(), home.path(), &claude).unwrap()["status"], "replaced");
         assert_eq!(calls.borrow().iter().filter(|c| c[1] == "remove").count(), 1);
+
+        // Exactly this one in ~/.claude.json: already, without running claude (which would only say "already exists").
+        let ours = json!({ "type": "stdio", "command": setup().command, "args": setup().args, "env": {} });
+        std::fs::write(home.path().join(".claude.json"), json!({ "mcpServers": { "thoth": ours } }).to_string()).unwrap();
+        let ran = calls.borrow().len();
+        assert_eq!(install("claude-code", false, &setup(), home.path(), &claude).unwrap()["status"], "already");
+        assert_eq!(calls.borrow().len(), ran, "claude not run");
+        // Replacing still goes through claude.
+        assert_eq!(install("claude-code", true, &setup(), home.path(), &claude).unwrap()["status"], "replaced");
     }
 
     #[test]
@@ -373,6 +513,85 @@ mod tests {
         // A marker the user broke: left alone.
         std::fs::write(&file, "<!-- thoth:start (added by Thoth; edit or remove freely) -->\nhalf\n").unwrap();
         assert_eq!(code(instruct("claude-code", home.path())), "EEXIST");
+    }
+
+    #[test]
+    fn the_status_says_what_each_app_has_and_changes_nothing() {
+        let home = tempfile::tempdir().unwrap();
+        let h = home.path();
+        let status = |app: &str| status(&setup(), h)[app].clone();
+        let all = || ["claude-code", "codex", "claude-desktop", "cursor"].map(|a| status(a)["server"].clone());
+        // Nothing on this computer.
+        assert_eq!(all(), [json!("unavailable"), json!("unavailable"), json!("unavailable"), json!("unavailable")]);
+        assert_eq!(status("claude-code")["instructions"], "unavailable");
+        assert_eq!(status("cursor").get("instructions"), None);
+
+        // Each app opened once: there, with nothing of Thoth's.
+        for dir in [".claude", ".codex", ".cursor", if cfg!(target_os = "macos") { "Library/Application Support/Claude" } else { ".config/Claude" }] {
+            std::fs::create_dir_all(h.join(dir)).unwrap();
+        }
+        assert_eq!(all(), [json!("none"), json!("none"), json!("none"), json!("none")]);
+        assert_eq!((status("claude-code")["instructions"].clone(), status("codex")["instructions"].clone()), (json!("none"), json!("none")));
+
+        // Set up by Thoth: exactly this one. Claude Code's own entry has `type` and an empty `env` too.
+        let ours = json!({ "type": "stdio", "command": setup().command, "args": setup().args, "env": {} });
+        std::fs::write(h.join(".claude.json"), json!({ "numStartups": 3, "mcpServers": { "thoth": ours } }).to_string()).unwrap();
+        install("codex", false, &setup(), h, &none).unwrap();
+        install("cursor", false, &setup(), h, &none).unwrap();
+        install("claude-desktop", false, &setup(), h, &none).unwrap();
+        instruct("claude-code", h).unwrap();
+        instruct("codex", h).unwrap();
+        assert_eq!(all(), [json!("this"), json!("this"), json!("this"), json!("this")]);
+        assert_eq!((status("claude-code")["instructions"].clone(), status("codex")["instructions"].clone()), (json!("this"), json!("this")));
+
+        // Another thoth server (an older copy of Thoth, another socket): `other`; one Codex has written another way too.
+        let old = json!({ "mcpServers": { "thoth": { "command": "/old/thoth-mcp", "args": setup().args } } }).to_string();
+        std::fs::write(h.join(".claude.json"), &old).unwrap();
+        std::fs::write(h.join(".cursor/mcp.json"), &old).unwrap();
+        std::fs::write(h.join(".codex/config.toml"), "[mcp_servers.thoth]\ncommand = \"/old/thoth-mcp\"\n").unwrap();
+        assert_eq!(
+            [status("claude-code")["server"].clone(), status("codex")["server"].clone(), status("cursor")["server"].clone()],
+            [json!("other"), json!("other"), json!("other")]
+        );
+        let desktop =
+            h.join(if cfg!(target_os = "macos") { "Library/Application Support/Claude" } else { ".config/Claude" }).join("claude_desktop_config.json");
+        std::fs::write(&desktop, &old).unwrap();
+        assert_eq!(status("claude-desktop")["server"], "other");
+        // Written as a dotted key or an inline table: edited by hand, which Thoth never replaces.
+        std::fs::write(h.join(".codex/config.toml"), "mcp_servers.thoth.command = \"x\"\n").unwrap();
+        assert_eq!(status("codex")["server"], "edited");
+        std::fs::write(h.join(".codex/config.toml"), "[mcp_servers]\nthoth = { command = \"x\" }\n").unwrap();
+        assert_eq!(status("codex")["server"], "edited");
+        // An older version of the instructions, and lines changed by hand.
+        let claude_md = h.join(".claude/CLAUDE.md");
+        std::fs::write(&claude_md, std::fs::read_to_string(&claude_md).unwrap().replace("call `recall`", "call recall")).unwrap();
+        assert_eq!(status("claude-code")["instructions"], "outdated");
+        std::fs::write(h.join(".codex/AGENTS.md"), "<!-- thoth:start (added by Thoth; edit or remove freely) -->\nhalf\n").unwrap();
+        assert_eq!(status("codex")["instructions"], "edited");
+
+        // A file Thoth cannot read: unknown, and still as it was.
+        std::fs::write(h.join(".cursor/mcp.json"), "{ not json").unwrap();
+        std::fs::write(h.join(".claude.json"), json!({ "mcpServers": [] }).to_string()).unwrap();
+        assert_eq!([status("cursor")["server"].clone(), status("claude-code")["server"].clone()], [json!("unknown"), json!("unknown")]);
+        assert_eq!(std::fs::read_to_string(h.join(".cursor/mcp.json")).unwrap(), "{ not json");
+        std::fs::write(&desktop, "{ not json").unwrap();
+        assert_eq!(status("claude-desktop")["server"], "unknown");
+        // A folder where the file should be.
+        std::fs::remove_file(h.join(".codex/config.toml")).unwrap();
+        std::fs::create_dir(h.join(".codex/config.toml")).unwrap();
+        std::fs::remove_file(&claude_md).unwrap();
+        std::fs::create_dir(&claude_md).unwrap();
+        assert_eq!([status("codex")["server"].clone(), status("claude-code")["instructions"].clone()], [json!("unknown"), json!("unknown")]);
+
+        // Claude Code without ~/.claude but with its file is there; without either it is not.
+        std::fs::remove_dir_all(h.join(".claude")).unwrap();
+        std::fs::write(h.join(".claude.json"), "{}").unwrap();
+        assert_eq!(status("claude-code")["server"], "none");
+        assert_eq!(status("claude-code")["instructions"], "unavailable");
+        std::fs::remove_file(h.join(".claude.json")).unwrap();
+        assert_eq!(status("claude-code")["server"], "unavailable");
+        let names: Vec<String> = std::fs::read_dir(h).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert!(!names.iter().any(|n| n.ends_with(".thoth.bak")), "the status never backs up or writes: {names:?}");
     }
 
     #[test]

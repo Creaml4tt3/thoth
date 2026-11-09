@@ -33,8 +33,9 @@ pub const TAURI_COMMANDS: &[&str] = &[
     // history of memory writes in the Private Spaces it has open (for Undo), and the links of its skills into the home
     // folder's skills folders (the host makes them; the webview has no fs permission).
     "mcp_mayRemember", "mcp_memoryFolder", "mcp_memoryHistory", "mcp_skillLinks",
-    // Setting up an app (ADR-0052 rule 10): the host adds thoth-mcp to that app's own MCP settings.
-    "mcp_install",
+    // Setting up an app (ADR-0052 rule 10): the host adds thoth-mcp to that app's own MCP settings, and says what each
+    // app already has (read only, never a file's contents).
+    "mcp_install", "mcp_setupStatus",
     // Problem reports (ADR-0040): the webview reports its uncaught errors to the host's local log and reads the redacted
     // log back; no log plugin permission.
     "diag_report", "diag_collect", "diag_settings",

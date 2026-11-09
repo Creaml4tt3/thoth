@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings as Settings, SetupApp } from "@thoth/platform";
+import type { ConnectedApps, ConnectedAppsLogEntry, ConnectedAppsSettings as Settings, SetupApp, SetupState } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { copyText } from "@thoth/app-ui/editor/link-cards.ts";
 import { useSession } from "../../app/context.ts";
@@ -392,13 +392,18 @@ const shellWord = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${
 /**
  * Set up an app (ADR-0052 rule 10): one card per app, each saying what it changes; the host edits the app's own
  * settings (backing up the file first) or runs Claude Code's own command. A `thoth` server already there is replaced
- * only when the user says so. Any other agent gets a prompt to copy.
+ * only when the user says so. Any other agent gets a prompt to copy. Each card says what its app has now, checked by the
+ * host when the section opens and after each button.
  */
 function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; setup: { command: string; args: string[]; instructions?: string } }) {
   const t = useDesktopStrings().connectedApps.cards;
   type Key = SetupApp | "other" | `starter-${number}`;
   const [said, setSaid] = useState<Partial<Record<Key, { text: string; alert?: boolean; replace?: boolean }>>>({});
   const [busy, setBusy] = useState<SetupApp | null>(null);
+  const [state, setState] = useState<Partial<Record<SetupApp, SetupState>>>({});
+  // Without an answer the cards just show no status line.
+  const check = useCallback(() => connectedApps.setupStatus().then(setState, () => setState({})), [connectedApps]);
+  useEffect(() => void check(), [check]);
   const command = ["claude", "mcp", "add", "--scope", "user", "thoth", "--", setup.command, ...setup.args].map(shellWord).join(" ");
   const say = (app: Key, text: string, more: { alert?: boolean; replace?: boolean } = {}) => setSaid((s) => ({ ...s, [app]: { text, ...more } }));
   const run = async (app: SetupApp, replace = false) => {
@@ -410,11 +415,14 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
       say(app, done.backup ? `${text} ${t.backup(done.backup)}` : text);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "EEXIST") say(app, t.exists(name), { replace: true });
+      // A refused replace, or an entry written by hand: replacing again cannot work.
+      if (code === "EEXIST" && (replace || state[app]?.server === "edited")) say(app, t.serverEdited(name), { alert: true });
+      else if (code === "EEXIST") say(app, t.exists(name), { replace: true });
       else if (code === "UNAVAILABLE") say(app, t.notThere(name), { alert: true });
       else say(app, t.failed(error instanceof Error ? error.message : String(error)), { alert: true });
     } finally {
       setBusy(null);
+      void check();
     }
   };
   // Claude Code and Codex read an instruction file Thoth can add to; Claude Desktop and Cursor keep theirs in settings.
@@ -432,6 +440,7 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
       else say(app, t.failed(error instanceof Error ? error.message : String(error)), { alert: true });
     } finally {
       setBusy(null);
+      void check();
     }
   };
   const copy = (key: Key, text: string) =>
@@ -459,38 +468,51 @@ function SetupCards({ connectedApps, setup }: { connectedApps: ConnectedApps; se
       <p className="muted small">{t.lede}</p>
       {setup.instructions && <p className="muted small">{t.instructionsWhat}</p>}
       <ul className="mcp-cards" data-testid="mcp-setup-cards">
-        {SETUP_APPS.map((app) => (
-          <li key={app} className="mcp-card" aria-labelledby={`mcp-card-${app}`}>
-            <b id={`mcp-card-${app}`}>{t.apps[app].name}</b>
-            <span className="muted small">{t.apps[app].what}</span>
-            <div className="set-actions">
-              <Button variant="primary" small disabled={busy !== null} onClick={() => void run(app)} aria-describedby={`mcp-card-${app}`}>
-                {t.setUp}
-              </Button>
-              {said[app]?.replace && (
-                <Button variant="ghost" small disabled={busy !== null} onClick={() => void run(app, true)}>
-                  {t.replace}
-                </Button>
+        {SETUP_APPS.map((app) => {
+          const now = state[app];
+          const instructions = now?.instructions && now.instructions !== "unavailable" ? now.instructions : null;
+          return (
+            <li key={app} className="mcp-card" aria-labelledby={`mcp-card-${app}`}>
+              <b id={`mcp-card-${app}`}>{t.apps[app].name}</b>
+              {now && (
+                <p id={`mcp-card-${app}-state`} className="mcp-card-state small" data-state={now.server}>
+                  <span className={now.server === "this" ? "badge badge-allowed" : "badge"}>
+                    {now.server === "this" && <span aria-hidden="true">✓ </span>}
+                    {t.server[now.server]}
+                  </span>
+                  {instructions && <span className="muted">{t.instructionsState[instructions]}</span>}
+                </p>
               )}
-              {app === "claude-code" && (
-                <Button variant="ghost" small onClick={() => copy(app, command)}>
-                  {t.copyCommand}
+              <span className="muted small">{t.apps[app].what}</span>
+              <div className="set-actions">
+                <Button variant="primary" small disabled={busy !== null} onClick={() => void run(app)} aria-describedby={now ? `mcp-card-${app} mcp-card-${app}-state` : `mcp-card-${app}`}>
+                  {now?.server === "this" ? t.setUpAgain : t.setUp}
                 </Button>
-              )}
-              {setup.instructions &&
-                (app === "claude-code" || app === "codex" ? (
-                  <Button variant="ghost" small disabled={busy !== null} onClick={() => void instruct(app)}>
-                    {t.addInstructions}
+                {(said[app]?.replace || now?.server === "other") && (
+                  <Button variant="ghost" small disabled={busy !== null} onClick={() => void run(app, true)}>
+                    {t.replace}
                   </Button>
-                ) : (
-                  <Button variant="ghost" small onClick={() => copy(app, setup.instructions!)}>
-                    {t.copyInstructions}
+                )}
+                {app === "claude-code" && (
+                  <Button variant="ghost" small onClick={() => copy(app, command)}>
+                    {t.copyCommand}
                   </Button>
-                ))}
-            </div>
-            {result(app)}
-          </li>
-        ))}
+                )}
+                {setup.instructions &&
+                  (app === "claude-code" || app === "codex" ? (
+                    <Button variant="ghost" small disabled={busy !== null} onClick={() => void instruct(app)}>
+                      {t.addInstructions}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" small onClick={() => copy(app, setup.instructions!)}>
+                      {t.copyInstructions}
+                    </Button>
+                  ))}
+              </div>
+              {result(app)}
+            </li>
+          );
+        })}
         <li className="mcp-card" aria-labelledby="mcp-card-other">
           <b id="mcp-card-other">{t.other}</b>
           <span className="muted small">{t.otherWhat}</span>

@@ -304,6 +304,58 @@ describe("Set up an app (ADR-0052 rule 10)", () => {
     await app.user.click(card("Any other agent").getByRole("button", { name: "Copy the prompt" }));
     await waitFor(() => expect(writeText.mock.calls[1]![0]).toContain("thothnotes.com/agents/setup"));
   });
+
+  it("says on each card what the app has now, and checks again after each button", async () => {
+    apps.setup = {
+      "claude-code": { server: "this", instructions: "outdated" },
+      codex: { server: "other", instructions: "edited" },
+      "claude-desktop": { server: "unavailable" },
+      cursor: { server: "unknown" },
+    };
+    apps.taken.add("codex");
+    const app = await open();
+    const section = await openSettings(app);
+    const card = (name: string) => within(section.getByRole("listitem", { name }));
+
+    const claude = card("Claude Code");
+    expect(await claude.findByText("Set up", { selector: ".badge" })).toBeTruthy();
+    expect(claude.getByText("Older instructions: add them again to update")).toBeTruthy();
+    expect(claude.getByRole("button", { name: "Set up again" })).toBeTruthy();
+    expect(claude.queryByRole("button", { name: "Replace it" })).toBeNull();
+
+    const codex = card("Codex and the ChatGPT app");
+    expect(codex.getByText("Set up for another copy of Thoth")).toBeTruthy();
+    expect(codex.getByText("Instructions changed by hand")).toBeTruthy();
+    expect(codex.getByRole("button", { name: "Set up" })).toBeTruthy();
+    // Another copy's server is replaced straight from the card.
+    await app.user.click(codex.getByRole("button", { name: "Replace it" }));
+    expect(await codex.findByText("Set up", { selector: ".badge" })).toBeTruthy();
+    expect(apps.calls).toContainEqual(["install", "codex", true]);
+    expect(codex.getByRole("button", { name: "Set up again" })).toBeTruthy();
+
+    expect(card("Claude Desktop").getByText("Not on this computer")).toBeTruthy();
+    expect(card("Cursor").getByText("Could not check its settings")).toBeTruthy();
+    // Claude Desktop and Cursor keep their instructions in their own settings: no line for them.
+    expect(card("Cursor").queryByText(/instructions/i, { selector: ".mcp-card-state *" })).toBeNull();
+
+    await app.user.click(claude.getByRole("button", { name: "Add the instructions" }));
+    expect(await claude.findByText("Instructions added")).toBeTruthy();
+    // Set up again when it is exactly this one: already, no replace offered.
+    await app.user.click(claude.getByRole("button", { name: "Set up again" }));
+    expect(await claude.findByText("Claude Code is already set up.")).toBeTruthy();
+    expect(claude.queryByRole("button", { name: "Replace it" })).toBeNull();
+  });
+
+  it("offers no replace for a server written by hand, which the host never replaces", async () => {
+    apps.setup.codex = { server: "edited", instructions: "none" };
+    const app = await open();
+    const section = await openSettings(app);
+    const codex = within(section.getByRole("listitem", { name: "Codex and the ChatGPT app" }));
+    expect(await codex.findByText("Set up by hand in a form Thoth cannot change")).toBeTruthy();
+    await app.user.click(codex.getByRole("button", { name: "Set up" }));
+    expect((await codex.findByRole("alert")).textContent).toContain("Copy the setup and edit its settings yourself");
+    expect(codex.queryByRole("button", { name: "Replace it" })).toBeNull();
+  });
 });
 
 describe("Agent instructions and first steps", () => {

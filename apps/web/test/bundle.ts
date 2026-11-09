@@ -70,6 +70,7 @@ export const DESKTOP_ONLY = [
   "mcp.memoryHistory",
   "mcp.skillLinks",
   "mcp.install",
+  "mcp.setupStatus",
   "thoth:mcp-memories",
   "mcp-memories",
 ];
