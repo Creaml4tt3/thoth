@@ -12,7 +12,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Added
 
-- Settings → Connected apps: each card now says whether the app is already set up for Thoth ("Set up", "Set up for another copy of Thoth" with Replace, "Not set up", "Not on this computer"), and on the Claude Code and Codex cards whether the instructions are added. The button reads "Set up again" once an app is set up. Thoth only reads each app's settings to tell.
+- Settings → Connected apps: each card now says whether the app is already set up for Thoth ("Set up", "Set up for another copy of Thoth" with "Replace it", "Not set up", "Not on this computer"), and on the Claude Code and Codex cards whether the instructions are added. The button reads "Set up again" once an app is set up. Thoth only reads each app's settings to tell.
 
 ### Changed
 
