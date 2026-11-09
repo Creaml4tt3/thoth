@@ -9,20 +9,7 @@ questions" and "Follow-up" sections, `docs/architecture/implementation-plan.md` 
 **Keeping it current:** when something here ships, delete its line in the same pull request. When the owner decides
 something ("later", "no", "yes, next"), write it on the line. New ideas go in the right section.
 
-## Next (0.9.2)
-
-- **Delete trial accounts after 90 days without a sign-in (S).** The privacy notice promises it
-  (`docs/legal/privacy.md`, "Inactive accounts"), and the owner chose the rule on 2026-10-22, but nothing deletes them:
-  `users.last_seen_at` is kept, `apps/server/src/maintenance.ts` does not use it (`apps/server/README.md`, sign-in open
-  points). A warning email first needs an email service (ADR-0014).
-- **Short words in Private Space search (S).** `trigramMatch` (`packages/local-store/src/search-query.ts`) gives up on
-  terms under 3 characters, so a two-letter Thai word inside a sentence is never found. The server already matches
-  substrings.
-- **Connected apps shows what is already set up (S–M).** Each setup card says whether Thoth is already in that app
-  (and whether it points at this Thoth), and whether the instructions are in the agent's file. Asked by the owner on
-  2026-11-09.
-
-## Planned next
+## Next
 
 - **Installable web app (PWA), trial-only (M).** Manifest, icons, service worker for the app shell, install on phones.
   The web app stays trial-only (ADR-0015 decision 1), owner 2026-11-09. Goes with ADR-0045 step 5 (make the web app
