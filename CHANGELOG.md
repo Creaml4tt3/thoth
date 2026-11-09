@@ -8,6 +8,21 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.9.2] - 2026-11-10
+
+### Added
+
+- Settings → Connected apps: each card now says whether the app is already set up for Thoth ("Set up", "Set up for another copy of Thoth" with Replace, "Not set up", "Not on this computer"), and on the Claude Code and Codex cards whether the instructions are added. The button reads "Set up again" once an app is set up. Thoth only reads each app's settings to tell.
+
+### Changed
+
+- Servers can delete accounts nobody has used for a while: set `INACTIVE_ACCOUNT_DAYS`, and an account with no sign-in and no app use for that many days is deleted, with the workspaces it alone owns. Unset (the default), nothing is deleted. The demo server deletes accounts after 90 days, and the sign-in page says so. Self-hosters: update your server to 0.9.2 (it migrates the database at start; with `MIGRATE_ON_START=false`, run `node src/cli.ts migrate` first).
+
+### Fixed
+
+- Search in a Private Space finds short words, such as a two-letter Thai word in the middle of a sentence.
+- The mascot no longer covers the last cards at the bottom of Settings.
+
 ## [0.9.1] - 2026-11-09
 
 ### Added
@@ -333,7 +348,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/Creaml4tt3/thoth/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Creaml4tt3/thoth/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Creaml4tt3/thoth/compare/v0.7.1...v0.8.0
