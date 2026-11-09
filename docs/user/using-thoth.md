@@ -161,12 +161,10 @@ Your agent's memory starts empty. Once the app is connected, try these two promp
 The first one checks the connection; Thoth asks you to allow the app if you have not yet. The second one fills in the
 start of your profile, which every agent then reads.
 
-<!-- UNRELEASED: setup-card instructions, remove this comment when the feature ships
 To have your agent use its Thoth memory every time, choose **Add the instructions** on the Claude Code or Codex card.
 It adds a few lines to `~/.claude/CLAUDE.md` (Claude Code) or `~/.codex/AGENTS.md` (Codex) telling the agent to
 recall and save memories in Thoth, after keeping a backup of the file. For Claude Desktop and Cursor, choose **Copy
 the instructions** and paste them into the app's own instructions.
--->
 
 ## Updates
 

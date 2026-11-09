@@ -8,6 +8,17 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.9.1] - 2026-11-09
+
+### Added
+
+- Settings → Connected apps → "Add the instructions" on the Claude Code and Codex cards: a few lines in `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` tell the agent to recall and save memories in Thoth. Thoth keeps a backup of the file and leaves your own lines as they are. Claude Desktop and Cursor have "Copy the instructions" to paste into the app.
+- A First steps card under Connected apps, with two prompts to try once an app is set up: one checks the connection, the other fills in the start of your profile.
+
+### Fixed
+
+- Timeline → Dated now says why the list looks the same as Edited when none of the pages has a date yet, and how a page gets one.
+
 ## [0.9.0] - 2026-11-09
 
 ### Added
@@ -322,7 +333,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Creaml4tt3/thoth/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Creaml4tt3/thoth/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Creaml4tt3/thoth/compare/v0.7.0...v0.7.1
