@@ -13,7 +13,7 @@
 > change both together, or the site build fails.
 <!-- repo-only:end -->
 
-Last updated: 2 November 2026
+Last updated: 10 November 2026
 
 ## Who we are
 
@@ -135,8 +135,11 @@ contractual safeguards, as the PDPA allows for transfers abroad.
 
 - **Earlier versions of a page** are deleted 30 days after they are replaced.
   The current version is kept until you delete it.
-- **Inactive accounts.** An account with no sign-in for 90 days is deleted,
-  together with the workspaces it alone owns. The app shows a warning first.
+- **Inactive accounts.** An account with no sign-in or app use for 90 days is deleted,
+  together with the workspaces it alone owns. The sign-in page states this rule; there is
+  no separate warning before the deletion. An account that alone owns a workspace other
+  people still use is kept. Where the account's edits appear in the history of another
+  workspace's pages, they show "Deleted account", without a name or email.
 - **Server logs** are kept for up to 30 days.
   <!-- OWNER: check your Vercel plan's log retention and match this number. -->
 - **Download site request records** are kept by Cloudflare for about a month
