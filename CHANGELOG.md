@@ -13,7 +13,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 ### Added
 
 - Settings → Connected apps → "Add the instructions" on the Claude Code and Codex cards: a few lines in `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` tell the agent to recall and save memories in Thoth. Thoth keeps a backup of the file and leaves your own lines as they are. Claude Desktop and Cursor have "Copy the instructions" to paste into the app.
-- A First steps card under Connected apps, with two prompts to try once an app is set up: one checks the connection, the other fills in the start of your profile.
+- A First steps card under Connected apps, with two prompts to try once an app is set up: one checks the connection, the other starts your profile.
 
 ### Fixed
 
