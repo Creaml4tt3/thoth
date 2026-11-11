@@ -5,7 +5,9 @@ python3 site.py -> midnight-site.html. Every text pair is checked; the build fai
 from palette import DIRECTIONS, scheme, ratio, tone
 from build import mark, folder_icon, vars_for, CSS, FONTS, FOLDERS, STYLE
 
-d, st = DIRECTIONS['midnight'], STYLE['midnight']
+import sys
+KEY = sys.argv[1] if len(sys.argv) > 1 else 'midnight'  # 'midnight-sans' builds the sans-only variant
+d, st = DIRECTIONS[KEY], STYLE[KEY]
 L, D = scheme(d, False), scheme(d, True)
 dk = {**d, **d['dark']}
 # Site surfaces: dark steps from the page (Grok: #0a0a0a -> #1a1a1a -> white 6%), light = papyrus paper and its sidebar tone.
@@ -70,7 +72,7 @@ def frame(m):
 </div>'''
 
 PAGE_CSS = r'''
-.site{--display:'Newsreader','Noto Serif Thai',serif;background:var(--page);color:var(--ink);border-radius:20px;overflow:hidden;font:400 15px/1.55 var(--body)}
+.site{background:var(--page);color:var(--ink);border-radius:20px;overflow:hidden;font:400 15px/1.55 var(--body)}
 .site .btn{font-weight:500}
 .site .btn.quiet{background:var(--raise2);color:var(--ink)}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--hair);background:color-mix(in srgb,var(--page) 85%,transparent);backdrop-filter:blur(12px)}
@@ -80,7 +82,7 @@ PAGE_CSS = r'''
 .hero2{text-align:center;padding:56px 20px 0;display:flex;flex-direction:column;align-items:center}
 .announce{display:inline-flex;gap:6px;align-items:center;background:var(--raise1);border:1px solid var(--hair);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--ink2)}
 .announce b{color:var(--ink);font-weight:600}
-.h1{font:500 clamp(44px,8vw,76px)/1 var(--display);letter-spacing:-.025em;margin:22px 0 0}
+.h1{font:var(--dw) clamp(44px,8vw,76px)/1 var(--display);letter-spacing:var(--dt);margin:22px 0 0}
 .glyph{display:inline-block;width:.8em;height:.8em;vertical-align:-.04em;margin:0 .02em;color:var(--p)}
 .glyph .mark{width:100%;height:100%}
 @media (prefers-reduced-motion:no-preference){.glyph{animation:rise .9s cubic-bezier(.2,.8,.2,1) both .1s}
@@ -97,7 +99,7 @@ PAGE_CSS = r'''
 .log-l{padding:2px 0}.log-l .ok{color:var(--success);font-weight:700;margin-right:6px}
 .big{position:relative;overflow:hidden;margin:56px 20px 0;border-radius:24px;background:var(--raise1);border:1px solid var(--hair);min-height:300px;display:flex;align-items:center}
 .big-copy{position:relative;padding:40px;max-width:540px}
-.h2{font:500 clamp(30px,4.6vw,44px)/1.1 var(--display);letter-spacing:-.02em;margin:0 0 14px}
+.h2{font:var(--dw) clamp(30px,4.6vw,44px)/1.1 var(--display);letter-spacing:var(--dt);margin:0 0 14px}
 .big p{color:var(--ink2);font-size:16px;margin:0}
 .pillword{display:inline-flex;align-items:center;gap:.25em;background:var(--pillw);color:var(--pillw_on);border-radius:999px;padding:0 .35em 0 .25em;font-style:italic}
 .pillword i{width:.32em;height:.32em;border-radius:50%;background:var(--p)}
@@ -127,5 +129,6 @@ html = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name
 <div class="modes" role="group" aria-label="Theme"><button aria-pressed="true" data-m="dark">Midnight</button><button aria-pressed="false" data-m="light">Paper</button></div>
 {frame('dark')}{frame('light').replace('data-mode="light">', 'data-mode="light" hidden>', 1)}
 </div>{CYCLE}</body></html>'''
-open('midnight-site.html', 'w').write(html)
-print('wrote midnight-site.html', len(checks), 'pairs, tightest', worst)
+out = f'{KEY}-site.html'
+open(out, 'w').write(html)
+print('wrote', out, len(checks), 'pairs, tightest', worst)

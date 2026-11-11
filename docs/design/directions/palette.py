@@ -174,6 +174,8 @@ DIRECTIONS['midnight'] = {**DIRECTIONS['navy'], 'name': 'Papyrus Midnight',
                           'dark': {**DIRECTIONS['navy']['dark'], 'neutral_c': 0.035, 'surface_dark_tone': 4,
                                    'sidebar_dark_tone': 7, 'container_dark_tone': 12}}
 
+DIRECTIONS['midnight-sans'] = {**DIRECTIONS['midnight'], 'name': 'Papyrus Midnight (sans)'}
+
 if __name__ == '__main__':
     for key, d in DIRECTIONS.items():
         for dark in (False, True):
