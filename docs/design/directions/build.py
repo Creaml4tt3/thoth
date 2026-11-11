@@ -51,6 +51,11 @@ STYLE = {
         extra='.side .row.sel{background:var(--sc);color:var(--on-sc)} .tab.act{box-shadow:none;background:var(--bg);border-radius:10px 10px 0 0} .run{border-radius:14px}'),
 }
 
+STYLE['navy'] = {**STYLE['papyrus'],
+    'tagline': 'Papyrus Night. Direction D in daylight (paper, brown-black ink, Moon, Egyptian blue, papyrus green), but at night the page '
+               'turns deep navy, like the sky the moon rises in, and the ink becomes warm papyrus cream. Orange on navy is the most-pinned pairing.',
+    'hero_bg': ('secondary', 9, 0.05), 'hero_bg2': ('secondary', 16, 0.06), 'hero_dark': True}
+
 _mask = [0]
 def mark(size, cls=''):
     _mask[0] += 1; i = f'm{_mask[0]}'
@@ -201,13 +206,14 @@ def hero(key, d, st):
         'faience': f'<div class="h-tiles">' + ''.join(f'<span style="background:{tone(s,c)}"></span>' for s, c in ((d['primary'], 62), (d['secondary'], 70), (d['tertiary'], 70), ('#E8B400', 82), (d['secondary'], 85), (d['primary'], 85))) + '</div>',
         'dusk': f'<div class="h-moon dusk" style="background:linear-gradient(180deg, {tone(d["primary"],75)}, {d["primary"]} 45%, {tone(d["tertiary"],50)} 100%);box-shadow:0 -10px 140px 40px {d["tertiary"]}55"></div>',
         'papyrus': APP_SHOT,
+        'navy': APP_SHOT,
         'earth': APP_SHOT,
     }[key]
     html = f'''
 <div class="hero hero-{key}" style="background:linear-gradient(170deg,{b1},{b2});color:{fg}">
  {moon}
  <div class="h-copy">
-  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
+  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth', 'navy') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
   <p class="h-lede" style="color:{lede}">Thoth is an open-source notes app. Everything you write is a Markdown file in a folder on your computer, and a page reaches your team only when you share it.</p>
   <div class="h-acts"><button class="btn primary lg">Download for macOS</button><button class="btn lg" style="background:transparent;color:{fg};border:1.5px solid {fg}">Open the web app</button></div>
  </div>
@@ -346,8 +352,8 @@ kbd{font:11px var(--mono);color:var(--fg2)}
 .h-tiles{position:absolute;left:28px;top:28px;display:grid;grid-template-columns:repeat(6,56px);gap:10px}
 .h-tiles span{height:56px;border-radius:18px}
 .h-tiles span:nth-child(2n){transform:translateY(14px)}
-.hero-papyrus,.hero-earth{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
-.hero-papyrus .h-app,.hero-earth .h-app{order:2}
+.hero-papyrus,.hero-earth,.hero-navy{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
+.hero-papyrus .h-app,.hero-earth .h-app,.hero-navy .h-app{order:2}
 .h-title em{font-style:italic;font-weight:calc(var(--dw) - 100)}
 .h-app{position:relative;margin:0 0 0 auto;width:min(620px,100%);height:210px;overflow:hidden;border-radius:var(--rc) var(--rc) 0 0;box-shadow:0 -1px 0 rgb(0 0 0/.06),0 -20px 50px -20px rgb(60 40 10/.35)}
 .h-app .win{min-height:300px;border-bottom:0;border-radius:var(--rc) var(--rc) 0 0;grid-template-columns:150px 1fr}
@@ -381,6 +387,7 @@ def page(key):
     vl, vd = vars_for(L), vars_for(D)
     common = f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono',monospace;--dw:{st['display_w']};--dt:{st['display_track']};--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px;--hero-mark:{L['primary'] if not st['hero_dark'] else D['primary']}"
     cc_rows = ''.join(f'<tr><td>{m}: {h.escape(l)}</td><td>{v:.2f}</td><td>{n}</td></tr>' for m, l, v, n in all_checks)
+    start = 'dark' if key == 'navy' else 'light'  # Papyrus Night only changes the dark theme, so it opens there
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{d["name"]} direction</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}
 .mock.light{{{vl}}} .mock.dark{{{vd}}} .mock{{{common}}} {' '.join('.mock ' + r.strip() + '}' for r in st['extra'].split('}') if r.strip())}</style></head>
@@ -395,13 +402,13 @@ def page(key):
 <h2 class="sec-h">Type and spacing</h2><p class="lead">Display: {st["display"].split(",")[0]} · UI and page: Inter · Thai: {st["thai"]} · scale ratio {st["ratio"]} · radius {st["r_content"]}px in content, {st["r_card"]}px for cards, pills for actions · 4px grid.</p>
 <div class="typescale">{ts}</div><div class="spacing" style="margin-top:12px">{sp}</div>
 <h2 class="sec-h">Screens</h2>
-<div class="modes" role="group" aria-label="Theme"><button aria-pressed="true" data-m="light">Light</button><button aria-pressed="false" data-m="dark">Dark</button></div>
+<div class="modes" role="group" aria-label="Theme"><button aria-pressed="{str(start == 'light').lower()}" data-m="light">Light</button><button aria-pressed="{str(start == 'dark').lower()}" data-m="dark">Dark</button></div>
 <div class="stage">
-<div><div class="mock light">{ed}</div><p class="cap">Editor and sidebar: coloured folders and tags, Today in tertiary, an agent proposal in the primary container.</p></div>
-<div><div class="mock light">{hub}</div><p class="cap">Agent Hub: each agent has its own accent; status has an icon and a word, never colour alone; the diff marks + and −.</p></div>
-<div><div class="mock light">{sett}</div><p class="cap">Settings: colour tiles make sections easy to find; the focus ring shows on every control.</p></div>
-<div><div class="mock light">{sign}</div><p class="cap">Web sign-in.</p></div>
-<div><div class="mock light">{hero_html}</div><p class="cap">Site home hero (current copy). Decoration sits behind the text, which is checked against both ends of the background.</p></div>
+<div><div class="mock {start}">{ed}</div><p class="cap">Editor and sidebar: coloured folders and tags, Today in tertiary, an agent proposal in the primary container.</p></div>
+<div><div class="mock {start}">{hub}</div><p class="cap">Agent Hub: each agent has its own accent; status has an icon and a word, never colour alone; the diff marks + and −.</p></div>
+<div><div class="mock {start}">{sett}</div><p class="cap">Settings: colour tiles make sections easy to find; the focus ring shows on every control.</p></div>
+<div><div class="mock {start}">{sign}</div><p class="cap">Web sign-in.</p></div>
+<div><div class="mock {start}">{hero_html}</div><p class="cap">Site home hero (current copy). Decoration sits behind the text, which is checked against both ends of the background.</p></div>
 </div></div>
 <script>document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>{{document.querySelectorAll('.modes button').forEach(x=>x.setAttribute('aria-pressed',x===b));document.querySelectorAll('.stage .mock').forEach(m=>{{m.classList.toggle('dark',b.dataset.m==='dark');m.classList.toggle('light',b.dataset.m!=='dark')}})}}))</script>
 </body></html>'''

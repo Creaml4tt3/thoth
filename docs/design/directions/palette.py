@@ -68,7 +68,9 @@ ACCENT_NAMES = ('gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 
 
 def scheme(d, dark):
     """Material roles for one theme. `d` is a direction dict from DIRECTIONS."""
+    if dark: d = {**d, **d.get('dark', {})}  # a direction may swap its dark-mode neutrals (Papyrus Night: navy)
     P, S, T, N, NV = (ramp(d[k], d.get(k + '_c')) for k in ('primary', 'secondary', 'tertiary', 'neutral', 'neutral_v'))
+    I, IV = (ramp(d['ink'], d.get('ink_c')), ramp(d['ink'], d.get('ink_v_c'))) if 'ink' in d else (N, NV)  # text ramp, when it differs from the surfaces
     E = ramp('#C4302B')
     if not dark:
         r = dict(primary=tone(d['primary'], d.get('p_tone', 40), d.get('primary_c')), on_primary=P[100], primary_container=P[90], on_primary_container=P[10],
@@ -83,7 +85,7 @@ def scheme(d, dark):
                  secondary=S[80], on_secondary=S[20], secondary_container=S[30], on_secondary_container=S[90],
                  tertiary=T[80], on_tertiary=T[20], tertiary_container=T[30], on_tertiary_container=T[90],
                  background=N[d.get('bg_dark_tone', 6)] if d.get('bg_dark_tone', 6) in N else tone(d['neutral'], d.get('bg_dark_tone', 6), d.get('neutral_c')),
-                 on_surface=N[90], on_surface_variant=NV[80], outline=NV[60], outline_variant=NV[30],
+                 on_surface=I[90], on_surface_variant=IV[80], outline=NV[60], outline_variant=NV[30],
                  error=E[80], on_error=E[20], error_container=E[30], on_error_container=E[90])
         r['surface'] = tone(d['neutral'], d.get('surface_dark_tone', 8), d.get('neutral_c'))
         r['surface_dim'] = tone(d['neutral'], d.get('sidebar_dark_tone', 11), d.get('neutral_c'))
@@ -161,6 +163,11 @@ DIRECTIONS = {
         accents=dict(gray=('#6F675C', 0.015), brown=('#8B5434', None), orange=('#E8590C', None), yellow=('#C08A1E', 0.12),
                      green=('#2F7D62', 0.09), blue=('#2F6390', 0.09), purple=('#7B4A6E', 0.09), red=('#B03A2E', 0.13))),
 }
+
+# D with a navy night instead of a brown one: same light theme; dark surfaces from Riviera-like navy, papyrus ink as text.
+DIRECTIONS['navy'] = {**DIRECTIONS['papyrus'], 'name': 'Papyrus Night',
+                      'dark': dict(neutral='#183451', neutral_c=0.045, neutral_v='#183451', neutral_v_c=0.06,
+                                   surface_dark_tone=9, sidebar_dark_tone=12, ink='#5A5040', ink_c=0.016, ink_v_c=0.022)}
 
 if __name__ == '__main__':
     for key, d in DIRECTIONS.items():
