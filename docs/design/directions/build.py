@@ -56,6 +56,11 @@ STYLE['navy'] = {**STYLE['papyrus'],
                'turns deep navy, like the sky the moon rises in, and the ink becomes warm papyrus cream. Orange on navy is the most-pinned pairing.',
     'hero_bg': ('secondary', 9, 0.05), 'hero_bg2': ('secondary', 16, 0.06), 'hero_dark': True}
 
+STYLE['midnight'] = {**STYLE['navy'],
+    'tagline': 'Papyrus Midnight. Direction D in daylight; at night the page is a navy so deep it reads as almost black, '
+               'with only a hint of blue, like the sky long after sunset. Ink stays warm papyrus cream, and Moon orange glows.',
+    'hero_bg': ('neutral', 3, 0.03), 'hero_bg2': ('neutral', 8, 0.04)}
+
 _mask = [0]
 def mark(size, cls=''):
     _mask[0] += 1; i = f'm{_mask[0]}'
@@ -188,7 +193,8 @@ def hero(key, d, st):
     dark = st['hero_dark']
     r = scheme(d, dark)
     which, t1, c1 = st['hero_bg']; w2, t2, c2 = st['hero_bg2']
-    b1, b2 = tone(d[which], t1, c1), tone(d[w2], t2, c2)
+    hd = {**d, **d.get('dark', {})} if dark else d
+    b1, b2 = tone(hd[which], t1, c1), tone(hd[w2], t2, c2)
     fg = '#FFFFFF' if dark else r['on_surface']
     lede = tone(d['secondary'], 88, 0.03) if dark else r['on_surface_variant']
     glow = r['primary'] if dark else d['primary']
@@ -207,13 +213,14 @@ def hero(key, d, st):
         'dusk': f'<div class="h-moon dusk" style="background:linear-gradient(180deg, {tone(d["primary"],75)}, {d["primary"]} 45%, {tone(d["tertiary"],50)} 100%);box-shadow:0 -10px 140px 40px {d["tertiary"]}55"></div>',
         'papyrus': APP_SHOT,
         'navy': APP_SHOT,
+        'midnight': APP_SHOT,
         'earth': APP_SHOT,
     }[key]
     html = f'''
 <div class="hero hero-{key}" style="background:linear-gradient(170deg,{b1},{b2});color:{fg}">
  {moon}
  <div class="h-copy">
-  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth', 'navy') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
+  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth', 'navy', 'midnight') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
   <p class="h-lede" style="color:{lede}">Thoth is an open-source notes app. Everything you write is a Markdown file in a folder on your computer, and a page reaches your team only when you share it.</p>
   <div class="h-acts"><button class="btn primary lg">Download for macOS</button><button class="btn lg" style="background:transparent;color:{fg};border:1.5px solid {fg}">Open the web app</button></div>
  </div>
@@ -352,8 +359,8 @@ kbd{font:11px var(--mono);color:var(--fg2)}
 .h-tiles{position:absolute;left:28px;top:28px;display:grid;grid-template-columns:repeat(6,56px);gap:10px}
 .h-tiles span{height:56px;border-radius:18px}
 .h-tiles span:nth-child(2n){transform:translateY(14px)}
-.hero-papyrus,.hero-earth,.hero-navy{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
-.hero-papyrus .h-app,.hero-earth .h-app,.hero-navy .h-app{order:2}
+.hero-papyrus,.hero-earth,.hero-navy,.hero-midnight{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
+.hero-papyrus .h-app,.hero-earth .h-app,.hero-navy .h-app,.hero-midnight .h-app{order:2}
 .h-title em{font-style:italic;font-weight:calc(var(--dw) - 100)}
 .h-app{position:relative;margin:0 0 0 auto;width:min(620px,100%);height:210px;overflow:hidden;border-radius:var(--rc) var(--rc) 0 0;box-shadow:0 -1px 0 rgb(0 0 0/.06),0 -20px 50px -20px rgb(60 40 10/.35)}
 .h-app .win{min-height:300px;border-bottom:0;border-radius:var(--rc) var(--rc) 0 0;grid-template-columns:150px 1fr}
@@ -387,7 +394,7 @@ def page(key):
     vl, vd = vars_for(L), vars_for(D)
     common = f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono',monospace;--dw:{st['display_w']};--dt:{st['display_track']};--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px;--hero-mark:{L['primary'] if not st['hero_dark'] else D['primary']}"
     cc_rows = ''.join(f'<tr><td>{m}: {h.escape(l)}</td><td>{v:.2f}</td><td>{n}</td></tr>' for m, l, v, n in all_checks)
-    start = 'dark' if key == 'navy' else 'light'  # Papyrus Night only changes the dark theme, so it opens there
+    start = 'dark' if key in ('navy', 'midnight') else 'light'  # Papyrus Night only changes the dark theme, so it opens there
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{d["name"]} direction</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}
 .mock.light{{{vl}}} .mock.dark{{{vd}}} .mock{{{common}}} {' '.join('.mock ' + r.strip() + '}' for r in st['extra'].split('}') if r.strip())}</style></head>

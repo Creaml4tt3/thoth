@@ -89,7 +89,7 @@ def scheme(d, dark):
                  error=E[80], on_error=E[20], error_container=E[30], on_error_container=E[90])
         r['surface'] = tone(d['neutral'], d.get('surface_dark_tone', 8), d.get('neutral_c'))
         r['surface_dim'] = tone(d['neutral'], d.get('sidebar_dark_tone', 11), d.get('neutral_c'))
-        r['surface_container'] = tone(d['neutral_v'], 16, d.get('neutral_v_c'))
+        r['surface_container'] = tone(d['neutral_v'], d.get('container_dark_tone', 16), d.get('neutral_v_c'))
         r['background'] = r['surface']
     acc = {}
     for name in ACCENT_NAMES:
@@ -168,6 +168,11 @@ DIRECTIONS = {
 DIRECTIONS['navy'] = {**DIRECTIONS['papyrus'], 'name': 'Papyrus Night',
                       'dark': dict(neutral='#183451', neutral_c=0.045, neutral_v='#183451', neutral_v_c=0.06,
                                    surface_dark_tone=9, sidebar_dark_tone=12, ink='#5A5040', ink_c=0.016, ink_v_c=0.022)}
+
+# Papyrus Night, darker: a navy so deep it reads as near-black, with just enough blue to stay night sky.
+DIRECTIONS['midnight'] = {**DIRECTIONS['navy'], 'name': 'Papyrus Midnight',
+                          'dark': {**DIRECTIONS['navy']['dark'], 'neutral_c': 0.035, 'surface_dark_tone': 4,
+                                   'sidebar_dark_tone': 7, 'container_dark_tone': 12}}
 
 if __name__ == '__main__':
     for key, d in DIRECTIONS.items():

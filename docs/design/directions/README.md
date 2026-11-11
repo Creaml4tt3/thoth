@@ -4,7 +4,7 @@ Five colour directions around Moon orange (D and E are the earth and paper tones
 
 - `palette.py`: Material-style tonal palettes (tone 0–100 = CIE L*, hue and chroma from OKLCH), the light and dark roles,
   and the WCAG check of every text/background pair. `python3 palette.py` prints pass or fail per direction and theme.
-- `build.py`: writes `lapis.html`, `faience.html`, `dusk.html`, `papyrus.html`, `earth.html`, `navy.html` (D with a navy dark mode) (self-contained; Google Fonts for the preview only).
+- `build.py`: writes `lapis.html`, `faience.html`, `dusk.html`, `papyrus.html`, `earth.html`, `navy.html` (D with a navy dark mode), `midnight.html` (D with a near-black navy) (self-contained; Google Fonts for the preview only).
   The build fails if any pair is below AA.
 
 Status: proposed, not chosen. Nothing in the app uses these yet.
