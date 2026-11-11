@@ -33,6 +33,22 @@ STYLE = {
         roles='Moon orange = you and your agents. Violet = the team and links. Rose = highlights and mentions.',
         hero_bg=('secondary', 5, 0.06), hero_bg2=('tertiary', 10, 0.07), hero_dark=True,
         extra='.hub-side{background:linear-gradient(180deg,var(--side),var(--sc))} .hub-side .hub-h{color:var(--on-sc)} .doc-title{font-size:34px;font-style:italic} .proposal{border:0;background:linear-gradient(135deg,var(--pc),var(--tc));color:var(--on-pc)} .signin{background:linear-gradient(160deg,var(--sc),var(--tc))}'),
+    'papyrus': dict(
+        tagline='Paper tones. Warm papyrus paper and brown-black ink, like the current design but fuller: Moon orange for you and your agents, '
+                'Egyptian blue for the team, papyrus green for time. Newsreader, the reading serif Thoth already ships, becomes the display face.',
+        display="'Newsreader', 'Noto Serif Thai', serif", display_w=500, display_track='-0.02em', thai='Noto Serif Thai (display), Noto Sans Thai (UI)',
+        body="'Inter', 'Noto Sans Thai', sans-serif", r_content=6, r_card=14, ratio=1.25,
+        roles='Moon orange = you and your agents. Egyptian blue = the team, shared pages and links. Papyrus green = time (Today, the timeline).',
+        hero_bg=('neutral', 97, 0.016), hero_bg2=('neutral', 93, 0.024), hero_dark=False,
+        extra='.hero-papyrus::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 31px,rgb(110 85 50/.10) 31px 32px)} .doc-title{font-size:34px} .tab.act{box-shadow:inset 0 -2px 0 var(--p)}'),
+    'earth': dict(
+        tagline='Earth tones. The pigments of an Egyptian painter: sand and umber surfaces, malachite green and yellow ochre beside Moon orange. '
+                'Warm in both themes; dark mode is umber soil, not black. Fraunces gives headlines a soft, hand-made weight.',
+        display="'Fraunces', 'Noto Serif Thai', serif", display_w=650, display_track='-0.025em', thai='Noto Serif Thai (display), Noto Sans Thai (UI)',
+        body="'Inter', 'Noto Sans Thai', sans-serif", r_content=10, r_card=18, ratio=1.25,
+        roles='Moon orange = you and your agents. Malachite = the team, shared pages and links. Ochre = time and highlights.',
+        hero_bg=('neutral', 10, 0.022), hero_bg2=('primary', 13, 0.045), hero_dark=True,
+        extra='.side .row.sel{background:var(--sc);color:var(--on-sc)} .tab.act{box-shadow:none;background:var(--bg);border-radius:10px 10px 0 0} .run{border-radius:14px}'),
 }
 
 _mask = [0]
@@ -179,6 +195,10 @@ def hero(key, d, st):
         'lapis': f'<div class="h-moon" style="background:radial-gradient(circle at 35% 35%, {tone(d["primary"],80)}, {d["primary"]} 55%, {tone(d["primary"],40)} 100%);box-shadow:0 0 120px 30px {d["primary"]}55"></div>',
         'faience': f'<div class="h-tiles">' + ''.join(f'<span style="background:{tone(s,c)}"></span>' for s, c in ((d['primary'], 62), (d['secondary'], 70), (d['tertiary'], 70), ('#E8B400', 82), (d['secondary'], 85), (d['primary'], 85))) + '</div>',
         'dusk': f'<div class="h-moon dusk" style="background:linear-gradient(180deg, {tone(d["primary"],75)}, {d["primary"]} 45%, {tone(d["tertiary"],50)} 100%);box-shadow:0 -10px 140px 40px {d["tertiary"]}55"></div>',
+        'papyrus': f'<div class="h-bigmark" style="color:{d["primary"]}">{mark(220)}</div>',
+        'earth': '<div class="h-strata">' + ''.join(f'<span style="background:{tone(d[k], t, c)};height:{px}px"></span>' for k, t, c, px in
+                 (('tertiary', 70, 0.11, 12), ('primary', 55, None, 20), ('neutral', 40, 0.04, 10), ('secondary', 45, 0.08, 26), ('tertiary', 50, 0.10, 14), ('primary', 35, None, 30))) +
+                 f'</div><div class="h-moon earth" style="background:radial-gradient(circle at 40% 35%, {tone(d["tertiary"],85,0.1)}, {d["primary"]} 70%)"></div>',
     }[key]
     html = f'''
 <div class="hero hero-{key}" style="background:linear-gradient(170deg,{b1},{b2});color:{fg}">
@@ -323,7 +343,12 @@ kbd{font:11px var(--mono);color:var(--fg2)}
 .h-tiles{position:absolute;left:28px;top:28px;display:grid;grid-template-columns:repeat(6,56px);gap:10px}
 .h-tiles span{height:56px;border-radius:18px}
 .h-tiles span:nth-child(2n){transform:translateY(14px)}
-@media (max-width:640px){.h-moon{opacity:.35}.h-tiles{grid-template-columns:repeat(4,44px)}.h-tiles span:nth-child(n+5){display:none}}
+.hero-papyrus{padding-bottom:120px}
+.h-bigmark{position:absolute;right:-40px;bottom:-70px}
+.hero-earth{padding-bottom:150px}
+.h-strata{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column}
+.h-moon.earth{width:120px;height:120px;top:auto;right:12%;bottom:112px;opacity:1}
+@media (max-width:640px){.h-moon,.h-bigmark{opacity:.3}.h-tiles{grid-template-columns:repeat(4,44px)}.h-tiles span:nth-child(n+5){display:none}}
 @media (prefers-reduced-motion:no-preference){.btn{transition:transform 120ms cubic-bezier(.2,.8,.2,1)}.btn:active{transform:scale(.97)}}
 details{margin-top:10px}summary{cursor:pointer;color:var(--muted-foreground);font-size:13px}
 table.cc{border-collapse:collapse;font-size:12px;width:100%;margin-top:8px}
@@ -346,7 +371,7 @@ def page(key):
     scale = [('Display', round(base * st['ratio'] ** 7)), ('H1', round(base * st['ratio'] ** 5)), ('H2', round(base * st['ratio'] ** 4)),
              ('H3', round(base * st['ratio'] ** 2)), ('Body (page)', 16), ('UI', 14), ('Small', 12)]
     ts = ''.join(f'<div><small>{n} · {px}px</small><span style="font:{st["display_w"] if i < 4 else 400} {px}px/1.15 {st["display"] if i < 4 else st["body"]};letter-spacing:{st["display_track"] if i < 4 else "0"}">{"Thoth ทอธ" if i < 2 else "The scribe’s page · หน้าของอาลักษณ์"}</span></div>' for i, (n, px) in enumerate(scale))
-    sp = ''.join(f'<div><span style="width:{s}px;height:{s}px"></span>{s}</div>' for s in (4, 8, 12, 16, 24, 32, 48, 64))
+    sp = ''.join(f'<div><span style="width:{s}px;height:{s}px;background:{d["primary"]}"></span>{s}</div>' for s in (4, 8, 12, 16, 24, 32, 48, 64))
     ed, hub, sett, sign = screens(key)
     vl, vd = vars_for(L), vars_for(D)
     common = f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono',monospace;--dw:{st['display_w']};--dt:{st['display_track']};--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px;--hero-mark:{L['primary'] if not st['hero_dark'] else D['primary']}"

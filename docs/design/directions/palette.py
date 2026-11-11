@@ -146,6 +146,20 @@ DIRECTIONS = {
         surface_l='#FFFFFF', sidebar_l=tone('#7B3FE4', 95, 0.025), bg_dark_tone=4, surface_dark_tone=5, sidebar_dark_tone=9,
         accents=dict(gray=('#716A7C', 0.02), brown=('#9C5A3C', None), orange=('#E8590C', None), yellow=('#D99A00', None),
                      green=('#2F9E6A', None), blue=('#3070E0', None), purple=('#7B3FE4', None), red=('#E0365A', None))),
+    'papyrus': dict(
+        p_tone=44,
+        name='Papyrus', primary='#E8590C', secondary='#3B5F8A', secondary_c=0.075, tertiary='#6F8A3C',
+        neutral='#5A5040', neutral_c=0.014, neutral_v='#5A5040', neutral_v_c=0.024,
+        surface_l=tone('#5A5040', 98.5, 0.012), sidebar_l=tone('#5A5040', 95, 0.02), bg_dark_tone=6, surface_dark_tone=7, sidebar_dark_tone=10,
+        accents=dict(gray=('#6E6A62', 0.012), brown=('#8A5A3A', None), orange=('#E8590C', None), yellow=('#C9961E', 0.11),
+                     green=('#6F8A3C', 0.10), blue=('#3B5F8A', 0.08), purple=('#7A4F7F', 0.08), red=('#B8452F', 0.12))),
+    'earth': dict(
+        p_tone=42,
+        name='Ochre & Malachite', primary='#E8590C', secondary='#2F7D62', secondary_c=0.08, tertiary='#B8862B', tertiary_c=0.11,
+        neutral='#6B5236', neutral_c=0.022, neutral_v='#6B5236', neutral_v_c=0.034,
+        surface_l=tone('#6B5236', 97, 0.016), sidebar_l=tone('#6B5236', 93, 0.026), bg_dark_tone=7, surface_dark_tone=8, sidebar_dark_tone=11,
+        accents=dict(gray=('#6F675C', 0.015), brown=('#8B5434', None), orange=('#E8590C', None), yellow=('#C08A1E', 0.12),
+                     green=('#2F7D62', 0.09), blue=('#2F6390', 0.09), purple=('#7B4A6E', 0.09), red=('#B03A2E', 0.13))),
 }
 
 if __name__ == '__main__':
