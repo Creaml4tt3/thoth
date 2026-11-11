@@ -84,3 +84,49 @@ Built into `docs/design/directions/midnight-site.html`. Every pair passes AA.
 6. **Orange stays on the CTA, the mark and agent moments.** Headlines stay ink or cream (Mobbin pattern 4).
 7. **Not borrowed:** Notion's blue buttons, which would compete with Moon. Notion's hand-drawn characters wait for the
    mascot decision, which the owner hasn't made yet.
+
+## How the Grok Bot mascot moves (checked 2026-11-11)
+
+Cloudflare blocked the live x.ai/bot for automated browsers (403), so this comes from the Wayback Machine copy of
+2026-11-04. Frames are in `.tmp/motion/`, which git ignores.
+
+- **The named CSS animations move the demo chat, not the mascot.**
+  - Message rows enter with opacity 0→1 and `translateY(8px) scale(.97)` → none, over 280–420 ms, with
+    `cubic-bezier(.2,.9,.3,1.15)`, a small overshoot.
+  - The demo window fades in over 1 s.
+  - A 12px spinner loops.
+- **The mascot is an SVG redrawn by script every frame.**
+  - Its eyes glance to a new spot (about ±10% of its size) and hold for 1–3 s.
+  - It blinks every 2–4 s, taking about 200 ms.
+  - It changes expression between dots, happy curves and tall ovals.
+  - Its eyes follow the pointer within about 600 ms.
+  - Hovering its card scales the face up about 7% over about 0.5 s. It never rotates or changes colour.
+- **Reduced motion:** the CSS entrances turn off, but the spinner and a pulse keep running. Whether the scripted eyes stop
+  could not be checked.
+
+**A spec for the Moon Ibis mark, kept as a proposal.** The ibis eye is the "eye" here, so it fits the mark.
+- **Entry:** opacity with `translateY(8px) scale(.97)` → none, 420 ms, `cubic-bezier(.2,.9,.3,1.15)`, played once.
+- **Idle:** the eye blinks (scaleY 1→0.15→1) over 180 ms every 2.5–5 s at random. The head glances ±2–3px every 2–4 s,
+  over 400 ms, with `cubic-bezier(.22,1,.36,1)`.
+- **Reaction:** on hover, scale up 6% over 350 ms. The eye may follow the pointer, by ±3px at most.
+- **Reduced motion:** no entry movement, no idle loop and no pointer tracking. Unlike Grok, no endless spinner.
+
+## Each site's own dark mode
+
+| Site | Dark mode | Dark page | Text | Accent in dark | Tone |
+|---|---|---|---|---|---|
+| Notion, Replit, Zapier, Harvest, Monarch | none | (light only) | | | |
+| Claude | follows the system | `#141413` | `#FAF9F5` | `#C46849`, deeper than the light `#D97757` | warm |
+| Postman | dark hero always | about `#291007` | `#FFF0DE` | `#E0531F` | warm brown |
+| Cloudflare | follows the system | `#151414` | `#FFFBF5` | `#FF5E1F`, unchanged | warm-neutral |
+| Mistral | follows the system | `#101013` | `#FAFAF4` | `#FF5229`, unchanged | neutral |
+| x.ai/bot | follows the system (light exists) | `#0A0A0A` | white | white and black buttons | neutral |
+| Linear | dark only | `#08090A` | `#F7F8F8` | `#5E6AD2` | slightly cool |
+| Raycast | dark only | `#07080A` | `#FFFFFF` | `#FF6363` | slightly cool |
+
+**Patterns:**
+- **Most orange brands have no dark mode at all.**
+- **The ones that do use a warm near-black.** None offers its own light/dark switch; the system setting decides.
+- **Claude deepens its orange in dark mode so it doesn't glow.** Papyrus Midnight's site test does the same with
+  `#E8590C`.
+- **`#030F1D` would be the only true navy in this set,** and the only one pairing orange with its cool complement.
