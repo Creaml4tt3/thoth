@@ -191,20 +191,23 @@ def hero(key, d, st):
                     ('hero lede / hero top', ratio(lede, b1), 4.5), ('hero lede / hero bottom', ratio(lede, b2), 4.5)]
     btn_bg, btn_fg = (r['primary'], r['on_primary'])
     checks_extra.append(('hero primary button', ratio(btn_fg, btn_bg), 4.5))
+    tree = ''.join(f'<div class="row">{folder_icon(c)}<span>{n}</span></div>' for n, c in FOLDERS[:4])
+    APP_SHOT = (f'<div class="h-app"><div class="win mini"><aside class="side">{tree}<div class="row sel">{folder_icon("blue")}<span>Launch notes</span></div></aside>'
+                f'<main class="pane"><div class="doc"><h2 class="doc-title">Launch notes</h2><p>Tokens first, then the app, then the site.</p>'
+                f'<div class="proposal"><div class="who"><span class="agent-av" style="background:var(--p);color:var(--on-p)">{mark(12)}</span><b>Claude Code</b> proposes</div>'
+                f'<p><ins>+ Step 4: screenshots in both themes.</ins></p><div class="acts"><button class="btn primary sm">Apply</button><button class="btn ghost sm">Discard</button></div></div></div></main></div></div>')
     moon = {
         'lapis': f'<div class="h-moon" style="background:radial-gradient(circle at 35% 35%, {tone(d["primary"],80)}, {d["primary"]} 55%, {tone(d["primary"],40)} 100%);box-shadow:0 0 120px 30px {d["primary"]}55"></div>',
         'faience': f'<div class="h-tiles">' + ''.join(f'<span style="background:{tone(s,c)}"></span>' for s, c in ((d['primary'], 62), (d['secondary'], 70), (d['tertiary'], 70), ('#E8B400', 82), (d['secondary'], 85), (d['primary'], 85))) + '</div>',
         'dusk': f'<div class="h-moon dusk" style="background:linear-gradient(180deg, {tone(d["primary"],75)}, {d["primary"]} 45%, {tone(d["tertiary"],50)} 100%);box-shadow:0 -10px 140px 40px {d["tertiary"]}55"></div>',
-        'papyrus': f'<div class="h-bigmark" style="color:{d["primary"]}">{mark(220)}</div>',
-        'earth': '<div class="h-strata">' + ''.join(f'<span style="background:{tone(d[k], t, c)};height:{px}px"></span>' for k, t, c, px in
-                 (('tertiary', 70, 0.11, 12), ('primary', 55, None, 20), ('neutral', 40, 0.04, 10), ('secondary', 45, 0.08, 26), ('tertiary', 50, 0.10, 14), ('primary', 35, None, 30))) +
-                 f'</div><div class="h-moon earth" style="background:radial-gradient(circle at 40% 35%, {tone(d["tertiary"],85,0.1)}, {d["primary"]} 70%)"></div>',
+        'papyrus': APP_SHOT,
+        'earth': APP_SHOT,
     }[key]
     html = f'''
 <div class="hero hero-{key}" style="background:linear-gradient(170deg,{b1},{b2});color:{fg}">
  {moon}
  <div class="h-copy">
-  <h1 class="h-title">Your notes. {mark(0, "inline")} Your files.</h1>
+  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
   <p class="h-lede" style="color:{lede}">Thoth is an open-source notes app. Everything you write is a Markdown file in a folder on your computer, and a page reaches your team only when you share it.</p>
   <div class="h-acts"><button class="btn primary lg">Download for macOS</button><button class="btn lg" style="background:transparent;color:{fg};border:1.5px solid {fg}">Open the web app</button></div>
  </div>
@@ -343,11 +346,13 @@ kbd{font:11px var(--mono);color:var(--fg2)}
 .h-tiles{position:absolute;left:28px;top:28px;display:grid;grid-template-columns:repeat(6,56px);gap:10px}
 .h-tiles span{height:56px;border-radius:18px}
 .h-tiles span:nth-child(2n){transform:translateY(14px)}
-.hero-papyrus{padding-bottom:120px}
-.h-bigmark{position:absolute;right:-40px;bottom:-70px}
-.hero-earth{padding-bottom:150px}
-.h-strata{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column}
-.h-moon.earth{width:120px;height:120px;top:auto;right:12%;bottom:112px;opacity:1}
+.hero-papyrus,.hero-earth{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
+.hero-papyrus .h-app,.hero-earth .h-app{order:2}
+.h-title em{font-style:italic;font-weight:calc(var(--dw) - 100)}
+.h-app{position:relative;margin:0 0 0 auto;width:min(620px,100%);height:210px;overflow:hidden;border-radius:var(--rc) var(--rc) 0 0;box-shadow:0 -1px 0 rgb(0 0 0/.06),0 -20px 50px -20px rgb(60 40 10/.35)}
+.h-app .win{min-height:300px;border-bottom:0;border-radius:var(--rc) var(--rc) 0 0;grid-template-columns:150px 1fr}
+.h-app .doc{padding:16px 20px}.h-app .doc-title{font-size:24px;margin-top:0}
+@media (max-width:560px){.h-app .win{grid-template-columns:1fr}}
 @media (max-width:640px){.h-moon,.h-bigmark{opacity:.3}.h-tiles{grid-template-columns:repeat(4,44px)}.h-tiles span:nth-child(n+5){display:none}}
 @media (prefers-reduced-motion:no-preference){.btn{transition:transform 120ms cubic-bezier(.2,.8,.2,1)}.btn:active{transform:scale(.97)}}
 details{margin-top:10px}summary{cursor:pointer;color:var(--muted-foreground);font-size:13px}
