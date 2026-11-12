@@ -67,6 +67,11 @@ STYLE['midnight-sans'] = {**STYLE['midnight'], 'display': "'Inter', 'Noto Sans T
     'tagline': 'Papyrus Midnight, sans only. The same colours as Papyrus Midnight, with Inter for headlines as well as text: '
                'weight 600, tight tracking, the way Notion and Grok bot set theirs. Thai uses Noto Sans Thai throughout.'}
 
+# Owner, 2026-11-12: #00001C for dark, sans headlines.
+STYLE['blueblack'] = {**STYLE['midnight-sans'], 'hero_bg': ('neutral', 1, 0.05), 'hero_bg2': ('neutral', 7, 0.05),
+    'tagline': 'Papyrus Blue-Black. Direction D in daylight; at night the page is #00001C, a blue so deep it is almost black, '
+               'with an indigo cast where Midnight had a navy one. Ink stays warm papyrus cream; headlines are Inter 600.'}
+
 _mask = [0]
 def mark(size, cls=''):
     _mask[0] += 1; i = f'm{_mask[0]}'
@@ -221,13 +226,14 @@ def hero(key, d, st):
         'navy': APP_SHOT,
         'midnight': APP_SHOT,
         'midnight-sans': APP_SHOT,
+        'blueblack': APP_SHOT,
         'earth': APP_SHOT,
     }[key]
     html = f'''
 <div class="hero hero-{key}" style="background:linear-gradient(170deg,{b1},{b2});color:{fg}">
  {moon}
  <div class="h-copy">
-  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth', 'navy', 'midnight', 'midnight-sans') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
+  <h1 class="h-title">{'Your notes.<br><em>Your files.</em>' if key in ('papyrus', 'earth', 'navy', 'midnight', 'midnight-sans', 'blueblack') else f'Your notes. {mark(0, "inline")} Your files.'}</h1>
   <p class="h-lede" style="color:{lede}">Thoth is an open-source notes app. Everything you write is a Markdown file in a folder on your computer, and a page reaches your team only when you share it.</p>
   <div class="h-acts"><button class="btn primary lg">Download for macOS</button><button class="btn lg" style="background:transparent;color:{fg};border:1.5px solid {fg}">Open the web app</button></div>
  </div>
@@ -366,8 +372,8 @@ kbd{font:11px var(--mono);color:var(--fg2)}
 .h-tiles{position:absolute;left:28px;top:28px;display:grid;grid-template-columns:repeat(6,56px);gap:10px}
 .h-tiles span{height:56px;border-radius:18px}
 .h-tiles span:nth-child(2n){transform:translateY(14px)}
-.hero-papyrus,.hero-earth,.hero-navy,.hero-midnight,.hero-midnight-sans{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
-.hero-papyrus .h-app,.hero-earth .h-app,.hero-navy .h-app,.hero-midnight .h-app,.hero-midnight-sans .h-app{order:2}
+.hero-papyrus,.hero-earth,.hero-navy,.hero-midnight,.hero-midnight-sans,.hero-blueblack{flex-direction:column;align-items:stretch;padding-bottom:0;gap:32px}
+.hero-papyrus .h-app,.hero-earth .h-app,.hero-navy .h-app,.hero-midnight .h-app,.hero-midnight-sans .h-app,.hero-blueblack .h-app{order:2}
 .h-title em{font-style:italic;font-weight:calc(var(--dw) - 100)}
 .h-app{position:relative;margin:0 0 0 auto;width:min(620px,100%);height:210px;overflow:hidden;border-radius:var(--rc) var(--rc) 0 0;box-shadow:0 -1px 0 rgb(0 0 0/.06),0 -20px 50px -20px rgb(60 40 10/.35)}
 .h-app .win{min-height:300px;border-bottom:0;border-radius:var(--rc) var(--rc) 0 0;grid-template-columns:150px 1fr}
@@ -401,7 +407,7 @@ def page(key):
     vl, vd = vars_for(L), vars_for(D)
     common = f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono',monospace;--dw:{st['display_w']};--dt:{st['display_track']};--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px;--hero-mark:{L['primary'] if not st['hero_dark'] else D['primary']}"
     cc_rows = ''.join(f'<tr><td>{m}: {h.escape(l)}</td><td>{v:.2f}</td><td>{n}</td></tr>' for m, l, v, n in all_checks)
-    start = 'dark' if key in ('navy', 'midnight', 'midnight-sans') else 'light'  # Papyrus Night only changes the dark theme, so it opens there
+    start = 'dark' if key in ('navy', 'midnight', 'midnight-sans', 'blueblack') else 'light'  # Papyrus Night only changes the dark theme, so it opens there
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{d["name"]} direction</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}
 .mock.light{{{vl}}} .mock.dark{{{vd}}} .mock{{{common}}} {' '.join('.mock ' + r.strip() + '}' for r in st['extra'].split('}') if r.strip())}</style></head>

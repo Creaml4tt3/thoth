@@ -123,9 +123,9 @@ common = (f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono
           f"--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px")
 worst = min(checks, key=lambda c: c[2])
 html = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Papyrus Midnight site</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}{PAGE_CSS}
+<title>{d['name']} site</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}{PAGE_CSS}
 .mock.light{{{vars_for(L)};{site_vars('light')}}} .mock.dark{{{vars_for(D)};{site_vars('dark')}}} .mock{{{common}}}</style></head><body><div class="dir">
-<p class="lead"><b style="color:var(--foreground)">Papyrus Midnight, as a site.</b> The patterns from x.ai/bot and notion.com, made Thoth's own: the Moon Ibis as a glyph in the headline (Grok's "Meet ◐ Grok Bot"; DESIGN.md already asks for "Meet ◐ Thoth"), pill actions at weight 500, a real app window with agent log lines, depth from tonal steps instead of glows, the mark at mascot scale cropped by a card, a Notion pill word, and a bento. All {len(checks)} site pairs pass AA (tightest {worst[0]} {worst[1]} at {worst[2]:.2f}:1).</p>
+<p class="lead"><b style="color:var(--foreground)">{d['name']}, as a site.</b> The patterns from x.ai/bot and notion.com, made Thoth's own: the Moon Ibis as a glyph in the headline (Grok's "Meet ◐ Grok Bot"; DESIGN.md already asks for "Meet ◐ Thoth"), pill actions at weight 500, a real app window with agent log lines, depth from tonal steps instead of glows, the mark at mascot scale cropped by a card, a Notion pill word, and a bento. All {len(checks)} site pairs pass AA (tightest {worst[0]} {worst[1]} at {worst[2]:.2f}:1).</p>
 <div class="modes" role="group" aria-label="Theme"><button aria-pressed="true" data-m="dark">Midnight</button><button aria-pressed="false" data-m="light">Paper</button></div>
 {frame('dark')}{frame('light').replace('data-mode="light">', 'data-mode="light" hidden>', 1)}
 </div>{CYCLE}</body></html>'''

@@ -87,7 +87,7 @@ def scheme(d, dark):
                  background=N[d.get('bg_dark_tone', 6)] if d.get('bg_dark_tone', 6) in N else tone(d['neutral'], d.get('bg_dark_tone', 6), d.get('neutral_c')),
                  on_surface=I[90], on_surface_variant=IV[80], outline=NV[60], outline_variant=NV[30],
                  error=E[80], on_error=E[20], error_container=E[30], on_error_container=E[90])
-        r['surface'] = tone(d['neutral'], d.get('surface_dark_tone', 8), d.get('neutral_c'))
+        r['surface'] = d.get('surface_dark') or tone(d['neutral'], d.get('surface_dark_tone', 8), d.get('neutral_c'))  # an exact page colour wins
         r['surface_dim'] = tone(d['neutral'], d.get('sidebar_dark_tone', 11), d.get('neutral_c'))
         r['surface_container'] = tone(d['neutral_v'], d.get('container_dark_tone', 16), d.get('neutral_v_c'))
         r['background'] = r['surface']
@@ -175,6 +175,12 @@ DIRECTIONS['midnight'] = {**DIRECTIONS['navy'], 'name': 'Papyrus Midnight',
                                    'sidebar_dark_tone': 7, 'container_dark_tone': 12}}
 
 DIRECTIONS['midnight-sans'] = {**DIRECTIONS['midnight'], 'name': 'Papyrus Midnight (sans)'}
+
+# Owner, 2026-11-12: "Dark Blue Black #00001C instead of Midnight". The page is exactly #00001C (OKLCH hue 264, an indigo
+# black); the raised steps keep that hue, a little less chroma, so cards read as the same night and not as grey.
+DIRECTIONS['blueblack'] = {**DIRECTIONS['midnight'], 'name': 'Papyrus Blue-Black',
+                           'dark': {**DIRECTIONS['midnight']['dark'], 'neutral': '#00001C', 'neutral_c': 0.05, 'neutral_v': '#00001C',
+                                    'neutral_v_c': 0.06, 'surface_dark': '#00001C', 'sidebar_dark_tone': 5, 'container_dark_tone': 11}}
 
 if __name__ == '__main__':
     for key, d in DIRECTIONS.items():
