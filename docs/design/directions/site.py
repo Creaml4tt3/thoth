@@ -12,7 +12,7 @@ L, D = scheme(d, False), scheme(d, True)
 dk = {**d, **d['dark']}
 # Site surfaces: dark steps from the page (Grok: #0a0a0a -> #1a1a1a -> white 6%), light = papyrus paper and its sidebar tone.
 SITE = {
-    'dark': dict(page=D['surface'], raise1=tone(dk['neutral'], 9, 0.04), raise2=tone(dk['neutral'], 14, 0.045), ink=D['on_surface'],
+    'dark': dict(page=D['surface'], raise1=tone(dk['neutral'], 9, min(0.04, dk['neutral_c'] + 0.005)), raise2=tone(dk['neutral'], 14, min(0.045, dk['neutral_c'] + 0.01)), ink=D['on_surface'],
                  ink2=D['on_surface_variant'], hair='rgb(255 255 255 / .07)', pillw=L['primary_container'], pillw_on=L['on_primary_container']),
     'light': dict(page=L['surface'], raise1=L['surface_dim'], raise2=tone(d['neutral'], 92.5, 0.02), ink=L['on_surface'],
                   ink2=L['on_surface_variant'], hair='rgb(60 45 20 / .10)', pillw=L['primary_container'], pillw_on=L['on_primary_container']),

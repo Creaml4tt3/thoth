@@ -182,6 +182,13 @@ DIRECTIONS['blueblack'] = {**DIRECTIONS['midnight'], 'name': 'Papyrus Blue-Black
                            'dark': {**DIRECTIONS['midnight']['dark'], 'neutral': '#00001C', 'neutral_c': 0.05, 'neutral_v': '#00001C',
                                     'neutral_v_c': 0.06, 'surface_dark': '#00001C', 'sidebar_dark_tone': 5, 'container_dark_tone': 11}}
 
+# Owner, 2026-11-12: "make dark mode beautiful black then use blue as secondary only". The ground is a soft ink black
+# (papyrus hue at almost no chroma, so it is warm without reading brown); greys, borders and text keep that hue, and blue
+# appears only where the secondary role is used: links, workspace badges, your own messages, tonal buttons.
+DIRECTIONS['black'] = {**DIRECTIONS['papyrus'], 'name': 'Papyrus Black',
+                       'dark': dict(neutral='#5A5040', neutral_c=0.004, neutral_v='#5A5040', neutral_v_c=0.006,
+                                    surface_dark_tone=3.5, sidebar_dark_tone=7, container_dark_tone=12, ink='#5A5040', ink_c=0.014, ink_v_c=0.018)}
+
 if __name__ == '__main__':
     for key, d in DIRECTIONS.items():
         for dark in (False, True):

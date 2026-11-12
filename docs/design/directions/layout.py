@@ -6,7 +6,8 @@ the two surfaces here are the page (ground) and surface_dim (the raised card), b
 from palette import DIRECTIONS, scheme
 from build import mark, folder_icon, vars_for, CSS, FONTS, FOLDERS, STYLE
 
-KEY = 'blueblack'
+import sys
+KEY = sys.argv[1] if len(sys.argv) > 1 else 'blueblack'  # 'black' builds Papyrus Black
 d, st = DIRECTIONS[KEY], STYLE[KEY]
 L, D = scheme(d, False), scheme(d, True)
 # Inset layout: the ground is the window, the page is a raised card. Light: papyrus sidebar tone as ground, paper as card.
@@ -196,7 +197,7 @@ def section(title, body, points):
 
 SECTIONS = [
     ('1 · Editor: the page is a card on the night', EDITOR, [
-        '<b>Inset layout.</b> The sidebar sits on the ground (#00001C at night, papyrus in daylight) and the page is a raised card with rounded corners, the way Notion Calendar, Arc and Linear frame content. Depth comes from one tonal step, not borders or glows.',
+        '<b>Inset layout.</b> The sidebar sits on the ground (the night ground in dark, papyrus in daylight) and the page is a raised card with rounded corners, the way Notion Calendar, Arc and Linear frame content. Depth comes from one tonal step, not borders or glows.',
         '<b>Pill tabs</b> on the ground instead of a tab strip; the active tab is the only one with a card behind it.',
         '<b>Ask beside the page.</b> The agent opens as a side panel for this page, not only in a separate Hub. Its change shows <i>on the page</i> as a Moon highlight with a "Proposed by" label (words, not only colour) before you apply it.',
         '<b>Sidebar is shorter:</b> Search and New page become one pill row; Home, Today and Agents are pinned; a live line at the bottom says what an agent is doing right now.']),
@@ -218,9 +219,9 @@ common = (f"--display:{st['display']};--body:{st['body']};--mono:'JetBrains Mono
           f"--rc:{st['r_card']}px;--rc2:{st['r_content'] + 2}px;--rs:{st['r_content'] - 2}px")
 body = ''.join(section(t, b, p).replace('{m}', 'dark') for t, b, p in SECTIONS)
 html = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Blue-Black layout</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}{LCSS}
+<title>{d['name']} layout</title><link rel="stylesheet" href="{FONTS}"><style>{CSS}{LCSS}
 .mock.light{{{vars_for(L)};{GROUND['light']}}} .mock.dark{{{vars_for(D)};{GROUND['dark']}}} .mock{{{common}}}</style></head><body><div class="dir" style="--font-body:{st['body']}">
-<p class="lead"><b style="color:var(--foreground)">Layout and UX, in Papyrus Blue-Black.</b> Five changes beyond colour, after Notion, Grok bot and the Awwwards apps. Proposals only: nothing here is in the app yet. Colours are the Blue-Black roles (all AA); sans headlines.</p>
+<p class="lead"><b style="color:var(--foreground)">Layout and UX, in {d['name']}.</b> Five changes beyond colour, after Notion, Grok bot and the Awwwards apps. Proposals only: nothing here is in the app yet. Colours are the {d['name']} roles (all AA); sans headlines.</p>
 <div class="modes" role="group" aria-label="Theme"><button aria-pressed="false" data-m="light">Light</button><button aria-pressed="true" data-m="dark">Dark</button></div>
 <div class="stage">{body}</div></div>
 <script>document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>{{document.querySelectorAll('.modes button').forEach(x=>x.setAttribute('aria-pressed',x===b));document.querySelectorAll('.stage .mock').forEach(m=>{{m.classList.toggle('dark',b.dataset.m==='dark');m.classList.toggle('light',b.dataset.m!=='dark')}})}}))</script>

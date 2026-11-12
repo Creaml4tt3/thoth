@@ -11,4 +11,7 @@ Five colour directions around Moon orange (D and E are the earth and paper tones
   `layout.py` writes the layout page: inset page card, Ask beside the page, a composer-first Home, a three-column Agent Hub,
   split sign-in, and a phone bottom bar.
 
+- `black.html`, `black-site.html`, `black-layout.html` (2026-11-12): D with a soft ink-black night (`#0E0C0B`), blue only as the secondary role.
+  `python3 site.py black` and `python3 layout.py black` build the site and layout pages.
+
 Status: proposed, not chosen. Nothing in the app uses these yet.
