@@ -97,15 +97,15 @@ describe.each(Object.entries(themes))("accent contrast, %s theme", (_name, t) =>
   });
 });
 
-/** Text tokens on every surface they sit on: the page (dialogs and menus too), the sidebar, and a hover, active or
- * menu-highlight row over each. 4.5:1 because they are body-size text, not large text or UI parts. */
+/** Text tokens on every surface they sit on: the page, the sidebar and the raised container (cards, inputs, menus, the
+ * modal), and a hover, active or menu-highlight row over each. 4.5:1 because they are body-size text. */
 describe.each(Object.entries(themes))("text contrast, %s theme", (_name, theme) => {
   const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
   const colour = (name: string): Colour => {
     const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
     return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
   };
-  const surfaces: [string, Rgb][] = ["--thoth-bg", "--thoth-bg-sidebar"].flatMap((name) => {
+  const surfaces: [string, Rgb][] = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"].flatMap((name) => {
     const base = colour(name).rgb;
     return [[name, base], ...["--thoth-bg-hover", "--thoth-bg-active", "--thoth-moon-soft"].map((wash): [string, Rgb] => [`${wash} over ${name}`, over(colour(wash), base)])];
   });
