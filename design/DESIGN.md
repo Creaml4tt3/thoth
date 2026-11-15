@@ -1,6 +1,6 @@
-# Thoth design system — "Ink & Moon"
+# Thoth design system — "Papyrus Black"
 
-Status: **Accepted** (v0.1, 2026-10-20; mark and accent confirmed by the owner 2026-10-22). Tokens: `packages/ui/src/tokens.css`.
+Status: **Accepted** (v0.2, 2026-11-15, ADR-0053; v0.1 "Ink & Moon" 2026-10-20). Tokens: `packages/ui/src/tokens.css`.
 Brand files: `design/brand/`. The early research, mockups and concept art are kept outside this repository.
 
 ## 1. Idea
@@ -14,24 +14,27 @@ cinematic look of today's AI product sites. Thoth takes a feeling from them,
 not their assets or code, and builds it from its own idea: a scribe's paper
 and ink by day, the night sky and the moon by night.
 
-- **Ink**: writing surfaces are warm paper with black ink. Text steps down
-  in opacity (94 / 66 / 46 / 28%) from one warm black, the way ink thins on
-  paper, never a set of cool greys.
-- **Night**: chrome for marketing, onboarding and the Agent Hub is the night
-  sky: a near-black `#0A0A0A`, white pill actions, and medium-weight display
-  type with tight tracking.
-- **Moon**: there is one accent, a warm lunar orange `#E8590C`. It means
-  "the agent is here or touching this": the agent avatar, running badges,
-  agent-proposed highlights, and focus. Use it sparingly; it is never
-  decorative.
+- **Papyrus**: by day, writing surfaces are papyrus paper `#FEFAF3` (sidebar
+  `#F8F0E2`) with warm ink `#1F1B14`. Text steps down from one warm ink, the way
+  ink thins on paper, never a set of cool greys.
+- **Black**: by night, a soft ink black `#0E0C0B` with raised steps `#171514`
+  and `#211F1C`, and warm text `#E8E2D8`. It is warm without reading brown.
+- **Moon**: the brand anchor, lunar orange `#E8590C`: primary actions, the
+  mark, the agent avatar, running badges and focus. As text it uses its role
+  tones, `#B64201` on paper and `#FF8C5F` on black.
+- **Blue, secondary only**: links, Workspace badges, your own chat messages and
+  tonal buttons (`#3F6088` / `#A5CAF7`). Never a page fill or a primary action.
+- **Colour that means something**: the eight folder and tag colours, callouts
+  and status use Material-style tonal ramps (ADR-0053 rule 4). Colour is never
+  the only signal: a badge also has a word, a status also has an icon.
 
 Space types have their own badges, so users always know where content lives,
 which matters for the private-to-workspace transfer UX:
 
 | Space | Badge | Colour |
 |---|---|---|
-| Private Space | `Local` | stone `#615D59` |
-| Workspace | `Workspace` | link blue `#0B6BCB` |
+| Private Space | `Local` | warm ink variant (`--thoth-text-secondary`) |
+| Workspace | `Workspace` | secondary blue |
 | Agent Hub | `Running` | moon |
 
 ## 2. Mark: Moon Ibis
@@ -99,17 +102,19 @@ The editor's content column is 720px.
 
 | Surface | Base theme | Notes |
 |---|---|---|
-| Marketing site, onboarding, import wizard | Night | Centred hero, muted lede, inverted white pill CTA, product window |
-| Editor, sidebar, page views | Paper (light) by default; Night available | Document layout: sidebar 260px, breadcrumbs, properties row, callouts |
-| Agent Hub, agent side panel | Night in both themes | Chat bubbles, diff review, Apply/Discard pills, moon avatar |
-| Transfer review (Private → Workspace) | Paper modal | Shows destination workspace and members before commit (spec §12) |
+| Marketing site | Follows the system (Papyrus or Black) | Hooded ibis in front of its moon, Moon pill CTA, notebook-cover intro |
+| Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs, properties row, callouts |
+| Onboarding, import wizard | Follows the chosen theme | Moon primary pill, secondary tonal pills |
+| Agent Hub, agent side panel | Follows the chosen theme | Your messages in the secondary container, agent work in Moon's, Apply/Discard pills |
+| Transfer review (Private → Workspace) | Modal on the raised step | Shows destination workspace and members before commit (spec §12) |
 
 ## 6. Accessibility
 
-- Body text contrast: ink-primary on paper is about 17:1; on night it is about 18:1.
-- Ink-tertiary (46%) is for meta text only, at 12px or larger.
-- Moon on white is about 3.9:1, so it is not used for text. Use
-  `--thoth-moon-ink` (`#8A3200`) for text on `moon-soft` instead.
+- Every text and background pair is checked by `packages/app-ui/test/contrast.test.ts` (AA: 4.5:1 text, 3:1 large
+  text, meaningful borders and focus rings) in light, night and system-dark. A new pair gets a check in the same commit.
+- Body text: ink on papyrus and warm text on black are both above 15:1.
+- The `#E8590C` seed is about 3.4:1 on papyrus, so it is a fill, never small text. Small orange text uses the role
+  tone (`#B64201` light, `#FF8C5F` dark).
 - Focus rings use the moon colour, 2px, with a 2px offset.
 - `prefers-reduced-motion` removes motion: the motion duration and distance tokens become 0, and `ui.css` forces
   animation and transition off everywhere in the app.
@@ -130,5 +135,7 @@ Calm, quick and purposeful (tokens and rules: the "Motion" note in `packages/ui/
   (direction A).
 - ~~Orange or silver-blue accent?~~ Decided 2026-10-22: lunar orange. Silver-blue
   was too close to the Workspace badge blue.
+- ~~A richer, more colourful system?~~ Decided 2026-11-12/15: Papyrus Black (ADR-0053).
+- New app icons and favicon in Papyrus Black: only if the owner asks.
 - Do we license a custom display face later? For now, Inter is a deliberate,
   free choice for an OSS project.
