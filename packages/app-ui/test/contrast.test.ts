@@ -192,6 +192,33 @@ describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_na
   });
 });
 
+/** The feature screens' pairs (ADR-0053 rollout, round 2). One group per area; each pair is text over the surface it sits on. */
+describe.each(Object.entries(themes))("Papyrus Black feature screens, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const mix = (top: Rgb, back: Rgb, share: number): Rgb => top.map((c, i) => Math.round(c * share + back[i]! * (1 - share))) as Rgb;
+  const onPage = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"];
+  /** Every ink in `inks` on `wash(surface)` for each surface, at 4.5:1. */
+  const check = (inks: string[], wash: (surface: Rgb) => Rgb, surfaces = onPage) => {
+    const low: string[] = [];
+    for (const surface of surfaces) {
+      const w = wash(rgb(surface));
+      for (const ink of inks) if (ratio(over(colour(ink), w), w) < 4.5) low.push(`${ink} over ${surface}`);
+    }
+    expect(low).toEqual([]);
+  };
+
+  // Agent Hub and the agent side panel
+  it("agents: Moon's container (running badge, the agent's answer, the chosen agent): accent-ink on accent-soft over the page and the container", () =>
+    check(["--thoth-accent-ink"], (back) => over(colour("--thoth-accent-soft"), back), ["--thoth-bg", "--thoth-bg-container"]));
+  it("agents: the run's transcript (a 10% Moon tint): primary and secondary ink and accent-ink are at least 4.5:1 on the page and the container", () =>
+    check(["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-accent-ink"], (back) => mix(rgb("--thoth-accent"), back, 0.1), ["--thoth-bg", "--thoth-bg-container"]));
+});
+
 describe("faint ink is not text", () => {
   /** --thoth-ink-faint is under 3:1: fine for disabled items, icons and separators, not for text someone has to read. */
   const files = ["../src/editor.css", "../src/shell.css", "../src/plain.css", "../src/ui.css"];
