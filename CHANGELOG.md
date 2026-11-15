@@ -8,6 +8,19 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.10.0] - 2026-11-15
+
+### Changed
+
+- A new look, Papyrus Black, in the desktop app, the web app and shared pages: warm paper in light mode, a soft ink-black at night, Moon orange as the brand colour, and blue for links and your own messages. Menus, cards and dialogs sit on a raised surface with clear outlines, and the selected row is softer.
+- Agent Hub: your messages sit in blue, and the agent's answers sit on the raised surface with a thin Moon line beside them.
+- The import wizard in Settings follows your theme instead of always being dark.
+- To-do checkboxes are Moon orange, so blue is kept for links.
+
+### Fixed
+
+- Voice control and screen readers: the sidebar's Search and space buttons, pinned tabs and "Delete permanently" in Trash are now named by the words you see.
+
 ## [0.9.2] - 2026-11-10
 
 ### Added
@@ -348,7 +361,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Creaml4tt3/thoth/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Creaml4tt3/thoth/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Creaml4tt3/thoth/compare/v0.8.0...v0.9.0
