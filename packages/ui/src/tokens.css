@@ -1,11 +1,11 @@
 /*
- * Thoth design tokens — "Ink & Moon" (design/DESIGN.md).
+ * Thoth design tokens: "Papyrus Black" (ADR-0053, design/DESIGN.md).
  *
- * Paper and ink for reading and writing: a calm, warm canvas and text that
- * steps down in opacity from one warm black. Night for chrome and the Agent
- * Hub: near-black cinematic surfaces, pill controls, and medium-weight tight
- * display type.
- * One accent — Moon (warm lunar orange) — used sparingly.
+ * Light is warm papyrus paper with brown-black ink; night is a soft ink black with warm greys, not blue. Moon
+ * (#E8590C) is the brand anchor and the primary role: in the app it is the darker tone that keeps text at 4.5:1
+ * (--thoth-accent). Blue is the secondary role only: links, workspace badges, your own messages, tonal buttons.
+ * Values come from docs/design/directions/palette.py (direction "black"); every pair is checked in
+ * packages/app-ui/test/contrast.test.ts. The theme names light, night and system stay (ADR-0016).
  */
 :root {
   /* Type */
@@ -23,53 +23,61 @@
   --thoth-tracking-display: -0.035em;
   --thoth-tracking-heading: -0.015em;
 
-  /* Ink ramp base (Notion-style opacity, warm black). The ramp itself is
+  /* Ink ramp base (Notion-style opacity, papyrus ink). The ramp itself is
      declared below on every theme scope so it re-resolves per theme. */
-  --thoth-ink: 20 18 16;
+  --thoth-ink: 31 27 20;
 
-  /* Surfaces — light (Paper) */
-  --thoth-bg: #FFFFFF;
-  --thoth-bg-sidebar: #F9F9F8;
+  /* Surfaces — light (papyrus paper) */
+  --thoth-bg: #FEFAF3;
+  --thoth-bg-sidebar: #F8F0E2;
+  --thoth-bg-container: #FAEFDF;      /* cards, inputs, raised panels */
+  --thoth-outline: #7F7668;           /* borders of controls and focus parts: 3:1 on every surface */
   --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
   --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);
   --thoth-border: rgb(var(--thoth-ink) / 0.09);
   --thoth-border-strong: rgb(var(--thoth-ink) / 0.16);
-  --thoth-stone-400: #A39E98;
-  --thoth-stone-600: #615D59;
+  --thoth-stone-400: #7F7668;
+  --thoth-stone-600: #615E57;
 
   /* Accent: Moon — warm lunar orange, used for focus, selection, the active agent */
   --thoth-moon: #E8590C;
-  --thoth-moon-soft: #FFDFC7;
-  --thoth-moon-ink: #8A3200;
-  --thoth-link: #0B6BCB;
+  --thoth-moon-soft: #FED7C9;
+  --thoth-moon-ink: #7A2E00;
+  --thoth-link: #3F6088;
+
+  /* Secondary role: blue, used only for links, workspace badges, your own messages and tonal buttons. */
+  --thoth-secondary: #3F6088;
+  --thoth-on-secondary: #FFFFFF;
+  --thoth-secondary-container: #D0E5FE;
+  --thoth-on-secondary-container: #001B3C;
 
   /* Accent roles (ADR-0016, Phase 3b AC 2). The accent is a shade of Moon that keeps white text at 4.5:1 and the
-     focus ring at 3:1 on paper. Tested in packages/app-ui/test/contrast.test.ts. */
-  --thoth-accent: #C2410C;            /* primary buttons, focus rings, links, active-tab line */
+     focus ring at 3:1 on paper (the palette's primary tone). Tested in packages/app-ui/test/contrast.test.ts. */
+  --thoth-accent: #B64201;            /* primary buttons, focus rings, links, active-tab line */
   --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
-  --thoth-accent-soft: #FFDFC7;       /* selected tree item */
-  --thoth-accent-ink: #8A3200;        /* text on --thoth-accent-soft */
+  --thoth-accent-soft: #FED7C9;       /* selected tree item */
+  --thoth-accent-ink: #7A2E00;        /* text on the soft wash, a mid Moon brown at 7.1:1 */
 
   /* Semantic */
-  --thoth-success: #2F8F5B;
+  --thoth-success: #006D37;
   /* Warning and danger are also text (ambiguous links, delete buttons, "Not saved"): 4.5:1 on the page, the sidebar,
      a hover or active row and the menu highlight of each theme (packages/app-ui/test/contrast.test.ts). */
-  --thoth-warning: #8A5B00;
-  --thoth-danger: #B83A31;
-  --thoth-private: #615D59;   /* Private Space badge: local, stone */
-  --thoth-workspace: #0B6BCB; /* Workspace badge: connected, blue */
+  --thoth-warning: #805603;
+  --thoth-danger: #B7211F;
+  --thoth-private: #615E57;   /* Private Space badge: local, stone */
+  --thoth-workspace: #3F6088; /* Workspace badge: connected, blue */
   --thoth-agent: #E8590C;     /* Agent Hub badge: moon */
 
   /* Text colours (ADR-0016 rule 1): the eight names a page can use. Every value keeps at least WCAG AA (4.5:1) on the
      page, the sidebar, a callout and the highlight background of its theme (checked in packages/app-ui/test). */
-  --thoth-text-gray: #5C5853;
-  --thoth-text-brown: #85513A;
-  --thoth-text-orange: #A94400;
-  --thoth-text-yellow: #855D00;
-  --thoth-text-green: #1B7444;
-  --thoth-text-blue: #0A62B8;
-  --thoth-text-purple: #7040C8;
-  --thoth-text-red: #BE2D28;
+  --thoth-text-gray: #615E57;
+  --thoth-text-brown: #835333;
+  --thoth-text-orange: #A53C03;
+  --thoth-text-yellow: #7A5905;
+  --thoth-text-green: #4F661F;
+  --thoth-text-blue: #3D608B;
+  --thoth-text-purple: #77517B;
+  --thoth-text-red: #9A4433;
 
   /* Shape — small radii in content, pills for actions */
   --thoth-radius-xs: 4px;
@@ -119,34 +127,46 @@
   color-scheme: light;
 }
 
-/* Night — the night sky: near-black surfaces with warm ink, so it pairs with paper. */
+/* Night — a soft ink black, warm and not blue; blue appears only as the secondary role. */
 [data-theme="night"][data-theme] {
-  --thoth-ink: 245 243 240;
-  --thoth-bg: #0A0A0A;
-  --thoth-bg-sidebar: #111112;
-  --thoth-bg-hover: rgb(255 255 255 / 0.05);
-  --thoth-bg-active: rgb(255 255 255 / 0.09);
-  --thoth-border: rgb(255 255 255 / 0.08);
-  --thoth-border-strong: rgb(255 255 255 / 0.14);
-  --thoth-moon: #FF7A2F;
-  --thoth-private: var(--thoth-stone-400); /* the light theme's stone is 2.3:1 on the dark badge */
-  --thoth-moon-soft: rgb(255 122 47 / 0.28);
-  --thoth-moon-ink: #FFB386;
-  --thoth-link: #5AA9FF;
-  --thoth-accent: #FF7A2F;
-  --thoth-on-accent: #0A0A0A;
-  --thoth-accent-soft: rgb(255 122 47 / 0.28);
-  --thoth-accent-ink: #FFB386;
-  --thoth-text-gray: #A8A29B;
-  --thoth-text-brown: #CE9A78;
-  --thoth-text-orange: #FF9A52;
-  --thoth-text-yellow: #E7BC4B;
-  --thoth-text-green: #4FC081;
-  --thoth-text-blue: #5AA9FF;
-  --thoth-text-purple: #B794F6;
-  --thoth-text-red: #FF7B72;
-  --thoth-warning: #D09530;
-  --thoth-danger: #FF7B72;
+  --thoth-ink: 232 226 216;
+  --thoth-bg: #0E0C0B;
+  --thoth-bg-sidebar: #171514;
+  --thoth-bg-container: #211F1C;
+  --thoth-outline: #93908D;
+  --thoth-bg-hover: rgb(232 226 216 / 0.05);
+  --thoth-bg-active: rgb(232 226 216 / 0.09);
+  --thoth-border: rgb(232 226 216 / 0.09);
+  --thoth-border-strong: rgb(232 226 216 / 0.16);
+  --thoth-moon: #E8590C;
+  --thoth-private: #CAC6BE;
+  --thoth-moon-soft: rgb(232 89 12 / 0.31);
+  --thoth-moon-ink: #FFDBCE;
+  --thoth-link: #A5CAF7;
+  --thoth-secondary: #A5CAF7;
+  --thoth-on-secondary: #113155;
+  --thoth-secondary-container: #28486E;
+  --thoth-on-secondary-container: #D0E4FE;
+  --thoth-workspace: #A5CAF7;
+  --thoth-accent: #FF8C5F;
+  --thoth-on-accent: #370E00;
+  --thoth-accent-soft: rgb(232 89 12 / 0.31);
+  --thoth-accent-ink: #FFDBCE;
+  --thoth-text-gray: #CAC6BE;
+  --thoth-text-brown: #F2BB99;
+  --thoth-text-orange: #FEB59A;
+  --thoth-text-yellow: #EAC170;
+  --thoth-text-green: #B5D088;
+  --thoth-text-blue: #A2CAFA;
+  --thoth-text-purple: #E3B8E8;
+  --thoth-text-red: #FEB4A4;
+  --thoth-success: #78DB97;
+  --thoth-warning: #F8BC60;
+  --thoth-danger: #FFB4AA;
+  /* Light ink on the soft black needs more opacity than dark ink on paper to keep 4.5:1 on active rows. A real two-step
+     ramp (0.94 / 0.82 / 0.66): tertiary is the AA floor over the Moon wash on the sidebar, secondary sits well above it. */
+  --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.82);
+  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.66);
   --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -154,32 +174,42 @@
 
 @media (prefers-color-scheme: dark) {
   [data-theme="system"][data-theme] {
-    --thoth-ink: 245 243 240;
-    --thoth-bg: #0A0A0A;
-    --thoth-bg-sidebar: #111112;
-    --thoth-bg-hover: rgb(255 255 255 / 0.05);
-    --thoth-bg-active: rgb(255 255 255 / 0.09);
-    --thoth-border: rgb(255 255 255 / 0.08);
-    --thoth-border-strong: rgb(255 255 255 / 0.14);
-    --thoth-moon: #FF7A2F;
-    --thoth-private: var(--thoth-stone-400);
-    --thoth-moon-soft: rgb(255 122 47 / 0.28);
-    --thoth-moon-ink: #FFB386;
-    --thoth-link: #5AA9FF;
-    --thoth-accent: #FF7A2F;
-    --thoth-on-accent: #0A0A0A;
-    --thoth-accent-soft: rgb(255 122 47 / 0.28);
-    --thoth-accent-ink: #FFB386;
-    --thoth-text-gray: #A8A29B;
-    --thoth-text-brown: #CE9A78;
-    --thoth-text-orange: #FF9A52;
-    --thoth-text-yellow: #E7BC4B;
-    --thoth-text-green: #4FC081;
-    --thoth-text-blue: #5AA9FF;
-    --thoth-text-purple: #B794F6;
-    --thoth-text-red: #FF7B72;
-  --thoth-warning: #D09530;
-  --thoth-danger: #FF7B72;
+    --thoth-ink: 232 226 216;
+    --thoth-bg: #0E0C0B;
+    --thoth-bg-sidebar: #171514;
+    --thoth-bg-container: #211F1C;
+    --thoth-outline: #93908D;
+    --thoth-bg-hover: rgb(232 226 216 / 0.05);
+    --thoth-bg-active: rgb(232 226 216 / 0.09);
+    --thoth-border: rgb(232 226 216 / 0.09);
+    --thoth-border-strong: rgb(232 226 216 / 0.16);
+    --thoth-moon: #E8590C;
+    --thoth-private: #CAC6BE;
+    --thoth-moon-soft: rgb(232 89 12 / 0.31);
+    --thoth-moon-ink: #FFDBCE;
+    --thoth-link: #A5CAF7;
+    --thoth-secondary: #A5CAF7;
+    --thoth-on-secondary: #113155;
+    --thoth-secondary-container: #28486E;
+    --thoth-on-secondary-container: #D0E4FE;
+    --thoth-workspace: #A5CAF7;
+    --thoth-accent: #FF8C5F;
+    --thoth-on-accent: #370E00;
+    --thoth-accent-soft: rgb(232 89 12 / 0.31);
+    --thoth-accent-ink: #FFDBCE;
+    --thoth-text-gray: #CAC6BE;
+    --thoth-text-brown: #F2BB99;
+    --thoth-text-orange: #FEB59A;
+    --thoth-text-yellow: #EAC170;
+    --thoth-text-green: #B5D088;
+    --thoth-text-blue: #A2CAFA;
+    --thoth-text-purple: #E3B8E8;
+    --thoth-text-red: #FEB4A4;
+    --thoth-success: #78DB97;
+    --thoth-warning: #F8BC60;
+    --thoth-danger: #FFB4AA;
+    --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.82);
+    --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.66);
     color-scheme: dark;
   }
 }
@@ -189,7 +219,7 @@
 :root, [data-theme] {
   --thoth-ink-primary: rgb(var(--thoth-ink) / 0.94);
   --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.66);
-  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.60); /* the lowest alpha that keeps 4.5:1 on light active rows */
+  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.64); /* the lowest alpha that keeps 4.5:1 on light active rows */
   --thoth-ink-faint: rgb(var(--thoth-ink) / 0.28);
   --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
   --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);

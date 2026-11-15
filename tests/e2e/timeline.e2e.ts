@@ -68,7 +68,8 @@ async function axe(page: Page, ...selectors: string[]) {
 const headings = (page: Page) => page.locator(".timeline h2").allTextContents();
 
 test("Timeline lists Private Space pages by day, filters by tags, shows Dated, and opens a page", async ({ page }) => {
-  await page.getByRole("button", { name: "Timeline", exact: true }).click();
+  // The sidebar's button: Home has its own Timeline link once it renders.
+  await page.getByRole("complementary", { name: "Sidebar" }).getByRole("button", { name: "Timeline", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Timeline" })).toBeVisible();
   await expect(page.getByRole("tab", { selected: true })).toHaveText("Timeline");
 

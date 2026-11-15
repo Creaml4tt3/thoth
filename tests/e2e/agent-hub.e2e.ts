@@ -447,7 +447,7 @@ test("a run that used up its spending limit says so, and its work so far can be 
 
 /** Light or dark (the theme attribute the tokens key off). */
 const theme = (page: Page, dark: boolean) => page.evaluate((night) => document.documentElement.setAttribute("data-theme", night ? "night" : "light"), dark);
-const SHOTS = join(REPO, "tests", ".tmp", "agent-sessions");
+const SHOTS = process.env["SHOTS"] ?? join(REPO, "tests", ".tmp", "agent-sessions");
 
 /** An earlier run, as a past session left it: its record in the vault and its transcript in the app data folder. */
 async function earlierRun(prompt: string, at: number): Promise<void> {

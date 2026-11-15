@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-/** WCAG AA for the accent roles of Phase 3b AC 2, computed from the real token CSS in both themes. */
+/** WCAG AA for the Papyrus Black roles (ADR-0053) and the accent roles of Phase 3b AC 2, computed from the real token CSS in every theme. */
 const css = readFileSync(new URL("../../ui/src/tokens.css", import.meta.url), "utf8");
 
 /** The declarations of the first rule whose selector line starts with `selector`. */
@@ -49,6 +49,8 @@ function ratio(a: Rgb, b: Rgb): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+const TEXT_COLOURS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "red"];
+
 const themes = { light, dark: night, "system (dark OS)": systemDark };
 
 describe.each(Object.entries(themes))("accent contrast, %s theme", (_name, t) => {
@@ -95,15 +97,15 @@ describe.each(Object.entries(themes))("accent contrast, %s theme", (_name, t) =>
   });
 });
 
-/** Text tokens on every surface they sit on: the page (dialogs and menus too), the sidebar, and a hover, active or
- * menu-highlight row over each. 4.5:1 because they are body-size text, not large text or UI parts. */
+/** Text tokens on every surface they sit on: the page, the sidebar and the raised container (cards, inputs, menus, the
+ * modal), and a hover, active or menu-highlight row over each. 4.5:1 because they are body-size text. */
 describe.each(Object.entries(themes))("text contrast, %s theme", (_name, theme) => {
   const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
   const colour = (name: string): Colour => {
     const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
     return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
   };
-  const surfaces: [string, Rgb][] = ["--thoth-bg", "--thoth-bg-sidebar"].flatMap((name) => {
+  const surfaces: [string, Rgb][] = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"].flatMap((name) => {
     const base = colour(name).rgb;
     return [[name, base], ...["--thoth-bg-hover", "--thoth-bg-active", "--thoth-moon-soft"].map((wash): [string, Rgb] => [`${wash} over ${name}`, over(colour(wash), base)])];
   });
@@ -113,6 +115,116 @@ describe.each(Object.entries(themes))("text contrast, %s theme", (_name, theme) 
     const low = surfaces.filter(([, back]) => ratio(over(colour(name), back), back) < 4.5).map(([surface]) => surface);
     expect(low).toEqual([]);
   });
+});
+
+/** The Papyrus Black roles (ADR-0053): the secondary (blue), the named text colours and the focus parts on the page, the
+ * sidebar and the raised container (cards, inputs). 4.5:1 for text, 3:1 for borders of controls and the focus ring. */
+describe.each(Object.entries(themes))("Papyrus Black roles, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const surfaces = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"];
+  const onSurfaces = (name: string, min: number) => {
+    const low = surfaces.filter((s) => ratio(over(colour(name), rgb(s)), rgb(s)) < min);
+    expect(low).toEqual([]);
+  };
+
+  it("secondary: text on it, and on its container, is at least 4.5:1", () => {
+    expect(ratio(rgb("--thoth-on-secondary"), rgb("--thoth-secondary"))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(["--thoth-secondary", "--thoth-link", "--thoth-workspace"])("%s as text is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(name, 4.5));
+
+  it("links and the workspace badge are the secondary role", () => {
+    expect(t["--thoth-link"]).toBe(t["--thoth-secondary"]);
+    expect(t["--thoth-workspace"]).toBe(t["--thoth-secondary"]);
+  });
+
+  it.each(["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-ink-tertiary", "--thoth-success", "--thoth-warning", "--thoth-danger", "--thoth-private", "--thoth-accent"])("%s is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(name, 4.5));
+
+  it.each(TEXT_COLOURS)("--thoth-text-%s is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(`--thoth-text-${name}`, 4.5));
+
+  it.each(["--thoth-accent", "--thoth-outline"])("%s (focus ring, control borders) is at least 3:1 on the page, sidebar and container", (name) => onSurfaces(name, 3));
+
+  it("the focus ring (accent) stays at least 3:1 on a tonal button (the secondary container)", () => {
+    expect(ratio(rgb("--thoth-accent"), over(colour("--thoth-secondary-container"), rgb("--thoth-bg")))).toBeGreaterThanOrEqual(3);
+  });
+});
+
+/** Component pairs of the app rollout (ADR-0053): a callout's 10% tint of its kind colour (editor.css, plain.css) under text,
+ * the hover of a tonal button, and text on the raised container (inputs, popovers, the modal). */
+describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const mix = (top: Rgb, back: Rgb, share: number): Rgb => top.map((c, i) => Math.round(c * share + back[i]! * (1 - share))) as Rgb;
+
+  const kinds = ["--thoth-success", "--thoth-warning", "--thoth-danger", "--thoth-link", "--thoth-stone-600", "--thoth-ink-secondary"];
+  it.each(kinds)("callout kind %s: primary and tertiary ink on its tint are at least 4.5:1 on the page, sidebar and container", (kind) => {
+    const low: string[] = [];
+    for (const surface of ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"]) {
+      const back = rgb(surface);
+      const tint = mix(over(colour(kind), back), back, 0.1);
+      for (const ink of ["--thoth-ink-primary", "--thoth-ink-tertiary"]) if (ratio(over(colour(ink), tint), tint) < 4.5) low.push(`${ink} on ${kind} over ${surface}`);
+    }
+    expect(low).toEqual([]);
+  });
+
+  it("a tonal button's hover (12% of its text colour in its container) keeps 4.5:1", () => {
+    const hover = mix(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"), 0.12);
+    expect(ratio(rgb("--thoth-on-secondary-container"), hover)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the mention chip and Workspace badge (on-secondary-container on its container) are at least 4.5:1", () => {
+    expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("menu highlight (moon-soft over the container) keeps primary ink and the danger text at 4.5:1", () => {
+    const wash = over(colour("--thoth-moon-soft"), rgb("--thoth-bg-container"));
+    for (const ink of ["--thoth-ink-primary", "--thoth-danger", "--thoth-moon-ink"]) expect(ratio(over(colour(ink), wash), wash)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+/** The feature screens' pairs (ADR-0053 rollout, round 2). One group per area; each pair is text over the surface it sits on. */
+describe.each(Object.entries(themes))("Papyrus Black feature screens, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const mix = (top: Rgb, back: Rgb, share: number): Rgb => top.map((c, i) => Math.round(c * share + back[i]! * (1 - share))) as Rgb;
+  const onPage = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"];
+  /** Every ink in `inks` on `wash(surface)` for each surface, at 4.5:1. */
+  const check = (inks: string[], wash: (surface: Rgb) => Rgb, surfaces = onPage) => {
+    const low: string[] = [];
+    for (const surface of surfaces) {
+      const w = wash(rgb(surface));
+      for (const ink of inks) if (ratio(over(colour(ink), w), w) < 4.5) low.push(`${ink} over ${surface}`);
+    }
+    expect(low).toEqual([]);
+  };
+
+  // Agent Hub and the agent side panel
+  it("agents: Moon's container (running badge, the agent's answer, the chosen agent): accent-ink on accent-soft over the page and the container", () =>
+    check(["--thoth-accent-ink"], (back) => over(colour("--thoth-accent-soft"), back), ["--thoth-bg", "--thoth-bg-container"]));
+  it("agents: the run's transcript (a 10% Moon tint): primary and secondary ink and accent-ink are at least 4.5:1 on the page and the container", () =>
+    check(["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-accent-ink"], (back) => mix(rgb("--thoth-accent"), back, 0.1), ["--thoth-bg", "--thoth-bg-container"]));
+
+  // Settings, connected apps, import, transfer, onboarding, tour, update notice, web sign-in
+  it("settings, import, transfer: a chosen card, the segmented control and a hovered recent item (accent-ink on the Moon wash) are at least 4.5:1 over the page, sidebar and container", () =>
+    check(["--thoth-accent-ink"], (back) => over(colour("--thoth-accent-soft"), back)));
+  it("connected apps, transfer, tour, update notice, sign-in: secondary and tertiary ink and links on a card or popover (the container) are at least 4.5:1", () =>
+    check(["--thoth-ink-secondary", "--thoth-ink-tertiary", "--thoth-link"], (back) => back, ["--thoth-bg-container"]));
+  it("transfer result and import cards: danger and warning text on the container stay at least 4.5:1", () =>
+    check(["--thoth-danger", "--thoth-warning", "--thoth-success"], (back) => back, ["--thoth-bg-container"]));
 });
 
 describe("faint ink is not text", () => {
@@ -138,7 +250,7 @@ describe("accent role tokens", () => {
     const share = readFileSync(new URL("../../../apps/server/assets/share/share.css", import.meta.url), "utf8");
     const darkCopy = block(share.slice(share.indexOf("@media (prefers-color-scheme: dark)")), ":root {");
     expect(block(share, ":root {")["--thoth-moon-soft"]?.toUpperCase()).toBe(light["--thoth-moon-soft"]!.toUpperCase());
-    expect(darkCopy["--thoth-moon-soft"]).toBe(night["--thoth-moon-soft"]);
+    expect(darkCopy["--thoth-moon-soft"]?.toUpperCase()).toBe(night["--thoth-moon-soft"]!.toUpperCase());
   });
 
   it("System in a dark OS uses the same accent values as Dark", () => {

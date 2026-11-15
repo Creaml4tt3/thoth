@@ -27,8 +27,8 @@ h1, h2, h3, p { margin: 0; }
 .btn-sm { font-size: 13px; padding: 8px 14px; }
 .btn-primary { background: var(--thoth-accent); color: var(--thoth-on-accent); }
 .btn-primary:hover:not(:disabled) { opacity: 0.88; }
-.btn-ghost { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
-.btn-ghost:hover:not(:disabled) { background: var(--thoth-border-strong); }
+.btn-ghost { background: var(--thoth-secondary-container); color: var(--thoth-on-secondary-container); }
+.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--thoth-on-secondary-container) 12%, var(--thoth-secondary-container)); }
 .btn-quiet { background: transparent; color: var(--thoth-ink-secondary); }
 .btn-quiet:hover:not(:disabled) { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .btn-danger { background: transparent; color: var(--thoth-danger); box-shadow: inset 0 0 0 1px var(--thoth-border-strong); }
@@ -45,12 +45,12 @@ h1, h2, h3, p { margin: 0; }
 /* Badges */
 .badge { font: 500 10px/1 var(--thoth-font-sans); padding: 3px 7px; border-radius: var(--thoth-radius-pill); letter-spacing: 0.02em; }
 .badge-private { background: var(--thoth-bg-active); color: var(--thoth-private); }
-.badge-workspace { background: color-mix(in srgb, var(--thoth-workspace) 12%, transparent); color: var(--thoth-workspace); }
+.badge-workspace { background: var(--thoth-secondary-container); color: var(--thoth-on-secondary-container); }
 .badge-muted { background: var(--thoth-bg-hover); color: var(--thoth-ink-tertiary); }
 
 .field { display: grid; gap: 6px; }
 .field > span { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
-.input { font: var(--thoth-text-ui); padding: 9px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); background: var(--thoth-bg); color: var(--thoth-ink-primary); width: 100%; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out); }
+.input { font: var(--thoth-text-ui); padding: 9px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-outline); background: var(--thoth-bg-container); color: var(--thoth-ink-primary); width: 100%; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out); }
 .input:focus-visible { outline-offset: 0; border-color: var(--thoth-accent); }
 
 .muted { color: var(--thoth-ink-tertiary); }
@@ -61,7 +61,7 @@ h1, h2, h3, p { margin: 0; }
    an inert copy with data-state="closing" for this exit (see ui/presence.ts). */
 .modal-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--thoth-space-6); color: var(--thoth-ink-primary); }
 .modal-scrim::before { content: ""; position: absolute; inset: 0; background: rgb(0 0 0 / 0.45); animation: thoth-fade-in var(--thoth-dur-base) var(--thoth-ease-out); }
-.modal { position: relative; background: var(--thoth-bg); color: var(--thoth-ink-primary); border-radius: var(--thoth-radius-xl); box-shadow: var(--thoth-shadow-modal); width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: var(--thoth-space-6); display: grid; gap: var(--thoth-space-4); align-content: start; animation: thoth-modal-in var(--thoth-dur-base) var(--thoth-ease-spring); }
+.modal { position: relative; background: var(--thoth-bg-container); color: var(--thoth-ink-primary); border-radius: var(--thoth-radius-xl); box-shadow: var(--thoth-shadow-modal); width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: var(--thoth-space-6); display: grid; gap: var(--thoth-space-4); align-content: start; animation: thoth-modal-in var(--thoth-dur-base) var(--thoth-ease-spring); }
 .modal-scrim[data-state="closing"] { pointer-events: none; }
 .modal-scrim[data-state="closing"]::before { animation: thoth-fade-out var(--thoth-dur-fast) var(--thoth-ease-in) both; }
 .modal-scrim[data-state="closing"] .modal { animation: thoth-modal-out var(--thoth-dur-fast) var(--thoth-ease-in) both; }

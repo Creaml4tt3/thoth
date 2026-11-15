@@ -114,7 +114,7 @@ export function ImportWizard({ onClose, onOpenFolder }: Props) {
 
   const index = ORDER.indexOf(step);
   return (
-    <div className="wizard" data-theme="night" role="region" aria-label={w.region}>
+    <div className="wizard" role="region" aria-label={w.region}>
       <header className="wz-head">
         <div>
           <p className="label">{w.stepOf(index + 1, ORDER.length)}</p>

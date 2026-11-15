@@ -31,41 +31,41 @@
 :root {
   --thoth-font-sans: "Inter Variable", "Noto Sans Thai", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --thoth-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
-  --thoth-ink: 20 18 16;
-  --thoth-bg: #ffffff;
-  --thoth-bg-sidebar: #f9f9f8;
+  --thoth-ink: 31 27 20;
+  --thoth-bg: #fefaf3;
+  --thoth-bg-sidebar: #f8f0e2;
   --thoth-moon: #e8590c;
-  --thoth-moon-soft: #ffdfc7;
-  --thoth-link: #0b6bcb;
-  --thoth-accent: #c2410c;
-  --thoth-text-gray: #5c5853;
-  --thoth-text-brown: #85513a;
-  --thoth-text-orange: #a94400;
-  --thoth-text-yellow: #855d00;
-  --thoth-text-green: #1b7444;
-  --thoth-text-blue: #0a62b8;
-  --thoth-text-purple: #7040c8;
-  --thoth-text-red: #be2d28;
+  --thoth-moon-soft: #fed7c9;
+  --thoth-link: #3f6088;
+  --thoth-accent: #b64201;
+  --thoth-text-gray: #615e57;
+  --thoth-text-brown: #835333;
+  --thoth-text-orange: #a53c03;
+  --thoth-text-yellow: #7a5905;
+  --thoth-text-green: #4f661f;
+  --thoth-text-blue: #3d608b;
+  --thoth-text-purple: #77517b;
+  --thoth-text-red: #9a4433;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --thoth-ink: 245 243 240;
-    --thoth-bg: #0a0a0a;
-    --thoth-bg-sidebar: #111112;
-    --thoth-moon: #ff7a2f;
-    --thoth-moon-soft: rgb(255 122 47 / 0.28);
-    --thoth-link: #5aa9ff;
-    --thoth-accent: #ff7a2f;
-    --thoth-text-gray: #a8a29b;
-    --thoth-text-brown: #ce9a78;
-    --thoth-text-orange: #ff9a52;
-    --thoth-text-yellow: #e7bc4b;
-    --thoth-text-green: #4fc081;
-    --thoth-text-blue: #5aa9ff;
-    --thoth-text-purple: #b794f6;
-    --thoth-text-red: #ff7b72;
+    --thoth-ink: 232 226 216;
+    --thoth-bg: #0e0c0b;
+    --thoth-bg-sidebar: #171514;
+    --thoth-moon: #e8590c;
+    --thoth-moon-soft: rgb(232 89 12 / 0.31);
+    --thoth-link: #a5caf7;
+    --thoth-accent: #ff8c5f;
+    --thoth-text-gray: #cac6be;
+    --thoth-text-brown: #f2bb99;
+    --thoth-text-orange: #feb59a;
+    --thoth-text-yellow: #eac170;
+    --thoth-text-green: #b5d088;
+    --thoth-text-blue: #a2cafa;
+    --thoth-text-purple: #e3b8e8;
+    --thoth-text-red: #feb4a4;
     color-scheme: dark;
   }
 }
