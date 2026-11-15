@@ -8,7 +8,7 @@
 .boot { min-height: 100%; display: grid; place-content: center; justify-items: center; gap: var(--thoth-space-3); color: var(--thoth-ink-secondary); text-align: center; padding: var(--thoth-space-6); }
 
 /* Sign-in */
-.signin { min-height: 100%; display: grid; place-items: center; padding: var(--thoth-space-8) var(--thoth-space-4); background: var(--thoth-bg-sidebar); }
+.signin { min-height: 100%; display: grid; place-items: center; padding: var(--thoth-space-8) var(--thoth-space-4); background: var(--thoth-bg); }
 .signin-card { animation: thoth-rise-in var(--thoth-dur-slow) var(--thoth-ease-out); width: min(440px, 100%); display: grid; gap: var(--thoth-space-4); padding: var(--thoth-space-8); border-radius: var(--thoth-radius-xl); background: var(--thoth-bg-container); box-shadow: var(--thoth-shadow-modal); }
 .signin-head { display: flex; justify-content: space-between; align-items: center; color: var(--thoth-accent); }
 .signin-title { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); }
