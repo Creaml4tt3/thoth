@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { thirdPartyLicenses } from "../../scripts/third-party-licenses.ts";
 
 /** The trial server (ADR-0015). A build for another server sets VITE_DEFAULT_SERVER. */
 export const DEFAULT_SERVER = "https://api.thothnotes.com";
@@ -38,7 +39,7 @@ export default defineConfig(({ mode }) => {
   const origin = serverOrigin(env["VITE_DEFAULT_SERVER"] || DEFAULT_SERVER);
   return {
     base: "/app/",
-    plugins: [react(), csp(origin), analytics(env["VITE_GA4_ID"] || process.env["VITE_GA4_ID"])],
+    plugins: [react(), thirdPartyLicenses(), csp(origin), analytics(env["VITE_GA4_ID"] || process.env["VITE_GA4_ID"])],
     clearScreen: false,
     define: { "import.meta.env.VITE_DEFAULT_SERVER": JSON.stringify(origin) },
     build: { outDir: "dist", emptyOutDir: true, target: "es2022", assetsInlineLimit: 0 },
