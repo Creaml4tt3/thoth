@@ -176,7 +176,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: 1200, height: 800 });
 
     // The logo's menu (0.2.6), All Private Spaces: the edit is written, and the picker lists this Private Space first.
-    await page.locator("aside.sidebar").getByRole("button", { name: /^Thoth, Private Space/ }).click();
+    await page.locator("aside.sidebar").getByRole("button", { name: /^Thoth, / }).click();
     const switcher = page.getByRole("menu", { name: "Switch space" });
     await expect(switcher.getByRole("menuitemradio", { name: "Vault" })).toHaveAttribute("aria-checked", "true");
     await settled(page);

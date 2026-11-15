@@ -18,7 +18,9 @@ export async function pickSpace(page: Page, options: { keyboard?: boolean } = {}
   // going away is not enough: it also hides while the folder is looked at, before the note.
   const ready = page.getByRole("heading", { name: "Ready", level: 1 });
   const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
-  await expect(note.or(ready).or(tree)).toBeVisible({ timeout: 20_000 });
+  // A space whose sidebar was left hidden opens with its tree hidden too: its "Show sidebar" button is the sign then.
+  const hidden = page.getByRole("button", { name: "Show sidebar" });
+  await expect(note.or(ready).or(tree).or(hidden)).toBeVisible({ timeout: 20_000 });
   if (!(await note.isVisible())) return;
   const open = note.getByRole("button", { name: "Open", exact: true });
   if (options.keyboard) {

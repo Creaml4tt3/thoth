@@ -31,7 +31,6 @@ export const th: DesktopStrings = {
 
   shell: {
     sidebar: "แถบด้านข้าง",
-    searchPages: "ค้นหาหน้า",
     search: "ค้นหา",
     local: "ในเครื่อง",
     pages: "หน้า",
@@ -53,7 +52,7 @@ export const th: DesktopStrings = {
     windowFailed: (reason) => `ย้ายแท็บไปหน้าต่างใหม่ไม่ได้: ${reason}`,
     leave: "กลับไปที่ Private Space", // REVIEW
     switcher: {
-      label: (space) => `Thoth, Private Space ${space}: สลับพื้นที่`, // REVIEW
+      label: (space) => `Thoth, ${space}: สลับพื้นที่`, // REVIEW
       tip: "สลับ Private Space หรือเวิร์กสเปซ", // REVIEW
       menu: "สลับพื้นที่", // REVIEW
       openFolder: "เปิดโฟลเดอร์ที่คุณใช้อยู่…", // REVIEW
