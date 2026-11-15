@@ -116,6 +116,11 @@ The editor's content column is 720px.
 - The `#E8590C` seed is about 3.4:1 on papyrus, so it is a fill, never small text. Small orange text uses the role
   tone (`#B64201` light, `#FF8C5F` dark).
 - Focus rings use the moon colour, 2px, with a 2px offset.
+- Night ink is a real two-step ramp: primary 0.94, secondary 0.82, tertiary 0.66 of the warm ink. Tertiary is the AA
+  floor (4.62:1 at worst, over the Moon wash on the sidebar); the selected row is a translucent Moon wash
+  (`rgb(232 89 12 / 0.31)`, the lowest alpha that still stands out from the page at 1.5:1) with `#FFDBCE` text on it.
+- Light selected-row text (`--thoth-accent-ink`, `--thoth-moon-ink`) is a mid Moon brown `#7A2E00` (7.1:1 on `#FED7C9`),
+  so selected tree text keeps its orange identity.
 - `prefers-reduced-motion` removes motion: the motion duration and distance tokens become 0, and `ui.css` forces
   animation and transition off everywhere in the app.
 

@@ -42,7 +42,7 @@
   /* Accent: Moon — warm lunar orange, used for focus, selection, the active agent */
   --thoth-moon: #E8590C;
   --thoth-moon-soft: #FED7C9;
-  --thoth-moon-ink: #370E00;
+  --thoth-moon-ink: #7A2E00;
   --thoth-link: #3F6088;
 
   /* Secondary role: blue, used only for links, workspace badges, your own messages and tonal buttons. */
@@ -56,7 +56,7 @@
   --thoth-accent: #B64201;            /* primary buttons, focus rings, links, active-tab line */
   --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
   --thoth-accent-soft: #FED7C9;       /* selected tree item */
-  --thoth-accent-ink: #370E00;        /* text on --thoth-accent-soft */
+  --thoth-accent-ink: #7A2E00;        /* text on the soft wash, a mid Moon brown at 7.1:1 */
 
   /* Semantic */
   --thoth-success: #006D37;
@@ -140,7 +140,7 @@
   --thoth-border-strong: rgb(232 226 216 / 0.16);
   --thoth-moon: #E8590C;
   --thoth-private: #CAC6BE;
-  --thoth-moon-soft: #7E2C01;
+  --thoth-moon-soft: rgb(232 89 12 / 0.31);
   --thoth-moon-ink: #FFDBCE;
   --thoth-link: #A5CAF7;
   --thoth-secondary: #A5CAF7;
@@ -150,7 +150,7 @@
   --thoth-workspace: #A5CAF7;
   --thoth-accent: #FF8C5F;
   --thoth-on-accent: #370E00;
-  --thoth-accent-soft: #7E2C01;
+  --thoth-accent-soft: rgb(232 89 12 / 0.31);
   --thoth-accent-ink: #FFDBCE;
   --thoth-text-gray: #CAC6BE;
   --thoth-text-brown: #F2BB99;
@@ -163,9 +163,10 @@
   --thoth-success: #78DB97;
   --thoth-warning: #F8BC60;
   --thoth-danger: #FFB4AA;
-  /* Light ink on the soft black needs more opacity than dark ink on paper to keep 4.5:1 on active rows. */
-  --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.78);
-  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.74);
+  /* Light ink on the soft black needs more opacity than dark ink on paper to keep 4.5:1 on active rows. A real two-step
+     ramp (0.94 / 0.82 / 0.66): tertiary is the AA floor over the Moon wash on the sidebar, secondary sits well above it. */
+  --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.82);
+  --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.66);
   --thoth-shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --thoth-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.08), 0 32px 80px -16px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -184,7 +185,7 @@
     --thoth-border-strong: rgb(232 226 216 / 0.16);
     --thoth-moon: #E8590C;
     --thoth-private: #CAC6BE;
-    --thoth-moon-soft: #7E2C01;
+    --thoth-moon-soft: rgb(232 89 12 / 0.31);
     --thoth-moon-ink: #FFDBCE;
     --thoth-link: #A5CAF7;
     --thoth-secondary: #A5CAF7;
@@ -194,7 +195,7 @@
     --thoth-workspace: #A5CAF7;
     --thoth-accent: #FF8C5F;
     --thoth-on-accent: #370E00;
-    --thoth-accent-soft: #7E2C01;
+    --thoth-accent-soft: rgb(232 89 12 / 0.31);
     --thoth-accent-ink: #FFDBCE;
     --thoth-text-gray: #CAC6BE;
     --thoth-text-brown: #F2BB99;
@@ -207,8 +208,8 @@
     --thoth-success: #78DB97;
     --thoth-warning: #F8BC60;
     --thoth-danger: #FFB4AA;
-    --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.78);
-    --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.74);
+    --thoth-ink-secondary: rgb(var(--thoth-ink) / 0.82);
+    --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.66);
     color-scheme: dark;
   }
 }
