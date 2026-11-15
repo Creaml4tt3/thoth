@@ -6,7 +6,8 @@
   "type": "module",
   "description": "The ADR-0006 transfer engine: Private Space <-> Workspace copy and move with durable operation records, reference classification and crash recovery.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./links.ts": "./src/links.ts"
   },
   "dependencies": {
     "@thoth/content": "workspace:*",
