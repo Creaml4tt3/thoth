@@ -23,3 +23,6 @@
 .demo-col:not(:has(.demo-cap)) { grid-template-rows: minmax(0, 1fr); }
 .demo-cap { margin: 0; padding: var(--thoth-space-2) var(--thoth-space-4); font: var(--thoth-text-small); color: var(--thoth-ink-secondary); border-bottom: 1px solid var(--thoth-border); background: var(--thoth-bg-sidebar); }
 .demo-col-body { min-height: 0; }
+
+/* Nothing is ever saved in the demo (the site's note says so), so the app's save status would contradict it. */
+.save-status { display: none; }
