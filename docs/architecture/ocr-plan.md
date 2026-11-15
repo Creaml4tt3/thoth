@@ -1,9 +1,9 @@
 # OCR in Thoth: review of the handoff, and a plan
 
 - **Status:** Proposal for the owner. Nothing is built yet.
-- **Date:** 2026-11-10
+- **Date:** 2026-11-10, updated 2026-11-15 with iApp's OpenThai 2.0 OCR (§2a)
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
-- **Next step:** the Phase 0 spike, then ADR-0053. The owner's decisions are in §7.
+- **Next step:** the Phase 0 spike, then ADR-0054. The owner's decisions are in §7.
 
 ## 1. Verdict on the handoff
 
@@ -64,6 +64,55 @@ Still unverified: the PaddleOCR model licenses (expected Apache-2.0), the size o
 each platform (its release archives are 10–79 MB and hold more than the library), and the installed sizes. Phase 0
 settles them.
 
+## 2a. Update 2026-11-15: OpenThai 2.0 OCR (iApp)
+
+The owner found iApp's guide ([blog][ot-blog]). iApp released two Thai OCR models in November 2026. One of them fits
+this plan better than the stock PaddleOCR Thai model, and changes the recommended model, not the design.
+
+| | OpenThai2.0-OCR-Text | OpenThai2.0-OCR-Markdown |
+| --- | --- | --- |
+| What | PP-OCRv6-tiny detector (unchanged) + PP-OCRv6-tiny recognizer fine-tuned for Thai with a new 528-character Thai+English output layer; CTC line recognizer | Thai fine-tune of NVIDIA Nemotron 3.5 Parse (631M parameters, vision encoder + mBART decoder) |
+| Output | Lines in reading order, a box and a confidence each; page rotation. No tables, no Markdown | Markdown, tables as HTML, a box and class per block |
+| Licence | **Apache-2.0** (NOTICE: derived from PaddlePaddle's PP-OCRv6 tiny models, Apache-2.0) | OpenMDW-1.1 (NVIDIA's model licence), tokenizer MIT |
+| Files | `det.onnx` 1.8 MB, `rec.onnx` 2.4 MB, `rec_dict.txt` 2 KB: **about 4.2 MB**, with `SHA256SUMS` in the repo | `model.safetensors` 2.52 GB (fp32) |
+| Runs on | CPU, ONNX Runtime or OpenVINO | vLLM on an NVIDIA GPU; on Apple silicon through PyTorch MPS at 15–27 s a page |
+| Printed Thai (iApp's 12 sets, 100×(1−CER)) | 87.8 | 90.3 |
+| Handwriting | 10.3: printed text only | 78.9 |
+
+For comparison, on the same table: Typhoon OCR V2 2B 89.6, Google Cloud Vision 83.6, **PaddleOCR PP-OCRv5 Thai 81.1**
+(the model this plan picked), Tesseract `tha+eng` 75.4. iApp measured all of these themselves, so Phase 0 still uses
+our own corpus. [Text card][ot-text], [Markdown card][ot-md]
+
+**Checked here (2026-11-15):**
+- The three files' SHA-256 match the repo's `SHA256SUMS`.
+- Both are plain ONNX (detector opset 14, recognizer opset 17), input `x` as N×3×H×W, recognizer height 48. They use
+  only common operators: Conv, ConvTranspose, Resize, Erf, HardSigmoid, HardSwish, MatMul, Softmax, pooling and
+  element-wise ops. Nothing custom, so `ort-tract` has a fair chance of running them (Phase 0 confirms).
+- iApp's own Python runtime with ONNX Runtime fp32, one thread, on an Apple M4: a synthetic four-line Thai+English
+  page (Ayuthaya font) read with **0 wrong characters in 0.13 s**. One clean image is a smoke test, not a benchmark.
+- `oar-ocr` 0.10.2 already runs PP-OCRv6 tiny det/rec models with a custom dictionary, so the Rust path in §4 needs no
+  new engine, only these files and our own pre- and post-processing settings.
+
+**What changes in the plan:**
+- **The Phase 0 primary model becomes OpenThai2.0-OCR-Text.** `th_PP-OCRv5_mobile_rec` stays as the comparison.
+  The download shrinks from about 12 MB to about 4.2 MB.
+- **Pre- and post-processing matter as much as the weights.** iApp's runtime (Python, about 1,000 lines) does
+  orientation from the text, deskew above 2.5°, reading order for two and three columns, background flattening for
+  coloured and light-on-dark text, dropping detached-mark fragments and Thai/Latin look-alike fixes (a lone `W` glued
+  to Thai becomes `พ`). `oar-ocr` does detection, cropping and CTC decoding but not all of this. Phase 0 measures the
+  gap on our corpus and ports only the steps that pay off. The runtime's own licence must be confirmed before any
+  code is ported (the repo's licence is Apache-2.0; confirm it covers `runtime/`).
+- **The Thai line-joining rule in §4 matches iApp's default** (`join.thai_no_space`), which Phase 0 checks.
+- **OCR Markdown is not for the desktop app now.** 2.5 GB, a GPU for usable speed and a separate model licence rule
+  it out of an on-demand CPU module. It is the candidate for "Later: layout and tables", and is noted for a possible
+  server-side option, which would need its own decision (it breaks "images never leave the computer").
+- **No iApp API.** It would send documents to a third party; the plan stays local.
+- Handwriting stays out of scope (the Text model scores 10.3).
+
+Caveats: the models are from November 2026 (v1.0.0) by one company; iApp's speed comparisons on its own pages
+disagree with each other (its model page still uses an outdated Typhoon figure). Pin by SHA-256 and host on R2 as
+§4 says, so an upstream change can't reach users.
+
 ## 3. What OCR should do in Thoth
 
 | Feature | What the user does | Fit |
@@ -111,8 +160,8 @@ asks; the server doesn't change.
 
   Removing it deletes only that folder. The host checks the hashes again each time it starts the program, which
   takes well under a second for files this size.
-- **Where the model files come from:** preferably we convert PaddlePaddle's published weights to ONNX ourselves, with
-  a script kept in the repo, so anyone can repeat it. Otherwise we copy oar-ocr's converted files and pin their hashes.
+- **Where the model files come from:** iApp's published ONNX files (§2a), pinned by SHA-256 and copied to R2. For the
+  PP-OCRv5 comparison, PaddlePaddle's weights converted by a script in the repo, or oar-ocr's converted files.
   Either way the files are hosted on R2, and the app's licenses page names the models, their license and their source.
 - **PDF pages** are rendered inside `thoth-ocr`, so a malformed PDF can only crash the child process. The renderer is
   pdfium (a native library, downloaded with the module) or `hayro` (pure Rust, compiled in). Phase 0 picks, for the
@@ -152,8 +201,9 @@ Each can be added behind the same store and runner without changing the modules.
 
 ## 6. Phases
 
-**Phase 0 — spike (about a week), ending in ADR-0053.**
-- Build a command-line `thoth-ocr` on `oar-ocr`, with PP-OCRv5 mobile detection and `th_PP-OCRv5_mobile_rec`.
+**Phase 0 — spike (about a week), ending in ADR-0054.**
+- Build a command-line `thoth-ocr` on `oar-ocr` with OpenThai2.0-OCR-Text (§2a). Compare it with PP-OCRv5 mobile
+  detection + `th_PP-OCRv5_mobile_rec`, and with iApp's Python runtime on the same files as the reference output.
 - Run it on both engines (§4): ONNX Runtime, and pure Rust through `ort-tract`. Compare accuracy, speed and size.
 - Render PDF pages with pdfium and with `hayro`. Use the PDF's own text where a page has some.
 - Platforms: macOS (Apple Silicon and Intel), Windows x64 and Linux x64, built in CI like the app.
@@ -167,7 +217,7 @@ Each can be added behind the same store and runner without changing the modules.
   per PDF page; peak memory; download size and installed size; cold start; and how much `thoth-ocr` adds to each
   installer. No word error rate: Thai has no spaces between words, so it would measure the word splitter.
 - Compare against the Tesseract `tha` model as a baseline, and macOS Vision if it lists Thai.
-- Check every license: the PaddleOCR models, oar-ocr, ONNX Runtime (MIT), pdfium and hayro.
+- Check every license: the OpenThai and PaddleOCR models, iApp's runtime (before porting any of it), oar-ocr, ONNX Runtime (MIT), pdfium and hayro.
 - Exit criteria. The numbers are targets set before measuring; the ADR records what was reached:
   - Thai CER of at most 5% on screenshots and synthetic pages, and at most 10% on scans and phone photos;
   - better than Tesseract `tha` on every group of images;
@@ -232,3 +282,6 @@ Waiting for the owner:
 [pdfium]: https://github.com/bblanchon/pdfium-binaries
 [hayro]: https://github.com/LaurenzV/hayro
 [winocr]: https://pypi.org/project/winocr/0.0.13
+[ot-blog]: https://iapp.co.th/blog/openthai2p0-ocr-how-to-run
+[ot-text]: https://huggingface.co/iapp/OpenThai2.0-OCR-Text
+[ot-md]: https://huggingface.co/iapp/OpenThai2.0-OCR-Markdown
