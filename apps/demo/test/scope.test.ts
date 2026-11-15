@@ -4,16 +4,14 @@ import { scopeSelector } from "../postcss-scope.ts";
 describe("scopeSelector", () => {
   it.each([
     [":root", ".thoth-demo"],
-    ["html, body", null],
     ["body", ".thoth-demo"],
     ["#root", ".thoth-demo"],
     ['[data-theme="night"][data-theme]', '.thoth-demo[data-theme="night"][data-theme]'],
-    [":root, [data-theme]", null],
     [".tree-item:hover", ".thoth-demo .tree-item:hover"],
-    ["*, *::before", null],
     ["*", ".thoth-demo *"],
   ])("%s", (input, expected) => {
-    if (expected) expect(scopeSelector(input)).toBe(expected);
+    // PostCSS hands each selector of a list (`html, body`) to scopeSelector on its own, so lists are not cases here.
+    expect(scopeSelector(input)).toBe(expected);
   });
 
   it("never leaves a rule that reaches the host page", () => {
