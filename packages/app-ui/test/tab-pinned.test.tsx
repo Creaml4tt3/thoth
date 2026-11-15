@@ -80,7 +80,7 @@ describe("pinned tabs in the bar", () => {
     const gamma = screen.getByRole("tab", { name: "Gamma, pinned" });
     const box = gamma.closest(".tab") as HTMLElement;
     expect(box.dataset["pinned"]).toBe("");
-    expect(gamma.textContent).toBe("Ga"); // the first letters
+    expect(gamma.querySelector(".tab-initials")?.getAttribute("data-initials")).toBe("Ga"); // the first letters, drawn by CSS
     expect(gamma.getAttribute("data-tip")).toBe("Gamma"); // the full title on hover and focus
     expect(box.querySelector(".tab-close")).toBeNull(); // nothing to close it by accident
     expect(screen.getByText("Gamma pinned", { selector: "[data-tabs-said]" })).toBeTruthy();

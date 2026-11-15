@@ -62,7 +62,7 @@ describe("Back to Private Spaces", () => {
     const app = await openApp(root, {}, createNodePlatform({ vault: root, recent: ["/elsewhere/Other", root] }));
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    await app.user.click(within(sidebar).getByRole("button", { name: /^Thoth, Private Space/ }));
+    await app.user.click(within(sidebar).getByRole("button", { name: /^Thoth, / }));
     await app.user.click(within(await screen.findByRole("menu", { name: "Switch space" })).getByRole("menuitem", { name: /^All Private Spaces/ }));
     await onPicker();
     expect((await recentSpaces()).map((b) => b.querySelector("b")!.textContent)).toEqual([leaf(), "Other"]);

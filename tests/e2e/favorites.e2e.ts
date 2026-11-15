@@ -121,7 +121,7 @@ test("a pinned tab moves left and goes compact, Cmd/Ctrl+W leaves it, a drag sto
   await page.getByRole("menu").getByRole("menuitem", { name: /^Pin tab/ }).click();
   await expect.poll(() => tabNames(page)).toEqual(["Gamma, pinned", "Alpha", "Beta"]);
   const pinned = page.getByRole("tab", { name: "Gamma, pinned" });
-  await expect(pinned).toHaveText("Ga");
+  await expect(pinned.locator(".tab-initials")).toHaveAttribute("data-initials", "Ga"); // drawn by CSS, not part of the name
   const box = (await tabBox(page, "Gamma, pinned").boundingBox())!;
   expect(box.width).toBeGreaterThanOrEqual(28);
   expect(box.width).toBeLessThan(60);

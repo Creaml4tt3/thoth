@@ -43,7 +43,6 @@ export const en = {
 
   shell: {
     sidebar: "Sidebar",
-    searchPages: "Search pages",
     search: "Search",
     local: "Local",
     pages: "Pages",
@@ -77,7 +76,7 @@ export const en = {
     leave: "Back to Private Spaces",
     /** The logo row (0.2.6): a menu to move between Private Spaces and workspaces. */
     switcher: {
-      label: (space: string) => `Thoth, Private Space ${space}: switch spaces`,
+      label: (space: string) => `Thoth, ${space}: switch spaces`, // starts with the visible words (WCAG 2.5.3)
       tip: "Switch Private Space or workspace",
       menu: "Switch space",
       openFolder: "Open a folder you already use…",

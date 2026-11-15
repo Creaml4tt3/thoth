@@ -128,8 +128,12 @@ const rowAt = (p: Page, path: string): Locator => p.locator(`[data-tree-id="${pa
 async function expandFolder(path: string): Promise<void> {
   const row = rowAt(page, path);
   await expect(row).toBeVisible();
-  if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
-  await expect(row).toHaveAttribute("aria-expanded", "true");
+  // A click flips the folder, and the app may open it itself at the same moment (an import reveals what it made), so
+  // check again after each click instead of trusting the state read before it.
+  await expect(async () => {
+    if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
+    await expect(row).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
 }
 
 /** Every step of the import wizard, from the start screen or Settings, to its report. */

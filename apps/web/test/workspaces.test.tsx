@@ -152,7 +152,7 @@ describe("Rename… and Delete… of a workspace in the web client", () => {
     const search = await palette(browser, "recently deleted");
     await browser.user.click(within(search).getByRole("option", { name: /^Recently deleted workspaces…/ }));
     const dialog = await screen.findByRole("dialog", { name: /^Recently deleted on / });
-    await browser.user.click(await within(dialog).findByRole("button", { name: "Delete Old notes permanently" }));
+    await browser.user.click(await within(dialog).findByRole("button", { name: "Delete permanently: Old notes" }));
     const group = within(dialog).getByRole("group", { name: "Delete “Old notes” permanently?" });
     const field = within(group).getByRole("textbox", { name: "To confirm, type the workspace's name: Old notes" });
     expect(document.activeElement).toBe(field);

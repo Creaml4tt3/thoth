@@ -122,7 +122,7 @@ describe("the space switcher", () => {
     servers.addWorkspace(server, { name: "Design" });
     const app = await openApp(root, {}, createNodePlatform({ vault: root, servers, recent: [other, root] }));
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
-    const button = within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: /^Thoth, Private Space/ });
+    const button = within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: /^Thoth, / });
     expect(button.getAttribute("aria-haspopup")).toBe("menu");
     await app.user.click(button);
     const menu = await screen.findByRole("menu", { name: "Switch space" });
@@ -148,7 +148,7 @@ describe("the space switcher", () => {
     servers.writeAsOther(ws, { title: "Plan", markdown: "# Plan\n" });
     const app = await openApp(root, {}, createNodePlatform({ vault: root, servers }));
     await screen.findByRole("tree", { name: "Workspaces on Team server" });
-    await app.user.click(within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: /^Thoth, Private Space/ }));
+    await app.user.click(within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("button", { name: /^Thoth, / }));
     await app.user.click(within(await screen.findByRole("menu", { name: "Switch space" })).getByRole("menuitem", { name: "Design" }));
     const row = within(screen.getByRole("tree", { name: "Workspaces on Team server" })).getByRole("treeitem", { name: /^Design/ });
     await waitFor(() => expect(document.activeElement).toBe(row));

@@ -400,7 +400,7 @@ export const en = {
     restored: (name: string) => `Restored ${name}.`,
     restoreFailed: (detail: string) => `Could not restore it: ${detail}`,
     purge: "Delete for good…",
-    purgeLabel: (name: string) => `Delete ${name} for good`,
+    purgeLabel: (name: string) => `Delete for good: ${name}`, // starts with the visible words (WCAG 2.5.3)
     purgeTitle: (name: string) => `Delete ${name} for good?`,
     purgeBody: (below: number) => `${below > 0 ? `It and the ${plural(below, "page")} inside it` : "It"} will be gone for good, with every earlier version. This cannot be undone.`,
     purgeConfirm: "Delete for good",
@@ -539,7 +539,7 @@ export const en = {
     restored: (name: string) => `Restored ${name}.`,
     restoreFailed: (detail: string) => `Could not restore the workspace: ${detail}`,
     purge: "Delete permanently…",
-    purgeLabel: (name: string) => `Delete ${name} permanently`,
+    purgeLabel: (name: string) => `Delete permanently: ${name}`, // starts with the visible words (WCAG 2.5.3)
     purgeTitle: (name: string) => `Delete “${name}” permanently?`,
     purgeBody: "Its pages, their history and its attachments are removed now, and it no longer counts toward your workspaces. This cannot be undone.",
     purgeConfirm: "Delete permanently",

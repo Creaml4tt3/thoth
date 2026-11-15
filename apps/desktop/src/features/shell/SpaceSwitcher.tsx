@@ -76,7 +76,7 @@ export function SpaceSwitcher({ onHome, onSwitch }: { onHome(): void; onSwitch(r
         onClick={() => void open()}
       >
         <Mark size={18} />
-        <span className="ws-name">Thoth</span>
+        <span className="ws-name">Thoth</span>{" "}
         <span className="ws-space" title={connection.root}>
           {connection.label}
         </span>

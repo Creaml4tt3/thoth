@@ -374,11 +374,11 @@ describe("Trash… (ADR-0043)", () => {
     trashed(ws);
     await app.user.click(within(dialog).getByRole("button", { name: "Done" }));
     const again = await openTrash(app, list);
-    await app.user.click(await within(again).findByRole("button", { name: "Delete Roadmap for good" }));
+    await app.user.click(await within(again).findByRole("button", { name: "Delete for good: Roadmap" }));
     const ask = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
     await app.user.click(within(ask).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(document.activeElement).toBe(within(again).getByRole("button", { name: "Delete Roadmap for good" })));
-    await app.user.click(within(again).getByRole("button", { name: "Delete Roadmap for good" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(again).getByRole("button", { name: "Delete for good: Roadmap" })));
+    await app.user.click(within(again).getByRole("button", { name: "Delete for good: Roadmap" }));
     const confirm = within(again).getByRole("group", { name: "Delete Roadmap for good?" });
     expect(within(confirm).getByText(/cannot be undone/)).toBeTruthy();
     await app.user.click(within(confirm).getByRole("button", { name: "Delete for good" }));
@@ -390,7 +390,7 @@ describe("Trash… (ADR-0043)", () => {
     trashed(ws);
     const dialog = await openTrash(app, list);
     expect(await within(dialog).findByRole("button", { name: "Restore Roadmap" })).toBeTruthy();
-    expect(within(dialog).queryByRole("button", { name: "Delete Roadmap for good" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Delete for good: Roadmap" })).toBeNull();
     cleanup();
 
     const viewer = await workspace({ role: "viewer", capabilities: TRASH });

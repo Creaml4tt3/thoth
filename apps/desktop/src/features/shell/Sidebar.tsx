@@ -287,7 +287,8 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
         <SpaceSwitcher onHome={onHome} onSwitch={onSwitch} />
         <IconButton ref={hidden.hideRef} icon="sidebar" label={hideLabel} shortcut="sidebar.toggle" onClick={() => hidden.setHidden(true)} />
       </div>
-      <button type="button" className="search-trigger" onClick={onSearch} aria-label={t.searchPages} aria-keyshortcuts="Control+K Meta+K">
+      {/* No aria-label: the name is the visible text, so speech users can say what they see (WCAG 2.5.3). */}
+      <button type="button" className="search-trigger" onClick={onSearch} aria-keyshortcuts="Control+K Meta+K">
         <span>{t.search}</span>
         <kbd>⌘K</kbd>
       </button>
