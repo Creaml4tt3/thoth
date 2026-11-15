@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-/** WCAG AA for the accent roles of Phase 3b AC 2, computed from the real token CSS in both themes. */
+/** WCAG AA for the Papyrus Black roles (ADR-0053) and the accent roles of Phase 3b AC 2, computed from the real token CSS in every theme. */
 const css = readFileSync(new URL("../../ui/src/tokens.css", import.meta.url), "utf8");
 
 /** The declarations of the first rule whose selector line starts with `selector`. */
@@ -48,6 +48,8 @@ function ratio(a: Rgb, b: Rgb): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
 }
+
+const TEXT_COLOURS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "red"];
 
 const themes = { light, dark: night, "system (dark OS)": systemDark };
 
@@ -115,6 +117,44 @@ describe.each(Object.entries(themes))("text contrast, %s theme", (_name, theme) 
   });
 });
 
+/** The Papyrus Black roles (ADR-0053): the secondary (blue), the named text colours and the focus parts on the page, the
+ * sidebar and the raised container (cards, inputs). 4.5:1 for text, 3:1 for borders of controls and the focus ring. */
+describe.each(Object.entries(themes))("Papyrus Black roles, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const surfaces = ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"];
+  const onSurfaces = (name: string, min: number) => {
+    const low = surfaces.filter((s) => ratio(over(colour(name), rgb(s)), rgb(s)) < min);
+    expect(low).toEqual([]);
+  };
+
+  it("secondary: text on it, and on its container, is at least 4.5:1", () => {
+    expect(ratio(rgb("--thoth-on-secondary"), rgb("--thoth-secondary"))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(["--thoth-secondary", "--thoth-link", "--thoth-workspace"])("%s as text is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(name, 4.5));
+
+  it("links and the workspace badge are the secondary role", () => {
+    expect(t["--thoth-link"]).toBe(t["--thoth-secondary"]);
+    expect(t["--thoth-workspace"]).toBe(t["--thoth-secondary"]);
+  });
+
+  it.each(["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-ink-tertiary", "--thoth-success", "--thoth-warning", "--thoth-danger", "--thoth-private", "--thoth-accent"])("%s is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(name, 4.5));
+
+  it.each(TEXT_COLOURS)("--thoth-text-%s is at least 4.5:1 on the page, sidebar and container", (name) => onSurfaces(`--thoth-text-${name}`, 4.5));
+
+  it.each(["--thoth-accent", "--thoth-outline"])("%s (focus ring, control borders) is at least 3:1 on the page, sidebar and container", (name) => onSurfaces(name, 3));
+
+  it("the focus ring (accent) stays at least 3:1 on a tonal button (the secondary container)", () => {
+    expect(ratio(rgb("--thoth-accent"), over(colour("--thoth-secondary-container"), rgb("--thoth-bg")))).toBeGreaterThanOrEqual(3);
+  });
+});
+
 describe("faint ink is not text", () => {
   /** --thoth-ink-faint is under 3:1: fine for disabled items, icons and separators, not for text someone has to read. */
   const files = ["../src/editor.css", "../src/shell.css", "../src/plain.css", "../src/ui.css"];
@@ -138,7 +178,7 @@ describe("accent role tokens", () => {
     const share = readFileSync(new URL("../../../apps/server/assets/share/share.css", import.meta.url), "utf8");
     const darkCopy = block(share.slice(share.indexOf("@media (prefers-color-scheme: dark)")), ":root {");
     expect(block(share, ":root {")["--thoth-moon-soft"]?.toUpperCase()).toBe(light["--thoth-moon-soft"]!.toUpperCase());
-    expect(darkCopy["--thoth-moon-soft"]).toBe(night["--thoth-moon-soft"]);
+    expect(darkCopy["--thoth-moon-soft"]?.toUpperCase()).toBe(night["--thoth-moon-soft"]!.toUpperCase());
   });
 
   it("System in a dark OS uses the same accent values as Dark", () => {
