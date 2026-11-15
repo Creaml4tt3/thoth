@@ -1,4 +1,4 @@
-/* Import wizard (Night). Inside Settings (Paper) it keeps its own dark surface. */
+/* Import wizard: sits on the theme around it (the first-run screens set Night; Settings uses the chosen theme). */
 .wizard { background: var(--thoth-bg); color: var(--thoth-ink-primary); border-radius: var(--thoth-radius-xl); padding: var(--thoth-space-6); display: grid; gap: var(--thoth-space-4); width: min(760px, 100%); text-align: left; }
 .wizard > * { min-width: 0; } /* a long name must not widen the grid past the panel */
 .onboarding-wizard .wizard { box-shadow: var(--thoth-shadow-modal); }
@@ -7,33 +7,33 @@
 .wz-steps { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
 .wz-steps li { flex: 1; height: 3px; border-radius: 2px; background: var(--thoth-border-strong); transition: background-color var(--thoth-dur-base) var(--thoth-ease-out); }
 .wz-steps li[data-state="done"] { background: var(--thoth-ink-secondary); }
-.wz-steps li[data-state="current"] { background: var(--thoth-ink-primary); }
+.wz-steps li[data-state="current"] { background: var(--thoth-accent); }
 .wz-step { display: grid; gap: var(--thoth-space-4); animation: thoth-fade-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wz-q { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); padding: 0; }
 .wz-name { color: var(--thoth-ink-secondary); }
 .wz-choices { border: 0; padding: 0; margin: 0; display: grid; gap: var(--thoth-space-2); }
 .wz-choices legend { margin-bottom: var(--thoth-space-2); }
-.wz-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--thoth-space-3); align-items: start; padding: 12px 14px; border-radius: var(--thoth-radius-lg); border: 1px solid var(--thoth-border); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.wz-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--thoth-space-3); align-items: start; padding: 12px 14px; border-radius: var(--thoth-radius-lg); border: 1px solid var(--thoth-outline); background: var(--thoth-bg-container); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .wz-choice > span { display: grid; gap: 2px; }
-.wz-choice[data-selected="true"] { border-color: var(--thoth-border-strong); background: var(--thoth-bg-hover); }
+.wz-choice[data-selected="true"] { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .wz-choice[data-disabled="true"] { opacity: 0.55; cursor: default; }
-.wz-choice input { margin-top: 3px; accent-color: var(--thoth-ink-primary); }
+.wz-choice input { margin-top: 3px; accent-color: var(--thoth-accent); }
 .wz-actions { display: flex; gap: var(--thoth-space-2); justify-content: flex-end; flex-wrap: wrap; }
 .wz-actions-start { justify-content: flex-start; }
 .wz-actions > * { min-width: 0; max-width: 100%; }
 .wz-open-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 36ch; }
 .wz-list { margin: 0; padding-left: 1.3em; display: grid; gap: var(--thoth-space-2); color: var(--thoth-ink-secondary); }
 .wz-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--thoth-space-2); }
-.wz-stat { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-hover); }
+.wz-stat { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-container); }
 .wz-stat b { font: var(--thoth-text-h3); }
 .wz-stat span { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .wz-warnings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
-.wz-warnings > li { border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); padding: 8px 12px; }
+.wz-warnings > li { border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); padding: 8px 12px; background: var(--thoth-bg-container); }
 .wz-warnings > li[data-severity="error"] { border-color: var(--thoth-danger); }
 .wz-warnings summary { cursor: pointer; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .wz-warnings p { margin: 8px 0; color: var(--thoth-ink-secondary); }
 .wz-examples { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; color: var(--thoth-ink-secondary); overflow-wrap: anywhere; }
-.wz-safe { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); padding: 8px 12px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); }
+.wz-safe { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); padding: 8px 12px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-container); border: 1px solid var(--thoth-border); }
 .wz-phases { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-3); }
 .wz-phases li { display: grid; grid-template-columns: 220px 1fr auto; gap: var(--thoth-space-3); align-items: center; }
 .wz-phases progress { width: 100%; height: 6px; accent-color: var(--thoth-accent); }
@@ -44,6 +44,6 @@
 .wz-phases progress[value]::-moz-progress-bar { background: var(--thoth-accent); border-radius: var(--thoth-radius-pill); }
 .wz-jobs { display: grid; gap: var(--thoth-space-2); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
 .wz-jobs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
-.wz-job { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-3); padding: 10px 14px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); }
+.wz-job { display: flex; justify-content: space-between; align-items: center; gap: var(--thoth-space-3); padding: 10px 14px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg-container); }
 .wz-sub { display: block; font: var(--thoth-text-small); }
 .wizard h4.label { margin-bottom: 6px; }
