@@ -26,3 +26,4 @@ tests/.tmp/
 /.codegraph/
 # The server settings for compose.external.yaml: they hold secrets
 server.env
+__pycache__/
