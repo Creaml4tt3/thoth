@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { thirdPartyLicenses } from "../../scripts/third-party-licenses.ts";
 
 /** The bundled fonts' SIL Open Font License texts, which must travel with the fonts (OFL 1.1 condition 2). */
 const FONT_LICENSES = ["OFL-Inter.txt", "OFL-NotoSansThai.txt"];
@@ -18,7 +19,7 @@ function fontLicenses(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), fontLicenses()],
+  plugins: [react(), fontLicenses(), thirdPartyLicenses()],
   clearScreen: false,
   envPrefix: ["VITE_", "TAURI_ENV_"],
   server: { port: 1420, strictPort: true },
