@@ -217,6 +217,14 @@ describe.each(Object.entries(themes))("Papyrus Black feature screens, %s theme",
     check(["--thoth-accent-ink"], (back) => over(colour("--thoth-accent-soft"), back), ["--thoth-bg", "--thoth-bg-container"]));
   it("agents: the run's transcript (a 10% Moon tint): primary and secondary ink and accent-ink are at least 4.5:1 on the page and the container", () =>
     check(["--thoth-ink-primary", "--thoth-ink-secondary", "--thoth-accent-ink"], (back) => mix(rgb("--thoth-accent"), back, 0.1), ["--thoth-bg", "--thoth-bg-container"]));
+
+  // Settings, connected apps, import, transfer, onboarding, tour, update notice, web sign-in
+  it("settings, import, transfer: a chosen card, the segmented control and a hovered recent item (accent-ink on the Moon wash) are at least 4.5:1 over the page, sidebar and container", () =>
+    check(["--thoth-accent-ink"], (back) => over(colour("--thoth-accent-soft"), back)));
+  it("connected apps, transfer, tour, update notice, sign-in: secondary and tertiary ink and links on a card or popover (the container) are at least 4.5:1", () =>
+    check(["--thoth-ink-secondary", "--thoth-ink-tertiary", "--thoth-link"], (back) => back, ["--thoth-bg-container"]));
+  it("transfer result and import cards: danger and warning text on the container stay at least 4.5:1", () =>
+    check(["--thoth-danger", "--thoth-warning", "--thoth-success"], (back) => back, ["--thoth-bg-container"]));
 });
 
 describe("faint ink is not text", () => {

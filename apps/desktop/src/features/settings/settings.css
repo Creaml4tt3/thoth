@@ -3,12 +3,12 @@
 .set-section h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); }
 .set-actions { display: flex; gap: var(--thoth-space-3); align-items: center; flex-wrap: wrap; margin-top: var(--thoth-space-1); }
 .mode-choices { border: 0; margin: 0; padding: 0; display: grid; gap: var(--thoth-space-2); }
-.mode-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.mode-choice { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--thoth-space-3); align-items: center; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-outline); cursor: pointer; transition: border-color var(--thoth-dur-fast) var(--thoth-ease-out), background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .mode-choice:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); }
 .mode-choice input { accent-color: var(--thoth-accent); margin: 0; }
 .mode-choice b { font-weight: 550; }
 .mode-choice span { grid-column: 2; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
-.server-card { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); }
+.server-card { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); background: var(--thoth-bg-container); }
 .server-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--thoth-space-3); }
 .server-id { min-width: 0; }
 .server-name, .server-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -16,7 +16,7 @@
 .server-account { color: var(--thoth-ink-secondary); }
 .server-limits ul { margin: 2px 0 0; padding-left: 1.2em; color: var(--thoth-ink-secondary); }
 .server-waiting { animation: thoth-rise-in var(--thoth-dur-base) var(--thoth-ease-out); display: flex; gap: var(--thoth-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--thoth-radius-md); background: var(--thoth-accent-soft); color: var(--thoth-ink-primary); }
-.server-starter { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px dashed var(--thoth-border-strong); }
+.server-starter { display: grid; gap: var(--thoth-space-2); padding: 14px 16px; border-radius: var(--thoth-radius-md); border: 1px dashed var(--thoth-outline); }
 .server-caution { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 .server-token { margin-top: var(--thoth-space-1); }
 .server-add { display: grid; grid-template-columns: 1fr auto; gap: var(--thoth-space-3); align-items: end; }
@@ -41,18 +41,18 @@
 /* A short choice of three: one pill row of radios. */
 .set-segmented { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
 .set-segmented > legend { padding: 0; margin-bottom: 6px; }
-.set-segments { display: inline-flex; width: fit-content; padding: 2px; gap: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); border: 1px solid var(--thoth-border); }
+.set-segments { display: inline-flex; width: fit-content; padding: 2px; gap: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-container); border: 1px solid var(--thoth-outline); }
 .set-segment { position: relative; }
 .set-segment input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .set-segment span { display: block; padding: 4px 14px; border-radius: var(--thoth-radius-pill); font: var(--thoth-text-small); color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
-.set-segment input:checked + span { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border-strong); }
+.set-segment input:checked + span { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); box-shadow: 0 0 0 1px var(--thoth-accent); }
 .set-segment input:focus-visible + span { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .set-narrow { max-width: 280px; }
 /* Settings → Editor → Link previews (ADR-0020). */
 .link-preview-settings { display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-4); }
 .link-preview-settings h3 { margin: 0; font: 600 15px / 1.4 var(--thoth-font-sans); letter-spacing: var(--thoth-tracking-heading); }
 .link-preview-choices { display: flex; flex-wrap: wrap; gap: var(--thoth-space-2); }
-.link-preview-choice { display: inline-flex; gap: var(--thoth-space-2); align-items: center; padding: 6px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-border-strong); cursor: pointer; }
+.link-preview-choice { display: inline-flex; gap: var(--thoth-space-2); align-items: center; padding: 6px 12px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-outline); cursor: pointer; }
 .link-preview-choice:has(input:checked) { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); }
 .link-preview-choice input { accent-color: var(--thoth-accent); margin: 0; }
 /* Settings → Today and the Obsidian question (ADR-0051). */
