@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- thoth:csp -->
+    <title>Thoth demo</title>
+    <style>
+      /* Only the test page's own look: the site brings its own fonts and styles. */
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 24px 16px; background: Canvas; color: CanvasText; }
+      main { max-width: 1100px; margin: 0 auto; display: grid; gap: 48px; }
+      h1, h2 { margin: 0 0 8px; }
+      .capture { border: 1px dashed currentColor; padding: 16px; opacity: 0.7; display: grid; gap: 8px; justify-items: start; }
+      .spacer { height: 120vh; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Thoth demo: test page</h1>
+      <p>Scroll down: each demo loads when it comes within about a screen. The dashed box is the site's static capture; it stays until the editor is mounted.</p>
+
+      <section>
+        <h2>Compare (EN)</h2>
+        <div data-thoth-demo="compare" lang="en">
+          <div class="capture"><span>capture placeholder</span><button type="button" data-thoth-demo-load>Try it here</button></div>
+        </div>
+      </section>
+
+      <div class="spacer" aria-hidden="true"></div>
+
+      <section>
+        <h2>Window (EN)</h2>
+        <div data-thoth-demo="window" lang="en">
+          <div class="capture"><span>capture placeholder</span><button type="button" data-thoth-demo-load>Try it here</button></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Compare (TH)</h2>
+        <div data-thoth-demo="compare" lang="th">
+          <div class="capture"><span>capture placeholder</span><button type="button" data-thoth-demo-load>ลองใช้ตรงนี้</button></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Window (TH)</h2>
+        <div data-thoth-demo="window" lang="th">
+          <div class="capture"><span>capture placeholder</span><button type="button" data-thoth-demo-load>ลองใช้ตรงนี้</button></div>
+        </div>
+      </section>
+      <p><a href="https://example.com/">An outside link on the host page (the demo itself never navigates)</a></p>
+    </main>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

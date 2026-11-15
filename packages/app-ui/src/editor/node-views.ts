@@ -8,7 +8,7 @@ import type { EditorContext } from "./context.ts";
 import type { LinkTarget } from "./links.ts";
 import { kindClass, kindIcon, kindLabel } from "./callout-kinds.ts";
 import { linkHint, pageLinkOpens } from "./link-open.ts";
-import { PAGE_LINK_PREFIX } from "@thoth/transfer";
+import { PAGE_LINK_PREFIX } from "@thoth/transfer/links.ts";
 import { embedPicture, embedPictureAttrs, pictureEmbedPath } from "./image-views.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {

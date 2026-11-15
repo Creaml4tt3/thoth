@@ -17,6 +17,7 @@
     "tests/fixtures/**",
     "apps/desktop/**",
     "apps/web/**",
+    "apps/demo/**",
     "packages/app-ui/**"
   ]
 }
