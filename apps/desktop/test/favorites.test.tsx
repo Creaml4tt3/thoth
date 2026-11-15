@@ -162,7 +162,7 @@ describe("pinned tabs", () => {
     fireEvent.contextMenu(screen.getByRole("tab", { name: "Beta" }), { clientX: 10, clientY: 10 });
     await app.user.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: /^Pin tab/ }));
     await waitFor(() => expect(tabNames()).toEqual(["Beta, pinned", "Alpha"]));
-    expect(screen.getByRole("tab", { name: "Beta, pinned" }).textContent).toBe("Be");
+    expect(screen.getByRole("tab", { name: "Beta, pinned" }).querySelector(".tab-initials")?.getAttribute("data-initials")).toBe("Be");
     await app.user.click(screen.getByRole("tab", { name: "Beta, pinned" }));
     await waitFor(() => expect(current()?.getAttribute("aria-label")).toBe("Beta, pinned"));
     await app.user.keyboard("{Control>}w{/Control}");

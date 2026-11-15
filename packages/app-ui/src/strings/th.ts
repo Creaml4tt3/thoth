@@ -349,7 +349,7 @@ export const th: Strings = {
     restored: (name) => `นำ ${name} กลับแล้ว`,
     restoreFailed: (detail) => `นำกลับไม่ได้: ${detail}`,
     purge: "ลบถาวร…",
-    purgeLabel: (name) => `ลบ ${name} ถาวร`,
+    purgeLabel: (name) => `ลบถาวร: ${name}`, // REVIEW
     purgeTitle: (name) => `ลบ ${name} ถาวรไหม`,
     purgeBody: (below) => `${below > 0 ? `รายการนี้และ ${count(below)} หน้าข้างใน` : "รายการนี้"}จะหายไปถาวรพร้อมทุกเวอร์ชันก่อนหน้า ย้อนกลับไม่ได้`,
     purgeConfirm: "ลบถาวร",
@@ -486,7 +486,7 @@ export const th: Strings = {
     restored: (name) => `กู้คืน ${name} แล้ว`,
     restoreFailed: (detail) => `กู้คืนเวิร์กสเปซไม่ได้: ${detail}`,
     purge: "ลบถาวร…",
-    purgeLabel: (name) => `ลบ ${name} ถาวร`,
+    purgeLabel: (name) => `ลบถาวร: ${name}`, // REVIEW
     purgeTitle: (name) => `ลบ “${name}” ถาวรไหม`,
     purgeBody: "หน้า ประวัติของหน้า และไฟล์แนบจะถูกลบทันที และจะไม่นับรวมในเวิร์กสเปซของคุณอีก ย้อนกลับไม่ได้",
     purgeConfirm: "ลบถาวร",

@@ -170,7 +170,7 @@ test.describe("several workspaces per account (ADR-0025)", () => {
     await newButton.click();
     await expect(create.getByText(/You already own 3 workspaces/)).toBeVisible();
     await create.getByRole("button", { name: "Recently deleted (1)" }).click();
-    await deleted.getByRole("button", { name: "Delete Field research permanently" }).click();
+    await deleted.getByRole("button", { name: "Delete permanently: Field research" }).click();
     const purge = deleted.getByRole("group", { name: "Delete “Field research” permanently?" });
     await purge.getByRole("textbox", { name: /type the workspace's name/ }).fill("Field research");
     await shoot(page, "delete-permanently", deleted);

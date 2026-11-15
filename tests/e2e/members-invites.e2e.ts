@@ -197,7 +197,7 @@ test.describe("members and invite links (ADR-0024)", () => {
     await page.getByRole("button", { name: `Members of ${wsName}` }).click();
     await expect(dialog.getByRole("list", { name: "Members" }).getByRole("listitem")).toHaveCount(2);
     await dialog.getByRole("combobox", { name: "Role of Linus Pauling" }).selectOption("viewer");
-    await expect(dialog.getByRole("status")).toHaveText("Linus Pauling is now Viewer.");
+    await expect(dialog.getByRole("status").filter({ hasText: "Linus Pauling is now Viewer." })).toBeVisible(); // the Teams section has its own status
     expect((await ref.db.query<{ role: string }>("SELECT role FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws, guestId])).rows[0]?.role).toBe("viewer");
     await shoot(page, "dialog-owner-members", dialog);
 

@@ -453,7 +453,9 @@ export function TabBar({ tabs, active, onActivate, onClose, onNew, onMove, onDet
                     <Icon name={tab.icon} size={14} />
                   </span>
                 )}
-                {!(pinned && tab.icon) && <span className="tab-text">{pinned ? tabInitials(tab.label) : tab.label}</span>}
+                {/* A pinned tab's initials are drawn by CSS, like an icon, so its name is its aria-label alone (WCAG 2.5.3). */}
+                {!(pinned && tab.icon) &&
+                  (pinned ? <span className="tab-text tab-initials" data-initials={tabInitials(tab.label)} /> : <span className="tab-text">{tab.label}</span>)}
               </button>
               {/* A mouse and touch affordance only: a tablist may own tabs and nothing else, so it is not a button. Delete, Cmd/Ctrl+W and middle-click close for everyone else. A pinned tab has none (ADR-0027). */}
               {!pinned && (
