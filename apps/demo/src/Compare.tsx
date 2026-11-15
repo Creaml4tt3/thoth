@@ -36,7 +36,7 @@ function Side({ kind, store, ctx, path }: { kind: Kind; store: PageStore; ctx: E
   const Plain = plainEditorNow();
   return (
     <div className="page-scroll demo-col-body" onFocus={() => member?.focused()}>
-      <div className="page-col">{Plain ? <Plain {...props} /> : <PageEditor {...props} />}</div>
+      <div className="page-col">{kind === "plain" && Plain ? <Plain {...props} /> : <PageEditor {...props} />}</div>
     </div>
   );
 }

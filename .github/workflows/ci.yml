@@ -46,6 +46,9 @@ jobs:
         run: cargo fmt --check
       # The desktop shell embeds the built web app (frontendDist), so it is built before Clippy and the tests.
       - run: pnpm --filter @thoth/desktop build
+      # The site's embedded demo: builds, then fails on eval, WebAssembly, network code or storage in dist/ (CSP: script-src 'self').
+      - name: Demo build and CSP check
+        run: pnpm --filter @thoth/demo check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Rust tests

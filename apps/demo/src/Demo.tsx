@@ -17,11 +17,23 @@ export type DemoKind = "compare" | "window";
 
 /** What focus is in when the hint shows and Esc applies: either editor. */
 export const EDITOR = ".ProseMirror, .cm-content";
+/** The editors' menus and selection toolbar, while one is showing (they hide with `hidden`). */
+const OPEN_POPUP = ".slash-menu:not([hidden]), .link-menu:not([hidden]), .block-menu:not([hidden]), .text-toolbar:not([hidden])";
 
 interface Session {
   id: number;
   vault: Vault;
   host: PageHost;
+}
+
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex], [contenteditable="true"]';
+const tabbable = (el: HTMLElement): boolean => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && !el.closest("[inert], [hidden]") && el.getClientRects().length > 0;
+
+/** The tab stop after (or, with `back`, before) the whole of `from` in the page, so Esc then Tab goes on past the editor just left, not into its own checkboxes. */
+export function tabStopFrom(from: HTMLElement, back: boolean): HTMLElement | undefined {
+  const side = back ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING;
+  const stops = [...document.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !from.contains(el) && !el.contains(from) && from.compareDocumentPosition(el) & side && tabbable(el));
+  return back ? stops[stops.length - 1] : stops[0];
 }
 
 let counter = 0;
@@ -37,6 +49,8 @@ export function Demo({ kind, lang }: { kind: DemoKind; lang: Lang }) {
   const [session, setSession] = useState(() => fresh(lang));
   const [editing, setEditing] = useState(false);
   const region = useRef<HTMLDivElement>(null);
+  /** The editor that Esc was pressed in: Tab from the region goes on from there. Plain's Tab indents, so this is how its user gets out. */
+  const left = useRef<HTMLElement | null>(null);
 
   const startOver = () => {
     resetModes();
@@ -44,9 +58,21 @@ export function Demo({ kind, lang }: { kind: DemoKind; lang: Lang }) {
   };
   const inEditor = (node: EventTarget | null) => node instanceof Element && node.closest(EDITOR) !== null;
   const onKeyDown = (event: KeyboardEvent) => {
-    // A menu or a selection takes the first Esc (it prevents the default); the next one leaves.
-    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing || !inEditor(event.target)) return;
+    if (event.key === "Tab" && event.target === region.current && left.current?.isConnected && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const next = tabStopFrom(left.current, event.shiftKey);
+      if (next) {
+        event.preventDefault();
+        left.current = null;
+        next.focus();
+      }
+      return;
+    }
+    // Capture phase: Tiptap and CodeMirror use Esc themselves (select the parent block, close a menu) and would swallow it.
+    // An open menu or the selection toolbar takes this Esc (it closes); the next one leaves.
+    if (event.key !== "Escape" || event.nativeEvent.isComposing || !inEditor(event.target) || document.querySelector(OPEN_POPUP)) return;
     event.preventDefault();
+    event.stopPropagation();
+    left.current = (event.target as Element).closest<HTMLElement>(EDITOR);
     region.current?.focus();
   };
   const hint = (children: ReactNode) => <p className="demo-hint" role="status">{children}</p>;
@@ -61,7 +87,7 @@ export function Demo({ kind, lang }: { kind: DemoKind; lang: Lang }) {
             role="region"
             tabIndex={-1}
             aria-label={kind === "compare" ? t.compareRegion : t.windowRegion}
-            onKeyDown={onKeyDown}
+            onKeyDownCapture={onKeyDown}
             onFocus={(event: FocusEvent) => setEditing(inEditor(event.target))}
             onBlur={(event: FocusEvent) => setEditing(inEditor(event.relatedTarget))}
             // The sample has no real links, but a typed one must never take the visitor off the site.
