@@ -155,6 +155,43 @@ describe.each(Object.entries(themes))("Papyrus Black roles, %s theme", (_name, t
   });
 });
 
+/** Component pairs of the app rollout (ADR-0053): a callout's 10% tint of its kind colour (editor.css, plain.css) under text,
+ * the hover of a tonal button, and text on the raised container (inputs, popovers, the modal). */
+describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_name, theme) => {
+  const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
+  const colour = (name: string): Colour => {
+    const value = t[name] ?? (() => { throw new Error(`missing ${name}`); })();
+    return parse(value.replace("var(--thoth-ink)", t["--thoth-ink"]!).replace(/\s*\/\*.*$/, ""));
+  };
+  const rgb = (name: string): Rgb => colour(name).rgb;
+  const mix = (top: Rgb, back: Rgb, share: number): Rgb => top.map((c, i) => Math.round(c * share + back[i]! * (1 - share))) as Rgb;
+
+  const kinds = ["--thoth-success", "--thoth-warning", "--thoth-danger", "--thoth-link", "--thoth-stone-600", "--thoth-ink-secondary"];
+  it.each(kinds)("callout kind %s: primary and tertiary ink on its tint are at least 4.5:1 on the page, sidebar and container", (kind) => {
+    const low: string[] = [];
+    for (const surface of ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"]) {
+      const back = rgb(surface);
+      const tint = mix(over(colour(kind), back), back, 0.1);
+      for (const ink of ["--thoth-ink-primary", "--thoth-ink-tertiary"]) if (ratio(over(colour(ink), tint), tint) < 4.5) low.push(`${ink} on ${kind} over ${surface}`);
+    }
+    expect(low).toEqual([]);
+  });
+
+  it("a tonal button's hover (12% of its text colour in its container) keeps 4.5:1", () => {
+    const hover = mix(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"), 0.12);
+    expect(ratio(rgb("--thoth-on-secondary-container"), hover)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the mention chip and Workspace badge (on-secondary-container on its container) are at least 4.5:1", () => {
+    expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("menu highlight (moon-soft over the container) keeps primary ink and the danger text at 4.5:1", () => {
+    const wash = over(colour("--thoth-moon-soft"), rgb("--thoth-bg-container"));
+    for (const ink of ["--thoth-ink-primary", "--thoth-danger", "--thoth-moon-ink"]) expect(ratio(over(colour(ink), wash), wash)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe("faint ink is not text", () => {
   /** --thoth-ink-faint is under 3:1: fine for disabled items, icons and separators, not for text someone has to read. */
   const files = ["../src/editor.css", "../src/shell.css", "../src/plain.css", "../src/ui.css"];

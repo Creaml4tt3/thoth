@@ -17,7 +17,7 @@
 .plain-editor .md-line-meta { font: 13px / 1.6 var(--thoth-font-mono); color: var(--thoth-ink-tertiary); }
 .plain-editor .md-line-done { color: var(--thoth-ink-tertiary); text-decoration: line-through; }
 /* Callouts: the quote lines take the kind's colour (same kinds as editor.css); the `[!kind]` marker shows as a label. */
-.plain-editor .md-line-callout { --callout: var(--thoth-ink-secondary); border-left-color: var(--callout); background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.plain-editor .md-line-callout { --callout: var(--thoth-ink-secondary); border-left-color: var(--callout); background: color-mix(in srgb, var(--callout) 10%, transparent); color: var(--thoth-ink-primary); }
 .plain-editor .md-line-callout-title { font-weight: 600; }
 .plain-editor .md-line-callout[data-callout="toggle"] { --callout: var(--thoth-border-strong); background: none; }
 .plain-editor .md-line-callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --callout: var(--thoth-success); }
