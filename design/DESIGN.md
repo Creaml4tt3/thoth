@@ -105,7 +105,7 @@ The editor's content column is 720px.
 | Marketing site | Follows the system (Papyrus or Black) | Hooded ibis in front of its moon, Moon pill CTA, notebook-cover intro |
 | Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs, properties row, callouts |
 | Onboarding, import wizard | Follows the chosen theme | Moon primary pill, secondary tonal pills |
-| Agent Hub, agent side panel | Follows the chosen theme | Your messages in the secondary container, agent work in Moon's, Apply/Discard pills |
+| Agent Hub, agent side panel | Follows the chosen theme | Your messages in the secondary container; the agent's answers on the container in ink with a 3px Moon rule at the left (calmer than a Moon wash in long chats; owner's pick 2026-11-15); Apply/Discard pills |
 | Transfer review (Private → Workspace) | Modal on the raised step | Shows destination workspace and members before commit (spec §12) |
 
 ## 6. Accessibility
