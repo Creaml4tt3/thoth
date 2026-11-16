@@ -49,6 +49,21 @@ and others) uses a warm off-white and a warm near-black; none uses pure `#FFF` o
    theme values users have saved, the motion rules, and the brand files and app icons (new icons need a regenerated
    set with `tauri icon` and are done only if the owner asks).
 
+## Amendment 2026-11-16: calmer chrome (owner)
+
+After a UX review against Notion, Linear, Craft, Bear, Things, Raycast and Arc (`docs/design/research/2026-11-app-ux-review.md`),
+the owner approved these changes to where Moon appears in the app:
+
+- **Moon marks the one thing that is current and the things you act on.** The current tab is filled with Moon
+  (`--thoth-tab-active-bg: var(--thoth-accent)`, text `--thoth-on-accent`), replacing ADR-0016's line on top. Primary
+  buttons, focus rings, checked to-dos and the mascot keep it.
+- **Selection elsewhere is neutral.** A selected tree, favourite or settings row uses `--thoth-bg-active` with ink text;
+  page icons in the tree are grey ink. Folder colours (rule 4) are unchanged.
+- **Links stay blue** (rule 3, option A of the review).
+- **The search palette** sits high on the window over a light scrim (12% ink on paper, 40% black on black), not the
+  45% black of dialogs that must be answered.
+- **Paths are not shown as code.** Crumbs, search and Connections drop `.md` and the monospace path.
+
 ## Consequences
 
 - One look across the site and the apps. The site has used these roles since 2026-11-13.

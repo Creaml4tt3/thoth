@@ -53,7 +53,7 @@
 
   /* Accent roles (ADR-0016, Phase 3b AC 2). The accent is a shade of Moon that keeps white text at 4.5:1 and the
      focus ring at 3:1 on paper (the palette's primary tone). Tested in packages/app-ui/test/contrast.test.ts. */
-  --thoth-accent: #B64201;            /* primary buttons, focus rings, links, active-tab line */
+  --thoth-accent: #B64201;            /* primary buttons, focus rings, links, the current tab's fill */
   --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
   --thoth-accent-soft: #FED7C9;       /* selected tree item */
   --thoth-accent-ink: #7A2E00;        /* text on the soft wash, a mid Moon brown at 7.1:1 */
@@ -224,8 +224,8 @@
   --thoth-bg-hover: rgb(var(--thoth-ink) / 0.045);
   --thoth-bg-active: rgb(var(--thoth-ink) / 0.08);
   /* Derived accent roles, re-declared per theme scope like the ramp. Other agents' tabs and drag and drop use these. */
-  --thoth-tab-active-bg: var(--thoth-bg);
-  --thoth-tab-active-ink: var(--thoth-ink-primary);
+  --thoth-tab-active-bg: var(--thoth-accent);
+  --thoth-tab-active-ink: var(--thoth-on-accent);
   --thoth-tab-active-line: var(--thoth-accent);
   --thoth-drop-indicator: var(--thoth-accent);
   color: var(--thoth-ink-primary);

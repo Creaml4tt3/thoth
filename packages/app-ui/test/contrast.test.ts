@@ -242,8 +242,8 @@ describe("accent role tokens", () => {
     const scope = block(css, ":root, [data-theme] {");
     expect(scope["--thoth-tab-active-line"]).toBe("var(--thoth-accent)");
     expect(scope["--thoth-drop-indicator"]).toBe("var(--thoth-accent)");
-    expect(scope["--thoth-tab-active-bg"]).toBe("var(--thoth-bg)");
-    expect(scope["--thoth-tab-active-ink"]).toBe("var(--thoth-ink-primary)");
+    expect(scope["--thoth-tab-active-bg"]).toBe("var(--thoth-accent)"); // the current tab is filled (owner, 2026-11-16)
+    expect(scope["--thoth-tab-active-ink"]).toBe("var(--thoth-on-accent)");
   });
 
   it("the public share page copies the app's highlight, light and dark", () => {

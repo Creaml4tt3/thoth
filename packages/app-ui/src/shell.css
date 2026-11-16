@@ -253,7 +253,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .ws-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 8px 4px 28px; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .ws-footer .sec-link { min-height: 24px; display: inline-flex; align-items: center; }
 
-/* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator.
+/* Tabs (ADR-0016 rule 5, amended by ADR-0053 2026-11-16): the current tab is filled with the accent, its text --thoth-on-accent (4.5:1+).
    A tab is --thoth-tab-width wide when there is room (202px, three quarters of the 270px before it; `width` too, because
    a flex-basis alone does not size the strip around it and a short title would shrink the tab), and shrinks toward
    --thoth-tab-min-width as more are open; then the strip scrolls. The enter and leave animations use the same tokens.
@@ -272,6 +272,10 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tab[data-selected] { background: var(--thoth-tab-active-bg); color: var(--thoth-tab-active-ink); border-color: var(--thoth-border); border-top-color: var(--thoth-tab-active-line); border-bottom: 1px solid var(--thoth-tab-active-bg); }
 .tab-label { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 7px 4px 7px 12px; cursor: pointer; font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
+/* On the filled tab the accent ring would vanish, and the grey close button would be low contrast. */
+.tab[data-selected] .tab-label:focus-visible { outline-color: var(--thoth-on-accent); }
+.tab[data-selected] .tab-close { color: inherit; }
+.tab[data-selected] .tab-close:hover { background: color-mix(in srgb, var(--thoth-on-accent) 18%, transparent); color: inherit; }
 .tab-text { overflow: hidden; text-overflow: ellipsis; }
 .tab-initials::before { content: attr(data-initials); }
 .tab-close { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 3px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; opacity: 0; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }

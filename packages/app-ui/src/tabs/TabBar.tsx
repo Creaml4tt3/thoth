@@ -104,7 +104,7 @@ function slideTiming(el: Element): { duration: number; easing: string } {
 /**
  * Browser-like tabs above the page (WAI-ARIA tabs, manual activation). Left and Right move between tabs and Home
  * and End jump to the ends, with one tab in the Tab order (roving); Enter or Space opens the tab that has focus,
- * Delete closes it. Middle-click and the × on the tab close it with a pointer. The current tab uses the accent tokens `--thoth-tab-active-*`.
+ * Delete closes it. Middle-click and the × on the tab close it with a pointer. The current tab is filled with the accent tokens `--thoth-tab-active-*`.
  *
  * Order (ADR-0019, amended 2026-10-26): a tab is dragged along the bar to reorder it. It lifts and follows the
  * pointer, and the other tabs slide aside to open the gap where it would land (a live preview, as in a browser). On
