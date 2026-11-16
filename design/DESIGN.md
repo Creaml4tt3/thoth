@@ -49,7 +49,8 @@ as a disc island. It is a single closed shape, monochrome, and uses
 | `mark.svg` | Inline UI; inherits `color` |
 | `mark-white.svg`, `mark-ink.svg` | Fixed-colour exports |
 | `favicon.svg` | ≤16px. Same shape with a slightly larger eye (r 16 instead of 11.4) so the eye still reads at 16px. |
-| `app-icon-dark.svg`, `app-icon-light.svg` | 1024 squircle tiles: Night or Paper |
+| `app-icon.svg` | The app icon (since 2026-11-16, the owner's pick "B2"): the mark in paper `#FFF8F1` on a Moon tile lit from the top (`#F7752E` to `#D84D0B`, a faint top glow, a thin light edge). The light is on the tile, never on the mark. |
+| `app-icon-dark.svg`, `app-icon-light.svg` | Earlier 1024 tiles, Night or Paper; kept for the site and press until they move to `app-icon.svg` |
 
 Rules:
 
@@ -65,8 +66,7 @@ Rules:
 
 Verified rendering: 256 / 96 / 48 / 24 / 16px on Night and Paper. Not yet done:
 
-- PNG/ICNS/ICO rasters. No SVG rasterizer is installed. Generate them in the
-  Tauri phase with `tauri icon`.
+- ~~PNG/ICNS/ICO rasters.~~ Generated from `app-icon.svg` with `resvg` and `tauri icon` (2026-11-16).
 - An optical-weight review by a human designer.
 
 ## 3. Type
@@ -144,6 +144,7 @@ Calm, quick and purposeful (tokens and rules: the "Motion" note in `packages/ui/
 - ~~Orange or silver-blue accent?~~ Decided 2026-10-22: lunar orange. Silver-blue
   was too close to the Workspace badge blue.
 - ~~A richer, more colourful system?~~ Decided 2026-11-12/15: Papyrus Black (ADR-0053).
-- New app icons and favicon in Papyrus Black: only if the owner asks.
+- ~~New app icons in Papyrus Black?~~ Decided 2026-11-16: the Moon tile `app-icon.svg` (option B2). The favicon stays
+  the plain mark for now.
 - Do we license a custom display face later? For now, Inter is a deliberate,
   free choice for an OSS project.

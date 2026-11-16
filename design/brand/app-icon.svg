@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Thoth">
+  <title>Thoth</title>
+  <!-- App icon B2 (owner, 2026-11-16; ADR-0053): the Moon Ibis in paper on a Moon tile lit from the top. The light is on
+       the tile only; the mark itself stays flat (DESIGN.md: never a gradient on the mark). -->
+  <defs>
+    <mask id="m"><circle cx="256" cy="256" r="224" fill="#fff"/><path d="M430.4 396.5 C428.9 354.3 390.7 304.0 360.1 276.3 C336.9 255.6 310.3 238.4 282.4 224.9 C275.6 221.6 268.9 218.3 261.9 215.5 C255.8 213.1 246.8 210.9 241.4 207.6 C235.6 204.0 229.6 194.5 224.4 189.4 C212.6 178.1 198.3 169.9 182.3 166.5 C141.0 157.8 101.4 183.0 87.4 222.0 C84.0 231.5 82.6 241.3 82.1 251.4 C80.8 277.6 91.8 303.3 105.0 325.3 C112.3 337.6 120.6 349.4 127.2 362.1 C137.1 381.0 142.3 405.1 132.1 425.0 C129.8 429.3 126.8 433.0 123.6 436.7 L118.9 443.1 A232 232 0 0 0 198.8 480.8 L200.8 473.1 C201.3 466.6 201.9 460.1 201.7 453.6 C200.5 425.6 190.0 397.9 176.0 373.9 C171.9 366.8 167.8 359.8 163.6 352.8 C151.8 333.7 138.3 313.2 140.8 289.7 C142.8 270.2 159.5 257.2 177.8 253.6 C188.5 251.5 200.0 252.0 210.8 252.8 C275.3 257.5 330.2 282.6 376.4 328.0 C403.0 354.2 406.5 372.3 430.4 396.5Z" fill="#000"/><path d="M195.4 210.3 A11.4 11.4 0 1 1 172.6 210.3 A11.4 11.4 0 1 1 195.4 210.3Z" fill="#fff"/></mask>
+  
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7752E"/><stop offset="1" stop-color="#D84D0B"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0" r="0.75"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#tile)"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#glow)"/>
+  <rect x="64.5" y="64.5" width="895" height="895" rx="199.5" fill="none" stroke="rgba(255,255,255,0.22)"/>
+  <g transform="translate(160 160) scale(1.375)"><circle cx="256" cy="256" r="224" fill="#FFF8F1" mask="url(#m)"/></g>
+</svg>

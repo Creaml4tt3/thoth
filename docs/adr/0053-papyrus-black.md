@@ -71,6 +71,11 @@ the owner approved these changes to where Moon appears in the app:
   opaque surfaces; reduced transparency, more contrast, forced colours and print turn grain and glass off. Wry's
   transparent window uses a private WebKit key, so a future Mac App Store build would need an opaque variant.
 
+- **App icon** (owner, 2026-11-16, option "B2" of A flat, B lit, C paper): the Moon Ibis in paper on a Moon tile lit
+  from the top, `design/brand/app-icon.svg`. Chosen over the flat tile because the light reads as a current Mac icon
+  and sets it apart from the flat orange tiles of other AI tools; the mark itself stays flat. The black tile stays
+  only where the site still uses it, until the site moves.
+
 ## Consequences
 
 - One look across the site and the apps. The site has used these roles since 2026-11-13.
@@ -81,5 +86,5 @@ the owner approved these changes to where Moon appears in the app:
 
 ## Open questions
 
-- New app icons and favicon in Papyrus Black: only if the owner asks.
+- ~~New app icons in Papyrus Black~~: decided 2026-11-16, the Moon tile (amendment above). The favicon is unchanged.
 - A licensed display face: still Inter for now.
