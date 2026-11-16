@@ -9,19 +9,15 @@ import { useDesktopStrings } from "../../strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { Icon } from "@thoth/app-ui/ui/Icon.tsx";
 
-/** The index body starts with the title and then the page's own H1, so a snippet often opens with the title twice;
- * the row already shows it. Drops those leading copies (match brackets ignored). */
+/** The index body starts with the title, then often the page's own H1 (parse.ts keeps block breaks), so a snippet can
+ * open with the title twice; the row already shows it. Drops only whole leading lines equal to the title (brackets and
+ * case ignored); anything else, such as a longer heading that starts the same, stays as it is. */
 export function withoutTitle(snippet: string, title: string): string {
-  let rest = snippet;
-  for (let i = 0; i < 2 && title; i++) {
-    const plain = rest.replace(/[[\]]/g, "");
-    if (!plain.toLowerCase().startsWith(title.toLowerCase())) break;
-    // Walk the bracketed text until `title.length` visible characters are consumed.
-    let seen = 0, cut = 0;
-    while (cut < rest.length && seen < title.length) { if (rest[cut] !== "[" && rest[cut] !== "]") seen++; cut++; }
-    if (rest[cut] === "]") cut++;
-    rest = rest.slice(cut).replace(/^\s+/, "");
-  }
+  const lines = snippet.split("\n");
+  const same = (line: string) => line.replace(/[[\]]/g, "").trim().toLowerCase() === title.trim().toLowerCase();
+  let start = 0;
+  while (start < lines.length && title.trim() !== "" && (same(lines[start]!) || (start > 0 && lines[start]!.trim() === ""))) start++;
+  const rest = lines.slice(start).join("\n").trim();
   return rest === "" ? snippet : rest;
 }
 
@@ -55,6 +51,7 @@ export function SearchPalette({ commands, onRun, onClose }: { commands: readonly
     const mine = ++seq.current;
     if (query.trim() === "" || cmd.on) {
       setHits([]);
+      setActive(0); // back to the recent list: its first row, never an index past its end
       return;
     }
     const timer = setTimeout(() => {

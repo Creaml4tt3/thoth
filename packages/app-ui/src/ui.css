@@ -74,7 +74,8 @@ h1, h2, h3, p { margin: 0; }
 .modal-palette { width: min(640px, 100%); padding: 0 0 8px; border-radius: var(--thoth-radius-lg); background: var(--thoth-bg); border: 1px solid var(--thoth-border); gap: 0; }
 .palette-input { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--thoth-border); color: var(--thoth-ink-tertiary); }
 .palette-input .input { flex: 1; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 16px; color: var(--thoth-ink-primary); outline: none; }
-.palette-input:focus-within { border-bottom-color: var(--thoth-border-strong); }
+/* The input has no box, so the focus ring sits on the whole input row (DESIGN.md §6: 2px Moon). */
+.palette-input:has(.input:focus-visible) { box-shadow: inset 0 -2px 0 var(--thoth-accent); }
 .modal-palette .results { padding: 6px 8px 0; max-height: min(56vh, 440px); }
 .modal-palette .alert { margin: 8px 12px 0; }
 .palette-label, .palette-hint { margin: 0; padding: 10px 18px 2px; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }

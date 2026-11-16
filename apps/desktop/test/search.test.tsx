@@ -34,6 +34,23 @@ describe("search", () => {
     await waitFor(() => expect(box.textContent).toContain("Striped animals gallop."));
   });
 
+  it("clearing a search goes back to the recent pages with the first one selected", async () => {
+    await seed(root, Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`Many/Stripe ${i}.md`, `# Stripe ${i}\n\nstripe\n`])));
+    const app = await openApp(root);
+    const tree = await screen.findByRole("tree");
+    await app.user.click(within(tree).getByRole("treeitem", { name: "Alpha" }));
+    await app.user.keyboard("{Meta>}k{/Meta}");
+    const dialog = await screen.findByRole("dialog", { name: "Search" });
+    const input = within(dialog).getByRole("combobox");
+    await app.user.type(input, "stripe");
+    await waitFor(() => expect(within(dialog).getAllByRole("option").length).toBeGreaterThan(4));
+    for (let i = 0; i < 5; i++) await app.user.keyboard("{ArrowDown}");
+    await app.user.clear(input);
+    const first = await within(dialog).findByRole("option", { name: /Alpha/ });
+    expect(first.getAttribute("aria-selected")).toBe("true");
+    expect(input.getAttribute("aria-activedescendant")).toBe(first.id);
+  });
+
   it("Ctrl+K also opens search, and Escape closes it", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");

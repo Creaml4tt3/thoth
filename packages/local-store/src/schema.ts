@@ -4,7 +4,7 @@
  * Everything here is a cache derived from vault files and durable `.thoth/`
  * JSON records; a version mismatch simply drops and rebuilds the index.
  */
-export const INDEX_SCHEMA_VERSION = 3;
+export const INDEX_SCHEMA_VERSION = 4; // 4: plainText keeps block breaks (parse.ts blockText), so old rows must be rebuilt
 
 export const INDEX_DDL = `
 CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
