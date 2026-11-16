@@ -27,8 +27,8 @@ h1, h2, h3, p { margin: 0; }
 .btn-sm { font-size: 13px; padding: 8px 14px; }
 .btn-primary { background: var(--thoth-accent); color: var(--thoth-on-accent); }
 .btn-primary:hover:not(:disabled) { opacity: 0.88; }
-.btn-ghost { background: var(--thoth-secondary-container); color: var(--thoth-on-secondary-container); }
-.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--thoth-on-secondary-container) 12%, var(--thoth-secondary-container)); }
+.btn-ghost { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
+.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--thoth-ink-primary) 14%, transparent); }
 .btn-quiet { background: transparent; color: var(--thoth-ink-secondary); }
 .btn-quiet:hover:not(:disabled) { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .btn-danger { background: transparent; color: var(--thoth-danger); box-shadow: inset 0 0 0 1px var(--thoth-border-strong); }
