@@ -78,7 +78,8 @@ We do not sell your data, show ads, or use your content to train AI models.
 We use **Google Analytics 4**, a service of Google, only if you choose
 **Accept** in the cookie banner. Until you accept, the website and the web
 version load nothing from Google and send nothing to it. If you choose
-**Decline**, nothing is sent.
+**Decline**, nothing is sent to Google. The website's visit counts (below)
+do not depend on this choice.
 
 If you accept, Google collects on our behalf:
 
@@ -161,6 +162,8 @@ contractual safeguards, as the PDPA allows for transfers abroad.
 - **Rate-limit counters** are deleted within a day.
 - **Feedback**, and any app log sent with it, is deleted 90 days after it arrives.
 - **Analytics data** is kept in Google Analytics for 2 months.
+- **Website visit counts** in Vercel Web Analytics are kept as totals; the value
+  that tells visits apart is discarded after 24 hours.
 - **Your cookie choice** is kept in your browser until you clear it.
 
 The demo server has **no uptime or retention guarantee**: it may be reset.
