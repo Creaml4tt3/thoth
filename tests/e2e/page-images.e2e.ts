@@ -197,7 +197,8 @@ test("images next to the page show; a missing one names its file; a web one is a
 
   // The SVG ran nothing and loaded nothing; the web image was never asked for.
   expect(await page.evaluate(() => (window as { __svgRan?: boolean }).__svgRan)).toBeUndefined();
-  expect(await page.locator("svg script, svg image").count()).toBe(0);
+  // Inside the page only: the mascot draws its own bundled pictures with SVG <image> (MascotArt.tsx).
+  expect(await box.locator("svg script, svg image").count()).toBe(0);
   expect(offBridge.filter((u) => /images\.example|tracker\.example/.test(u))).toEqual([]);
 
   await settled(page);

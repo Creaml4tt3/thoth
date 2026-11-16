@@ -14,6 +14,10 @@ export const th: DesktopStrings = {
     startNew: "เริ่ม Private Space ใหม่", // REVIEW
     openExisting: "เปิดโฟลเดอร์ที่คุณใช้อยู่", // REVIEW
     opening: "กำลังเปิด…",
+    headline: ["โน้ตของคุณ", "ไฟล์ของคุณ"],
+    startNewNote: "โฟลเดอร์ว่าง พร้อมหน้าแนะนำการใช้งานไม่กี่หน้า", // REVIEW
+    openExistingNote: "โฟลเดอร์ Obsidian หรือโฟลเดอร์ Markdown ใดก็ได้ ไม่มีการคัดลอกหรือย้ายไฟล์", // REVIEW
+    promise: ["อยู่ในคอมพิวเตอร์ของคุณ", "Markdown ธรรมดา", "ไม่ต้องมีบัญชี"], // REVIEW
     hint: "ทั้งสองแบบเปิดโฟลเดอร์ตรงที่อยู่เดิม ไม่มีการคัดลอกไฟล์ ถ้าจะเริ่ม Private Space ใหม่ ให้เลือกหรือสร้างโฟลเดอร์ว่าง Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์", // REVIEW
     folderNote: {
       title: "เปิดโฟลเดอร์นี้ตรงที่อยู่เดิมไหม", // REVIEW

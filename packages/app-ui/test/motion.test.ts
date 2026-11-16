@@ -296,6 +296,6 @@ describe("what animates, and how", () => {
 
   it("keeps dialogs and menus short: nothing uses the slow duration but the first-run screens", () => {
     const slow = motionDeclarations.filter((d) => d.value.includes("--thoth-dur-slow")).map((d) => d.rule.selector).sort();
-    expect(slow).toEqual([".onboarding-inner", ".signin-card"]);
+    expect(slow).toEqual([".first-copy", ".first-ibis", ".first-stage", ".onboarding-inner", ".signin-card"]); // the first screen's three parts arrive together (2026-11-16)
   });
 });
