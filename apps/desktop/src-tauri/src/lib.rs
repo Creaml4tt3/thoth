@@ -546,6 +546,13 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     // Cmd/Ctrl + - = 0 zoom the page (WCAG 1.4.4), as in the main window (tauri.conf.json).
                     .zoom_hotkeys_enabled(true)
                     .focused(true);
+                // The same translucent sidebar as the main window (tauri.macos.conf.json; ADR-0053 amendment).
+                #[cfg(target_os = "macos")]
+                {
+                    use tauri::utils::config::WindowEffectsConfig;
+                    use tauri::window::{Effect, EffectState};
+                    builder = builder.transparent(true).effects(WindowEffectsConfig { effects: vec![Effect::Sidebar], state: Some(EffectState::FollowsWindowActiveState), ..Default::default() });
+                }
                 // The tab was let go here: the new window's tab bar starts under the pointer.
                 if let Some((x, y)) = window.at {
                     builder = builder.position((x - 140.0).max(0.0), (y - 20.0).max(0.0));

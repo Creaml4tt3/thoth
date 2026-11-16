@@ -63,6 +63,13 @@ the owner approved these changes to where Moon appears in the app:
 - **The search palette** sits high on the window over a light scrim (12% ink on paper, 40% black on black), not the
   45% black of dialogs that must be answered.
 - **Paths are not shown as code.** Crumbs, search and Connections drop `.md` and the monospace path.
+- **Paper and glass** (owner: "a little bit transparent, with paper texture"; research in
+  `docs/design/research/2026-11-translucent-paper.md`). A static grain tile sits behind the shell, sidebar and tab strip
+  (2.5% ink on paper, 1.2% on black; the faintest text stays above 5:1 on its darkest pixel). On macOS the window has
+  the native Sidebar material and the sidebar is 88% (paper) or 90% (black) opaque, so the desktop shows through it
+  faintly; the writing area stays opaque. The window's appearance follows Thoth's theme. Windows, Linux and the web keep
+  opaque surfaces; reduced transparency, more contrast, forced colours and print turn grain and glass off. Wry's
+  transparent window uses a private WebKit key, so a future Mac App Store build would need an opaque variant.
 
 ## Consequences
 

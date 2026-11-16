@@ -1,12 +1,15 @@
 import { createRoot } from "react-dom/client";
 import "@thoth/ui/tokens.css";
 import "./fonts/fonts.css";
-import "./features/settings/theme.ts"; // applies the saved theme before the first render
+import { desktopTheme } from "./features/settings/theme.ts"; // applies the saved theme before the first render
+import { isMacTauri, startWindowGlass } from "./platform/window-glass.ts";
 import { App } from "./app/App.tsx";
 import { readLaunch } from "./app/windows.ts";
 import { selectPlatform } from "./platform/select.ts";
 import { selectNotifier } from "./platform/notifier.ts";
 import { createErrorReporter } from "./platform/errors.ts";
+
+startWindowGlass(isMacTauri(), desktopTheme, async () => (await import("@tauri-apps/api/window")).getCurrentWindow());
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Missing #root");

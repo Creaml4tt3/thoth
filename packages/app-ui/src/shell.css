@@ -448,3 +448,29 @@ div.tree-empty > p { margin: 0 0 6px; }
 .sidebar-link[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .sidebar-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .home-timeline { min-height: 24px; }
+
+/* Paper (ADR-0053 amendment 2026-11-16). A static grain tile under the shell, sidebar and tab strip: ink pigment at
+   2.5% on paper, 1.2% on black (the alpha is in the PNG, so nothing else multiplies it). Its darkest pixel keeps the
+   faintest text, tertiary ink, at 5.2:1 on paper and 6.8:1 on black. Behind content only: menus, dialogs and the
+   text's own boxes stay flat. 256px tiles at 128 CSS px, sharp at 2×. */
+.shell, .sidebar, .tabstrip { background-image: url("./textures/grain-paper.png"); background-size: 128px 128px; }
+[data-theme="night"] :is(.shell, .sidebar, .tabstrip) { background-image: url("./textures/grain-night.png"); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] :is(.shell, .sidebar, .tabstrip) { background-image: url("./textures/grain-night.png"); } }
+
+/* Translucent sidebar, on macOS only (main.tsx sets data-os-effect when the window has the native Sidebar material,
+   tauri.macos.conf.json). The page and everything around it turn clear so the material shows through the sidebar
+   alone; the writing area stays opaque paper. The faintest sidebar text is lifted (0.66 to 0.78) because the material
+   behind it can be darker than paper. */
+:root { --thoth-sidebar-glass: rgb(248 240 226 / 0.88); }
+[data-theme="night"] { --thoth-sidebar-glass: rgb(23 21 20 / 0.9); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] { --thoth-sidebar-glass: rgb(23 21 20 / 0.9); } }
+html[data-os-effect], html[data-os-effect] :is(body, #root), html[data-os-effect] .shell { background-color: transparent; }
+html[data-os-effect] .main { background-color: var(--thoth-bg); background-image: inherit; background-size: 128px 128px; }
+html[data-os-effect] .sidebar { background-color: var(--thoth-sidebar-glass); --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.78); }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-os-effect] :is(body, #root) { background-color: var(--thoth-bg); }
+  html[data-os-effect] .sidebar { background-color: var(--thoth-bg-sidebar); }
+  :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; }
+}
+@media (forced-colors: active), print { :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; } }
