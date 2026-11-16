@@ -3,7 +3,7 @@
 - **Status:** Proposal for the owner. Nothing is built yet.
 - **Date:** 2026-11-10, updated 2026-11-15 with iApp's OpenThai 2.0 OCR (§2a)
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
-- **Next step:** the Phase 0 spike, then ADR-0054. The owner's decisions are in §7.
+- **Next step:** the Phase 0 spike, then ADR-0054. The owner's decisions are in §7 (all made by 2026-11-16).
 
 ## 1. Verdict on the handoff
 
@@ -263,10 +263,13 @@ Left out of the handoff on purpose:
 - A test set of 100–200 pages for the spike. It starts at 40–60 and grows before Phase 1 ships.
 - Table and layout scores, until those models are in the plan.
 
-Waiting for the owner:
-- §5: build OCR as the first module, with a shared store and runner and Settings → Modules, but no registry yet.
-- Intel Macs, only if Phase 0 picks ONNX Runtime: offer OCR on Apple Silicon Macs only, or build the library for
-  Intel ourselves.
+Decided by the owner on 2026-11-16:
+- Test first: Phase 0 runs, and its numbers decide, before any of Phase 1 is built.
+- OCR is a separate download (§5: the first module, with a shared store and runner and Settings → Modules, no
+  registry yet), not part of the installer.
+- Every platform Thoth ships gets it, Intel Macs included. If Phase 0 picks ONNX Runtime, we build the library for
+  Intel Macs ourselves rather than leave them out.
+- OpenThai2.0-OCR-Text is the Thai model to try first (§2a).
 
 [pp5-multi]: https://www.paddleocr.ai/latest/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.html
 [th-card]: https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec
