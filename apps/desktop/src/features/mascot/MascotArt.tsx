@@ -1,19 +1,15 @@
 /**
- * The Thoth mascot, "Moon Crown" (design round 9, owner approved): a paper-white ibis standing in front of a lunar
- * orange moon (the full version), or the logo mark, the ibis head cut out of the moon, with a small state cue beside
- * it (the compact version). Each state has its own drawing (art/<state>-<size>.svg), its pose drawn in.
+ * The Thoth mascot, the hooded ibis (owner, 2026-11-15: Option 1 replaces Moon Crown everywhere): a small scribe in an
+ * orange moon-spotted cloak. Each state is its own painted pose (art/<state>.webp), with a Night copy that carries a
+ * paper outline so the dark cloak edges still read on a dark panel (art/<state>-night.webp), and a round head badge for
+ * the compact version (art/<state>-head.webp). The paintings come from the approved concept art (thoth .tmp/
+ * mascot-humanoid/app-states, cut out and exported at 316 px high, so 2x at the largest stage).
  *
- * The art files are the designer's files with what the app does not need taken out (their <style>, every fill and the
- * transforms on the -pos groups: mascot.css sets those, so there is one stylesheet for every copy on a page). Ids
- * carry the placeholder `__m__`, replaced per instance so two copies never share a clip or a mask.
- *
- * Both versions are drawn in one 88×88 stage, so a switch between them is a morph, never a pop: the figure and the
- * badge are moved and scaled so their moons lie on each other, and one fades out while the other fades in. The
- * compact version fills the bottom-left 52×52 of the stage, facing right; `facing="left"` mirrors the stage and
- * `vertical="top"` lifts the badge to the top corner, so it shrinks toward the corner the mascot is docked in.
+ * Both versions are drawn in one 88×88 stage, so a switch between them is a morph, never a pop: the figure shrinks into
+ * the badge's corner while the badge grows in. The compact version fills the bottom-left 52×52 of the stage;
+ * `facing="left"` mirrors the stage and `vertical="top"` lifts the badge to the top corner, so it shrinks toward the
+ * corner the mascot is docked in.
  */
-import { useId, useMemo } from "react";
-
 export const MASCOT_STATES = ["idle", "listening", "working", "review", "done", "error", "sleeping"] as const;
 export type MascotState = (typeof MASCOT_STATES)[number];
 export type MascotVersion = "full" | "compact";
@@ -23,37 +19,11 @@ export type MascotMotion = "full" | "calm" | "off";
 export const STAGE = 88;
 /** The compact badge's box inside the stage (bottom-left, before mirroring). */
 export const COMPACT_BOX = 52;
-/** Below this stage size (CSS px) the full version uses the simplified 64 px figure. */
-export const SMALL_STAGE = 76;
 
-const files = import.meta.glob<string>("./art/*.svg", { query: "?raw", import: "default", eager: true });
-/** The drawing inside a file's root <svg>. */
-const art = (name: string) => {
-  const raw = files[`./art/${name}.svg`] ?? "";
-  return raw.slice(raw.indexOf(">") + 1, raw.lastIndexOf("</svg>"));
-};
-/**
- * A figure's top-level elements in paint order, in runs: the moon and the head (they lie on the badge's moon) and the
- * rest of the bird (body, wing, legs, cue), so the morph can fade the two apart.
- */
-const figureParts = (drawing: string) => {
-  const parts: { moon: boolean; __html: string }[] = [];
-  let depth = 0;
-  let start = 0;
-  for (const tag of drawing.matchAll(/<(\/?)[^>]*?(\/?)>/g)) {
-    if (tag[1]) depth--;
-    else if (!tag[2]) depth++;
-    if (depth !== 0) continue;
-    const end = tag.index + tag[0].length;
-    const el = drawing.slice(start, end);
-    start = end;
-    const moon = /class="m-(disc|head)-pos"/.test(el);
-    const last = parts.at(-1);
-    if (last?.moon === moon) last.__html += el;
-    else parts.push({ moon, __html: el });
-  }
-  return parts;
-};
+const files = import.meta.glob<string>("./art/*.webp", { query: "?url", import: "default", eager: true });
+const art = (name: string) => files[`./art/${name}.webp`] ?? "";
+/** States that are waiting on the person or busy for them: the badge shows a small orange cue. */
+const ENGAGED: ReadonlySet<MascotState> = new Set(["listening", "working", "review"]);
 
 interface Props {
   state: MascotState;
@@ -61,15 +31,10 @@ interface Props {
   facing?: "right" | "left";
   vertical?: "top" | "bottom";
   motion?: MascotMotion;
-  /** The simplified figure (thicker legs, one plume, a larger eye), for a stage under `SMALL_STAGE`. */
-  tiny?: boolean;
   className?: string;
 }
 
-export function MascotArt({ state, version, facing = "right", vertical = "bottom", motion = "full", tiny = false, className }: Props) {
-  const id = `m${useId().replace(/[^\w-]/g, "")}-`;
-  const figure = useMemo(() => figureParts(art(`${state}-${tiny ? 64 : 88}`).replaceAll("__m__", id)), [state, tiny, id]);
-  const badge = useMemo(() => ({ __html: art(`${state}-48`).replaceAll("__m__", id) }), [state, id]);
+export function MascotArt({ state, version, facing = "right", vertical = "bottom", motion = "full", className }: Props) {
   return (
     <svg
       className={["mascot-art", className ?? ""].filter(Boolean).join(" ")}
@@ -79,23 +44,25 @@ export function MascotArt({ state, version, facing = "right", vertical = "bottom
       data-facing={facing}
       data-vertical={vertical}
       data-motion={motion}
-      data-detail={tiny ? "low" : "high"}
       aria-hidden="true"
       focusable="false"
     >
       <g className="m-face">
         <g className="m-offset">
           <g className="m-rig">
-            {/* The figure is drawn in 1040 units to the stage, with its origin 355, 100 units in. */}
             <g className="m-figure" data-part="full" data-state={state}>
-              <g transform="scale(0.0846154) translate(355 100)">
-                {figure.map(({ moon, __html }, i) => (
-                  <g key={i} className={moon ? "m-figure-moon" : "m-figure-bird"} dangerouslySetInnerHTML={{ __html }} />
-                ))}
-              </g>
+              <image className="m-paper-only" href={art(state)} x="0" y="1" width={STAGE} height={STAGE - 1} preserveAspectRatio="xMidYMax meet" />
+              <image className="m-night-only" href={art(`${state}-night`)} x="0" y="1" width={STAGE} height={STAGE - 1} preserveAspectRatio="xMidYMax meet" />
             </g>
-            {/* The badge is drawn on a 48 px square. */}
-            <g className="m-badge" data-part="compact" data-state={state} dangerouslySetInnerHTML={badge} />
+            <g className="m-badge" data-part="compact" data-state={state}>
+              <image href={art(`${state}-head`)} x="2" y="38" width="48" height="48" />
+              {ENGAGED.has(state) && (
+                <g className="m-cue">
+                  <circle className="m-cue-ring" cx="44" cy="43" r="6" />
+                  <circle className="m-cue-engaged" cx="44" cy="43" r="4" />
+                </g>
+              )}
+            </g>
           </g>
         </g>
       </g>
