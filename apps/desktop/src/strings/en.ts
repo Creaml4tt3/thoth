@@ -103,6 +103,7 @@ export const en = {
     label: "Search pages",
     placeholder: "Search pages, or type > for commands",
     results: "Results",
+    recent: "Recent pages",
     none: (query: string) => `No pages match “${query}”.`,
   },
 

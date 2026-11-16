@@ -3,15 +3,18 @@
 .prose { outline: none; font: var(--thoth-text-body); min-height: 40vh; padding-bottom: var(--thoth-space-16); caret-color: var(--thoth-accent); }
 .prose[contenteditable="false"] { cursor: default; }
 .prose p { margin: 0 0 0.6em; }
-.prose h1 { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); margin: 1.4em 0 0.4em; }
-.prose h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); margin: 1.2em 0 0.4em; }
+.prose h1 { font: 700 32px / 1.2 var(--thoth-font-sans); letter-spacing: -0.02em; margin: 1.2em 0 0.35em; }
+.prose > h1:first-child { margin-top: 0.2em; }
+.prose h2 { font: 600 22px / 1.3 var(--thoth-font-sans); letter-spacing: -0.01em; margin: 1.3em 0 0.35em; }
 .prose h3, .prose h4, .prose h5, .prose h6 { font: 600 17px / 1.4 var(--thoth-font-sans); margin: 1em 0 0.3em; }
 .prose ul, .prose ol { margin: 0 0 0.6em; padding-left: 1.5em; }
 .prose li > p { margin: 0 0 0.2em; }
 .prose ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
+.prose ul[data-type="taskList"] > li { margin: 0; }
+.prose ul[data-type="taskList"] > li > .task-content > p { margin: 0 0 2px; }
 .task-item { display: flex; gap: 8px; align-items: flex-start; }
 /* A 24×24 target (WCAG 2.5.8); the negative margin keeps the row laid out as for the old 15px box. */
-.task-check { padding-top: 5px; }
+.task-check { padding-top: 0; height: 26px; display: flex; align-items: center; }
 .task-box { appearance: none; -webkit-appearance: none; box-sizing: content-box; width: 16px; height: 16px; margin: -4.5px; border: 3px solid transparent; background: var(--thoth-bg) padding-box; box-shadow: inset 0 0 0 1.5px var(--thoth-outline); border-radius: 7px; cursor: pointer; display: inline-grid; place-content: center; vertical-align: -3px; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out); }
 .task-box::after { content: ""; width: 10px; height: 10px; background: var(--thoth-on-accent, #fff); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.2l2.2 2.2L8.5 2.6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.2l2.2 2.2L8.5 2.6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; opacity: 0; transform: scale(0.6); transition: transform var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .task-box:checked { background-color: var(--thoth-accent); box-shadow: inset 0 0 0 1.5px var(--thoth-accent); }
@@ -73,9 +76,9 @@
 
 /* Callouts, styled by kind. Neutral by default; semantic colours only for state kinds.
    Layout: a lead (fold triangle, icon) beside the content (editable title, then the body). */
-.callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 14px 16px; border-radius: var(--thoth-radius-lg); background: color-mix(in srgb, var(--callout) 10%, transparent); }
+.callout { --callout: var(--thoth-ink-secondary); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 0.9em 0; padding: 12px 16px; border-radius: var(--thoth-radius-sm); background: color-mix(in srgb, var(--callout) 7%, var(--thoth-bg-sidebar)); }
 .callout-lead { display: flex; gap: 6px; align-items: flex-start; padding-top: 1px; user-select: none; }
-.callout-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--callout) 16%, transparent); color: var(--callout); font-size: 12px; font-weight: 600; }
+.callout-icon { width: 20px; height: 20px; display: grid; place-items: center; color: var(--callout); font-size: 13px; font-weight: 700; }
 .callout-fold { all: unset; box-sizing: border-box; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); font-size: 12px; cursor: pointer; }
 .callout-fold { transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .callout-fold:hover { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
@@ -100,7 +103,7 @@
 .callout[data-callout="tip"], .callout[data-callout="hint"], .callout[data-callout="success"], .callout[data-callout="check"], .callout[data-callout="done"] { --callout: var(--thoth-success); }
 .callout[data-callout="warning"], .callout[data-callout="caution"], .callout[data-callout="attention"], .callout[data-callout="important"] { --callout: var(--thoth-warning); }
 .callout[data-callout="danger"], .callout[data-callout="error"], .callout[data-callout="failure"], .callout[data-callout="fail"], .callout[data-callout="missing"], .callout[data-callout="bug"] { --callout: var(--thoth-danger); }
-.callout[data-callout="note"], .callout[data-callout="info"], .callout[data-callout="todo"], .callout[data-callout="question"], .callout[data-callout="help"], .callout[data-callout="faq"] { --callout: var(--thoth-link); }
+.callout[data-callout="note"], .callout[data-callout="info"], .callout[data-callout="todo"], .callout[data-callout="question"], .callout[data-callout="help"], .callout[data-callout="faq"] { --callout: var(--thoth-ink-secondary); }
 .callout[data-callout="quote"], .callout[data-callout="cite"], .callout[data-callout="example"], .callout[data-callout="abstract"], .callout[data-callout="summary"], .callout[data-callout="tldr"] { --callout: var(--thoth-stone-600); }
 
 /* Preserved blocks: read-only, monospace, visibly "as written" */
@@ -142,7 +145,7 @@
 .page-title { font: var(--thoth-text-h1); letter-spacing: var(--thoth-tracking-heading); margin: var(--thoth-space-4) 0 var(--thoth-space-1); overflow-wrap: anywhere; }
 .page-props { display: flex; gap: 14px; flex-wrap: wrap; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-4); }
 .page-props b { font-weight: 450; color: var(--thoth-ink-secondary); }
-.crumbs { display: flex; align-items: center; gap: var(--thoth-space-3); justify-content: space-between; padding: var(--thoth-space-3) var(--thoth-space-6); font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); min-height: 40px; }
+.crumbs { display: flex; align-items: center; gap: var(--thoth-space-3); justify-content: space-between; padding: 4px 12px 4px var(--thoth-space-6); font: 450 13px / 18px var(--thoth-font-sans); color: var(--thoth-ink-tertiary); min-height: 40px; }
 /* One line that scrolls sideways when it is wider than the page (PageFrame.tsx starts it at its end, the page's own
    crumb), with the tab bar's thin scrollbar. Only this row scrolls: its ancestors clip (shell.css). */
 .crumb-trail { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; overscroll-behavior-x: contain; padding-block: 2px; }
@@ -164,7 +167,7 @@
 .missing { display: grid; gap: var(--thoth-space-3); justify-items: start; padding: var(--thoth-space-12) 0; }
 
 .backlinks { margin-top: var(--thoth-space-8); padding-top: var(--thoth-space-4); border-top: 1px solid var(--thoth-border); }
-.backlinks h2 { font: var(--thoth-text-small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-2); }
+.backlinks h2 { font: 600 13px / 18px var(--thoth-font-sans); color: var(--thoth-ink-secondary); margin-bottom: var(--thoth-space-2); }
 .backlinks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .backlinks :is(.connection-page, .connections-toggle) { all: unset; box-sizing: border-box; display: flex; gap: 8px; width: 100%; padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .backlinks :is(.connection-page, .connections-toggle):hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }

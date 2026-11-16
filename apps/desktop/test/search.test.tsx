@@ -26,7 +26,8 @@ describe("search", () => {
     const dialog = await screen.findByRole("dialog", { name: "Search" });
     await app.user.type(within(dialog).getByRole("combobox"), "gallop");
     const option = await within(dialog).findByRole("option", { name: /Zebra/ });
-    expect(option.textContent).toContain("Notes/Zebra.md");
+    expect(option.textContent).toContain("Notes"); // the folder it lives in, beside the title
+    expect(option.querySelector("mark")?.textContent).toBe("gallop");
     await app.user.keyboard("{Enter}");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull());
     const box = await editorBox();
@@ -42,12 +43,13 @@ describe("search", () => {
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
   });
 
-  it("the Close button and a click on the backdrop also close search", async () => {
+  it("Escape and a click on the backdrop close search (a palette has no Close button)", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     await app.user.keyboard("{Meta>}k{/Meta}");
     let dialog = await screen.findByRole("dialog", { name: "Search" });
-    await app.user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull();
+    await app.user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
 
     await app.user.keyboard("{Meta>}k{/Meta}");

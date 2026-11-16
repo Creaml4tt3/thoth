@@ -41,7 +41,7 @@ div.tree-empty > p { margin: 0 0 6px; }
    preview (transforms only, nothing under reduced motion where the duration tokens are 0). */
 .fav-row { position: relative; }
 .fav-item { padding-left: 24px; min-height: 28px; }
-.fav-item[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.fav-item[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-tertiary); }
 .fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 [data-fav-dragging] .fav-row:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
@@ -81,6 +81,12 @@ div.tree-empty > p { margin: 0 0 6px; }
 .form { display: grid; gap: var(--thoth-space-4); }
 .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 50vh; overflow: auto; }
 .result { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--thoth-radius-md); cursor: pointer; }
+.result-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.result-line .icon { flex: none; color: var(--thoth-ink-tertiary); }
+.result-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-path { flex: none; max-width: 45%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.result .snippet mark { background: none; color: var(--thoth-ink-primary); font-weight: 600; }
+.result .snippet { padding-left: 26px; }
 .result[aria-selected="true"] { background: var(--thoth-bg-active); }
 .result .snippet { color: var(--thoth-ink-secondary); font: var(--thoth-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-badge { margin-left: auto; flex: none; }
@@ -136,9 +142,9 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tree-icon-folder[data-color="purple"] { color: var(--thoth-text-purple); }
 .tree-icon-folder[data-color="red"] { color: var(--thoth-text-red); }
 /* The folder New page and New folder go into (the last one clicked). */
-.tree-item[data-target]:not([aria-selected="true"]) { background: var(--thoth-bg-hover); }
+.tree-item[data-target]:not([aria-selected="true"]) { background: transparent; }
 .tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
-.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-accent); }
+.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-secondary); }
 @media (forced-colors: active) { .tree-item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; } }
 /* `all: unset` on .tree-item also removes the browser's own `[draggable="true"] { -webkit-user-drag: element }`, and a row
    with `user-drag: auto` never starts a drag (Chromium, WebKit and so Tauri's webviews). Say it again here. */
@@ -378,10 +384,10 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home { overflow: auto; padding: 48px 24px; }
 .home-inner { max-width: 640px; margin: 0 auto; display: grid; gap: 28px; }
 .home-head { display: grid; justify-items: start; gap: 6px; color: var(--thoth-ink-primary); }
-.home-head h1 { margin: 6px 0 0; font: var(--thoth-text-h2); letter-spacing: -0.02em; }
+.home-head h1 { margin: 6px 0 0; font: 700 28px / 1.2 var(--thoth-font-sans); letter-spacing: -0.02em; }
 .home-head p { margin: 0; color: var(--thoth-ink-secondary); }
 .home-section { display: grid; gap: 6px; min-width: 0; }
-.home-section h2 { margin: 0; padding: 0 8px; font: 600 12px / 16px var(--thoth-font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--thoth-ink-secondary); }
+.home-section h2 { margin: 0; padding: 0 8px; font: 600 13px / 18px var(--thoth-font-sans); color: var(--thoth-ink-secondary); }
 .home-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .home-favorites .home-list { max-height: 320px; overflow: auto; }
 .home-empty { margin: 0; padding: 4px 8px; color: var(--thoth-ink-secondary); }
@@ -392,7 +398,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-tertiary); }
 .home-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { flex: none; display: flex; align-items: center; gap: 8px; max-width: 50%; min-width: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
-.home-today-card { min-height: 44px; border: 1px solid var(--thoth-border); }
+.home-today-card { min-height: 36px; }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-badge { flex: none; }
 @media (max-width: 520px) { .home { padding: 24px 12px; } .home-row-meta { max-width: 40%; } }

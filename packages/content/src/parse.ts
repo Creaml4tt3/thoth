@@ -232,8 +232,17 @@ export function parsePage(path: string, source: string): PageDocument {
     aliases: stringList(data["aliases"] ?? data["alias"]),
     ...(thothId !== undefined ? { thothId } : {}),
     ...(date !== undefined ? { date } : {}),
-    plainText: toString(tree, { includeHtml: false }),
+    plainText: blockText(tree),
   };
+}
+
+/** The page's text for search: each block's text on its own line (mdast's toString joins blocks with no space). */
+function blockText(node: { type: string; children?: unknown[] }): string {
+  const kids = (node.children ?? []) as { type: string; children?: unknown[] }[];
+  if (node.type === "root" || node.type === "list" || node.type === "listItem" || node.type === "blockquote" || node.type === "table" || node.type === "tableRow") {
+    return kids.map(blockText).filter((t) => t !== "").join("\n");
+  }
+  return toString(node, { includeHtml: false });
 }
 
 /**

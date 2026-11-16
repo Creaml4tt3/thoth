@@ -60,6 +60,12 @@ function useLoad<T>(load: () => Promise<T> | null, deps: unknown[]): Load<T> {
   return value;
 }
 
+/** The path without ".md", shown only when it says more than the title (a page in a folder, or a renamed title). */
+const where = (page: ConnectedPage): string => {
+  const path = (page.detail ?? "").replace(/\.md$/i, "");
+  return path === page.title ? "" : path;
+};
+
 function PageButton({ page, open, children }: { page: ConnectedPage; open: ConnectionsSource["open"]; children?: React.ReactNode }) {
   return (
     <button
@@ -79,7 +85,7 @@ function PageButton({ page, open, children }: { page: ConnectedPage; open: Conne
       }}
     >
       <span>{page.title}</span>
-      {children ?? (page.detail ? <span className="muted mono">{page.detail}</span> : null)}
+      {children ?? (page.detail && where(page) ? <span className="muted connection-where">{where(page)}</span> : null)}
     </button>
   );
 }

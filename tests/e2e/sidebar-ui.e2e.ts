@@ -220,7 +220,7 @@ test("a breadcrumb too long for the page scrolls sideways on its own row: it sta
   await page.setViewportSize({ width: 760, height: 700 });
   const trail = page.getByRole("navigation", { name: "Breadcrumb" });
   const current = trail.locator('[aria-current="page"]');
-  await expect(current).toHaveText(`${DEEP_PAGE}.md`);
+  await expect(current).toHaveText(DEEP_PAGE); // the page's own crumb drops ".md"
   await settled(page);
   const row = () => trail.evaluate((el) => ({ scroll: el.scrollWidth - el.clientWidth, left: Math.round(el.scrollLeft), height: Math.round(el.getBoundingClientRect().height) }));
   const first = await row();

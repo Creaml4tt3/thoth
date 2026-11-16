@@ -97,7 +97,7 @@ function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, announce, childre
                   </button>
                 ) : (
                   <span className="crumb-text">
-                    {part}
+                    {last ? part.replace(/\.md$/i, "") : part}
                   </span>
                 )}
               </li>
