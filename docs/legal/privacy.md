@@ -13,7 +13,7 @@
 > change both together, or the site build fails.
 <!-- repo-only:end -->
 
-Last updated: 10 November 2026
+Last updated: 16 November 2026
 
 ## Who we are
 
@@ -65,6 +65,7 @@ download site. It does not cover:
 | IP address, country, user agent (for the app, its version number), time and path of each request to the download site: update checks and installer downloads | Your app or your browser | Delivering the files; counting, once a week, how many different addresses check for updates or download an installer, which tells us roughly how many people use Thoth | Our legitimate interest in running the download site and knowing whether Thoth is used |
 | Server logs: time, method, path without query, status code, request ID | Each request to the demo server | Running and fixing the service | Our legitimate interest in running the service |
 | Feedback you send from the website, the web version or the desktop app: your message, the kind, and, only if you give or include them, your email address, the app version, operating system, processor type and language, and the recent app log (from the desktop app, only if you tick "Include recent app log", after you have seen every line; built to leave out page text and titles; file paths, links and emails masked). If you are signed in when you send it, it is linked to your account | You, when you send it; the demo server only receives it if the app sends it there | To read and answer problems, ideas and questions, and to fix bugs | Our legitimate interest in answering you and fixing the app; for the app log, your consent, given by ticking the box |
+| Visit counts on the website: the page, the page that sent you, your approximate location, device type, operating system and browser (see below) | Your browser, on every visit to thothnotes.com | Counting visits and where they come from, including visitors who decline cookies | Our legitimate interest in knowing whether the website is used |
 | Website and web version analytics (see below) | Your browser, only if you accept analytics | Learning which pages and features people use, so we can improve them | Your consent |
 
 We do not store passwords. You sign in at Google or GitHub: we never receive
@@ -77,7 +78,8 @@ We do not sell your data, show ads, or use your content to train AI models.
 We use **Google Analytics 4**, a service of Google, only if you choose
 **Accept** in the cookie banner. Until you accept, the website and the web
 version load nothing from Google and send nothing to it. If you choose
-**Decline**, nothing is sent.
+**Decline**, nothing is sent to Google. The website's visit counts (below)
+do not depend on this choice.
 
 If you accept, Google collects on our behalf:
 
@@ -107,6 +109,17 @@ settings** at the bottom of every page. If you withdraw consent, we stop
 sending data and delete the analytics cookies on this website. Data already
 sent stays in Google Analytics until the retention period ends.
 
+## Visit counts on the website (Vercel Web Analytics)
+
+The website (thothnotes.com, not the web version) also counts visits with
+**Vercel Web Analytics**, from Vercel, our host. It uses no third-party cookies.
+For each page you open, it sends Vercel the time, the page's address (with its
+query string filtered), the page that sent you here, your approximate location
+(country, region and city) and your device type, operating system and browser
+with their versions. Vercel tells visits apart with a value made from your
+request, not tied to your IP address, and discards it after 24 hours. Nothing
+it collects can follow you across websites, and we see only totals.
+
 ## Who can see your content
 
 - Members of a workspace can see its pages, history and attachments,
@@ -119,7 +132,7 @@ sent stays in Google Analytics until the retention period ends.
 We use these providers, each under its own terms and privacy policy:
 
 - **Vercel** (United States): hosting for the website, the web version and the
-  demo server;
+  demo server, and the website's visit counts;
 - **Neon** (United States), with the database in the AWS Asia Pacific
   (Singapore) region: the demo server's database;
 - **Google** (United States): sign-in, and analytics if you accept it;
@@ -149,6 +162,8 @@ contractual safeguards, as the PDPA allows for transfers abroad.
 - **Rate-limit counters** are deleted within a day.
 - **Feedback**, and any app log sent with it, is deleted 90 days after it arrives.
 - **Analytics data** is kept in Google Analytics for 2 months.
+- **Website visit counts** in Vercel Web Analytics are kept as totals; the value
+  that tells visits apart is discarded after 24 hours.
 - **Your cookie choice** is kept in your browser until you clear it.
 
 The demo server has **no uptime or retention guarantee**: it may be reset.
@@ -187,6 +202,8 @@ the Personal Data Protection Committee (PDPC), Thailand: www.pdpc.or.th.
   `thoth.consent.version`), so we do not ask again. Strictly necessary.
 - **Analytics cookies** `_ga` and `_ga_<ID>`, only after you accept. They last
   up to 2 years unless you withdraw consent or clear them.
+
+Vercel Web Analytics uses no third-party cookies.
 
 There are no advertising cookies.
 
