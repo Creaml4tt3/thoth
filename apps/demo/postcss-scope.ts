@@ -13,6 +13,7 @@ interface Rule {
 }
 interface Root {
   walkRules(visit: (rule: Rule) => void): void;
+  source?: { input?: { file?: string } } | undefined;
 }
 
 export const SCOPE = ".thoth-demo";
@@ -29,6 +30,8 @@ export function scopeCss() {
   return {
     postcssPlugin: "thoth-demo-scope",
     Once(root: Root) {
+      // The test page's own inline <style> (index.html?html-proxy) styles that page, not the demo.
+      if (root.source?.input?.file?.includes("index.html")) return;
       root.walkRules((rule) => {
         const parent = rule.parent;
         if (parent?.type === "atrule" && /keyframes$/i.test(parent.name ?? "")) return;
