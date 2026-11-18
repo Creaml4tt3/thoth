@@ -17,8 +17,6 @@ const times = (n: number) => (n === 1 ? "once" : `${n} times`);
 
 export const en = {
   onboarding: {
-    /** "Meet <mark> Thoth": the mark sits between the two parts. */
-    meet: { before: "Meet", after: "Thoth" },
     lede: "A private place for everything you know. Your files stay on your computer as Markdown, in a folder you choose. No account, no cloud.",
     /** The two ways in (ADR-0051 rule 3): both open the chosen folder where it is; nothing is copied. */
     startNew: "Start a new Private Space",
@@ -29,7 +27,6 @@ export const en = {
     startNewNote: "An empty folder, with a few pages that show you around.",
     openExistingNote: "Obsidian or any folder of Markdown. Nothing is copied or moved.",
     promise: ["On your computer", "Plain Markdown", "No account"],
-    hint: "Both open the folder where it is, and nothing is copied. For a new Private Space, choose or create an empty folder. Thoth keeps its search index on this computer, not in the folder.",
     /** Said before a folder that already holds Markdown is opened (ADR-0051 rule 4). Obsidian is named only here. */
     folderNote: {
       title: "Open this folder where it is?",

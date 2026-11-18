@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
+import { isMarkdownPath, stripExtension } from "@thoth/domain";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { tip } from "../ui/Tooltip.tsx";
@@ -97,7 +98,7 @@ function Breadcrumbs({ badge, parts, onCrumb, onBadge, status, announce, childre
                   </button>
                 ) : (
                   <span className="crumb-text">
-                    {last ? part.replace(/\.md$/i, "") : part}
+                    {last && isMarkdownPath(part) ? stripExtension(part) : part}
                   </span>
                 )}
               </li>

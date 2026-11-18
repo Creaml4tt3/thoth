@@ -473,6 +473,7 @@ html[data-os-effect] .sidebar { background-color: var(--thoth-sidebar-glass); --
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   html[data-os-effect] :is(body, #root) { background-color: var(--thoth-bg); }
   html[data-os-effect] .sidebar { background-color: var(--thoth-bg-sidebar); }
-  :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; }
+  :is(.shell, .sidebar, .tabstrip, .main) { background-image: none !important; }
 }
-@media (forced-colors: active), print { :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; } }
+/* !important: the night and system-dark grain rules above are more specific than these opt-outs. */
+@media (forced-colors: active), print { :is(.shell, .sidebar, .tabstrip, .main) { background-image: none !important; } }

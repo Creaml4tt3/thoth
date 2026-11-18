@@ -30,7 +30,7 @@ and others) uses a warm off-white and a warm near-black; none uses pure `#FFF` o
 2. **Moon stays the anchor.** Seed `#E8590C`. It is the brand fill (primary buttons, the mark, the agent avatar,
    running badges). As text and thin lines it uses its role tones: `#B64201` on paper and `#FF8C5F` on black, so small
    orange text always passes AA. Its containers are `#FFDBCE` / `#7E2C01`.
-3. **Blue is the secondary role only:** links, Workspace badges, the user's own chat messages and tonal buttons.
+3. **Blue is the secondary role only:** links, Workspace badges, mention chips and the user's own chat messages.
    `#3F6088` on paper, `#A5CAF7` on black, containers `#D0E5FE` / `#28486E`. Blue never fills a page or a primary
    action.
 4. **Colour is allowed where it means something.** This replaces "one accent, used sparingly": the eight ADR-0037
@@ -59,10 +59,14 @@ the owner approved these changes to where Moon appears in the app:
   buttons, focus rings, checked to-dos and the mascot keep it.
 - **Selection elsewhere is neutral.** A selected tree, favourite or settings row uses `--thoth-bg-active` with ink text;
   page icons in the tree are grey ink. Folder colours (rule 4) are unchanged.
-- **Links stay blue** (rule 3, option A of the review).
+- **Links stay blue** (rule 3, option A of the review). Secondary (ghost) buttons are neutral: `--thoth-bg-active`
+  with ink, so blue keeps meaning "a link" and a Discard beside your own blue messages doesn't read as one of them.
 - **The search palette** sits high on the window over a light scrim (12% ink on paper, 40% black on black), not the
   45% black of dialogs that must be answered.
 - **Paths are not shown as code.** Crumbs, search and Connections drop `.md` and the monospace path.
+- **Page headings are smaller and heavier than the interface's:** H1 32/700, H2 22/600 (`--thoth-text-doc-h1`,
+  `--thoth-text-doc-h2`, both editors), so a page reads as a document under its 40/600 title. Rule 7's "headlines 600"
+  stays for the interface; onboarding's headline is 700 like the site.
 - **Paper and glass** (owner: "a little bit transparent, with paper texture"; research in
   `docs/design/research/2026-11-translucent-paper.md`). A static grain tile sits behind the shell, sidebar and tab strip
   (2.5% ink on paper, 1.2% on black; the faintest text stays above 5:1 on its darkest pixel). On macOS the window has

@@ -6,12 +6,11 @@
 .lede { max-width: 540px; font-size: 18px; line-height: 1.6; color: var(--thoth-ink-secondary); }
 .ctas { display: flex; gap: 10px; justify-content: center; margin: var(--thoth-space-2) 0; flex-wrap: wrap; }
 .onboarding .btn { font-size: 15px; padding: 13px 22px; }
-.onboarding-hint { max-width: 520px; font: var(--thoth-text-small); line-height: 1.5; }
 .label { font: var(--thoth-text-small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--thoth-ink-tertiary); }
 .recent { width: min(520px, 100%); text-align: left; display: grid; gap: var(--thoth-space-2); margin-top: var(--thoth-space-6); }
 .recent ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .recent-item { width: 100%; display: grid; gap: 2px; text-align: left; padding: 10px 14px; border-radius: var(--thoth-radius-md); border: 1px solid var(--thoth-outline); background: var(--thoth-bg-container); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
-.recent-item:hover:not(:disabled) { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.recent-item:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .recent-item b { font-weight: 550; }
 .recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -62,7 +61,7 @@
   .first-stage { min-height: 260px; height: 34vh; width: 100%; }
   .first-copy { max-width: none; }
 }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) { .onboarding-first { background-image: none; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active), print { .onboarding-first { background-image: none !important; } }
 @media (forced-colors: active) { .first-stage { background: Canvas; border: 1px solid CanvasText; } .first-choice { border: 1px solid ButtonText; } .first-choice:has(.first-choice-title:focus-visible) { outline-color: Highlight; } }
 /* Thai stacks marks above and below the line: give the big headline room. */
 :lang(th) .first-title { line-height: 1.22; letter-spacing: -0.01em; }

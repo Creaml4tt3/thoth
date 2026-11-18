@@ -9,8 +9,8 @@
 .plain-editor .cm-content[contenteditable="false"] { cursor: default; }
 
 /* Line styles */
-.plain-editor .md-line-h1 { font: var(--thoth-text-h2); letter-spacing: var(--thoth-tracking-heading); padding-top: 0.5em !important; }
-.plain-editor .md-line-h2 { font: var(--thoth-text-h3); letter-spacing: var(--thoth-tracking-heading); padding-top: 0.4em !important; }
+.plain-editor .md-line-h1 { font: var(--thoth-text-doc-h1); letter-spacing: -0.02em; padding-top: 0.5em !important; }
+.plain-editor .md-line-h2 { font: var(--thoth-text-doc-h2); letter-spacing: -0.01em; padding-top: 0.4em !important; }
 .plain-editor .md-line-h3 { font: 600 17px / 1.4 var(--thoth-font-sans); padding-top: 0.3em !important; }
 .plain-editor .md-line-code { font: 13px / 1.6 var(--thoth-font-mono); background: var(--thoth-bg-hover); padding: 0 14px !important; }
 .plain-editor .md-line-quote { border-left: 3px solid var(--thoth-border-strong); padding-left: 1em !important; color: var(--thoth-ink-secondary); }
@@ -23,7 +23,7 @@
 .plain-editor .md-line-callout:is([data-callout="tip"], [data-callout="hint"], [data-callout="success"], [data-callout="check"], [data-callout="done"]) { --callout: var(--thoth-success); }
 .plain-editor .md-line-callout:is([data-callout="warning"], [data-callout="caution"], [data-callout="attention"], [data-callout="important"]) { --callout: var(--thoth-warning); }
 .plain-editor .md-line-callout:is([data-callout="danger"], [data-callout="error"], [data-callout="failure"], [data-callout="fail"], [data-callout="missing"], [data-callout="bug"]) { --callout: var(--thoth-danger); }
-.plain-editor .md-line-callout:is([data-callout="note"], [data-callout="info"], [data-callout="todo"], [data-callout="question"], [data-callout="help"], [data-callout="faq"]) { --callout: var(--thoth-link); }
+.plain-editor .md-line-callout:is([data-callout="note"], [data-callout="info"], [data-callout="todo"], [data-callout="question"], [data-callout="help"], [data-callout="faq"]) { --callout: var(--thoth-ink-secondary); }
 .plain-editor .md-line-callout:is([data-callout="quote"], [data-callout="cite"], [data-callout="example"], [data-callout="abstract"], [data-callout="summary"], [data-callout="tldr"]) { --callout: var(--thoth-stone-600); }
 
 /* Tokens (visible on the active line, and wherever live preview keeps the source) */

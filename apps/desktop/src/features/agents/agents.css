@@ -119,7 +119,7 @@
 .agents-row { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; transition: background-color var(--thoth-dur-instant) var(--thoth-ease-out); }
 .agents-row:hover { background: var(--thoth-bg-hover); }
 .agents-row:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
-.agents-row[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.agents-row[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .agents-row-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agents-row-state { flex: none; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); white-space: nowrap; }
 .agents-row[aria-current="page"] .agents-row-state { color: inherit; }

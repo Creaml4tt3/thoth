@@ -22,10 +22,12 @@ and ink by day, the night sky and the moon by night.
 - **Moon**: the brand anchor, lunar orange `#E8590C`: primary actions, the
   mark, the agent avatar, running badges and focus. As text it uses its role
   tones, `#B64201` on paper and `#FF8C5F` on black.
-- **Blue, secondary only**: links, Workspace badges, your own chat messages and
-  tonal buttons (`#3F6088` / `#A5CAF7`). Never a page fill or a primary action.
-- **Colour that means something**: the eight folder and tag colours, callouts
-  and status use Material-style tonal ramps (ADR-0053 rule 4). Colour is never
+- **Blue, secondary only**: links, Workspace badges, mention chips and your own
+  chat messages (`#3F6088` / `#A5CAF7`). Never a page fill, a primary action or a
+  button: secondary buttons are neutral (ADR-0053 amendment 2026-11-16).
+- **Colour that means something**: the eight folder and tag colours, the tip,
+  warning and danger callouts, and status use Material-style tonal ramps (ADR-0053
+  rule 4). Note, info and quote callouts are ink on a warm tint. Colour is never
   the only signal: a badge also has a word, a status also has an icon.
 
 Space types have their own badges, so users always know where content lives,
@@ -80,11 +82,14 @@ Verified rendering: 256 / 96 / 48 / 24 / 16px on Night and Paper. Not yet done:
 
 | Token | Spec |
 |---|---|
-| display | 600, 40–72px, 1.02 |
-| h1 / h2 / h3 | 40 / 28 / 20px, weight 600 |
+| display | 600, 40–72px, 1.02 (onboarding's headline: 700, 44–76px, like the site) |
+| h1 / h2 / h3 | 40 / 28 / 20px, weight 600 (interface and the page title) |
+| doc-h1 / doc-h2 | 32px 700 / 22px 600: headings inside a page, in both editors; H3–H6 17px 600 |
 | body | 16px / 1.65 |
 | UI | 14px / 20px |
 | small | 12px |
+
+Tables in a page have row lines only, with grey header text.
 
 The editor's content column is 720px.
 
@@ -103,8 +108,8 @@ The editor's content column is 720px.
 | Surface | Base theme | Notes |
 |---|---|---|
 | Marketing site | Follows the system (Papyrus or Black) | Hooded ibis in front of its moon, Moon pill CTA, notebook-cover intro |
-| Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs (no `.md`), properties row, callouts on a warm tint; page title 32/700, H2 22/600; the current tab filled with Moon; selection otherwise neutral (ADR-0053 amendment 2026-11-16) |
-| Onboarding, import wizard | Follows the chosen theme | Moon primary pill, secondary tonal pills |
+| Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs (no `.md`), properties row, callouts on a warm tint; page headings 32/700 and 22/600 (the page title above them is 40/600); the current tab filled with Moon; selection otherwise neutral (ADR-0053 amendment 2026-11-16) |
+| Onboarding, import wizard | Follows the chosen theme | Moon primary pill, neutral secondary pills |
 | Agent Hub, agent side panel | Follows the chosen theme | Your messages in the secondary container; the agent's answers on the container in ink with a 3px Moon rule at the left (calmer than a Moon wash in long chats; owner's pick 2026-11-15); Apply/Discard pills |
 | Transfer review (Private → Workspace) | Modal on the raised step | Shows destination workspace and members before commit (spec §12) |
 
@@ -120,8 +125,9 @@ The editor's content column is 720px.
   floor (4.62:1 at worst, over the Moon wash on the sidebar); the selected row is a translucent Moon wash
   (`rgb(232 89 12 / 0.31)`, the lowest alpha that still stands out from the page at 1.5:1) with `#FFDBCE` text on it.
 - Light selected-row text (`--thoth-accent-ink`, `--thoth-moon-ink`) is a mid Moon brown `#7A2E00` (7.1:1 on `#FED7C9`)
-  where a Moon wash is still used (menus' current item, chips). The tree, favourites and settings select with the
-  neutral `--thoth-bg-active` since 2026-11-16 (ADR-0053 amendment).
+  where a Moon wash is still used: text highlights, drop targets, the chosen option in pickers, the Running badge
+  and the excerpt chip. Rows that are selected or hovered (tree, favourites, settings, Agent Hub, menus, search) and
+  pressed toolbar buttons use the neutral `--thoth-bg-active` since 2026-11-16 (ADR-0053 amendment).
 - The current tab is a Moon fill with `--thoth-on-accent` text (white on `#B64201`, `#370E00` on `#FF8C5F`), both
   above 4.5:1; its focus ring switches to `--thoth-on-accent` so it stays visible on the fill.
 - `prefers-reduced-motion` removes motion: the motion duration and distance tokens become 0, and `ui.css` forces

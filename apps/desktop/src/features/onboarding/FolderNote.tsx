@@ -9,7 +9,7 @@ import { useDesktopStrings } from "../../strings/index.ts";
  * Both open the folder where it is. A folder that already holds Markdown, and that Thoth has not opened before (no
  * `.thoth/`), gets a short note first, right after the pick: Open, Choose another folder, or Escape back.
  */
-export function useFolderPicker(platform: Platform, onOpen: (root: string) => void, theme: "night" | "paper" = "paper") {
+export function useFolderPicker(platform: Platform, onOpen: (root: string) => void) {
   const t = useDesktopStrings().onboarding.folderNote;
   const [note, setNote] = useState<{ root: string; obsidian: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function useFolderPicker(platform: Platform, onOpen: (root: string) => vo
   };
 
   const dialog: ReactNode = note && (
-    <Modal title={t.title} theme={theme} onClose={() => setNote(null)}>
+    <Modal title={t.title} onClose={() => setNote(null)}>
       <div className="folder-note">
         <p>{t.body}</p>
         {note.obsidian && <p>{t.obsidian}</p>}

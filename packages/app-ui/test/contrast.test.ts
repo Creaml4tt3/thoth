@@ -150,13 +150,14 @@ describe.each(Object.entries(themes))("Papyrus Black roles, %s theme", (_name, t
 
   it.each(["--thoth-accent", "--thoth-outline"])("%s (focus ring, control borders) is at least 3:1 on the page, sidebar and container", (name) => onSurfaces(name, 3));
 
-  it("the focus ring (accent) stays at least 3:1 on a tonal button (the secondary container)", () => {
+  it("the focus ring (accent) stays at least 3:1 on the mention chip and Workspace badge (the secondary container)", () => {
     expect(ratio(rgb("--thoth-accent"), over(colour("--thoth-secondary-container"), rgb("--thoth-bg")))).toBeGreaterThanOrEqual(3);
   });
 });
 
-/** Component pairs of the app rollout (ADR-0053): a callout's 10% tint of its kind colour (editor.css, plain.css) under text,
- * the hover of a tonal button, and text on the raised container (inputs, popovers, the modal). */
+/** Component pairs of the app rollout (ADR-0053): a callout's tint of its kind colour under text (Blocks: 7% over the
+ * sidebar colour, editor.css; Plain: 10% over the surface, plain.css), the neutral ghost button and its hover (ui.css),
+ * and text on the raised container (inputs, popovers, the modal). */
 describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_name, theme) => {
   const t: Record<string, string> = { ...block(css, ":root, [data-theme] {"), ...theme };
   const colour = (name: string): Colour => {
@@ -177,18 +178,35 @@ describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_na
     expect(low).toEqual([]);
   });
 
-  it("a tonal button's hover (12% of its text colour in its container) keeps 4.5:1", () => {
-    const hover = mix(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"), 0.12);
-    expect(ratio(rgb("--thoth-on-secondary-container"), hover)).toBeGreaterThanOrEqual(4.5);
+  it.each(kinds)("Blocks callout kind %s: primary and tertiary ink on its 7% tint over the sidebar colour are at least 4.5:1", (kind) => {
+    const sidebar = rgb("--thoth-bg-sidebar");
+    const tint = mix(over(colour(kind), sidebar), sidebar, 0.07);
+    for (const ink of ["--thoth-ink-primary", "--thoth-ink-tertiary"]) expect(ratio(over(colour(ink), tint), tint)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("a ghost button (bg-active) and its hover (14% primary ink) keep primary ink at 4.5:1 on the page, sidebar and container", () => {
+    const low: string[] = [];
+    for (const surface of ["--thoth-bg", "--thoth-bg-sidebar", "--thoth-bg-container"]) {
+      const back = rgb(surface);
+      const ink = over(colour("--thoth-ink-primary"), back);
+      const fills: [string, Rgb][] = [["rest", over(colour("--thoth-bg-active"), back)], ["hover", mix(ink, back, 0.14)]];
+      for (const [state, fill] of fills) if (ratio(over(colour("--thoth-ink-primary"), fill), fill) < 4.5) low.push(`${state} over ${surface}`);
+    }
+    expect(low).toEqual([]);
   });
 
   it("the mention chip and Workspace badge (on-secondary-container on its container) are at least 4.5:1", () => {
     expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("menu highlight (moon-soft over the container) keeps primary ink and the danger text at 4.5:1", () => {
+  it("menu highlight (bg-active over the container) keeps primary ink and the danger text at 4.5:1", () => {
+    const wash = over(colour("--thoth-bg-active"), rgb("--thoth-bg-container"));
+    for (const ink of ["--thoth-ink-primary", "--thoth-danger"]) expect(ratio(over(colour(ink), wash), wash)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("text highlight (moon-soft over the container) keeps primary ink and moon-ink at 4.5:1", () => {
     const wash = over(colour("--thoth-moon-soft"), rgb("--thoth-bg-container"));
-    for (const ink of ["--thoth-ink-primary", "--thoth-danger", "--thoth-moon-ink"]) expect(ratio(over(colour(ink), wash), wash)).toBeGreaterThanOrEqual(4.5);
+    for (const ink of ["--thoth-ink-primary", "--thoth-moon-ink"]) expect(ratio(over(colour(ink), wash), wash)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

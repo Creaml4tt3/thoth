@@ -9,7 +9,6 @@ const count = (n: number) => n.toLocaleString("th-TH");
 
 export const th: DesktopStrings = {
   onboarding: {
-    meet: { before: "พบกับ", after: "Thoth" },
     lede: "ที่เก็บทุกสิ่งที่คุณรู้แบบส่วนตัว ไฟล์ของคุณอยู่ในคอมพิวเตอร์เป็น Markdown ในโฟลเดอร์ที่คุณเลือกเอง ไม่ต้องมีบัญชี ไม่ต้องใช้คลาวด์",
     startNew: "เริ่ม Private Space ใหม่", // REVIEW
     openExisting: "เปิดโฟลเดอร์ที่คุณใช้อยู่", // REVIEW
@@ -18,7 +17,6 @@ export const th: DesktopStrings = {
     startNewNote: "โฟลเดอร์ว่าง พร้อมหน้าแนะนำการใช้งานไม่กี่หน้า", // REVIEW
     openExistingNote: "โฟลเดอร์ Obsidian หรือโฟลเดอร์ Markdown ใดก็ได้ ไม่มีการคัดลอกหรือย้ายไฟล์", // REVIEW
     promise: ["อยู่ในคอมพิวเตอร์ของคุณ", "Markdown ธรรมดา", "ไม่ต้องมีบัญชี"], // REVIEW
-    hint: "ทั้งสองแบบเปิดโฟลเดอร์ตรงที่อยู่เดิม ไม่มีการคัดลอกไฟล์ ถ้าจะเริ่ม Private Space ใหม่ ให้เลือกหรือสร้างโฟลเดอร์ว่าง Thoth เก็บดัชนีการค้นหาไว้ในคอมพิวเตอร์เครื่องนี้ ไม่ใช่ในโฟลเดอร์", // REVIEW
     folderNote: {
       title: "เปิดโฟลเดอร์นี้ตรงที่อยู่เดิมไหม", // REVIEW
       body: "Thoth เปิดไฟล์เหล่านี้ตรงที่อยู่เดิม และแก้ไฟล์เฉพาะตอนที่คุณแก้เท่านั้น Thoth เก็บโฟลเดอร์ .thoth เล็ก ๆ ไว้ที่นี่สำหรับข้อมูลของตัวเอง", // REVIEW

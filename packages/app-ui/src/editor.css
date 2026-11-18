@@ -3,9 +3,9 @@
 .prose { outline: none; font: var(--thoth-text-body); min-height: 40vh; padding-bottom: var(--thoth-space-16); caret-color: var(--thoth-accent); }
 .prose[contenteditable="false"] { cursor: default; }
 .prose p { margin: 0 0 0.6em; }
-.prose h1 { font: 700 32px / 1.2 var(--thoth-font-sans); letter-spacing: -0.02em; margin: 1.2em 0 0.35em; }
+.prose h1 { font: var(--thoth-text-doc-h1); letter-spacing: -0.02em; margin: 1.2em 0 0.35em; }
 .prose > h1:first-child { margin-top: 0.2em; }
-.prose h2 { font: 600 22px / 1.3 var(--thoth-font-sans); letter-spacing: -0.01em; margin: 1.3em 0 0.35em; }
+.prose h2 { font: var(--thoth-text-doc-h2); letter-spacing: -0.01em; margin: 1.3em 0 0.35em; }
 .prose h3, .prose h4, .prose h5, .prose h6 { font: 600 17px / 1.4 var(--thoth-font-sans); margin: 1em 0 0.3em; }
 .prose ul, .prose ol { margin: 0 0 0.6em; padding-left: 1.5em; }
 .prose li > p { margin: 0 0 0.2em; }
@@ -274,7 +274,7 @@
 .text-tool { all: unset; box-sizing: border-box; min-width: 32px; height: 32px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; font: 600 14px / 1 var(--thoth-font-sans); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .text-tool:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .text-tool:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
-.text-tool[aria-pressed="true"] { background: var(--thoth-moon-soft); color: var(--thoth-moon-ink); }
+.text-tool[aria-pressed="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .text-tool-italic .text-tool-glyph { font-style: italic; font-weight: 500; font-family: var(--thoth-font-serif); }
 .text-tool-underline .text-tool-glyph { text-decoration: underline; text-underline-offset: 3px; }
 .text-tool-strike .text-tool-glyph { text-decoration: line-through; }
