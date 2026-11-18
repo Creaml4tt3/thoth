@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.10.1] - 2026-11-16
+
+### Added
+
+- The desktop app and the web app now include `THIRD-PARTY-LICENSES.txt`, the licence texts of the open-source libraries and fonts built into them.
+
 ## [0.10.0] - 2026-11-15
 
 ### Changed
@@ -361,7 +367,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/Creaml4tt3/thoth/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Creaml4tt3/thoth/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Creaml4tt3/thoth/compare/v0.9.0...v0.9.1
