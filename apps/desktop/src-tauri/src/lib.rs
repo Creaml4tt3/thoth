@@ -551,7 +551,11 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 {
                     use tauri::utils::config::WindowEffectsConfig;
                     use tauri::window::{Effect, EffectState};
-                    builder = builder.transparent(true).effects(WindowEffectsConfig { effects: vec![Effect::Sidebar], state: Some(EffectState::FollowsWindowActiveState), ..Default::default() });
+                    builder = builder.transparent(true).effects(WindowEffectsConfig {
+                        effects: vec![Effect::Sidebar],
+                        state: Some(EffectState::FollowsWindowActiveState),
+                        ..Default::default()
+                    });
                 }
                 // The tab was let go here: the new window's tab bar starts under the pointer.
                 if let Some((x, y)) = window.at {
