@@ -33,7 +33,7 @@ export function checkDist(dist: string): string[] {
   return problems;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   const problems = checkDist(join(import.meta.dirname, "..", "dist"));
   if (problems.length > 0) {
     console.error(`dist/ breaks the demo's rules:\n${problems.map((p) => `  ${p}`).join("\n")}`);

@@ -18,7 +18,8 @@ export type DemoKind = "compare" | "window";
 /** What focus is in when the hint shows and Esc applies: either editor. */
 export const EDITOR = ".ProseMirror, .cm-content";
 /** The editors' menus and selection toolbar, while one is showing (they hide with `hidden`). */
-const OPEN_POPUP = ".slash-menu:not([hidden]), .link-menu:not([hidden]), .block-menu:not([hidden]), .text-toolbar:not([hidden])";
+/** Not the selection toolbar: it only hears Esc from inside itself, and it hides by itself once focus leaves the text. */
+const OPEN_POPUP = ".slash-menu:not([hidden]), .link-menu:not([hidden]), .block-menu:not([hidden])";
 
 interface Session {
   id: number;
@@ -68,7 +69,7 @@ export function Demo({ kind, lang }: { kind: DemoKind; lang: Lang }) {
       return;
     }
     // Capture phase: Tiptap and CodeMirror use Esc themselves (select the parent block, close a menu) and would swallow it.
-    // An open menu or the selection toolbar takes this Esc (it closes); the next one leaves.
+    // An open menu takes this Esc (it closes); the next one leaves.
     if (event.key !== "Escape" || event.nativeEvent.isComposing || !inEditor(event.target) || document.querySelector(OPEN_POPUP)) return;
     event.preventDefault();
     event.stopPropagation();
