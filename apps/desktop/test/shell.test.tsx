@@ -32,7 +32,9 @@ describe("onboarding", () => {
     const { App } = await import("../src/app/App.tsx");
     render(<App platform={platform} />);
     expect(await screen.findByText(/files stay on your computer as Markdown/i)).toBeTruthy();
-    expect(document.querySelector('[data-theme="night"]')).not.toBeNull();
+    // It follows the app's theme now (2026-11-16), so nothing on it forces Night.
+    expect(document.querySelector('.onboarding [data-theme], .onboarding[data-theme]')).toBeNull();
+    expect(screen.getByRole("button", { name: "Start a new Private Space" }).getAttribute("aria-describedby")).toBeTruthy();
     const recent = await screen.findByRole("button", { name: new RegExp(root.split("/").pop()!) });
     expect(recent).toBeTruthy();
   });

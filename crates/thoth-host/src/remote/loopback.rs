@@ -84,8 +84,8 @@ fn serve(mut stream: TcpStream, state: &str, issuer: &str) -> Option<HostResult<
     }
     let outcome = check(query, state, issuer);
     match &outcome {
-        Ok(_) => respond(&mut stream, 200, "Signed in", "You are signed in to Thoth. You can close this window and return to the app."),
-        Err(e) => respond(&mut stream, 400, "Sign-in failed", &format!("{} Return to the Thoth app and try again.", e.message)),
+        Ok(_) => respond(&mut stream, 200, "You're signed in", "You can close this window and return to Thoth."),
+        Err(e) => respond(&mut stream, 400, "Sign-in failed", &format!("{}. Return to the Thoth app and try again.", e.message.trim_end_matches('.'))),
     }
     Some(outcome)
 }
@@ -143,21 +143,35 @@ pub fn constant_time_eq(a: &str, b: &str) -> bool {
     da.iter().zip(db.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
+/// The page the browser shows after the sign-in, in the website's look (Papyrus Black: paper in light, soft ink-black
+/// at night, Moon orange): the Moon Ibis mark, a round badge with a tick or a cross, the words, and a quiet line under
+/// them. It stays plain HTML with inline style only, so the CSP below (no script, nothing fetched) holds.
+fn page(ok: bool, title: &str, text: &str) -> String {
+    let badge = if ok {
+        r#"<path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>"#
+    } else {
+        r#"<path d="M8.5 8.5l7 7M15.5 8.5l-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>"#
+    };
+    format!(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"color-scheme\" content=\"light dark\"><title>{t} - Thoth</title><style>{STYLE}</style></head><body><main class=\"card\" data-ok=\"{ok}\"><div class=\"brand\">{MARK}<span>Thoth</span></div><div class=\"badge\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">{badge}</svg></div><h1>{t}</h1><p>{x}</p><p class=\"hint\">{hint}</p></main></body></html>",
+        t = escape(title),
+        x = escape(text),
+        hint = if ok { "This tab is no longer needed." } else { "Nothing was changed." },
+    )
+}
+
+const STYLE: &str = "*{box-sizing:border-box}html{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;font:16px/1.55 Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"Noto Sans Thai\",system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#fefaf3;color:#1f1b14}.card{width:100%;max-width:440px;padding:40px 36px 32px;border-radius:28px;background:#f8f0e2;border:1px solid rgb(60 45 20/.12)}.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px;letter-spacing:-.02em}.brand svg{width:26px;height:26px;color:#e8590c}.badge{margin:36px 0 18px;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#e8590c;color:#fefaf3}.badge svg{width:30px;height:30px}[data-ok=false] .badge{background:#3f221c;color:#ffdbce}h1{margin:0 0 8px;font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-.035em}p{margin:0;color:#4e4638}.hint{margin-top:24px;padding-top:16px;border-top:1px solid rgb(60 45 20/.12);font-size:14px;color:#6b6255}@media (prefers-color-scheme:dark){body{background:#0e0c0b;color:#e8e2d8}.card{background:#1a1715;border-color:rgb(255 255 255/.08)}p{color:#cdc6ba}.hint{color:#93908d;border-color:rgb(255 255 255/.08)}.badge{color:#0e0c0b}[data-ok=false] .badge{background:#582612;color:#ffdbce}}";
+
+/// The Moon Ibis (design/brand/mark.svg), the same drawing the server's shared pages use.
+const MARK: &str = r##"<svg viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><mask id="thoth-mark"><circle cx="256" cy="256" r="224" fill="#fff"/><path d="M430.4 396.5 C428.9 354.3 390.7 304.0 360.1 276.3 C336.9 255.6 310.3 238.4 282.4 224.9 C275.6 221.6 268.9 218.3 261.9 215.5 C255.8 213.1 246.8 210.9 241.4 207.6 C235.6 204.0 229.6 194.5 224.4 189.4 C212.6 178.1 198.3 169.9 182.3 166.5 C141.0 157.8 101.4 183.0 87.4 222.0 C84.0 231.5 82.6 241.3 82.1 251.4 C80.8 277.6 91.8 303.3 105.0 325.3 C112.3 337.6 120.6 349.4 127.2 362.1 C137.1 381.0 142.3 405.1 132.1 425.0 C129.8 429.3 126.8 433.0 123.6 436.7 L118.9 443.1 A232 232 0 0 0 198.8 480.8 L200.8 473.1 C201.3 466.6 201.9 460.1 201.7 453.6 C200.5 425.6 190.0 397.9 176.0 373.9 C171.9 366.8 167.8 359.8 163.6 352.8 C151.8 333.7 138.3 313.2 140.8 289.7 C142.8 270.2 159.5 257.2 177.8 253.6 C188.5 251.5 200.0 252.0 210.8 252.8 C275.3 257.5 330.2 282.6 376.4 328.0 C403.0 354.2 406.5 372.3 430.4 396.5Z" fill="#000"/><path d="M195.4 210.3 A11.4 11.4 0 1 1 172.6 210.3 A11.4 11.4 0 1 1 195.4 210.3Z" fill="#fff"/></mask></defs><circle cx="256" cy="256" r="224" fill="currentColor" mask="url(#thoth-mark)"/></svg>"##;
+
 fn respond(stream: &mut TcpStream, status: u16, title: &str, text: &str) {
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
         _ => "Not Found",
     };
-    let body = if text.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{t}</title></head><body style=\"font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem\"><h1>{t}</h1><p>{x}</p></body></html>",
-            t = escape(title),
-            x = escape(text)
-        )
-    };
+    let body = if text.is_empty() { String::new() } else { page(status == 200, title, text) };
     let head = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'\r\nX-Frame-Options: DENY\r\nConnection: close\r\n\r\n",
         body.len()

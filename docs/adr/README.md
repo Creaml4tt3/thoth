@@ -63,6 +63,7 @@ trade-off.
 | [0051](0051-timeline-folders-you-use-and-daily-notes.md) | Timeline, a folder you already use, and daily notes your way | Proposed 2026-11-04 |
 | [0052](0052-agent-memory-and-skills.md) | Agent memory and skills in Thoth | Accepted 2026-11-07 |
 | [0053](0053-papyrus-black.md) | Papyrus Black, the colour system for the app and the site | Accepted 2026-11-15 |
+| [0054](0054-hooded-ibis-mascot.md) | The hooded ibis replaces Moon Crown as the mascot | Accepted 2026-11-18 |
 
 Template: [0000-template.md](0000-template.md).
 

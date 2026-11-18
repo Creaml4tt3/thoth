@@ -546,6 +546,17 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     // Cmd/Ctrl + - = 0 zoom the page (WCAG 1.4.4), as in the main window (tauri.conf.json).
                     .zoom_hotkeys_enabled(true)
                     .focused(true);
+                // The same translucent sidebar as the main window (tauri.macos.conf.json; ADR-0053 amendment).
+                #[cfg(target_os = "macos")]
+                {
+                    use tauri::utils::config::WindowEffectsConfig;
+                    use tauri::window::{Effect, EffectState};
+                    builder = builder.transparent(true).effects(WindowEffectsConfig {
+                        effects: vec![Effect::Sidebar],
+                        state: Some(EffectState::FollowsWindowActiveState),
+                        ..Default::default()
+                    });
+                }
                 // The tab was let go here: the new window's tab bar starts under the pointer.
                 if let Some((x, y)) = window.at {
                     builder = builder.position((x - 140.0).max(0.0), (y - 20.0).max(0.0));
@@ -1035,6 +1046,9 @@ mod tests {
                     || p == "core:event:allow-unlisten"
                     // The zoom keys (zoomHotkeysEnabled): set the webview's own zoom, nothing else of core:webview.
                     || p == "core:webview:allow-set-webview-zoom"
+                    // The window's light or dark appearance, so the macOS sidebar material follows Thoth's theme
+                    // (ADR-0053): nothing else of core:window.
+                    || p == "core:window:allow-set-theme"
                     || NOTIFICATION.contains(&p),
                 "unexpected permission {p}"
             );
@@ -1045,7 +1059,9 @@ mod tests {
         assert_eq!(granted, NOTIFICATION);
         assert!(capability.get("remote").is_none());
         let text = include_str!("../capabilities/main.json");
-        for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
+        // core:window: only set-theme, exactly once (the permissions loop above refuses any other).
+        assert_eq!(text.matches("core:window:").count(), 1, "capability grants core:window: beyond set-theme");
+        for plugin in ["http:", "opener:", "shell:", "fs:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
         }
     }

@@ -26,11 +26,29 @@ describe("search", () => {
     const dialog = await screen.findByRole("dialog", { name: "Search" });
     await app.user.type(within(dialog).getByRole("combobox"), "gallop");
     const option = await within(dialog).findByRole("option", { name: /Zebra/ });
-    expect(option.textContent).toContain("Notes/Zebra.md");
+    expect(option.textContent).toContain("Notes"); // the folder it lives in, beside the title
+    expect(option.querySelector("mark")?.textContent).toBe("gallop");
     await app.user.keyboard("{Enter}");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull());
     const box = await editorBox();
     await waitFor(() => expect(box.textContent).toContain("Striped animals gallop."));
+  });
+
+  it("clearing a search goes back to the recent pages with the first one selected", async () => {
+    await seed(root, Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`Many/Stripe ${i}.md`, `# Stripe ${i}\n\nstripe\n`])));
+    const app = await openApp(root);
+    const tree = await screen.findByRole("tree");
+    await app.user.click(within(tree).getByRole("treeitem", { name: "Alpha" }));
+    await app.user.keyboard("{Meta>}k{/Meta}");
+    const dialog = await screen.findByRole("dialog", { name: "Search" });
+    const input = within(dialog).getByRole("combobox");
+    await app.user.type(input, "stripe");
+    await waitFor(() => expect(within(dialog).getAllByRole("option").length).toBeGreaterThan(4));
+    for (let i = 0; i < 5; i++) await app.user.keyboard("{ArrowDown}");
+    await app.user.clear(input);
+    const first = await within(dialog).findByRole("option", { name: /Alpha/ });
+    expect(first.getAttribute("aria-selected")).toBe("true");
+    expect(input.getAttribute("aria-activedescendant")).toBe(first.id);
   });
 
   it("Ctrl+K also opens search, and Escape closes it", async () => {
@@ -42,12 +60,13 @@ describe("search", () => {
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
   });
 
-  it("the Close button and a click on the backdrop also close search", async () => {
+  it("Escape and a click on the backdrop close search (a palette has no Close button)", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     await app.user.keyboard("{Meta>}k{/Meta}");
     let dialog = await screen.findByRole("dialog", { name: "Search" });
-    await app.user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull();
+    await app.user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
 
     await app.user.keyboard("{Meta>}k{/Meta}");

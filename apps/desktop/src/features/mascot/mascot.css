@@ -1,23 +1,20 @@
 /*
- * The Thoth mascot, Moon Crown (MascotArt.tsx, art/). Only transform and opacity move, on SVG groups whose pivot is
- * their own origin (`transform-box: view-box; transform-origin: 0 0`, so a CSS transform composes like the SVG
- * attribute). This is the one stylesheet for every copy of the drawing: the art files carry no style or fill.
+ * The Thoth mascot, the hooded ibis (MascotArt.tsx, art/). Only transform and opacity move, on SVG groups whose pivot
+ * is their own origin (`transform-box: view-box; transform-origin: 0 0`, so a CSS transform composes like the SVG
+ * attribute). This is the one stylesheet for every copy of the drawing.
  *
  * Motion: the morph between the versions is a transition (it can be re-triggered and retargeted mid-flight); each
- * state is its own drawing, so a state change swaps the drawing and its cue comes in. The per-state loops are
- * keyframes whose amplitude and tempo come from two variables: Full is 1 and 1, Calm halves the amplitude and slows the tempo, Off (and the OS's reduced-motion setting, through
- * the tokens and the global override in ui.css) leaves a static pose for each state. Loops are slow and small: the
- * mascot sits beside the writing, it must never pull the eye from it.
+ * state is its own painting, so a state change swaps it and its cue comes in. The per-state loops are keyframes whose
+ * amplitude and tempo come from two variables: Full is 1 and 1, Calm halves the amplitude and slows the tempo, Off (and
+ * the OS's reduced-motion setting, through the tokens and the global override in ui.css) leaves a still pose for each
+ * state. Loops are slow and small: the mascot sits beside the writing, it must never pull the eye from it.
  */
 
-/* Colours are the brand's own (design/DESIGN.md), not theme tokens. Two colourways: Paper (the light theme) is an
-   ink bird; Night (the dark theme) a paper-white bird with an ink head. The badge's head is cut out of the moon on
-   Night, so it shows the panel; on Paper the ink head is drawn. */
+/* Two copies of each painting: Paper (the light theme) as painted; Night with a thin paper outline, so the dark cloak
+   edge and legs still read on a near-black panel (as the website's poses do). */
 .mascot-art {
   --m-moon: #E8590C;
-  --m-ink: #0A0A0A;
-  --m-paper: #F7F5F0;
-  --m-body: var(--m-ink);
+  --m-paper: #F3EEE5;
   --m-show-night: none;
   --m-show-paper: inline;
 
@@ -32,42 +29,17 @@
   display: block;
   overflow: visible;
 }
-[data-theme="night"] .mascot-art { --m-body: var(--m-paper); --m-show-night: inline; --m-show-paper: none; }
+[data-theme="night"] .mascot-art { --m-show-night: inline; --m-show-paper: none; }
 @media (prefers-color-scheme: dark) {
-  [data-theme="system"] .mascot-art { --m-body: var(--m-paper); --m-show-night: inline; --m-show-paper: none; }
+  [data-theme="system"] .mascot-art { --m-show-night: inline; --m-show-paper: none; }
 }
 .mascot-art[data-motion="calm"] { --m-amp: 0.5; --m-tempo: 1.6; }
 
 .mascot-art g { transform-box: view-box; transform-origin: 0 0; }
-.mascot-art .m-body, .mascot-art .m-leg, .mascot-art .m-cue-neutral { fill: var(--m-body); }
-.mascot-art .m-ink { fill: var(--m-ink); }
-.mascot-art .m-eye-white, .mascot-art .m-gap-a, .mascot-art .m-gap-b { fill: var(--m-paper); }
-.mascot-art .m-moon, .mascot-art .m-cue-engaged { fill: var(--m-moon); }
-.mascot-art .m-mask-keep { fill: #FFF; }
-.mascot-art .m-gap-a, .mascot-art .m-night-only { display: var(--m-show-night); }
-.mascot-art .m-gap-b, .mascot-art .m-paper-only { display: var(--m-show-paper); }
-
-/* ---------------------------------------------------------------- pivots, from the drawing (figure units, badge px) */
-
-/* The moon: its centre, the unit circle scaled to its radius. The wing turns at its shoulder. */
-.mascot-art .m-figure .m-disc-pos { transform: translate(262px, 282px) scale(250); }
-.mascot-art .m-figure .m-wing-pos { transform: translate(60px, 600px); }
-/* The eye's centre, inside the head (so it turns with it). */
-.mascot-art .m-figure .m-eye-pos { transform: translate(184px, 210.3px); }
-.mascot-art[data-detail="low"] .m-figure .m-eye-pos { transform: translate(180px, 210.5px); }
-/* The head turns at the neck's narrowest point, which each pose puts somewhere else (sleeping: the tucked head's centre). */
-.mascot-art[data-state="idle"] .m-figure .m-head-pos { transform: translate(138px, 345px); }
-.mascot-art[data-state="listening"] .m-figure .m-head-pos { transform: translate(122.186px, 329.279px); }
-.mascot-art[data-state="listening"][data-detail="low"] .m-figure .m-head-pos { transform: translate(124.649px, 327.041px); }
-.mascot-art[data-state="working"] .m-figure .m-head-pos { transform: translate(146.584px, 347.394px); }
-.mascot-art[data-state="review"] .m-figure .m-head-pos { transform: translate(143.596px, 345.525px); }
-.mascot-art[data-state="done"] .m-figure .m-head-pos { transform: translate(119.572px, 343.42px); }
-.mascot-art[data-state="done"][data-detail="low"] .m-figure .m-head-pos { transform: translate(121.337px, 341.763px); }
-.mascot-art[data-state="error"] .m-figure .m-head-pos { transform: translate(133.222px, 362.928px); }
-.mascot-art[data-state="sleeping"] .m-figure .m-head-pos { transform: translate(176px, 414px); }
-/* The badge is the mark: its parts are placed, never turned. */
-.mascot-art .m-badge .m-disc-pos { transform: translate(19.7px, 28.3px) scale(19.2); }
-.mascot-art .m-badge .m-head-pos { transform: translate(19.7px, 28.3px); }
+.mascot-art .m-night-only { display: var(--m-show-night); }
+.mascot-art .m-paper-only { display: var(--m-show-paper); }
+.mascot-art .m-cue-engaged { fill: var(--m-moon); }
+.mascot-art .m-cue-ring { fill: var(--thoth-bg, var(--m-paper)); }
 
 /* ---------------------------------------------------------------- the stage: facing, corner, versions */
 
@@ -76,61 +48,46 @@
 .mascot-art .m-offset { transition: transform var(--m-morph) var(--m-ease-morph); }
 .mascot-art[data-version="compact"][data-vertical="top"] .m-offset { transform: translate(0, -36px); }
 
-/* The morph: the figure and the badge move so their moons always lie on each other (the figure's moon, centre 52.2,
-   32.3 and radius 21.2, onto the badge's, 21.7, 66.3 and 19.2: the 48 px badge at 1:1 in the 52 px compact box).
-   The incoming moon fades in first and the outgoing one fades out after it, so the moon never dims halfway. The
-   figure's head fades with its moon (on Night the badge's head is a hole in the moon, and the figure's moon under it
-   would fill it). The rest of the bird hangs below and left of the moon, so mid-morph it would stick out of the stage:
-   it leaves at once and comes in only once the figure is nearly in place. */
-.mascot-art .m-figure { transition: transform var(--m-morph) var(--m-ease-morph); }
+/* The morph: the figure shrinks into the badge's square (bottom-left 52 px of the stage) and fades as the badge grows
+   in from the figure's size; the reverse on the way back. The badge (head at 2,38, 48 px) starts as large as the
+   figure's head would be, so the eye follows one head. */
+.mascot-art .m-figure { transition: transform var(--m-morph) var(--m-ease-morph), opacity var(--m-fade) var(--thoth-ease-out, ease-out); }
 .mascot-art .m-badge { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out), transform var(--m-morph) var(--m-ease-morph); }
-.mascot-art .m-figure-moon { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out); }
-.mascot-art .m-badge { transform: translate(30.503px, 1.1432px) scale(1.10176); }
-.mascot-art[data-version="compact"] .m-badge { transform: translate(2px, 38px); }
-.mascot-art[data-version="compact"] .m-figure { transform: translate(-25.6856px, 36.9624px) scale(0.907636); }
-.mascot-art[data-version="compact"] .m-figure-moon,
-.mascot-art[data-version="full"] .m-badge { opacity: 0; transition-delay: var(--m-fade), 0s; transition-timing-function: var(--thoth-ease-in, ease-in), var(--m-ease-morph); }
-.mascot-art .m-figure-bird { transition: opacity var(--m-fade) var(--thoth-ease-out, ease-out) var(--m-fade); }
-.mascot-art[data-version="compact"] .m-figure-bird { opacity: 0; transition-duration: calc(var(--m-fade) / 2); transition-delay: 0s; }
-
-/* ---------------------------------------------------------------- poses per state */
-
-/* Each state's pose, head included, is in its drawing; a CSS turn of the head on top would double it. The wing turns
-   a little for review and error. It turns under the body's fixed outline, so past -4deg (88 px) the outline cuts the
-   plumes and leaves dark slivers inside the body. Done's wing is drawn against the outline already: it stays put. */
-.mascot-art[data-state="review"] .m-figure .m-wing { transform: rotate(-4deg); }
-.mascot-art[data-state="error"] .m-figure .m-wing { transform: rotate(-2deg); }
+.mascot-art[data-version="full"] .m-badge { opacity: 0; transform: translate(-30px, -60px) scale(1.7); }
+.mascot-art[data-version="compact"] .m-figure { opacity: 0; transform: translate(2px, 38px) scale(0.55); transition-delay: 0s, calc(var(--m-fade) / 2); }
 
 /* ---------------------------------------------------------------- loops and one-shots, per state */
 
-/* idle: a slow bob and a blink now and then. */
+/* idle: a slow bob. */
 @keyframes m-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, calc(var(--m-amp) * -1.4px)); } }
-@keyframes m-blink { 0%, 90%, 96%, 100% { transform: scale(1, 1); } 93% { transform: scale(1, 0.1); } }
 /* working: the cue breathes while the agent works. */
-@keyframes m-pulse { 0%, 100% { opacity: 1; } 50% { opacity: calc(1 - var(--m-amp) * 0.4); } }
+@keyframes m-pulse { 0%, 100% { opacity: 1; } 50% { opacity: calc(1 - var(--m-amp) * 0.45); } }
+/* working: the scribe leans into the page now and then. */
+@keyframes m-write { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(calc(var(--m-amp) * 1.4deg)); } }
 /* done: one small hop with a soft landing. */
 @keyframes m-hop { 0% { transform: translate(0, 0); } 35% { transform: translate(0, calc(var(--m-amp) * var(--m-hop, -6px))); } 70% { transform: translate(0, 0); } 82% { transform: translate(0, calc(var(--m-amp) * 0.8px)); } 100% { transform: translate(0, 0); } }
 /* error: a short worried shake, once. */
 @keyframes m-shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(var(--m-amp) * -1px), 0); } 45% { transform: translate(calc(var(--m-amp) * 1px), 0); } 70% { transform: translate(calc(var(--m-amp) * -0.6px), 0); } }
-/* A state's cue comes in when the state starts. */
-@keyframes m-in { from { transform: scale(0.82); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-/* sleeping: slow breathing. */
-@keyframes m-breathe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, calc(var(--m-amp) * 0.9px)); } }
+/* A state's painting and cue come in when the state starts. */
+@keyframes m-in { from { opacity: 0.4; } to { opacity: 1; } }
+@keyframes m-cue-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* sleeping: slow breathing, the cloak rising a little. */
+@keyframes m-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1, calc(1 + var(--m-amp) * 0.012)); } }
 
 .mascot-art[data-version="compact"] { --m-hop: -3px; }
-.mascot-art .m-cue, .mascot-art .m-cue > g { transform-box: fill-box; transform-origin: center; }
-.mascot-art .m-cue { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both; }
-/* Facing left mirrors the stage; the cue keeps its place in the corner but reads the right way round (the tick). */
-.mascot-art[data-facing="left"] .m-cue > g { transform: scale(-1, 1); }
+.mascot-art .m-cue { transform-box: fill-box; transform-origin: center; animation: m-cue-in var(--m-pose) var(--thoth-ease-out, ease-out) both; }
+.mascot-art image { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both; }
 .mascot-art[data-state="working"] .m-cue-engaged { animation: m-pulse calc(2.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+/* Turns and the breath pivot at the feet (the bottom middle of the stage). */
+.mascot-art .m-figure > image { transform-box: view-box; transform-origin: 44px 88px; }
 .mascot-art[data-state="idle"] .m-rig { animation: m-bob calc(4.8s * var(--m-tempo)) var(--m-ease-loop) infinite; }
-.mascot-art[data-state="idle"] .m-eye,
-.mascot-art[data-state="listening"] .m-eye,
-.mascot-art[data-state="working"] .m-eye { animation: m-blink calc(5.6s * var(--m-tempo)) linear infinite; }
 .mascot-art[data-state="listening"] .m-rig { animation: m-bob calc(3.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+/* review: holds the page out and waits, the cue still. */
+.mascot-art[data-state="review"] .m-rig { animation: m-bob calc(5.6s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="working"][data-version="full"] .m-figure > image { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both, m-write calc(1.6s * var(--m-tempo)) var(--m-ease-loop) infinite; }
 .mascot-art[data-state="done"] .m-rig { animation: m-hop 640ms var(--m-ease-loop) 1 both; }
 .mascot-art[data-state="error"] .m-rig { animation: m-shake 420ms var(--m-ease-loop) 1 both; }
-.mascot-art[data-state="sleeping"] .m-rig { animation: m-breathe calc(6.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
+.mascot-art[data-state="sleeping"][data-version="full"] .m-figure > image { animation: m-in var(--m-pose) var(--thoth-ease-out, ease-out) both, m-breathe calc(6.4s * var(--m-tempo)) var(--m-ease-loop) infinite; }
 
 /* Off: a still pose per state (the OS's reduced-motion setting does the same through ui.css). Nothing moves, nothing fades. */
 .mascot-art[data-motion="off"] *, .mascot-art[data-motion="off"] { animation: none !important; transition: none !important; }

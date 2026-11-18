@@ -33,6 +33,7 @@ Hosts the platform ports for the webview (ADR-0008, option (a)). The React UI in
   are bundled (`apps/desktop/src/fonts`, `font-src 'self'`).
 - `Info.plist` (merged by Tauri) declares English and Thai localizations, so
   macOS reports a Thai system language to the webview and the UI can follow it.
-- Icons are generated from `design/brand/app-icon-dark.svg` with
-  `pnpm --filter @thoth/desktop tauri icon ../../design/brand/app-icon-dark.svg -o src-tauri/icons`.
+- Icons are generated from `design/brand/app-icon.svg` (the Moon tile, ADR-0053 amendment 2026-11-16). `tauri icon`
+  reads PNG, so render it first, then delete the `android/` and `ios/` folders it also writes:
+  `resvg -w 1024 design/brand/app-icon.svg /tmp/icon.png && pnpm --filter @thoth/desktop tauri icon /tmp/icon.png -o src-tauri/icons`.
 - The `thoth-host-stdio` binary is test infrastructure and is never bundled.

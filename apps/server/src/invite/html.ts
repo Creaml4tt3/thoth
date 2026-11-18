@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from "../signin/html.ts";
-import { MARK } from "../share/html.ts";
+import { MARK } from "../mark.ts";
 
 /**
  * The invite pages (ADR-0024 rule 3): plain HTML, no script anywhere, the share pages' stylesheet and fonts, light and

@@ -45,9 +45,36 @@ and others) uses a warm off-white and a warm near-black; none uses pure `#FFF` o
    pairs.
 7. **Type stays sans.** Inter Variable with Noto Sans Thai, headlines 600 with tight tracking. The serif reading mode
    stays optional.
-8. **Unchanged:** the Moon Ibis mark and the app's Moon Crown mascot (a change of mascot would be its own ADR), the
+8. **Unchanged:** the Moon Ibis mark (the mascot changed to the hooded ibis in ADR-0054), the
    theme values users have saved, the motion rules, and the brand files and app icons (new icons need a regenerated
    set with `tauri icon` and are done only if the owner asks).
+
+## Amendment 2026-11-16: calmer chrome (owner)
+
+After a UX review against Notion, Linear, Craft, Bear, Things, Raycast and Arc (`docs/design/research/2026-11-app-ux-review.md`),
+the owner approved these changes to where Moon appears in the app:
+
+- **Moon marks the one thing that is current and the things you act on.** The current tab is filled with Moon
+  (`--thoth-tab-active-bg: var(--thoth-accent)`, text `--thoth-on-accent`), replacing ADR-0016's line on top. Primary
+  buttons, focus rings, checked to-dos and the mascot keep it.
+- **Selection elsewhere is neutral.** A selected tree, favourite or settings row uses `--thoth-bg-active` with ink text;
+  page icons in the tree are grey ink. Folder colours (rule 4) are unchanged.
+- **Links stay blue** (rule 3, option A of the review).
+- **The search palette** sits high on the window over a light scrim (12% ink on paper, 40% black on black), not the
+  45% black of dialogs that must be answered.
+- **Paths are not shown as code.** Crumbs, search and Connections drop `.md` and the monospace path.
+- **Paper and glass** (owner: "a little bit transparent, with paper texture"; research in
+  `docs/design/research/2026-11-translucent-paper.md`). A static grain tile sits behind the shell, sidebar and tab strip
+  (2.5% ink on paper, 1.2% on black; the faintest text stays above 5:1 on its darkest pixel). On macOS the window has
+  the native Sidebar material and the sidebar is 88% (paper) or 90% (black) opaque, so the desktop shows through it
+  faintly; the writing area stays opaque. The window's appearance follows Thoth's theme. Windows, Linux and the web keep
+  opaque surfaces; reduced transparency, more contrast, forced colours and print turn grain and glass off. Wry's
+  transparent window uses a private WebKit key, so a future Mac App Store build would need an opaque variant.
+
+- **App icon** (owner, 2026-11-16, option "B2" of A flat, B lit, C paper): the Moon Ibis in paper on a Moon tile lit
+  from the top, `design/brand/app-icon.svg`. Chosen over the flat tile because the light reads as a current Mac icon
+  and sets it apart from the flat orange tiles of other AI tools; the mark itself stays flat. The black tile stays
+  only where the site still uses it, until the site moves.
 
 ## Consequences
 
@@ -59,5 +86,5 @@ and others) uses a warm off-white and a warm near-black; none uses pure `#FFF` o
 
 ## Open questions
 
-- New app icons and favicon in Papyrus Black: only if the owner asks.
+- ~~New app icons in Papyrus Black~~: decided 2026-11-16, the Moon tile (amendment above). The favicon is unchanged.
 - A licensed display face: still Inter for now.

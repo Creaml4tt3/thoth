@@ -77,9 +77,13 @@ describe("the two versions", () => {
     view.unmount();
   });
 
-  it("is hand-drawn SVG with no raster and no hard-coded silhouette colour", () => {
-    const { container } = render(<MascotArt state="idle" version="full" />);
-    expect(container.querySelectorAll("image, foreignObject").length).toBe(0);
+  it.each(MASCOT_STATES)("paints its own pose, a Night copy and a head badge from the bundled art, nothing remote (%s)", (state: MascotState) => {
+    const { container } = render(<MascotArt state={state} version="full" />);
+    const hrefs = [...container.querySelectorAll("image")].map((i) => i.getAttribute("href") ?? "");
+    expect(hrefs).toHaveLength(3);
+    for (const href of hrefs) expect(href, href).toMatch(new RegExp(`${state}(-night|-head)?\\.webp`));
+    for (const href of hrefs) expect(href).not.toMatch(/^https?:/);
+    expect(container.querySelectorAll("foreignObject").length).toBe(0);
     for (const el of container.querySelectorAll("[fill]")) expect(el.getAttribute("fill"), el.outerHTML).not.toMatch(/^#/);
   });
 });

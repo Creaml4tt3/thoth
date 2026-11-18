@@ -14,3 +14,56 @@
 .recent-item:hover:not(:disabled) { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
 .recent-item b { font-weight: 550; }
 .recent-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* First screen (2026-11-16): the site's hero in the app. The hooded ibis stands on a Moon stage with its moon behind
+   it; the copy beside it is the site's headline and the two ways in as cards. Follows the theme (paper or black), with
+   the same grain as the shell. Under 860px the stage sits above the copy. */
+.onboarding-first { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: center; place-items: center stretch; padding: clamp(28px, 5vh, 64px) max(clamp(20px, 5vw, 64px), calc((100% - 1180px) / 2)); text-align: left; background-image: url("@thoth/app-ui/textures/grain-paper.png"); background-size: 128px 128px; }
+[data-theme="night"] .onboarding-first { background-image: url("@thoth/app-ui/textures/grain-night.png"); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] .onboarding-first { background-image: url("@thoth/app-ui/textures/grain-night.png"); } }
+
+.first-stage { position: relative; align-self: stretch; min-height: 420px; max-height: 640px; border-radius: 28px; overflow: hidden; background: linear-gradient(180deg, #F7752E, #D84D0B); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 30px 60px -30px rgb(120 40 0 / 0.55); animation: thoth-fade-in var(--thoth-dur-slow) var(--thoth-ease-out); }
+.first-moon { position: absolute; width: 78%; aspect-ratio: 1; left: 50%; top: 14%; translate: -50% 0; border-radius: 50%; background: radial-gradient(circle at 38% 34%, rgb(255 248 241 / 0.34), rgb(255 248 241 / 0.12) 62%, rgb(255 248 241 / 0.06)); }
+.first-ibis { position: absolute; left: 50%; bottom: -2%; height: 92%; width: auto; translate: -50% 0; filter: drop-shadow(0 18px 24px rgb(80 24 0 / 0.35)); animation: thoth-ibis-in var(--thoth-dur-slow) var(--thoth-ease-out) both; }
+@keyframes thoth-ibis-in { from { opacity: 0; transform: translateY(calc(var(--thoth-shift) * 3)); } }
+
+.first-copy { display: grid; gap: 18px; justify-items: start; max-width: 560px; animation: thoth-rise-in var(--thoth-dur-slow) var(--thoth-ease-out) both; }
+.first-brand { display: inline-flex; align-items: center; gap: 10px; font: 600 20px / 1 var(--thoth-font-sans); letter-spacing: -0.02em; color: var(--thoth-ink-primary); }
+.first-brand .mark { color: var(--thoth-accent); }
+.first-title { margin: 6px 0 0; font: 700 clamp(44px, 6.2vw, 76px) / 1.02 var(--thoth-font-sans); letter-spacing: -0.04em; color: var(--thoth-ink-primary); }
+.first-title span { display: block; }
+.first-title span + span { color: var(--thoth-accent); }
+.first-lede { max-width: 480px; font: 400 17px / 1.6 var(--thoth-font-sans); color: var(--thoth-ink-secondary); }
+
+.first-choices { width: 100%; display: grid; gap: 10px; margin-top: 6px; }
+.first-choice { position: relative; display: grid; gap: 3px; padding: 16px 52px 16px 20px; border-radius: 16px; border: 1px solid var(--thoth-border-strong); background: var(--thoth-bg-container); color: var(--thoth-ink-primary); transition: transform var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.first-choice:has(.first-choice-title:hover:not(:disabled)) { transform: translateY(-1px); border-color: var(--thoth-accent); }
+.first-choice[data-busy] { opacity: 0.6; }
+.first-choice-main { background: var(--thoth-accent); border-color: var(--thoth-accent); color: var(--thoth-on-accent); }
+/* The button is the title; its ::after covers the card so the whole card is the target. */
+.first-choice-title { all: unset; font: 600 17px / 1.3 var(--thoth-font-sans); cursor: pointer; }
+.first-choice-title::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.first-choice-title:disabled { cursor: progress; }
+.first-choice:has(.first-choice-title:focus-visible) { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.first-choice-main:has(.first-choice-title:focus-visible) { outline-color: var(--thoth-ink-primary); }
+.first-choice-note { font: 400 14px / 1.45 var(--thoth-font-sans); color: var(--thoth-ink-secondary); }
+.first-choice-main .first-choice-note { color: inherit; opacity: 0.88; }
+.first-choice-arrow { position: absolute; right: 20px; top: 50%; translate: 0 -50%; font-size: 20px; transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
+.first-choice:has(.first-choice-title:hover:not(:disabled)) .first-choice-arrow { transform: translateX(3px); }
+
+.first-promise { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font: 450 13px / 1.4 var(--thoth-font-sans); color: var(--thoth-ink-tertiary); }
+.first-promise li { display: inline-flex; align-items: center; gap: 7px; }
+.first-promise li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--thoth-accent); }
+.first-label { font: 600 13px / 18px var(--thoth-font-sans); color: var(--thoth-ink-secondary); }
+.onboarding-first .recent { margin-top: 8px; width: 100%; }
+
+@media (max-width: 860px) {
+  .onboarding-first { grid-template-columns: 1fr; align-content: start; }
+  .first-stage { min-height: 260px; height: 34vh; width: 100%; }
+  .first-copy { max-width: none; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) { .onboarding-first { background-image: none; } }
+@media (forced-colors: active) { .first-stage { background: Canvas; border: 1px solid CanvasText; } .first-choice { border: 1px solid ButtonText; } .first-choice:has(.first-choice-title:focus-visible) { outline-color: Highlight; } }
+/* Thai stacks marks above and below the line: give the big headline room. */
+:lang(th) .first-title { line-height: 1.22; letter-spacing: -0.01em; }
+:lang(th) .first-choice-note, :lang(th) .first-lede { line-height: 1.7; }

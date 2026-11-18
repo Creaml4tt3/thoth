@@ -8,7 +8,7 @@ import { useDesktopStrings } from "../../strings/index.ts";
 import { seedWelcome } from "./welcome.ts";
 
 /**
- * Shown once for an empty Private Space (Night): start writing, which writes the Welcome pages the first time
+ * Shown once for an empty Private Space (it follows the theme, like the first screen): start writing, which writes the Welcome pages the first time
  * (ADR-0032) and hands back the page to open, or bring notes in first.
  */
 export function Intro({ onContinue }: { onContinue(welcome?: string): void }) {
@@ -28,7 +28,7 @@ export function Intro({ onContinue }: { onContinue(welcome?: string): void }) {
 
   if (importing) {
     return (
-      <main className="onboarding onboarding-wizard" data-theme="night">
+      <main className="onboarding onboarding-wizard">
         <ImportWizard
           onClose={() => {
             setImporting(false);
@@ -46,7 +46,7 @@ export function Intro({ onContinue }: { onContinue(welcome?: string): void }) {
   }
 
   return (
-    <main className="onboarding" data-theme="night">
+    <main className="onboarding">
       <div className="onboarding-inner">
         <h1 className="display onboarding-title">
           <Mark size={48} /> {t.ready}

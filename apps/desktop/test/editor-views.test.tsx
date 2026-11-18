@@ -99,7 +99,7 @@ describe("node views", () => {
     await app.user.click(box.querySelector<HTMLElement>("a.wikilink")!);
     const crumbs = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByText("Folder")).toBeTruthy();
-    expect(within(crumbs).getByText("Target Page.md").closest("li")!.getAttribute("aria-current")).toBe("page");
+    expect(within(crumbs).getByText("Target Page").closest("li")!.getAttribute("aria-current")).toBe("page");
   });
 
   it("a folder crumb shows that folder in the sidebar and focuses its row; the badge focuses the section", async () => {
@@ -111,7 +111,7 @@ describe("node views", () => {
     const folder = within(tree).getByRole("treeitem", { name: "Folder" });
     await app.user.click(folder);
     expect(folder.getAttribute("aria-expanded")).toBe("false");
-    expect(within(crumbs).queryByRole("button", { name: "Target Page.md" })).toBeNull(); // the page itself stays text
+    expect(within(crumbs).queryByRole("button", { name: "Target Page" })).toBeNull(); // the page itself stays text
     await app.user.click(within(crumbs).getByRole("button", { name: "Folder" }));
     await waitFor(() => expect(document.activeElement).toBe(within(tree).getByRole("treeitem", { name: "Folder" })));
     await waitFor(() => expect(within(tree).getByRole("treeitem", { name: "Folder" }).getAttribute("aria-expanded")).toBe("true"));

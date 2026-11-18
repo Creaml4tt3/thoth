@@ -8,6 +8,17 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- The mascot is now the hooded ibis, the same one as on thothnotes.com, with new poses for listening, working, an error and sleeping.
+- A new app icon: the Moon Ibis in paper on a Moon orange tile.
+- The first screen looks like the website: "Your notes. Your files." with a short line under each choice and your recent folders.
+- A calmer look: the current tab is filled with Moon orange, selected rows elsewhere are neutral, and paths no longer show as code.
+- A faint paper texture behind the sidebar and tabs. On macOS the sidebar is slightly see-through; reduced transparency and more contrast turn it off.
+- The browser pages you see after signing in now match the website.
+
 ## [0.10.1] - 2026-11-16
 
 ### Added

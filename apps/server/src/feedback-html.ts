@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from "./signin/html.ts";
-import { MARK } from "./share/html.ts";
+import { MARK } from "./mark.ts";
 
 /**
  * The page the website's no-JavaScript support form gets back (ADR-0033): thanks, or what to fix, and a link back to

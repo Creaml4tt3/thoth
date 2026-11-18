@@ -35,13 +35,13 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tree-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 4px; width: 100%; padding: 4px 8px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; white-space: nowrap; overflow: hidden; transition: background-color var(--thoth-dur-instant) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
 .tree-item:hover { background: var(--thoth-bg-hover); }
 .tree-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
-.tree-item[aria-selected="true"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.tree-item[aria-selected="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); font-weight: 500; }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
 /* Favorites (ADR-0027): rows like the tree's, with a small hint of their space, reordered by a pointer drag with a live
    preview (transforms only, nothing under reduced motion where the duration tokens are 0). */
 .fav-row { position: relative; }
 .fav-item { padding-left: 24px; min-height: 28px; }
-.fav-item[aria-current="page"] { background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
+.fav-item[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .fav-item[data-unavailable] .tree-label { color: var(--thoth-ink-tertiary); }
 .fav-hint { flex: none; margin-left: auto; padding-left: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 [data-fav-dragging] .fav-row:not([data-dragging]) { transition: transform var(--thoth-dur-fast) var(--thoth-ease-out); }
@@ -81,6 +81,12 @@ div.tree-empty > p { margin: 0 0 6px; }
 .form { display: grid; gap: var(--thoth-space-4); }
 .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 50vh; overflow: auto; }
 .result { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--thoth-radius-md); cursor: pointer; }
+.result-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.result-line .icon { flex: none; color: var(--thoth-ink-tertiary); }
+.result-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-path { flex: none; max-width: 45%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--thoth-text-small); color: var(--thoth-ink-tertiary); }
+.result .snippet mark { background: none; color: var(--thoth-ink-primary); font-weight: 600; }
+.result .snippet { padding-left: 26px; }
 .result[aria-selected="true"] { background: var(--thoth-bg-active); }
 .result .snippet { color: var(--thoth-ink-secondary); font: var(--thoth-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-badge { margin-left: auto; flex: none; }
@@ -136,9 +142,11 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tree-icon-folder[data-color="purple"] { color: var(--thoth-text-purple); }
 .tree-icon-folder[data-color="red"] { color: var(--thoth-text-red); }
 /* The folder New page and New folder go into (the last one clicked). */
-.tree-item[data-target]:not([aria-selected="true"]) { background: var(--thoth-bg-hover); box-shadow: inset 2px 0 0 var(--thoth-border-strong); }
+.tree-item[data-target]:not([aria-selected="true"]) { background: transparent; box-shadow: inset 2px 0 0 var(--thoth-border-strong); }
+@media (forced-colors: active) { .tree-item[data-target]:not([aria-selected="true"]) { box-shadow: none; border-left: 2px solid CanvasText; } }
 .tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
-.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-accent); }
+.tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-secondary); }
+@media (forced-colors: active) { .tree-item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; } }
 /* `all: unset` on .tree-item also removes the browser's own `[draggable="true"] { -webkit-user-drag: element }`, and a row
    with `user-drag: auto` never starts a drag (Chromium, WebKit and so Tauri's webviews). Say it again here. */
 .tree-item[draggable="true"] { -webkit-user-drag: element; user-select: none; -webkit-user-select: none; }
@@ -175,10 +183,10 @@ div.tree-empty > p { margin: 0 0 6px; }
 .page-actions { display: flex; gap: 4px; }
 
 /* The row menu and the Move to dialog. */
-.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg-container); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); transform-origin: top left; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; display: grid; gap: 1px; background: var(--thoth-bg-container); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-pop); transform-origin: top left; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
 .ctx-item { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 6px 10px; border-radius: var(--thoth-radius-sm); cursor: pointer; font: var(--thoth-text-ui); }
 .ctx-item kbd { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
-.ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-moon-soft); }
+.ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--thoth-bg-active); }
 .ctx-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .ctx-item:disabled { color: var(--thoth-ink-faint); cursor: default; }
 .ctx-danger:not(:disabled) { color: var(--thoth-danger); }
@@ -246,7 +254,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .ws-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 8px 4px 28px; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .ws-footer .sec-link { min-height: 24px; display: inline-flex; align-items: center; }
 
-/* Tabs (ADR-0016 rule 5): the current tab uses the accent tokens, a line on top like the drop indicator.
+/* Tabs (ADR-0016 rule 5, amended by ADR-0053 2026-11-16): the current tab is filled with the accent, its text --thoth-on-accent (4.5:1+).
    A tab is --thoth-tab-width wide when there is room (202px, three quarters of the 270px before it; `width` too, because
    a flex-basis alone does not size the strip around it and a short title would shrink the tab), and shrinks toward
    --thoth-tab-min-width as more are open; then the strip scrolls. The enter and leave animations use the same tokens.
@@ -265,6 +273,10 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tab[data-selected] { background: var(--thoth-tab-active-bg); color: var(--thoth-tab-active-ink); border-color: var(--thoth-border); border-top-color: var(--thoth-tab-active-line); border-bottom: 1px solid var(--thoth-tab-active-bg); }
 .tab-label { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 7px 4px 7px 12px; cursor: pointer; font: var(--thoth-text-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-label:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; border-radius: var(--thoth-radius-sm); }
+/* On the filled tab the accent ring would vanish, and the grey close button would be low contrast. */
+.tab[data-selected] .tab-label:focus-visible { outline-color: var(--thoth-on-accent); }
+.tab[data-selected] .tab-close { color: inherit; }
+.tab[data-selected] .tab-close:hover { background: color-mix(in srgb, var(--thoth-on-accent) 18%, transparent); color: inherit; }
 .tab-text { overflow: hidden; text-overflow: ellipsis; }
 .tab-initials::before { content: attr(data-initials); }
 .tab-close { all: unset; box-sizing: border-box; flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 3px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); cursor: pointer; opacity: 0; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out); }
@@ -350,7 +362,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .notif-item { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; padding: 8px 10px; border-radius: var(--thoth-radius-md); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .notif-item::before { content: ""; grid-row: 1; grid-column: 1; align-self: center; width: 6px; height: 6px; border-radius: 50%; background: transparent; }
 .notif-item[data-unread]::before { background: var(--thoth-accent); }
-.notif-item:hover, .notif-item:focus-visible { background: var(--thoth-moon-soft); }
+.notif-item:hover, .notif-item:focus-visible { background: var(--thoth-bg-active); }
 .notif-item:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .notif-title { grid-row: 1; grid-column: 2; font: var(--thoth-text-ui); font-weight: 500; overflow-wrap: anywhere; }
 .notif-item:not([data-unread]) .notif-title { font-weight: 450; color: var(--thoth-ink-secondary); }
@@ -377,10 +389,10 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home { overflow: auto; padding: 48px 24px; }
 .home-inner { max-width: 640px; margin: 0 auto; display: grid; gap: 28px; }
 .home-head { display: grid; justify-items: start; gap: 6px; color: var(--thoth-ink-primary); }
-.home-head h1 { margin: 6px 0 0; font: var(--thoth-text-h2); letter-spacing: -0.02em; }
+.home-head h1 { margin: 6px 0 0; font: 700 28px / 1.2 var(--thoth-font-sans); letter-spacing: -0.02em; }
 .home-head p { margin: 0; color: var(--thoth-ink-secondary); }
 .home-section { display: grid; gap: 6px; min-width: 0; }
-.home-section h2 { margin: 0; padding: 0 8px; font: 600 12px / 16px var(--thoth-font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--thoth-ink-secondary); }
+.home-section h2 { margin: 0; padding: 0 8px; font: 600 13px / 18px var(--thoth-font-sans); color: var(--thoth-ink-secondary); }
 .home-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .home-favorites .home-list { max-height: 320px; overflow: auto; }
 .home-empty { margin: 0; padding: 4px 8px; color: var(--thoth-ink-secondary); }
@@ -391,7 +403,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .home-row[data-unavailable] .home-row-title { color: var(--thoth-ink-tertiary); }
 .home-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-row-meta { flex: none; display: flex; align-items: center; gap: 8px; max-width: 50%; min-width: 0; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
-.home-today-card { min-height: 44px; border: 1px solid var(--thoth-border); }
+.home-today-card { min-height: 36px; }
 .home-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-badge { flex: none; }
 @media (max-width: 520px) { .home { padding: 24px 12px; } .home-row-meta { max-width: 40%; } }
@@ -437,3 +449,30 @@ div.tree-empty > p { margin: 0 0 6px; }
 .sidebar-link[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .sidebar-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }
 .home-timeline { min-height: 24px; }
+
+/* Paper (ADR-0053 amendment 2026-11-16). A static grain tile under the shell, sidebar and tab strip: ink pigment at
+   2.5% on paper, 1.2% on black (the alpha is in the PNG, so nothing else multiplies it). Its darkest pixel keeps the
+   faintest text, tertiary ink, at 5.2:1 on paper and 5.0:1 on the sidebar (its darkest pixel is 4.7% ink), and 6.8:1
+   on black. Behind content only: menus, dialogs and the
+   text's own boxes stay flat. 256px tiles at 128 CSS px, sharp at 2×. */
+.shell, .sidebar, .tabstrip { background-image: url("./textures/grain-paper.png"); background-size: 128px 128px; }
+[data-theme="night"] :is(.shell, .sidebar, .tabstrip) { background-image: url("./textures/grain-night.png"); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] :is(.shell, .sidebar, .tabstrip) { background-image: url("./textures/grain-night.png"); } }
+
+/* Translucent sidebar, on macOS only (main.tsx sets data-os-effect when the window has the native Sidebar material,
+   tauri.macos.conf.json). The page and everything around it turn clear so the material shows through the sidebar
+   alone; the writing area stays opaque paper. The faintest sidebar text is lifted (0.66 to 0.78) because the material
+   behind it can be darker than paper. */
+:root { --thoth-sidebar-glass: rgb(248 240 226 / 0.88); }
+[data-theme="night"] { --thoth-sidebar-glass: rgb(23 21 20 / 0.9); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] { --thoth-sidebar-glass: rgb(23 21 20 / 0.9); } }
+html[data-os-effect], html[data-os-effect] :is(body, #root), html[data-os-effect] .shell { background-color: transparent; }
+html[data-os-effect] .main { background-color: var(--thoth-bg); background-image: inherit; background-size: 128px 128px; }
+html[data-os-effect] .sidebar { background-color: var(--thoth-sidebar-glass); --thoth-ink-tertiary: rgb(var(--thoth-ink) / 0.78); }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-os-effect] :is(body, #root) { background-color: var(--thoth-bg); }
+  html[data-os-effect] .sidebar { background-color: var(--thoth-bg-sidebar); }
+  :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; }
+}
+@media (forced-colors: active), print { :is(.shell, .sidebar, .tabstrip, .main) { background-image: none; } }

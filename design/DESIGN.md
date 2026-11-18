@@ -49,7 +49,8 @@ as a disc island. It is a single closed shape, monochrome, and uses
 | `mark.svg` | Inline UI; inherits `color` |
 | `mark-white.svg`, `mark-ink.svg` | Fixed-colour exports |
 | `favicon.svg` | ≤16px. Same shape with a slightly larger eye (r 16 instead of 11.4) so the eye still reads at 16px. |
-| `app-icon-dark.svg`, `app-icon-light.svg` | 1024 squircle tiles: Night or Paper |
+| `app-icon.svg` | The app icon (since 2026-11-16, the owner's pick "B2"): the mark in paper `#FFF8F1` on a Moon tile lit from the top (`#F7752E` to `#D84D0B`, a faint top glow, a thin light edge). The light is on the tile, never on the mark. |
+| `app-icon-dark.svg`, `app-icon-light.svg` | Earlier 1024 tiles, Night or Paper; kept for the site and press until they move to `app-icon.svg` |
 
 Rules:
 
@@ -65,8 +66,7 @@ Rules:
 
 Verified rendering: 256 / 96 / 48 / 24 / 16px on Night and Paper. Not yet done:
 
-- PNG/ICNS/ICO rasters. No SVG rasterizer is installed. Generate them in the
-  Tauri phase with `tauri icon`.
+- ~~PNG/ICNS/ICO rasters.~~ Generated from `app-icon.svg` with `resvg` and `tauri icon` (2026-11-16).
 - An optical-weight review by a human designer.
 
 ## 3. Type
@@ -103,7 +103,7 @@ The editor's content column is 720px.
 | Surface | Base theme | Notes |
 |---|---|---|
 | Marketing site | Follows the system (Papyrus or Black) | Hooded ibis in front of its moon, Moon pill CTA, notebook-cover intro |
-| Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs, properties row, callouts |
+| Editor, sidebar, page views | Follows the chosen theme | Document layout: sidebar 260px, breadcrumbs (no `.md`), properties row, callouts on a warm tint; page title 32/700, H2 22/600; the current tab filled with Moon; selection otherwise neutral (ADR-0053 amendment 2026-11-16) |
 | Onboarding, import wizard | Follows the chosen theme | Moon primary pill, secondary tonal pills |
 | Agent Hub, agent side panel | Follows the chosen theme | Your messages in the secondary container; the agent's answers on the container in ink with a 3px Moon rule at the left (calmer than a Moon wash in long chats; owner's pick 2026-11-15); Apply/Discard pills |
 | Transfer review (Private → Workspace) | Modal on the raised step | Shows destination workspace and members before commit (spec §12) |
@@ -119,8 +119,11 @@ The editor's content column is 720px.
 - Night ink is a real two-step ramp: primary 0.94, secondary 0.82, tertiary 0.66 of the warm ink. Tertiary is the AA
   floor (4.62:1 at worst, over the Moon wash on the sidebar); the selected row is a translucent Moon wash
   (`rgb(232 89 12 / 0.31)`, the lowest alpha that still stands out from the page at 1.5:1) with `#FFDBCE` text on it.
-- Light selected-row text (`--thoth-accent-ink`, `--thoth-moon-ink`) is a mid Moon brown `#7A2E00` (7.1:1 on `#FED7C9`),
-  so selected tree text keeps its orange identity.
+- Light selected-row text (`--thoth-accent-ink`, `--thoth-moon-ink`) is a mid Moon brown `#7A2E00` (7.1:1 on `#FED7C9`)
+  where a Moon wash is still used (menus' current item, chips). The tree, favourites and settings select with the
+  neutral `--thoth-bg-active` since 2026-11-16 (ADR-0053 amendment).
+- The current tab is a Moon fill with `--thoth-on-accent` text (white on `#B64201`, `#370E00` on `#FF8C5F`), both
+  above 4.5:1; its focus ring switches to `--thoth-on-accent` so it stays visible on the fill.
 - `prefers-reduced-motion` removes motion: the motion duration and distance tokens become 0, and `ui.css` forces
   animation and transition off everywhere in the app.
 
@@ -141,6 +144,7 @@ Calm, quick and purposeful (tokens and rules: the "Motion" note in `packages/ui/
 - ~~Orange or silver-blue accent?~~ Decided 2026-10-22: lunar orange. Silver-blue
   was too close to the Workspace badge blue.
 - ~~A richer, more colourful system?~~ Decided 2026-11-12/15: Papyrus Black (ADR-0053).
-- New app icons and favicon in Papyrus Black: only if the owner asks.
+- ~~New app icons in Papyrus Black?~~ Decided 2026-11-16: the Moon tile `app-icon.svg` (option B2). The favicon stays
+  the plain mark for now.
 - Do we license a custom display face later? For now, Inter is a deliberate,
   free choice for an OSS project.
