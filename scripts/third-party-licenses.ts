@@ -26,14 +26,19 @@ export function packageOf(file: string): BundledPackage | null {
   return null;
 }
 
+/** A package's licence texts: LICENSE, LICENSE.md, LICENSE-MIT, COPYING… (all of them for a dual licence), not SPDX metadata. */
+export function licenceFiles(names: readonly string[]): string[] {
+  return names.filter((f) => /^(licen[sc]e|copying)([-_][\w.-]*)?(\.(txt|md|markdown|rst))?$/i.test(f) && !/\.spdx$/i.test(f)).sort();
+}
+
 /** The file's text: a header, then each package's licence file (or what it declares when it ships none). */
 export function licenseText(packages: Iterable<BundledPackage>): string {
   const byKey = new Map([...packages].map((p) => [`${p.name}@${p.version}`, p]));
   const parts = ["Thoth's own code in this bundle is Apache-2.0 (https://github.com/Creaml4tt3/thoth).\nThe third-party packages below are bundled with it, under their own licences.\n"];
   for (const key of [...byKey.keys()].sort()) {
     const pkg = byKey.get(key)!;
-    const file = readdirSync(pkg.dir).find((f) => /^(licen[sc]e|copying)(\.|$)/i.test(f));
-    const text = file ? readFileSync(join(pkg.dir, file), "utf8").trim() : `(no licence file shipped; the package declares ${pkg.license})`;
+    const files = licenceFiles(readdirSync(pkg.dir));
+    const text = files.length > 0 ? files.map((f) => readFileSync(join(pkg.dir, f), "utf8").trim()).join("\n\n") : `(no licence file shipped; the package declares ${pkg.license})`;
     parts.push(`${"=".repeat(78)}\n${key}  (${pkg.license})\n${"=".repeat(78)}\n${text}\n`);
   }
   return parts.join("\n");

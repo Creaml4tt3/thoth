@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { licenseText, packageOf } from "../scripts/third-party-licenses.ts";
+import { licenceFiles, licenseText, packageOf } from "../scripts/third-party-licenses.ts";
 
 function fakePackage(root: string, name: string, files: Record<string, string>): string {
   const dir = join(root, "node_modules", name);
@@ -32,5 +32,15 @@ describe("third-party licences", () => {
     expect(text.indexOf("@scope/a@1.0.0")).toBeLessThan(text.indexOf("b@2.0.0"));
     expect(text).toContain("MIT text");
     expect(text).toContain("(no licence file shipped; the package declares ISC)");
+  });
+
+  it("takes every licence text of a dual-licensed package, never the SPDX metadata", () => {
+    expect(licenceFiles(["package.json", "LICENSE.spdx", "LICENSE-MIT", "LICENSE-APACHE-2.0", "README.md"])).toEqual(["LICENSE-APACHE-2.0", "LICENSE-MIT"]);
+    expect(licenceFiles(["LICENSE.md", "licence", "COPYING", "LICENSE-MIT.txt", "LICENSES.json", "license.js", "LICENSE-MIT.spdx"])).toEqual(["COPYING", "LICENSE-MIT.txt", "LICENSE.md", "licence"]);
+    const dual = fakePackage(root, "dual", { "package.json": '{"name":"dual","version":"1.0.0","license":"Apache-2.0 OR MIT"}', "LICENSE.spdx": "SPDXVersion: SPDX-2.1", "LICENSE-MIT": "MIT text", "LICENSE-APACHE-2.0": "Apache text" });
+    const text = licenseText([packageOf(join(dual, "dist", "x.js"))!]);
+    expect(text).toContain("MIT text");
+    expect(text).toContain("Apache text");
+    expect(text).not.toContain("SPDXVersion");
   });
 });
