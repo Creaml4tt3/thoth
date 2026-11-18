@@ -1046,6 +1046,9 @@ mod tests {
                     || p == "core:event:allow-unlisten"
                     // The zoom keys (zoomHotkeysEnabled): set the webview's own zoom, nothing else of core:webview.
                     || p == "core:webview:allow-set-webview-zoom"
+                    // The window's light or dark appearance, so the macOS sidebar material follows Thoth's theme
+                    // (ADR-0053): nothing else of core:window.
+                    || p == "core:window:allow-set-theme"
                     || NOTIFICATION.contains(&p),
                 "unexpected permission {p}"
             );
@@ -1055,7 +1058,7 @@ mod tests {
         }
         assert_eq!(granted, NOTIFICATION);
         assert!(capability.get("remote").is_none());
-        let text = include_str!("../capabilities/main.json");
+        let text = include_str!("../capabilities/main.json").replace("core:window:allow-set-theme", "");
         for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
         }
