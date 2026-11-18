@@ -55,7 +55,7 @@
      focus ring at 3:1 on paper (the palette's primary tone). Tested in packages/app-ui/test/contrast.test.ts. */
   --thoth-accent: #B64201;            /* primary buttons, focus rings, links, the current tab's fill */
   --thoth-on-accent: #FFFFFF;         /* text on --thoth-accent */
-  --thoth-accent-soft: #FED7C9;       /* selected tree item */
+  --thoth-accent-soft: #FED7C9;       /* a soft Moon wash: drop targets and the chosen colour or share option */
   --thoth-accent-ink: #7A2E00;        /* text on the soft wash, a mid Moon brown at 7.1:1 */
 
   /* Semantic */

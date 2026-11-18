@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withoutTitle } from "../src/features/shell/SearchPalette.js";
+import { plainSnippet, withoutTitle } from "../src/features/shell/SearchPalette.js";
 
 describe("withoutTitle", () => {
   it("drops the title and the page's H1 from the front of a snippet", () => {
@@ -14,5 +14,13 @@ describe("withoutTitle", () => {
   });
   it("keeps the snippet when it is only the title", () => {
     expect(withoutTitle("[Zebra]", "Zebra")).toBe("[Zebra]");
+  });
+});
+
+describe("plainSnippet", () => {
+  it("drops only the match brackets; the page's [[wikilinks]] and [x] stay", () => {
+    expect(plainSnippet("see [[Weekly review]] before [plan]ning", ["plan"])).toBe("see [[Weekly review]] before planning");
+    expect(plainSnippet("- [x] [Book] the train", ["book"])).toBe("- [x] Book the train");
+    expect(plainSnippet("[แผน] for 2027", ["แผน"])).toBe("แผน for 2027");
   });
 });

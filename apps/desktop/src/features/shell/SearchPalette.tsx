@@ -21,11 +21,29 @@ export function withoutTitle(snippet: string, title: string): string {
   return rest === "" ? snippet : rest;
 }
 
-/** A snippet's matches come bracketed from the index (`[plan]`, search-query.ts `markTerms`); shown as <mark>. */
-export function Snippet({ text }: { text: string }) {
-  const parts = text.split(/\[([^\]]*)\]/);
-  return <>{parts.map((part, i) => (i % 2 === 1 ? <mark key={i}>{part}</mark> : part))}</>;
+/**
+ * A snippet's matches come bracketed from the index (`[plan]`, search-query.ts `markTerms`); shown as <mark>. Only a
+ * bracketed run that holds one of the typed words counts, so the page's own `[[wikilinks]]` and `[x]` stay as written.
+ */
+export function Snippet({ text, words }: { text: string; words: readonly string[] }) {
+  const terms = words.map((w) => w.toLocaleLowerCase()).filter((w) => w !== "");
+  const parts = text.split(/(\[[^[\]]*\])/);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const inner = part.slice(1, -1);
+        const hit = i % 2 === 1 && inner !== "" && terms.some((w) => inner.toLocaleLowerCase().includes(w) || w.includes(inner.toLocaleLowerCase()));
+        return hit ? <mark key={i}>{inner}</mark> : part;
+      })}
+    </>
+  );
 }
+
+/** The snippet as plain text (a tooltip): the match brackets go, the page's own brackets stay. */
+export const plainSnippet = (text: string, words: readonly string[]): string => {
+  const terms = words.map((w) => w.toLocaleLowerCase()).filter((w) => w !== "");
+  return text.replace(/\[([^[\]]*)\]/g, (all, inner: string) => (inner !== "" && terms.some((w) => inner.toLocaleLowerCase().includes(w) || w.includes(inner.toLocaleLowerCase())) ? inner : all));
+};
 
 /** The folder a page sits in, as people read it: "Projects / Ideas", nothing for the top level, no ".md". */
 export const parentOf = (path: string): string => path.split("/").slice(0, -1).join(" / ");
@@ -46,6 +64,7 @@ export function SearchPalette({ commands, onRun, onClose }: { commands: readonly
   const listId = useId();
   const seq = useRef(0);
   const cmd = useCommandMode(query, commands, onRun);
+  const words = query.normalize("NFC").split(/\s+/).filter((w) => w !== ""); // as the index splits it (search-query.ts tokenize)
 
   useEffect(() => {
     const mine = ++seq.current;
@@ -131,8 +150,8 @@ export function SearchPalette({ commands, onRun, onClose }: { commands: readonly
                   {parentOf(row.path) && <span className="result-path">{parentOf(row.path)}</span>}
                 </span>
                 {row.snippet && (
-                  <span className="snippet" {...tipIfClipped(row.snippet.replace(/[[\]]/g, ""))}>
-                    <Snippet text={row.snippet} />
+                  <span className="snippet" {...tipIfClipped(plainSnippet(row.snippet, words))}>
+                    <Snippet text={row.snippet} words={words} />
                   </span>
                 )}
               </li>

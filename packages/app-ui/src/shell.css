@@ -142,7 +142,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .tree-icon-folder[data-color="purple"] { color: var(--thoth-text-purple); }
 .tree-icon-folder[data-color="red"] { color: var(--thoth-text-red); }
 /* The folder New page and New folder go into (the last one clicked). */
-.tree-item[data-target]:not([aria-selected="true"]) { background: transparent; }
+.tree-item[data-target]:not([aria-selected="true"]) { background: transparent; box-shadow: inset 2px 0 0 var(--thoth-border-strong); }
+@media (forced-colors: active) { .tree-item[data-target]:not([aria-selected="true"]) { box-shadow: none; border-left: 2px solid CanvasText; } }
 .tree-item[data-kind="page"] .tree-icon-page, .tree-item[data-kind="page"][aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-tertiary); }
 .tree-item[aria-selected="true"] .tree-icon-page { color: var(--thoth-ink-secondary); }
 @media (forced-colors: active) { .tree-item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; } }
@@ -451,7 +452,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 
 /* Paper (ADR-0053 amendment 2026-11-16). A static grain tile under the shell, sidebar and tab strip: ink pigment at
    2.5% on paper, 1.2% on black (the alpha is in the PNG, so nothing else multiplies it). Its darkest pixel keeps the
-   faintest text, tertiary ink, at 5.2:1 on paper and 6.8:1 on black. Behind content only: menus, dialogs and the
+   faintest text, tertiary ink, at 5.2:1 on paper and 5.0:1 on the sidebar (its darkest pixel is 4.7% ink), and 6.8:1
+   on black. Behind content only: menus, dialogs and the
    text's own boxes stay flat. 256px tiles at 128 CSS px, sharp at 2×. */
 .shell, .sidebar, .tabstrip { background-image: url("./textures/grain-paper.png"); background-size: 128px 128px; }
 [data-theme="night"] :is(.shell, .sidebar, .tabstrip) { background-image: url("./textures/grain-night.png"); }

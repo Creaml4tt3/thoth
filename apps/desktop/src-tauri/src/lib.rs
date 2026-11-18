@@ -1058,8 +1058,10 @@ mod tests {
         }
         assert_eq!(granted, NOTIFICATION);
         assert!(capability.get("remote").is_none());
-        let text = include_str!("../capabilities/main.json").replace("core:window:allow-set-theme", "");
-        for plugin in ["http:", "opener:", "shell:", "fs:", "core:window:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
+        let text = include_str!("../capabilities/main.json");
+        // core:window: only set-theme, exactly once (the permissions loop above refuses any other).
+        assert_eq!(text.matches("core:window:").count(), 1, "capability grants core:window: beyond set-theme");
+        for plugin in ["http:", "opener:", "shell:", "fs:", "notification:default", "core:webview:default", "core:webview:allow-create"] {
             assert!(!text.contains(plugin), "capability must not grant {plugin}");
         }
     }
