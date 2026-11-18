@@ -45,7 +45,7 @@ and others) uses a warm off-white and a warm near-black; none uses pure `#FFF` o
    pairs.
 7. **Type stays sans.** Inter Variable with Noto Sans Thai, headlines 600 with tight tracking. The serif reading mode
    stays optional.
-8. **Unchanged:** the Moon Ibis mark and the app's Moon Crown mascot (a change of mascot would be its own ADR), the
+8. **Unchanged:** the Moon Ibis mark (the mascot changed to the hooded ibis in ADR-0054), the
    theme values users have saved, the motion rules, and the brand files and app icons (new icons need a regenerated
    set with `tauri icon` and are done only if the owner asks).
 
