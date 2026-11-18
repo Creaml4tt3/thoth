@@ -3,7 +3,7 @@
 - **Status:** Proposal for the owner. Nothing is built yet.
 - **Date:** 2026-11-10, updated 2026-11-15 with iApp's OpenThai 2.0 OCR (§2a)
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
-- **Next step:** the Phase 0 spike, then ADR-0054. The owner's decisions are in §7 (all made by 2026-11-16).
+- **Next step:** the Phase 0 spike, then ADR-0055. The owner's decisions are in §7 (all made by 2026-11-16).
 
 ## 1. Verdict on the handoff
 
@@ -201,7 +201,7 @@ Each can be added behind the same store and runner without changing the modules.
 
 ## 6. Phases
 
-**Phase 0 — spike (about a week), ending in ADR-0054.**
+**Phase 0 — spike (about a week), ending in ADR-0055.**
 - Build a command-line `thoth-ocr` on `oar-ocr` with OpenThai2.0-OCR-Text (§2a). Compare it with PP-OCRv5 mobile
   detection + `th_PP-OCRv5_mobile_rec`, and with iApp's Python runtime on the same files as the reference output.
 - Run it on both engines (§4): ONNX Runtime, and pure Rust through `ort-tract`. Compare accuracy, speed and size.
