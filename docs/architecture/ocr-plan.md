@@ -255,7 +255,11 @@ files. Program code (`thoth-ocr`, any native library) still only changes with an
 - Build a command-line `thoth-ocr` on `oar-ocr` with OpenThai2.0-OCR-Text (§2a). Compare it with PP-OCRv5 mobile
   detection + `th_PP-OCRv5_mobile_rec`, and with iApp's Python runtime on the same files as the reference output.
 - Run it on both engines (§4): ONNX Runtime, and pure Rust through `ort-tract`. Compare accuracy, speed and size.
-- Render PDF pages with pdfium and with `hayro`. Use the PDF's own text where a page has some.
+- Render PDF pages with pdfium and with `hayro`. Use the PDF's own text where a page has some, **unless it is broken**:
+  many Thai PDFs store text whose above-line vowels and tone marks are lost (the owner's brochure reads `ติดตั ง`
+  for `ติดตั้ง`, `เริ มต้น` for `เริ่มต้น`). Phase 0 designs and tests a check (for example: Thai text with a space
+  where a combining mark should be, a mark-to-consonant ratio far below normal Thai, or replacement characters) that
+  sends such a page to OCR instead, and measures it on the owner's PDF and on generated broken and clean PDFs.
 - Platforms: macOS (Apple Silicon and Intel), Windows x64 and Linux x64, built in CI like the app.
 - Test corpus: 40–60 images with checked text, plus a held-out part. It covers Thai, English, mixed lines, app
   screenshots, phone photos, scanned PDFs and two-column pages. Its sources:
