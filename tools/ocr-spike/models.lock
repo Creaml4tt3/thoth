@@ -1,0 +1,32 @@
+# SHA-256 of every downloaded file the spike uses. Paths are relative to ~/Library/Caches/thoth-ocr-spike/.
+# models/openthai21: huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118 @ c765cb8017c406ddc2a518de51db22bb2e2bbd07 (Apache-2.0)
+# models/pp5th: huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec_onnx @ 1d4adbbafb1034a2fd6618498575b81ea7b69f69 (Apache-2.0)
+# models/pp5det: huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx @ e6f4fa85f00e168c862bc462aebca69eef9b3d3d (Apache-2.0)
+# models/pp5/dict.txt: PostProcess.character_dict of models/pp5th/inference.yml, one per line
+# *.tract*.onnx: made by scripts/tract_patch.py, input then pinned to a 1280 (OpenThai) or 960 (PP-OCRv5) square
+# fonts: github.com/google/fonts main, ofl/* (SIL OFL 1.1)
+# pdfium: github.com/bblanchon/pdfium-binaries chromium/8125
+# tessdata: github.com/tesseract-ocr/tessdata_best main (Apache-2.0)
+193bab7a04fca699a6c82e6abb5b81bdb28177f0abd4062552b04908dafb19f8  models/openthai21/det.onnx
+82ec89533346faadcb30df96703dad2dd7521de65709e60d83fd9745b8968124  models/openthai21/rec.onnx
+6ec0f96f5ade665fc7eb33a9800ed055bc220870cbf963cf97c4750e64cd27ce  models/openthai21/rec2.onnx
+259ef2636cec0eeae225ae9fd9a63fa9305285650c22d7ec34fe8a82b24c2f1a  models/openthai21/rec_dict.txt
+f5a38f5677784b10d4abcc2ad8a8b044826a8211bc51213b38c889ad792b417a  models/openthai21/config.json
+4c0e4f27877836de51e29aec3918b6c743c3028cd4163b6661fd540336db32b3  models/openthai21/NOTICE
+6bbd83c590e66445a6844f69ed3029be98e3be0fd1fcc01e2147ace28748d54a  models/openthai21/runtime/line_engine.py
+53a03ac139fb0de3e7aec0f5b8ab69b0b519fb5e636f7c1de09cb357b023344a  models/openthai21/runtime/thai_norm.py
+27618be66018f8598ac0a526a593f9f1cebf794e7eded93428e8fb016e537f5f  models/pp5th/inference.onnx
+f6ba7fefc38ca1ff398ddafa75d67d16e0b3757c4e6c833adffee98a981766c9  models/pp5th/inference.yml
+a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d  models/pp5det/inference.onnx
+98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699  models/pp5det/inference.yml
+57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a  models/pp5/dict.txt
+87761213babfd9968cb59d44039328605c26b3930df9b335668fa028ea7e2abf  models/openthai21/det.tract1280.onnx
+085ad48dd2e04a6d6ca372711da7c4910e06d7b62132dcc1bb7b7fa0349d334d  models/pp5det/inference.tract960.onnx
+bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d  fonts/notosans_NotoSans.ttf
+5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8  fonts/notosansthai_NotoSansThai.ttf
+4d8e6761424656867019081a1a01336f3cb086982682698714054fc33f782713  fonts/notoserif_NotoSerif.ttf
+34a7ad11647c845303aabdde639059806c56b84719e5d2ceb28eb038711bdf53  fonts/notoserifthai_NotoSerifThai.ttf
+226d4f368fbc0457990ddef2692679badfd2c1a4e89e5ac4d43c10ba7743b2f1  fonts/sarabun_Sarabun-Regular.ttf
+4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d  pdfium/dl/pdfium-mac-arm64.tgz
+8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba  tessdata/eng.traineddata
+ee8adab6dc69eb8df3d3c8307ae8295471b7bd7d86a06d9267aa8f479b064eac  tessdata/tha.traineddata

@@ -1,0 +1,42 @@
+# Phase 0 OCR spike (docs/architecture/ocr-plan.md §6). Standalone: not in the main workspace.
+[package]
+name = "thoth-ocr"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[workspace]
+
+[features]
+default = ["native"]
+# ONNX Runtime native library (downloaded prebuilt by ort-sys at build time).
+native = ["oar-ocr/download-binaries"]
+# Pure-Rust engine: ort's alternative-backend API served by tract.
+tract = ["dep:ort-tract", "ort/alternative-backend"]
+pdfium = ["dep:pdfium-render"]
+# ONNX Runtime loaded at run time from ORT_DYLIB_PATH (the library would ship in the module download).
+dynamic = ["ort/load-dynamic"]
+
+[dependencies]
+# Pinned: 0.10.3 is the last oar-ocr on ort rc.13, the ort version ort-tract 0.4.1 implements.
+oar-ocr = { version = "=0.10.3", default-features = false, features = ["simd"] }
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std"] }
+ort-tract = { version = "=0.4.1", optional = true }
+hayro = { version = "=0.9.0" }
+pdfium-render = { version = "=0.9.5", optional = true, default-features = false, features = ["pdfium_latest", "image_025", "thread_safe"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde_json = "1"
+unicode-normalization = "0.1"
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+
+# Size measurement only: `--profile small`.
+[profile.small]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+panic = "abort"

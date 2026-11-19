@@ -1,0 +1,4 @@
+target/
+results/private/
+results/**/renders/
+results/**/*.jsonl

@@ -1,0 +1,51 @@
+[
+ {
+  "run": "ort-openthai",
+  "rc": 0,
+  "peak_mb": 534.421875,
+  "wall_s": 6.779930114746094,
+  "error": null
+ },
+ {
+  "run": "ort-openthai-pdfium",
+  "rc": 0,
+  "peak_mb": 492.3125,
+  "wall_s": 2.1711320877075195,
+  "error": null
+ },
+ {
+  "run": "ort-pp5",
+  "rc": 0,
+  "peak_mb": 460.21875,
+  "wall_s": 12.88938283920288,
+  "error": null
+ },
+ {
+  "run": "ort-openthai-square",
+  "rc": 0,
+  "peak_mb": 661.640625,
+  "wall_s": 10.92299199104309,
+  "error": null
+ },
+ {
+  "run": "tract-openthai",
+  "rc": 0,
+  "peak_mb": 2250.71875,
+  "wall_s": 75.29192304611206,
+  "error": null
+ },
+ {
+  "run": "ort-pp5-square",
+  "rc": 0,
+  "peak_mb": 525.828125,
+  "wall_s": 16.15901279449463,
+  "error": null
+ },
+ {
+  "run": "tract-pp5",
+  "rc": 0,
+  "peak_mb": 1462.375,
+  "wall_s": 1302.6547617912292,
+  "error": null
+ }
+]

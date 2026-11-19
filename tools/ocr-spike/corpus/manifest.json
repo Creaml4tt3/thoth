@@ -1,0 +1,657 @@
+[
+ {
+  "id": "clean-sans-th",
+  "file": "img/clean-sans-th.png",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-sans-en",
+  "file": "img/clean-sans-en.png",
+  "group": "synthetic-clean",
+  "lang": "en",
+  "lines": [
+   "Every morning I write my plans in a small notebook.",
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days."
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-sans-mixed",
+  "file": "img/clean-sans-mixed.png",
+  "group": "synthetic-clean",
+  "lang": "mixed",
+  "lines": [
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email",
+   "ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR",
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-sarabun-th",
+  "file": "img/clean-sarabun-th.png",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-sarabun-en",
+  "file": "img/clean-sarabun-en.png",
+  "group": "synthetic-clean",
+  "lang": "en",
+  "lines": [
+   "Send questions to the support team before Friday.",
+   "The quick brown fox jumps over the lazy dog.",
+   "Version 0.11.0 adds a calmer look and faster sync.",
+   "Total due: $1,249.50 including 7% VAT.",
+   "Open the menu, choose Settings, then Modules.",
+   "Good notes help you remember what matters."
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-sarabun-mixed",
+  "file": "img/clean-sarabun-mixed.png",
+  "group": "synthetic-clean",
+  "lang": "mixed",
+  "lines": [
+   "งบประมาณ Q4 เพิ่มขึ้น 12.5% จากไตรมาสก่อน",
+   "อ่านคู่มือ Getting Started ก่อนเริ่มใช้งาน",
+   "บันทึก Markdown ไว้ในโฟลเดอร์ Notes/2026",
+   "สมัครสมาชิกฟรี 30 วัน ไม่ต้องใช้บัตรเครดิต",
+   "ประชุมทีม Design วันพุธ เวลา 10:00 น.",
+   "ดาวน์โหลด Thoth 0.11.0 ได้ที่หน้าเว็บไซต์"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-serif-th",
+  "file": "img/clean-serif-th.png",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-serif-en",
+  "file": "img/clean-serif-en.png",
+  "group": "synthetic-clean",
+  "lang": "en",
+  "lines": [
+   "Every morning I write my plans in a small notebook.",
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days."
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-serif-mixed",
+  "file": "img/clean-serif-mixed.png",
+  "group": "synthetic-clean",
+  "lang": "mixed",
+  "lines": [
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email",
+   "ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR",
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-small16-sans-th",
+  "file": "img/clean-small16-sans-th.png",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-large44-sarabun-th",
+  "file": "img/clean-large44-sarabun-th.png",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า",
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-small18-sans-mixed",
+  "file": "img/clean-small18-sans-mixed.png",
+  "group": "synthetic-clean",
+  "lang": "mixed",
+  "lines": [
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes",
+   "งบประมาณ Q4 เพิ่มขึ้น 12.5% จากไตรมาสก่อน",
+   "อ่านคู่มือ Getting Started ก่อนเริ่มใช้งาน",
+   "บันทึก Markdown ไว้ในโฟลเดอร์ Notes/2026"
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-small16-serif-en",
+  "file": "img/clean-small16-serif-en.png",
+  "group": "synthetic-clean",
+  "lang": "en",
+  "lines": [
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days.",
+   "Send questions to the support team before Friday."
+  ],
+  "note": ""
+ },
+ {
+  "id": "clean-scan-a4-th",
+  "file": "img/clean-scan-a4-th.jpg",
+  "group": "synthetic-clean",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า",
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง",
+   "เริ่มต้นติดตั้งโปรแกรมได้ทันทีโดยไม่ต้องสมัคร",
+   "พระอาทิตย์ขึ้นทางทิศตะวันออกเสมอ"
+  ],
+  "note": "flat scan-like page"
+ },
+ {
+  "id": "columns-two-th",
+  "file": "img/columns-two-th.png",
+  "group": "synthetic-columns",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้ เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้ ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า",
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้ กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง"
+  ],
+  "note": "two columns of Thai prose; read left column first"
+ },
+ {
+  "id": "columns-two-mixed",
+  "file": "img/columns-two-mixed.png",
+  "group": "synthetic-columns",
+  "lang": "mixed",
+  "lines": [
+   "ประชุมทีม Design วันพุธ เวลา 10:00 น. ดาวน์โหลด Thoth 0.11.0 ได้ที่หน้าเว็บไซต์",
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "Good notes help you remember what matters. Every morning I write my plans in a small notebook. Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM. Please keep the receipt (No. 48213) for any exchange. Search finds pages by title, tag, or any word inside.",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server โทร 02-123-4567 หรือ LINE @thothnotes"
+  ],
+  "note": "two columns, mixed and English prose"
+ },
+ {
+  "id": "deg-blur12-sans-th",
+  "file": "img/deg-blur12-sans-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-blur12-sarabun-mixed",
+  "file": "img/deg-blur12-sarabun-mixed.png",
+  "group": "synthetic-degraded",
+  "lang": "mixed",
+  "lines": [
+   "งบประมาณ Q4 เพิ่มขึ้น 12.5% จากไตรมาสก่อน",
+   "อ่านคู่มือ Getting Started ก่อนเริ่มใช้งาน",
+   "บันทึก Markdown ไว้ในโฟลเดอร์ Notes/2026",
+   "สมัครสมาชิกฟรี 30 วัน ไม่ต้องใช้บัตรเครดิต",
+   "ประชุมทีม Design วันพุธ เวลา 10:00 น.",
+   "ดาวน์โหลด Thoth 0.11.0 ได้ที่หน้าเว็บไซต์"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-blur20-serif-th",
+  "file": "img/deg-blur20-serif-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-blur20-sans-en",
+  "file": "img/deg-blur20-sans-en.png",
+  "group": "synthetic-degraded",
+  "lang": "en",
+  "lines": [
+   "Every morning I write my plans in a small notebook.",
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days."
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-skew3-sarabun-th",
+  "file": "img/deg-skew3-sarabun-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-skew5-sans-mixed",
+  "file": "img/deg-skew5-sans-mixed.png",
+  "group": "synthetic-degraded",
+  "lang": "mixed",
+  "lines": [
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email",
+   "ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR",
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-skew5-serif-en",
+  "file": "img/deg-skew5-serif-en.png",
+  "group": "synthetic-degraded",
+  "lang": "en",
+  "lines": [
+   "Every morning I write my plans in a small notebook.",
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days."
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-jpeg15-sans-th",
+  "file": "img/deg-jpeg15-sans-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-jpeg15-serif-mixed",
+  "file": "img/deg-jpeg15-serif-mixed.png",
+  "group": "synthetic-degraded",
+  "lang": "mixed",
+  "lines": [
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email",
+   "ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR",
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-photo-sarabun-th",
+  "file": "img/deg-photo-sarabun-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-lowcontrast-sans-th",
+  "file": "img/deg-lowcontrast-sans-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-lowcontrast-serif-en",
+  "file": "img/deg-lowcontrast-serif-en.png",
+  "group": "synthetic-degraded",
+  "lang": "en",
+  "lines": [
+   "Backups run every night at 02:00 and keep 30 days.",
+   "Send questions to the support team before Friday.",
+   "The quick brown fox jumps over the lazy dog.",
+   "Version 0.11.0 adds a calmer look and faster sync.",
+   "Total due: $1,249.50 including 7% VAT.",
+   "Open the menu, choose Settings, then Modules."
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-dark-sans-th",
+  "file": "img/deg-dark-sans-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง",
+   "เริ่มต้นติดตั้งโปรแกรมได้ทันทีโดยไม่ต้องสมัคร",
+   "พระอาทิตย์ขึ้นทางทิศตะวันออกเสมอ"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-dark-sarabun-mixed",
+  "file": "img/deg-dark-sarabun-mixed.png",
+  "group": "synthetic-degraded",
+  "lang": "mixed",
+  "lines": [
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes",
+   "งบประมาณ Q4 เพิ่มขึ้น 12.5% จากไตรมาสก่อน",
+   "อ่านคู่มือ Getting Started ก่อนเริ่มใช้งาน",
+   "บันทึก Markdown ไว้ในโฟลเดอร์ Notes/2026",
+   "สมัครสมาชิกฟรี 30 วัน ไม่ต้องใช้บัตรเครดิต"
+  ],
+  "note": ""
+ },
+ {
+  "id": "deg-dark-color-serif-th",
+  "file": "img/deg-dark-color-serif-th.png",
+  "group": "synthetic-degraded",
+  "lang": "th",
+  "lines": [
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน"
+  ],
+  "note": ""
+ },
+ {
+  "id": "good-text.pdf#1",
+  "file": "pdf/good-text.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "text_layer": "ok"
+ },
+ {
+  "id": "good-text.pdf#2",
+  "file": "pdf/good-text.pdf",
+  "page": 2,
+  "group": "pdf",
+  "lang": "mixed",
+  "lines": [
+   "ประชุมทีม Design วันพุธ เวลา 10:00 น.",
+   "ดาวน์โหลด Thoth 0.11.0 ได้ที่หน้าเว็บไซต์",
+   "ส่งไฟล์ PDF ขนาดไม่เกิน 20 MB ทาง email",
+   "ราคาโปรโมชัน 1,290 บาท (รวม VAT 7%)",
+   "เปิด Settings แล้วเลือก Modules > OCR",
+   "รหัสสินค้า TH-2026-0457 จัดส่งภายใน 3 วัน",
+   "ทดสอบ API ด้วย curl ก่อน deploy ขึ้น server",
+   "โทร 02-123-4567 หรือ LINE @thothnotes",
+   "งบประมาณ Q4 เพิ่มขึ้น 12.5% จากไตรมาสก่อน",
+   "อ่านคู่มือ Getting Started ก่อนเริ่มใช้งาน",
+   "บันทึก Markdown ไว้ในโฟลเดอร์ Notes/2026",
+   "สมัครสมาชิกฟรี 30 วัน ไม่ต้องใช้บัตรเครดิต"
+  ],
+  "text_layer": "ok"
+ },
+ {
+  "id": "shaped-sara-am.pdf#1",
+  "file": "pdf/shaped-sara-am.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "text_layer": "broken"
+ },
+ {
+  "id": "chrome-print.pdf#1",
+  "file": "pdf/chrome-print.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "text_layer": "broken"
+ },
+ {
+  "id": "good-text-en.pdf#1",
+  "file": "pdf/good-text-en.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "en",
+  "lines": [
+   "Good notes help you remember what matters.",
+   "Every morning I write my plans in a small notebook.",
+   "Your files stay on your own computer, in plain text.",
+   "The meeting moved from Tuesday to Thursday at 3:30 PM.",
+   "Please keep the receipt (No. 48213) for any exchange.",
+   "Search finds pages by title, tag, or any word inside.",
+   "Backups run every night at 02:00 and keep 30 days.",
+   "Send questions to the support team before Friday.",
+   "The quick brown fox jumps over the lazy dog.",
+   "Version 0.11.0 adds a calmer look and faster sync.",
+   "Total due: $1,249.50 including 7% VAT.",
+   "Open the menu, choose Settings, then Modules."
+  ],
+  "text_layer": "no-thai"
+ },
+ {
+  "id": "broken-cmap.pdf#1",
+  "file": "pdf/broken-cmap.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า",
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา",
+   "ห้องสมุดประชาชนมีหนังสือใหม่มาเพิ่มอีกสามร้อยเล่ม",
+   "ราคาผักและผลไม้ปรับขึ้นเล็กน้อยในช่วงหน้าแล้ง",
+   "เริ่มต้นติดตั้งโปรแกรมได้ทันทีโดยไม่ต้องสมัคร",
+   "พระอาทิตย์ขึ้นทางทิศตะวันออกเสมอ"
+  ],
+  "text_layer": "broken"
+ },
+ {
+  "id": "broken-invisible.pdf#1",
+  "file": "pdf/broken-invisible.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "การจดบันทึกที่ดีช่วยให้เราจำเรื่องสำคัญได้นานขึ้น",
+   "ทุกเช้าฉันเขียนสิ่งที่ต้องทำไว้ในสมุดเล่มเล็ก",
+   "ถ้าข้อมูลอยู่ในเครื่องของเราเอง เราก็ควบคุมได้ทั้งหมด",
+   "ฝนตกหนักตั้งแต่เมื่อคืน ถนนหน้าบ้านจึงมีน้ำขัง",
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า"
+  ],
+  "text_layer": "broken"
+ },
+ {
+  "id": "image-only.pdf#1",
+  "file": "pdf/image-only.pdf",
+  "page": 1,
+  "group": "pdf",
+  "lang": "th",
+  "lines": [
+   "คุณยายสอนให้หุงข้าวด้วยหม้อดินตามแบบโบราณ",
+   "ร้านกาแฟเปิดเวลาเจ็ดโมงเช้าและปิดหกโมงเย็น",
+   "นักเรียนส่งรายงานฉบับสมบูรณ์ภายในวันศุกร์นี้",
+   "เจ้าหน้าที่ตรวจสอบเอกสารครบถ้วนแล้วเมื่อวานนี้",
+   "ภาษาไทยมีวรรณยุกต์สี่รูป ได้แก่ เอก โท ตรี และจัตวา",
+   "ผู้ใหญ่บ้านประกาศเรื่องการประชุมประจำเดือน",
+   "เด็ก ๆ วิ่งเล่นกันอย่างสนุกสนานในสวนสาธารณะ",
+   "โปรดเก็บใบเสร็จไว้เป็นหลักฐานในการเปลี่ยนสินค้า",
+   "ศาลฎีกาพิพากษายืนตามศาลอุทธรณ์ในคดีนี้",
+   "กรุณาชำระเงินภายในวันที่ ๑๕ ของทุกเดือน",
+   "ปัญญาประดิษฐ์ช่วยแปลเอกสารได้รวดเร็วยิ่งขึ้น",
+   "ฤดูหนาวปีนี้อากาศเย็นสบายกว่าทุกปีที่ผ่านมา"
+  ],
+  "text_layer": "no-text"
+ }
+]
