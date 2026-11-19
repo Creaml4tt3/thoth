@@ -124,6 +124,20 @@ export interface SearchHit {
   snippet: string;
 }
 
+export interface GraphPage {
+  id: string;
+  path: string;
+  title: string;
+  tags: string[];
+  excerpt: string;
+}
+
+/** A resolved link between two pages, by vault path; no self links, each pair once. */
+export interface GraphLink {
+  from: string;
+  to: string;
+}
+
 export interface Backlink {
   sourceId: string;
   sourcePath: string;
@@ -631,6 +645,7 @@ export class Vault {
       "refs (source_page_id, ord, syntax, target, fragment, external, resolution, target_path, line)",
       doc.references.map((ref, ord) => [id, ord, ref.syntax, ref.target, ref.fragment ?? null, ref.external ? 1 : 0, ref.external ? "external" : "unresolved", null, ref.range.startLine]),
     );
+    // graph() relies on this layout: `title \n aliases \n plainText`. Change both together.
     const searchable = [doc.title, doc.aliases.join(" "), doc.plainText].join("\n");
     await this.sql.run("INSERT INTO search_content (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
     await this.sql.run("INSERT INTO search_trigram (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
@@ -823,13 +838,29 @@ export class Vault {
     ).map((r) => ({ sourcePath: r.path, target: r.target, resolution: r.resolution, line: r.line }));
   }
 
-  /** Nodes and resolved edges between pages for the basic graph view. */
-  async graph(): Promise<{ nodes: { id: string; path: string; title: string }[]; edges: { from: string; to: string }[] }> {
-    const nodes = await this.sql.all<{ id: string; path: string; title: string }>("SELECT id, path, title FROM pages ORDER BY path");
-    const edges = await this.sql.all<{ from: string; to: string }>(
-      'SELECT DISTINCT r.source_page_id AS "from", p.id AS "to" FROM refs r JOIN pages p ON p.path = r.target_path WHERE r.resolution = \'resolved\' AND r.source_page_id <> p.id',
+  /** Pages (with tags and a one-line excerpt) and the resolved page-to-page links between them, for the Board. */
+  async graph(): Promise<{ pages: GraphPage[]; links: GraphLink[] }> {
+    // Only a bounded head of the body is read: enough for title + aliases + the first line (a very long title/alias list gives an empty excerpt).
+    const rows = await this.sql.all<{ id: string; path: string; title: string; body: string | null }>(
+      "SELECT p.id, p.path, p.title, substr(s.body, 1, 2000) AS body FROM pages p LEFT JOIN search_content s ON s.page_id = p.id ORDER BY p.path",
     );
-    return { nodes, edges };
+    const tags = new Map<string, string[]>();
+    for (const t of await this.sql.all<{ page_id: string; tag: string }>("SELECT page_id, tag FROM page_tags ORDER BY rowid"))
+      tags.set(t.page_id, [...(tags.get(t.page_id) ?? []), t.tag]);
+    const aliases = new Map<string, string[]>();
+    for (const a of await this.sql.all<{ page_id: string; alias: string }>("SELECT page_id, alias FROM page_aliases ORDER BY rowid"))
+      aliases.set(a.page_id, [...(aliases.get(a.page_id) ?? []), a.alias]);
+    const pages = rows.map((r): GraphPage => {
+      // The search body is `title \n aliases \n plainText` (upsertPage); drop that head, then take the first non-empty line.
+      const head = `${r.title}\n${(aliases.get(r.id) ?? []).join(" ")}\n`.length;
+      const excerpt = (r.body ?? "").slice(head).split("\n").map((l) => l.trim()).find((l) => l && l !== r.title) ?? "";
+      return { id: r.id, path: r.path, title: r.title, tags: tags.get(r.id) ?? [], excerpt: Array.from(excerpt).slice(0, 140).join("") };
+    });
+    // The JOIN on pages keeps attachments out; `external = 0` and `resolved` drop web links and unresolved ones.
+    const links = await this.sql.all<{ from: string; to: string }>(
+      'SELECT DISTINCT p.path AS "from", r.target_path AS "to" FROM refs r JOIN pages p ON p.id = r.source_page_id JOIN pages t ON t.path = r.target_path WHERE r.resolution = \'resolved\' AND r.external = 0 AND r.target_path <> p.path ORDER BY "from", "to"',
+    );
+    return { pages, links };
   }
 
   async listAttachments(): Promise<{ path: string; hash: string; size: number; mimeType: string }[]> {
