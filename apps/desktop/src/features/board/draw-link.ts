@@ -3,8 +3,11 @@
  * `linkText` as Connections spells a linked mention. Every open page's pending edits are written first, so the line
  * lands after them; the write is compare-and-swap on the bytes just read, and one conflict reads again and retries.
  * Undo removes that exact line only while it is still the last line and unchanged; it never touches anything else.
+ * Callers must refresh the session (reconcile + revision bump) after linked/undone, as Connections does, or an open tab
+ * of the source page goes stale.
  */
-import { LinkResolver } from "@thoth/content";
+import { LinkResolver, parsePage } from "@thoth/content";
+import { basename, stripExtension } from "@thoth/domain";
 import { ConflictError, NotFoundError, type Vault } from "@thoth/local-store";
 import type { Mention } from "@thoth/app-ui/connections/mentions.ts";
 import { linkText } from "../editor/PrivateConnections.tsx";
@@ -49,8 +52,14 @@ export async function drawLink(vault: Vault, flushAll: () => Promise<boolean>, f
 
   const [scan, pages, folders] = await Promise.all([vault.scanFiles(), vault.listPages(), vault.listFolders()]);
   const resolver = new LinkResolver(scan.files, pages.map((p) => ({ path: p.path, aliases: p.aliases })), folders);
-  const found: Mention = { start: 0, end: 0, text: target.title, name: target.title, occurrence: 0, inTable: false, before: "", after: "" };
+  // A title that would break the link's label (a line break, brackets, a pipe, a backslash) gives way to the file name.
+  const text = target.title === "" || /[[\]|\r\n\\]/.test(target.title) ? stripExtension(basename(to)) : target.title;
+  const found: Mention = { start: 0, end: 0, text, name: text, occurrence: 0, inTable: false, before: "", after: "" };
   const line = linkText(resolver, from, to, found);
+  // Written only if the line is, whole, one link that reaches `to`; some names cannot be spelled as one.
+  const [ref, ...more] = parsePage(from, line).references;
+  const reached = ref && resolver.resolve(from, ref);
+  if (!ref || more.length || ref.range.start !== 0 || ref.range.end !== line.length || reached?.state !== "resolved" || reached.path !== to) return { outcome: "changed" };
 
   // Recorded by the write that succeeded, for undo.
   let eol = "\n";

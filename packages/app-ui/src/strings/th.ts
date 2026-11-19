@@ -1095,5 +1095,6 @@ export const th: Strings = {
     linkToTitle: (title) => `ลิงก์ ${title} ไปยัง…`, // REVIEW
     linkFilter: "ค้นหาโน้ตบนบอร์ดนี้", // REVIEW
     linkNone: "ไม่มีโน้ตอื่นที่ตรงกัน", // REVIEW
+    linkFailed: "เพิ่มลิงก์ไม่สำเร็จ", // REVIEW
   },
 };

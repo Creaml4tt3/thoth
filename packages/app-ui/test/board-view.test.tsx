@@ -4,7 +4,7 @@
 // menu, undo keys, reduced motion, and Thai titles that wrap inside a note.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardView, type BoardActions } from "../src/board/BoardView.tsx";
@@ -371,6 +371,7 @@ describe("BoardView, drawing string (Task 7)", () => {
     return { clientX: tx + x * z, clientY: ty + y * z };
   };
   const pinOf = (name: RegExp) => noteButton(name).querySelector<HTMLElement>(".board-pin")!;
+  const says = (text: string) => waitFor(() => expect(screen.getByRole("status").textContent).toBe(text));
   const drawFromA = (plane: HTMLElement, x: number, y: number, end: "pointerUp" | "pointerCancel" = "pointerUp") => {
     fireEvent.pointerDown(pinOf(/^A,/), { button: 0, ...screenAt(plane, 80, 0) });
     fireEvent.pointerMove(window, screenAt(plane, x, y));
@@ -386,7 +387,7 @@ describe("BoardView, drawing string (Task 7)", () => {
     expect(drawLink).toHaveBeenCalledTimes(1);
     expect(drawLink).toHaveBeenCalledWith("A.md", "B.md");
     expect(actions.move).not.toHaveBeenCalled(); // the pin draws string, it does not move the note
-    expect(screen.getByRole("status").textContent).toBe("Linked.");
+    await says("Linked.");
     expect(plane().querySelector(".board-string-snap")).toBeTruthy();
   });
 
@@ -409,13 +410,41 @@ describe("BoardView, drawing string (Task 7)", () => {
     const { plane } = setup({ actions: { drawLink } });
     drawFromA(plane(), 380, 60);
     await act(async () => {});
-    expect(screen.getByRole("status").textContent).toBe("The page changed; nothing was written.");
+    await says("The page changed; nothing was written.");
     expect(plane().querySelector(".board-string-snap")).toBeNull();
     expect(plane().querySelector(".board-string-draft")).toBeNull();
     drawLink.mockResolvedValueOnce("gone");
     drawFromA(plane(), 380, 60);
     await act(async () => {});
-    expect(screen.getByRole("status").textContent).toBe("That page is gone.");
+    await says("That page is gone.");
+  });
+
+  it("snaps only when linked; a failure says so; the same outcome twice is announced again", async () => {
+    const drawLink = vi.fn<NonNullable<BoardActions["drawLink"]>>(async () => "changed");
+    const { plane } = setup({ actions: { drawLink } });
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    await says("The page changed; nothing was written.");
+    expect(plane().querySelector(".board-string-snap")).toBeNull();
+    // The same words again: the region empties first, so a screen reader hears them a second time.
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    expect(screen.getByRole("status").textContent).toBe("");
+    await says("The page changed; nothing was written.");
+    drawLink.mockRejectedValueOnce(new Error("disk"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    await says("Couldn’t add the link.");
+    expect(plane().querySelector(".board-string-snap")).toBeNull();
+  });
+
+  it("a drop where notes overlap links to the one on top", async () => {
+    const drawLink = vi.fn(async () => "linked" as const);
+    const { plane } = setup({ notes: [A, B, note("D.md", 340, 40)], actions: { drawLink } });
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    expect(drawLink).toHaveBeenCalledWith("A.md", "D.md");
   });
 
   it("without drawLink the pin moves the note as before and the menu has no Link to…", async () => {
@@ -445,7 +474,7 @@ describe("BoardView, drawing string (Task 7)", () => {
     expect(drawLink).toHaveBeenCalledWith("A.md", "C.md");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(noteButton(/^A,/));
-    expect(screen.getByRole("status").textContent).toBe("Linked.");
+    await says("Linked.");
   });
 
   it("Link to… chooses with a click; Escape closes without linking", async () => {

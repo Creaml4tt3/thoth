@@ -48,6 +48,8 @@ const STEP = 1.25;
 const SQUARES_BELOW = 0.4;
 const DRAG_PX = 4;
 const WOBBLE_MS = 300;
+/** The status is emptied this long before an outcome is written, so the same words twice are announced twice. */
+const ANNOUNCE_MS = 100;
 const FIT_PAD = 48;
 const FOCUS_MARGIN = 16;
 /** jsdom and a region not laid out yet measure 0×0. */
@@ -141,6 +143,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   const [snap, setSnap] = useState<{ from: string; to: string } | null>(null);
   const snapTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [status, setStatus] = useState("");
+  const statusTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   /** "Link to…" is open for this note. */
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
 
@@ -181,7 +184,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     if (path && (document.activeElement as HTMLElement | null)?.dataset?.path !== path) focusNote(path);
   }, [moved]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => (clearTimeout(wobbleTimer.current), clearTimeout(snapTimer.current)), []);
+  useEffect(() => () => [wobbleTimer, snapTimer, statusTimer].forEach((timer) => clearTimeout(timer.current)), []);
 
   // Zooming out to squares removes the focused note button: keep focus on the board instead of losing it to the page.
   const squares = !list && view.z < SQUARES_BELOW;
@@ -242,10 +245,26 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     track(e, (dx, dy) => setView({ ...start, x: start.x + dx, y: start.y + dy }), (moved) => moved || setSelected(null));
   };
 
-  const link = (from: string, to: string) => {
+  const announce = (text: string) => {
+    clearTimeout(statusTimer.current);
+    setStatus("");
+    statusTimer.current = setTimeout(() => setStatus(text), ANNOUNCE_MS);
+  };
+
+  /** Links `from` to `to`; a drawn string (`snap`) snaps taut once the link is written, unless reduced motion is on. */
+  const link = (from: string, to: string, snap = false) => {
     void actions.drawLink?.(from, to).then(
-      (outcome) => setStatus({ linked: t.linked, changed: t.linkChanged, gone: t.linkGone }[outcome]),
-      (error: unknown) => console.error(error),
+      (outcome) => {
+        announce({ linked: t.linked, changed: t.linkChanged, gone: t.linkGone }[outcome]);
+        if (outcome !== "linked" || !snap || motionOff()) return;
+        clearTimeout(snapTimer.current);
+        setSnap({ from, to });
+        snapTimer.current = setTimeout(() => setSnap(null), WOBBLE_MS);
+      },
+      (error: unknown) => {
+        console.error(error);
+        announce(t.linkFailed);
+      },
     );
   };
 
@@ -265,14 +284,9 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
         setDraft(null);
         if (!wasMoved) return;
         dragged.current = true;
-        const target = released && notes.find((o) => o.path !== n.path && o.state !== "missing" && (({ x, y }) => to.x >= x && to.x <= x + NOTE_W && to.y >= y && to.y <= y + NOTE_H)(at(o)));
-        if (!target) return;
-        if (!motionOff()) {
-          clearTimeout(snapTimer.current);
-          setSnap({ from: n.path, to: target.path });
-          snapTimer.current = setTimeout(() => setSnap(null), WOBBLE_MS);
-        }
-        link(n.path, target.path);
+        // The note on top: the last drawn (reading order) under the pointer.
+        const target = released && ordered.findLast((o) => o.path !== n.path && o.state !== "missing" && (({ x, y }) => to.x >= x && to.x <= x + NOTE_W && to.y >= y && to.y <= y + NOTE_H)(at(o)));
+        if (target) link(n.path, target.path, true);
       },
     );
   };

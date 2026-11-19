@@ -74,7 +74,7 @@ describe("drawLink", () => {
       return true;
     };
     expect((await drawLink(vault, flushAll, "Atlas.md", "Roadmap.md")).outcome).toBe("linked");
-    expect(calls[0]).toBe("flush");
+    expect(calls.slice(0, 2)).toEqual(["flush", "read Atlas.md"]);
     expect(await read("Atlas.md")).toBe("# Atlas\n\nSome text.\nUnsaved edit.\n[[Roadmap]]\n");
   });
 
@@ -118,6 +118,59 @@ describe("drawLink", () => {
     }
     const { undo } = await drawLink(vault, flushed, "Atlas.md", "Roadmap.md");
     expect(await undo!()).toBe("undone");
+    expect(await read("Atlas.md")).toBe("# Atlas\n\nSome text.\n");
+  });
+
+  it("a page with a BOM keeps it, and undo gives back its bytes", async () => {
+    await put("Bom.md", "\uFEFF# Bom\n");
+    await vault.reconcile();
+    const { undo } = await drawLink(vault, flushed, "Bom.md", "Roadmap.md");
+    expect(await read("Bom.md")).toBe("\uFEFF# Bom\n[[Roadmap]]\n");
+    expect(await undo!()).toBe("undone");
+    expect(await readFile(join(root, "Bom.md"))).toEqual(Buffer.from("\uFEFF# Bom\n"));
+  });
+
+  it("undo retries once after a conflict and keeps the outside change", async () => {
+    const { undo } = await drawLink(vault, flushed, "Atlas.md", "Roadmap.md");
+    const write = vault.writePage.bind(vault);
+    let first = true;
+    vault.writePage = async (path, source, options) => {
+      if (first) {
+        first = false;
+        await writeFile(join(root, path), "# Atlas\n\nEdited elsewhere.\n[[Roadmap]]\n");
+      }
+      return write(path, source, options);
+    };
+    expect(await undo!()).toBe("undone");
+    expect(await read("Atlas.md")).toBe("# Atlas\n\nEdited elsewhere.\n");
+  });
+
+  it("undo leaves the page alone when text was joined onto the link line", async () => {
+    const { undo } = await drawLink(vault, flushed, "Atlas.md", "Roadmap.md");
+    await writeFile(join(root, "Atlas.md"), "# Atlas\n\nSome text. [[Roadmap]]\n");
+    expect(await undo!()).toBe("changed");
+    expect(await read("Atlas.md")).toBe("# Atlas\n\nSome text. [[Roadmap]]\n");
+  });
+
+  it("a title that cannot be a link label falls back to the file name, and the line is one resolved link", async () => {
+    await put("Draft.md", "---\ntitle: Notes [draft]\n---\n# x\n");
+    await put("Block.md", "---\ntitle: |\n  First line\n  Second line\n---\n# y\n");
+    await vault.reconcile();
+    expect((await drawLink(vault, flushed, "Atlas.md", "Draft.md")).outcome).toBe("linked");
+    expect((await drawLink(vault, flushed, "Atlas.md", "Block.md")).outcome).toBe("linked");
+    expect(added("# Atlas\n\nSome text.\n", await read("Atlas.md"))).toEqual(["[[Draft]]", "[[Block]]"]);
+    await vault.reconcile();
+    // Both are real links now: drawing again writes nothing.
+    const before = await read("Atlas.md");
+    expect(await drawLink(vault, flushed, "Atlas.md", "Draft.md")).toEqual({ outcome: "linked" });
+    expect(await drawLink(vault, flushed, "Atlas.md", "Block.md")).toEqual({ outcome: "linked" });
+    expect(await read("Atlas.md")).toBe(before);
+  });
+
+  it("a page whose name cannot be spelled as a working link is not written to", async () => {
+    await put("a]b.md", "# a]b\n");
+    await vault.reconcile();
+    expect((await drawLink(vault, flushed, "Atlas.md", "a]b.md")).outcome).toBe("changed");
     expect(await read("Atlas.md")).toBe("# Atlas\n\nSome text.\n");
   });
 

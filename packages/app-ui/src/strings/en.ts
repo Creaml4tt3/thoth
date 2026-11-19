@@ -1206,6 +1206,7 @@ export const en = {
     linkToTitle: (title: string) => `Link ${title} to…`,
     linkFilter: "Find a note on this board",
     linkNone: "No other note matches.",
+    linkFailed: "Couldn’t add the link.",
   },
 };
 
