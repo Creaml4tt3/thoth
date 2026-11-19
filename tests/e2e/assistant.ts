@@ -51,6 +51,7 @@ export async function openReview(page: Page): Promise<Locator> {
 export async function openAssistantSettings(page: Page): Promise<Locator> {
   if (await bubble(page).isVisible()) await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Thoth assistant" }).click();
   const section = page.getByTestId("assistant-settings");
   await expect(section).toBeVisible();
   return section;

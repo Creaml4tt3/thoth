@@ -10,7 +10,7 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
-const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
+const tabNames = () => [...document.querySelectorAll(".tablist [role=tab]")].map((t) => t.textContent); // the tab strip, not Settings' section tabs
 const current = () => screen.queryAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const row = (name: string) => screen.findByRole("treeitem", { name });
 const treeRows = () => screen.getAllByRole("treeitem").map((r) => r.textContent?.replace(/Workspace$/, ""));
@@ -83,7 +83,8 @@ describe("commands", () => {
     await browser.user.click(await row("Alpha"));
     await run(browser, "settings");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Settings"]));
-    const panel = screen.getByRole("tabpanel");
+    const panel = document.querySelector<HTMLElement>(".tab-panel")!;
+    await browser.user.click(within(panel).getByRole("tab", { name: "Keyboard" }));
     await browser.user.click(within(panel).getByRole("button", { name: "Show keyboard shortcuts" }));
     expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeTruthy();
   });

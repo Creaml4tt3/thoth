@@ -198,7 +198,8 @@ test("the switch: off keeps Download; a host that cannot update has none", async
   await expect(popup(page)).toBeVisible({ timeout: 25_000 });
   await popup(page).getByRole("button", { name: "Later" }).click();
   await page.getByRole("button", { name: "Settings" }).click();
-  const section = page.getByRole("region", { name: "Updates" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Updates" }).click();
+  const section = page.getByRole("tabpanel", { name: "Updates" });
   const toggle = section.getByRole("switch", { name: "Download and install updates in the app" });
   await expect(toggle).toBeChecked();
   await expectAccessible(page, "section.update-settings");
@@ -221,6 +222,7 @@ test("the switch: off keeps Download; a host that cannot update has none", async
   const plain = await launch(browser, undefined);
   await expect(popup(plain).getByRole("button", { name: "Download" })).toBeVisible({ timeout: 25_000 });
   await plain.getByRole("button", { name: "Settings" }).click();
+  await plain.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Updates" }).click();
   await expect(plain.getByRole("switch", { name: "Tell me when a new version is out" })).toBeVisible();
   await expect(plain.getByRole("switch", { name: "Download and install updates in the app" })).toHaveCount(0);
 });

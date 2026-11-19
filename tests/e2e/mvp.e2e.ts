@@ -145,7 +145,7 @@ async function importThroughWizard(system: "notion" | "obsidian", pick: "zip" | 
   await page.getByRole("button", { name: pick === "zip" ? /choose zip file/i : /choose folder/i }).click();
   await expect(page.getByText(/Preview of/)).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("region", { name: "Import" }).getByRole("textbox").fill(destination);
+  await page.getByRole("region", { name: "Import" }).getByRole("textbox").fill(destination); // the wizard's own region inside Settings → Import notes
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: /start import/i }).click();
   const report = page.getByTestId("import-report");
@@ -314,7 +314,8 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await openApp(vaults.obsidian);
     await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
     await page.getByRole("button", { name: "Settings" }).click();
-    const servers = page.getByRole("region", { name: "Servers" });
+    await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+    const servers = page.getByRole("tabpanel", { name: "Servers" });
     await servers.getByRole("textbox", { name: "Server address" }).fill(ref.url);
     await servers.getByRole("button", { name: "Add server" }).click();
     const card = servers.getByRole("article");

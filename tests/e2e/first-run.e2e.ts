@@ -168,6 +168,7 @@ test("Skip tour ends it at once; Settings shows it again", async ({ page }) => {
   expect(await page.evaluate(() => localStorage.getItem("thoth.desktop.tour"))).toBe("skipped");
 
   await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Help and feedback" }).click();
   await page.getByRole("button", { name: "Show the tour again" }).click();
   await expect(tour(page)).toBeVisible();
   await expect(tour(page).locator("h2")).toHaveText("Your pages");

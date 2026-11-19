@@ -24,7 +24,7 @@ afterEach(async () => {
   await dirs.cleanup();
 });
 
-const tabs = () => screen.queryAllByRole("tab");
+const tabs = () => [...document.querySelectorAll<HTMLElement>(".tablist [role=tab]")]; // the tab strip, not Settings' section tabs
 /** The × next to the tab named `name`: a pointer affordance, not a button (a tablist owns tabs only). */
 const closeButton = (name: string) => tabs().find((t) => t.textContent === name)!.parentElement!.querySelector<HTMLElement>(".tab-close")!;
 const tabNames = () => tabs().map((t) => t.textContent);

@@ -331,16 +331,17 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-test("the window never scrolls as a whole, even on the long Settings page: only the page area scrolls", async ({ page }) => {
-  await page.setViewportSize({ width: 1200, height: 600 });
+test("the window never scrolls as a whole, even on a long Settings section: only the page area scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 400 });
   await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Thoth assistant" }).click();
   const scroller = page.locator(".page-scroll").first();
   await expect(scroller).toBeVisible();
-  // The settings page is longer than the window, and its own area scrolls to its end.
+  // The section is longer than the window, and its own area scrolls to its end.
   expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
   // A wheel over the sidebar and a scroll asked of the document (what a focus or scrollIntoView does) move nothing.
-  await page.mouse.move(100, 400);
+  await page.mouse.move(100, 300);
   await page.mouse.wheel(0, 2000);
   await page.evaluate(() => {
     window.scrollTo(0, 10_000);
@@ -356,67 +357,55 @@ test("the window never scrolls as a whole, even on the long Settings page: only 
     mainScrolled: document.querySelector(".main")!.scrollTop,
     sidebarBottom: document.querySelector(".sidebar")!.getBoundingClientRect().bottom,
   }));
-  expect(where).toEqual({ scrolled: 0, tall: 0, shellTop: 0, shellScrolled: 0, mainScrolled: 0, sidebarBottom: 600 });
+  expect(where).toEqual({ scrolled: 0, tall: 0, shellTop: 0, shellScrolled: 0, mainScrolled: 0, sidebarBottom: 400 });
   // The tab bar is still at the top.
   expect(await page.locator(".tabstrip").evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
 });
 
-test("Settings: a link to one of the last (short) sections scrolls only the settings area; the shell stays put and the list's first item stays in view", async ({ page }) => {
+test("Settings: one section at a time, chosen from its tab by pointer or arrow keys, in both themes; the shell stays put", async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 600 });
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  const nav = page.getByRole("navigation", { name: "Settings sections" });
-  await expect(nav.getByRole("link", { name: "Help and feedback" })).toBeVisible();
-  const first = nav.getByRole("link").first();
+  const list = page.getByRole("tablist", { name: "Settings sections" });
+  await expect(list).toHaveAttribute("aria-orientation", "vertical");
+  await expect(list.getByRole("tab", { name: "Appearance" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: "Appearance" })).toBeVisible();
   for (const name of ["Connected apps", "Notifications", "Help and feedback"]) {
-    await nav.getByRole("link", { name }).click();
-    await settled(page);
-    await page.waitForTimeout(1100); // past the smooth scroll and the held mark
-    const ancestors = await page.locator(".settings-scroll").evaluate((el) => {
-      const out: { at: string; top: number; left: number }[] = [];
-      for (let p = el.parentElement; p; p = p.parentElement) out.push({ at: p.className || p.tagName, top: p.scrollTop, left: p.scrollLeft });
-      return out.filter((a) => a.top !== 0 || a.left !== 0);
-    });
-    expect(ancestors, name).toEqual([]);
+    await list.getByRole("tab", { name }).click();
+    await expect(list.getByRole("tab", { name }), name).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel", { name }), name).toBeVisible();
+    await expect(page.getByRole("tabpanel", { name: "Appearance" }), name).toBeHidden();
     expect(await page.evaluate(() => window.scrollY), name).toBe(0);
-    await expect(first, name).toBeInViewport();
-    expect(await first.evaluate((el) => el.getBoundingClientRect().top), name).toBeGreaterThanOrEqual(0);
-    await expect(nav.getByRole("link", { name }), name).toHaveAttribute("aria-current", "true");
+    expect(await page.locator(".shell").evaluate((el) => [el.scrollTop, (el.querySelector(".main") as HTMLElement).scrollTop]), name).toEqual([0, 0]);
     await expect(page.locator(".tabstrip").first(), name).toBeInViewport();
   }
-  // Any other scrollIntoView in the shell cannot move its clipped ancestors either.
-  const moved = await page.locator(".settings-scroll").evaluate((el) => {
-    const last = el.querySelector(".settings-nav li:last-child a")!.getAttribute("href")!.slice(1);
-    document.getElementById(last)!.closest("section")!.scrollIntoView({ block: "start" });
-    const out: string[] = [];
-    for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollTop || p.scrollLeft) out.push(p.className || p.tagName);
-    return out;
-  });
-  expect(moved).toEqual([]);
   for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await settled(page);
-    await page.screenshot({ path: join(SHOTS, `settings-last-section-${scheme}.png`) });
+    await page.screenshot({ path: join(SHOTS, `settings-tabs-${scheme}.png`) });
   }
   await page.emulateMedia({ colorScheme: "light" });
-  // The keyboard path does the same.
-  await nav.getByRole("link", { name: "Notifications" }).focus();
-  await page.keyboard.press("Enter");
-  await settled(page);
-  expect(await page.locator(".shell").evaluate((el) => [el.scrollTop, (el.querySelector(".main") as HTMLElement).scrollTop])).toEqual([0, 0]);
-  await expect(first).toBeInViewport();
+  // The keyboard: arrows move and choose, Home goes to the first.
+  await list.getByRole("tab", { name: "Help and feedback" }).focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(list.getByRole("tab", { name: "Notifications" })).toBeFocused(); // no Updates section in this build
+  await expect(page.getByRole("tabpanel", { name: "Notifications" })).toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(list.getByRole("tab", { name: "Appearance" })).toBeFocused();
+  await expect(page.getByRole("tabpanel", { name: "Appearance" })).toBeVisible();
+  expect((await new AxeBuilder({ page }).include(".settings-layout").analyze()).violations.map((v) => v.id)).toEqual([]);
 });
 
 test("Settings: the search box filters the page to the matching settings, in both themes, and Escape clears it", async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 700 });
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const search = page.getByRole("searchbox", { name: "Search settings" });
-  const nav = page.getByRole("navigation", { name: "Settings sections" });
+  const nav = page.getByRole("tablist", { name: "Settings sections" });
   await search.fill("rebuild");
-  await expect(nav.getByRole("link")).toHaveText(["Private Space"]);
+  await expect(nav.getByRole("tab")).toHaveText(["Private Space"]);
   await expect(page.getByRole("button", { name: "Rebuild index" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Switch Private Space" })).toBeHidden();
   await search.fill("language");
-  await expect(nav.getByRole("link")).toHaveText(["Appearance"]);
+  await expect(nav.getByRole("tab")).toHaveText(["Appearance"]);
   await expect(page.getByRole("combobox", { name: "Language" })).toBeVisible();
   for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
@@ -429,8 +418,9 @@ test("Settings: the search box filters the page to the matching settings, in bot
   await expect(page.getByText("No setting matches “qqqq”")).toBeVisible();
   await search.press("Escape");
   await expect(search).toHaveValue("");
+  // Back to the section chosen before the search.
   await expect(page.getByRole("combobox", { name: "Theme" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Switch Private Space" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch Private Space" })).toBeHidden();
 });
 
 test("a section's drag grip is hidden and takes no room until the pointer is over its header; the name does not move", async ({ page }) => {

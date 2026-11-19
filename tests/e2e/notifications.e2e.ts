@@ -141,6 +141,7 @@ test("a run ends in review while the window is in the background: a system notif
 
 test("Settings → Notifications: switches that are kept, and pass axe in light and dark", async ({ page }) => {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Notifications" }).click();
   const section = page.getByTestId("notification-settings");
   await section.scrollIntoViewIfNeeded();
   await expect(section.getByRole("switch", { name: "System notifications" })).toBeChecked();
@@ -154,6 +155,7 @@ test("Settings → Notifications: switches that are kept, and pass axe in light 
   await page.reload();
   await pickSpace(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Notifications" }).click();
   await expect(page.getByTestId("notification-settings").getByRole("checkbox", { name: "Save conflict" })).not.toBeChecked();
   await expect(page.getByTestId("notification-settings").getByRole("checkbox", { name: "Changes ready for review" })).toBeChecked();
 });

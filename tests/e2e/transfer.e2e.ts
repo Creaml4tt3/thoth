@@ -33,7 +33,8 @@ async function api(token: string, path: string) {
 
 async function signInWithToken(page: Page, token: string) {
   await page.getByRole("button", { name: "Settings" }).click();
-  const servers = page.getByRole("region", { name: "Servers" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+  const servers = page.getByRole("tabpanel", { name: "Servers" });
   await servers.getByRole("textbox", { name: "Server address" }).fill(serverUrl);
   await servers.getByRole("button", { name: "Add server" }).click();
   const card = servers.getByRole("article");

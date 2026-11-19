@@ -7,7 +7,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { BUDGET_CHOICES_USD, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
-import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { MascotSettings } from "../mascot/MascotSettings.tsx";
@@ -281,17 +280,13 @@ function Usage({ state, now }: { state: AgentsState; now: () => number }) {
   );
 }
 
-function Body({ agents, focus }: { agents: AgentsService; focus: boolean }) {
+function Body({ agents }: { agents: AgentsService }) {
   const t = useDesktopStrings().agents;
   const { options } = useSession();
   const state = useSyncExternalStore(agents.subscribe, agents.getState);
   useEffect(() => {
     if (!agents.getState().status && !agents.getState().checking) void agents.detect();
   }, [agents]);
-  useEffect(() => {
-    const heading = document.getElementById("set-agents");
-    if (focus && heading) scrollToSection(heading.closest("section") ?? heading);
-  }, [focus]);
   return (
     <section aria-labelledby="set-agents" className="set-section agents" data-testid="assistant-settings">
       <h2 id="set-agents">{t.title}</h2>
@@ -306,8 +301,8 @@ function Body({ agents, focus }: { agents: AgentsService; focus: boolean }) {
 }
 
 /** The section; nothing where the host cannot run agent CLIs (the web client, a test host without agents). */
-export function AgentSettings({ focus = false }: { focus?: boolean }) {
+export function AgentSettings() {
   const { agents } = useSession();
   if (!agents) return null;
-  return <Body agents={agents} focus={focus} />;
+  return <Body agents={agents} />;
 }

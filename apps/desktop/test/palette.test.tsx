@@ -28,8 +28,9 @@ afterEach(async () => {
   await dirs.cleanup();
 });
 
-const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
-const current = () => screen.queryAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
+const tabs = () => [...document.querySelectorAll<HTMLElement>(".tablist [role=tab]")]; // the tab strip, not Settings' section tabs
+const tabNames = () => tabs().map((t) => t.textContent);
+const current = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const tree = async () => screen.findByRole("tree", { name: "Pages in this Private Space" });
 const row = async (name: string) => within(await tree()).getByRole("treeitem", { name });
 const rows = async () => within(await tree()).getAllByRole("treeitem").map((r) => r.textContent);
@@ -157,7 +158,7 @@ describe("commands", () => {
     await run(app, "settings");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Settings"]));
     expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
-    expect(within(screen.getByRole("tabpanel")).getByRole("combobox", { name: "Theme" })).toBeTruthy();
+    expect(within(document.querySelector<HTMLElement>(".tab-panel")!).getByRole("combobox", { name: "Theme" })).toBeTruthy();
     await app.user.keyboard("{Control>}1{/Control}");
     await waitFor(() => expect(current()).toBe("Alpha"));
     await app.user.keyboard("{Control>}[Comma]{/Control}");

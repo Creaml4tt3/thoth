@@ -10,7 +10,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeConnectedApps } from "./support/connected-apps.ts";
 
@@ -176,7 +176,7 @@ describe("Letting an app propose", () => {
   it("Settings → Connected apps has the per-app switch, off until turned on", async () => {
     apps.state.apps = [{ name: "Claude", allowed: true, decidedAt: "2026-11-02T08:00:00Z", propose: null }];
     const { app } = await open();
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    await openSettingsAt(app, "Connected apps");
     const section = within(await screen.findByTestId("connected-apps-settings"));
     const claude = within(section.getByRole("listitem", { name: "Claude" }));
     const toggle = claude.getByRole("switch", { name: "May propose changes" }) as HTMLInputElement;

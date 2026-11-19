@@ -9,7 +9,7 @@
 import { readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 import { FAKE_CLAUDE_DIR, FAKE_CODEX_DIR, fakeRecord } from "../../../tests/helpers/agent.ts";
@@ -98,7 +98,7 @@ async function openReview(app: Harness): Promise<HTMLElement> {
 /** Settings → Thoth assistant. */
 async function openAssistantSettings(app: Harness, name = "Settings"): Promise<HTMLElement> {
   if (screen.queryByRole("dialog", { name: "Ask Thoth" })) await app.user.keyboard("{Escape}");
-  await app.user.click(screen.getAllByRole("button", { name })[0]!);
+  await openSettingsAt(app, /^(Thoth assistant|ผู้ช่วย Thoth)$/, name);
   return screen.findByTestId("assistant-settings");
 }
 

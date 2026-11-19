@@ -81,6 +81,7 @@ test("a Thai system gets the Thai UI with the bundled fonts, and Settings change
 
   // Settings → Language: English now, remembered after a reload, then back to the system's Thai.
   await page.getByRole("button", { name: "การตั้งค่า" }).click();
+  await page.getByRole("tablist", { name: "หัวข้อการตั้งค่า" }).getByRole("tab", { name: "หน้าตา" }).click();
   const language = page.getByRole("combobox", { name: "ภาษา" });
   await expect(language).toHaveValue("system");
   await language.selectOption("en");
@@ -97,6 +98,7 @@ test("Settings shows the folder shortened with the full path as a tooltip, and S
   await page.getByRole("button", { name: "เริ่ม Private Space ใหม่" }).click();
   await page.getByRole("button", { name: "เริ่มเขียน" }).click();
   await page.getByRole("button", { name: "การตั้งค่า" }).click();
+  await page.getByRole("tablist", { name: "หัวข้อการตั้งค่า" }).getByRole("tab", { name: "Private Space" }).click();
   const location = page.getByTestId("vault-location");
   await expect(location).toHaveAttribute("title", vault);
   const shown = (await location.textContent()) ?? "";

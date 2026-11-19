@@ -12,7 +12,7 @@ import { render } from "@testing-library/react";
 import { App, DEFAULT_OPTIONS } from "../src/app/App.tsx";
 import { NOTIFICATION_PREFS_KEY } from "../src/features/notifications/prefs.ts";
 import { setLangPreference } from "../src/strings/index.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 
@@ -285,7 +285,7 @@ describe("the notification list", () => {
     const app = await start();
     await findPopup();
     expect(bell().getAttribute("aria-label")).toBe("Notifications");
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Notifications");
     const box = await screen.findByRole("checkbox", { name: "Add a new version to the list under the bell" });
     expect((box as HTMLInputElement).checked).toBe(false);
     await app.user.click(box);
@@ -297,7 +297,7 @@ describe("the notification list", () => {
 
 describe("Settings → Updates", () => {
   async function openSettings(app: Harness) {
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Updates");
     return screen.findByRole("switch", { name: "Tell me when a new version is out" });
   }
 
@@ -499,8 +499,8 @@ describe("in-app updates (ADR-0034)", () => {
     updates.answer = inApp();
     const app = await start();
     await findPopup();
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    const general = await screen.findByRole("region", { name: "Updates" });
+    await openSettingsAt(app, "Updates");
+    const general = await screen.findByRole("tabpanel", { name: "Updates" });
     await app.user.click(within(general).getByRole("button", { name: "Check now" }));
     await app.user.click(await within(general).findByRole("button", { name: "Update" }));
     updates.emit({ phase: "downloading", received: 1_048_576, total: 2_097_152 });

@@ -4,7 +4,7 @@ import type { AppOptions } from "../src/app/context.ts";
 import { describeLimits } from "../src/features/servers/ServersSettings.tsx";
 import { titleFromMarkdown } from "@thoth/app-ui/workspace/workspace-store.ts";
 import { nestWorkspaceTree } from "@thoth/app-ui/workspace/tree.ts";
-import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
@@ -53,8 +53,8 @@ async function start(setup: (servers: FakeServers) => void = () => undefined, op
 }
 
 async function openServersSettings(app: Harness) {
-  await app.user.click(screen.getByRole("button", { name: "Settings" }));
-  return screen.findByRole("region", { name: "Servers" });
+  await openSettingsAt(app, "Servers");
+  return screen.findByRole("tabpanel", { name: "Servers" });
 }
 
 const card = (name: string) => screen.getByRole("article", { name });
@@ -299,7 +299,7 @@ describe("sidebar", () => {
     const section = screen.getByRole("region", { name: "Server Team server" });
     expect(within(section).queryByRole("tree")).toBeNull();
     await app.user.click(within(section).getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByRole("region", { name: "Servers" })).toBeTruthy();
+    expect(await screen.findByRole("tabpanel", { name: "Servers" })).toBeTruthy();
     expect(within(card("Team server")).getByRole("button", { name: "Use a personal access token" })).toBeTruthy();
   });
 
@@ -587,8 +587,8 @@ describe("Settings → Servers in Thai", () => {
     servers.define(LOCAL);
     const app = await openApp(root, { starterServer: STARTER_SERVER }, createNodePlatform({ vault: root, servers }));
     await screen.findByRole("tree", { name: th.shell.pagesInSpace });
-    await app.user.click(screen.getByRole("button", { name: th.shell.settings }));
-    const region = await screen.findByRole("region", { name: th.servers.title });
+    await openSettingsAt(app, th.servers.title, th.shell.settings);
+    const region = await screen.findByRole("tabpanel", { name: th.servers.title });
     // The demo server is suggested with its Thai name and caution.
     const suggestion = within(region).getByRole("group", { name: th.servers.starter.name });
     expect(within(suggestion).getByText(th.servers.starter.caution)).toBeTruthy();

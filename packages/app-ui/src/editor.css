@@ -117,30 +117,31 @@
 .page-view { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
-/* Settings (ui/SettingsLayout.tsx): the list of sections beside the page, sticky while it scrolls; above the sections
-   when the page column would be squeezed below 600px (160px list + gap + 600px). */
+/* Settings (ui/SettingsLayout.tsx): a tab list of the sections beside the chosen section, sticky while it scrolls; above
+   the section as a scrolling row when the page column would be squeezed below 600px (220px list + gap + 600px). */
 .settings-scroll { container-type: inline-size; }
-.settings-layout { display: grid; grid-template-columns: 160px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-6); justify-content: center; align-items: start; }
+.settings-layout { display: grid; grid-template-columns: 220px minmax(0, var(--thoth-content-width)); gap: var(--thoth-space-6); justify-content: center; align-items: start; }
 .settings-layout > .page-col { margin: 0; min-width: 0; }
-.settings-layout .settings > section { scroll-margin-top: var(--thoth-space-4); }
 .settings-side { position: sticky; top: 0; padding-top: var(--thoth-space-4); display: grid; gap: var(--thoth-space-3); }
 .settings-search { width: 100%; min-width: 0; }
-/* The search hides what does not match; sections and parts set their own display, so `hidden` must win here. */
+/* The search and the tabs hide what is not shown; sections and parts set their own display, so `hidden` must win here. */
 .settings [hidden] { display: none !important; }
 .settings-none { padding: var(--thoth-space-6) 0; }
-.settings-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.settings-nav a { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 2px 10px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); text-decoration: none; font: var(--thoth-text-ui); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
-.settings-nav a:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
-.settings-nav a[aria-current="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); font-weight: 500; }
-.settings-nav a:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
-@container (max-width: 784px) {
+.settings-nav { display: grid; gap: 2px; }
+.settings-tab { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 2px 10px; border: 0; border-radius: var(--thoth-radius-sm); background: none; color: var(--thoth-ink-secondary); text-align: start; font: var(--thoth-text-ui); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.settings-tab .icon { flex: none; }
+.settings-tab:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.settings-tab[aria-selected="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); font-weight: 500; }
+.settings-tab:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+@container (max-width: 844px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--thoth-space-4); }
   .settings-layout > .page-col, .settings-side { width: 100%; max-width: var(--thoth-content-width); margin: 0 auto; }
   .settings-side { position: static; padding-top: var(--thoth-space-2); }
-  .settings-nav ul { display: flex; flex-wrap: wrap; gap: 4px; }
+  .settings-nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
+  .settings-tab { flex: none; white-space: nowrap; }
 }
 @media (forced-colors: active) {
-  .settings-nav a[aria-current="true"] { outline: 2px solid Highlight; }
+  .settings-tab[aria-selected="true"] { outline: 2px solid Highlight; }
 }
 .page-title { font: var(--thoth-text-h1); letter-spacing: var(--thoth-tracking-heading); margin: var(--thoth-space-4) 0 var(--thoth-space-1); overflow-wrap: anywhere; }
 .page-props { display: flex; gap: 14px; flex-wrap: wrap; color: var(--thoth-ink-tertiary); margin-bottom: var(--thoth-space-4); }

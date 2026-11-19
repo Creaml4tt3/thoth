@@ -5,7 +5,7 @@ import type { AppOptions } from "../src/app/context.ts";
 import { FakeServers, type FakeServerConfig } from "../../../tests/helpers/fake-servers.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 
 const dirs = tempDirs();
 let root: string;
@@ -31,10 +31,8 @@ async function start(setup: (servers: FakeServers) => void, options: Partial<App
 }
 
 async function openFromSettings(app: Harness) {
-  await app.user.click(screen.getByRole("button", { name: "Settings" }));
-  const nav = await screen.findByRole("navigation", { name: /settings/i });
-  await waitFor(() => expect(within(nav).getByRole("link", { name: "Help and feedback" })).toBeTruthy());
-  const section = screen.getByRole("region", { name: "Help and feedback" });
+  await openSettingsAt(app, "Help and feedback");
+  const section = screen.getByRole("tabpanel", { name: "Help and feedback" });
   await app.user.click(within(section).getByRole("button", { name: "Send feedback…" }));
   return screen.findByRole("dialog", { name: "Send feedback" });
 }
@@ -101,8 +99,8 @@ describe("Save diagnostics (ADR-0040)", () => {
     Object.assign(platform, { diagnostics: { report: async () => undefined, collect: async () => ({ version: "0.3.0", os: "macos", arch: "aarch64", log }), enabled: async () => true, setEnabled: async (on: boolean) => on } });
     const app = await openApp(root, {}, platform);
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    await openSettingsAt(app, "Help and feedback");
+    const section = await screen.findByRole("tabpanel", { name: "Help and feedback" });
     await app.user.click(within(section).getByRole("button", { name: "Save diagnostics…" }));
     return { section, saved };
   }
@@ -136,8 +134,8 @@ describe("Save diagnostics (ADR-0040)", () => {
     });
     const app = await openApp(root, {}, platform);
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    await openSettingsAt(app, "Help and feedback");
+    const section = await screen.findByRole("tabpanel", { name: "Help and feedback" });
     const toggle = (await within(section).findByRole("switch", { name: "Keep an app log on this computer" })) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
     await app.user.click(toggle);
@@ -147,8 +145,8 @@ describe("Save diagnostics (ADR-0040)", () => {
 
   it("is not offered without a host log", async () => {
     const { app } = await start(() => undefined);
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    await openSettingsAt(app, "Help and feedback");
+    const section = await screen.findByRole("tabpanel", { name: "Help and feedback" });
     expect(within(section).queryByRole("button", { name: "Save diagnostics…" })).toBeNull();
   });
 

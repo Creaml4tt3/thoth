@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent } from "@testing-library/react";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
 import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
 
@@ -181,7 +181,7 @@ describe("Members… for editors and viewers", () => {
 describe("Settings → Servers → Join with an invite link", () => {
   async function openJoin(app: Harness) {
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Servers");
     return screen.findByRole("region", { name: "Join with an invite link" });
   }
 

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { MemoryHistoryText } from "@thoth/platform";
 import { MEMORY_README_TEXT } from "@thoth/local-store";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs, type NodePlatform } from "./support/node-platform.ts";
 import { FakeConnectedApps } from "./support/connected-apps.ts";
 
@@ -135,7 +135,7 @@ describe("Agents' memory", () => {
 
   it("opens from Settings → Connected apps", async () => {
     const { app } = await open();
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    await openSettingsAt(app, "Connected apps");
     const section = within(await screen.findByTestId("connected-apps-settings"));
     await app.user.click(section.getByRole("button", { name: "Show memories" }));
     const view = within(await screen.findByRole("dialog", { name: "Memories" }));

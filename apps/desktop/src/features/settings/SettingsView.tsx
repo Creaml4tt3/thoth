@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { STRINGS, useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
@@ -12,7 +12,7 @@ import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { DailySettingsSection } from "./DailySettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
-import { SettingsLayout, scrollToSection, type SettingsSectionLink } from "@thoth/app-ui/ui/SettingsLayout.tsx";
+import { SettingsLayout, type SettingsSectionLink } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -38,13 +38,11 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   const [importing, setImporting] = useState(false);
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
   const [revealError, setRevealError] = useState<string | null>(null);
-  const importSection = useRef<HTMLElement>(null);
   // Opened at Import notes (the sidebar's Import button, the palette): the wizard starts and takes focus itself.
   // `request` is the tab's target, new on every open, so asking again after closing the wizard starts it again.
   useEffect(() => {
     if (section !== "import") return;
     setImporting(true);
-    if (importSection.current) scrollToSection(importSection.current);
   }, [section, request]);
 
   const rebuildIndex = async () => {
@@ -85,7 +83,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   ];
 
   return (
-    <SettingsLayout sections={sections}>
+    <SettingsLayout sections={sections} initial={section === "top" ? undefined : `set-${section}`} request={request}>
       <h1 className="page-title">{t.title}</h1>
 
       <section aria-labelledby="set-appearance" className="set-section">
@@ -189,9 +187,9 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         </div>
       </section>
 
-      <DailySettingsSection focus={section === "today"} />
+      <DailySettingsSection />
 
-      <section ref={importSection} aria-labelledby="set-import" className="set-section">
+      <section aria-labelledby="set-import" className="set-section">
         <h2 id="set-import">{t.importExport}</h2>
         {importing ? (
           <ImportWizard
@@ -214,9 +212,9 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         )}
       </section>
 
-      <ServersSettings focus={section === "servers"} />
+      <ServersSettings />
 
-      <AgentSettings focus={section === "agents"} />
+      <AgentSettings />
 
       {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
 

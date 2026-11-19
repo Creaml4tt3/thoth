@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
-import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { DEFAULT_DAILY, dailyPath, dailySettingsProblem, readDailySettings, updateDailySettings, type DailyProblem, type DailySettings } from "@thoth/local-store";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings, type DesktopStrings } from "../../strings/index.ts";
@@ -25,11 +24,10 @@ const formOf = (s: DailySettings) => ({ folder: s.folder, pattern: s.pattern, te
  * Settings → Today (ADR-0051 rules 7 and 8): the folder, the file name pattern and the template of today's page, saved
  * in `.thoth/daily.json`. Today's file name is shown as you type; a pattern Thoth cannot make is refused, with why.
  */
-export function DailySettingsSection({ focus }: { focus: boolean }) {
+export function DailySettingsSection() {
   const { vault, refresh } = useSession();
   const t = useDesktopStrings().daily;
   const id = useId();
-  const section = useRef<HTMLElement>(null);
   const [form, setForm] = useState<{ folder: string; pattern: string; template: string } | null>(null);
   const [status, setStatus] = useState<{ kind: "idle" | "saved" } | { kind: "failed"; reason: string }>({ kind: "idle" });
 
@@ -40,9 +38,6 @@ export function DailySettingsSection({ focus }: { focus: boolean }) {
       live = false;
     };
   }, [vault]);
-  useEffect(() => {
-    if (focus && section.current) scrollToSection(section.current);
-  }, [focus, form === null]);
 
   const settings = form ? settingsOf(form) : DEFAULT_DAILY;
   const problem = dailySettingsProblem(settings);
@@ -80,7 +75,7 @@ export function DailySettingsSection({ focus }: { focus: boolean }) {
   );
 
   return (
-    <section ref={section} aria-labelledby="set-today" className="set-section">
+    <section aria-labelledby="set-today" className="set-section">
       <h2 id="set-today">{t.title}</h2>
       <p className="muted">{t.note}</p>
       <form

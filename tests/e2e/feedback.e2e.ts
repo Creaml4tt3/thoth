@@ -75,7 +75,9 @@ test.describe("Send feedback in the desktop app (ADR-0033)", () => {
     await ref.db.query("INSERT INTO identities (provider, subject, user_id) VALUES ('google', $1, $2)", [SUBJECT, ada]);
 
     await page.getByRole("button", { name: "Settings" }).click();
-    const servers = page.getByRole("region", { name: "Servers" });
+
+    await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+    const servers = page.getByRole("tabpanel", { name: "Servers" });
     await servers.getByRole("textbox", { name: "Server address" }).fill(ref.url);
     await servers.getByRole("button", { name: "Add server" }).click();
     const card = servers.getByRole("article");
@@ -84,7 +86,8 @@ test.describe("Send feedback in the desktop app (ADR-0033)", () => {
     await actAsBrowser(opened[0]!);
     await expect(card.getByTestId("server-account")).toHaveText(/Signed in as Ada Lovelace/, { timeout: 15_000 });
 
-    const section = page.getByRole("region", { name: "Help and feedback" });
+    await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Help and feedback" }).click();
+    const section = page.getByRole("tabpanel", { name: "Help and feedback" });
     await section.getByRole("button", { name: "Send feedback…" }).click();
     const dialog = page.getByRole("dialog", { name: "Send feedback" });
     await expect(dialog.getByText(/^Sent to /)).toBeVisible();

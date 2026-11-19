@@ -99,8 +99,8 @@ async function newPage(page: Page, name: string, folder?: string) {
   await expect(field).toBeHidden();
 }
 
-const current = (page: Page) => page.getByRole("tab", { selected: true });
-const tabNames = (page: Page) => page.getByRole("tab").allTextContents();
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
+const tabNames = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab").allTextContents();
 const editorOf = (page: Page) => page.getByRole("textbox", { name: /page content/i });
 const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
 
@@ -261,7 +261,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await page.reload();
   expect(await theme(page)).toBe("system");
   await pickSpace(page, { keyboard: true });
-  await expect(page.getByRole("tab")).toHaveCount(3);
+  await expect(page.getByRole("tablist", { name: "Open pages" }).getByRole("tab")).toHaveCount(3);
   expect(await tabNames(page)).toEqual(["Roadmap", "Settings", "Old"]);
   await expect(current(page)).toHaveText("Settings");
   await page.keyboard.press("ControlOrMeta+1");

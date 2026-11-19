@@ -46,8 +46,8 @@ test.afterEach(async ({ context }) => {
   await rm(scratch, { recursive: true, force: true });
 });
 
-const tabNames = (page: Page) => page.getByRole("tab").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label") ?? el.textContent));
-const current = (page: Page) => page.getByRole("tab", { selected: true });
+const tabNames = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label") ?? el.textContent));
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
 const tabBox = (page: Page, name: string): Locator => page.getByRole("tab", { name, exact: true }).locator("xpath=..");
 const row = (page: Page, name: string) => page.getByRole("tree", { name: "Pages in this Private Space" }).getByRole("treeitem", { name, exact: true });
 const favorites = (page: Page) => page.getByRole("region", { name: "Favorites" });

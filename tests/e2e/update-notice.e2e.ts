@@ -114,6 +114,7 @@ async function expectAccessible(page: Page, selector: string) {
 
 async function openSettings(page: Page) {
   await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Updates" }).click();
   const toggle = page.getByRole("switch", { name: "Tell me when a new version is out" });
   await expect(toggle).toBeVisible();
   return toggle;
@@ -195,7 +196,7 @@ test("a popup right after the app opens for a newer version; Skip is remembered 
 
   // Settings → Updates, light and dark.
   await second.page.emulateMedia({ reducedMotion: "reduce" });
-  const general = second.page.getByRole("region", { name: "Updates" });
+  const general = second.page.getByRole("tabpanel", { name: "Updates" });
   await expectAccessible(second.page, "section.update-settings");
   for (const dark of [false, true]) {
     await theme(second.page, dark);

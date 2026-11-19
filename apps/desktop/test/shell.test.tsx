@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildTree } from "../src/features/shell/tree.ts";
 import { displayPath } from "../src/features/settings/path.ts";
 import { createUnavailablePlatform, selectPlatform } from "../src/platform/select.ts";
-import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
@@ -160,51 +160,54 @@ describe("settings", () => {
   it("shows the vault location and rebuilds the index", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Private Space");
     const location = await screen.findByTestId("vault-location");
     expect(location.getAttribute("title")).toBe(root);
     expect(location.textContent).toBe(displayPath(root));
     await app.user.click(screen.getByRole("button", { name: "Rebuild index" }));
     await waitFor(() => expect(screen.getByText(/Index rebuilt \(2 pages read\)/)).toBeTruthy());
-    expect(screen.getByRole("heading", { level: 2, name: "Import notes" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Import notes", hidden: true })).toBeTruthy();
   });
 
-  it("lists its sections beside the page; a link moves focus to that section's heading", async () => {
+  it("lists its sections as tabs beside the page, and shows the chosen one", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
-    const nav = await screen.findByRole("navigation", { name: "Settings sections" });
-    const links = within(nav).getAllByRole("link").map((a) => a.textContent);
+    const list = await screen.findByRole("tablist", { name: "Settings sections" });
+    const names = within(list).getAllByRole("tab").map((a) => a.textContent);
     // Most used first; the folder's own upkeep (the search index) and the tour are parts of their sections now.
-    expect(links.slice(0, 6)).toEqual(["Appearance", "Editor", "Private Space", "Today", "Import notes", "Servers"]);
-    expect(links.at(-1)).toBe("Help and feedback");
-    expect(links).not.toContain("Search index");
-    // Every link goes to a heading on the page.
-    for (const a of within(nav).getAllByRole("link")) expect(document.querySelector(a.getAttribute("href")!)?.tagName).toBe("H2");
-    await app.user.click(within(nav).getByRole("link", { name: "Editor" }));
-    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 2, name: "Editor" }));
-    expect(within(nav).getByRole("link", { name: "Editor" }).getAttribute("aria-current")).toBe("true");
+    expect(names.slice(0, 6)).toEqual(["Appearance", "Editor", "Private Space", "Today", "Import notes", "Servers"]);
+    expect(names.at(-1)).toBe("Help and feedback");
+    expect(names).not.toContain("Search index");
+    // Each tab shows a section with a heading.
+    for (const tab of within(list).getAllByRole("tab")) expect(document.getElementById(tab.getAttribute("aria-controls")!)?.querySelector(":scope > h2")).toBeTruthy();
+    await app.user.click(within(list).getByRole("tab", { name: "Editor" }));
+    expect(screen.getByRole("tabpanel", { name: "Editor" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 2, name: "Appearance" })).toBeNull();
+    expect(within(list).getByRole("tab", { name: "Editor" }).getAttribute("aria-selected")).toBe("true");
   });
 });
 
 describe("searching settings", () => {
-  it("finds a setting by a word in its name, hint or choices, and Escape shows them all again", async () => {
+  it("finds a setting by a word in its name, hint or choices, and Escape shows the chosen section again", async () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     await app.user.click(screen.getByRole("button", { name: "Settings" }));
     const search = await screen.findByRole("searchbox", { name: "Search settings" });
-    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    const nav = screen.getByRole("tablist", { name: "Settings sections" });
+    const names = () => within(nav).getAllByRole("tab").map((a) => a.textContent);
+    await app.user.click(within(nav).getByRole("tab", { name: "Appearance" }));
     await app.user.type(search, "rebuild");
-    await waitFor(() => expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Private Space"]));
+    await waitFor(() => expect(names()).toEqual(["Private Space"]));
     expect(screen.getByRole("button", { name: "Rebuild index" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Switch Private Space" })).toBeNull();
     await app.user.clear(search);
     await app.user.type(search, "dark");
-    await waitFor(() => expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Appearance"]));
+    await waitFor(() => expect(names()).toEqual(["Appearance"]));
     expect(screen.getByRole("combobox", { name: "Theme" })).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Language" })).toBeNull();
     await app.user.keyboard("{Escape}");
-    await waitFor(() => expect(within(nav).getAllByRole("link").length).toBeGreaterThan(5));
+    await waitFor(() => expect(names().length).toBeGreaterThan(5));
     expect(screen.getByRole("combobox", { name: "Language" })).toBeTruthy();
   });
 });
@@ -224,6 +227,7 @@ describe("Import from Notion or Obsidian", () => {
     await app.user.click(button);
     await wizardStarted();
     await app.user.click(within(screen.getByRole("region", { name: "Import" })).getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("tab", { name: "Import notes", selected: true })).toBeTruthy();
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Choose a source" })).toBeNull());
     await app.user.click(button);
     await wizardStarted();
