@@ -3,7 +3,8 @@
 - **Status:** Proposal for the owner. Nothing is built yet.
 - **Date:** 2026-11-10, updated 2026-11-15 with iApp's OpenThai 2.0 OCR (§2a)
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
-- **Next step:** the Phase 0 spike, then ADR-0055. The owner's decisions are in §7 (all made by 2026-11-16).
+- **Next step:** the Phase 0 spike, then ADR-0055. The owner's decisions are in §7 (latest 2026-11-19: model choices
+  and a signed model list, §2b and §5a). Ships in 0.12.0.
 
 ## 1. Verdict on the handoff
 
@@ -113,6 +114,30 @@ Caveats: the models are from November 2026 (v1.0.0) by one company; iApp's speed
 disagree with each other (its model page still uses an outdated Typhoon figure). Pin by SHA-256 and host on R2 as
 §4 says, so an upstream change can't reach users.
 
+## 2b. Update 2026-11-19: how often models change, and the choices
+
+Checked on Hugging Face and GitHub on 2026-11-19:
+
+| Model | Latest | Changes | Licence | Download |
+| --- | --- | --- | --- | --- |
+| OpenThai OCR Text (iApp) | **2.1** (`iapp/OpenThai2.1-OCR-Text-20261118`), 2026-11-18; 2.2 with photo dewarping on a branch | 2.0 → 2.1 in 8 days; mostly runtime and config, weights less often | Apache-2.0 | ≈7 MB |
+| PaddleOCR `th_PP-OCRv5_mobile_rec` | weights 2025-08-21; **official ONNX** `PaddlePaddle/th_PP-OCRv5_mobile_rec_onnx` since 2026-05-26 | not retrained; PP-OCRv6 has no Thai | Apache-2.0 | ≈10 MB with detection |
+| Typhoon OCR 2 0.8B (`typhoon-ai/typhoon-ocr2-0.8b`) | 2026-11-05 (GGUF 11-09) | new | Apache-2.0 **plus** OpenTyphoon terms (no modification) | ≈750 MB, llama.cpp, not ONNX |
+| Tesseract `tha` | 2019 | frozen | Apache-2.0 | baseline only |
+
+Corrections to §2 and §4: the Thai model to try first is **OpenThai 2.1**, not 2.0 (oar-ocr's preset still names
+2.0, so pin oar-ocr and check its 2.1 support in Phase 0); PaddlePaddle publishes the Thai recognizer as ONNX itself,
+so no conversion script is needed. Ruled out by licence: Indra OCR (modified OpenRAIL-M with a revenue limit, as Surya)
+and OpenThai OCR Markdown (OpenMDW, 2.5 GB, GPU).
+
+**Choices for the user** (owner, 2026-11-19), in Settings → Modules → OCR:
+
+- **Fast** (default): OpenThai 2.1 Text.
+- **Second opinion:** PaddleOCR Thai. Also offered as "Try again with the other model" on a result.
+- **Later, not in 0.12.0:** **Accurate + handwriting** (Typhoon OCR 2 0.8B), after a person reads the OpenTyphoon terms
+  and Phase 0-style numbers on a laptop CPU; it also adds llama.cpp to `thoth-ocr`. **Mac built-in** (Vision) only if
+  Phase 0 finds it reliable for Thai.
+
 ## 3. What OCR should do in Thoth
 
 | Feature | What the user does | Fit |
@@ -199,6 +224,31 @@ These wait until a real need appears:
 
 Each can be added behind the same store and runner without changing the modules.
 
+## 5a. Model updates without an app update (owner, 2026-11-19)
+
+This replaces "hashes compiled into the app" (§1 point 4, §4 "The download", §5 "A compiled-in list") for *model*
+files. Program code (`thoth-ocr`, any native library) still only changes with an app update.
+
+- **A signed model list** at `download.thothnotes.com/modules/models.json` (plus `models.json.sig`). For each module
+  and choice: the newest model's version, files (URL on R2, size, SHA-256), the **lowest app version (and
+  `thoth-ocr` protocol version) that can run it**, and a test image with its expected text.
+- **Signature:** minisign, like the updater (ADR-0034), with a **separate key** (`THOTH_MODULES_SIGNING_KEY` in the
+  repository's secrets; the public key compiled into the app). The app refuses a list that fails the signature, is
+  older than the one it has (a `serial` that only goes up), or names a file on another host. A lost key is not fatal:
+  the next app update carries a new public key.
+- **When it is read:** together with the app's update check (same request type, same privacy: no user data), and when
+  Settings → Modules opens. A model newer than the installed one, that this app can run, shows "A better OCR model is
+  ready (6 MB)" with Update; a switch "Update OCR models automatically" (off by default) does it without asking.
+- **Install** as §4: download to staging, check SHA-256, run the list's test image, switch by renaming the folder, keep
+  the previous version until the new one passes, then delete it. The compiled-in list stays as the **fallback** for a
+  first install when the list can't be read.
+- **Weekly model watch** (GitHub Actions in this repo): looks for new versions of the listed models on Hugging Face,
+  downloads them, runs the Phase 0 corpus, and opens a pull request that adds the model to `models.json` only if its
+  CER is no worse on every image group; a person merges it, and a release job signs and uploads the list. A new model
+  that needs new code goes into a normal app release instead, with its lowest app version set.
+- **Tests:** a bad signature, a lower serial, a foreign host, a model for a newer app, a hash mismatch, a failed test
+  image (keeps the old model), and an offline start (uses what is installed).
+
 ## 6. Phases
 
 **Phase 0 — spike (about a week), ending in ADR-0055.**
@@ -270,6 +320,13 @@ Decided by the owner on 2026-11-16:
 - Every platform Thoth ships gets it, Intel Macs included. If Phase 0 picks ONNX Runtime, we build the library for
   Intel Macs ourselves rather than leave them out.
 - OpenThai2.0-OCR-Text is the Thai model to try first (§2a).
+
+Decided by the owner on 2026-11-19:
+- Ships in 0.12.0, after the Phase 0 numbers.
+- Offer choices: **Fast** (OpenThai 2.1) and **Second opinion** (PaddleOCR Thai) in 0.12.0; Accurate + handwriting
+  (Typhoon OCR 2) later, after its licence terms are read and it is measured on a CPU. This replaces "one pack,
+  nothing to choose".
+- Models update **without an app update**, through a signed model list (§5a), with a separate signing key.
 
 [pp5-multi]: https://www.paddleocr.ai/latest/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.html
 [th-card]: https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec
