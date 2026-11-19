@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { licenceFiles, licenseText, packageOf } from "../scripts/third-party-licenses.ts";
@@ -42,5 +43,12 @@ describe("third-party licences", () => {
     expect(text).toContain("MIT text");
     expect(text).toContain("Apache text");
     expect(text).not.toContain("SPDXVersion");
+  });
+
+  it("lists d3-force (the Board layout) with its ISC licence text", () => {
+    const entry = createRequire(join(process.cwd(), "packages/app-ui/package.json")).resolve("d3-force");
+    const pkg = packageOf(entry)!;
+    expect(pkg).toMatchObject({ name: "d3-force", license: "ISC" });
+    expect(licenseText([pkg])).toMatch(/d3-force@\S+[\s\S]*Permission to use, copy, modify/);
   });
 });
