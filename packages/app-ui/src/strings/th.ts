@@ -1084,8 +1084,8 @@ export const th: Strings = {
     empty: "ยังไม่มีโน้ต เพิ่มโน้ตเพื่อเริ่มบอร์ดนี้", // REVIEW
     emptyOverview: "ยังไม่มีหน้า", // REVIEW
     instructions: "กด Tab เพื่อไปยังโน้ตถัดไป Space เพื่อเลือกโน้ต Escape เพื่อยกเลิกการเลือก Enter เพื่อเปิด ปุ่มลูกศรเลื่อนโน้ตที่เลือก กด Shift ค้างเพื่อเลื่อนทีละมาก เลือกโน้ตจาง ๆ ที่แนะนำเพื่อปักลงบอร์ด ปุ่มเมนูหรือ Shift+F10 แสดงคำสั่งเพิ่ม บวก ลบ และ 0 ใช้ซูม", // REVIEW
-    noteLabel: (title, tags, links, state) =>
-      state === "missing" ? `${title}, ไม่พบโน้ตนี้` : [title, ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), `ลิงก์ ${count(links)} รายการ`, ...(state === "suggested" ? ["แนะนำ"] : [])].join(", "), // REVIEW
+    noteLabel: (title, excerpt, tags, links, state) =>
+      state === "missing" ? `${title}, ไม่พบโน้ตนี้` : [title, ...(excerpt ? [excerpt] : []), ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), `ลิงก์ ${count(links)} รายการ`, ...(state === "suggested" ? ["แนะนำ"] : [])].join(", "), // REVIEW
     menu: (title) => `โน้ต: ${title}`, // REVIEW
     linksOf: (title) => `ลิงก์ของ ${title}`, // REVIEW
     linked: "ลิงก์แล้ว", // REVIEW

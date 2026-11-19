@@ -42,12 +42,12 @@ const noteButton = (name: RegExp) => screen.getByRole("button", { name });
 const activeStrings = (root: HTMLElement) => [...root.querySelectorAll("path[data-active]")].map((p) => `${p.getAttribute("data-from")}–${p.getAttribute("data-to")}`);
 
 describe("BoardView", () => {
-  it("is an application region with instructions, and each note is a button named by title, tags and links", () => {
+  it("is an application region with instructions, and each note is a button named by what it shows and its links", () => {
     const { region } = setup();
     expect(region.getAttribute("aria-describedby")).toBeTruthy();
     expect(document.getElementById(region.getAttribute("aria-describedby")!)!.textContent).toMatch(/arrow keys/i);
-    expect(noteButton(/^A,/).getAttribute("aria-label")).toBe("A, #idea #ocr, 2 links");
-    expect(noteButton(/^B,/).getAttribute("aria-label")).toBe("B, 1 link");
+    expect(noteButton(/^A,/).getAttribute("aria-label")).toBe("A, About A.md, #idea #ocr, 2 links");
+    expect(noteButton(/^B,/).getAttribute("aria-label")).toBe("B, About B.md, 1 link");
     expect(noteButton(/^A,/).getAttribute("data-color")).toBe("blue");
     expect(noteButton(/^B,/).hasAttribute("data-color")).toBe(false);
     expect(noteButton(/^A,/).getAttribute("data-state")).toBe("pinned");
@@ -259,7 +259,7 @@ describe("BoardView", () => {
     });
     const s = noteButton(/^S,/);
     expect(s.getAttribute("data-state")).toBe("suggested");
-    expect(s.getAttribute("aria-label")).toBe("S, 0 links, suggested");
+    expect(s.getAttribute("aria-label")).toBe("S, About S.md, 0 links, suggested");
     await user.click(s);
     expect(pin).toHaveBeenCalledWith("S.md");
     const gone = noteButton(/^Gone,/);
@@ -331,7 +331,7 @@ describe("BoardView, focus and safety (review round 1)", () => {
     const { region } = setup();
     act(() => noteButton(/^B,/).focus());
     fireEvent.wheel(region, { deltaX: 100_000, deltaY: 0 });
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("B, 1 link");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("B, About B.md, 1 link");
     expect(screen.queryByRole("button", { name: /^A,/ })).toBeNull();
   });
 

@@ -512,7 +512,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
                   data-lifted={drag?.path === n.path || undefined}
                   data-wobble={wobble === n.path || undefined}
                   aria-pressed={selected === n.path}
-                  aria-label={t.noteLabel(n.title, n.tags, n.links, n.state)}
+                  aria-label={t.noteLabel(n.title, n.excerpt, n.tags, n.links, n.state)}
                   style={{ left: p.x, top: p.y }}
                   onPointerDown={(e) => onNoteDown(e, n)}
                   onClick={(e) => onNoteClick(e, n)}
@@ -528,11 +528,12 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
                 >
                   <span className="board-pin" aria-hidden="true" data-draw={(actions.drawLink && n.state !== "missing") || undefined} />
                   {n.state === "suggested" && <span className="board-plus" aria-hidden="true">+</span>}
-                  <span className="board-title">{n.title}</span>
-                  {n.state === "missing" ? <span className="board-excerpt">{t.missing}</span> : n.excerpt && <span className="board-excerpt">{n.excerpt}</span>}
+                  {/* The spaces keep words apart in the text the name is checked against (not drawn in a flex box). */}
+                  <span className="board-title">{n.title}</span>{" "}
+                  {n.state === "missing" ? <span className="board-excerpt">{t.missing}</span> : n.excerpt && <span className="board-excerpt">{n.excerpt}</span>}{" "}
                   {n.tags.length > 0 && (
                     <span className="board-tags">
-                      {n.tags.slice(0, 3).map((tag) => <span key={tag} className="board-tag">#{tag}</span>)}
+                      {n.tags.slice(0, 3).map((tag) => <span key={tag} className="board-tag">#{tag} </span>)}
                     </span>
                   )}
                 </button>
