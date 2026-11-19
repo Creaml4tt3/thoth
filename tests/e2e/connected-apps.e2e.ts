@@ -85,6 +85,7 @@ const result = (message: Record<string, unknown>) => message.result as ToolResul
 
 test("switch on, allow an app, and it searches and reads through thoth-mcp; the log shows it without page text", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Connected apps" }).click();
   const section = page.getByTestId("connected-apps-settings");
   await expect(section.getByRole("heading", { name: "Connected apps" })).toBeVisible();
   const toggle = section.getByRole("switch", { name: "Let other apps read my notes" });
@@ -170,6 +171,7 @@ test("after the identifier change, someone with apps set up is told once to copy
   await expect(page.getByRole("tree", { name: "Pages in this Private Space" })).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Connected apps" }).click();
   const section = page.getByTestId("connected-apps-settings");
   const notice = section.getByRole("note", { name: "Copy the setup again" });
   await expect(notice).toContainText("stop connecting");
@@ -188,6 +190,7 @@ test("after the identifier change, someone with apps set up is told once to copy
   if (await choose.isVisible()) await choose.click();
   await expect(tree).toBeVisible();
   await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Connected apps" }).click();
   await expect(section.getByRole("list", { name: "Apps", exact: true }).getByRole("listitem", { name: "Claude Desktop" })).toBeVisible();
   await expect(section.getByRole("note")).toHaveCount(0);
 });
