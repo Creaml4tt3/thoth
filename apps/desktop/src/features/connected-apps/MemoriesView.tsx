@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ConnectedApps, MemoryHistoryChange } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import { MEMORY_FOLDER, MEMORY_KINDS, ageDays, canUndoMemory, isStale, loadMemories, undoMemory, type Memory } from "@thoth/local-store";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
@@ -96,17 +97,10 @@ export function MemoriesView({ connectedApps, onClose }: { connectedApps: Connec
         ) : (
           <>
             {apps.length > 1 && (
-              <label className="mcp-memories-filter">
-                <span className="small">{t.app}</span>
-                <select value={app} onChange={(e) => setApp(e.target.value)}>
-                  <option value="">{t.allApps}</option>
-                  {apps.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="mcp-memories-filter">
+                <span id="mcp-memories-app" className="small">{t.app}</span>
+                <Select aria-labelledby="mcp-memories-app" value={app} onChange={setApp} options={[{ value: "", label: t.allApps }, ...apps.map((a) => ({ value: a, label: a }))]} />
+              </div>
             )}
             {data.about && data.about.text !== "" && (
               <section className="mcp-review-app" aria-label={t.aboutMe}>

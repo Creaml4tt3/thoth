@@ -9,6 +9,7 @@ import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../..
 import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { chooseOption, selectLabels, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -56,9 +57,9 @@ describe("Members… for an owner", () => {
     const list = await within(dialog).findByRole("list", { name: "Members" });
     await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(3));
     expect(rowOf(dialog, /^Ada/).textContent).toContain("(you)");
-    const cy = within(rowOf(dialog, /^Cy/)).getByRole("combobox", { name: "Role of Cy" }) as HTMLSelectElement;
-    expect(cy.value).toBe("viewer");
-    await app.user.selectOptions(cy, "editor");
+    const cy = within(rowOf(dialog, /^Cy/)).getByRole("combobox", { name: "Role of Cy" });
+    expect(selectValue(cy)).toBe("viewer");
+    chooseOption(cy, "Editor");
     await waitFor(() => expect(ws.members.find((m) => m.userId === "usr_cy")!.role).toBe("editor"));
     expect(await within(dialog).findByText("Cy is now Editor.")).toBeTruthy();
 
@@ -273,9 +274,9 @@ describe("Teams and Visible to…", () => {
     const members = [...TEAM("manager"), { userId: "usr_oz", displayName: "Oz", role: "owner" as const }];
     const { app, ws } = await workspace({ role: "manager", capabilities: TEAMS, members });
     const dialog = await openMembers(app);
-    const bo = (await within(dialog).findByRole("combobox", { name: "Role of Bo" })) as HTMLSelectElement;
-    expect([...bo.options].map((o) => o.value)).toEqual(["manager", "editor", "viewer"]);
-    await app.user.selectOptions(bo, "manager");
+    const bo = await within(dialog).findByRole("combobox", { name: "Role of Bo" });
+    expect(selectLabels(bo)).toEqual(["Manager", "Editor", "Viewer"]);
+    chooseOption(bo, "Manager");
     await waitFor(() => expect(ws.members.find((m) => m.userId === "usr_bo")!.role).toBe("manager"));
     expect(within(dialog).queryByRole("combobox", { name: "Role of Oz" })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Remove Oz from the workspace" })).toBeNull();
@@ -300,8 +301,8 @@ describe("Teams and Visible to…", () => {
     const owner = await openMembers(app);
     const invite = within(owner).getByRole("region", { name: "Invite people" });
     expect(within(invite).getByRole("radio", { name: "Manager" })).toBeTruthy();
-    const cy = (await within(owner).findByRole("combobox", { name: "Role of Cy" })) as HTMLSelectElement;
-    expect([...cy.options].map((o) => o.value)).toEqual(["owner", "manager", "editor", "viewer"]);
+    const cy = await within(owner).findByRole("combobox", { name: "Role of Cy" });
+    expect(selectLabels(cy)).toEqual(["Owner", "Manager", "Editor", "Viewer"]);
   });
 
   it("offers Visible to… on a folder to owners and managers only, and limits it to a team", async () => {

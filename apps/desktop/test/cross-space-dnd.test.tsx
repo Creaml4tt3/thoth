@@ -12,6 +12,7 @@ import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../../tests/helpers/fake-servers.ts";
 import { seed } from "./support/fixtures.ts";
 import { isFolderMarkdown } from "@thoth/app-ui/workspace/folders.ts";
+import { selectLabels, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -101,8 +102,8 @@ function hold(source: HTMLElement, target: HTMLElement, options: { alt?: boolean
   };
 }
 
-const parentSelect = (dialog: HTMLElement) => within(dialog).getByRole("combobox", { name: "Put the pages" }) as HTMLSelectElement;
-const workspaceSelect = (dialog: HTMLElement) => within(dialog).getByRole("combobox", { name: "Workspace" }) as HTMLSelectElement;
+const parentSelect = (dialog: HTMLElement) => within(dialog).getByRole("combobox", { name: "Put the pages" });
+const workspaceSelect = (dialog: HTMLElement) => within(dialog).getByRole("combobox", { name: "Workspace" });
 const radio = (dialog: HTMLElement, name: string) => within(dialog).getByRole("radio", { name: new RegExp(`^${name}`) }) as HTMLInputElement;
 
 describe("Private Space → workspace by drag and drop", () => {
@@ -118,8 +119,8 @@ describe("Private Space → workspace by drag and drop", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Copy 1 page to a workspace" });
     // Studio, not the first workspace in the list (Archive).
-    expect(workspaceSelect(dialog).value).toContain(ws.id);
-    expect(parentSelect(dialog).value).toBe("");
+    expect(selectValue(workspaceSelect(dialog))).toContain(ws.id);
+    expect(selectValue(parentSelect(dialog))).toBe("");
     expect(radio(dialog, "Copy").checked).toBe(true);
     await waitFor(() => expect(within(dialog).getByRole("region", { name: "Who can see it" }).textContent).toContain("Nothing has left this computer yet."));
     // The drop itself sent nothing.
@@ -143,7 +144,7 @@ describe("Private Space → workspace by drag and drop", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Move 1 page to a workspace" });
     expect(radio(dialog, "Move").checked).toBe(true);
-    await waitFor(() => expect(parentSelect(dialog).value).toBe(board.id));
+    await waitFor(() => expect(selectValue(parentSelect(dialog))).toBe(board.id));
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(() => expect(within(dialog).getByRole("status").textContent).toContain("1 page was moved to Studio."), { timeout: 10_000 });
@@ -204,7 +205,7 @@ describe("workspace → Private Space by drag and drop", () => {
     expect(badge()?.textContent).toBe("Copy to Private Space…");
     drag.drop();
     const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    expect((within(dialog).getByRole("combobox", { name: "Put the pages" }) as HTMLSelectElement).value).toBe("");
+    expect(selectValue(within(dialog).getByRole("combobox", { name: "Put the pages" }))).toBe("");
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(within(dialog).getByRole("status").textContent).toContain("copied to your Private Space"), { timeout: 10_000 });
@@ -227,7 +228,7 @@ describe("workspace → Private Space by drag and drop", () => {
     expect(badge()?.textContent).toBe("Move to Private Space…");
     drag.drop();
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" });
-    expect((within(dialog).getByRole("combobox", { name: "Put the pages" }) as HTMLSelectElement).value).toBe("Projects");
+    expect(selectValue(within(dialog).getByRole("combobox", { name: "Put the pages" }))).toBe("Projects");
     expect(radio(dialog, "Move").checked).toBe(true);
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
@@ -269,9 +270,9 @@ describe("workspace → another workspace by drag and drop (amendment of 2026-10
     expect(badge()?.textContent).toBe("Move to Archive…");
     drag.drop();
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to another workspace" });
-    expect(workspaceSelect(dialog).value.endsWith(`\n${archive.id}`)).toBe(true);
+    expect(selectValue(workspaceSelect(dialog)).endsWith(`\n${archive.id}`)).toBe(true);
     // The source is not offered as a destination.
-    expect([...workspaceSelect(dialog).options].map((o) => o.textContent)).toEqual(["Archive"]);
+    expect(selectLabels(workspaceSelect(dialog))).toEqual(["Archive"]);
     expect(radio(dialog, "Move").checked).toBe(true);
     const preview = await within(dialog).findByRole("region", { name: "Who can see it" });
     await waitFor(() => expect(preview.textContent).toContain("Milestones"));
@@ -292,7 +293,7 @@ describe("workspace → another workspace by drag and drop (amendment of 2026-10
     const target = await within(list).findByRole("treeitem", { name: "Shelf" });
     hold(row(group, "Roadmap"), target, { alt: true }).drop();
     const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to another workspace" });
-    await waitFor(() => expect(parentSelect(dialog).value).toBe(shelf.id));
+    await waitFor(() => expect(selectValue(parentSelect(dialog))).toBe(shelf.id));
   });
 
   it("an export-restricted workspace refuses a drop on another workspace, and says why", async () => {

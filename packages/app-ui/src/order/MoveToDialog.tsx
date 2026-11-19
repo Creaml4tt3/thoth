@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useStrings } from "../strings/index.ts";
 import { Button } from "../ui/Button.tsx";
 import { Modal } from "../ui/Modal.tsx";
+import { Select } from "../ui/Select.tsx";
 import { shellRoot } from "./ContextMenu.tsx";
 
 export interface Destination {
@@ -29,7 +30,7 @@ interface Props {
 /** "Move to…": pick the page or folder to move into. The same dialog serves both trees. */
 export function MoveToDialog({ name, destinations, initial, onMove, onClose, as }: Props) {
   const t = useStrings().tree;
-  const selectId = useId();
+  const labelId = useId();
   const [value, setValue] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +53,10 @@ export function MoveToDialog({ name, destinations, initial, onMove, onClose, as 
           void submit();
         }}
       >
-        <label className="field" htmlFor={selectId}>
-          <span>{as?.destination ?? t.moveDialog.destination}</span>
-          <select id={selectId} className="input move-list" size={Math.min(8, Math.max(3, destinations.length))} value={value} onChange={(event) => setValue(event.target.value)} data-autofocus>
-            {destinations.map((d) => (
-              <option key={d.id} value={d.id}>
-                {"\u00a0\u00a0".repeat(d.depth)}
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span id={labelId}>{as?.destination ?? t.moveDialog.destination}</span>
+          <Select data-autofocus className="move-list" aria-labelledby={labelId} value={value} onChange={setValue} options={destinations.map((d) => ({ value: d.id, label: `${"\u00a0\u00a0".repeat(d.depth)}${d.label}` }))} />
+        </div>
         {as?.notes(value).map((note) => (
           <p key={note} className="share-note">
             {note}

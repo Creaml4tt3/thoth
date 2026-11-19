@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { startBridge, type Bridge } from "./bridge.ts";
 import { buildAll } from "./setup.ts";
 import { START } from "./pick-space.ts";
+import { choose } from "./select.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -83,14 +84,15 @@ test("a Thai system gets the Thai UI with the bundled fonts, and Settings change
   await page.getByRole("button", { name: "การตั้งค่า" }).click();
   await page.getByRole("tablist", { name: "หัวข้อการตั้งค่า" }).getByRole("tab", { name: "หน้าตา" }).click();
   const language = page.getByRole("combobox", { name: "ภาษา" });
-  await expect(language).toHaveValue("system");
-  await language.selectOption("en");
+  await expect(language).toHaveAttribute("data-value", "system");
+  await choose(language, "English");
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await page.reload();
   await page.getByRole("button", { name: START }).click();
   await page.getByRole("button", { name: "Settings" }).click();
-  await page.getByRole("combobox", { name: "Language" }).selectOption("system");
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Appearance" }).click();
+  await choose(page.getByRole("combobox", { name: "Language" }), "System");
   await expect(page.getByRole("heading", { level: 1, name: "การตั้งค่า" })).toBeVisible();
 });
 

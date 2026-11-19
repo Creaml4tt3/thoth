@@ -4,6 +4,7 @@ import { THEME_KEY, desktopTheme } from "../src/features/settings/theme.ts";
 import { cleanup, openApp, screen } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { chooseOption, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -25,12 +26,13 @@ describe("desktop theme", () => {
   it("is chosen in Settings, applies at once and is kept with the other preferences", async () => {
     const app = await openApp(root);
     await app.user.click(await screen.findByRole("button", { name: "Settings" }));
-    const select = (await screen.findByRole("combobox", { name: "Theme" })) as HTMLSelectElement;
-    expect(select.value).toBe("system");
-    await app.user.selectOptions(select, "dark");
+    await app.user.click(await screen.findByRole("tab", { name: "Appearance" }));
+    const select = await screen.findByRole("combobox", { name: "Theme" });
+    expect(selectValue(select)).toBe("system");
+    chooseOption(select, "Dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("night");
     expect(localStorage.getItem(THEME_KEY)).toBe("dark");
-    await app.user.selectOptions(select, "light");
+    chooseOption(select, "Light");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
     expect(localStorage.getItem(THEME_KEY)).toBe("light");
   });

@@ -27,6 +27,7 @@ import { buildAll } from "./setup.ts";
 import { REPO } from "../ports/harness.ts";
 import { axe, bubble, mascot, openAssistantSettings, openBubble, openReview, picker, pickOnly, writeAndStart } from "./assistant.ts";
 import { pickSpace } from "./pick-space.ts";
+import { choose } from "./select.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let scratch: string;
@@ -85,7 +86,7 @@ async function workDir(): Promise<string> {
 
 async function startTask(page: Page, prompt: string, check = false) {
   const b = await openBubble(page);
-  await expect(b.locator('option[value="claude"]')).toHaveText("Claude Code · Ready, 2.1.310");
+  await expect(b.getByRole("combobox", { name: "Agent" })).toHaveText("Claude Code · Ready, 2.1.310");
   await pickOnly(page, ["Plan"]);
   await expect(await picker(page)).toContainText("1 selected");
   await b.getByRole("textbox", { name: "Task" }).fill(prompt);
@@ -163,8 +164,10 @@ test("cancel stops the CLI and everything it started, and changes nothing", asyn
 /** Opens the bubble and picks Codex. */
 async function pickCodex(page: Page) {
   const b = await openBubble(page, "codex");
-  await expect(b.locator('option[value="codex"]')).toHaveText("Codex · Ready, 0.164.0");
-  await b.getByRole("combobox", { name: "Agent" }).selectOption("codex");
+  // Codex's option reads "Ready" once it is detected; the list is read again each time it opens.
+  await expect(async () => {
+    await choose(b.getByRole("combobox", { name: "Agent" }), "Codex · Ready, 0.164.0");
+  }).toPass({ timeout: 15_000 });
   await expect(b).toContainText("Thoth runs it only inside Codex's own sandbox");
 }
 
@@ -429,8 +432,8 @@ test("a run that used up its spending limit says so, and its work so far can be 
   await pickOnly(page, ["Plan"]);
   // This run only: 5 minutes and US$0.25 (the host checks both before it starts anything).
   await b.getByText("Options").click();
-  await b.getByRole("combobox", { name: "Time limit" }).selectOption("5");
-  await b.getByRole("combobox", { name: "Spending limit" }).selectOption("0.25");
+  await choose(b.getByRole("combobox", { name: "Time limit" }), "5 minutes");
+  await choose(b.getByRole("combobox", { name: "Spending limit" }), "US$0.25");
   await writeAndStart(page, "@replace Notes/Plan.md :: cat => dog\n@budget\n");
   await expect(b.getByTestId("agent-stopped")).toHaveText("Stopped at the spending limit (US$0.25). What the agent did before then can still be reviewed.", { timeout: 15_000 });
   await expect(b.getByRole("log", { name: "What the agent is doing" })).toContainText("The spending limit was reached.");

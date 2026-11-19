@@ -22,6 +22,9 @@ export interface SelectProps<V extends string> {
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
+  "data-testid"?: string;
+  /** The Modal focuses the element marked `data-autofocus` first. */
+  "data-autofocus"?: boolean;
 }
 
 const MARGIN = 8;
@@ -30,7 +33,7 @@ const GAP = 4;
 const TYPE_AHEAD_MS = 500;
 
 /**
- * Thoth's dropdown, in place of the system's `<select>`: the WAI-ARIA select-only combobox. A button shows the chosen
+ * Thoth's dropdown, in place of the system's select element: the WAI-ARIA select-only combobox. A button shows the chosen
  * label; it opens a listbox on the raised surface, below the button or above it when there is no room, kept inside the
  * window. Focus stays on the button the whole time (`aria-activedescendant` names the active option). Enter, Space and
  * Alt+Down open; Up, Down, Home and End move; typed letters jump to the option that starts with them (Thai too); Enter
@@ -151,7 +154,12 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
   }, [open]);
 
   useEffect(() => {
-    if (open) document.getElementById(optionId(active))?.scrollIntoView?.({ block: "nearest" });
+    // Scrolls the list only: scrollIntoView would also move clipped ancestors of the shell (the WebKit trap).
+    const box = list.current;
+    const row = open ? document.getElementById(optionId(active)) : null;
+    if (!box || !row) return;
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight;
   }, [open, active]);
 
   // A press elsewhere, a scroll of the page under it, or a resize of the window closes it, as a system menu does.
@@ -193,6 +201,7 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
         {...aria}
         disabled={disabled}
         className={`input select${className ? ` ${className}` : ""}`}
+        data-value={value}
         // What the search in Settings finds: every choice, not only the shown one.
         data-search={options.map((o) => o.label).join(" ")}
         onClick={() => (open ? close() : show(start()))}

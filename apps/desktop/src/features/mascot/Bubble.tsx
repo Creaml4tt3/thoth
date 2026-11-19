@@ -20,6 +20,7 @@ import { BUDGET_CHOICES_USD, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { basename, stripExtension } from "@thoth/domain";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import { tip, tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
@@ -191,16 +192,16 @@ function Form({ state, agents, focusNonce }: { state: AgentsState; agents: Agent
         }} />
       </label>
       <div className="bubble-row">
-        <label className="field bubble-agent">
-          <span className="bubble-label">{t.agent}</span>
-          <select className="input" value={state.provider} onChange={(e) => agents.selectProvider(e.target.value as (typeof AGENT_PROVIDERS)[number])} disabled={busy} data-testid="bubble-agent">
-            {AGENT_PROVIDERS.map((id) => (
-              <option key={id} value={id} data-state={state.statuses[id]?.state ?? "checking"}>
-                {t.agentOption(all.providers[id].name, shortStatus(state.statuses[id], state.checking, all.picker.short))}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field bubble-agent">
+          <span id="bubble-agent-label" className="bubble-label">{t.agent}</span>
+          <Select
+            aria-labelledby="bubble-agent-label"
+            value={state.provider}
+            onChange={(v) => agents.selectProvider(v)}
+            disabled={busy}
+            options={AGENT_PROVIDERS.map((id) => ({ value: id, label: t.agentOption(all.providers[id].name, shortStatus(state.statuses[id], state.checking, all.picker.short)) }))}
+          />
+        </div>
       </div>
       {state.status && state.status.state !== "ready" && !state.checking && (
         <p className="alert alert-warning small" role="status" data-testid="bubble-agent-status" data-state={state.status.state}>
@@ -222,34 +223,31 @@ function Form({ state, agents, focusNonce }: { state: AgentsState; agents: Agent
               {p.modelHint}
             </small>
           </div>
-          <label className="field">
-            <span>{f.timeLimit}</span>
-            <select className="input" value={String(draft.timeMinutes)} disabled={busy} onChange={(e) => agents.setDraft({ timeMinutes: e.target.value === "default" ? "default" : Number(e.target.value) })}>
-              <option value="default">{f.useDefault(defaultTime)}</option>
-              {TIME_LIMIT_MINUTES.map((m) => (
-                <option key={m} value={m}>
-                  {f.timeOption(m)}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="field">
-            <label htmlFor="bubble-budget">{f.budget}</label>
+            <span id="bubble-time-label">{f.timeLimit}</span>
+            <Select
+              aria-labelledby="bubble-time-label"
+              value={String(draft.timeMinutes)}
+              disabled={busy}
+              onChange={(v) => agents.setDraft({ timeMinutes: v === "default" ? "default" : Number(v) })}
+              options={[{ value: "default", label: f.useDefault(defaultTime) }, ...TIME_LIMIT_MINUTES.map((m) => ({ value: String(m), label: f.timeOption(m) }))]}
+            />
+          </div>
+          <div className="field">
+            <label id="bubble-budget-label" htmlFor="bubble-budget">{f.budget}</label>
             {budgetOn ? (
-              <select id="bubble-budget" className="input" value={String(draft.budget)} disabled={busy} onChange={(e) => agents.setDraft({ budget: e.target.value === "default" ? "default" : e.target.value === "none" ? "none" : Number(e.target.value) })} aria-describedby="bubble-budget-hint">
-                <option value="default">{f.useDefault(defaultBudget)}</option>
-                {BUDGET_CHOICES_USD.map((b) => (
-                  <option key={b} value={b}>
-                    {f.budgetOption(b)}
-                  </option>
-                ))}
-                <option value="none">{f.noLimit}</option>
-              </select>
+              <Select
+                id="bubble-budget"
+                aria-labelledby="bubble-budget-label"
+                aria-describedby="bubble-budget-hint"
+                value={String(draft.budget)}
+                disabled={busy}
+                onChange={(v) => agents.setDraft({ budget: v === "default" ? "default" : v === "none" ? "none" : Number(v) })}
+                options={[{ value: "default", label: f.useDefault(defaultBudget) }, ...BUDGET_CHOICES_USD.map((b) => ({ value: String(b), label: f.budgetOption(b) })), { value: "none", label: f.noLimit }]}
+              />
             ) : (
               // Codex has no spending limit: the field says so instead of offering one that would not be enforced.
-              <select id="bubble-budget" className="input" value="unsupported" disabled aria-describedby="bubble-budget-hint" data-testid="agent-budget-unsupported">
-                <option value="unsupported">{p.noBudget}</option>
-              </select>
+              <Select id="bubble-budget" aria-labelledby="bubble-budget-label" aria-describedby="bubble-budget-hint" value="unsupported" disabled onChange={() => undefined} options={[{ value: "unsupported", label: p.noBudget }]} data-testid="agent-budget-unsupported" />
             )}
             <small id="bubble-budget-hint" className="muted">
               {p.budgetHint}

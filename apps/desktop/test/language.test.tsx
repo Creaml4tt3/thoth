@@ -6,6 +6,7 @@ import { currentOs, displayPath, middleTruncate, withTilde } from "../src/featur
 import { cleanup, openApp, screen, waitFor, within, openSettingsAt, chooseSettingsSection } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { chooseOption, selectLabels, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -158,15 +159,15 @@ describe("language in the app", () => {
     expect(document.documentElement.lang).toBe("en");
     await openSettingsAt(app, "Appearance");
     const language = await screen.findByRole("combobox", { name: "Language" });
-    expect([...(language as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["System", "English", "ไทย"]);
-    expect((language as HTMLSelectElement).value).toBe("system");
+    expect(selectLabels(language)).toEqual(["System", "English", "ไทย"]);
+    expect(selectValue(language)).toBe("system");
 
-    await app.user.selectOptions(language, "th");
+    chooseOption(language, "ไทย");
     expect(await screen.findByRole("heading", { level: 1, name: th.settings.title })).toBeTruthy();
     expect(document.documentElement.lang).toBe("th");
     expect(localStorage.getItem("thoth.desktop.lang")).toBe("th");
-    const thaiSelect = screen.getByRole("combobox", { name: th.settings.language }) as HTMLSelectElement;
-    expect([...thaiSelect.options].map((o) => o.textContent)).toEqual([th.settings.system, "English", "ไทย"]);
+    const thaiSelect = screen.getByRole("combobox", { name: th.settings.language });
+    expect(selectLabels(thaiSelect)).toEqual([th.settings.system, "English", "ไทย"]);
     expect(within(screen.getByRole("complementary")).getByRole("button", { name: th.shell.settings })).toBeTruthy();
 
     // A new window starts in the remembered language even though the system is English.
@@ -178,8 +179,8 @@ describe("language in the app", () => {
     cleanup();
     const back = await openApp(root);
     await screen.findByRole("tree");
-    await back.user.click(screen.getByRole("button", { name: th.shell.settings }));
-    await back.user.selectOptions(await screen.findByRole("combobox", { name: th.settings.language }), "system");
+    await openSettingsAt(back, th.settings.appearance, th.shell.settings);
+    chooseOption(await screen.findByRole("combobox", { name: th.settings.language }), th.settings.system);
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: en.settings.title })).toBeTruthy());
     expect(localStorage.getItem("thoth.desktop.lang")).toBe("system");
     await chooseSettingsSection(back, en.settings.editor);

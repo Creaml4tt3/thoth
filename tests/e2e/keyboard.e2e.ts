@@ -247,7 +247,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect(current(page)).toHaveText("Settings");
   expect(await tabNames(page)).toEqual(["Roadmap", "Settings", "Old"]);
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Theme" })).toHaveValue("system");
+  await expect(page.getByRole("combobox", { name: "Theme" })).toHaveAttribute("data-value", "system");
   await page.keyboard.press("ControlOrMeta+/");
   const shortcuts = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(shortcuts).toBeVisible();

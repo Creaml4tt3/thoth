@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } fro
 import { PageIcon } from "../order/icons.tsx";
 import { useStrings } from "../strings/index.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
+import { Select } from "../ui/Select.tsx";
 import { tipIfClipped } from "../ui/Tooltip.tsx";
 import { dayLabel, groupTimeline, tagsOf, timeLabel, type TimelineItem, type TimelineMode } from "./timeline.ts";
 
@@ -73,16 +74,10 @@ export function TimelineView({ sources, now = new Date() }: { sources: readonly 
         </header>
         <div className="timeline-controls">
           {sources.length > 1 && (
-            <label className="timeline-space">
-              <span>{t.space}</span>
-              <select value={shown?.id} onChange={(event) => setSource(event.target.value)}>
-                {sources.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="timeline-space">
+              <span id="timeline-space-label">{t.space}</span>
+              <Select aria-labelledby="timeline-space-label" value={shown?.id ?? ""} onChange={setSource} options={sources.map((s) => ({ value: s.id, label: s.label }))} />
+            </div>
           )}
           {tagged && (
             <div className="mode-switch timeline-modes" role="group" aria-label={t.sortBy}>

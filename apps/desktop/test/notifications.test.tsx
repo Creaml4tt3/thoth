@@ -82,8 +82,8 @@ describe("agent runs", () => {
   async function start(app: Harness, prompt: string) {
     if (!screen.queryByRole("dialog", { name: "Ask Thoth" })) await app.user.click(screen.getByRole("button", { name: MASCOT }));
     await screen.findByRole("dialog", { name: "Ask Thoth" });
-    const select = within(bubble()).getByRole("combobox", { name: "Agent" }) as HTMLSelectElement;
-    await waitFor(() => expect(select.querySelector("option")!.dataset["state"]).toBe("ready"));
+    const select = within(bubble()).getByRole("combobox", { name: "Agent" });
+    await waitFor(() => expect(select.textContent).toMatch(/ · Ready, /));
     await app.user.click(within(bubble()).getByRole("button", { name: "Add context" }));
     const group = await screen.findByRole("group", { name: "Pages for the agent" });
     const clear = within(group).queryByRole("button", { name: "Clear" });

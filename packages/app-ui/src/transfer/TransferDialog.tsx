@@ -17,6 +17,7 @@ import { roleCan, type Workspace } from "@thoth/workspace-protocol";
 import { useStrings, type Strings } from "../strings/index.ts";
 import { Button } from "../ui/Button.tsx";
 import { Modal } from "../ui/Modal.tsx";
+import { Select } from "../ui/Select.tsx";
 import { workspaceKey, type ServerDirectory, type WorkspacePageRef } from "../workspace/directory.ts";
 import { nestWorkspaceTree, type WorkspaceTreeItem } from "../workspace/tree.ts";
 import type { TransferService } from "./service.ts";
@@ -269,53 +270,45 @@ export function TransferDialog({ target, onClose, servers, transfers, openWorksp
                   <p className="muted">{target.direction === "between_workspaces" ? t.noOtherWorkspaces : t.noWorkspaces}</p>
                 ) : (
                   <div className="xfer-grid">
-                    <label className="field">
-                      <span>{t.workspace}</span>
-                      <select
+                    <div className="field">
+                      <span id="xfer-workspace-label">{t.workspace}</span>
+                      <Select
                         data-autofocus
-                        className="input"
+                        aria-labelledby="xfer-workspace-label"
                         value={dest ? `${dest.server}\n${dest.workspace}` : ""}
-                        onChange={(e) => {
-                          const [server, workspace] = e.target.value.split("\n") as [string, string];
+                        onChange={(v) => {
+                          const [server, workspace] = v.split("\n") as [string, string];
                           setDest({ server, workspace });
                           setParentId(null);
                         }}
-                      >
-                        {writable.map((w) => (
-                          <option key={`${w.server}\n${w.workspace.id}`} value={`${w.server}\n${w.workspace.id}`}>
-                            {all.some((o) => o.server !== w.server) ? `${w.workspace.name} · ${w.serverLabel}` : w.workspace.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span>{t.parent}</span>
-                      <select className="input" value={parentId ?? ""} onChange={(e) => setParentId(e.target.value === "" ? null : e.target.value)}>
-                        <option value="">{t.topLevel}</option>
-                        {parents.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {`${"  ".repeat(p.depth)}${t.under(p.title)}`}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        options={writable.map((w) => ({ value: `${w.server}\n${w.workspace.id}`, label: all.some((o) => o.server !== w.server) ? `${w.workspace.name} · ${w.serverLabel}` : w.workspace.name }))}
+                      />
+                    </div>
+                    <div className="field">
+                      <span id="xfer-parent-label">{t.parent}</span>
+                      <Select
+                        aria-labelledby="xfer-parent-label"
+                        value={parentId ?? ""}
+                        onChange={(v) => setParentId(v === "" ? null : v)}
+                        options={[{ value: "", label: t.topLevel }, ...parents.map((p) => ({ value: p.id, label: `${"\u00a0\u00a0".repeat(p.depth)}${t.under(p.title)}` }))]}
+                      />
+                    </div>
                   </div>
                 )}
               </fieldset>
             ) : (
               <fieldset className="xfer-section">
                 <legend className="label">{t.destination}</legend>
-                <label className="field">
-                  <span>{t.folder}</span>
-                  <select data-autofocus className="input" value={folder} onChange={(e) => setFolder(e.target.value)}>
-                    <option value="">{t.topLevel}</option>
-                    {folderChoices.map((f) => (
-                      <option key={f} value={f}>
-                        {`${"  ".repeat(f.split("/").length - 1)}${t.under(f.split("/").pop()!)}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="field">
+                  <span id="xfer-folder-label">{t.folder}</span>
+                  <Select
+                    data-autofocus
+                    aria-labelledby="xfer-folder-label"
+                    value={folder}
+                    onChange={setFolder}
+                    options={[{ value: "", label: t.topLevel }, ...folderChoices.map((f) => ({ value: f, label: `${"\u00a0\u00a0".repeat(f.split("/").length - 1)}${t.under(f.split("/").pop()!)}` }))]}
+                  />
+                </div>
                 <p className="muted small">{t.folderHint}</p>
               </fieldset>
             )}

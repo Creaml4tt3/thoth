@@ -8,6 +8,7 @@ import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { setLangPreference } from "../src/strings/index.ts";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -229,8 +230,7 @@ describe("commands", () => {
     await waitFor(() => expect(current()).toBe("Gamma"));
     await run(app, "move to");
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox");
-    await app.user.selectOptions(list, within(list).getByRole("option", { name: /Docs/ }));
+    chooseOption(within(dialog).getByRole("combobox", { name: "Move into" }), /Docs/);
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(async () => expect(await app.read("Docs/Gamma.md")).toBe("# Gamma\n\nThe third page.\n"));
     await expect(app.read("Gamma.md")).rejects.toThrow();

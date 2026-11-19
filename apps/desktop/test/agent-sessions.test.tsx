@@ -57,7 +57,7 @@ async function open(p = platform()): Promise<Harness> {
 async function ask(app: Harness, prompt: string) {
   await app.user.click(await screen.findByRole("button", { name: MASCOT }));
   const dialog = await screen.findByRole("dialog", { name: "Ask Thoth" });
-  await waitFor(() => expect(dialog.querySelector<HTMLOptionElement>('option[value="claude"]')!.dataset["state"]).toBe("ready"));
+  await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "Agent" }).textContent).toMatch(/^Claude Code · Ready, /));
   await app.user.click(within(dialog).getByRole("textbox", { name: "Task" }));
   await app.user.paste(prompt);
   await app.user.click(within(dialog).getByRole("button", { name: "Start" }));
@@ -329,7 +329,7 @@ describe("conversations", () => {
     expect(within(dialog).getByTestId("bubble-followup").textContent).toContain("Follow-up to “What is this?”");
     expect((within(dialog).getByRole("textbox", { name: "Task" }) as HTMLTextAreaElement).value).toBe("And then?");
     expect(within(dialog).getByRole("list", { name: "Context" }).textContent).toContain("Diary");
-    await waitFor(() => expect(dialog.querySelector<HTMLOptionElement>('option[value="claude"]')!.dataset["state"]).toBe("ready"));
+    await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "Agent" }).textContent).toMatch(/^Claude Code · Ready, /));
     await app.user.click(within(dialog).getByRole("button", { name: "Start" }));
     await within(bubble()).findByRole("region", { name: "Answer" }, { timeout: 15_000 });
     const turn2 = (await records()).find((r) => r.id !== first)!;

@@ -37,6 +37,7 @@ import { generateToken, hashToken } from "../../apps/server/src/auth.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import { newPrivatePage } from "./new-page.ts";
 import { pickSpace, START } from "./pick-space.ts";
+import { choose } from "./select.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let ref: ReferenceServer;
@@ -345,7 +346,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await expect(tree.getByRole("checkbox", { name: "Select Welcome" })).toBeChecked();
     await page.getByRole("button", { name: "Copy to workspace…" }).click();
     const copy = page.getByRole("dialog", { name: "Copy 1 page to a workspace" });
-    await copy.getByRole("combobox", { name: "Workspace" }).selectOption({ label: "Studio" });
+    await choose(copy.getByRole("combobox", { name: "Workspace" }), /^Studio/);
     const copyPreview = copy.getByRole("region", { name: "Who can see it" });
     await expect(copyPreview).toContainText("Everyone in this workspace (2 members) can see these pages.");
     await expect(copyPreview).toContainText("Grace");
@@ -361,7 +362,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
     await tree.getByRole("checkbox", { name: "Select Café" }).check();
     await page.getByRole("button", { name: "Move to workspace…" }).click();
     const move = page.getByRole("dialog", { name: "Move 2 pages to a workspace" });
-    await move.getByRole("combobox", { name: "Workspace" }).selectOption({ label: "Studio" });
+    await choose(move.getByRole("combobox", { name: "Workspace" }), /^Studio/);
     const movePreview = move.getByRole("region", { name: "Who can see it" });
     await expect(movePreview).toContainText("1 attachment is uploaded");
     await expect(movePreview).toContainText(/point to pages or files in this transfer/);
@@ -471,7 +472,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
       await expect(tree.getByRole("checkbox", { name: `Select ${title}` })).toBeChecked();
       await page.getByRole("button", { name: `${mode} to workspace…` }).click();
       const dialog = page.getByRole("dialog", { name: `${mode} 1 page to a workspace` });
-      await dialog.getByRole("combobox", { name: "Workspace" }).selectOption({ label: "Studio" });
+      await choose(dialog.getByRole("combobox", { name: "Workspace" }), /^Studio/);
       await expect(dialog.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has left this computer yet.");
       const held = bridge!.holdNext("api.call", hold);
       await dialog.getByRole("button", { name: mode, exact: true }).click();
@@ -529,7 +530,7 @@ test.describe.serial("the MVP, end to end (spec §14)", () => {
   test("9. ask the local AI CLI from the mascot, with one page as its only context, on the user's own login", async () => {
     agentRun.cafe = await readFile(join(vaults.obsidian, "Obsidian/Café.md"));
     const bubble = await openBubble(page);
-    await expect(bubble.locator('option[value="claude"]')).toHaveText("Claude Code · Ready, 2.1.310");
+    await expect(bubble.getByRole("combobox", { name: "Agent" })).toHaveText("Claude Code · Ready, 2.1.310");
     await pickOnly(page, ["Café"]);
     await expect(await picker(page)).toContainText("1 selected");
     await writeAndStart(page, `Tidy the spelling.\n@replace Obsidian/Café.md :: normalised => normalized\n@write Obsidian/Summary.md :: # Summary\\n`);

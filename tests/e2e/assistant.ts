@@ -14,7 +14,11 @@ export const layer = (page: Page): Locator => page.getByTestId("mascot");
 export async function openBubble(page: Page, agent: "claude" | "codex" = "claude"): Promise<Locator> {
   if (!(await bubble(page).isVisible())) await mascot(page).click();
   await expect(bubble(page)).toBeVisible();
-  await expect(bubble(page).locator(`option[value="${agent}"]`)).toHaveAttribute("data-state", "ready", { timeout: 15_000 });
+  // The picker shows the chosen agent as "<name> · Ready, <version>" once it is detected; another agent is picked
+  // from its option, which reads the same way once ready.
+  const select = bubble(page).getByRole("combobox", { name: "Agent" });
+  if (agent === "claude") await expect(select).toHaveText(/^Claude Code · Ready, /, { timeout: 15_000 });
+  else await expect(select).toHaveText(/ · (Ready|Checking)/, { timeout: 15_000 });
   return bubble(page);
 }
 

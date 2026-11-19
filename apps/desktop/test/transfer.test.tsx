@@ -16,6 +16,7 @@ import { FakeServers, type FakeServerConfig, type FakeWorkspace } from "../../..
 import { seed } from "./support/fixtures.ts";
 import { en, th } from "../src/strings/index.ts";
 import { problemText } from "../src/features/transfer/TransferDialog.tsx";
+import { chooseOption, selectLabels, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -75,7 +76,7 @@ describe("Private Space → workspace", () => {
     await app.user.click(screen.getByRole("button", { name: "Copy to workspace…" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Copy 2 pages to a workspace" });
-    expect((within(dialog).getByRole("combobox", { name: "Workspace" }) as HTMLSelectElement).value).toContain(ws.id);
+    expect(selectValue(within(dialog).getByRole("combobox", { name: "Workspace" }))).toContain(ws.id);
     const preview = await within(dialog).findByRole("region", { name: "Who can see it" });
     await waitFor(() => expect(preview.textContent).toContain("Everyone in this workspace (2 members) can see these pages."));
     expect(preview.textContent).toContain("Grace");
@@ -143,8 +144,9 @@ describe("workspace → Private Space", () => {
     await app.user.click(await screen.findByRole("button", { name: "Move to Private Space…" }));
     const dialog = await screen.findByRole("dialog", { name: "Move “Roadmap” to your Private Space" });
     // The Private Space's folders load after the dialog opens.
-    await within(dialog).findByRole("option", { name: /From team/ });
-    await app.user.selectOptions(within(dialog).getByRole("combobox", { name: "Put the pages" }), "From team");
+    const where = within(dialog).getByRole("combobox", { name: "Put the pages" });
+    await waitFor(() => expect(selectLabels(where).some((l) => /From team/.test(l))).toBe(true));
+    chooseOption(where, /From team/);
     await waitFor(() => expect(within(dialog).getByRole("region", { name: "Who can see it" }).textContent).toContain("Nothing has been written to your Private Space yet."));
     await waitFor(() => expect((within(dialog).getByRole("button", { name: "Move" }) as HTMLButtonElement).disabled).toBe(false));
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));

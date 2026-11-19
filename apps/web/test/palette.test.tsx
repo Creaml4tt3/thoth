@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { FakeWebServer } from "./support/fake-web-server.ts";
 import { cleanup, editorBox, fakeBrowser, screen, signInThroughUi, waitFor, within, type FakeBrowser } from "./support/render.tsx";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 afterEach(() => {
   cleanup();
@@ -134,8 +135,7 @@ describe("commands", () => {
     await waitFor(() => expect(treeRows().filter((r) => ["Alpha", "Beta", "Gamma"].includes(r ?? ""))).toEqual(["Alpha", "Beta", "Gamma"]));
     await run(browser, "move to");
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox");
-    await browser.user.selectOptions(list, within(list).getByRole("option", { name: /Alpha/ }));
+    chooseOption(within(dialog).getByRole("combobox", { name: "Move into" }), /Alpha/);
     await browser.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(() => expect(browser.server.servers.page(browser.ws, "Gamma").parentId).toBe(browser.server.servers.page(browser.ws, "Alpha").id));
   });

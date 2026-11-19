@@ -110,8 +110,9 @@ export function SettingsLayout({ sections, initial, request, children }: { secti
         const whole = heading !== null && matchesQuery(heading.textContent ?? "", query);
         let any = whole;
         for (const part of parts) {
-          // A form control's chosen value is not text: options and labels are, so "dark" finds the theme.
-          const hit = whole || matchesQuery(`${part.textContent ?? ""} ${[...part.querySelectorAll("[aria-label],[title]")].map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""}`).join(" ")}`, query);
+          // A form control's chosen value is not text: options and labels are (a Select lists its options in
+          // `data-search`), so "dark" finds the theme.
+          const hit = whole || matchesQuery(`${part.textContent ?? ""} ${[...part.querySelectorAll("[aria-label],[title],[data-search]")].map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("title") ?? ""} ${el.getAttribute("data-search") ?? ""}`).join(" ")}`, query);
           part.hidden = !hit;
           any ||= hit;
         }

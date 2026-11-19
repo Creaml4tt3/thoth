@@ -199,8 +199,6 @@ div.tree-empty > p { margin: 0 0 6px; }
 .color-choice:hover { background: var(--thoth-bg-hover); }
 .color-choice:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .color-choice[aria-checked="true"] { border-color: var(--thoth-accent); background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); }
-.move-list { padding: 4px; }
-.move-list option { padding: 4px 8px; }
 .move-actions { display: flex; gap: var(--thoth-space-3); justify-content: flex-end; align-items: center; }
 
 /* "Share…" (ADR-0023): the expiry choice, the new address with its copy button, the active links. */
@@ -232,7 +230,8 @@ div.tree-empty > p { margin: 0 0 6px; }
 .member { display: flex; align-items: center; gap: var(--thoth-space-3); min-height: 44px; padding: 6px 0; border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); }
 .member-name { flex: 1; min-width: 0; display: grid; overflow-wrap: anywhere; }
 .member-hint { margin: 0; }
-.member-role { width: auto; min-width: 8.5rem; }
+.member-role { min-width: 8.5rem; }
+.move-list, .xfer-grid .select, .bubble-options-grid .select, .agents-limits .select { width: 100%; }
 .member-badge { flex: none; }
 .members-leave { display: flex; justify-content: flex-start; padding-top: var(--thoth-space-2); }
 .members-confirm { display: grid; gap: 6px; padding: var(--thoth-space-3); border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-lg); background: var(--thoth-bg-sidebar); }
@@ -428,11 +427,11 @@ div.tree-empty > p { margin: 0 0 6px; }
 /* Timeline (ADR-0051): Home's column and rows, with the Edited / Dated switch and tag toggles above the days. */
 .timeline-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .timeline-space { display: flex; align-items: center; gap: 8px; color: var(--thoth-ink-secondary); }
-.timeline-space select { min-height: 32px; padding: 0 8px; border: 1px solid var(--thoth-outline); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg-container); color: var(--thoth-ink-primary); font: inherit; }
+.timeline-space .select { min-height: 32px; padding: 0 8px; border-radius: var(--thoth-radius-sm); }
 .timeline-modes { display: inline-flex; padding: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); }
 .timeline-toggle, .timeline-tag { all: unset; box-sizing: border-box; min-height: 28px; min-width: 24px; padding: 4px 12px; border-radius: var(--thoth-radius-pill); color: var(--thoth-ink-secondary); cursor: pointer; font: var(--thoth-text-small); }
 .timeline-toggle[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
-.timeline-toggle:focus-visible, .timeline-tag:focus-visible, .timeline-space select:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
+.timeline-toggle:focus-visible, .timeline-tag:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }
 .timeline-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .timeline-tag { border: 1px solid var(--thoth-outline); }
 .timeline-tag:hover, .timeline-toggle:hover { background: var(--thoth-bg-active); }

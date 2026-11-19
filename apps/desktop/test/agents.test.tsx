@@ -18,6 +18,7 @@ import { AGENT_SETTINGS_KEY, DEFAULT_AGENT_SETTINGS } from "../src/features/agen
 import { excerptAllowed, type Excerpt } from "../src/features/agents/service.ts";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { setLangPreference } from "../src/strings/index.ts";
+import { chooseOption, selectLabels, selectedLabel } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -41,8 +42,10 @@ const MASCOT = /^Thoth assistant/;
 const mascot = () => screen.getByRole("button", { name: MASCOT });
 const mascotState = () => screen.getByTestId("mascot").dataset["state"];
 const bubble = () => screen.getByRole("dialog", { name: "Ask Thoth" });
-const agentSelect = () => screen.getByRole("combobox", { name: "Agent" }) as HTMLSelectElement;
-const optionOf = (id: string) => agentSelect().querySelector<HTMLOptionElement>(`option[value="${id}"]`)!;
+const agentSelect = () => screen.getByRole("combobox", { name: "Agent" });
+const NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex" };
+/** The agent picker's option for `id`, as it reads ("Claude Code · Ready, 2.1.310"). */
+const optionOf = (id: string) => selectLabels(agentSelect()).find((l) => l.startsWith(`${NAMES[id]} · `)) ?? "";
 
 /** Opens the app with agents, waits for the first page, and opens the mascot's bubble. */
 async function open(searchDirs = [FAKE_CLAUDE_DIR], servers?: FakeServers): Promise<Harness> {
@@ -57,7 +60,7 @@ async function open(searchDirs = [FAKE_CLAUDE_DIR], servers?: FakeServers): Prom
 }
 
 async function ready(id = "claude") {
-  await waitFor(() => expect(optionOf(id).dataset["state"]).toBe("ready"));
+  await waitFor(() => expect(optionOf(id)).toMatch(/ · Ready, /));
 }
 
 /** The context picker inside the bubble ("+"). */
@@ -117,8 +120,7 @@ async function workDir(): Promise<string> {
 describe("the assistant's runs", () => {
   it("says the CLI is missing, where it looked and how to fix it", async () => {
     const app = await open([join(data, "empty")]);
-    await waitFor(() => expect(optionOf("claude").dataset["state"]).toBe("missing"));
-    expect(optionOf("claude").textContent).toBe("Claude Code · Not found");
+    await waitFor(() => expect(optionOf("claude")).toBe("Claude Code · Not found"));
     expect(within(bubble()).getByRole("button", { name: "Start" })).toHaveProperty("disabled", true);
     expect(within(bubble()).getByTestId("bubble-agent-status").textContent).toContain("Not found");
     await openAssistantSettings(app);
@@ -269,7 +271,7 @@ describe("the assistant's runs", () => {
     await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
     await app.user.click(screen.getByRole("button", { name: /^ผู้ช่วย Thoth, / }));
     const dialog = await screen.findByRole("dialog", { name: "ถาม Thoth" });
-    await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "เอเจนต์" }).querySelector("option")!.dataset["state"]).toBe("ready"));
+    await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "เอเจนต์" }).textContent).toMatch(/ · พร้อม /));
     expect(within(dialog).getByRole("button", { name: "เริ่ม" })).toBeTruthy();
     expect(within(dialog).getByText("เอเจนต์ทำงานด้วยสิทธิ์ผู้ใช้ของคุณ Thoth จำกัดสิ่งที่ส่งให้เอเจนต์ ไม่ได้จำกัดสิ่งที่เอเจนต์ทำได้")).toBeTruthy();
   });
@@ -473,7 +475,7 @@ describe("the assistant's runs: context", () => {
 });
 
 describe("the assistant's runs: limits and settings", () => {
-  const select = (name: string, scope: HTMLElement = document.body) => within(scope).getByRole("combobox", { name }) as HTMLSelectElement;
+  const select = (name: string, scope: HTMLElement = document.body) => within(scope).getByRole("combobox", { name });
   const argvOf = async () => (await fakeRecord(await workDir())).argv;
   const budgetArg = (argv: string[]) => (argv.includes("--max-budget-usd") ? argv[argv.indexOf("--max-budget-usd") + 1] : null);
   async function options(app: Harness): Promise<HTMLElement> {
@@ -486,10 +488,10 @@ describe("the assistant's runs: limits and settings", () => {
     const app = await open();
     await ready();
     const form = await options(app);
-    expect(select("Time limit", form).selectedOptions[0]!.textContent).toBe("Default (30 minutes)");
-    expect(select("Spending limit", form).selectedOptions[0]!.textContent).toBe("Default (US$1)");
-    expect([...select("Time limit", form).options].map((o) => o.textContent)).toEqual(["Default (30 minutes)", "5 minutes", "15 minutes", "30 minutes", "60 minutes"]);
-    expect([...select("Spending limit", form).options].map((o) => o.textContent)).toEqual(["Default (US$1)", "US$0.25", "US$0.50", "US$1", "US$2", "US$5", "No limit"]);
+    expect(selectedLabel(select("Time limit", form))).toBe("Default (30 minutes)");
+    expect(selectedLabel(select("Spending limit", form))).toBe("Default (US$1)");
+    expect(selectLabels(select("Time limit", form))).toEqual(["Default (30 minutes)", "5 minutes", "15 minutes", "30 minutes", "60 minutes"]);
+    expect(selectLabels(select("Spending limit", form))).toEqual(["Default (US$1)", "US$0.25", "US$0.50", "US$1", "US$2", "US$5", "No limit"]);
 
     await pickOnly(app, ["Diary"]);
     await writeAndStart(app, "@sleep 300\n");
@@ -500,8 +502,8 @@ describe("the assistant's runs: limits and settings", () => {
 
     // This run only: 5 minutes and US$0.25.
     await app.user.click(within(bubble()).getByRole("button", { name: "New task" }));
-    await app.user.selectOptions(select("Time limit", await options(app)), "5");
-    await app.user.selectOptions(select("Spending limit", await options(app)), "0.25");
+    chooseOption(select("Time limit", await options(app)), "5 minutes");
+    chooseOption(select("Spending limit", await options(app)), "US$0.25");
     await writeAndStart(app, "@sleep 300\n");
     await waitFor(async () => expect(await readdir(join(data, "agent-runs"))).toHaveLength(1));
     expect(budgetArg(await argvOf())).toBe("0.25");
@@ -510,7 +512,7 @@ describe("the assistant's runs: limits and settings", () => {
 
     // No limit: the flag is not passed at all.
     await app.user.click(within(bubble()).getByRole("button", { name: "New task" }));
-    await app.user.selectOptions(select("Spending limit", await options(app)), "none");
+    chooseOption(select("Spending limit", await options(app)), "No limit");
     await writeAndStart(app, "@sleep 300\n");
     await waitFor(async () => expect(await readdir(join(data, "agent-runs"))).toHaveLength(1));
     expect(budgetArg(await argvOf())).toBeNull();
@@ -524,18 +526,18 @@ describe("the assistant's runs: limits and settings", () => {
     await openAssistantSettings(app);
     const limits = screen.getByRole("region", { name: "Permissions and limits" });
     const history = screen.getByRole("region", { name: "Run history" });
-    expect([select("Time limit", limits).value, select("Spending limit", limits).value, select("Keep run history for", history).value]).toEqual(["30", "1", "30"]);
-    expect([...select("Keep run history for", history).options].map((o) => o.textContent)).toEqual(["7 days", "30 days", "90 days", "For ever"]);
+    expect([selectedLabel(select("Time limit", limits)), selectedLabel(select("Spending limit", limits)), selectedLabel(select("Keep run history for", history))]).toEqual(["30 minutes", "US$1", "30 days"]);
+    expect(selectLabels(select("Keep run history for", history))).toEqual(["7 days", "30 days", "90 days", "For ever"]);
     expect(limits.textContent).toContain("Codex has no spending limit of its own");
-    await app.user.selectOptions(select("Time limit", limits), "60");
-    await app.user.selectOptions(select("Spending limit", limits), "none");
-    await app.user.selectOptions(select("Keep run history for", history), "0");
+    chooseOption(select("Time limit", limits), "60 minutes");
+    chooseOption(select("Spending limit", limits), "No limit");
+    chooseOption(select("Keep run history for", history), "For ever");
     expect(JSON.parse(localStorage.getItem(AGENT_SETTINGS_KEY)!)).toEqual({ provider: "claude", timeMinutes: 60, budgetUsd: null, retentionDays: 0, allowPrivate: true, allowWholeSpace: true, allowWorkspace: true });
     await app.user.click(mascot());
     await screen.findByRole("dialog", { name: "Ask Thoth" });
     const form = await options(app);
-    expect(select("Time limit", form).selectedOptions[0]!.textContent).toBe("Default (60 minutes)");
-    expect(select("Spending limit", form).selectedOptions[0]!.textContent).toBe("Default (No limit)");
+    expect(selectedLabel(select("Time limit", form))).toBe("Default (60 minutes)");
+    expect(selectedLabel(select("Spending limit", form))).toBe("Default (No limit)");
 
     await ready();
     await pickOnly(app, ["Diary"]);
@@ -550,7 +552,7 @@ describe("the assistant's runs: limits and settings", () => {
     localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify({ timeMinutes: 61, budgetUsd: 9, retentionDays: 0 }));
     const again = await open();
     await openAssistantSettings(again);
-    expect([select("Time limit", screen.getByRole("region", { name: "Permissions and limits" })).value, select("Spending limit", screen.getByRole("region", { name: "Permissions and limits" })).value, select("Keep run history for", screen.getByRole("region", { name: "Run history" })).value]).toEqual(["30", "1", "0"]);
+    expect([selectedLabel(select("Time limit", screen.getByRole("region", { name: "Permissions and limits" }))), selectedLabel(select("Spending limit", screen.getByRole("region", { name: "Permissions and limits" }))), selectedLabel(select("Keep run history for", screen.getByRole("region", { name: "Run history" })))]).toEqual(["30 minutes", "US$1", "For ever"]);
   });
 
   it("says when a run stopped at its spending limit, and the work done so far can still be reviewed", async () => {
@@ -725,7 +727,7 @@ describe("the assistant's runs: Thai", () => {
     expect(screen.getByRole("group", { name: "หน้าจากเวิร์กสเปซ (อ่านอย่างเดียว)" })).toBeTruthy();
     await app.user.click(within(dialog).getByText("ตัวเลือก"));
     expect(within(dialog).getByRole("combobox", { name: "เวลาสูงสุด" })).toBeTruthy();
-    expect(within(dialog).getByRole("combobox", { name: "วงเงินค่าใช้จ่าย" })).toHaveProperty("value", "default");
+    expect(selectedLabel(within(dialog).getByRole("combobox", { name: "วงเงินค่าใช้จ่าย" }))).toMatch(/^ค่าเริ่มต้น \(/);
     await openAssistantSettings(app, "การตั้งค่า");
     const history = screen.getByRole("region", { name: "ประวัติการทำงาน" });
     expect(within(history).getByRole("combobox", { name: "เก็บประวัติการทำงานไว้" })).toBeTruthy();
@@ -740,14 +742,14 @@ describe("the assistant's runs: Codex", () => {
 
   it("offers Claude Code and Codex with each one's state, and runs Codex in its sandbox without a spending limit", async () => {
     const app = await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
-    await waitFor(() => expect(optionOf("codex").textContent).toBe("Codex · Ready, 0.164.0"));
-    expect(optionOf("claude").textContent).toBe("Claude Code · Ready, 2.1.310");
-    expect(agentSelect().value).toBe("claude");
-    await app.user.selectOptions(agentSelect(), "codex");
+    await waitFor(() => expect(optionOf("codex")).toBe("Codex · Ready, 0.164.0"));
+    expect(optionOf("claude")).toBe("Claude Code · Ready, 2.1.310");
+    expect(selectedLabel(agentSelect())).toMatch(/^Claude Code/);
+    chooseOption(agentSelect(), /^Codex/);
     expect(within(bubble()).getByText(/Thoth runs it only inside Codex's own sandbox/)).toBeTruthy();
     // No spending limit is offered for Codex, and none is passed.
     await app.user.click(within(bubble()).getByText("Options"));
-    const budget = within(bubble()).getByRole("combobox", { name: "Spending limit" }) as HTMLSelectElement;
+    const budget = within(bubble()).getByRole("combobox", { name: "Spending limit" }) as HTMLButtonElement;
     expect(budget.disabled).toBe(true);
     expect(budget.textContent).toBe("Not supported by Codex");
     expect(within(bubble()).getByText("Codex has no spending limit of its own, so none is set. The time limit still applies.")).toBeTruthy();
@@ -778,7 +780,7 @@ describe("the assistant's runs: Codex", () => {
     // The picked agent is the remembered default next time.
     cleanup();
     await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
-    expect(agentSelect().value).toBe("codex");
+    expect(selectedLabel(agentSelect())).toMatch(/^Codex/);
   });
 
   it("will not run Codex where its sandbox does not start, and says how to fix it", async () => {
@@ -786,11 +788,10 @@ describe("the assistant's runs: Codex", () => {
     try {
       localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify({ provider: "codex" }));
       const app = await open([FAKE_CODEX_DIR, FAKE_CLAUDE_DIR]);
-      await waitFor(() => expect(optionOf("codex").dataset["state"]).toBe("sandbox_unavailable"));
-      expect(optionOf("codex").textContent).toBe("Codex · No sandbox here");
+      await waitFor(() => expect(optionOf("codex")).toBe("Codex · No sandbox here"));
       expect(within(bubble()).getByRole("button", { name: "Start" })).toHaveProperty("disabled", true);
       // Claude Code is still there to pick.
-      expect(optionOf("claude").textContent).toBe("Claude Code · Ready, 2.1.310");
+      expect(optionOf("claude")).toBe("Claude Code · Ready, 2.1.310");
       await openAssistantSettings(app);
       await waitFor(() => expect(status("codex").dataset["state"]).toBe("sandbox_unavailable"));
       expect(status("codex").textContent).toBe("Codex's sandbox does not work on this computer, so Thoth will not run Codex: without it, the commands Codex runs would have all your permissions. Codex said: Error: the sandbox could not be started (fake)");
@@ -808,8 +809,8 @@ describe("the assistant's runs: Codex", () => {
     await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
     await app.user.click(screen.getByRole("button", { name: /^ผู้ช่วย Thoth, / }));
     const dialog = await screen.findByRole("dialog", { name: "ถาม Thoth" });
-    const pick = within(dialog).getByRole("combobox", { name: "เอเจนต์" }) as HTMLSelectElement;
-    await waitFor(() => expect(pick.querySelector<HTMLOptionElement>('option[value="codex"]')!.dataset["state"]).toBe("ready"));
+    const pick = within(dialog).getByRole("combobox", { name: "เอเจนต์" });
+    await waitFor(() => expect(selectLabels(pick)).toContain("Codex · พร้อม 0.164.0"));
     await app.user.click(within(dialog).getByText("ตัวเลือก"));
     expect(within(dialog).getByTestId("agent-budget-unsupported").textContent).toBe("Codex ไม่รองรับ");
     await openAssistantSettings(app, "การตั้งค่า");
