@@ -27,6 +27,7 @@ import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import { useSession } from "../../app/context.ts";
 import { RenameError, renameProblemText } from "../shell/rename.ts";
 import { targetFolder } from "../shell/target-folder.ts";
@@ -314,7 +315,6 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
   };
 
   // ---------------------------------------------------------------- render
-  const switcherId = useId();
   const listed = [...new Set([...boards, ...(path !== undefined ? [path] : [])])].sort((a, b) => stem(a).localeCompare(stem(b)) || a.localeCompare(b));
   const pinned = loaded.kind === "ready" ? new Set(pinnedPaths(loaded.canvas)) : new Set<string>();
   const label = path === undefined ? t.overview : stem(path);
@@ -322,18 +322,13 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
   return (
     <div className="board-tab">
       <div className="board-header">
-        {/* Native selects for now: the Thoth Select (parallel work) replaces every native select. */}
-        <label className="board-field" htmlFor={switcherId}>
-          <span className="sr-only">{t.switcher}</span>
-          <select id={switcherId} className="input" value={path ?? ""} onChange={(e) => tabs.open(e.target.value === "" ? { kind: "board" } : { kind: "board", path: e.target.value }, { replace: true })}>
-            <option value="">{t.overview}</option>
-            {listed.map((b) => (
-              <option key={b} value={b} title={b}>
-                {stem(b)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          aria-label={t.switcher}
+          value={path ?? ""}
+          onChange={(v) => tabs.open(v === "" ? { kind: "board" } : { kind: "board", path: v }, { replace: true })}
+          // Two boards with one name: their folders tell them apart.
+          options={[{ value: "", label: t.overview }, ...listed.map((b) => ({ value: b, label: stem(b), ...(listed.some((o) => o !== b && stem(o) === stem(b)) ? { description: dirname(b) || "/" } : {}) }))]}
+        />
         <Button small onClick={() => setDialog("new")}>
           {t.newBoard}
         </Button>
@@ -344,22 +339,8 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
         )}
         {path === undefined && (
           <>
-            <select className="input" aria-label={t.filterTag} value={tag} onChange={(e) => setTag(e.target.value)}>
-              <option value="">{t.allTags}</option>
-              {tags.map((x) => (
-                <option key={x} value={x}>
-                  #{x}
-                </option>
-              ))}
-            </select>
-            <select className="input" aria-label={t.filterFolder} value={folder} onChange={(e) => setFolder(e.target.value)}>
-              <option value="">{t.allFolders}</option>
-              {folders.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
+            <Select aria-label={t.filterTag} value={tag} onChange={setTag} options={[{ value: "", label: t.allTags }, ...tags.map((x) => ({ value: x, label: `#${x}` }))]} />
+            <Select aria-label={t.filterFolder} value={folder} onChange={setFolder} options={[{ value: "", label: t.allFolders }, ...folders.map((x) => ({ value: x, label: x }))]} />
           </>
         )}
         <span className="board-message" role="status">

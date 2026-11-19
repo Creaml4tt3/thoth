@@ -98,7 +98,7 @@
 /* The Board tab's header (desktop): switcher, New board, Add note, Overview filters. */
 .board-tab { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .board-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--thoth-space-2); padding: var(--thoth-space-2) var(--thoth-space-3); border-bottom: 1px solid var(--thoth-border); }
-.board-header select.input { width: auto; max-width: 16rem; }
+.board-header .select { max-width: 16rem; }
 .board-message { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .board-tab > .board { flex: 1; min-height: 0; }
 .board-empty { margin: var(--thoth-space-3); color: var(--thoth-ink-secondary); }
