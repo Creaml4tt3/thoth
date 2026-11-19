@@ -1165,6 +1165,42 @@ export const en = {
       feedbackNote: "Found a problem, have an idea or a question? Send it to this server's team. Only what you type is sent, and the browser details if you leave them on.",
     },
   },
+  /** The Board (ADR-0056): sticky notes for pages, string for links, an Overview and the user's own boards. */
+  board: {
+    title: "Board",
+    overview: "Overview",
+    newBoard: "New board",
+    newBoardName: "Board name",
+    newBoardPlaceholder: "OCR research",
+    addNote: "Add note",
+    linkTo: "Link to…",
+    pin: "Pin to board",
+    unpin: "Remove from board",
+    open: "Open",
+    openNewTab: "Open in new tab",
+    reveal: "Reveal in sidebar",
+    listView: "List view",
+    zoom: "Zoom",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    zoomFit: "Zoom to fit",
+    zoomPercent: (percent: number) => `${percent}%`,
+    allTags: "All tags",
+    allFolders: "All folders",
+    missing: "Missing note",
+    empty: "No notes yet. Add a note to start this board.",
+    emptyOverview: "No pages yet.",
+    instructions: "Tab moves between notes. Enter opens a note; arrow keys move the selected one, Shift for larger steps. Choosing a faded suggestion pins it. The context menu key or Shift+F10 shows more. Plus, minus and 0 zoom.",
+    /** A note button's name: title, tags and how many pages it links with. */
+    noteLabel: (title: string, tags: readonly string[], links: number, state: "pinned" | "suggested" | "missing" | "free") =>
+      state === "missing" ? `${title}, missing note` : [title, ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), plural(links, "link"), ...(state === "suggested" ? ["suggested"] : [])].join(", "),
+    menu: (title: string) => `Note: ${title}`,
+    linksOf: (title: string) => `Links of ${title}`,
+    linked: "Linked.",
+    linkChanged: "The page changed; nothing was written.",
+    linkGone: "That page is gone.",
+    undoLinkEdited: "The link line was edited, so it was left in place.",
+  },
 };
 
 export type Strings = typeof en;

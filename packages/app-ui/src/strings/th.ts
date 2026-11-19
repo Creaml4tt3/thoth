@@ -1058,4 +1058,38 @@ export const th: Strings = {
       feedbackNote: "เจอปัญหา มีไอเดีย หรือมีคำถาม ส่งถึงทีมของเซิร์ฟเวอร์นี้ได้ จะส่งเฉพาะสิ่งที่คุณพิมพ์ และรายละเอียดของเบราว์เซอร์หากคุณเปิดไว้", // REVIEW
     },
   },
+  board: {
+    title: "บอร์ด", // REVIEW
+    overview: "ภาพรวม", // REVIEW
+    newBoard: "บอร์ดใหม่", // REVIEW
+    newBoardName: "ชื่อบอร์ด", // REVIEW
+    newBoardPlaceholder: "งานวิจัย OCR", // REVIEW
+    addNote: "เพิ่มโน้ต", // REVIEW
+    linkTo: "ลิงก์ไปยัง…", // REVIEW
+    pin: "ปักลงบอร์ด", // REVIEW
+    unpin: "เอาออกจากบอร์ด", // REVIEW
+    open: "เปิด", // REVIEW
+    openNewTab: "เปิดในแท็บใหม่", // REVIEW
+    reveal: "แสดงในแถบด้านข้าง", // REVIEW
+    listView: "มุมมองรายการ", // REVIEW
+    zoom: "ซูม", // REVIEW
+    zoomIn: "ซูมเข้า", // REVIEW
+    zoomOut: "ซูมออก", // REVIEW
+    zoomFit: "ซูมให้พอดี", // REVIEW
+    zoomPercent: (percent) => `${percent}%`,
+    allTags: "ทุกแท็ก", // REVIEW
+    allFolders: "ทุกโฟลเดอร์", // REVIEW
+    missing: "ไม่พบโน้ตนี้", // REVIEW
+    empty: "ยังไม่มีโน้ต เพิ่มโน้ตเพื่อเริ่มบอร์ดนี้", // REVIEW
+    emptyOverview: "ยังไม่มีหน้า", // REVIEW
+    instructions: "กด Tab เพื่อไปยังโน้ตถัดไป Enter เพื่อเปิด ปุ่มลูกศรเลื่อนโน้ตที่เลือก กด Shift ค้างเพื่อเลื่อนทีละมาก เลือกโน้ตจาง ๆ ที่แนะนำเพื่อปักลงบอร์ด ปุ่มเมนูหรือ Shift+F10 แสดงคำสั่งเพิ่ม บวก ลบ และ 0 ใช้ซูม", // REVIEW
+    noteLabel: (title, tags, links, state) =>
+      state === "missing" ? `${title}, ไม่พบโน้ตนี้` : [title, ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), `ลิงก์ ${count(links)} รายการ`, ...(state === "suggested" ? ["แนะนำ"] : [])].join(", "), // REVIEW
+    menu: (title) => `โน้ต: ${title}`, // REVIEW
+    linksOf: (title) => `ลิงก์ของ ${title}`, // REVIEW
+    linked: "ลิงก์แล้ว", // REVIEW
+    linkChanged: "หน้านี้เปลี่ยนไปแล้ว จึงไม่ได้เขียนอะไรลงไป", // REVIEW
+    linkGone: "ไม่พบหน้านั้นแล้ว", // REVIEW
+    undoLinkEdited: "บรรทัดลิงก์ถูกแก้ไขแล้ว จึงไม่ได้เอาออก", // REVIEW
+  },
 };

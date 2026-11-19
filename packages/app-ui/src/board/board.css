@@ -1,0 +1,77 @@
+/* The Board (ADR-0056): a paper desk with a faint dot grid, sticky notes, an orange pin and string between them. */
+.board { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+.board-toolbar { display: flex; align-items: center; gap: var(--thoth-space-1); padding: var(--thoth-space-2) var(--thoth-space-3); border-bottom: 1px solid var(--thoth-border); }
+.board-tool { font: var(--thoth-text-ui); color: var(--thoth-ink-secondary); background: transparent; border: 0; border-radius: var(--thoth-radius-sm); padding: 4px 10px; min-width: 28px; min-height: 28px; cursor: pointer; transition: background-color var(--thoth-dur-instant) var(--thoth-ease-out), color var(--thoth-dur-instant) var(--thoth-ease-out); }
+.board-tool:hover:not(:disabled) { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
+.board-tool:disabled { opacity: 0.5; cursor: default; }
+.board-tool[aria-pressed="true"] { background: var(--thoth-moon-soft); color: var(--thoth-moon-ink); }
+.board-zoom-group { display: flex; align-items: center; gap: var(--thoth-space-1); }
+.board-toolbar > .board-tool:last-child { margin-inline-start: auto; }
+.board-zoom { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.board-tool:focus-visible, .board-paper:focus-visible, .board-note:focus-visible, .board-list-open:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.board-paper:focus-visible { outline-offset: -2px; }
+
+.board-paper {
+  position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; cursor: grab;
+  background-color: var(--thoth-bg);
+  background-image: radial-gradient(circle, rgb(var(--thoth-ink) / 0.12) 1px, transparent 1.2px);
+}
+.board-paper:active { cursor: grabbing; }
+.board-plane { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.board-strings, .board-squares { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.board-strings path { fill: none; stroke: rgb(var(--thoth-ink) / 0.35); stroke-width: 1.5; stroke-linecap: round; transition: stroke var(--thoth-dur-fast) var(--thoth-ease-out); }
+.board-strings path[data-active] { stroke: var(--thoth-moon); stroke-width: 2; }
+.board-squares rect[data-state="suggested"] { opacity: 0.5; }
+.board-squares rect[data-state="missing"] { fill: var(--thoth-bg-active) !important; }
+
+/* A note: 160×120, square with a curled corner, top-left at the note's x/y. */
+.board-note {
+  position: absolute; width: 160px; height: 120px; box-sizing: border-box; padding: 14px 12px 10px;
+  display: flex; flex-direction: column; gap: 4px; text-align: start; cursor: pointer;
+  border: 0; border-radius: 2px 2px 14px 2px; background: var(--thoth-note-cream); color: var(--thoth-note-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 10px -4px rgb(0 0 0 / 0.18);
+  transition: box-shadow var(--thoth-dur-fast) var(--thoth-ease-out), transform var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out);
+}
+.board-note::after { content: ""; position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; border-radius: 0 0 14px 0; background: linear-gradient(135deg, transparent 50%, rgb(0 0 0 / 0.1) 50%); pointer-events: none; }
+.board-note[data-color="gray"] { background: var(--thoth-note-gray); }
+.board-note[data-color="brown"] { background: var(--thoth-note-brown); }
+.board-note[data-color="orange"] { background: var(--thoth-note-orange); }
+.board-note[data-color="yellow"] { background: var(--thoth-note-yellow); }
+.board-note[data-color="green"] { background: var(--thoth-note-green); }
+.board-note[data-color="blue"] { background: var(--thoth-note-blue); }
+.board-note[data-color="purple"] { background: var(--thoth-note-purple); }
+.board-note[data-color="red"] { background: var(--thoth-note-red); }
+.board-note[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--thoth-accent), 0 4px 10px -4px rgb(0 0 0 / 0.18); }
+.board-note[data-state="suggested"] { opacity: 0.55; box-shadow: none; outline: 1px dashed rgb(var(--thoth-ink) / 0.3); }
+.board-note[data-state="suggested"]:hover, .board-note[data-state="suggested"]:focus-visible { opacity: 0.9; }
+.board-note[data-state="missing"] { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
+.board-note[data-lifted] { z-index: 1; cursor: grabbing; transform: rotate(3deg) scale(1.03); box-shadow: 0 2px 4px rgb(0 0 0 / 0.12), 0 18px 32px -10px rgb(0 0 0 / 0.35); transition: none; }
+.board-note[data-wobble] { animation: board-wobble 300ms var(--thoth-ease-out); }
+@keyframes board-wobble { 0% { transform: rotate(3deg); } 40% { transform: rotate(-1.5deg); } 70% { transform: rotate(0.6deg); } 100% { transform: rotate(0); } }
+
+/* Thai and long words wrap inside the note, never past it. */
+.board-title { font: 600 13px / 1.35 var(--thoth-font-sans); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.board-excerpt { font: 400 12px / 1.4 var(--thoth-font-sans); color: var(--thoth-note-ink-muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; overflow: hidden; max-height: 20px; }
+.board-tag { font: 500 11px / 18px var(--thoth-font-sans); padding: 0 6px; border-radius: var(--thoth-radius-pill); background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.board-pin { position: absolute; top: -5px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgb(255 255 255 / 0.55), transparent 45%), var(--thoth-moon); box-shadow: 0 2px 3px rgb(0 0 0 / 0.3); }
+.board-plus { position: absolute; top: 6px; right: 8px; font: 600 14px / 1 var(--thoth-font-sans); color: var(--thoth-note-ink-muted); }
+
+/* Dark mode: the selected note's strings glow a little. Reduced motion has no glow, tilt or wobble. */
+[data-theme="night"] .board-strings path[data-active] { filter: drop-shadow(0 0 3px var(--thoth-moon)); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] .board-strings path[data-active] { filter: drop-shadow(0 0 3px var(--thoth-moon)); } }
+@media (prefers-reduced-motion: reduce) {
+  .board-strings path[data-active] { filter: none !important; }
+  .board-note, .board-strings path { transition: none; }
+  .board-note[data-lifted] { transform: none; }
+  .board-note[data-wobble] { animation: none; }
+}
+
+.board-list { margin: 0; padding: var(--thoth-space-4) var(--thoth-space-6); overflow: auto; flex: 1; font: var(--thoth-text-ui); color: var(--thoth-ink-primary); }
+.board-list > li { margin-block: var(--thoth-space-2); }
+.board-list ul { margin: 2px 0 0; padding-inline-start: var(--thoth-space-6); color: var(--thoth-ink-secondary); }
+.board-list-open { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 2px 4px; border-radius: var(--thoth-radius-xs); cursor: pointer; }
+.board-list-open:hover:not(:disabled) { background: var(--thoth-bg-hover); }
+.board-list-open:disabled { cursor: default; }
+.board-list-state { color: var(--thoth-ink-secondary); }

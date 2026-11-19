@@ -82,6 +82,20 @@
   --thoth-text-purple: #77517B;
   --thoth-text-red: #9A4433;
 
+  /* Board sticky notes (ADR-0056): cream, or the paper of the note's folder colour, with their own ink. Title, excerpt and a
+     tag chip keep 4.5:1 on every paper in every theme (packages/app-ui/test/contrast.test.ts). */
+  --thoth-note-cream: #FFF4D6;
+  --thoth-note-gray: #ECEAE5;
+  --thoth-note-brown: #F1E3D6;
+  --thoth-note-orange: #FDDFCB;
+  --thoth-note-yellow: #FCEFB4;
+  --thoth-note-green: #E2EDCB;
+  --thoth-note-blue: #DCE8F5;
+  --thoth-note-purple: #EEDFF0;
+  --thoth-note-red: #F9DCD6;
+  --thoth-note-ink: #1F1B14;
+  --thoth-note-ink-muted: #5C544A;
+
   /* Shape — small radii in content, pills for actions */
   --thoth-radius-xs: 4px;
   --thoth-radius-sm: 6px;
@@ -163,6 +177,17 @@
   --thoth-text-blue: #A2CAFA;
   --thoth-text-purple: #E3B8E8;
   --thoth-text-red: #FEB4A4;
+  --thoth-note-cream: #2B271F;
+  --thoth-note-gray: #292826;
+  --thoth-note-brown: #33291F;
+  --thoth-note-orange: #3A281B;
+  --thoth-note-yellow: #343019;
+  --thoth-note-green: #252F20;
+  --thoth-note-blue: #1F2A37;
+  --thoth-note-purple: #2F2537;
+  --thoth-note-red: #38221F;
+  --thoth-note-ink: #F0EAE0;
+  --thoth-note-ink-muted: #C4BCB0;
   --thoth-success: #78DB97;
   --thoth-warning: #F8BC60;
   --thoth-danger: #FFB4AA;
@@ -208,6 +233,17 @@
     --thoth-text-blue: #A2CAFA;
     --thoth-text-purple: #E3B8E8;
     --thoth-text-red: #FEB4A4;
+    --thoth-note-cream: #2B271F;
+    --thoth-note-gray: #292826;
+    --thoth-note-brown: #33291F;
+    --thoth-note-orange: #3A281B;
+    --thoth-note-yellow: #343019;
+    --thoth-note-green: #252F20;
+    --thoth-note-blue: #1F2A37;
+    --thoth-note-purple: #2F2537;
+    --thoth-note-red: #38221F;
+    --thoth-note-ink: #F0EAE0;
+    --thoth-note-ink-muted: #C4BCB0;
     --thoth-success: #78DB97;
     --thoth-warning: #F8BC60;
     --thoth-danger: #FFB4AA;
