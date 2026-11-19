@@ -6,10 +6,11 @@
  *   while no save is pending (another app may have changed it). A board that is gone or cannot be read says so and is
  *   never written.
  * - Saving: moves, pins and removals show at once and are queued; 500 ms after the last one they are written in one
- *   `boardStore.save` (which merges once on a conflict). A failed save says so and reads the file again. Leaving the tab
- *   writes what is still queued.
- * - Undo/redo covers moves, pins, removals and drawn links for the tab's life. After a drawn link is written or undone
- *   the session is refreshed, so an open editor of the source page is not left stale.
+ *   `boardStore.save` (which merges once on a conflict). A failed save says so and reads the file again. The queue is
+ *   registered with the session's `flushAll`, so switching or closing tabs, windows or the Private Space writes it first.
+ * - Undo/redo covers moves, pins, removals and drawn links for the tab's life: the history lives outside the component
+ *   (only the current tab is mounted), per tab and board. After a drawn link is written or undone the session is
+ *   refreshed, so an open editor of the source page is not left stale.
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
@@ -22,6 +23,7 @@ import { layoutOverviewAsync } from "@thoth/app-ui/board/layout.ts";
 import { boardNotes, overviewNotes, type Graph } from "@thoth/app-ui/board/model.ts";
 import { shellRoot } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { focusTreeItem } from "@thoth/app-ui/order/tree-keys.ts";
+import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
@@ -42,10 +44,23 @@ const overviewCache = new Map<string, { key: string; positions: Map<string, Poin
 
 const stem = (path: string) => stripExtension(basename(path));
 
+/**
+ * What outlives a mount of a board tab (only the current tab is mounted): its undo history, the chain of its saves (a
+ * remount reads the file after the last save), and the mounted instance's handlers the history entries call.
+ */
+interface Slot {
+  history: ReturnType<typeof createHistory>;
+  saving: Promise<unknown>;
+  change(ch: BoardChange): void;
+  say(text: string): void;
+}
+const slots = new Map<string, Slot>();
+const slotKey = (root: string, tab: string, path: string | undefined) => `${root}\n${tab}\n${path ?? ""}`;
+
 type Loaded = { kind: "loading" } | { kind: "ready"; canvas: CanvasFile } | { kind: "gone" } | { kind: "invalid" };
 
-export function BoardTab({ path }: { path?: string | undefined }) {
-  const { vault, connection, revision, refresh, flushAll, openPage, openFolder, tabs } = useSession();
+export function BoardTab({ tabId, path }: { tabId: string; path?: string | undefined }) {
+  const { vault, connection, revision, refresh, flushAll, registerFlush, openPage, openFolder, tabs } = useSession();
   const strings = useStrings();
   const t = strings.board;
   const store = useMemo(() => boardStore(vault), [vault]);
@@ -77,15 +92,30 @@ export function BoardTab({ path }: { path?: string | undefined }) {
   const queue = useRef<BoardChange[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const inflight = useRef(0);
-  const saving = useRef<Promise<void>>(Promise.resolve());
-  const [history] = useState(() => createHistory());
+  const [slot] = useState<Slot>(() => {
+    // A board tab's history ends when its tab closes, or shows another board: there is no close hook for a tab that is
+    // not mounted, so slots of tabs gone from this window are dropped whenever a board tab mounts.
+    const open = new Set(allTabs(tabs.layout).flatMap((tab) => (tab.target.kind === "board" ? [slotKey(connection.root, tab.id, tab.target.path)] : [])));
+    for (const key of slots.keys()) if (key.startsWith(`${connection.root}\n`) && !open.has(key)) slots.delete(key);
+    const key = slotKey(connection.root, tabId, path);
+    const found = slots.get(key);
+    if (found) return found;
+    const made: Slot = { history: createHistory(), saving: Promise.resolve(), change: () => undefined, say: () => undefined };
+    slots.set(key, made);
+    return made;
+  });
+  const history = slot.history;
   const live = useRef(true);
   useEffect(() => () => void (live.current = false), []);
+  /** The index changed while Thoth had something of its own to write: read the file once that is written. */
+  const stale = useRef(false);
 
   const show = (canvas: CanvasFile) => live.current && setLoaded({ kind: "ready", canvas });
   const reread = () => {
     if (path === undefined) return;
-    void store.read(path).then(
+    stale.current = false;
+    // After any save still running, so it reads what that save wrote.
+    void slot.saving.then(() => store.read(path)).then(
       (board) => {
         base.current = board;
         show(applyChanges(board.canvas, queue.current));
@@ -100,35 +130,52 @@ export function BoardTab({ path }: { path?: string | undefined }) {
     );
   };
   useEffect(reread, [path, store]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Another app may have changed the file: read it again, unless Thoth has something of its own still to write.
+  const busy = () => timer.current !== undefined || inflight.current > 0 || queue.current.length > 0;
+  // Another app may have changed the file: read it again, or once Thoth's own changes are written.
   const seen = useRef(revision);
   useEffect(() => {
     if (seen.current === revision) return;
     seen.current = revision;
-    if (timer.current === undefined && inflight.current === 0 && queue.current.length === 0) reread();
+    if (busy()) stale.current = true;
+    else reread();
   }, [revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Writes what is queued, after any save still running (each save starts from the base the one before left). */
-  const flush = () => {
+  /**
+   * Writes what is queued, after any save still running (each save starts from the base the one before left). Resolves
+   * true once it is written (or nothing was queued), false when the save failed.
+   */
+  const flush = (): Promise<boolean> => {
     clearTimeout(timer.current);
     timer.current = undefined;
-    if (path === undefined || queue.current.length === 0) return;
+    if (path === undefined || queue.current.length === 0) return slot.saving.then(() => true);
     const changes = queue.current.splice(0);
     inflight.current++;
-    saving.current = saving.current.then(async () => {
+    const done = slot.saving.then(async () => {
       try {
         if (!base.current) throw new Error(t.saveFailed);
         base.current = await store.save(path, base.current, changes);
+        // What another app wrote meanwhile shows now, under what is still queued.
+        show(applyChanges(base.current.canvas, queue.current));
+        if (live.current) setMessage("");
+        return true;
       } catch {
         if (live.current) setMessage(t.saveFailed);
-        reread();
+        return false;
       } finally {
         inflight.current--;
       }
     });
+    slot.saving = done;
+    void done.then((ok) => {
+      if (!ok || (stale.current && !busy())) reread();
+    });
+    return done;
   };
-  // Leaving the tab writes what is queued: fired, not dropped.
-  useEffect(() => () => flush(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Switching or closing tabs, windows or the Private Space writes what is queued first (flushAll); so does unmounting.
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => registerFlush(() => flushRef.current()), [registerFlush]);
+  useEffect(() => () => void flushRef.current(), []);
 
   const canvasNow = (): CanvasFile | null => (loaded.kind === "ready" ? loaded.canvas : null);
   const latest = useRef<CanvasFile | null>(null);
@@ -137,6 +184,7 @@ export function BoardTab({ path }: { path?: string | undefined }) {
   const change = (ch: BoardChange) => {
     const now = latest.current;
     if (!now) return;
+    setMessage("");
     queue.current.push(ch);
     latest.current = applyChanges(now, [ch]);
     show(latest.current);
@@ -145,9 +193,12 @@ export function BoardTab({ path }: { path?: string | undefined }) {
   };
   const nodeOf = (file: string): CanvasNode | undefined => latest.current?.nodes.find((n) => n.type === "file" && n.file === file);
 
+  // History entries call the mounted instance through the slot, never a closure of an unmounted one.
+  slot.change = change;
+  slot.say = setMessage;
   const pinNode = (node: CanvasNode) => {
     change({ kind: "pin", node });
-    history.push({ undo: () => change({ kind: "unpin", id: node.id }), redo: () => change({ kind: "pin", node }) });
+    history.push({ undo: () => slot.change({ kind: "unpin", id: node.id }), redo: () => slot.change({ kind: "pin", node }) });
   };
 
   // ---------------------------------------------------------------- the Overview's layout
@@ -173,7 +224,12 @@ export function BoardTab({ path }: { path?: string | undefined }) {
   const [tag, setTag] = useState("");
   const [folder, setFolder] = useState("");
   const tags = useMemo(() => [...new Set(graph?.pages.flatMap((p) => p.tags) ?? [])].sort((a, b) => a.localeCompare(b)), [graph]);
-  const folders = useMemo(() => [...new Set(graph?.pages.map((p) => dirname(p.path)).filter(Boolean) ?? [])].sort((a, b) => a.localeCompare(b)), [graph]);
+  // Every folder that holds a page, at any depth (choosing one shows the pages below it too).
+  const folders = useMemo(() => {
+    const all = new Set<string>();
+    for (const p of graph?.pages ?? []) for (let dir = dirname(p.path); dir; dir = dirname(dir)) all.add(dir);
+    return [...all].sort((a, b) => a.localeCompare(b));
+  }, [graph]);
 
   const shown = useMemo(() => {
     if (!graph) return null;
@@ -200,7 +256,7 @@ export function BoardTab({ path }: { path?: string | undefined }) {
         let undo = r.undo;
         history.push({
           undo: async () => {
-            if ((await undo()) === "changed") return void setMessage(t.undoLinkEdited);
+            if ((await undo()) === "changed") return void slot.say(t.undoLinkEdited);
             await refresh([from]);
           },
           redo: async () => {
@@ -221,7 +277,7 @@ export function BoardTab({ path }: { path?: string | undefined }) {
       if (!node) return;
       const from = { x: node.x, y: node.y };
       change({ kind: "move", id: node.id, x, y });
-      history.push({ undo: () => change({ kind: "move", id: node.id, ...from }), redo: () => change({ kind: "move", id: node.id, x, y }) });
+      history.push({ undo: () => slot.change({ kind: "move", id: node.id, ...from }), redo: () => slot.change({ kind: "move", id: node.id, x, y }) });
     };
     actions.pin = (page) => {
       const at = shown?.notes.find((n) => n.path === page) ?? { x: 0, y: 0 };
@@ -231,7 +287,7 @@ export function BoardTab({ path }: { path?: string | undefined }) {
       const node = nodeOf(page);
       if (!node) return;
       change({ kind: "unpin", id: node.id });
-      history.push({ undo: () => change({ kind: "pin", node }), redo: () => change({ kind: "unpin", id: node.id }) });
+      history.push({ undo: () => slot.change({ kind: "pin", node }), redo: () => slot.change({ kind: "unpin", id: node.id }) });
     };
   }
 
@@ -268,7 +324,7 @@ export function BoardTab({ path }: { path?: string | undefined }) {
         {/* Native selects for now: the Thoth Select (parallel work) replaces every native select. */}
         <label className="board-field" htmlFor={switcherId}>
           <span className="sr-only">{t.switcher}</span>
-          <select id={switcherId} className="input" value={path ?? ""} onChange={(e) => tabs.open(e.target.value === "" ? { kind: "board" } : { kind: "board", path: e.target.value })}>
+          <select id={switcherId} className="input" value={path ?? ""} onChange={(e) => tabs.open(e.target.value === "" ? { kind: "board" } : { kind: "board", path: e.target.value }, { replace: true })}>
             <option value="">{t.overview}</option>
             {listed.map((b) => (
               <option key={b} value={b} title={b}>
@@ -350,7 +406,7 @@ function NewBoardDialog({ onCreate, onClose }: { onCreate(name: string): Promise
       >
         <label className="field">
           <span>{t.newBoardName}</span>
-          <input data-autofocus className="input" value={value} placeholder={t.newBoardPlaceholder} disabled={busy} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} onChange={(e) => setValue(e.target.value)} />
+          <input data-autofocus className="input" value={value} placeholder={t.newBoardPlaceholder} readOnly={busy} aria-busy={busy || undefined} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} onChange={(e) => setValue(e.target.value)} />
         </label>
         {error && (
           <p id={errorId} role="alert" className="alert alert-danger">
@@ -386,7 +442,7 @@ function AddNoteDialog({ pages, onChoose, onClose }: { pages: Graph["pages"]; on
   return createPortal(
     <Modal title={t.addNote} onClose={onClose}>
       <input data-autofocus className="input" aria-label={t.addNoteFilter} placeholder={t.addNoteFilter} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} />
-      <ul className="board-link-list" aria-label={t.addNoteFilter}>
+      <ul className="board-link-list" aria-label={t.addNoteList}>
         {matches.map((p) => (
           <li key={p.path}>
             <button type="button" className="board-add-option" onClick={() => onChoose(p.path)}>

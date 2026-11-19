@@ -553,7 +553,7 @@ export function Shell() {
     ) : shown.kind === "timeline" ? (
       <TimelineView sources={timelineSources} />
     ) : shown.kind === "board" ? (
-      <BoardTab key={`${id}\n${shown.path ?? ""}`} path={shown.path} />
+      <BoardTab key={`${id}\n${shown.path ?? ""}`} tabId={id} path={shown.path} />
     ) : (
       <HomeView recent={homeRecent} favorites={homeFavorites} today={homeToday} onTimeline={openTimeline} />
     );

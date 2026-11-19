@@ -44,21 +44,35 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
-function setup(path?: string) {
+function setup(path?: string, options: { tabId?: string } = {}) {
+  const tabId = options.tabId ?? "t1";
   const refresh = vi.fn(async (changed?: readonly string[]) => {
     await vault.reconcile(changed ? { changed } : {});
   });
-  const tabs = { open: vi.fn() };
+  // The session's flush registry, as VaultHost keeps it.
+  const flushers = new Set<() => Promise<boolean>>();
+  const registerFlush = (f: () => Promise<boolean>) => (flushers.add(f), () => void flushers.delete(f));
+  const flushAll = async () => (await Promise.all([...flushers].map((f) => f().catch(() => false)))).every(Boolean);
+  const tabs = { open: vi.fn(), layout: { panes: [{ tabs: [{ id: tabId, target: path === undefined ? { kind: "board" } : { kind: "board", path } }] }] } };
   const openPage = vi.fn();
   const session = (revision: number) =>
-    ({ vault, connection: { root }, revision, refresh, flushAll: async () => true, openPage, openFolder: vi.fn(), tabs }) as unknown as Session;
-  const ui = (revision: number) => (
-    <SessionContext value={session(revision)}>
-      <BoardTab path={path} />
-    </SessionContext>
+    ({ vault, connection: { root }, revision, refresh, flushAll, registerFlush, openPage, openFolder: vi.fn(), tabs }) as unknown as Session;
+  const ui = (revision: number, mounted = true) => (
+    <SessionContext value={session(revision)}>{mounted && <BoardTab tabId={tabId} path={path} />}</SessionContext>
   );
   const view = render(ui(1));
-  return { refresh, tabs, openPage, rerender: (revision: number) => view.rerender(ui(revision)), user: userEvent.setup({ delay: null }) };
+  return {
+    refresh,
+    tabs,
+    openPage,
+    flushAll,
+    flushers,
+    rerender: (revision: number) => view.rerender(ui(revision)),
+    /** Another tab becomes current (this one unmounts), then this one again. */
+    unmount: () => view.rerender(ui(1, false)),
+    remount: () => view.rerender(ui(1)),
+    user: userEvent.setup({ delay: null }),
+  };
 }
 
 /** Lets the file system and promise chains run without timers (they may be fake). */
@@ -79,7 +93,7 @@ describe("BoardTab", () => {
     const switcher = await screen.findByRole("combobox", { name: "Board" });
     await waitFor(() => expect(within(switcher).getAllByRole("option").map((o) => o.textContent)).toEqual(["Overview", "Alpha board", "Zeta"]));
     fireEvent.change(switcher, { target: { value: "Zeta.canvas" } });
-    expect(tabs.open).toHaveBeenCalledWith({ kind: "board", path: "Zeta.canvas" });
+    expect(tabs.open).toHaveBeenCalledWith({ kind: "board", path: "Zeta.canvas" }, { replace: true });
   });
 
   it("New board creates <name>.canvas in the sidebar's selected folder and opens it", async () => {
@@ -190,6 +204,125 @@ describe("BoardTab", () => {
     cleanup();
     setup("Gone.canvas");
     expect(await screen.findByText(/This board is gone/)).toBeTruthy();
+  });
+});
+
+describe("BoardTab: saves and history across tabs and windows", () => {
+  const BOARD = "Research/Alpha board.canvas";
+  const moveA = async (key = "ArrowRight") => fireEvent.keyDown(note(/^A,/), { key });
+  async function selectA(user: ReturnType<typeof setup>["user"]) {
+    await user.click(await screen.findByRole("button", { name: /^A,/ }));
+  }
+
+  it("the session's flushAll writes a queued move before the 500 ms (window close, Quit, Space switch)", async () => {
+    const { flushAll, user } = setup(BOARD);
+    await selectA(user);
+    fake();
+    await moveA();
+    expect(await flushAll()).toBe(true);
+    expect((await nodes(BOARD))[0]).toMatchObject({ x: 8 });
+  });
+
+  it("flushAll also waits for a save already running, and says false when it fails", async () => {
+    const { flushAll, user } = setup(BOARD);
+    await selectA(user);
+    fake();
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    const write = vault.writeFileAtomic.bind(vault);
+    const spy = vi.spyOn(vault, "writeFileAtomic").mockImplementationOnce(async (...args) => (await held, write(...args)));
+    await moveA();
+    await advance(500); // the save starts and waits
+    await moveA(); // a second change while it runs
+    const all = flushAll();
+    release();
+    expect(await all).toBe(true);
+    expect((await nodes(BOARD))[0]).toMatchObject({ x: 16 });
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRejectedValueOnce(new Error("disk full"));
+    await moveA();
+    expect(await flushAll()).toBe(false);
+  });
+
+  it("a failed save says so and reads the file again; the next good change clears the message", async () => {
+    const { user } = setup(BOARD);
+    await selectA(user);
+    fake();
+    vi.spyOn(vault, "writeFileAtomic").mockRejectedValueOnce(new Error("disk full"));
+    await moveA();
+    await advance(500);
+    await until(() => screen.queryByText(/Couldn’t save the board/) !== null);
+    // Read again: the note is back where the file has it.
+    await until(() => note(/^A,/).style.left === "0px");
+    await moveA();
+    expect(screen.queryByText(/Couldn’t save the board/)).toBeNull();
+  });
+
+  it("Cmd/Ctrl+Z after leaving the tab and coming back still undoes the move", async () => {
+    const { unmount, remount, user } = setup(BOARD);
+    await selectA(user);
+    fake();
+    await moveA();
+    unmount(); // another tab became current: the move is written on the way out
+    await until(async () => (await nodes(BOARD))[0]!.x === 8);
+    remount();
+    await until(() => screen.queryByRole("button", { name: /^A,/ })?.style.left === "8px");
+    fireEvent.keyDown(note(/^A,/), { key: "z", ctrlKey: true });
+    await advance(500);
+    await until(async () => (await nodes(BOARD))[0]!.x === 0);
+  });
+
+  it("history ends with its tab: a tab gone from the window starts a new history", async () => {
+    const first = setup(BOARD, { tabId: "t1" });
+    await selectA(first.user);
+    fake();
+    await moveA();
+    cleanup();
+    await until(async () => (await nodes(BOARD))[0]!.x === 8);
+    setup(BOARD, { tabId: "t2" }); // t1 is not in this window any more
+    await until(() => screen.queryByRole("button", { name: /^A,/ })?.style.left === "8px");
+    fireEvent.keyDown(note(/^A,/), { key: "z", ctrlKey: true });
+    await advance(600);
+    expect((await nodes(BOARD))[0]).toMatchObject({ x: 8 });
+  });
+
+  it("an index change reads the board again; while a change is queued it waits until that is written", async () => {
+    const { rerender, user } = setup(BOARD);
+    await selectA(user);
+    // Another app adds B to the board.
+    await put(BOARD, board(["a", "A.md", 0, 0], ["b", "B.md", 400, 0]));
+    rerender(2);
+    await until(() => screen.queryByRole("button", { name: /^B,/ })?.getAttribute("data-state") === "pinned");
+    // Another app moves B; meanwhile A is moved here and not yet written.
+    fake();
+    await moveA();
+    await put(BOARD, board(["a", "A.md", 0, 0], ["b", "B.md", 400, 200]));
+    const reads = vi.spyOn(vault.fs, "readFile");
+    rerender(3);
+    await act(async () => {});
+    expect(reads).not.toHaveBeenCalled();
+    await advance(500);
+    // Written on top of what the other app wrote, then shown with B where that app put it.
+    await until(async () => (await nodes(BOARD))[0]!.x === 8);
+    expect((await nodes(BOARD))[1]).toMatchObject({ file: "B.md", y: 200 });
+    await until(() => note(/^B,/).style.top === "200px");
+  });
+
+  it("a drawn link's outcome resolves only after the session was refreshed", async () => {
+    await put(BOARD, board(["a", "A.md", 0, 0], ["c", "C.md", 300, 0]));
+    const { refresh, user } = setup(BOARD);
+    let release!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((r) => (release = r)));
+    (await screen.findByRole("button", { name: /^C,/ })).focus();
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    await user.click(screen.getByRole("menuitem", { name: "Link to…" }));
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(refresh).toHaveBeenCalledWith(["C.md"]));
+    const said = () => document.querySelector(".board-status")!.textContent;
+    await new Promise((r) => setTimeout(r, 150));
+    expect(said()).toBe("");
+    release();
+    await waitFor(() => expect(said()).toBe("Linked."));
   });
 });
 

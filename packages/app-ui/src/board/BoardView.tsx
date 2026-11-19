@@ -186,6 +186,18 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
 
   useEffect(() => () => [wobbleTimer, snapTimer, statusTimer].forEach((timer) => clearTimeout(timer.current)), []);
 
+  // A session move is dropped for good once the note's own position has changed (the board took the move): a later
+  // return to the old place (undo, a failed save read again) must show there, not revive the old move.
+  useEffect(() => {
+    setMoved((m) => {
+      const keep = [...m].filter(([path, v]) => {
+        const n = notes.find((o) => o.path === path);
+        return n !== undefined && n.x === v.from.x && n.y === v.from.y;
+      });
+      return keep.length === m.size ? m : new Map(keep);
+    });
+  }, [notes]);
+
   // Zooming out to squares removes the focused note button: keep focus on the board instead of losing it to the page.
   const squares = !list && view.z < SQUARES_BELOW;
   useEffect(() => {

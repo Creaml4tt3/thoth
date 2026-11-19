@@ -398,12 +398,16 @@ describe("the Board tab (ADR-0056)", () => {
     expect(activeTab(s).target).toEqual(board("A.canvas"));
   });
 
-  it("a board tab's switcher shows another board in the same tab; a new tab is asked for with newTab", () => {
+  it("a board opened from elsewhere gets its own tab; only the switcher (replace) shows it in the current tab", () => {
     let s = open(initialTabs([page("A.md")]), board());
     s = open(s, board("A.canvas"));
-    expect(shown(s)).toEqual(["A.md", "board:A.canvas"]);
-    s = open(s, board("B.canvas"), { newTab: true });
-    expect(shown(s)).toEqual(["A.md", "board:A.canvas", "board:B.canvas"]);
+    expect(shown(s)).toEqual(["A.md", "board:", "board:A.canvas"]);
+    s = open(s, board("B.canvas"), { replace: true });
+    expect(shown(s)).toEqual(["A.md", "board:", "board:B.canvas"]);
+    // One already open is gone to, wherever it is.
+    s = open(s, board(), { replace: true });
+    expect(shown(s)).toEqual(["A.md", "board:", "board:B.canvas"]);
+    expect(activeTab(s).target).toEqual(board());
   });
 
   it("is stored and comes back on restart; a stored path that is not a .canvas is dropped", () => {

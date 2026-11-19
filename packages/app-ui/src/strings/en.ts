@@ -1220,6 +1220,8 @@ export const en = {
     saveFailed: "Couldn’t save the board; it was read again.",
     fromPage: "Board from this page",
     openCommand: "Open Board",
+    addNoteList: "Pages not on this board",
+    deleteBoard: (trash: string) => `This board moves to the ${trash}. The pages on it stay. You can put it back from there.`,
   },
 };
 

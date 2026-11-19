@@ -39,6 +39,8 @@ export interface OpenOptions {
   newTab?: boolean;
   /** A new window of this Private Space showing only it (Shift+click a page link, 0.2.7); a new tab where there are no windows. */
   newWindow?: boolean;
+  /** A one-per-target view (a board) not open anywhere replaces the current tab's view instead of opening a tab (a board's switcher). */
+  replace?: boolean;
 }
 
 export interface Tab {
@@ -131,8 +133,7 @@ export function open(state: TabsState, target: TabTarget, options: OpenOptions =
     const existing = state.tabs.find((t) => (target.kind === "settings" ? t.target.kind === "settings" : sameTarget(t.target, target)));
     if (existing) return { ...retarget(state, existing.id, target), active: existing.id };
     const here = activeTab(state);
-    // A board tab switches boards in place (its switcher), unless it is pinned or a new tab is asked for.
-    const takes = here.target.kind === "blank" || (target.kind === "board" && here.target.kind === "board" && !here.pinned && !options.newTab);
+    const takes = here.target.kind === "blank" || (options.replace === true && !here.pinned && !options.newTab);
     return takes ? retarget(state, state.active, target) : insertAfterActive(state, target);
   }
   // A pinned tab keeps its page: what would replace it opens beside the pinned tabs instead.

@@ -47,11 +47,14 @@ describe("the Board in the app", () => {
     // One tab per board, like Timeline: it opens beside the page instead of replacing it.
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Research"]));
     expect(await screen.findByRole("application", { name: "Research" })).toBeTruthy();
+    await waitFor(() => expect(row.getAttribute("aria-current")).toBe("page"));
     fireEvent.contextMenu(row);
     const menu = await screen.findByRole("menu");
     const items = within(menu).getAllByRole("menuitem").map((m) => m.textContent ?? "");
     expect(items.some((i) => /favorite|duplicate|board from/i.test(i))).toBe(false);
     expect(items.some((i) => /rename/i.test(i))).toBe(true);
+    await app.user.click(within(menu).getByRole("menuitem", { name: /^Delete/ }));
+    expect((await screen.findByRole("dialog")).textContent).toMatch(/This board moves to the/);
   });
 
   it("Board from this page in a page's menu makes <page>.canvas beside it, pins the page and its neighbours, and opens it", async () => {

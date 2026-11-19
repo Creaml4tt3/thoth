@@ -89,6 +89,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const favorites = useFavorites();
   const tf = useStrings().favorites;
   const tb = useStrings().board;
+  const shownBoard = tabs.active.target.kind === "board" ? tabs.active.target.path : undefined;
   /** `path` is null for the menu of the empty area (the top level). */
   const [menu, setMenu] = useState<{ path: string | null; at: { x: number; y: number } } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -553,9 +554,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       if (node.kind === "page") {
         return (
           <li role="none" key={`page:${node.path}`}>
-            <div role="treeitem" aria-selected={node.path === current} className="tree-item tree-renaming" data-kind="page" style={indent} {...common}>
+            <div role="treeitem" aria-selected={node.path === (node.board ? shownBoard : current)} className="tree-item tree-renaming" data-kind="page" style={indent} {...common}>
               <Disclosure open={false} hidden />
-              <PageIcon />
+              {node.board ? <BoardIcon /> : <PageIcon />}
               {field}
             </div>
           </li>
@@ -580,6 +581,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
 
     if (node.kind === "page") {
       const checked = selection.paths.has(node.path);
+      // A board row is current while its board is the current tab.
+      const isCurrent = node.path === (node.board ? shownBoard : current);
       if (selection.active && node.board) return null; // only pages go to a workspace
       if (selection.active) {
         // While selecting, the row is a checkbox: Space toggles it, the tree keeps its keyboard order.
@@ -597,8 +600,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           <button
             type="button"
             role="treeitem"
-            aria-selected={node.path === current}
-            aria-current={node.path === current ? "page" : undefined}
+            aria-selected={isCurrent}
+            aria-current={isCurrent ? "page" : undefined}
             {...common}
             className="tree-item"
             data-kind="page"
@@ -739,7 +742,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       {deletingNode && (
         <DeleteDialog
           name={label(deletingNode.path)}
-          body={deletingNode.kind === "folder" ? tt.deleteDialog.privateFolder(pagesIn(deletingNode).length, trashName) : tt.deleteDialog.privatePage(trashName)}
+          body={deletingNode.kind === "folder" ? tt.deleteDialog.privateFolder(pagesIn(deletingNode).length, trashName) : deletingNode.board ? tb.deleteBoard(trashName) : tt.deleteDialog.privatePage(trashName)}
           onDelete={() => deleteEntry(deletingNode.path)}
           onClose={() => {
             setDeleting(null);
