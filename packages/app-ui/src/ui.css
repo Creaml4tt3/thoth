@@ -101,6 +101,26 @@ h1, h2, h3, p { margin: 0; }
 .alert-danger { background: color-mix(in srgb, var(--thoth-danger) 12%, transparent); color: var(--thoth-ink-primary); }
 .alert-warning { background: color-mix(in srgb, var(--thoth-warning) 14%, transparent); color: var(--thoth-ink-primary); }
 
+/* Select (ui/Select.tsx): the button looks like the inputs, with a chevron; its list is a raised menu like the context
+   menus, with the neutral active row (no Moon wash, ADR-0053) and a check on the chosen option. */
+.select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: auto; min-width: 160px; max-width: 100%; text-align: start; cursor: pointer; }
+.select:disabled { cursor: default; color: var(--thoth-ink-tertiary); }
+.select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-chevron { flex: none; color: var(--thoth-ink-secondary); }
+.select-list { position: fixed; z-index: 65; max-width: calc(100vw - 16px); overflow-y: auto; padding: 4px; display: grid; gap: 1px; align-content: start; background: var(--thoth-bg-container); color: var(--thoth-ink-primary); border: 1px solid var(--thoth-outline); border-radius: var(--thoth-radius-lg); box-shadow: var(--thoth-shadow-pop); --pop-y: calc(var(--thoth-shift) * -1); transform-origin: top left; animation: thoth-pop-in var(--thoth-dur-fast) var(--thoth-ease-out); }
+.select-list[data-side="top"] { --pop-y: var(--thoth-shift); transform-origin: bottom left; }
+.select-option { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px 6px 6px; border-radius: var(--thoth-radius-sm); font: var(--thoth-text-ui); cursor: pointer; }
+.select-option[data-active] { background: var(--thoth-bg-active); }
+.select-option[aria-disabled="true"] { color: var(--thoth-ink-tertiary); cursor: default; }
+.select-check { flex: none; width: 16px; height: 1lh; display: grid; place-items: center; color: var(--thoth-ink-primary); }
+.select-text { display: grid; gap: 1px; min-width: 0; }
+.select-desc { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
+@media (forced-colors: active) {
+  .select-list { border-color: CanvasText; }
+  .select-option[data-active] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .select-option[aria-disabled="true"] { color: GrayText; }
+}
+
 /* Changing theme (theme.ts runs the change inside a view transition): the old page dissolves into the new one. The browser's
    own default is 250ms with `ease`; this makes it the app's base duration and curve. Where the API is missing the theme
    just changes. The first paint is never a transition. */

@@ -195,6 +195,16 @@ describe.each(Object.entries(themes))("Papyrus Black components, %s theme", (_na
     expect(low).toEqual([]);
   });
 
+  it("the Select's options (ui/Select.tsx): text on the container and on the active row is at least 4.5:1, a disabled option at least 3:1", () => {
+    const container = rgb("--thoth-bg-container");
+    const activeRow = over(colour("--thoth-bg-active"), container);
+    expect(ratio(over(colour("--thoth-ink-primary"), container), container)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(over(colour("--thoth-ink-primary"), activeRow), activeRow)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(over(colour("--thoth-ink-secondary"), container), container)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(over(colour("--thoth-ink-tertiary"), container), container)).toBeGreaterThanOrEqual(3);
+    expect(ratio(over(colour("--thoth-ink-tertiary"), activeRow), activeRow)).toBeGreaterThanOrEqual(3);
+  });
+
   it("the mention chip and Workspace badge (on-secondary-container on its container) are at least 4.5:1", () => {
     expect(ratio(rgb("--thoth-on-secondary-container"), rgb("--thoth-secondary-container"))).toBeGreaterThanOrEqual(4.5);
   });
