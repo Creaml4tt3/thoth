@@ -96,7 +96,8 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
     // A board tab's history ends when its tab closes, or shows another board: there is no close hook for a tab that is
     // not mounted, so slots of tabs gone from this window are dropped whenever a board tab mounts.
     const open = new Set(allTabs(tabs.layout).flatMap((tab) => (tab.target.kind === "board" ? [slotKey(connection.root, tab.id, tab.target.path)] : [])));
-    for (const key of slots.keys()) if (key.startsWith(`${connection.root}\n`) && !open.has(key)) slots.delete(key);
+    // Slots of another (closed) Private Space go too: a drawn link's undo there would hold a closed vault.
+    for (const key of slots.keys()) if (!open.has(key)) slots.delete(key);
     const key = slotKey(connection.root, tabId, path);
     const found = slots.get(key);
     if (found) return found;

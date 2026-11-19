@@ -190,9 +190,10 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   // return to the old place (undo, a failed save read again) must show there, not revive the old move.
   useEffect(() => {
     setMoved((m) => {
+      // A note not shown now (an Overview filter hides it) keeps its move for when it comes back.
       const keep = [...m].filter(([path, v]) => {
         const n = notes.find((o) => o.path === path);
-        return n !== undefined && n.x === v.from.x && n.y === v.from.y;
+        return n === undefined || (n.x === v.from.x && n.y === v.from.y);
       });
       return keep.length === m.size ? m : new Map(keep);
     });

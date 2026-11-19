@@ -147,6 +147,18 @@ describe("BoardView", () => {
     expect(b.style.left).toBe("350px");
   });
 
+  it("a session move outlives a filter that hides the note and shows it again (the Overview)", () => {
+    const actions: BoardActions = { open: vi.fn() };
+    const view = render(<BoardView label="Overview" notes={notes} strings={strings} actions={actions} />);
+    fireEvent.pointerDown(noteButton(/^B,/), { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    fireEvent.pointerUp(window, { clientX: 60, clientY: 10 });
+    view.rerender(<BoardView label="Overview" notes={[A, C]} strings={[]} actions={actions} />);
+    expect(screen.queryByRole("button", { name: /^B,/ })).toBeNull();
+    view.rerender(<BoardView label="Overview" notes={notes} strings={strings} actions={actions} />);
+    expect(noteButton(/^B,/).style.left).toBe("350px");
+  });
+
   it("dragging empty paper pans; Ctrl+wheel zooms around the pointer; plain wheel pans", () => {
     const { region, plane } = setup();
     const before = plane().style.transform;
