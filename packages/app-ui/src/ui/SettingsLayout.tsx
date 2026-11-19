@@ -27,6 +27,10 @@ const PARTS = ":scope > :not(h2)";
 
 /** The section chosen last, for the rest of the session (not stored: a new session opens at the first section). */
 let lastChosen: string | null = null;
+/** The deep-link requests already opened (each tab target is a new object), so one is not opened again. */
+const openedFor = new WeakSet<object>();
+/** The request a deep link is opened for: the tab target, or (without one) nothing to remember it by. */
+const requestOf = (request: object | undefined): object | null => request ?? null;
 
 /**
  * Settings, one section at a time: a vertical tab list of the sections beside the page (a scrolling row above it in a
@@ -54,6 +58,8 @@ export function SettingsLayout({ sections, initial, request, children }: { secti
   const wanted = sections.map((s) => s.id).join("\n");
 
   const choose = (id: string) => {
+    const key = requestOf(request);
+    if (pending.current !== null && key !== null) openedFor.add(key);
     pending.current = null;
     lastChosen = id;
     setChosen(id);
@@ -76,8 +82,11 @@ export function SettingsLayout({ sections, initial, request, children }: { secti
     return () => watch.disconnect();
   }, [wanted]);
 
+  // A deep link opens its section once per request: the tab keeps its target, so coming back to the tab (or a restart)
+  // must not take the person away from the section they chose since.
   useLayoutEffect(() => {
-    pending.current = initial ?? null;
+    const key = requestOf(request);
+    if (initial !== undefined && (key === null || !openedFor.has(key))) pending.current = initial;
   }, [initial, request]);
   useLayoutEffect(() => {
     if (pending.current !== null && present.includes(pending.current)) choose(pending.current);

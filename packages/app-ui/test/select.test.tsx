@@ -271,6 +271,71 @@ describe("Select", () => {
     }
   });
 
+  it("a press on the list's padding or scrollbar keeps focus on the button, so Escape still closes only the list", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal title="Move" onClose={onClose}>
+        <Harness />
+      </Modal>,
+    );
+    fireEvent.click(box());
+    expect(fireEvent.mouseDown(list()!)).toBe(false); // prevented: focus does not move to the dialog
+  });
+
+  it("an option can say its language, for a screen reader (a language named in itself)", () => {
+    render(<Harness options={[{ value: "en", label: "English", lang: "en" }, { value: "th", label: "ไทย", lang: "th" }]} initial="th" />);
+    expect(box().querySelector(".select-value")!.getAttribute("lang")).toBe("th");
+    fireEvent.click(box());
+    expect(screen.getByRole("option", { name: "English" }).getAttribute("lang")).toBe("en");
+  });
+
+  it("measures the list's layout height, not its size mid-animation, to choose a side", () => {
+    vi.stubGlobal("innerHeight", 600);
+    render(<Harness />);
+    box().getBoundingClientRect = () => ({ top: 400, bottom: 430, left: 20, right: 220, width: 200, height: 30, x: 20, y: 400, toJSON: () => ({}) });
+    const rect = HTMLElement.prototype.getBoundingClientRect;
+    const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight")!;
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      // scaled to 0.97 by the open animation
+      if (this.getAttribute("role") === "listbox") return { top: 0, bottom: 155, left: 0, right: 194, width: 194, height: 155, x: 0, y: 0, toJSON: () => ({}) };
+      return rect.call(this);
+    };
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get(this: HTMLElement) { return this.getAttribute("role") === "listbox" ? 160 : 0; } });
+    try {
+      fireEvent.click(box());
+      expect(list()!.dataset["side"]).toBe("top"); // 160 does not fit in the 158 below
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = rect;
+      Object.defineProperty(HTMLElement.prototype, "offsetHeight", height);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("closes when its button scrolls out of the area that shows it, instead of floating over the rest", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    render(
+      <div className="page-scroll" style={{ overflowY: "auto" }}>
+        <Harness />
+      </div>,
+    );
+    const scroller = document.querySelector<HTMLElement>(".page-scroll")!;
+    scroller.getBoundingClientRect = () => ({ top: 100, bottom: 500, left: 0, right: 800, width: 800, height: 400, x: 0, y: 100, toJSON: () => ({}) });
+    let top = 200;
+    box().getBoundingClientRect = () => ({ top, bottom: top + 30, left: 20, right: 220, width: 200, height: 30, x: 20, y: top, toJSON: () => ({}) });
+    try {
+      fireEvent.click(box());
+      act(() => frames.shift()?.(0));
+      expect(list()).toBeTruthy();
+      top = 40; // scrolled up under whatever is above the area (the tab bar)
+      act(() => frames.shift()?.(0));
+      expect(list()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a disabled select does not open", () => {
     render(<Harness disabled />);
     expect((box() as HTMLButtonElement).disabled).toBe(true);

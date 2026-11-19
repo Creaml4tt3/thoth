@@ -160,6 +160,9 @@ describe("language in the app", () => {
     await openSettingsAt(app, "Appearance");
     const language = await screen.findByRole("combobox", { name: "Language" });
     expect(selectLabels(language)).toEqual(["System", "English", "ไทย"]);
+    await app.user.click(language);
+    expect(screen.getByRole("option", { name: "ไทย" }).getAttribute("lang")).toBe("th");
+    await app.user.keyboard("{Escape}");
     expect(selectValue(language)).toBe("system");
 
     chooseOption(language, "ไทย");

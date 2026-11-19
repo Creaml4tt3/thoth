@@ -98,7 +98,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
           <span className="set-field-name">{t.language}</span>
           <span id="set-language-hint" className="muted">{t.languageHint}</span>
           {/* Each language is named in itself, so it can be found whatever the UI language is. */}
-          <Select<LangPreference> aria-label={t.language} aria-describedby="set-language-hint" value={preference} onChange={setPreference} options={LANG_PREFERENCES.map((choice) => ({ value: choice, label: choice === "system" ? t.system : STRINGS[choice].name }))} />
+          <Select<LangPreference> aria-label={t.language} aria-describedby="set-language-hint" value={preference} onChange={setPreference} options={LANG_PREFERENCES.map((choice) => (choice === "system" ? { value: choice, label: t.system } : { value: choice, label: STRINGS[choice].name, lang: choice }))} />
         </div>
       </section>
 

@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { matchesQuery } from "../src/ui/SettingsLayout.tsx";
+import { Select } from "../src/ui/Select.tsx";
 
 let SettingsLayout: typeof import("../src/ui/SettingsLayout.tsx").SettingsLayout;
 beforeEach(async () => {
@@ -14,14 +15,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function Fixture({ extra = false }: { extra?: boolean }) {
+function Fixture({ extra = false, initial, request }: { extra?: boolean; initial?: string; request?: object }) {
   const sections = [
     { id: "s-a", label: "Alpha", icon: "gear" as const },
     { id: "s-b", label: "Beta", icon: "gear" as const },
     { id: "s-c", label: "Gamma", icon: "gear" as const },
   ];
   return (
-    <SettingsLayout sections={sections}>
+    <SettingsLayout sections={sections} initial={initial} request={request}>
       <h1>Settings</h1>
       {["s-a", "s-b"].map((id) => (
         <section key={id} aria-labelledby={id}>
@@ -119,6 +120,19 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("tab", { name: "Servers" }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("a deep link opens its section once: the person's later choice stays when the tab comes back", () => {
+    const request = {};
+    const { unmount } = render(<Fixture initial="s-b" request={request} />);
+    expect(shownPanels()).toEqual(["s-b"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Alpha" }));
+    unmount();
+    const again = render(<Fixture initial="s-b" request={request} />);
+    expect(shownPanels()).toEqual(["s-a"]);
+    again.unmount();
+    render(<Fixture initial="s-b" request={{}} />); // asked again
+    expect(shownPanels()).toEqual(["s-b"]);
+  });
+
   it("the last chosen section is remembered for the session", () => {
     const { unmount } = render(<Fixture />);
     fireEvent.click(screen.getByRole("tab", { name: "Beta" }));
@@ -184,6 +198,26 @@ describe("SettingsLayout", () => {
       fireEvent.change(box(), { target: { value: "editor" } });
       expect(shown()).toEqual(["s-ed"]);
       expect(screen.getByText("Link previews").closest<HTMLElement>(".set-sub")!.hidden).toBe(false);
+    });
+
+    it("finds a Thoth Select by the label of any of its options, not only the chosen one", () => {
+      render(
+        <SettingsLayout sections={[{ id: "s-x", label: "Look", icon: "gear" as const }, { id: "s-y", label: "Other", icon: "gear" as const }]}>
+          <section aria-labelledby="s-x">
+            <h2 id="s-x">Look</h2>
+            <div className="field">
+              <Select aria-label="Colour scheme" value="a" onChange={() => undefined} options={[{ value: "a", label: "Paper" }, { value: "b", label: "Ink" }]} />
+            </div>
+            <p>Unrelated</p>
+          </section>
+          <section aria-labelledby="s-y">
+            <h2 id="s-y">Other</h2>
+          </section>
+        </SettingsLayout>,
+      );
+      fireEvent.change(box(), { target: { value: "ink" } });
+      expect(shown()).toEqual(["s-x"]);
+      expect(screen.getByText("Unrelated").hidden).toBe(true);
     });
 
     it("finds a sub-section by its own heading and says how many sections matched", () => {

@@ -10,7 +10,7 @@ export function LanguageSwitch() {
   const setLang = useContext(SetLangContext);
   return (
     <div className="lang-switch">
-      <Select<Lang> className="lang-select" value={t.lang} onChange={setLang} aria-label={t.web.language} options={LANGS.map((lang) => ({ value: lang, label: STRINGS[lang].name }))} />
+      <Select<Lang> className="lang-select" value={t.lang} onChange={setLang} aria-label={t.web.language} options={LANGS.map((lang) => ({ value: lang, label: STRINGS[lang].name, lang }))} />
     </div>
   );
 }

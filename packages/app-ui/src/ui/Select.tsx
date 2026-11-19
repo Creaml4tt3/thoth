@@ -9,6 +9,8 @@ export interface SelectOption<V extends string> {
   label: string;
   description?: string;
   disabled?: boolean;
+  /** The language of the label when it is not the page's (a language named in itself), so it is read in its voice. */
+  lang?: string;
 }
 
 export interface SelectProps<V extends string> {
@@ -131,9 +133,10 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
     }
   };
 
-  // Before paint: below the button when it fits, otherwise on the side with more room, and never past the window. Then
-  // it follows the button each frame while open: the dialog around it can still be animating in or move (the bubble
-  // moves when its content grows), and a list left where the button was would be clicked in the wrong place.
+  // Before paint: below the button when it fits, otherwise on the side with more room, clamped to the window. Then it
+  // follows the button each frame while open: the dialog around it can still be animating in or move (the bubble moves
+  // when its content grows), and a list left where the button was would be clicked in the wrong place. When the button
+  // scrolls out of the area that shows it, the list closes rather than float over the tab bar or the sidebar.
   useLayoutEffect(() => {
     if (!open) return;
     let natural = 0;
@@ -141,7 +144,13 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
     const measure = () => {
       if (!button.current || !list.current) return;
       const anchor = button.current.getBoundingClientRect();
-      natural ||= list.current.getBoundingClientRect().height; // measured once, before a max-height can cap it
+      // Layout height (offsetHeight ignores the open animation's scale), measured once, before a max-height can cap it.
+      natural ||= list.current.offsetHeight || list.current.getBoundingClientRect().height;
+      const area = button.current.closest(".page-scroll, .modal, .mascot-bubble")?.getBoundingClientRect();
+      if (area && area.height > 0 && (anchor.bottom <= area.top || anchor.top >= area.bottom)) {
+        close();
+        return;
+      }
       const viewW = document.documentElement.clientWidth || window.innerWidth;
       const viewH = document.documentElement.clientHeight || window.innerHeight;
       const below = viewH - MARGIN - anchor.bottom - GAP;
@@ -149,10 +158,10 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
       const side = natural <= below || below >= above ? "bottom" : "top";
       const room = Math.max(0, side === "bottom" ? below : above);
       const shown = Math.min(natural, room);
-      const width = Math.max(anchor.width, list.current.getBoundingClientRect().width);
+      const width = Math.max(anchor.width, list.current.offsetWidth || list.current.getBoundingClientRect().width);
       const next = {
         side,
-        top: Math.round(side === "bottom" ? anchor.bottom + GAP : anchor.top - GAP - shown),
+        top: Math.round(Math.max(MARGIN, Math.min(side === "bottom" ? anchor.bottom + GAP : anchor.top - GAP - shown, viewH - MARGIN - shown))),
         left: Math.round(Math.max(MARGIN, Math.min(anchor.left, viewW - MARGIN - width))),
         minWidth: anchor.width,
         maxHeight: natural > room ? room : undefined,
@@ -216,7 +225,9 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
         // A button clicks itself on the keyup of Space; that would close what the keydown opened.
         onKeyUp={(event) => event.key === " " && event.preventDefault()}
       >
-        <span className="select-value">{options[chosen]?.label ?? ""}</span>
+        <span className="select-value" lang={options[chosen]?.lang}>
+          {options[chosen]?.label ?? ""}
+        </span>
         <svg className="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -224,7 +235,18 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
       {name !== undefined && <input type="hidden" name={name} value={value} />}
       {open &&
         createPortal(
-          <div ref={list} id={listId} role="listbox" aria-labelledby={aria["aria-labelledby"]} aria-label={aria["aria-label"]} className="select-list" data-side={place?.side} style={style}>
+          <div
+            ref={list}
+            id={listId}
+            role="listbox"
+            aria-labelledby={aria["aria-labelledby"]}
+            aria-label={aria["aria-label"]}
+            className="select-list"
+            data-side={place?.side}
+            style={style}
+            // Keeps focus on the button: a press on the list's padding, a gap or its scrollbar must not move it.
+            onMouseDown={(event) => event.preventDefault()}
+          >
             {options.map((o, i) => (
               <div
                 key={o.value}
@@ -235,9 +257,8 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
                 aria-labelledby={`${optionId(i)}-l`}
                 aria-describedby={o.description ? `${optionId(i)}-d` : undefined}
                 className="select-option"
+                lang={o.lang}
                 data-active={i === active || undefined}
-                // Keeps focus on the button: a press on an option must not move it.
-                onMouseDown={(event) => event.preventDefault()}
                 onPointerMove={() => enabled(i) && i !== active && setActive(i)}
                 onClick={() => enabled(i) && choose(i)}
               >
