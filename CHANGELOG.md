@@ -8,6 +8,13 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [Unreleased]
+
+### Changed
+
+- Settings shows one section at a time, with a wider list and an icon for each section.
+- Dropdowns look like the rest of Thoth instead of your system's.
+
 ## [0.11.0] - 2026-11-19
 
 ### Changed

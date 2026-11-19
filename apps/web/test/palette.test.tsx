@@ -4,13 +4,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { FakeWebServer } from "./support/fake-web-server.ts";
 import { cleanup, editorBox, fakeBrowser, screen, signInThroughUi, waitFor, within, type FakeBrowser } from "./support/render.tsx";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 afterEach(() => {
   cleanup();
   document.documentElement.removeAttribute("data-theme");
 });
 
-const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
+const tabNames = () => [...document.querySelectorAll(".tablist [role=tab]")].map((t) => t.textContent); // the tab strip, not Settings' section tabs
 const current = () => screen.queryAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const row = (name: string) => screen.findByRole("treeitem", { name });
 const treeRows = () => screen.getAllByRole("treeitem").map((r) => r.textContent?.replace(/Workspace$/, ""));
@@ -83,7 +84,8 @@ describe("commands", () => {
     await browser.user.click(await row("Alpha"));
     await run(browser, "settings");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Settings"]));
-    const panel = screen.getByRole("tabpanel");
+    const panel = document.querySelector<HTMLElement>(".tab-panel")!;
+    await browser.user.click(within(panel).getByRole("tab", { name: "Keyboard" }));
     await browser.user.click(within(panel).getByRole("button", { name: "Show keyboard shortcuts" }));
     expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeTruthy();
   });
@@ -133,8 +135,7 @@ describe("commands", () => {
     await waitFor(() => expect(treeRows().filter((r) => ["Alpha", "Beta", "Gamma"].includes(r ?? ""))).toEqual(["Alpha", "Beta", "Gamma"]));
     await run(browser, "move to");
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox");
-    await browser.user.selectOptions(list, within(list).getByRole("option", { name: /Alpha/ }));
+    chooseOption(within(dialog).getByRole("combobox", { name: "Move into" }), /Alpha/);
     await browser.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(() => expect(browser.server.servers.page(browser.ws, "Gamma").parentId).toBe(browser.server.servers.page(browser.ws, "Alpha").id));
   });

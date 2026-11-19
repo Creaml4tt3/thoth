@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LinkPreview, Links } from "@thoth/platform";
 import { HostCallError } from "@thoth/platform/remote";
 import { linkPreviewMode, setLinkPreviewMode } from "@thoth/app-ui/editor/link-previews.ts";
-import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 import { FakeServers, type FakeServerConfig } from "../../../tests/helpers/fake-servers.ts";
@@ -262,7 +262,8 @@ describe("when previews are fetched", () => {
 describe("Settings → Editor → Link previews", () => {
   it("chooses On, Only for links I paste or Off, and clears the cache", async () => {
     const app = await openApp(root, {}, createNodePlatform({ vault: root, links }));
-    await app.user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("button", { name: "Settings" });
+    await openSettingsAt(app, "Editor");
     const group = await screen.findByRole("radiogroup", { name: "Link previews" });
     const radios = within(group).getAllByRole("radio");
     expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["On", "Only for links I paste", "Off"]);

@@ -6,7 +6,7 @@
  */
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, editorBox, openApp, screen, waitFor, within } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, openSettingsAt } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { guardWrites } from "./support/write-guard.ts";
@@ -203,7 +203,8 @@ describe("Plain mode", () => {
 
   it("the default mode is chosen in Settings", async () => {
     const app = await openApp(root);
-    await app.user.click(await screen.findByRole("button", { name: /settings/i }));
+    await screen.findByRole("button", { name: "Settings" });
+    await openSettingsAt(app, "Editor");
     await app.user.click(await screen.findByRole("radio", { name: /plain/i }));
     await waitFor(() => expect(localStorage.getItem("thoth.editor.defaultMode")).toBe("plain"));
     await app.user.click(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Beta" }));

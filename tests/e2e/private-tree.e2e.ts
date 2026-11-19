@@ -57,7 +57,7 @@ const row = (page: Page, name: string) => page.getByRole("treeitem", { name, exa
  * screen for a moment, so a row asked for by name may match twice (Playwright then fails at once instead of retrying).
  */
 const rowAt = (page: Page, path: string) => page.locator(`[data-tree-id="${path}"]`);
-const current = (page: Page) => page.getByRole("tab", { selected: true });
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
 
 test("F2 renames a page and a folder in place, and Cmd/Ctrl+Shift+N makes a folder that starts in rename", async ({ page }) => {
   await openVault(page);

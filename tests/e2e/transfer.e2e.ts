@@ -19,6 +19,7 @@ import type { Database } from "../../apps/server/src/db.ts";
 import { opaqueId } from "../../apps/server/src/ids.ts";
 import { newStableId } from "@thoth/domain";
 import { pickSpace } from "./pick-space.ts";
+import { choose } from "./select.ts";
 
 let built: { dist: string; bridgeDir: string; binary: string };
 let ref: ReferenceServer;
@@ -33,7 +34,8 @@ async function api(token: string, path: string) {
 
 async function signInWithToken(page: Page, token: string) {
   await page.getByRole("button", { name: "Settings" }).click();
-  const servers = page.getByRole("region", { name: "Servers" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+  const servers = page.getByRole("tabpanel", { name: "Servers" });
   await servers.getByRole("textbox", { name: "Server address" }).fill(serverUrl);
   await servers.getByRole("button", { name: "Add server" }).click();
   const card = servers.getByRole("article");
@@ -136,7 +138,7 @@ test.describe("transfers", () => {
     await page.getByRole("group", { name: "Pages in Studio" }).getByRole("treeitem", { name: "Plan" }).click();
     await page.getByRole("button", { name: "Move to Private Space…" }).click();
     const back = page.getByRole("dialog", { name: "Move “Plan” to your Private Space" });
-    await back.getByRole("combobox", { name: "Put the pages" }).selectOption("Inbox");
+    await choose(back.getByRole("combobox", { name: "Put the pages" }), /Inbox”$/);
     await expect(back.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await back.getByRole("button", { name: "Move", exact: true }).click();
     await expect(back.getByRole("status")).toContainText("1 page was moved to your Private Space.", { timeout: 20_000 });
@@ -177,7 +179,7 @@ test.describe("transfers", () => {
     await tree.getByRole("checkbox", { name: "Select Plan" }).check();
     await page.getByRole("button", { name: "Move to workspace…" }).click();
     const move = page.getByRole("dialog", { name: "Move 1 page to a workspace" });
-    await move.getByRole("combobox", { name: "Workspace" }).selectOption({ label: "Studio" });
+    await choose(move.getByRole("combobox", { name: "Workspace" }), /^Studio/);
     await expect(move.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has left this computer yet.");
     await move.getByRole("button", { name: "Move", exact: true }).click();
     await expect(move.getByRole("status")).toContainText("1 page was moved to Studio.", { timeout: 20_000 });
@@ -216,7 +218,7 @@ test.describe("transfers", () => {
     await remoteNotes.click();
     await page.getByRole("button", { name: "Copy to Private Space…" }).click();
     const copy = page.getByRole("dialog", { name: "Copy “Notes” to your Private Space" });
-    await copy.getByRole("combobox", { name: "Put the pages" }).selectOption("Projects");
+    await choose(copy.getByRole("combobox", { name: "Put the pages" }), /Projects”$/);
     await expect(copy.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await copy.getByRole("button", { name: "Copy", exact: true }).click();
     await expect(copy.getByRole("status")).toContainText("copied to your Private Space", { timeout: 20_000 });

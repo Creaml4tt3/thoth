@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StringsContext, th } from "../src/strings/index.ts";
 import { TimelineView, type TimelineSource } from "../src/timeline/TimelineView.tsx";
 import type { TimelineItem } from "../src/timeline/timeline.ts";
+import { chooseOption } from "./support/select.ts";
 
 afterEach(cleanup);
 
@@ -97,9 +98,8 @@ describe("TimelineView", () => {
 
   it("switches spaces, loading the one chosen; says loading and empty", async () => {
     const load = vi.fn();
-    const user = userEvent.setup();
     render(<TimelineView sources={[source(), source({ id: "w", label: "Team", items: null, load })]} now={now} />);
-    await user.selectOptions(screen.getByRole("combobox", { name: "Space" }), "w");
+    chooseOption(screen.getByRole("combobox", { name: "Space" }), "Team");
     expect(load).toHaveBeenCalled();
     expect(screen.getByText("Loading pages…")).toBeTruthy();
     cleanup();

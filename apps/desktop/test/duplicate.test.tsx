@@ -11,6 +11,7 @@ import { FakeServers, type FakeServerConfig } from "../../../tests/helpers/fake-
 import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -109,7 +110,7 @@ describe("Duplicate in the Private Space", () => {
     await app.user.click(within(await menuFor("Beta")).getByRole("menuitem", { name: "Duplicate to…" }));
     const dialog = await screen.findByRole("dialog", { name: "Duplicate “Beta” to…" });
     expect(await axeViolations(dialog)).toEqual([]);
-    await app.user.selectOptions(within(dialog).getByRole("listbox", { name: "Put the copy in" }), "Notes");
+    chooseOption(within(dialog).getByRole("combobox", { name: "Put the copy in" }), /Notes/);
     await app.user.click(within(dialog).getByRole("button", { name: "Duplicate" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await exists("Notes/Beta (copy).md")).toBe(true);
@@ -209,7 +210,7 @@ describe("Duplicate in a workspace", () => {
     await app.user.click(within(await openMenu(group, /^Q1/, "Q1")).getByRole("menuitem", { name: "Duplicate to…" }));
     const picker = await screen.findByRole("dialog", { name: "Duplicate “Q1” to…" });
     expect(picker.textContent).not.toContain("visible to everyone");
-    await app.user.selectOptions(within(picker).getByRole("listbox", { name: "Put the copy in" }), "");
+    chooseOption(within(picker).getByRole("combobox", { name: "Put the copy in" }), /Top level/);
     expect(picker.textContent).toContain("visible to everyone");
     expect(await axeViolations(picker)).toEqual([]);
   });

@@ -7,6 +7,7 @@ import { fireEvent } from "@testing-library/react";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
 import { FakeWebServer, SERVER } from "./support/fake-web-server.ts";
 import { cleanup, fakeBrowser, screen, signInThroughUi, waitFor, within, type FakeBrowser } from "./support/render.tsx";
+import { chooseOption, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 afterEach(() => cleanup());
 
@@ -57,14 +58,14 @@ describe("Members… in the web client", () => {
     const browser = await signedIn();
     await browser.user.click(await screen.findByRole("button", { name: "Members of Notes" }));
     const dialog = await screen.findByRole("dialog", { name: "Members of “Notes”" });
-    const kim = (await within(dialog).findByRole("combobox", { name: "Role of Kim" })) as HTMLSelectElement;
+    const kim = await within(dialog).findByRole("combobox", { name: "Role of Kim" });
     // Demote the only owner (the user): refused, and said why.
-    const me = within(dialog).getByRole("combobox", { name: "Role of Ada Lovelace" }) as HTMLSelectElement;
-    await browser.user.selectOptions(me, "viewer");
+    const me = within(dialog).getByRole("combobox", { name: "Role of Ada Lovelace" });
+    chooseOption(me, "Viewer");
     expect((await within(dialog).findByRole("alert")).textContent).toBe("A workspace needs at least one owner. Make someone else an owner first.");
     expect(browser.ws.members.find((m) => m.userId === "usr_ada")!.role).toBe("owner");
-    await waitFor(() => expect(me.value).toBe("owner"));
-    expect(kim.value).toBe("editor");
+    await waitFor(() => expect(selectValue(me)).toBe("owner"));
+    expect(selectValue(kim)).toBe("editor");
   });
 
   it("a viewer leaves: the workspace leaves the sidebar and its open page says there is no access", async () => {

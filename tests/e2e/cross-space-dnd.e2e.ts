@@ -67,7 +67,8 @@ const markdownOf = async (token: string, workspace: string, id: string): Promise
 
 async function signInWithToken(page: Page, token: string) {
   await page.getByRole("button", { name: "Settings" }).click();
-  const servers = page.getByRole("region", { name: "Servers" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+  const servers = page.getByRole("tabpanel", { name: "Servers" });
   await servers.getByRole("textbox", { name: "Server address" }).fill(ref.url);
   await servers.getByRole("button", { name: "Add server" }).click();
   const card = servers.getByRole("article");
@@ -138,7 +139,7 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await page.keyboard.up("Alt");
     const dialog = page.getByRole("dialog", { name: "Copy 1 page to a workspace" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("combobox", { name: "Workspace" })).toHaveValue(new RegExp(s.studio));
+    await expect(dialog.getByRole("combobox", { name: "Workspace" })).toHaveAttribute("data-value", new RegExp(s.studio));
     await expect(dialog.getByRole("radio", { name: /^Copy/ })).toBeChecked();
     await expect(dialog.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has left this computer yet.");
     await shot(page, "dialog-to-workspace-light");
@@ -186,7 +187,7 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await folder.drop();
     await page.keyboard.up("Alt");
     const dialog = page.getByRole("dialog", { name: "Copy 2 pages to a workspace" });
-    await expect(dialog.getByRole("combobox", { name: "Put the pages" })).toHaveValue(board);
+    await expect(dialog.getByRole("combobox", { name: "Put the pages" })).toHaveAttribute("data-value", board);
     await expect(dialog.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has left this computer yet.");
     await shot(page, "dialog-to-workspace-dark");
     await dialog.getByRole("button", { name: "Copy", exact: true }).click();
@@ -207,7 +208,7 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await out.drop();
     await page.keyboard.up("Alt");
     const back = page.getByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    await expect(back.getByRole("combobox", { name: "Put the pages" })).toHaveValue("");
+    await expect(back.getByRole("combobox", { name: "Put the pages" })).toHaveAttribute("data-value", "");
     await expect(back.getByRole("region", { name: "Who can see it" })).toContainText("Nothing has been written to your Private Space yet.");
     await shot(page, "dialog-to-private-dark");
     await back.getByRole("button", { name: "Copy", exact: true }).click();
@@ -226,7 +227,7 @@ test.describe("drag and drop between the Private Space and a workspace", () => {
     await into.drop();
     await page.keyboard.up("Alt");
     const again = page.getByRole("dialog", { name: "Copy “Roadmap” to your Private Space" });
-    await expect(again.getByRole("combobox", { name: "Put the pages" })).toHaveValue("Projects");
+    await expect(again.getByRole("combobox", { name: "Put the pages" })).toHaveAttribute("data-value", "Projects");
     await shot(page, "dialog-to-private-light");
     await again.getByRole("button", { name: "Copy", exact: true }).click();
     await expect(again.getByRole("status")).toContainText("copied to your Private Space", { timeout: 20_000 });

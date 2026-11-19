@@ -63,7 +63,7 @@ async function axe(page: Page, ...selectors: string[]) {
   return results.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
 }
 
-const current = (page: Page) => page.getByRole("tab", { selected: true });
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
 const OBSIDIAN_DAILY = JSON.stringify({ folder: "Journal", format: "YYYY/MM-DD", template: "Journal/Daily template" });
 /** The browser's local date, written with `[year, month, day]`. */
 const today = (page: Page) =>
@@ -123,7 +123,8 @@ test("Today makes today's page from the template, and Connections links an unlin
 
 test("Alt+Shift+T opens today's page from anywhere, where Settings → Today puts it", async ({ page }) => {
   await page.keyboard.press("ControlOrMeta+,");
-  const section = page.getByRole("region", { name: "Today" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Today" }).click();
+  const section = page.getByRole("tabpanel", { name: "Today" });
   await expect(section.getByRole("textbox", { name: /^File name/ })).toHaveValue("YYYY-MM-DD");
   await section.getByRole("textbox", { name: /^Folder/ }).fill("Journal");
   await section.getByRole("textbox", { name: /^File name/ }).fill("YYYY-ww");

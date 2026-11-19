@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { createThemeStore, storageKey, THEMES, useTheme, type Theme, type ThemeStore } from "@thoth/app-ui/ui/theme.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import type { WebEnv } from "./env.ts";
 
 /** The one localStorage key for the theme. It holds only the theme name ("light", "dark" or "system"), never sign-in data. */
@@ -24,15 +25,8 @@ export function ThemeSwitch() {
 function ThemeSelect({ store, label, names }: { store: ThemeStore; label: string; names: Record<Theme, string> }) {
   const { theme, setTheme } = useTheme(store);
   return (
-    <label className="lang-switch">
-      <span className="sr-only">{label}</span>
-      <select className="input lang-select" value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label={label}>
-        {THEMES.map((choice) => (
-          <option key={choice} value={choice}>
-            {names[choice]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="lang-switch">
+      <Select<Theme> className="lang-select" value={theme} onChange={setTheme} aria-label={label} options={THEMES.map((choice) => ({ value: choice, label: names[choice] }))} />
+    </div>
   );
 }

@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImportSource } from "@thoth/importer-core";
 import type { NotificationKind, SystemNotification, SystemNotifier } from "@thoth/app-ui/notifications/core.ts";
-import { cleanup, editorBox, caretAtEnd, paragraph, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, editorBox, caretAtEnd, paragraph, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { nodeOpenImportSource } from "./support/import-source.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
@@ -82,8 +82,8 @@ describe("agent runs", () => {
   async function start(app: Harness, prompt: string) {
     if (!screen.queryByRole("dialog", { name: "Ask Thoth" })) await app.user.click(screen.getByRole("button", { name: MASCOT }));
     await screen.findByRole("dialog", { name: "Ask Thoth" });
-    const select = within(bubble()).getByRole("combobox", { name: "Agent" }) as HTMLSelectElement;
-    await waitFor(() => expect(select.querySelector("option")!.dataset["state"]).toBe("ready"));
+    const select = within(bubble()).getByRole("combobox", { name: "Agent" });
+    await waitFor(() => expect(select.textContent).toMatch(/ · Ready, /));
     await app.user.click(within(bubble()).getByRole("button", { name: "Add context" }));
     const group = await screen.findByRole("group", { name: "Pages for the agent" });
     const clear = within(group).queryByRole("button", { name: "Clear" });
@@ -173,7 +173,7 @@ describe("agent runs", () => {
     await start(app, "@sleep 1500\n@replace Notes/Plan.md :: cat => dog\n");
     setForeground();
     // Switched off while the run works.
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    await openSettingsAt(app, "Thoth assistant");
     await app.user.click(await screen.findByRole("switch", { name: "Show the mascot" }));
     expect(screen.queryByTestId("mascot")).toBeNull();
     await waitFor(() => expect(screen.getByTestId("notification-live").textContent).toBe("Changes ready for review. Claude Code · Plan"), { timeout: 15_000 });
@@ -356,15 +356,15 @@ describe("the bell", () => {
 });
 
 describe("Settings → Notifications", () => {
-  const section = () => screen.getByRole("region", { name: "Notifications" });
+  const section = () => screen.getByRole("tabpanel", { name: "Notifications" });
 
   it("switches system notifications off for a kind, or all, and keeps the choice for the next window", async () => {
     await seed(root, { "Alpha.md": ALPHA });
     const withAgents = () => createNodePlatform({ vault: root, agents: { dataDir: data, searchDirs: [FAKE_CLAUDE_DIR] } });
     let app = await openApp(root, { notifier }, withAgents());
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
-    const system = within(await screen.findByRole("region", { name: "Notifications" })).getByRole("switch", { name: "System notifications" }) as HTMLInputElement;
+    await openSettingsAt(app, "Notifications");
+    const system = within(await screen.findByRole("tabpanel", { name: "Notifications" })).getByRole("switch", { name: "System notifications" }) as HTMLInputElement;
     expect(system.checked).toBe(true);
     const kinds = within(section()).getAllByRole("checkbox") as HTMLInputElement[];
     expect(kinds.map((k) => k.labels?.[0]?.textContent)).toEqual([
@@ -394,8 +394,8 @@ describe("Settings → Notifications", () => {
     cleanup();
     app = await openApp(root, { notifier }, withAgents());
     await screen.findByRole("tree", { name: "Pages in this Private Space" });
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
-    await screen.findByRole("region", { name: "Notifications" });
+    await openSettingsAt(app, "Notifications");
+    await screen.findByRole("tabpanel", { name: "Notifications" });
     expect((within(section()).getByRole("switch", { name: "System notifications" }) as HTMLInputElement).checked).toBe(false);
     expect((within(section()).getByRole("checkbox", { name: "Save conflict" }) as HTMLInputElement).checked).toBe(false);
     expect(section().textContent).toContain("Only while Thoth is in the background");
@@ -425,8 +425,8 @@ describe("Settings → Notifications", () => {
     const app = await openApp(root, { notifier });
     await screen.findByRole("tree", { name: "หน้าใน Private Space นี้" });
     expect(screen.getByRole("button", { name: "การแจ้งเตือน" })).toBeTruthy();
-    await app.user.click(screen.getAllByRole("button", { name: "การตั้งค่า" })[0]!);
-    const region = await screen.findByRole("region", { name: "การแจ้งเตือน" });
+    await openSettingsAt(app, "การแจ้งเตือน", "การตั้งค่า");
+    const region = await screen.findByRole("tabpanel", { name: "การแจ้งเตือน" });
     expect(within(region).getByRole("switch", { name: "การแจ้งเตือนของระบบ" })).toBeTruthy();
   });
 });

@@ -7,6 +7,7 @@ import { useStrings } from "../strings/index.ts";
 import { Button } from "../ui/Button.tsx";
 import { copyText } from "../ui/clipboard.ts";
 import { Modal } from "../ui/Modal.tsx";
+import { Select } from "../ui/Select.tsx";
 
 type MembersClient = Pick<WorkspaceClient, "getMe" | "listMembers" | "setMemberRole" | "removeMember" | "createInviteLink" | "listInviteLinks" | "revokeInviteLink"> &
   Partial<Pick<WorkspaceClient, "listTeams" | "createTeam" | "renameTeam" | "deleteTeam" | "setTeamMember" | "listTeamPages">>;
@@ -248,13 +249,7 @@ export function MembersDialog({ client, workspace, me: knownMe, canInvite, canTe
                   <span className="share-note member-hint">{t.roleHints[m.role]}</span>
                 </span>
                 {canChange(m) ? (
-                  <select className="input member-role" aria-label={t.roleOf(m.displayName)} value={m.role} onChange={(event) => void changeRole(m, event.target.value as Role)}>
-                    {choices.map((r) => (
-                      <option key={r} value={r}>
-                        {t.roles[r]}
-                      </option>
-                    ))}
-                  </select>
+                  <Select<Role> className="member-role" aria-label={t.roleOf(m.displayName)} value={m.role} onChange={(role) => void changeRole(m, role)} options={choices.map((r) => ({ value: r, label: t.roles[r] }))} />
                 ) : (
                   <span className="badge badge-muted member-badge">{t.roles[m.role]}</span>
                 )}

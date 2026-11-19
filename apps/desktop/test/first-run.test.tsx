@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLangPreference } from "../src/strings/index.ts";
 import { WELCOME, WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
-import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { TOUR_KEY } from "../src/features/tour/store.ts";
 import { TOUR_STEPS, availableSteps } from "../src/features/tour/steps.ts";
 import { tempDirs } from "./support/node-platform.ts";
@@ -153,14 +153,14 @@ describe("the first-run tour", () => {
     await seed(root, { "Notes.md": "# Notes\n\nText.\n" });
     const app = await openApp(root);
     await screen.findByRole("heading", { level: 1, name: "Notes" });
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Help and feedback");
     await app.user.click(await screen.findByRole("button", { name: "Show the tour again" }));
     await waitFor(() => expect(tourTitle()).toBe("Your pages"));
     // On Settings there is no page, so no editor step: 5 steps.
     expect(tourDialog()!.textContent).toContain("1 of 5");
     await app.user.keyboard("{Escape}");
 
-    await app.user.click(screen.getByRole("tab", { name: "Settings" }));
+    await app.user.click(within(document.querySelector<HTMLElement>(".tablist")!).getByRole("tab", { name: "Settings" }));
     await app.user.keyboard("{Control>}w{/Control}");
     await screen.findByRole("heading", { level: 1, name: "Notes" });
     await app.user.keyboard("{Control>}\\{/Control}"); // hide the sidebar

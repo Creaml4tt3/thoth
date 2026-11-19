@@ -14,6 +14,7 @@ import { en, th } from "../src/strings/index.ts";
 import { problemText } from "../src/features/transfer/TransferDialog.tsx";
 import { transferEvent } from "../src/features/notifications/sources.ts";
 import type { OperationRecord } from "@thoth/transfer";
+import { selectLabels } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -70,8 +71,7 @@ describe("from the right-click menu", () => {
     await app.user.click(within(menu).getByRole("menuitem", { name: "Copy to another workspace…" }));
     const dialog = await screen.findByRole("dialog", { name: "Copy “Roadmap” to another workspace" });
     // Workspaces on two servers: each is named with its server; the source is not among them.
-    const select = within(dialog).getByRole("combobox", { name: "Workspace" }) as HTMLSelectElement;
-    expect([...select.options].map((o) => o.textContent)).toEqual(["Archive · Other"]);
+    expect(selectLabels(within(dialog).getByRole("combobox", { name: "Workspace" }))).toEqual(["Archive · Other"]);
     const preview = await within(dialog).findByRole("region", { name: "Who can see it" });
     await waitFor(() => expect(preview.textContent).toContain("Milestones"));
     expect(preview.textContent).toContain("From Studio");

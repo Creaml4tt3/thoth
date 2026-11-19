@@ -13,6 +13,7 @@ import { FakeServers, type FakePage, type FakeServerConfig, type FakeWorkspace }
 import { ALPHA, seed } from "./support/fixtures.ts";
 import { th } from "../src/strings/index.ts";
 import { th as sharedTh } from "@thoth/app-ui/strings/index.ts";
+import { chooseOption, selectLabels } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -191,9 +192,9 @@ describe("workspace tree: order", () => {
     const { app, servers, ws, server, group, made } = await workspace(trio);
     requestMoveTo({ kind: "workspace", server, workspace: ws.id, page: made.get("Gamma")!.id });
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox", { name: "Move into" });
-    expect(within(list).getAllByRole("option").map((o) => o.textContent?.trim())).toEqual(["Top level", "Alpha", "Beta"]);
-    await app.user.selectOptions(list, made.get("Beta")!.id);
+    const list = within(dialog).getByRole("combobox", { name: "Move into" });
+    expect(selectLabels(list).map((l) => l.trim())).toEqual(["Top level", "Alpha", "Beta"]);
+    chooseOption(list, /Beta/);
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(() => expect(made.get("Gamma")!.parentId).toBe(made.get("Beta")!.id));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -558,9 +559,9 @@ describe("Private Space tree", () => {
     const { app, tree } = await open();
     requestMoveTo({ kind: "private", path: "Gamma.md" });
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox", { name: "Move into" });
-    expect(within(list).getAllByRole("option").map((o) => o.textContent?.trim())).toEqual(["Top level", "Docs", "Empty"]);
-    await app.user.selectOptions(list, "Empty");
+    const list = within(dialog).getByRole("combobox", { name: "Move into" });
+    expect(selectLabels(list).map((l) => l.trim())).toEqual(["Top level", "Docs", "Empty"]);
+    chooseOption(list, /Empty/);
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(async () => expect(await app.read("Empty/Gamma.md")).toBe("# Gamma\n"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

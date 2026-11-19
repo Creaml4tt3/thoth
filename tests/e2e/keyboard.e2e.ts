@@ -99,8 +99,8 @@ async function newPage(page: Page, name: string, folder?: string) {
   await expect(field).toBeHidden();
 }
 
-const current = (page: Page) => page.getByRole("tab", { selected: true });
-const tabNames = (page: Page) => page.getByRole("tab").allTextContents();
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
+const tabNames = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab").allTextContents();
 const editorOf = (page: Page) => page.getByRole("textbox", { name: /page content/i });
 const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
 
@@ -169,11 +169,16 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect.poll(() => read("Roadmap.md")).toBe(renamed);
   expect(await exists(".thoth/order.json")).toBe(false); // renaming creates no order record
 
-  // 3. Move it into the folder with Move to…: Down picks "Archive", Tab goes to the Move button, Enter presses it.
+  // 3. Move it into the folder with Move to…: Down opens the list, Down again and Enter pick "Archive", Tab goes to
+  // the Move button (after Cancel), Enter presses it.
   await command(page, "move to");
   const move = page.getByRole("dialog", { name: "Move “Roadmap” to…" });
   await expect(move).toBeVisible();
+  await expect(move.getByRole("combobox", { name: "Move into" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(move.getByRole("combobox", { name: "Move into" })).toHaveText(/Archive/);
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Enter");
@@ -247,7 +252,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect(current(page)).toHaveText("Settings");
   expect(await tabNames(page)).toEqual(["Roadmap", "Settings", "Old"]);
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Theme" })).toHaveValue("system");
+  await expect(page.getByRole("combobox", { name: "Theme" })).toHaveAttribute("data-value", "system");
   await page.keyboard.press("ControlOrMeta+/");
   const shortcuts = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(shortcuts).toBeVisible();
@@ -261,7 +266,7 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await page.reload();
   expect(await theme(page)).toBe("system");
   await pickSpace(page, { keyboard: true });
-  await expect(page.getByRole("tab")).toHaveCount(3);
+  await expect(page.getByRole("tablist", { name: "Open pages" }).getByRole("tab")).toHaveCount(3);
   expect(await tabNames(page)).toEqual(["Roadmap", "Settings", "Old"]);
   await expect(current(page)).toHaveText("Settings");
   await page.keyboard.press("ControlOrMeta+1");

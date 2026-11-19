@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, editorBox, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { seed } from "./support/fixtures.ts";
 import { FAKE_CLAUDE_DIR } from "../../../tests/helpers/agent.ts";
@@ -323,7 +323,7 @@ describe("the mascot's settings", () => {
 
   it("changes size, scale, motion, snapping and visibility at once, keeps them per user, and resets the position", async () => {
     const app = await openWithMascot();
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Thoth assistant");
     const section = await screen.findByRole("region", { name: "Mascot" });
     await app.user.click(within(section).getByRole("radio", { name: "Compact" }));
     expect(art().dataset["version"]).toBe("compact");
@@ -343,7 +343,7 @@ describe("the mascot's settings", () => {
     cleanup();
     await openWithMascot();
     expect(translate()).toEqual([100, 100]);
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Thoth assistant");
     const again = await screen.findByRole("region", { name: "Mascot" });
     await app.user.click(within(again).getByRole("button", { name: "Reset position" }));
     expect(within(again).getByRole("status").textContent).toBe("Back in the bottom-right corner.");

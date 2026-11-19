@@ -12,9 +12,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { MemoryHistoryText } from "@thoth/platform";
 import { MEMORY_README_TEXT } from "@thoth/local-store";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs, type NodePlatform } from "./support/node-platform.ts";
 import { FakeConnectedApps } from "./support/connected-apps.ts";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 const TEA = "---\nkind: preference\ntitle: Tea, not coffee\nsource: Claude Code\nupdated: 2026-11-05T10:00:00+07:00\nupdated_by: Claude Code\ncertainty: inferred\n---\nPrefers tea.\n";
@@ -93,12 +94,12 @@ describe("Agents' memory", () => {
     expect(view.queryByRole("region", { name: "People" })).toBeNull();
 
     // Filtered by app.
-    await app.user.selectOptions(view.getByRole("combobox", { name: "App" }), "Cursor");
+    chooseOption(view.getByRole("combobox", { name: "App" }), "Cursor");
     expect(view.queryByRole("region", { name: "Preferences" })).toBeNull();
     expect(await axeViolations(document.body)).toEqual([]);
 
     // A memory opens as a page.
-    await app.user.selectOptions(view.getByRole("combobox", { name: "App" }), "");
+    chooseOption(view.getByRole("combobox", { name: "App" }), "All apps");
     await app.user.click(view.getByRole("button", { name: "Tea, not coffee" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Memories" })).toBeNull());
     expect(await screen.findByRole("tab", { name: /tea/i, selected: true })).toBeTruthy();
@@ -135,7 +136,7 @@ describe("Agents' memory", () => {
 
   it("opens from Settings → Connected apps", async () => {
     const { app } = await open();
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    await openSettingsAt(app, "Connected apps");
     const section = within(await screen.findByTestId("connected-apps-settings"));
     await app.user.click(section.getByRole("button", { name: "Show memories" }));
     const view = within(await screen.findByRole("dialog", { name: "Memories" }));

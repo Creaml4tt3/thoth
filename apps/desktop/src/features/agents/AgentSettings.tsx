@@ -7,7 +7,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { BUDGET_CHOICES_USD, RETENTION_CHOICES_DAYS, TIME_LIMIT_MINUTES } from "@thoth/agent-core";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
-import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import { useSession } from "../../app/context.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { MascotSettings } from "../mascot/MascotSettings.tsx";
@@ -63,27 +63,20 @@ function Permissions({ settings, agents }: { settings: Settings; agents: AgentsS
       <fieldset className="agents-limits">
         <legend>{t.limits}</legend>
         <div className="xfer-grid">
-          <label className="field">
-            <span>{s.time}</span>
-            <select className="input" value={settings.timeMinutes} onChange={(e) => agents.updateSettings({ timeMinutes: Number(e.target.value) })}>
-              {TIME_LIMIT_MINUTES.map((m) => (
-                <option key={m} value={m}>
-                  {f.timeOption(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>{s.budget}</span>
-            <select className="input" value={settings.budgetUsd === null ? "none" : String(settings.budgetUsd)} onChange={(e) => agents.updateSettings({ budgetUsd: e.target.value === "none" ? null : Number(e.target.value) })} aria-describedby="agents-codex-note">
-              {BUDGET_CHOICES_USD.map((b) => (
-                <option key={b} value={b}>
-                  {f.budgetOption(b)}
-                </option>
-              ))}
-              <option value="none">{f.noLimit}</option>
-            </select>
-          </label>
+          <div className="field">
+            <span id="agents-time-label">{s.time}</span>
+            <Select aria-labelledby="agents-time-label" value={String(settings.timeMinutes)} onChange={(v) => agents.updateSettings({ timeMinutes: Number(v) })} options={TIME_LIMIT_MINUTES.map((m) => ({ value: String(m), label: f.timeOption(m) }))} />
+          </div>
+          <div className="field">
+            <span id="agents-budget-label">{s.budget}</span>
+            <Select
+              aria-labelledby="agents-budget-label"
+              aria-describedby="agents-codex-note"
+              value={settings.budgetUsd === null ? "none" : String(settings.budgetUsd)}
+              onChange={(v) => agents.updateSettings({ budgetUsd: v === "none" ? null : Number(v) })}
+              options={[...BUDGET_CHOICES_USD.map((b) => ({ value: String(b), label: f.budgetOption(b) })), { value: "none", label: f.noLimit }]}
+            />
+          </div>
         </div>
         <p id="agents-codex-note" className="muted small">
           {t.codexNote}
@@ -133,14 +126,16 @@ function RunHistory({ state, agents }: { state: AgentsState; agents: AgentsServi
           {s.heading}
         </h3>
         <div className="field">
-          <label htmlFor="agents-retention">{s.retention}</label>
-          <select id="agents-retention" className="input set-narrow" value={settings(state).retentionDays} onChange={(e) => agents.updateSettings({ retentionDays: Number(e.target.value) })} aria-describedby="agents-retention-hint">
-            {RETENTION_CHOICES_DAYS.map((d) => (
-              <option key={d} value={d}>
-                {s.retentionOption(d)}
-              </option>
-            ))}
-          </select>
+          <label id="agents-retention-label" htmlFor="agents-retention">{s.retention}</label>
+          <Select
+            id="agents-retention"
+            className="set-narrow"
+            aria-labelledby="agents-retention-label"
+            aria-describedby="agents-retention-hint"
+            value={String(settings(state).retentionDays)}
+            onChange={(v) => agents.updateSettings({ retentionDays: Number(v) })}
+            options={RETENTION_CHOICES_DAYS.map((d) => ({ value: String(d), label: s.retentionOption(d) }))}
+          />
           <small id="agents-retention-hint" className="muted">
             {s.retentionHint}
           </small>
@@ -205,16 +200,10 @@ function Usage({ state, now }: { state: AgentsState; now: () => number }) {
     <section className="agents-sub agents-usage" aria-labelledby="agents-usage-heading">
       <div className="agents-sub-head">
         <h3 id="agents-usage-heading">{t.heading}</h3>
-        <label className="agents-inline-field">
-          <span>{t.period}</span>
-          <select className="input" value={period} onChange={(e) => setPeriod(e.target.value as UsagePeriod)}>
-            {(["day", "week", "month"] as const).map((p) => (
-              <option key={p} value={p}>
-                {t.periods[p]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="agents-inline-field">
+          <span id="agents-period-label">{t.period}</span>
+          <Select<UsagePeriod> aria-labelledby="agents-period-label" value={period} onChange={setPeriod} options={(["day", "week", "month"] as const).map((p) => ({ value: p, label: t.periods[p] }))} />
+        </div>
       </div>
       <p className="muted small">{t.lede}</p>
       <ul className="agents-legend" aria-hidden="true">
@@ -281,17 +270,13 @@ function Usage({ state, now }: { state: AgentsState; now: () => number }) {
   );
 }
 
-function Body({ agents, focus }: { agents: AgentsService; focus: boolean }) {
+function Body({ agents }: { agents: AgentsService }) {
   const t = useDesktopStrings().agents;
   const { options } = useSession();
   const state = useSyncExternalStore(agents.subscribe, agents.getState);
   useEffect(() => {
     if (!agents.getState().status && !agents.getState().checking) void agents.detect();
   }, [agents]);
-  useEffect(() => {
-    const heading = document.getElementById("set-agents");
-    if (focus && heading) scrollToSection(heading.closest("section") ?? heading);
-  }, [focus]);
   return (
     <section aria-labelledby="set-agents" className="set-section agents" data-testid="assistant-settings">
       <h2 id="set-agents">{t.title}</h2>
@@ -306,8 +291,8 @@ function Body({ agents, focus }: { agents: AgentsService; focus: boolean }) {
 }
 
 /** The section; nothing where the host cannot run agent CLIs (the web client, a test host without agents). */
-export function AgentSettings({ focus = false }: { focus?: boolean }) {
+export function AgentSettings() {
   const { agents } = useSession();
   if (!agents) return null;
-  return <Body agents={agents} focus={focus} />;
+  return <Body agents={agents} />;
 }

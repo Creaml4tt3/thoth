@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { REPO } from "../ports/harness.ts";
 import { freePort, buildWebClient, serveWebClient, startReferenceServer, type ReferenceServer } from "./reference-server.ts";
 import type { FakeIssuer } from "../../apps/server/test-db/fakes.ts";
+import { choose } from "./select.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "members");
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
@@ -196,7 +197,7 @@ test.describe("members and invite links (ADR-0024)", () => {
     // ---- The owner sees them, and makes them a viewer.
     await page.getByRole("button", { name: `Members of ${wsName}` }).click();
     await expect(dialog.getByRole("list", { name: "Members" }).getByRole("listitem")).toHaveCount(2);
-    await dialog.getByRole("combobox", { name: "Role of Linus Pauling" }).selectOption("viewer");
+    await choose(dialog.getByRole("combobox", { name: "Role of Linus Pauling" }), "Viewer");
     await expect(dialog.getByRole("status").filter({ hasText: "Linus Pauling is now Viewer." })).toBeVisible(); // the Teams section has its own status
     expect((await ref.db.query<{ role: string }>("SELECT role FROM memberships WHERE workspace_id = $1 AND user_id = $2", [ws, guestId])).rows[0]?.role).toBe("viewer");
     await shoot(page, "dialog-owner-members", dialog);

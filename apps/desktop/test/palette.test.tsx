@@ -8,6 +8,7 @@ import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { setDefaultEditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { setLangPreference } from "../src/strings/index.ts";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -28,8 +29,9 @@ afterEach(async () => {
   await dirs.cleanup();
 });
 
-const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
-const current = () => screen.queryAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
+const tabs = () => [...document.querySelectorAll<HTMLElement>(".tablist [role=tab]")]; // the tab strip, not Settings' section tabs
+const tabNames = () => tabs().map((t) => t.textContent);
+const current = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const tree = async () => screen.findByRole("tree", { name: "Pages in this Private Space" });
 const row = async (name: string) => within(await tree()).getByRole("treeitem", { name });
 const rows = async () => within(await tree()).getAllByRole("treeitem").map((r) => r.textContent);
@@ -157,7 +159,7 @@ describe("commands", () => {
     await run(app, "settings");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Settings"]));
     expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
-    expect(within(screen.getByRole("tabpanel")).getByRole("combobox", { name: "Theme" })).toBeTruthy();
+    expect(within(document.querySelector<HTMLElement>(".tab-panel")!).getByRole("combobox", { name: "Theme" })).toBeTruthy();
     await app.user.keyboard("{Control>}1{/Control}");
     await waitFor(() => expect(current()).toBe("Alpha"));
     await app.user.keyboard("{Control>}[Comma]{/Control}");
@@ -228,8 +230,7 @@ describe("commands", () => {
     await waitFor(() => expect(current()).toBe("Gamma"));
     await run(app, "move to");
     const dialog = await screen.findByRole("dialog", { name: "Move “Gamma” to…" });
-    const list = within(dialog).getByRole("listbox");
-    await app.user.selectOptions(list, within(list).getByRole("option", { name: /Docs/ }));
+    chooseOption(within(dialog).getByRole("combobox", { name: "Move into" }), /Docs/);
     await app.user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(async () => expect(await app.read("Docs/Gamma.md")).toBe("# Gamma\n\nThe third page.\n"));
     await expect(app.read("Gamma.md")).rejects.toThrow();

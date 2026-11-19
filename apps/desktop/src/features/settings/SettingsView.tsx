@@ -1,5 +1,6 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
+import { Select } from "@thoth/app-ui/ui/Select.tsx";
 import { STRINGS, useStrings } from "@thoth/app-ui/strings/index.ts";
 import { useSession } from "../../app/context.ts";
 import { LANG_PREFERENCES, LangPreferenceContext, useDesktopStrings, type LangPreference } from "../../strings/index.ts";
@@ -12,7 +13,7 @@ import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { DailySettingsSection } from "./DailySettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
-import { SettingsLayout, scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
+import { SettingsLayout, type SettingsSectionLink } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -38,13 +39,11 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
   const [importing, setImporting] = useState(false);
   const [mode, setMode] = useState<EditorMode>(defaultEditorMode);
   const [revealError, setRevealError] = useState<string | null>(null);
-  const importSection = useRef<HTMLElement>(null);
   // Opened at Import notes (the sidebar's Import button, the palette): the wizard starts and takes focus itself.
   // `request` is the tab's target, new on every open, so asking again after closing the wizard starts it again.
   useEffect(() => {
     if (section !== "import") return;
     setImporting(true);
-    if (importSection.current) scrollToSection(importSection.current);
   }, [section, request]);
 
   const rebuildIndex = async () => {
@@ -70,49 +69,37 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
 
   const d = useDesktopStrings();
   // Every section's heading id, in page order; the list leaves out those this build does not show.
-  const sections = [
-    { id: "set-appearance", label: t.appearance },
-    { id: "set-editor", label: t.editor },
-    { id: "set-vault", label: t.privateSpace },
-    { id: "set-today", label: d.daily.title },
-    { id: "set-import", label: t.importExport },
-    { id: "set-servers", label: d.servers.title },
-    { id: "set-agents", label: d.agents.title },
-    { id: "set-connected-apps", label: d.connectedApps.title },
-    { id: "set-notifications", label: d.notifications.title },
-    { id: "set-general", label: d.updates.general },
-    { id: "set-feedback", label: d.helpFeedback.title },
+  const sections: SettingsSectionLink[] = [
+    { id: "set-appearance", label: t.appearance, icon: "moon" },
+    { id: "set-editor", label: t.editor, icon: "pen" },
+    { id: "set-vault", label: t.privateSpace, icon: "folder" },
+    { id: "set-today", label: d.daily.title, icon: "sun" },
+    { id: "set-import", label: t.importExport, icon: "import" },
+    { id: "set-servers", label: d.servers.title, icon: "server" },
+    { id: "set-agents", label: d.agents.title, icon: "sparkle" },
+    { id: "set-connected-apps", label: d.connectedApps.title, icon: "plug" },
+    { id: "set-notifications", label: d.notifications.title, icon: "bell" },
+    { id: "set-general", label: d.updates.general, icon: "gear" },
+    { id: "set-feedback", label: d.helpFeedback.title, icon: "speech" },
   ];
 
   return (
-    <SettingsLayout sections={sections}>
+    <SettingsLayout sections={sections} initial={section === "top" ? undefined : `set-${section}`} request={request}>
       <h1 className="page-title">{t.title}</h1>
 
       <section aria-labelledby="set-appearance" className="set-section">
         <h2 id="set-appearance">{t.appearance}</h2>
-        <label className="field set-language">
+        <div className="field set-language">
           <span className="set-field-name">{t.theme}</span>
-          <span className="muted">{t.themeHint}</span>
-          <select className="input" value={theme} aria-label={t.theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])}>
-            {THEMES.map((choice) => (
-              <option key={choice} value={choice}>
-                {themeNames[choice]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field set-language">
+          <span id="set-theme-hint" className="muted">{t.themeHint}</span>
+          <Select aria-label={t.theme} aria-describedby="set-theme-hint" value={theme} onChange={setTheme} options={THEMES.map((choice) => ({ value: choice, label: themeNames[choice] }))} />
+        </div>
+        <div className="field set-language">
           <span className="set-field-name">{t.language}</span>
-          <span className="muted">{t.languageHint}</span>
-          <select className="input" value={preference} aria-label={t.language} onChange={(e) => setPreference(e.target.value as LangPreference)}>
-            {LANG_PREFERENCES.map((choice) => (
-              // Each language is named in itself, so it can be found whatever the UI language is.
-              <option key={choice} value={choice} lang={choice === "system" ? undefined : choice}>
-                {choice === "system" ? t.system : STRINGS[choice].name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <span id="set-language-hint" className="muted">{t.languageHint}</span>
+          {/* Each language is named in itself, so it can be found whatever the UI language is. */}
+          <Select<LangPreference> aria-label={t.language} aria-describedby="set-language-hint" value={preference} onChange={setPreference} options={LANG_PREFERENCES.map((choice) => (choice === "system" ? { value: choice, label: t.system } : { value: choice, label: STRINGS[choice].name, lang: choice }))} />
+        </div>
       </section>
 
       <section aria-labelledby="set-editor" className="set-section">
@@ -189,9 +176,9 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         </div>
       </section>
 
-      <DailySettingsSection focus={section === "today"} />
+      <DailySettingsSection />
 
-      <section ref={importSection} aria-labelledby="set-import" className="set-section">
+      <section aria-labelledby="set-import" className="set-section">
         <h2 id="set-import">{t.importExport}</h2>
         {importing ? (
           <ImportWizard
@@ -214,9 +201,9 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
         )}
       </section>
 
-      <ServersSettings focus={section === "servers"} />
+      <ServersSettings />
 
-      <AgentSettings focus={section === "agents"} />
+      <AgentSettings />
 
       {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
 

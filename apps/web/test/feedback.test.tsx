@@ -24,7 +24,8 @@ describe("Send feedback in the web client", () => {
     await browser.user.keyboard("{Control>}k{/Control}");
     await screen.findByRole("dialog", { name: "Search" });
     await browser.user.keyboard("> open settings{Enter}");
-    const section = await screen.findByRole("region", { name: "Help and feedback" });
+    await browser.user.click(await screen.findByRole("tab", { name: "Help and feedback" }));
+    const section = await screen.findByRole("tabpanel", { name: "Help and feedback" });
     await browser.user.click(within(section).getByRole("button", { name: "Send feedback…" }));
     const dialog = await screen.findByRole("dialog", { name: "Send feedback" });
     await within(dialog).findByText(/^Sent to /);
@@ -49,6 +50,6 @@ describe("Send feedback in the web client", () => {
     await screen.findByRole("dialog", { name: "Search" });
     await browser.user.keyboard("> open settings{Enter}");
     await screen.findByRole("heading", { name: "Settings", level: 1 });
-    expect(screen.queryByRole("region", { name: "Help and feedback" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Help and feedback" })).toBeNull();
   });
 });

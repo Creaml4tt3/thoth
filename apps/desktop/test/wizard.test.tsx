@@ -6,7 +6,7 @@ import { planImport } from "@thoth/importer-core";
 import { ObsidianVaultImporter } from "@thoth/importer-obsidian/node";
 import { openNodeVault } from "@thoth/local-store/node";
 import { snapshotTree } from "../../../tests/helpers/fs.ts";
-import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { createGate, nodeOpenImportSource } from "./support/import-source.ts";
 import { seed } from "./support/fixtures.ts";
@@ -110,7 +110,8 @@ describe("import wizard", () => {
     platform.pickedSource = FIXTURE;
     const app = await openApp(root, { openImportSource: gate.open }, platform);
 
-    await app.user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("button", { name: "Settings" });
+    await openSettingsAt(app, "Import notes");
     await app.user.click(await screen.findByText(/import from notion or obsidian/i, { selector: "button" }));
     await walkToPreview(app);
     await app.user.click(screen.getByRole("button", { name: "Continue" }));

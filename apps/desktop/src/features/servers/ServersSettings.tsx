@@ -1,8 +1,7 @@
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
 import type { ServerInfo } from "@thoth/platform";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
-import { scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import type { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { describeLimits } from "@thoth/app-ui/workspace/limits.ts";
 import { JoinInvite } from "@thoth/app-ui/workspace/JoinInvite.tsx";
@@ -220,7 +219,7 @@ export function ServerCard({ info, error, directory, signInOnly = false }: { inf
 }
 
 /** Settings → Servers: add a server, sign in (browser or token), sign out, remove, and join a workspace with an invite link. */
-export function ServersSettings({ focus }: { focus: boolean }) {
+export function ServersSettings() {
   const { servers, options } = useSession();
   const t = useDesktopStrings().servers;
   const state = useSyncExternalStore(servers.subscribe, servers.getState);
@@ -229,7 +228,6 @@ export function ServersSettings({ focus }: { focus: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [addingStarter, setAddingStarter] = useState(false);
   const [starterError, setStarterError] = useState<string | null>(null);
-  const section = useRef<HTMLElement>(null);
   const errorId = useId();
   const starter = localStarter(options.starterServer, t);
   // Suggested until added. Nothing is sent to it before the user chooses Add.
@@ -247,10 +245,6 @@ export function ServersSettings({ focus }: { focus: boolean }) {
       setAddingStarter(false);
     }
   };
-
-  useEffect(() => {
-    if (focus && section.current) scrollToSection(section.current);
-  }, [focus]);
 
   const add = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -272,7 +266,7 @@ export function ServersSettings({ focus }: { focus: boolean }) {
   };
 
   return (
-    <section ref={section} aria-labelledby="set-servers" className="set-section" id="settings-servers">
+    <section aria-labelledby="set-servers" className="set-section">
       <h2 id="set-servers">{t.title}</h2>
       <p className="muted">{t.intro}</p>
       {state.error && (

@@ -67,3 +67,15 @@ export const paragraph = (box: HTMLElement, text: string): HTMLElement => {
   if (!found) throw new Error(`No paragraph "${text}"`);
   return found;
 };
+
+/** Opens Settings (the sidebar's button) at the section whose tab is `section`: Settings shows one section at a time. */
+export async function openSettingsAt(app: Harness, section: string | RegExp, button: string | RegExp = "Settings"): Promise<void> {
+  await app.user.click(screen.getAllByRole("button", { name: button })[0]!);
+  await chooseSettingsSection(app, section);
+}
+
+/** Chooses a section of the open Settings by its tab, once it is listed (some sections load their state first). */
+export async function chooseSettingsSection(app: Harness, section: string | RegExp): Promise<void> {
+  const list = await screen.findByRole("tablist", { name: /settings sections|หัวข้อการตั้งค่า/i });
+  await app.user.click(await within(list).findByRole("tab", { name: section }));
+}

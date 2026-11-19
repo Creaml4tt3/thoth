@@ -8,7 +8,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FakeServers } from "../../../tests/helpers/fake-servers.ts";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeConnectedApps } from "./support/connected-apps.ts";
 
@@ -46,7 +46,7 @@ describe("Team memory (ADR-0052 rule 8)", () => {
     const ws = servers.addWorkspace(server, { name: "Studio", role: "owner" });
     servers.addWorkspace(server, { name: "Readers", role: "viewer" });
     const app = await open();
-    await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    await openSettingsAt(app, "Connected apps");
     const section = within(await screen.findByTestId("connected-apps-settings"));
     const studio = within(await section.findByRole("listitem", { name: "Studio" }));
     await app.user.click(studio.getByRole("checkbox", { name: /Studio/ }));

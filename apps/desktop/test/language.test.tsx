@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en as sharedEn, th as sharedTh } from "@thoth/app-ui/strings/index.ts";
 import { DESKTOP_STRINGS, langPreference, resolveLang, setLangPreference, systemLanguages, en, th } from "../src/strings/index.ts";
 import { currentOs, displayPath, middleTruncate, withTilde } from "../src/features/settings/path.ts";
-import { cleanup, openApp, screen, waitFor, within } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, openSettingsAt, chooseSettingsSection } from "./support/render.tsx";
 import { tempDirs } from "./support/node-platform.ts";
 import { ALPHA, seed } from "./support/fixtures.ts";
+import { chooseOption, selectLabels, selectValue } from "../../../packages/app-ui/test/support/select.ts";
 
 const dirs = tempDirs();
 let root: string;
@@ -105,7 +106,7 @@ describe("Private Space folder in Settings", () => {
     const reveal = vi.fn(async () => undefined);
     await screen.findByRole("tree");
     app.platform.connections[0]!.reveal = reveal;
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Private Space");
     const location = await screen.findByTestId("vault-location");
     expect(location.getAttribute("title")).toBe(root);
     expect(location.textContent).toBe(displayPath(root));
@@ -117,7 +118,7 @@ describe("Private Space folder in Settings", () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     const connection = app.platform.connections[0]!;
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Private Space");
     await screen.findByTestId("vault-location");
     expect(connection.reveal).toBeUndefined();
     expect(screen.queryByRole("button", { name: /^Show in/ })).toBeNull();
@@ -128,7 +129,7 @@ describe("Private Space folder in Settings", () => {
     again.platform.connections.at(-1)!.reveal = async () => {
       throw new Error("Could not open the file manager");
     };
-    await again.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(again, "Private Space");
     await again.user.click(await screen.findByRole("button", { name: /^Show in/ }));
     expect((await screen.findByRole("alert")).textContent).toContain("Could not open the file manager");
   });
@@ -145,7 +146,9 @@ describe("language in the app", () => {
     expect(await screen.findByRole("group", { name: sharedTh.editor.modeGroup })).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: th.shell.settings }));
     expect(await screen.findByRole("heading", { level: 1, name: th.settings.title })).toBeTruthy();
+    await chooseSettingsSection(app, th.settings.editor);
     expect(screen.getByRole("radio", { name: sharedTh.editor.modes.plain.label })).toBeTruthy();
+    await chooseSettingsSection(app, th.settings.privateSpace);
     expect(screen.getByRole("button", { name: th.settings.rebuild })).toBeTruthy();
   });
 
@@ -154,17 +157,20 @@ describe("language in the app", () => {
     const app = await openApp(root);
     await screen.findByRole("tree");
     expect(document.documentElement.lang).toBe("en");
-    await app.user.click(screen.getByRole("button", { name: "Settings" }));
+    await openSettingsAt(app, "Appearance");
     const language = await screen.findByRole("combobox", { name: "Language" });
-    expect([...(language as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["System", "English", "ไทย"]);
-    expect((language as HTMLSelectElement).value).toBe("system");
+    expect(selectLabels(language)).toEqual(["System", "English", "ไทย"]);
+    await app.user.click(language);
+    expect(screen.getByRole("option", { name: "ไทย" }).getAttribute("lang")).toBe("th");
+    await app.user.keyboard("{Escape}");
+    expect(selectValue(language)).toBe("system");
 
-    await app.user.selectOptions(language, "th");
+    chooseOption(language, "ไทย");
     expect(await screen.findByRole("heading", { level: 1, name: th.settings.title })).toBeTruthy();
     expect(document.documentElement.lang).toBe("th");
     expect(localStorage.getItem("thoth.desktop.lang")).toBe("th");
-    const thaiSelect = screen.getByRole("combobox", { name: th.settings.language }) as HTMLSelectElement;
-    expect([...thaiSelect.options].map((o) => o.textContent)).toEqual([th.settings.system, "English", "ไทย"]);
+    const thaiSelect = screen.getByRole("combobox", { name: th.settings.language });
+    expect(selectLabels(thaiSelect)).toEqual([th.settings.system, "English", "ไทย"]);
     expect(within(screen.getByRole("complementary")).getByRole("button", { name: th.shell.settings })).toBeTruthy();
 
     // A new window starts in the remembered language even though the system is English.
@@ -176,10 +182,11 @@ describe("language in the app", () => {
     cleanup();
     const back = await openApp(root);
     await screen.findByRole("tree");
-    await back.user.click(screen.getByRole("button", { name: th.shell.settings }));
-    await back.user.selectOptions(await screen.findByRole("combobox", { name: th.settings.language }), "system");
+    await openSettingsAt(back, th.settings.appearance, th.shell.settings);
+    chooseOption(await screen.findByRole("combobox", { name: th.settings.language }), th.settings.system);
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: en.settings.title })).toBeTruthy());
     expect(localStorage.getItem("thoth.desktop.lang")).toBe("system");
+    await chooseSettingsSection(back, en.settings.editor);
     expect(screen.getByRole("radio", { name: sharedEn.editor.modes.plain.label })).toBeTruthy();
   });
 });

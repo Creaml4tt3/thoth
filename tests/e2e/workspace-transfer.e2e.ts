@@ -18,6 +18,7 @@ import { opaqueId } from "../../apps/server/src/ids.ts";
 import { REPO } from "../ports/harness.ts";
 import { newStableId } from "@thoth/domain";
 import { pickSpace } from "./pick-space.ts";
+import { choose } from "./select.ts";
 
 const SHOTS = join(REPO, "tests", ".tmp", "workspace-transfer");
 
@@ -64,7 +65,8 @@ async function seedServer(): Promise<Seeded> {
 
 async function signInWithToken(page: Page, token: string) {
   await page.getByRole("button", { name: "Settings" }).click();
-  const servers = page.getByRole("region", { name: "Servers" });
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Servers" }).click();
+  const servers = page.getByRole("tabpanel", { name: "Servers" });
   await servers.getByRole("textbox", { name: "Server address" }).fill(ref.url);
   await servers.getByRole("button", { name: "Add server" }).click();
   const card = servers.getByRole("article");
@@ -123,7 +125,7 @@ test.describe("copy and move between two workspaces", () => {
     await shot(page, "menu-light");
     await menu.getByRole("menuitem", { name: "Copy to another workspace…" }).click();
     const dialog = page.getByRole("dialog", { name: "Copy “Roadmap” to another workspace" });
-    await dialog.getByRole("combobox", { name: "Workspace" }).selectOption({ label: "Archive" });
+    await choose(dialog.getByRole("combobox", { name: "Workspace" }), /^Archive/);
     const preview = dialog.getByRole("region", { name: "Who can see it" });
     await expect(preview).toContainText("Milestones");
     await expect(preview).toContainText("From Studio");

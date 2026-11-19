@@ -9,7 +9,7 @@ import { cleanup, editorBox, fakeBrowser, open, screen, signInThroughUi, waitFor
 
 afterEach(() => cleanup());
 
-const tabs = () => screen.queryAllByRole("tab");
+const tabs = () => [...document.querySelectorAll<HTMLElement>(".tablist [role=tab]")]; // the tab strip, not Settings' section tabs
 const tabNames = () => tabs().map((t) => t.textContent);
 const current = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.textContent;
 const paragraph = (box: HTMLElement, text: string): HTMLElement => {
@@ -90,11 +90,11 @@ describe("opening pages in tabs", () => {
     await browser.user.keyboard("{Alt>}[Comma]{/Alt}");
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Settings"]));
     expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
-    const panel = screen.getByRole("tabpanel");
+    const panel = document.querySelector<HTMLElement>(".tab-panel")!;
     expect(within(panel).getByRole("combobox", { name: "Theme" })).toBeTruthy();
     expect(within(panel).getByRole("combobox", { name: "Language" })).toBeTruthy();
-    const nav = within(panel).getByRole("navigation", { name: "Settings sections" });
-    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["Appearance", "Keyboard", "Account"]);
+    const list = within(panel).getByRole("tablist", { name: "Settings sections" });
+    expect(within(list).getAllByRole("tab").map((a) => a.textContent)).toEqual(["Appearance", "Keyboard", "Account"]);
     await browser.user.keyboard("{Alt>}[Comma]{/Alt}");
     expect(tabNames()).toEqual(["Alpha", "Settings"]);
   });

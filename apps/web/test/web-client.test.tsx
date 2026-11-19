@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { FakeWebServer, SERVER } from "./support/fake-web-server.ts";
 import { sameOrigin } from "../src/App.tsx";
 import { cleanup, editorBox, fakeBrowser, open, screen, signInThroughUi, waitFor, within } from "./support/render.tsx";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 
 afterEach(() => cleanup());
 
@@ -313,7 +314,7 @@ describe("English and Thai", () => {
     open(browser);
     expect(await screen.findByRole("button", { name: "เข้าสู่ระบบด้วย Google" })).toBeTruthy();
     expect(document.documentElement.lang).toBe("th");
-    await browser.user.selectOptions(screen.getByRole("combobox", { name: "ภาษา" }), "en");
+    chooseOption(screen.getByRole("combobox", { name: "ภาษา" }), "English");
     expect(await screen.findByRole("button", { name: "Sign in with Google" })).toBeTruthy();
     expect(document.documentElement.lang).toBe("en");
     expect(browser.local.get("thoth.web.lang")).toBe("en");

@@ -61,7 +61,7 @@ test.afterEach(async ({ page }) => {
 });
 
 const row = (page: Page, name: string) => page.getByRole("tree", { name: "Pages in this Private Space" }).getByRole("treeitem", { name, exact: true });
-const current = (page: Page) => page.getByRole("tab", { selected: true });
+const current = (page: Page) => page.getByRole("tablist", { name: "Open pages" }).getByRole("tab", { selected: true });
 const axe = async (page: Page, ...include: string[]) => {
   // The `/` and `[[` menus scroll but hold no focus on purpose: the editor keeps it and arrows move aria-activedescendant
   // (a pattern axe only recognises when the owner's role is combobox, not the editor's textbox).

@@ -8,7 +8,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { DEFAULT_DAILY, dailyPath } from "@thoth/local-store";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, openApp, screen, waitFor, within, type Harness } from "./support/render.tsx";
+import { cleanup, openApp, screen, waitFor, within, type Harness, openSettingsAt } from "./support/render.tsx";
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { FakeConnectedApps, INSTRUCTIONS, SIDECAR, SOCKET } from "./support/connected-apps.ts";
 import { setLangPreference } from "../src/strings/index.ts";
@@ -41,7 +41,7 @@ async function open(): Promise<Harness> {
 }
 
 async function openSettings(app: Harness) {
-  await app.user.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+  await openSettingsAt(app, /^(Connected apps|แอปที่เชื่อมต่อ)$/);
   return within(await screen.findByTestId("connected-apps-settings"));
 }
 
