@@ -13,10 +13,10 @@ export function SettingsView({ account, signOut, signingOut, showShortcuts, send
   return (
     <SettingsLayout
       sections={[
-        { id: "web-set-appearance", label: s.appearance },
-        { id: "web-set-keyboard", label: s.keyboard },
-        { id: "web-set-account", label: s.account },
-        { id: "web-set-feedback", label: s.feedback },
+        { id: "web-set-appearance", label: s.appearance, icon: "moon" },
+        { id: "web-set-keyboard", label: s.keyboard, icon: "keyboard" },
+        { id: "web-set-account", label: s.account, icon: "people" },
+        { id: "web-set-feedback", label: s.feedback, icon: "speech" },
       ]}
     >
       <h1 className="page-title">{s.title}</h1>

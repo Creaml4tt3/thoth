@@ -129,7 +129,7 @@
 .settings [hidden] { display: none !important; }
 .settings-none { padding: var(--thoth-space-6) 0; }
 .settings-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.settings-nav a { display: flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); text-decoration: none; font: var(--thoth-text-ui); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.settings-nav a { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 2px 10px; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-secondary); text-decoration: none; font: var(--thoth-text-ui); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .settings-nav a:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .settings-nav a[aria-current="true"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); font-weight: 500; }
 .settings-nav a:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }

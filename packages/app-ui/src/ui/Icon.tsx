@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A house: Home (ADR-0029). */
@@ -66,6 +66,49 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     <>
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
       <path d="M14 3v5h5" />
+    </>
+  ),
+  /** A crescent moon: Appearance (theme and language). */
+  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />,
+  /** A pen: the Editor. */
+  pen: (
+    <>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z" />
+      <path d="M14.5 5.5l3 3" />
+    </>
+  ),
+  /** A closed folder: the Private Space. */
+  folder: <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" />,
+  /** A sun: Today. */
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+    </>
+  ),
+  /** Two stacked server boxes: Servers. */
+  server: (
+    <>
+      <rect x="4" y="4" width="16" height="7" rx="1.5" />
+      <rect x="4" y="13" width="16" height="7" rx="1.5" />
+      <path d="M8 7.5h.01M8 16.5h.01" />
+    </>
+  ),
+  /** A plug: Connected apps. */
+  plug: (
+    <>
+      <path d="M9 3v4M15 3v4" />
+      <path d="M6.5 7h11v3a5.5 5.5 0 0 1-11 0z" />
+      <path d="M12 15.5V21" />
+    </>
+  ),
+  /** A speech bubble: Help and feedback. */
+  speech: <path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-8L6.5 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z" />,
+  /** A keyboard: keyboard shortcuts. */
+  keyboard: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8" />
     </>
   ),
   "page-plus": (

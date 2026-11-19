@@ -37,9 +37,9 @@ afterEach(() => {
 
 function Fixture({ extra = false }: { extra?: boolean }) {
   const sections = [
-    { id: "s-a", label: "Alpha" },
-    { id: "s-b", label: "Beta" },
-    { id: "s-c", label: "Gamma" },
+    { id: "s-a", label: "Alpha", icon: "gear" as const },
+    { id: "s-b", label: "Beta", icon: "gear" as const },
+    { id: "s-c", label: "Gamma", icon: "gear" as const },
   ];
   return (
     <SettingsLayout sections={sections}>
@@ -132,7 +132,7 @@ describe("SettingsLayout", () => {
   describe("search", () => {
     function Page() {
       return (
-        <SettingsLayout sections={[{ id: "s-look", label: "Appearance" }, { id: "s-ed", label: "Editor" }, { id: "s-up", label: "Updates" }]}>
+        <SettingsLayout sections={[{ id: "s-look", label: "Appearance", icon: "gear" as const }, { id: "s-ed", label: "Editor", icon: "gear" as const }, { id: "s-up", label: "Updates", icon: "gear" as const }]}>
           <section aria-labelledby="s-look">
             <h2 id="s-look">Appearance</h2>
             <label className="field">

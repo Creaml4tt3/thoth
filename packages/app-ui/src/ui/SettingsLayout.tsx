@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useStrings } from "../strings/index.ts";
+import { Icon, type IconName } from "./Icon.tsx";
 import { motionOff } from "./presence.ts";
 
 export interface SettingsSectionLink {
   /** The id of the section's heading (`<h2 id>`). */
   id: string;
   label: string;
+  icon: IconName;
 }
 
 /**
@@ -187,6 +189,7 @@ export function SettingsLayout({ sections, children }: { sections: readonly Sett
                 .map((x) => (
                   <li key={x.id}>
                     <a href={`#${x.id}`} aria-current={x.id === current ? "true" : undefined} onClick={(event) => go(event, x.id)}>
+                      <Icon name={x.icon} />
                       {x.label}
                     </a>
                   </li>

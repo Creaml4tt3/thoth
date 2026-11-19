@@ -12,7 +12,7 @@ import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { DailySettingsSection } from "./DailySettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
-import { SettingsLayout, scrollToSection } from "@thoth/app-ui/ui/SettingsLayout.tsx";
+import { SettingsLayout, scrollToSection, type SettingsSectionLink } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
 import { THEMES, useTheme } from "@thoth/app-ui/ui/theme.ts";
 import { desktopTheme } from "./theme.ts";
@@ -70,18 +70,18 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
 
   const d = useDesktopStrings();
   // Every section's heading id, in page order; the list leaves out those this build does not show.
-  const sections = [
-    { id: "set-appearance", label: t.appearance },
-    { id: "set-editor", label: t.editor },
-    { id: "set-vault", label: t.privateSpace },
-    { id: "set-today", label: d.daily.title },
-    { id: "set-import", label: t.importExport },
-    { id: "set-servers", label: d.servers.title },
-    { id: "set-agents", label: d.agents.title },
-    { id: "set-connected-apps", label: d.connectedApps.title },
-    { id: "set-notifications", label: d.notifications.title },
-    { id: "set-general", label: d.updates.general },
-    { id: "set-feedback", label: d.helpFeedback.title },
+  const sections: SettingsSectionLink[] = [
+    { id: "set-appearance", label: t.appearance, icon: "moon" },
+    { id: "set-editor", label: t.editor, icon: "pen" },
+    { id: "set-vault", label: t.privateSpace, icon: "folder" },
+    { id: "set-today", label: d.daily.title, icon: "sun" },
+    { id: "set-import", label: t.importExport, icon: "import" },
+    { id: "set-servers", label: d.servers.title, icon: "server" },
+    { id: "set-agents", label: d.agents.title, icon: "sparkle" },
+    { id: "set-connected-apps", label: d.connectedApps.title, icon: "plug" },
+    { id: "set-notifications", label: d.notifications.title, icon: "bell" },
+    { id: "set-general", label: d.updates.general, icon: "gear" },
+    { id: "set-feedback", label: d.helpFeedback.title, icon: "speech" },
   ];
 
   return (
