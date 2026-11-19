@@ -13,10 +13,10 @@ export const th: DesktopStrings = {
     startNew: "เริ่ม Private Space ใหม่", // REVIEW
     openExisting: "เปิดโฟลเดอร์ที่คุณใช้อยู่", // REVIEW
     opening: "กำลังเปิด…",
-    headline: ["โน้ตของคุณ", "ไฟล์ของคุณ"], // REVIEW
-    startNewNote: "โฟลเดอร์ว่าง พร้อมหน้าแนะนำการใช้งานไม่กี่หน้า", // REVIEW
-    openExistingNote: "โฟลเดอร์ Obsidian หรือโฟลเดอร์ Markdown ใดก็ได้ ไม่มีการคัดลอกหรือย้ายไฟล์", // REVIEW
-    promise: ["อยู่ในคอมพิวเตอร์ของคุณ", "Markdown ธรรมดา", "ไม่ต้องมีบัญชี"], // REVIEW
+    headline: ["โน้ตของคุณ", "ไฟล์ของคุณ"],
+    startNewNote: "โฟลเดอร์ว่าง พร้อมหน้าแนะนำการใช้งานไม่กี่หน้า",
+    openExistingNote: "โฟลเดอร์ Obsidian หรือโฟลเดอร์ Markdown ใดก็ได้ ไม่มีการคัดลอกหรือย้ายไฟล์",
+    promise: ["อยู่ในคอมพิวเตอร์ของคุณ", "Markdown ธรรมดา", "ไม่ต้องมีบัญชี"],
     folderNote: {
       title: "เปิดโฟลเดอร์นี้ตรงที่อยู่เดิมไหม", // REVIEW
       body: "Thoth เปิดไฟล์เหล่านี้ตรงที่อยู่เดิม และแก้ไฟล์เฉพาะตอนที่คุณแก้เท่านั้น Thoth เก็บโฟลเดอร์ .thoth เล็ก ๆ ไว้ที่นี่สำหรับข้อมูลของตัวเอง", // REVIEW
@@ -77,7 +77,7 @@ export const th: DesktopStrings = {
     label: "ค้นหาหน้า",
     placeholder: "ค้นหาหน้า หรือพิมพ์ > เพื่อใช้คำสั่ง",
     results: "ผลการค้นหา",
-    recent: "หน้าที่เปิดล่าสุด", // REVIEW
+    recent: "โฟลเดอร์ที่เปิดล่าสุด",
     none: (query) => `ไม่มีหน้าที่ตรงกับ “${query}”`,
   },
 
