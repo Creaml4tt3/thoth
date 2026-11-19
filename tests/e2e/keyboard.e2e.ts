@@ -169,11 +169,16 @@ test("with the keyboard only: create, rename, move, format, switch tab, change t
   await expect.poll(() => read("Roadmap.md")).toBe(renamed);
   expect(await exists(".thoth/order.json")).toBe(false); // renaming creates no order record
 
-  // 3. Move it into the folder with Move to…: Down picks "Archive", Tab goes to the Move button, Enter presses it.
+  // 3. Move it into the folder with Move to…: Down opens the list, Down again and Enter pick "Archive", Tab goes to
+  // the Move button (after Cancel), Enter presses it.
   await command(page, "move to");
   const move = page.getByRole("dialog", { name: "Move “Roadmap” to…" });
   await expect(move).toBeVisible();
+  await expect(move.getByRole("combobox", { name: "Move into" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(move.getByRole("combobox", { name: "Move into" })).toHaveText(/Archive/);
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Enter");

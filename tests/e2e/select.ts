@@ -6,7 +6,7 @@ export async function choose(select: Locator, name: string | RegExp): Promise<vo
   await select.click();
   const list = select.page().locator(`[id="${await select.getAttribute("aria-controls")}"]`);
   await list.getByRole("option", typeof name === "string" ? { name, exact: true } : { name }).click();
-  await expect(select).toHaveAttribute("aria-expanded", "false");
+  await expect(list).toHaveCount(0); // closed (the select's own name can change: a language)
 }
 
 /** The chosen value, as the select carries it (`data-value`). */

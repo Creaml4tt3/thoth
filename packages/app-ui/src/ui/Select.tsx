@@ -131,26 +131,41 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
     }
   };
 
-  // Before paint: below the button when it fits, otherwise on the side with more room, and never past the window.
+  // Before paint: below the button when it fits, otherwise on the side with more room, and never past the window. Then
+  // it follows the button each frame while open: the dialog around it can still be animating in or move (the bubble
+  // moves when its content grows), and a list left where the button was would be clicked in the wrong place.
   useLayoutEffect(() => {
-    if (!open || !button.current || !list.current) return;
-    const anchor = button.current.getBoundingClientRect();
-    const height = list.current.getBoundingClientRect().height;
-    const viewW = document.documentElement.clientWidth || window.innerWidth;
-    const viewH = document.documentElement.clientHeight || window.innerHeight;
-    const below = viewH - MARGIN - anchor.bottom - GAP;
-    const above = anchor.top - GAP - MARGIN;
-    const side = height <= below || below >= above ? "bottom" : "top";
-    const room = Math.max(0, side === "bottom" ? below : above);
-    const shown = Math.min(height, room);
-    const width = Math.max(anchor.width, list.current.getBoundingClientRect().width);
-    setPlace({
-      side,
-      top: side === "bottom" ? anchor.bottom + GAP : anchor.top - GAP - shown,
-      left: Math.max(MARGIN, Math.min(anchor.left, viewW - MARGIN - width)),
-      minWidth: anchor.width,
-      maxHeight: height > room ? room : undefined,
-    });
+    if (!open) return;
+    let natural = 0;
+    let frame = 0;
+    const measure = () => {
+      if (!button.current || !list.current) return;
+      const anchor = button.current.getBoundingClientRect();
+      natural ||= list.current.getBoundingClientRect().height; // measured once, before a max-height can cap it
+      const viewW = document.documentElement.clientWidth || window.innerWidth;
+      const viewH = document.documentElement.clientHeight || window.innerHeight;
+      const below = viewH - MARGIN - anchor.bottom - GAP;
+      const above = anchor.top - GAP - MARGIN;
+      const side = natural <= below || below >= above ? "bottom" : "top";
+      const room = Math.max(0, side === "bottom" ? below : above);
+      const shown = Math.min(natural, room);
+      const width = Math.max(anchor.width, list.current.getBoundingClientRect().width);
+      const next = {
+        side,
+        top: Math.round(side === "bottom" ? anchor.bottom + GAP : anchor.top - GAP - shown),
+        left: Math.round(Math.max(MARGIN, Math.min(anchor.left, viewW - MARGIN - width))),
+        minWidth: anchor.width,
+        maxHeight: natural > room ? room : undefined,
+      } as const;
+      setPlace((prev) => (prev && prev.top === next.top && prev.left === next.left && prev.side === next.side && prev.minWidth === next.minWidth && prev.maxHeight === next.maxHeight ? prev : next));
+    };
+    measure();
+    const follow = () => {
+      measure();
+      frame = requestAnimationFrame(follow);
+    };
+    if (typeof requestAnimationFrame === "function") frame = requestAnimationFrame(follow);
+    return () => cancelAnimationFrame?.(frame);
   }, [open]);
 
   useEffect(() => {
@@ -162,24 +177,16 @@ export function Select<V extends string>({ value, onChange, options, id, name, d
     else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight;
   }, [open, active]);
 
-  // A press elsewhere, a scroll of the page under it, or a resize of the window closes it, as a system menu does.
+  // A press elsewhere closes it. A scroll or a resize does not: the list follows its button (above).
   useEffect(() => {
     if (!open) return;
-    const inside = (target: EventTarget | null) => target instanceof Node && (button.current?.contains(target) || list.current?.contains(target));
     const onDown = (event: PointerEvent) => {
-      if (!inside(event.target)) close();
-    };
-    const onScroll = (event: Event) => {
-      if (!inside(event.target)) close();
+      const target = event.target;
+      if (!(target instanceof Node) || button.current?.contains(target) || list.current?.contains(target)) return;
+      close();
     };
     document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", close);
-    return () => {
-      document.removeEventListener("pointerdown", onDown, true);
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", close);
-    };
+    return () => document.removeEventListener("pointerdown", onDown, true);
   }, [open]);
 
   const style: CSSProperties = place

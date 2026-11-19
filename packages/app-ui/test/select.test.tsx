@@ -251,6 +251,26 @@ describe("Select", () => {
     }
   });
 
+  it("stays open when something around it scrolls (a dialog growing), and follows its button", () => {
+    render(<Harness />);
+    let top = 100;
+    box().getBoundingClientRect = () => ({ top, bottom: top + 30, left: 20, right: 220, width: 200, height: 30, x: 20, y: top, toJSON: () => ({}) });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    try {
+      fireEvent.click(box());
+      expect(parseFloat(list()!.style.top)).toBe(134);
+      fireEvent.scroll(document);
+      expect(list()).toBeTruthy();
+      top = 200;
+      act(() => frames.shift()?.(0));
+      expect(parseFloat(list()!.style.top)).toBe(234);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a disabled select does not open", () => {
     render(<Harness disabled />);
     expect((box() as HTMLButtonElement).disabled).toBe(true);
