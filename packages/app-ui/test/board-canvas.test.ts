@@ -61,6 +61,10 @@ describe("applyChanges", () => {
     expect(after.nodes).toHaveLength(4);
     expect(after.nodes[0]).toMatchObject({ type: "text" });
   });
+  it("ignores a pin of a page another app already pinned under another id", () => {
+    const after = applyChanges(parseCanvas(OBSIDIAN), [{ kind: "pin", node: file("n1", "Notes/Plan.md") }]);
+    expect(serializeCanvas(after)).toBe(OBSIDIAN);
+  });
   it("unpins one note and leaves every edge, even one that points at it", () => {
     const before = parseCanvas(OBSIDIAN);
     const after = applyChanges(before, [{ kind: "unpin", id: "d4" }]);

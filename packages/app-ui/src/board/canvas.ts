@@ -47,13 +47,13 @@ export function serializeCanvas(c: CanvasFile): string {
   return `${JSON.stringify(out, null, 2)}\n`;
 }
 
-/** Pure. A move or unpin of a node that is gone (another app deleted it) is dropped; a pin of an existing id is ignored. */
+/** Pure. A move or unpin of a node that is gone (another app deleted it) is dropped; a pin of an id or a file already on the board is ignored. */
 export function applyChanges(c: CanvasFile, changes: readonly BoardChange[]): CanvasFile {
   let nodes = c.nodes;
   for (const ch of changes) {
     if (ch.kind === "move") nodes = nodes.map((n) => (n.id === ch.id ? { ...n, x: Math.round(ch.x), y: Math.round(ch.y) } : n));
     else if (ch.kind === "unpin") nodes = nodes.filter((n) => n.id !== ch.id);
-    else if (!nodes.some((n) => n.id === ch.node.id)) nodes = [...nodes, { ...ch.node, x: Math.round(ch.node.x), y: Math.round(ch.node.y) }];
+    else if (!nodes.some((n) => n.id === ch.node.id || (ch.node.file !== undefined && n.file === ch.node.file))) nodes = [...nodes, { ...ch.node, x: Math.round(ch.node.x), y: Math.round(ch.node.y) }];
   }
   return { ...c, nodes };
 }
