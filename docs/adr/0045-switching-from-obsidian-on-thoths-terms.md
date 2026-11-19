@@ -2,7 +2,8 @@
 
 - **Status:** Accepted (owner, 2026-11-02): the direction, the brand rules and the order. Each step gets its own ADR
   or PR when it is built. "AI edits you review first" amended by ADR-0052 (2026-11-07): agents' memories in the
-  memory folder are written without review.
+  memory folder are written without review. "No graph view" amended by ADR-0056 (Proposed, 2026-11-20): a Board
+  view of notes and their links, separate from the Connections panel.
 - **Date:** 2026-11-02
 - **Deciders:** owner
 
@@ -71,7 +72,7 @@ The owner wants people to be able to leave Obsidian for Thoth, **without Thoth b
 
 - Positive: the one data risk in the review goes first, and it helps every user with a synced or network folder.
 - Positive: people moving from Obsidian keep their files, links and AI habits; Thoth keeps its own character.
-- Negative: no graph view and no plugins. Some Obsidian users will miss them and stay; that is accepted.
+- Negative: no graph view (amended by ADR-0056: a Board) and no plugins. Some Obsidian users will miss them and stay; that is accepted.
 - Negative: skills built on the Obsidian MCP need porting, because Thoth does not copy its tool names.
 - Negative: every AI write needs a review in Thoth, which is slower than writing directly.
 

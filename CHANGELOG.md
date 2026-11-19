@@ -10,6 +10,10 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ## [Unreleased]
 
+### Added
+
+- Board: see your notes as sticky notes on a board, joined by their links. Build your own boards, and draw string between two notes to link them. Boards are .canvas files that Obsidian can open too.
+
 ### Changed
 
 - Settings shows one section at a time, with a wider list and an icon for each section.

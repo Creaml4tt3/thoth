@@ -103,6 +103,22 @@ The editor's content column is 720px.
 - Use hairline borders first (9% ink). Shadows are only for floating layers
   (popover, modal).
 
+### Board
+
+The Board (ADR-0056) is the one place where the paper desk is drawn literally. Styles: `packages/app-ui/src/board/board.css`.
+
+- **Paper:** the page background with a faint dot grid (12% ink, 24px at 100%); soft black at night.
+- **Sticky notes:** 160×120px, small radii with a curled bottom-right corner, a small resting shadow. Its paper is its
+  folder's colour from the sidebar (the nearest coloured parent folder's, else cream), as the `--thoth-note-*` tokens,
+  light and dark; text is `--thoth-note-ink` and `--thoth-note-ink-muted`, checked on every paper in `contrast.test.ts`.
+  Title 13/600, first line 12/400, two lines each, wrapping anywhere (Thai included).
+- **Pin and tags:** a Moon push pin at the top centre (the handle for drawing string); up to three tag chips in the Moon
+  soft wash (`--thoth-accent-soft` / `--thoth-accent-ink`), pill-shaped.
+- **String:** ink at 35%, sagging slightly; the selected note's strings turn Moon (`--thoth-moon`), with a slight glow
+  at night. A suggestion is a faded note (55% paper, dashed outline) whose text never fades.
+- **Motion:** a dragged note lifts (larger shadow, ~3° tilt) and settles with a 300ms wobble; a drawn string snaps taut.
+  Reduced motion removes the tilt, wobble, glow and string animation: positions change at once.
+
 ## 5. Where each influence applies
 
 | Surface | Base theme | Notes |
