@@ -8,15 +8,21 @@
  *   suggestion pins it. Drag a note to move it (it lifts, then wobbles once unless reduced motion is on); arrow keys move
  *   the selected one 8 px (Shift: 40). Without `actions.move` (the Overview) a move lasts for the session only.
  * - Drag the paper or scroll to pan; Ctrl/Cmd+scroll or pinch zooms around the pointer; + / - / 0 on the board.
+ * - With `actions.drawLink`, dragging from a note's pin pulls a string to the pointer; dropped on another note it links the
+ *   two (the source page gets one link line) and snaps taut; anywhere else it lets go. "Link to…" in the note's menu
+ *   does the same from the keyboard, choosing among the other notes on the board. The outcome is announced.
  * - Below 40 % the notes are coloured squares in one SVG and no note is a button; above it only notes in view are.
  *   The List view shows every note and its links as a plain list, so keyboard and screen-reader users always reach them.
  */
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ContextMenu, type MenuItem } from "../order/ContextMenu.tsx";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
+import { dirname } from "@thoth/domain";
+import { ContextMenu, shellRoot, type MenuItem } from "../order/ContextMenu.tsx";
 import { useStrings } from "../strings/index.ts";
 import type { OpenOptions } from "../tabs/model.ts";
 import { clickOpens } from "../tabs/open-keys.ts";
 import { motionOff } from "../ui/presence.ts";
+import { Modal } from "../ui/Modal.tsx";
 import { tip } from "../ui/Tooltip.tsx";
 import type { BoardNote, BoardString } from "./model.ts";
 
@@ -26,7 +32,7 @@ export interface BoardActions {
   move?(path: string, x: number, y: number): void;
   pin?(path: string): void;
   unpin?(path: string): void;
-  /** Task 7: drawing string between two notes adds a link. */
+  /** Drawing string from one note to another adds a link line to the first page (absent: the pin only decorates). */
   drawLink?(from: string, to: string): Promise<"linked" | "changed" | "gone">;
   /** Shows the page in the sidebar tree. */
   reveal?(path: string): void;
@@ -86,7 +92,7 @@ function stringPath(a: Point, b: Point): string {
 const isMenuKey = (e: KeyboardEvent) => e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey);
 
 /** Follows a pointer from a pointerdown (captured by the element) until it is released, cancelled or loses capture. */
-function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => void, onUp: (moved: boolean) => void) {
+function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => void, onUp: (moved: boolean, released: boolean) => void) {
   const el = start.currentTarget as Element;
   el.setPointerCapture?.(start.pointerId);
   let moved = false;
@@ -96,12 +102,12 @@ function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => voi
     moved = true;
     onMove(dx, dy);
   };
-  const up = () => {
+  const up = (e: Event) => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up);
     el.removeEventListener("lostpointercapture", up);
-    onUp(moved);
+    onUp(moved, e.type === "pointerup");
   };
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
@@ -130,6 +136,13 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   const refocus = useRef<string | null>(null);
   const fitted = useRef(false);
   const wobbleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** A string being pulled from a pin, in board units. */
+  const [draft, setDraft] = useState<{ from: Point; to: Point } | null>(null);
+  const [snap, setSnap] = useState<{ from: string; to: string } | null>(null);
+  const snapTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [status, setStatus] = useState("");
+  /** "Link to…" is open for this note. */
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
 
   const at = (n: BoardNote): Point => {
     if (drag?.path === n.path) return drag;
@@ -168,7 +181,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     if (path && (document.activeElement as HTMLElement | null)?.dataset?.path !== path) focusNote(path);
   }, [moved]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => clearTimeout(wobbleTimer.current), []);
+  useEffect(() => () => (clearTimeout(wobbleTimer.current), clearTimeout(snapTimer.current)), []);
 
   // Zooming out to squares removes the focused note button: keep focus on the board instead of losing it to the page.
   const squares = !list && view.z < SQUARES_BELOW;
@@ -229,11 +242,47 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     track(e, (dx, dy) => setView({ ...start, x: start.x + dx, y: start.y + dy }), (moved) => moved || setSelected(null));
   };
 
+  const link = (from: string, to: string) => {
+    void actions.drawLink?.(from, to).then(
+      (outcome) => setStatus({ linked: t.linked, changed: t.linkChanged, gone: t.linkGone }[outcome]),
+      (error: unknown) => console.error(error),
+    );
+  };
+
+  /** Pulls a string from the note's pin; dropped on another (not missing) note, it links them. */
+  const onPinDown = (e: ReactPointerEvent<HTMLButtonElement>, n: BoardNote) => {
+    const p = at(n);
+    const from = { x: p.x + NOTE_W / 2, y: p.y };
+    const z = view.z;
+    let to = from;
+    track(
+      e,
+      (dx, dy) => {
+        to = { x: from.x + dx / z, y: from.y + dy / z };
+        setDraft({ from, to });
+      },
+      (wasMoved, released) => {
+        setDraft(null);
+        if (!wasMoved) return;
+        dragged.current = true;
+        const target = released && notes.find((o) => o.path !== n.path && o.state !== "missing" && (({ x, y }) => to.x >= x && to.x <= x + NOTE_W && to.y >= y && to.y <= y + NOTE_H)(at(o)));
+        if (!target) return;
+        if (!motionOff()) {
+          clearTimeout(snapTimer.current);
+          setSnap({ from: n.path, to: target.path });
+          snapTimer.current = setTimeout(() => setSnap(null), WOBBLE_MS);
+        }
+        link(n.path, target.path);
+      },
+    );
+  };
+
   const onNoteDown = (e: ReactPointerEvent<HTMLButtonElement>, n: BoardNote) => {
     e.stopPropagation();
     dragged.current = false;
     pointerFocus.current = true;
     if (e.button !== 0) return;
+    if (actions.drawLink && n.state !== "missing" && (e.target as Element).closest?.(".board-pin")) return onPinDown(e, n);
     const from = at(n);
     const z = view.z;
     let last = from;
@@ -308,7 +357,11 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
       { id: "open", label: t.open, disabled: gone, onSelect: () => actions.open(n.path) },
       { id: "open-tab", label: t.openNewTab, disabled: gone, onSelect: () => actions.open(n.path, { newTab: true }) },
     ];
-    // Task 7 adds "Link to…" here.
+    if (actions.drawLink && !gone)
+      items.push({ id: "link", label: t.linkTo, onSelect: () => {
+        focusNote(n.path); // the dialog gives focus back to what had it: the note
+        setLinkFrom(n.path);
+      } });
     const { unpin, reveal } = actions;
     if (unpin && (n.state === "pinned" || gone)) items.push({ id: "unpin", label: t.unpin, separator: true, onSelect: () => unpin(n.path) });
     if (reveal && !gone) items.push({ id: "reveal", label: t.reveal, onSelect: () => reveal(n.path) });
@@ -334,6 +387,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
           <button type="button" className="board-tool" onClick={zoomFit}>{t.zoomFit}</button>
         </div>
       )}
+      <span className="board-status" role="status">{status}</span>
       <button type="button" className="board-tool" aria-pressed={list} onClick={() => setList(!list)}>
         {t.listView}
       </button>
@@ -378,6 +432,9 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   const inView = (p: Point) => p.x + NOTE_W >= vx0 && p.x <= vx1 && p.y + NOTE_H >= vy0 && p.y <= vy1;
   const paper = (n: BoardNote) => `var(--thoth-note-${n.color ?? "cream"}, var(--thoth-note-cream))`;
   const menuNote = menu && byPath.get(menu.path);
+  const snapA = snap && byPath.get(snap.from);
+  const snapB = snap && byPath.get(snap.to);
+  const linkNote = linkFrom !== null ? byPath.get(linkFrom) : undefined;
 
   return (
     <div className="board">
@@ -403,6 +460,8 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
               const active = selected !== null && (s.from === selected || s.to === selected);
               return <path key={`${s.from}\n${s.to}`} d={stringPath(at(a), at(b))} data-from={s.from} data-to={s.to} data-active={active || undefined} />;
             })}
+            {snapA && snapB && <path className="board-string-snap" d={stringPath(at(snapA), at(snapB))} />}
+            {draft && <path className="board-string-draft" d={`M${draft.from.x} ${draft.from.y}L${draft.to.x} ${draft.to.y}`} />}
           </svg>
           {squares ? (
             <svg className="board-squares" aria-hidden="true" width="1" height="1">
@@ -440,7 +499,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
                     setMenu({ path: n.path, at: { x: e.clientX, y: e.clientY } });
                   }}
                 >
-                  <span className="board-pin" aria-hidden="true" />
+                  <span className="board-pin" aria-hidden="true" data-draw={(actions.drawLink && n.state !== "missing") || undefined} />
                   {n.state === "suggested" && <span className="board-plus" aria-hidden="true">+</span>}
                   <span className="board-title">{n.title}</span>
                   {n.state === "missing" ? <span className="board-excerpt">{t.missing}</span> : n.excerpt && <span className="board-excerpt">{n.excerpt}</span>}
@@ -467,6 +526,62 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
           }}
         />
       )}
+      {linkNote && (
+        <LinkToDialog
+          title={t.linkToTitle(linkNote.title)}
+          notes={notes.filter((o) => o.path !== linkNote.path && o.state !== "missing")}
+          onChoose={(to) => {
+            setLinkFrom(null);
+            link(linkNote.path, to);
+          }}
+          onClose={() => setLinkFrom(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** "Link to…": a filter box over the other notes on the board; arrows and Enter, or a click, choose one. */
+function LinkToDialog({ title, notes, onChoose, onClose }: { title: string; notes: BoardNote[]; onChoose(path: string): void; onClose(): void }) {
+  const t = useStrings().board;
+  const id = useId();
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const sorted = useMemo(() => [...notes].sort((a, b) => a.title.localeCompare(b.title)), [notes]);
+  const q = query.trim().toLocaleLowerCase();
+  const shown = q ? sorted.filter((n) => n.title.toLocaleLowerCase().includes(q)) : sorted;
+  const current = Math.min(active, shown.length - 1);
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (step && shown.length) setActive((current + step + shown.length) % shown.length);
+    else if (e.key === "Enter" && shown[current]) onChoose(shown[current].path);
+    else return;
+    e.preventDefault();
+  };
+  return createPortal(
+    <Modal title={title} onClose={onClose}>
+      <input
+        className="input"
+        role="combobox"
+        aria-label={t.linkFilter}
+        aria-expanded="true"
+        aria-controls={`${id}-list`}
+        aria-activedescendant={shown.length ? `${id}-${current}` : undefined}
+        value={query}
+        onChange={(e) => (setQuery(e.target.value), setActive(0))}
+        onKeyDown={onKeyDown}
+        data-autofocus
+      />
+      <ul id={`${id}-list`} role="listbox" aria-label={t.linkFilter} className="board-link-list">
+        {shown.map((n, i) => (
+          <li key={n.path} id={`${id}-${i}`} role="option" aria-selected={i === current} onClick={() => onChoose(n.path)}>
+            <span className="board-link-title">{n.title}</span>
+            {dirname(n.path) && <span className="board-link-folder">{dirname(n.path)}</span>}
+          </li>
+        ))}
+      </ul>
+      {!shown.length && <p className="board-link-none">{t.linkNone}</p>}
+    </Modal>,
+    shellRoot(),
   );
 }

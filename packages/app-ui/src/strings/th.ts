@@ -1092,5 +1092,8 @@ export const th: Strings = {
     linkChanged: "หน้านี้เปลี่ยนไปแล้ว จึงไม่ได้เขียนอะไรลงไป", // REVIEW
     linkGone: "ไม่พบหน้านั้นแล้ว", // REVIEW
     undoLinkEdited: "บรรทัดลิงก์ถูกแก้ไขแล้ว จึงไม่ได้เอาออก", // REVIEW
+    linkToTitle: (title) => `ลิงก์ ${title} ไปยัง…`, // REVIEW
+    linkFilter: "ค้นหาโน้ตบนบอร์ดนี้", // REVIEW
+    linkNone: "ไม่มีโน้ตอื่นที่ตรงกัน", // REVIEW
   },
 };

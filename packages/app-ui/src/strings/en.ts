@@ -1202,6 +1202,10 @@ export const en = {
     linkChanged: "The page changed; nothing was written.",
     linkGone: "That page is gone.",
     undoLinkEdited: "The link line was edited, so it was left in place.",
+    /** "Link to…": the dialog's title, its filter box, and when no note matches. */
+    linkToTitle: (title: string) => `Link ${title} to…`,
+    linkFilter: "Find a note on this board",
+    linkNone: "No other note matches.",
   },
 };
 

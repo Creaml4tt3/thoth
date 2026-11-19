@@ -363,6 +363,106 @@ describe("BoardView, focus and safety (review round 1)", () => {
   });
 });
 
+describe("BoardView, drawing string (Task 7)", () => {
+  /** The screen point over a board point, from the plane's transform (the region sits at 0,0 in jsdom). */
+  const screenAt = (plane: HTMLElement, x: number, y: number) => {
+    const [tx, ty] = translate(plane);
+    const z = zoom(plane);
+    return { clientX: tx + x * z, clientY: ty + y * z };
+  };
+  const pinOf = (name: RegExp) => noteButton(name).querySelector<HTMLElement>(".board-pin")!;
+  const drawFromA = (plane: HTMLElement, x: number, y: number, end: "pointerUp" | "pointerCancel" = "pointerUp") => {
+    fireEvent.pointerDown(pinOf(/^A,/), { button: 0, ...screenAt(plane, 80, 0) });
+    fireEvent.pointerMove(window, screenAt(plane, x, y));
+    expect(plane.querySelector(".board-string-draft")).toBeTruthy();
+    fireEvent[end](window, screenAt(plane, x, y));
+  };
+
+  it("dragging from A's pin onto B links A to B once, and says so", async () => {
+    const drawLink = vi.fn(async () => "linked" as const);
+    const { actions, plane } = setup({ actions: { drawLink } });
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    expect(drawLink).toHaveBeenCalledTimes(1);
+    expect(drawLink).toHaveBeenCalledWith("A.md", "B.md");
+    expect(actions.move).not.toHaveBeenCalled(); // the pin draws string, it does not move the note
+    expect(screen.getByRole("status").textContent).toBe("Linked.");
+    expect(plane().querySelector(".board-string-snap")).toBeTruthy();
+  });
+
+  it("dropping on paper, on the same note, or cancelling draws nothing", async () => {
+    const drawLink = vi.fn(async () => "linked" as const);
+    const { plane } = setup({ actions: { drawLink } });
+    drawFromA(plane(), 700, 700);
+    await act(async () => {});
+    drawFromA(plane(), 100, 60);
+    await act(async () => {});
+    drawFromA(plane(), 380, 60, "pointerCancel");
+    await act(async () => {});
+    expect(drawLink).not.toHaveBeenCalled();
+    expect(plane().querySelector(".board-string-draft")).toBeNull();
+  });
+
+  it("shows when the page changed or is gone; no snap under reduced motion", async () => {
+    reduced = true;
+    const drawLink = vi.fn<NonNullable<BoardActions["drawLink"]>>(async () => "changed");
+    const { plane } = setup({ actions: { drawLink } });
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    expect(screen.getByRole("status").textContent).toBe("The page changed; nothing was written.");
+    expect(plane().querySelector(".board-string-snap")).toBeNull();
+    expect(plane().querySelector(".board-string-draft")).toBeNull();
+    drawLink.mockResolvedValueOnce("gone");
+    drawFromA(plane(), 380, 60);
+    await act(async () => {});
+    expect(screen.getByRole("status").textContent).toBe("That page is gone.");
+  });
+
+  it("without drawLink the pin moves the note as before and the menu has no Link to…", async () => {
+    const { actions, plane, user } = setup();
+    fireEvent.pointerDown(pinOf(/^A,/), { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    fireEvent.pointerUp(window, { clientX: 60, clientY: 10 });
+    expect(actions.move).toHaveBeenCalled();
+    expect(plane().querySelector(".board-string-draft")).toBeNull();
+    noteButton(/^B,/).focus();
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    expect(screen.queryByRole("menuitem", { name: "Link to…" })).toBeNull();
+  });
+
+  it("Link to… lists the other notes, filters, chooses with the keyboard, and returns focus to the note", async () => {
+    const drawLink = vi.fn(async () => "linked" as const);
+    const { user } = setup({ notes: [A, B, C, note("Docs/Deep.md", 600, 0, { title: "Deep" })], actions: { drawLink } });
+    noteButton(/^A,/).focus();
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    await user.click(screen.getByRole("menuitem", { name: "Link to…" }));
+    const dialog = screen.getByRole("dialog", { name: "Link A to…" });
+    const options = () => within(dialog).getAllByRole("option").map((o) => o.textContent);
+    expect(options()).toEqual(["B", "C", "DeepDocs"]);
+    await user.keyboard("c");
+    expect(options()).toEqual(["C"]);
+    await user.keyboard("{Backspace}{ArrowDown}{Enter}");
+    expect(drawLink).toHaveBeenCalledWith("A.md", "C.md");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(noteButton(/^A,/));
+    expect(screen.getByRole("status").textContent).toBe("Linked.");
+  });
+
+  it("Link to… chooses with a click; Escape closes without linking", async () => {
+    const drawLink = vi.fn(async () => "linked" as const);
+    const { user } = setup({ actions: { drawLink } });
+    fireEvent.contextMenu(noteButton(/^B,/), { clientX: 20, clientY: 20 });
+    await user.click(screen.getByRole("menuitem", { name: "Link to…" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(drawLink).not.toHaveBeenCalled();
+    fireEvent.contextMenu(noteButton(/^B,/), { clientX: 20, clientY: 20 });
+    await user.click(screen.getByRole("menuitem", { name: "Link to…" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("option", { name: /^A/ }));
+    expect(drawLink).toHaveBeenCalledWith("B.md", "A.md");
+  });
+});
+
 function translate(el: HTMLElement): [number, number] {
   const m = /translate\(([-\d.e]+)px,\s*([-\d.e]+)px\)/.exec(el.style.transform)!;
   return [Number(m[1]), Number(m[2])];

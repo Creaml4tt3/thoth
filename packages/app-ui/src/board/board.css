@@ -60,6 +60,19 @@
 .board-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; overflow: hidden; max-height: 20px; }
 .board-tag { font: 500 11px / 18px var(--thoth-font-sans); padding: 0 6px; border-radius: var(--thoth-radius-pill); background: var(--thoth-accent-soft); color: var(--thoth-accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .board-pin { position: absolute; top: -5px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgb(255 255 255 / 0.55), transparent 45%), var(--thoth-moon); box-shadow: 0 2px 3px rgb(0 0 0 / 0.3); }
+/* With drawLink the pin is a handle: string is pulled from it to the pointer, and snaps taut on a note. */
+.board-pin[data-draw] { cursor: crosshair; }
+.board-pin[data-draw]::before { content: ""; position: absolute; inset: -8px; } /* a 28 px target around the 12 px pin */
+.board-strings path.board-string-draft { stroke: var(--thoth-moon); stroke-width: 2; stroke-dasharray: 4 4; }
+.board-strings path.board-string-snap { stroke: var(--thoth-moon); stroke-width: 2; animation: board-snap 300ms var(--thoth-ease-out); }
+@keyframes board-snap { 0% { stroke-width: 3.5; } 100% { stroke-width: 2; } }
+.board-status { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); margin-inline-start: var(--thoth-space-2); }
+.board-link-list { list-style: none; margin: var(--thoth-space-2) 0 0; padding: 0; max-height: 280px; overflow: auto; }
+.board-link-list [role="option"] { display: flex; align-items: baseline; gap: var(--thoth-space-2); padding: 6px 8px; border-radius: var(--thoth-radius-sm); cursor: pointer; font: var(--thoth-text-ui); color: var(--thoth-ink-primary); }
+.board-link-list [role="option"]:hover { background: var(--thoth-bg-hover); }
+.board-link-list [role="option"][aria-selected="true"] { background: var(--thoth-moon-soft); color: var(--thoth-moon-ink); }
+.board-link-title { font-weight: 600; overflow-wrap: anywhere; }
+.board-link-folder, .board-link-none { font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .board-plus { position: absolute; top: 6px; right: 8px; font: 600 14px / 1 var(--thoth-font-sans); color: var(--thoth-note-ink-muted); }
 
 /* Dark mode: the selected note's strings glow a little. Reduced motion has no glow, tilt or wobble. */
@@ -70,6 +83,7 @@
   .board-note, .board-strings path { transition: none; }
   .board-note[data-lifted] { transform: none; }
   .board-note[data-wobble] { animation: none; }
+  .board-strings path.board-string-snap { animation: none; }
 }
 
 .board-list { margin: 0; padding: var(--thoth-space-4) var(--thoth-space-6); overflow: auto; flex: 1; font: var(--thoth-text-ui); color: var(--thoth-ink-primary); }
