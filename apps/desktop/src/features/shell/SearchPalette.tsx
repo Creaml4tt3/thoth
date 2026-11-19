@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { basename, stripExtension } from "@thoth/domain";
 import type { SearchHit } from "@thoth/local-store";
 import { Modal } from "@thoth/app-ui/ui/Modal.tsx";
 import { CommandOptions, useCommandMode } from "@thoth/app-ui/keyboard/CommandOptions.tsx";
@@ -47,7 +48,7 @@ export const plainSnippet = (text: string, words: readonly string[]): string => 
 
 /** The folder a page sits in, as people read it: "Projects / Ideas", nothing for the top level, no ".md". */
 export const parentOf = (path: string): string => path.split("/").slice(0, -1).join(" / ");
-const titleOf = (path: string): string => (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+const titleOf = (path: string): string => stripExtension(basename(path));
 
 /**
  * Cmd/Ctrl+K quick search over the index (`vault.search`). Starting with `>` it lists commands instead (ADR-0016 rule

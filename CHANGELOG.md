@@ -16,7 +16,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - A new app icon: the Moon Ibis in paper on a Moon orange tile.
 - The first screen looks like the website: "Your notes. Your files." with a short line under each choice and your recent folders.
 - A calmer look: the current tab is filled with Moon orange, selected rows elsewhere are neutral, and paths no longer show as code.
-- A faint paper texture behind the sidebar and tabs. On macOS the sidebar is slightly see-through; reduced transparency and more contrast turn it off.
+- A faint paper texture behind the whole window. On macOS the sidebar is slightly see-through. Reduced transparency or more contrast turns both off.
+- Pages read more like documents: headings are a little smaller and bolder, note and info callouts are grey, and tables have only row lines.
+- Search shows your recent pages before you type, marks the words you typed, and no longer repeats the title in the snippet. The search index rebuilds once after the update.
 - The browser pages you see after signing in now match the website.
 
 ## [0.10.1] - 2026-11-16

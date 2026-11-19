@@ -4,6 +4,7 @@
  * and how a mention is linked is the `source`'s business.
  */
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { isMarkdownPath, stripExtension } from "@thoth/domain";
 import { useStrings } from "../strings/index.ts";
 import { clickOpens, isMiddleClick, isOpenInNewTabKey } from "../tabs/open-keys.ts";
 import type { OpenOptions } from "../tabs/model.ts";
@@ -62,7 +63,8 @@ function useLoad<T>(load: () => Promise<T> | null, deps: unknown[]): Load<T> {
 
 /** The path without ".md", shown only when it says more than the title (a page in a folder, or a renamed title). */
 const where = (page: ConnectedPage): string => {
-  const path = (page.detail ?? "").replace(/\.md$/i, "");
+  const detail = page.detail ?? "";
+  const path = isMarkdownPath(detail) ? stripExtension(detail) : detail;
   return path === page.title ? "" : path;
 };
 
