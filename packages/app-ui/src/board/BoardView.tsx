@@ -43,6 +43,7 @@ const SQUARES_BELOW = 0.4;
 const DRAG_PX = 4;
 const WOBBLE_MS = 300;
 const FIT_PAD = 48;
+const FOCUS_MARGIN = 16;
 /** jsdom and a region not laid out yet measure 0×0. */
 const FALLBACK = { w: 1200, h: 800 };
 
@@ -84,8 +85,10 @@ function stringPath(a: Point, b: Point): string {
 
 const isMenuKey = (e: KeyboardEvent) => e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey);
 
-/** Follows a pointer on the window from a pointerdown until it is released. */
+/** Follows a pointer from a pointerdown (captured by the element) until it is released, cancelled or loses capture. */
 function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => void, onUp: (moved: boolean) => void) {
+  const el = start.currentTarget as Element;
+  el.setPointerCapture?.(start.pointerId);
   let moved = false;
   const move = (e: PointerEvent) => {
     const [dx, dy] = [e.clientX - start.clientX, e.clientY - start.clientY];
@@ -97,11 +100,13 @@ function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => voi
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up);
+    el.removeEventListener("lostpointercapture", up);
     onUp(moved);
   };
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
+  el.addEventListener("lostpointercapture", up);
 }
 
 export function BoardView({ label, notes, strings, actions }: { label: string; notes: BoardNote[]; strings: BoardString[]; actions: BoardActions }) {
@@ -117,7 +122,13 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   const [moved, setMoved] = useState<ReadonlyMap<string, Point & { from: Point }>>(new Map());
   const [drag, setDrag] = useState<{ path: string } & Point | null>(null);
   const [wobble, setWobble] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
   const dragged = useRef(false);
+  /** The next focus on a note came from a pointer: no pan to show it (it is under the pointer, and a pan would jump the drag). */
+  const pointerFocus = useRef(false);
+  /** A keyboard move: keep focus on this note once it is drawn at its new place. */
+  const refocus = useRef<string | null>(null);
+  const fitted = useRef(false);
   const wobbleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const at = (n: BoardNote): Point => {
@@ -127,21 +138,35 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   };
   const byPath = new Map(notes.map((n) => [n.path, n]));
 
-  // Measure the region; fit the notes once, when it first has a size.
+  const measure = () => {
+    const r = region.current?.getBoundingClientRect();
+    return r && r.width && r.height ? { w: r.width, h: r.height } : FALLBACK;
+  };
+  // Measure the board while it is shown (the List view replaces it).
   useLayoutEffect(() => {
     const el = region.current;
-    const measure = () => {
-      const r = el?.getBoundingClientRect();
-      return r && r.width && r.height ? { w: r.width, h: r.height } : FALLBACK;
-    };
-    const first = measure();
-    setSize(first);
-    setView(opening(notes.map(at), first.w, first.h));
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (!el) return;
+    setSize(measure());
+    if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => setSize(measure()));
     ro.observe(el);
     return () => ro.disconnect();
   }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fit once, when the board first shows notes (they may arrive after mount); later pan and zoom are the user's.
+  useLayoutEffect(() => {
+    if (fitted.current || !notes.length || !region.current) return;
+    fitted.current = true;
+    const { w, h } = measure();
+    setView(opening(notes.map(at), w, h));
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A keyboard move redraws the note; if the browser dropped its focus on the way, give it back.
+  useLayoutEffect(() => {
+    const path = refocus.current;
+    refocus.current = null;
+    if (path && (document.activeElement as HTMLElement | null)?.dataset?.path !== path) focusNote(path);
+  }, [moved]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => clearTimeout(wobbleTimer.current), []);
 
@@ -207,6 +232,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   const onNoteDown = (e: ReactPointerEvent<HTMLButtonElement>, n: BoardNote) => {
     e.stopPropagation();
     dragged.current = false;
+    pointerFocus.current = true;
     if (e.button !== 0) return;
     const from = at(n);
     const z = view.z;
@@ -231,11 +257,26 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   };
 
   const onNoteClick = (e: MouseEvent, n: BoardNote) => {
+    pointerFocus.current = false; // Safari does not focus a clicked button: never let the flag outlive the click
     if (dragged.current) return void (dragged.current = false);
     const newTab = clickOpens(e);
     if (newTab) return void (n.state !== "missing" && actions.open(n.path, newTab));
-    if (n.state === "suggested" && actions.pin) actions.pin(n.path);
+    if (n.state === "suggested" && actions.pin && e.detail <= 1) actions.pin(n.path); // the second click of a double-click opens
     setSelected(n.path);
+  };
+
+  /** Keyboard focus on a note pans just enough to show all of it, with a margin (WCAG 2.4.11). */
+  const onNoteFocus = (n: BoardNote) => {
+    setFocused(n.path);
+    if (pointerFocus.current) return void (pointerFocus.current = false);
+    const p = at(n);
+    setView((v) => {
+      const shift = (start: number, length: number, room: number) =>
+        start < FOCUS_MARGIN ? FOCUS_MARGIN - start : start + length > room - FOCUS_MARGIN ? Math.max(FOCUS_MARGIN - start, room - FOCUS_MARGIN - start - length) : 0;
+      const dx = shift(v.x + p.x * v.z, NOTE_W * v.z, size.w);
+      const dy = shift(v.y + p.y * v.z, NOTE_H * v.z, size.h);
+      return dx || dy ? { ...v, x: v.x + dx, y: v.y + dy } : v;
+    });
   };
 
   const onNoteKeyDown = (e: KeyboardEvent<HTMLButtonElement>, n: BoardNote) => {
@@ -257,6 +298,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     e.preventDefault();
     const step = e.shiftKey ? 40 : 8;
     const p = at(n);
+    refocus.current = n.path;
     place(n.path, { x: p.x + arrow[0]! * step, y: p.y + arrow[1]! * step });
   };
 
@@ -273,8 +315,9 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
     return items;
   };
 
-  // Reading order: top to bottom, then left to right.
-  const ordered = [...notes].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x);
+  // Reading order: top to bottom, then left to right, by the stored positions only. A live drag or arrow move must not
+  // reorder the DOM: React would move the focused button, and Chromium blurs a moved element.
+  const ordered = [...notes].sort((a, b) => a.y - b.y || a.x - b.x);
   const linked = (path: string) => strings.flatMap((s) => (s.from === path ? [s.to] : s.to === path ? [s.from] : []));
 
   const toolbar = (
@@ -310,6 +353,12 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
                   {n.title}
                 </button>
                 {n.state === "missing" && <span className="board-list-state"> {t.missing}</span>}
+                {n.state === "suggested" && <span className="board-list-state"> {t.suggested}</span>}
+                {n.state === "suggested" && actions.pin && (
+                  <button type="button" className="board-tool" onClick={() => actions.pin?.(n.path)}>
+                    {t.pin}
+                  </button>
+                )}
                 {links.length > 0 && (
                   <ul aria-label={t.linksOf(n.title)}>
                     {links.map((title, i) => <li key={i}>{title}</li>)}
@@ -365,7 +414,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
           ) : (
             ordered.map((n) => {
               const p = at(n);
-              if (!inView(p) && n.path !== selected) return null; // the selected note keeps its focus when panned away
+              if (!inView(p) && n.path !== selected && n.path !== focused) return null; // a focused or selected note stays when panned away
               return (
                 <button
                   key={n.path}
@@ -383,6 +432,8 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
                   onClick={(e) => onNoteClick(e, n)}
                   onDoubleClick={() => n.state !== "missing" && actions.open(n.path)}
                   onKeyDown={(e) => onNoteKeyDown(e, n)}
+                  onFocus={() => onNoteFocus(n)}
+                  onBlur={() => setFocused((f) => (f === n.path ? null : f))}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setSelected(n.path);

@@ -13,7 +13,7 @@
 .board-paper:focus-visible { outline-offset: -2px; }
 
 .board-paper {
-  position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; cursor: grab;
+  position: relative; flex: 1; min-height: 0; overflow: clip; touch-action: none; cursor: grab; /* clip, not hidden: focus must never scroll it */
   background-color: var(--thoth-bg);
   background-image: radial-gradient(circle, rgb(var(--thoth-ink) / 0.12) 1px, transparent 1.2px);
 }
@@ -22,29 +22,33 @@
 .board-strings, .board-squares { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .board-strings path { fill: none; stroke: rgb(var(--thoth-ink) / 0.35); stroke-width: 1.5; stroke-linecap: round; transition: stroke var(--thoth-dur-fast) var(--thoth-ease-out); }
 .board-strings path[data-active] { stroke: var(--thoth-moon); stroke-width: 2; }
-.board-squares rect[data-state="suggested"] { opacity: 0.5; }
+.board-squares rect[data-state="suggested"] { fill-opacity: 0.55; }
 .board-squares rect[data-state="missing"] { fill: var(--thoth-bg-active) !important; }
 
 /* A note: 160×120, square with a curled corner, top-left at the note's x/y. */
 .board-note {
   position: absolute; width: 160px; height: 120px; box-sizing: border-box; padding: 14px 12px 10px;
   display: flex; flex-direction: column; gap: 4px; text-align: start; cursor: pointer;
-  border: 0; border-radius: 2px 2px 14px 2px; background: var(--thoth-note-cream); color: var(--thoth-note-ink);
+  border: 0; border-radius: 2px 2px 14px 2px; --note-paper: var(--thoth-note-cream); background: var(--note-paper); color: var(--thoth-note-ink);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 10px -4px rgb(0 0 0 / 0.18);
   transition: box-shadow var(--thoth-dur-fast) var(--thoth-ease-out), transform var(--thoth-dur-fast) var(--thoth-ease-out), opacity var(--thoth-dur-fast) var(--thoth-ease-out);
 }
 .board-note::after { content: ""; position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; border-radius: 0 0 14px 0; background: linear-gradient(135deg, transparent 50%, rgb(0 0 0 / 0.1) 50%); pointer-events: none; }
-.board-note[data-color="gray"] { background: var(--thoth-note-gray); }
-.board-note[data-color="brown"] { background: var(--thoth-note-brown); }
-.board-note[data-color="orange"] { background: var(--thoth-note-orange); }
-.board-note[data-color="yellow"] { background: var(--thoth-note-yellow); }
-.board-note[data-color="green"] { background: var(--thoth-note-green); }
-.board-note[data-color="blue"] { background: var(--thoth-note-blue); }
-.board-note[data-color="purple"] { background: var(--thoth-note-purple); }
-.board-note[data-color="red"] { background: var(--thoth-note-red); }
+.board-note[data-color="gray"] { --note-paper: var(--thoth-note-gray); }
+.board-note[data-color="brown"] { --note-paper: var(--thoth-note-brown); }
+.board-note[data-color="orange"] { --note-paper: var(--thoth-note-orange); }
+.board-note[data-color="yellow"] { --note-paper: var(--thoth-note-yellow); }
+.board-note[data-color="green"] { --note-paper: var(--thoth-note-green); }
+.board-note[data-color="blue"] { --note-paper: var(--thoth-note-blue); }
+.board-note[data-color="purple"] { --note-paper: var(--thoth-note-purple); }
+.board-note[data-color="red"] { --note-paper: var(--thoth-note-red); }
 .board-note[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--thoth-accent), 0 4px 10px -4px rgb(0 0 0 / 0.18); }
-.board-note[data-state="suggested"] { opacity: 0.55; box-shadow: none; outline: 1px dashed rgb(var(--thoth-ink) / 0.3); }
-.board-note[data-state="suggested"]:hover, .board-note[data-state="suggested"]:focus-visible { opacity: 0.9; }
+/* A suggestion fades its paper and pin, never its text (55 % paper: contrast.test.ts checks the inks on it). */
+.board-note[data-state="suggested"] { background: color-mix(in srgb, var(--note-paper) 55%, transparent); box-shadow: none; outline: 1px dashed rgb(var(--thoth-ink) / 0.35); outline-offset: -1px; }
+.board-note[data-state="suggested"]::after { opacity: 0.4; }
+.board-note[data-state="suggested"] .board-pin { opacity: 0.4; }
+.board-note[data-state="suggested"]:hover { background: color-mix(in srgb, var(--note-paper) 80%, transparent); }
+.board-note[data-state="suggested"]:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .board-note[data-state="missing"] { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
 .board-note[data-lifted] { z-index: 1; cursor: grabbing; transform: rotate(3deg) scale(1.03); box-shadow: 0 2px 4px rgb(0 0 0 / 0.12), 0 18px 32px -10px rgb(0 0 0 / 0.35); transition: none; }
 .board-note[data-wobble] { animation: board-wobble 300ms var(--thoth-ease-out); }
@@ -75,3 +79,4 @@
 .board-list-open:hover:not(:disabled) { background: var(--thoth-bg-hover); }
 .board-list-open:disabled { cursor: default; }
 .board-list-state { color: var(--thoth-ink-secondary); }
+.board-list .board-tool { margin-inline-start: var(--thoth-space-2); }

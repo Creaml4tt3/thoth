@@ -1188,9 +1188,11 @@ export const en = {
     allTags: "All tags",
     allFolders: "All folders",
     missing: "Missing note",
+    /** A faded note: linked to the board, not pinned yet. */
+    suggested: "Suggested",
     empty: "No notes yet. Add a note to start this board.",
     emptyOverview: "No pages yet.",
-    instructions: "Tab moves between notes. Enter opens a note; arrow keys move the selected one, Shift for larger steps. Choosing a faded suggestion pins it. The context menu key or Shift+F10 shows more. Plus, minus and 0 zoom.",
+    instructions: "Tab moves between notes. Space selects a note and Escape clears the selection. Enter opens a note; arrow keys move the selected one, Shift for larger steps. Choosing a faded suggestion pins it. The context menu key or Shift+F10 shows more. Plus, minus and 0 zoom.",
     /** A note button's name: title, tags and how many pages it links with. */
     noteLabel: (title: string, tags: readonly string[], links: number, state: "pinned" | "suggested" | "missing" | "free") =>
       state === "missing" ? `${title}, missing note` : [title, ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), plural(links, "link"), ...(state === "suggested" ? ["suggested"] : [])].join(", "),

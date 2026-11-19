@@ -69,3 +69,25 @@ describe("createHistory", () => {
     expect(h.canRedo()).toBe(true);
   });
 });
+
+describe("createHistory, a push while a step is in flight", () => {
+  it("keeps the new entry undoable and still moves the stepped entry to redo", async () => {
+    const seen: string[] = [];
+    const h = createHistory();
+    let release!: () => void;
+    h.push({ undo: () => new Promise<void>((r) => (release = () => { seen.push("undo a"); r(); })), redo: () => void seen.push("redo a") });
+    const undoing = h.undo();
+    await Promise.resolve();
+    await Promise.resolve();
+    h.push({ undo: () => void seen.push("undo b"), redo: () => void seen.push("redo b") });
+    release();
+    await undoing;
+    expect(h.canUndo()).toBe(true);
+    expect(h.canRedo()).toBe(true);
+    await h.undo();
+    expect(seen).toEqual(["undo a", "undo b"]);
+    await h.redo();
+    await h.redo();
+    expect(seen).toEqual(["undo a", "undo b", "redo b", "redo a"]);
+  });
+});

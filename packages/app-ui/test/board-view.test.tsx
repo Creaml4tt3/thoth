@@ -288,6 +288,81 @@ describe("BoardView", () => {
   });
 });
 
+describe("BoardView, focus and safety (review round 1)", () => {
+  it("an arrow move that passes another note in reading order keeps focus on the moved note", async () => {
+    const { user } = setup({ notes: [note("A.md", 0, 0), note("B.md", 300, 8)] });
+    await user.click(noteButton(/^B,/));
+    expect(document.activeElement).toBe(noteButton(/^B,/));
+    await user.keyboard("{Shift>}{ArrowUp}{/Shift}");
+    expect(noteButton(/^B,/).style.top).toBe("-32px");
+    expect(document.activeElement).toBe(noteButton(/^B,/));
+    // DOM order follows the stored positions, so the focused button is not moved in the DOM (Chromium blurs it).
+    expect(screen.getAllByRole("button", { name: /links?$/ }).map((b) => b.dataset.path)).toEqual(["A.md", "B.md"]);
+  });
+
+  it("the paper clips instead of scrolling, and focusing a note partly out of view pans it into view", () => {
+    const css = readFileSync(fileURLToPath(import.meta.url).replace(/test[\\/][^\\/]+$/, "src/board/board.css"), "utf8");
+    expect(/\.board-paper \{[^}]*overflow:\s*clip/.test(css)).toBe(true);
+    const { region, plane } = setup();
+    const [x0] = translate(plane());
+    fireEvent.wheel(region, { deltaX: x0 + 50, deltaY: 0 }); // A's left edge now 50 px left of the board
+    expect(translate(plane())[0]).toBe(-50);
+    act(() => noteButton(/^A,/).focus());
+    const [x, y] = translate(plane());
+    const z = zoom(plane());
+    expect(x).toBeGreaterThanOrEqual(0); // A is at board x 0
+    expect(x + 160 * z).toBeLessThanOrEqual(1200);
+    expect(y).toBeGreaterThanOrEqual(0);
+  });
+
+  it("a focused note panned out of view stays in the DOM with focus", () => {
+    const { region } = setup();
+    act(() => noteButton(/^B,/).focus());
+    fireEvent.wheel(region, { deltaX: 100_000, deltaY: 0 });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("B, 1 link");
+    expect(screen.queryByRole("button", { name: /^A,/ })).toBeNull();
+  });
+
+  it("List view keeps the zoom and pan; a board whose notes arrive after mount still fits", async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "Zoom out" }));
+    expect(screen.getByText("80%")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "List view" }));
+    await user.click(screen.getByRole("button", { name: "List view" }));
+    expect(screen.getByText("80%")).toBeTruthy();
+    cleanup();
+    const actions: BoardActions = { open: vi.fn() };
+    const view = render(<BoardView label="Late" notes={[]} strings={[]} actions={actions} />);
+    view.rerender(<BoardView label="Late" notes={[note("Far.md", 5000, 5000)]} strings={[]} actions={actions} />);
+    expect(screen.getByRole("button", { name: /^Far,/ })).toBeTruthy();
+  });
+
+  it("a double-click on a suggestion pins it once", async () => {
+    const pin = vi.fn();
+    const { user } = setup({ notes: [A, note("S.md", 300, 0, { state: "suggested" })], actions: { pin } });
+    await user.dblClick(noteButton(/^S,/));
+    expect(pin).toHaveBeenCalledTimes(1);
+  });
+
+  it("List view marks suggested notes (with Pin to board) and missing ones", async () => {
+    const pin = vi.fn();
+    const { user } = setup({ notes: [A, note("S.md", 300, 0, { state: "suggested" }), note("Gone.md", 0, 300, { state: "missing" })], strings: [], actions: { pin } });
+    await user.click(screen.getByRole("button", { name: "List view" }));
+    const [, s, gone] = within(screen.getByRole("list", { name: "OCR research" })).getAllByRole("listitem");
+    expect(s!.textContent).toContain("Suggested");
+    await user.click(within(s!).getByRole("button", { name: "Pin to board" }));
+    expect(pin).toHaveBeenCalledWith("S.md");
+    expect(gone!.textContent).toContain("Missing note");
+  });
+
+  it("the instructions mention Space to select and Escape to clear", () => {
+    const { region } = setup();
+    const text = document.getElementById(region.getAttribute("aria-describedby")!)!.textContent!;
+    expect(text).toMatch(/Space/);
+    expect(text).toMatch(/Escape/);
+  });
+});
+
 function translate(el: HTMLElement): [number, number] {
   const m = /translate\(([-\d.e]+)px,\s*([-\d.e]+)px\)/.exec(el.style.transform)!;
   return [Number(m[1]), Number(m[2])];

@@ -3,7 +3,8 @@ export interface HistoryEntry { undo(): Promise<void> | void; redo(): Promise<vo
 
 /**
  * Undo and redo stacks. A new entry clears redo. Calls run one after another (key repeat can fire Cmd+Z faster than a
- * write finishes); an entry whose step throws stays where it was, and the error reaches the caller.
+ * write finishes); an entry whose step throws stays where it was, and the error reaches the caller. An entry pushed
+ * while a step runs stays undoable, and the stepped entry still moves to the other stack.
  * The type parameter is unused (kept from the plan's signature): entries are plain closures.
  */
 export function createHistory<_T = unknown>(): { push(entry: HistoryEntry): void; undo(): Promise<void>; redo(): Promise<void>; canUndo(): boolean; canRedo(): boolean } {
@@ -15,7 +16,8 @@ export function createHistory<_T = unknown>(): { push(entry: HistoryEntry): void
       const entry = from.at(-1);
       if (!entry) return;
       await run(entry);
-      from.pop();
+      // A push during the await stays where it was; only this entry moves (and a push's cleared redo stays cleared).
+      from.splice(from.lastIndexOf(entry), 1);
       to.push(entry);
     });
     queue = next.catch(() => {});
