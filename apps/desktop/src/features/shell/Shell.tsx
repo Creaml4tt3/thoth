@@ -68,6 +68,8 @@ import { ObsidianDailyQuestion } from "../settings/DailySettings.tsx";
 import { useRecentPages } from "@thoth/app-ui/home/useRecent.ts";
 import { RECENT_SHOWN } from "@thoth/app-ui/home/recent.ts";
 import { folderOf, workspaceRow } from "@thoth/app-ui/home/rows.ts";
+import { BoardTab } from "../board/BoardTab.tsx";
+import { openBoardFromPage } from "../board/from-page.ts";
 
 const noSubscribe = () => () => undefined;
 
@@ -172,6 +174,8 @@ export function Shell() {
 
   /** Timeline (ADR-0051): one tab, like Settings. */
   const openTimeline = () => tabs.open(TIMELINE);
+  /** The Board's Overview (ADR-0056): one tab, like Timeline. */
+  const openBoard = () => tabs.open({ kind: "board" });
   const toggleSearch = () => setDialog((d) => (d?.kind === "search" ? null : { kind: "search" }));
   const toggleShortcuts = () => setDialog((d) => (d?.kind === "shortcuts" ? null : { kind: "shortcuts" }));
   const platform = useMemo(() => currentPlatform(), []);
@@ -197,6 +201,8 @@ export function Shell() {
       }
       case "timeline":
         return strings.timeline.title;
+      case "board":
+        return tab.path === undefined ? strings.board.overview : stripExtension(basename(tab.path));
       case "home": // never shown: the desktop drops a saved Home tab
       case "blank":
         return tt.blank;
@@ -360,6 +366,8 @@ export function Shell() {
     leaveSpace: leave,
     openToday: () => openToday(),
     openTimeline: () => openTimeline(),
+    openBoard,
+    ...(path ? { boardFromPage: () => attempt(() => openBoardFromPage({ vault, refresh, tabs }, path)) } : {}),
     showTour: requestTour,
     sidebar: { hidden: side.hidden, toggle: side.toggle },
     ...(editor?.canFormat() ? { format: (command) => void editor.format(command) } : {}),
@@ -544,6 +552,8 @@ export function Shell() {
       <PageView key={`${id}\n${shown.path}`} path={shown.path} />
     ) : shown.kind === "timeline" ? (
       <TimelineView sources={timelineSources} />
+    ) : shown.kind === "board" ? (
+      <BoardTab key={`${id}\n${shown.path ?? ""}`} path={shown.path} />
     ) : (
       <HomeView recent={homeRecent} favorites={homeFavorites} today={homeToday} onTimeline={openTimeline} />
     );
@@ -566,7 +576,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
-      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} onTimeline={openTimeline} timelineOpen={target.kind === "timeline"} />
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} onTimeline={openTimeline} timelineOpen={target.kind === "timeline"} onBoard={openBoard} boardOpen={target.kind === "board"} />
       <main className="main">
         <Panes
           tabs={tabs}

@@ -1096,5 +1096,17 @@ export const th: Strings = {
     linkFilter: "ค้นหาโน้ตบนบอร์ดนี้", // REVIEW
     linkNone: "ไม่มีโน้ตอื่นที่ตรงกัน", // REVIEW
     linkFailed: "เพิ่มลิงก์ไม่สำเร็จ", // REVIEW
+    switcher: "บอร์ด", // REVIEW
+    filterTag: "แท็ก", // REVIEW
+    filterFolder: "โฟลเดอร์", // REVIEW
+    create: "สร้าง", // REVIEW
+    cancel: "ยกเลิก", // REVIEW
+    addNoteFilter: "ค้นหาหน้า", // REVIEW
+    addNoteNone: "ไม่มีหน้าที่ตรงกัน", // REVIEW
+    gone: "ไม่พบบอร์ดนี้แล้ว อาจถูกย้ายหรือลบไป", // REVIEW
+    invalid: "อ่านบอร์ดนี้ไม่ได้ Thoth จึงไม่แตะต้องไฟล์นี้", // REVIEW
+    saveFailed: "บันทึกบอร์ดไม่สำเร็จ จึงอ่านบอร์ดใหม่อีกครั้ง", // REVIEW
+    fromPage: "สร้างบอร์ดจากหน้านี้", // REVIEW
+    openCommand: "เปิดบอร์ด", // REVIEW
   },
 };

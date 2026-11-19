@@ -12,6 +12,8 @@ import { useSession } from "../../app/context.ts";
 import { privateAcross } from "./space-drop.ts";
 import { useDesktopStrings } from "../../strings/index.ts";
 import { ancestorFolders, buildTree } from "./tree.ts";
+import { setTargetFolder } from "./target-folder.ts";
+import { boardStore } from "../board/board-store.ts";
 import { PrivateTree, type Selection } from "./PrivateTree.tsx";
 import { useServerSections } from "../servers/ServersSidebar.tsx";
 import { SidebarSections, type SidebarSection } from "./SidebarSections.tsx";
@@ -55,6 +57,9 @@ interface Props {
   /** Opens the Timeline (ADR-0051), and whether the current tab shows it. */
   onTimeline(): void;
   timelineOpen: boolean;
+  /** Opens the Board's Overview (ADR-0056), and whether the current tab shows a board. */
+  onBoard(): void;
+  boardOpen: boolean;
 }
 
 /** Moves whose originals were kept: the result stays visible until dismissed (ADR-0006: never reported as finished). */
@@ -96,7 +101,7 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch, onTimeline, timelineOpen }: Props) {
+export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch, onTimeline, timelineOpen, onBoard, boardOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
@@ -107,24 +112,28 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
   const teamMemories = useTeamMemoryEntry();
   const hideLabel = useStrings().sidebar.hide;
   const timelineLabel = useStrings().timeline.title;
+  const boardLabel = useStrings().board.title;
   // The order people gave (`.thoth/order.json`) and the folders that hold no page; A–Z when there is none.
   const [order, setOrder] = useState<OrderRecord>(() => emptyOrder());
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
+  const [boards, setBoards] = useState<string[]>([]);
   useEffect(() => {
     let live = true;
-    void Promise.all([readOrder(vault), vault.listFolders().catch(() => [] as string[])]).then(([record, folders]) => {
+    void Promise.all([readOrder(vault), vault.listFolders().catch(() => [] as string[]), boardStore(vault).list().catch(() => [] as string[])]).then(([record, folders, canvases]) => {
       if (!live) return;
       setOrder(record);
       setEmptyFolders(folders);
+      setBoards(canvases);
     });
     return () => {
       live = false;
     };
   }, [vault, pages]);
-  const tree = useMemo(() => buildTree(pages, { folders: emptyFolders, order }), [pages, emptyFolders, order]);
+  const tree = useMemo(() => buildTree(pages, { folders: emptyFolders, order, boards }), [pages, emptyFolders, order, boards]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   /** The folder New page and New folder go into: the last folder clicked, or the folder of the last page clicked (0.2.6). */
   const [target, setTarget] = useState("");
+  useEffect(() => setTargetFolder(target), [target]);
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
 
@@ -294,6 +303,9 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
       </button>
       <button type="button" className="sidebar-link" aria-current={timelineOpen ? "page" : undefined} onClick={onTimeline}>
         {timelineLabel}
+      </button>
+      <button type="button" className="sidebar-link" aria-current={boardOpen ? "page" : undefined} onClick={onBoard}>
+        {boardLabel}
       </button>
       <nav aria-label={t.pages} className="tree-wrap">
         <SidebarSections root={connection.root} sections={[...(favoritesSection ? [favoritesSection] : []), privateSection, ...serverSections, ...(agentsSection ? [agentsSection] : [])]} />

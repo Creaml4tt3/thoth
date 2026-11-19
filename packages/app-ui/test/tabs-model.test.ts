@@ -377,3 +377,46 @@ describe("the gestures that open a new tab", () => {
     expect(isOpenInNewTabKey({ ...mods, key: "a", ctrlKey: true })).toBe(false);
   });
 });
+
+describe("the Board tab (ADR-0056)", () => {
+  const board = (path?: string): TabTarget => (path === undefined ? { kind: "board" } : { kind: "board", path });
+  const shown = (s: TabsState) => s.tabs.map((t) => (t.target.kind === "board" ? `board:${t.target.path ?? ""}` : t.target.kind === "page" ? t.target.path : t.target.kind));
+
+  it("the Overview opened twice is one tab", () => {
+    let s = open(initialTabs([page("A.md")]), board());
+    s = open(activate(s, s.tabs[0]!.id), board());
+    expect(shown(s)).toEqual(["A.md", "board:"]);
+    expect(activeTab(s).target).toEqual(board());
+  });
+
+  it("two boards are two tabs, each opened again goes to its tab", () => {
+    let s = open(initialTabs([page("A.md")]), board("A.canvas"));
+    s = open(activate(s, s.tabs[0]!.id), board("B.canvas"));
+    expect(shown(s)).toEqual(["A.md", "board:B.canvas", "board:A.canvas"]);
+    s = open(activate(s, s.tabs[0]!.id), board("A.canvas"));
+    expect(shown(s)).toEqual(["A.md", "board:B.canvas", "board:A.canvas"]);
+    expect(activeTab(s).target).toEqual(board("A.canvas"));
+  });
+
+  it("a board tab's switcher shows another board in the same tab; a new tab is asked for with newTab", () => {
+    let s = open(initialTabs([page("A.md")]), board());
+    s = open(s, board("A.canvas"));
+    expect(shown(s)).toEqual(["A.md", "board:A.canvas"]);
+    s = open(s, board("B.canvas"), { newTab: true });
+    expect(shown(s)).toEqual(["A.md", "board:A.canvas", "board:B.canvas"]);
+  });
+
+  it("is stored and comes back on restart; a stored path that is not a .canvas is dropped", () => {
+    const s = open(open(initialTabs([page("A.md")]), board()), board("Research/OCR.canvas"), { newTab: true });
+    const text = serializeTabs(s);
+    expect(JSON.parse(text).tabs.slice(1)).toEqual([{ k: "board" }, { k: "board", path: "Research/OCR.canvas" }]);
+    expect(shown(parseTabs(text)!)).toEqual(["A.md", "board:", "board:Research/OCR.canvas"]);
+    const bad = JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }, { k: "board", path: "A.md" }, { k: "board", path: 3 }] });
+    expect(shown(parseTabs(bad)!)).toEqual(["A.md"]);
+  });
+
+  it("follows a renamed board file", () => {
+    const s = remapPaths(open(initialTabs([page("A.md")]), board("Old.canvas")), "Old.canvas", "New.canvas");
+    expect(shown(s)).toEqual(["A.md", "board:New.canvas"]);
+  });
+});

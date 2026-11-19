@@ -29,6 +29,8 @@ export type TabTarget =
   | { kind: "home" }
   /** Timeline (ADR-0051): pages by date. One tab at most, like Home. */
   | { kind: "timeline" }
+  /** The Board (ADR-0056): no `path` is the Overview, else a `.canvas` file. One tab per board, like Timeline. */
+  | { kind: "board"; path?: string }
   /** A new tab: it shows the Home view too, so a new tab is never empty. */
   | { kind: "blank" };
 
@@ -98,6 +100,8 @@ export function sameTarget(a: TabTarget, b: TabTarget): boolean {
       return b.kind === "home";
     case "timeline":
       return b.kind === "timeline";
+    case "board":
+      return b.kind === "board" && a.path === b.path;
     case "blank":
       return b.kind === "blank";
   }
@@ -123,10 +127,13 @@ export function retarget(state: TabsState, id: string, target: TabTarget): TabsS
 
 /** Opens `target` in the current tab, or in a new one next to it. */
 export function open(state: TabsState, target: TabTarget, options: OpenOptions = {}): TabsState {
-  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home" || target.kind === "timeline") {
+  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home" || target.kind === "timeline" || target.kind === "board") {
     const existing = state.tabs.find((t) => (target.kind === "settings" ? t.target.kind === "settings" : sameTarget(t.target, target)));
     if (existing) return { ...retarget(state, existing.id, target), active: existing.id };
-    return activeTab(state).target.kind === "blank" ? retarget(state, state.active, target) : insertAfterActive(state, target);
+    const here = activeTab(state);
+    // A board tab switches boards in place (its switcher), unless it is pinned or a new tab is asked for.
+    const takes = here.target.kind === "blank" || (target.kind === "board" && here.target.kind === "board" && !here.pinned && !options.newTab);
+    return takes ? retarget(state, state.active, target) : insertAfterActive(state, target);
   }
   // A pinned tab keeps its page: what would replace it opens beside the pinned tabs instead.
   return options.newTab || activeTab(state).pinned ? insertAfterActive(state, target) : retarget(state, state.active, target);
@@ -254,11 +261,11 @@ export function detach(state: TabsState, id: string): { source: TabsState; moved
 export function remapPaths(state: TabsState, from: string, to: string): TabsState {
   let changed = false;
   const tabs = state.tabs.map((t) => {
-    if (t.target.kind !== "page") return t;
+    if (t.target.kind !== "page" && t.target.kind !== "board") return t;
     const path = t.target.path;
-    if (path !== from && !path.startsWith(`${from}/`)) return t;
+    if (path === undefined || (path !== from && !path.startsWith(`${from}/`))) return t;
     changed = true;
-    return { ...t, target: { kind: "page" as const, path: to + path.slice(from.length) } };
+    return { ...t, target: { kind: t.target.kind, path: to + path.slice(from.length) } };
   });
   return changed ? { ...state, tabs } : state;
 }
@@ -302,6 +309,8 @@ function storedTarget(target: TabTarget): unknown {
       return { k: "home" };
     case "timeline":
       return { k: "timeline" };
+    case "board":
+      return target.path === undefined ? { k: "board" } : { k: "board", path: target.path };
     case "blank":
       return { k: "blank" };
   }
@@ -324,6 +333,9 @@ function targetFromStored(value: unknown): TabTarget | null {
       return HOME;
     case "timeline":
       return TIMELINE;
+    case "board":
+      if (v["path"] === undefined) return { kind: "board" };
+      return text(v["path"], 4096) && v["path"].endsWith(".canvas") ? { kind: "board", path: v["path"] } : null;
     case "blank":
       return BLANK;
     default:

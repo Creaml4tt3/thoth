@@ -1207,6 +1207,19 @@ export const en = {
     linkFilter: "Find a note on this board",
     linkNone: "No other note matches.",
     linkFailed: "Couldn’t add the link.",
+    /** The tab's header (Task 8): the board switcher, filters, dialogs and what a board that cannot be shown says. */
+    switcher: "Board",
+    filterTag: "Tag",
+    filterFolder: "Folder",
+    create: "Create",
+    cancel: "Cancel",
+    addNoteFilter: "Find a page",
+    addNoteNone: "No page matches.",
+    gone: "This board is gone. It may have been moved or deleted.",
+    invalid: "This board can’t be read, so Thoth leaves it as it is.",
+    saveFailed: "Couldn’t save the board; it was read again.",
+    fromPage: "Board from this page",
+    openCommand: "Open Board",
   },
 };
 

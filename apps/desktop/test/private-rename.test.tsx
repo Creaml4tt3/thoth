@@ -133,7 +133,7 @@ describe("rename a page with F2", () => {
     const app = await start();
     fireEvent.contextMenu(await rowEl("Beta"));
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Add to Favorites", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "DuplicateCtrl+Shift+D", "Duplicate structure only", "Duplicate to…", "Delete…"]);
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Open in new tabCtrl+Enter", "Add to Favorites", "Board from this page", "RenameF2", "Move up⌥⇧↑", "Move down⌥⇧↓", "Move to…", "DuplicateCtrl+Shift+D", "Duplicate structure only", "Duplicate to…", "Delete…"]);
     await app.user.click(within(menu).getByRole("menuitem", { name: /^Rename/ }));
     const field = (await screen.findByRole("textbox", { name: "Rename Beta" })) as HTMLInputElement;
     expect(field.value).toBe("Beta");
