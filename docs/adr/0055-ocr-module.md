@@ -1,6 +1,6 @@
 # ADR-0055: The OCR module: engine, models, PDF renderer and the broken-text check
 
-- **Status:** Proposed (Phase 0 spike, 2026-11-19). The owner decides; §"Decisions for the owner" lists what is open.
+- **Status:** Accepted (owner, 2026-11-19), after the Phase 0 spike.
 - **Date:** 2026-11-19
 - **Deciders:** project owner
 - **Builds on:** [the OCR plan](../architecture/ocr-plan.md) §2b, §4, §5, §5a, §6; ADR-0008, ADR-0034.
@@ -152,14 +152,16 @@ And on a page judged broken, OCR read the owner's brochure at 1.0–3.6 % oCER, 
 7. **Pin `oar-ocr` =0.10.3, `ort` =2.0.0-rc.13**, and move together when oar-ocr and ort-tract (if kept for Intel)
    line up again.
 
-## Decisions for the owner
+## Decided by the owner (2026-11-19)
 
-- **Ship `thoth-ocr` in the module download** instead of the installer (plan §4 put it next to `thoth-mcp`). Measured,
-  it would add 12.6–30 MB to every installer, against a 5 MB target. In the download, it updates only with the app.
-- **Intel Macs:** our own ONNX Runtime build for x86_64 (Decision 2), or tract as the Intel-only fallback.
-- **Mac built-in (Vision)** as a later third choice on Macs (Decision 5).
-- **Read ten outputs next to their images** (exit criterion 3). The ten files whose ground truth to check are listed
-  in the spike's private results folder, not here.
+- **`thoth-ocr` ships in the module download**, not in the installer. The installer does not grow; the program updates
+  only with the app.
+- **Intel Macs: we build ONNX Runtime for `x86_64-apple-darwin` ourselves** in CI (Decision 2). The tract engine stays
+  the fallback for Intel Macs only if that build is not ready for 0.12.0.
+- **Mac built-in (Vision) becomes a third choice on Macs, later** (after 0.12.0).
+- **Ground truth checked by the owner:** the page name ends in กิฐ, the first name is รัศมิ์ and the surname โซ๊ะ, as
+  transcribed; the news headlines print the name both as พีธ and พีท, and the transcription keeps what is printed.
+  Rescored after the check: no number changed by more than 0.03 points, so no decision changes.
 
 ## Consequences
 
@@ -181,7 +183,7 @@ And on a page judged broken, OCR read the owner's brochure at 1.0–3.6 % oCER, 
 - **ONNX Runtime for x86_64 macOS from source:** not attempted.
 - **A laptop other than an M4:** an M4 is a fast laptop; older or Intel laptops will be slower. The 3 s target has
   headroom on ORT (278 ms p95) but not much on tract.
-- **The ten-output owner review:** not done; it needs the owner.
+- **The ten-output owner review:** the owner checked the four uncertain words (above); the rest of the ten were not re-read.
 - **Handwriting and Typhoon OCR 2:** out of scope.
 - **Installed size on disk per platform** and the final signed module archive.
 - **Public images** (Thai Wikipedia screenshots, public-domain scans): not added. The synthetic set covers those
