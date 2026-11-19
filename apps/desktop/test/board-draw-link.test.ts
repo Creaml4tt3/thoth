@@ -167,6 +167,20 @@ describe("drawLink", () => {
     expect(await read("Atlas.md")).toBe(before);
   });
 
+  it("a page ending inside an open code block is not written to", async () => {
+    await put("Code.md", "# Code\n\n```js\nconst a = 1;\n");
+    await vault.reconcile();
+    expect((await drawLink(vault, flushed, "Code.md", "Roadmap.md")).outcome).toBe("changed");
+    expect(await read("Code.md")).toBe("# Code\n\n```js\nconst a = 1;\n");
+  });
+
+  it("a page with frontmatter gets a link it resolves", async () => {
+    await put("Front.md", "---\ntags: [a]\n---\nBody");
+    await vault.reconcile();
+    expect((await drawLink(vault, flushed, "Front.md", "Roadmap.md")).outcome).toBe("linked");
+    expect(await read("Front.md")).toBe("---\ntags: [a]\n---\nBody\n[[Roadmap]]\n");
+  });
+
   it("a page whose name cannot be spelled as a working link is not written to", async () => {
     await put("a]b.md", "# a]b\n");
     await vault.reconcile();

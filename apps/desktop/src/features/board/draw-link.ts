@@ -56,10 +56,6 @@ export async function drawLink(vault: Vault, flushAll: () => Promise<boolean>, f
   const text = target.title === "" || /[[\]|\r\n\\]/.test(target.title) ? stripExtension(basename(to)) : target.title;
   const found: Mention = { start: 0, end: 0, text, name: text, occurrence: 0, inTable: false, before: "", after: "" };
   const line = linkText(resolver, from, to, found);
-  // Written only if the line is, whole, one link that reaches `to`; some names cannot be spelled as one.
-  const [ref, ...more] = parsePage(from, line).references;
-  const reached = ref && resolver.resolve(from, ref);
-  if (!ref || more.length || ref.range.start !== 0 || ref.range.end !== line.length || reached?.state !== "resolved" || reached.path !== to) return { outcome: "changed" };
 
   // Recorded by the write that succeeded, for undo.
   let eol = "\n";
@@ -67,7 +63,13 @@ export async function drawLink(vault: Vault, flushAll: () => Promise<boolean>, f
   const written = await rewrite(vault, from, (source) => {
     eol = source.includes("\r\n") ? "\r\n" : "\n";
     sep = source === "" || source.endsWith("\n") ? "" : eol;
-    return source + sep + line + eol;
+    const next = source + sep + line + eol;
+    // Written only if, in the page as it would be, our line is one whole link that reaches `to`: not inside an open
+    // code block, not a name that cannot be spelled as a link. Ranges are UTF-16 offsets into the whole source.
+    const start = source.length + sep.length;
+    const ref = parsePage(from, next).references.at(-1);
+    const reached = ref && resolver.resolve(from, ref);
+    return ref?.range.start === start && ref.range.end === start + line.length && reached?.state === "resolved" && reached.path === to ? next : null;
   });
   if (written !== "written") return { outcome: written };
 
