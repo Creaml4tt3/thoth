@@ -845,9 +845,14 @@ export class Vault {
   /** Pages (with tags and a one-line excerpt) and the resolved page-to-page links between them, for the Board. */
   async graph(): Promise<{ pages: GraphPage[]; links: GraphLink[] }> {
     // Only a bounded head of the body is read: enough for title + aliases + the first line (a very long title/alias list gives an empty excerpt).
-    const rows = await this.sql.all<{ id: string; path: string; title: string; body: string | null }>(
-      "SELECT p.id, p.path, p.title, substr(s.body, 1, 2000) AS body FROM pages p LEFT JOIN search_content s ON s.page_id = p.id ORDER BY p.path",
-    );
+    // One scan of the FTS table, joined in JS: its page_id is UNINDEXED, so a JOIN on it scans the whole table per page.
+    const bodies = new Map<string, string>();
+    for (const b of await this.sql.all<{ page_id: string; body: string | null }>("SELECT page_id, substr(body, 1, 2000) AS body FROM search_content"))
+      bodies.set(b.page_id, b.body ?? "");
+    const rows = (await this.sql.all<{ id: string; path: string; title: string }>("SELECT id, path, title FROM pages ORDER BY path")).map((r) => ({
+      ...r,
+      body: bodies.get(r.id) ?? null,
+    }));
     const tags = new Map<string, string[]>();
     for (const t of await this.sql.all<{ page_id: string; tag: string }>("SELECT page_id, tag FROM page_tags ORDER BY rowid"))
       tags.set(t.page_id, [...(tags.get(t.page_id) ?? []), t.tag]);

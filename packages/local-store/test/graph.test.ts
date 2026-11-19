@@ -51,3 +51,27 @@ describe("Vault.graph", () => {
     ]);
   });
 });
+
+describe("Vault.graph at scale", () => {
+  it("reads 2,000 pages of ~3 KB in under a second", async () => {
+    const big = await mkdtemp(join(tmpdir(), "thoth-graph-big-"));
+    try {
+      const body = "word ".repeat(600);
+      for (let i = 0; i < 2000; i++) await writeFile(join(big, `P${i}.md`), `# P${i}\n\n[[P${(i + 1) % 2000}]] ${body}\n`);
+      const { vault: v } = await openNodeVault(big);
+      try {
+        const start = performance.now();
+        const { pages, links } = await v.graph();
+        const ms = performance.now() - start;
+        expect(pages).toHaveLength(2000);
+        expect(links).toHaveLength(2000);
+        // A JOIN on the FTS table's UNINDEXED page_id took ~2 s here; one scan takes tens of ms. 1 s is generous for CI.
+        expect(ms).toBeLessThan(1000);
+      } finally {
+        await v.close();
+      }
+    } finally {
+      await rm(big, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
