@@ -17,7 +17,9 @@ path = "src/bin/thoth-host-stdio.rs"
 
 [dependencies]
 base64.workspace = true
+flate2.workspace = true
 getrandom.workspace = true
+minisign-verify.workspace = true
 log.workspace = true
 notify.workspace = true
 notify-debouncer-full.workspace = true

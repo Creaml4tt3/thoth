@@ -30,6 +30,7 @@ pub mod index_home;
 pub mod install;
 pub mod links;
 pub mod mcp;
+pub mod modules;
 pub mod network;
 pub mod paths;
 pub mod remote;
