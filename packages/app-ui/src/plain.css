@@ -58,6 +58,8 @@
 .mode-switch { display: inline-flex; padding: 2px; border-radius: var(--thoth-radius-pill); background: var(--thoth-bg-hover); }
 .mode-option { border-radius: var(--thoth-radius-pill); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), box-shadow var(--thoth-dur-fast) var(--thoth-ease-out); }
 .mode-option:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--thoth-bg-active); }
+.mode-option { display: inline-flex; align-items: center; width: auto; gap: 5px; padding: 0 9px 0 7px; }
+.mode-option-label { font: var(--thoth-text-small); }
 .mode-option[aria-pressed="true"] { background: var(--thoth-bg); color: var(--thoth-ink-primary); box-shadow: 0 0 0 1px var(--thoth-border); }
 .plain-editor .wikilink[data-state="resolved"] { color: var(--thoth-link); }
 /* A web link in Plain mode (0.2.7): Cmd/Ctrl+click or a middle-click opens it; the tooltip says so. */

@@ -3,6 +3,7 @@ import type { PageSummary } from "@thoth/domain";
 import { emptyOrder, readOrder, type OrderRecord } from "@thoth/local-store";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { NotificationBell } from "@thoth/app-ui/notifications/NotificationBell.tsx";
+import { Icon } from "@thoth/app-ui/ui/Icon.tsx";
 import { IconButton } from "@thoth/app-ui/ui/IconButton.tsx";
 import { useAcrossDropZone } from "@thoth/app-ui/order/dnd.ts";
 import { requestNewFolder, requestNewPage } from "@thoth/app-ui/order/new-folder-request.ts";
@@ -306,9 +307,11 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
         <kbd>⌘K</kbd>
       </button>
       <button type="button" className="sidebar-link" aria-current={timelineOpen ? "page" : undefined} onClick={onTimeline}>
+        <Icon name="calendar" />
         {timelineLabel}
       </button>
       <button type="button" className="sidebar-link" aria-current={boardOpen ? "page" : undefined} onClick={onBoard}>
+        <Icon name="board" />
         {boardLabel}
       </button>
       <nav aria-label={t.pages} className="tree-wrap">

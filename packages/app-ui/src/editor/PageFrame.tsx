@@ -39,6 +39,9 @@ function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: 
           onClick={() => onChange(m.id)}
         >
           <Icon name={m.id === "blocks" ? "blocks" : "text"} />
+          <span className="mode-option-label" aria-hidden="true">
+            {t.modes[m.id].label}
+          </span>
         </button>
       ))}
     </div>

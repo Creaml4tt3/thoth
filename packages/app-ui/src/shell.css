@@ -443,7 +443,7 @@ div.tree-empty > p { margin: 0 0 6px; }
 .timeline-row-tags { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--thoth-text-small); color: var(--thoth-ink-secondary); }
 .timeline-time { flex: none; font-variant-numeric: tabular-nums; }
 /* The sidebar's Timeline entry, under search: a row like the trees' rows, at least 24px tall (WCAG 2.5.8). */
-.sidebar-link { all: unset; box-sizing: border-box; display: flex; align-items: center; min-height: 28px; margin: 0 4px 6px; padding: 4px 10px; border-radius: var(--thoth-radius-md); color: var(--thoth-ink-secondary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.sidebar-link { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 0 4px 6px; padding: 4px 10px; border-radius: var(--thoth-radius-md); color: var(--thoth-ink-secondary); cursor: pointer; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .sidebar-link:hover { background: var(--thoth-bg-hover); color: var(--thoth-ink-primary); }
 .sidebar-link[aria-current="page"] { background: var(--thoth-bg-active); color: var(--thoth-ink-primary); }
 .sidebar-link:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: -2px; }

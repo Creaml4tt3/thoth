@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard" | "module";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard" | "module" | "calendar" | "board";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A house: Home (ADR-0029). */
@@ -161,6 +161,21 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     </>
   ),
   text: <path d="M4 6h16M4 12h16M4 18h10" />,
+  /** A calendar page: the Timeline, pages by date (ADR-0051). */
+  calendar: (
+    <>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
+      <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+    </>
+  ),
+  /** Two notes pinned on a board, joined by a string: the Board (ADR-0056). */
+  board: (
+    <>
+      <rect x="3.5" y="4" width="8" height="7" rx="1.2" />
+      <rect x="12.5" y="13" width="8" height="7" rx="1.2" />
+      <path d="M11.5 8.5c2.5 0 4.5 1.5 4.5 4.5" />
+    </>
+  ),
   copy: (
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />

@@ -19,6 +19,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 
 ### Changed
 
+- Thoth opens the Private Space you had open when you quit. Back to Private Spaces before quitting shows the list of Private Spaces next time.
+- Blocks and Plain show their names next to their icons, and Timeline and Board in the sidebar have icons.
 - Settings shows one section at a time, with a wider list and an icon for each section.
 - Dropdowns look like the rest of Thoth instead of your system's.
 
