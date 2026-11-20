@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/thoth-host", "crates/thoth-mcp", "apps/desktop/src-tauri"]
+# The OCR program has its own workspace: it ships in the module download, not with the app (ADR-0055).
+exclude = ["crates/thoth-ocr"]
 
 [workspace.package]
 edition = "2024"
