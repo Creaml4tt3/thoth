@@ -119,6 +119,7 @@
 /* Page chrome */
 /* minmax(0, 1fr): the column may be narrower than its content, so a long breadcrumb is cut instead of widening the page. */
 .page-view { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
+.page-view:has(> .page-info) { grid-template-rows: auto auto 1fr; }
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
 /* Settings (ui/SettingsLayout.tsx): a tab list of the sections beside the chosen section, sticky while it scrolls; above
@@ -351,4 +352,4 @@
 .presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
 
 /* Under the breadcrumbs, outside the page's text: when the page was made and last edited, and by whom. */
-.page-info { margin: -6px 0 0; padding: 0 12px 4px var(--thoth-space-6); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-info { margin: -6px 0 0; padding: 0 12px 6px var(--thoth-space-6); line-height: 16px; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
