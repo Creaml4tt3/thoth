@@ -113,15 +113,24 @@ export function runImageOcr(ctx: EditorContext, view: EditorView, pos: number, m
   };
 
   const read = async (model?: Model): Promise<void> => {
-    status.say(t.reading, ctx.cancelOcr ? [{ label: t.cancel, onClick: () => ctx.cancelOcr?.() }] : []);
+    // Cancel may come before the host has started the program: the answer is dropped whatever it is.
+    let cancelled = false;
+    const cancel = (): void => {
+      cancelled = true;
+      ctx.cancelOcr?.();
+      status.say(t.cancelled);
+    };
+    status.say(t.reading, [{ label: t.cancel, onClick: cancel }]);
     let result: OcrResult;
     try {
       const loaded = await ctx.media()?.load(image.attrs["src"] as string);
+      if (cancelled) return;
       if (!loaded || loaded.state !== "ready") return status.say(t.notLoadedNoOcr);
       result = await ocr({ bytes: loaded.bytes, mimeType: loaded.mimeType }, model);
     } catch {
       result = { state: "failed", reason: "failed" };
     }
+    if (cancelled) return;
     switch (result.state) {
       case "not-installed":
         return status.say(t.notInstalled, ctx.openModules ? [{ label: t.openSettings, onClick: () => ctx.openModules?.() }] : []);

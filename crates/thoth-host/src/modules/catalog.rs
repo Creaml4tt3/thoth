@@ -93,7 +93,8 @@ impl Catalog {
         Catalog { runtime, list: parse_list(MODELS_JSON.as_bytes()).expect("models.json") }
     }
 
-    /// The signed list, checked with the compiled-in key: `serial` above `last_serial`, every URL under `BASE`.
+    /// The signed list, checked with the compiled-in key: `serial` not below `last_serial` (the same list is read again
+    /// after every restart; an older one is a rollback), every URL under `BASE`.
     pub fn from_signed(json: &[u8], sig: &str, last_serial: u64) -> HostResult<Catalog> {
         Self::from_signed_with(json, sig, last_serial, PUBLIC_KEY)
     }
@@ -101,8 +102,8 @@ impl Catalog {
     fn from_signed_with(json: &[u8], sig: &str, last_serial: u64, key: &str) -> HostResult<Catalog> {
         verify(json, sig, key)?;
         let list = parse_list(json)?;
-        if list.serial <= last_serial {
-            return Err(HostError::not_allowed(format!("the model list's serial {} is not above {last_serial}", list.serial)));
+        if list.serial < last_serial {
+            return Err(HostError::not_allowed(format!("the model list's serial {} is below {last_serial}", list.serial)));
         }
         Ok(Catalog { runtime: Self::compiled().runtime, list })
     }
@@ -196,9 +197,11 @@ mod tests {
     }
 
     #[test]
-    fn refuses_a_lower_or_equal_serial() {
-        assert!(Catalog::from_signed_with(LIST, LIST_SIG, 5, TEST_KEY).is_err());
+    fn refuses_a_lower_serial_and_takes_the_same_list_again() {
         assert!(Catalog::from_signed_with(LIST, LIST_SIG, 9, TEST_KEY).is_err());
+        assert!(Catalog::from_signed_with(LIST, LIST_SIG, 6, TEST_KEY).is_err());
+        // After a restart the app reads the list it already accepted: the same serial, not a rollback.
+        assert_eq!(Catalog::from_signed_with(LIST, LIST_SIG, 5, TEST_KEY).unwrap().list.serial, 5);
     }
 
     #[test]

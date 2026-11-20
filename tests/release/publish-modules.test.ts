@@ -49,6 +49,12 @@ describe("publish-modules", () => {
     expect(filled.test.file.size).toBeGreaterThan(0);
   });
 
+  it("never changes a published file, and skips one already there", async () => {
+    const { uploadsFor } = await import("../../scripts/publish-modules.ts");
+    expect(uploadsFor({ "modules/a.gz": "1", "modules/b.gz": "2" }, { "modules/a.gz": "1", "modules/b.gz": null })).toEqual(["modules/b.gz"]);
+    expect(() => uploadsFor({ "modules/a.gz": "1", "modules/b.gz": "2" }, { "modules/a.gz": "9", "modules/b.gz": null })).toThrow(/modules\/a\.gz/);
+  });
+
   it("refuses a url outside download.thothnotes.com/modules/", async () => {
     const root = await staged();
     for (const url of ["https://download.thothnotes.com/v0.12.0/det.onnx.gz", "https://evil.example/modules/det.onnx.gz", "http://download.thothnotes.com/modules/det.onnx.gz", `${BASE}../latest.json`]) {

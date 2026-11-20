@@ -156,9 +156,11 @@ async function main(): Promise<void> {
     const paths = { list: join(repo, "modules", "models.json"), stage: join(repo, "scripts", "ocr", "stage-models.sh"), release: join(repo, ".github", "workflows", "release-ocr.yml") };
     const next = applyChanges({ list: readFileSync(paths.list, "utf8"), stage: readFileSync(paths.stage, "utf8"), release: readFileSync(paths.release, "utf8") }, changes);
     for (const key of ["list", "stage", "release"] as const) writeFileSync(paths[key], next[key]);
-    // The revisions models.lock names in its header; its hashes are rewritten by staging with RELOCK=1.
-    const lock = join(repo, "tools", "ocr-spike", "models.lock");
-    writeFileSync(lock, changes.reduce((text, c) => text.replaceAll(c.from, c.to), readFileSync(lock, "utf8")));
+    // The revisions models.lock names in its header (its hashes are rewritten by staging with RELOCK=1), and WATCHED
+    // here: next week's check starts from the new revision.
+    for (const file of [join(repo, "tools", "ocr-spike", "models.lock"), join(repo, "scripts", "model-watch.ts")]) {
+      writeFileSync(file, changes.reduce((text, c) => text.replaceAll(c.from, c.to), readFileSync(file, "utf8")));
+    }
     console.log(JSON.stringify(next.versions));
   } else if (command === "read") {
     const [exe, models, preset, out] = args;

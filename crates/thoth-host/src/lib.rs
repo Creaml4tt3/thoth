@@ -618,10 +618,10 @@ impl Host {
             // The bytes are the image or PDF; they go to the program on stdin and nowhere else. Pages: `ocr.progress`.
             "ocr.read" => {
                 let data = bytes.ok_or_else(|| HostError::bad_argument("ocr.read needs request bytes"))?;
-                json(self.modules.read(args, data)?)
+                json(self.modules.read_as(owner, args, data)?)
             }
             "ocr.cancel" => {
-                self.modules.cancel_read();
+                self.modules.cancel_read(owner);
                 null()
             }
             // Connected apps (ADR-0021): the switch, the shared Private Spaces and each app's Allow or Deny, set by the

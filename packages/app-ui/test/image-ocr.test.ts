@@ -130,6 +130,21 @@ describe("Copy text and Insert text below", () => {
     expect(md()).toBe("![Receipt](receipt.png)\n");
   });
 
+  it("cancel before the program starts still changes nothing", async () => {
+    let finish: (r: OcrResult) => void = () => {};
+    // The host ignores this Cancel (nothing of this window runs yet) and the read later finishes normally.
+    const cancelOcr = vi.fn();
+    setup("![Receipt](receipt.png)\n", () => new Promise<OcrResult>((r) => (finish = r)), { cancelOcr });
+    item(openMenuOnImage(), "Insert text below")!.click();
+    await vi.waitFor(() => expect(status()?.textContent).toContain("Reading text…"));
+    [...status()!.querySelectorAll("button")].find((b) => b.textContent === "Cancel")!.click();
+    finish(done("Late text"));
+    await vi.waitFor(() => expect(status()?.textContent).toContain("Nothing was changed"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(md()).toBe("![Receipt](receipt.png)\n");
+    expect(status()?.textContent).toContain("Nothing was changed");
+  });
+
   it("a web image disables the items", async () => {
     setup("![Logo](https://example.org/logo.png)\n", async () => done("x"));
     const menu = openMenuOnImage();

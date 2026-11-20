@@ -78,10 +78,19 @@ impl Fetch for HttpFetch {
     fn open(&self, url: &str, max: u64) -> Result<Box<dyn std::io::Read + Send>, Failure> {
         let url = url::Url::parse(url).map_err(|_| Failure::Verify)?;
         let want = Want { accept: "*/*", user_agent: &self.user_agent, https_only: true, max: max as usize, stop_at_head: false, refuse_longer: true };
-        self.fetcher.open(&url, Instant::now() + DOWNLOAD_TIME, &want).map(|(_, _, r)| r).map_err(|e| match e.code {
-            "NOT_ALLOWED" => Failure::Verify,
-            _ => Failure::Offline,
-        })
+        self.fetcher.open(&url, Instant::now() + DOWNLOAD_TIME, &want).map(|(_, _, r)| r).map_err(|e| download_failure(e.code, &e.message))
+    }
+}
+
+/// What a failed download says. The server answered (a missing or wrong file) is not "offline": only a connection that
+/// failed, broke or took too long is.
+fn download_failure(code: &str, message: &str) -> Failure {
+    if code == "NOT_ALLOWED" || message.contains("too large") {
+        Failure::Verify
+    } else if message.contains("the server answered") || message.contains("redirect") {
+        Failure::Failed
+    } else {
+        Failure::Offline
     }
 }
 
@@ -99,7 +108,8 @@ impl ListSource for HttpFetch {
 }
 
 /// Runs the list's test image through a newly installed model: true when every expected phrase is in the text.
-type Tester = Arc<dyn Fn(&Program, &[u8], &[String]) -> bool + Send + Sync>;
+/// It runs on the app's own runner, so Cancel, Remove and quitting stop it as they stop a read.
+type Tester = Arc<dyn Fn(&Runner, &Program, &[u8], &[String]) -> bool + Send + Sync>;
 
 pub struct ModuleOptions {
     /// `<app-data>/modules/ocr`; `None`: no data folder, OCR unavailable.
@@ -151,8 +161,7 @@ fn model_arg(args: &Value) -> HostResult<ModelId> {
 }
 
 /// The real test: the program reads the image, and every phrase must be in its text.
-fn run_test(program: &Program, image: &[u8], expect: &[String]) -> bool {
-    let runner = Runner::new(runner::IDLE);
+fn run_test(runner: &Runner, program: &Program, image: &[u8], expect: &[String]) -> bool {
     let Ok((pages, _)) = runner.run(program, Kind::Image, image, &mut |_, _| {}) else { return false };
     let text: String = pages.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join("\n");
     expect.iter().all(|e| text.contains(e.as_str()))
@@ -332,13 +341,14 @@ impl Modules {
             .program(id, &entry.preset)
             .ok()
             .zip(std::fs::read(staged.path.join(TEST_FILE)).ok())
-            .is_some_and(|(program, image)| (self.tester)(&program, &image, &test.expect));
+            .is_some_and(|(program, image)| (self.tester)(&self.runner, &program, &image, &test.expect));
         if !passed {
             let _ = store.roll_back(&staged);
             if let Some(r) = &staged_runtime {
                 let _ = store.roll_back(r);
             }
-            return Err("test");
+            // Cancel (or quitting) during the check stops the test: that is not the model's fault.
+            return Err(if self.cancel.load(Ordering::SeqCst) { "cancelled" } else { "test" });
         }
         let _ = store.forget_previous(Dest::Model(id));
         if staged_runtime.is_some() {
@@ -356,18 +366,25 @@ impl Modules {
         Ok(Program { exe: runtime.join(EXE), ort: ort.exists().then_some(ort), models, preset: preset.to_owned() })
     }
 
-    /// `module.cancel`.
+    /// `module.cancel`: stops a download, or the test of a new model (which then keeps what was there).
     pub fn cancel(&self) -> Value {
-        if matches!(*locked(&self.job), Job::Downloading { .. }) {
-            self.cancel.store(true, Ordering::SeqCst);
+        let job = locked(&self.job).clone();
+        match job {
+            Job::Downloading { .. } => self.cancel.store(true, Ordering::SeqCst),
+            Job::Checking { .. } => {
+                self.cancel.store(true, Ordering::SeqCst);
+                self.runner.cancel();
+            }
+            _ => {}
         }
         self.status()
     }
 
     /// `module.remove`: stops a running read first, then deletes the model (and the program with the last one).
+    /// Refused while any download or check runs: removing the other model could take the program it is about to use.
     pub fn remove(&self, id: ModelId) -> HostResult<Value> {
         let store = self.store()?;
-        if matches!(*locked(&self.job), Job::Downloading { model, .. } | Job::Checking { model } if model == id) {
+        if matches!(*locked(&self.job), Job::Downloading { .. } | Job::Checking { .. }) {
             return Err(HostError::new("OCR_BUSY", "Wait for the download to finish or cancel it first"));
         }
         self.runner.cancel();
@@ -386,6 +403,11 @@ impl Modules {
 
     /// `ocr.read`: the text of an image or a PDF. `model`: `fast` if installed, else `second`.
     pub fn read(&self, args: &Value, bytes: &[u8]) -> HostResult<Value> {
+        self.read_as("", args, bytes)
+    }
+
+    /// `read` for `owner` (the window that asked): only its own `ocr.cancel` stops it.
+    pub fn read_as(&self, owner: &str, args: &Value, bytes: &[u8]) -> HostResult<Value> {
         let kind = match args.get("kind").and_then(Value::as_str) {
             Some("image") => Kind::Image,
             Some("pdf") => Kind::Pdf,
@@ -423,7 +445,8 @@ impl Modules {
         store.verify(Dest::Model(id))?;
         let program = self.program(id, &preset)?;
         let events = self.events.clone();
-        let (pages, total) = self.runner.run(&program, kind, bytes, &mut |page, pages| events(OCR_PROGRESS_EVENT, json!({ "page": page, "pages": pages })))?;
+        let (pages, total) =
+            self.runner.run_as(owner, &program, kind, bytes, &mut |page, pages| events(OCR_PROGRESS_EVENT, json!({ "page": page, "pages": pages })))?;
         let pages: Vec<Value> = pages.iter().map(|p| json!({ "text": p.text, "source": p.source })).collect();
         Ok(match total {
             Some(total) => json!({ "model": id.as_str(), "pages": pages, "total": total }),
@@ -431,9 +454,9 @@ impl Modules {
         })
     }
 
-    /// `ocr.cancel`.
-    pub fn cancel_read(&self) {
-        self.runner.cancel();
+    /// `ocr.cancel` from `owner`: stops its own read, never another window's.
+    pub fn cancel_read(&self, owner: &str) {
+        self.runner.cancel_for(owner);
     }
 
     /// The app quits: a running read is killed and a download stops.
@@ -460,12 +483,30 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct Served(Mutex<HashMap<String, Vec<u8>>>);
+    struct Served(Mutex<HashMap<String, Vec<u8>>>, Arc<AtomicBool>);
+
+    impl Served {
+        /// While set, every body waits before its first byte (a server that stalls).
+        fn slow(&self) -> &AtomicBool {
+            &self.1
+        }
+    }
+
+    /// Waits while `slow` is set, then reads the body.
+    struct Stalling(Arc<AtomicBool>, std::io::Cursor<Vec<u8>>);
+    impl std::io::Read for Stalling {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            while self.0.load(Ordering::SeqCst) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            self.1.read(buf)
+        }
+    }
 
     impl Fetch for Served {
         fn open(&self, url: &str, _max: u64) -> Result<Box<dyn std::io::Read + Send>, Failure> {
             let body = locked(&self.0).get(url).cloned().ok_or(Failure::Offline)?;
-            Ok(Box::new(std::io::Cursor::new(body)))
+            Ok(Box::new(Stalling(self.1.clone(), std::io::Cursor::new(body))))
         }
     }
 
@@ -561,7 +602,7 @@ echo '{"done":true}'
     #[test]
     fn a_failed_test_image_keeps_nothing_new() {
         let dir = tempfile::tempdir().unwrap();
-        let (m, _) = setup(dir.path(), Some(Arc::new(|_: &Program, _: &[u8], _: &[String]| false)));
+        let (m, _) = setup(dir.path(), Some(Arc::new(|_: &Runner, _: &Program, _: &[u8], _: &[String]| false)));
         m.install(ModelId::Fast).unwrap();
         let s = wait_idle(&m);
         assert_eq!(s["job"], json!({ "state": "failed", "model": "fast", "reason": "test" }));
@@ -616,6 +657,68 @@ echo '{"done":true}'
         m.shutdown();
         assert_eq!(job.join().unwrap().unwrap_err().code, "OCR_CANCELLED");
         assert!(t.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn remove_waits_for_the_other_models_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let (m, served) = setup(dir.path(), None);
+        m.install(ModelId::Fast).unwrap();
+        wait_idle(&m);
+        // Second downloads slowly; removing Fast meanwhile would take the program Second's test needs.
+        served.slow().store(true, Ordering::SeqCst);
+        m.install(ModelId::Second).unwrap();
+        assert_eq!(m.remove(ModelId::Fast).unwrap_err().code, "OCR_BUSY");
+        served.slow().store(false, Ordering::SeqCst);
+        let s = wait_idle(&m);
+        assert_eq!((s["models"][0]["installed"].as_str(), s["models"][1]["installed"].as_str()), (Some("v1"), Some("v1")));
+        assert_eq!(s["job"]["state"], "idle");
+    }
+
+    #[test]
+    fn cancel_works_while_the_server_stalls() {
+        let dir = tempfile::tempdir().unwrap();
+        let (m, served) = setup(dir.path(), None);
+        served.slow().store(true, Ordering::SeqCst);
+        m.install(ModelId::Fast).unwrap();
+        m.cancel();
+        let s = wait_idle(&m);
+        assert_eq!(s["job"], json!({ "state": "failed", "model": "fast", "reason": "cancelled" }));
+        served.slow().store(false, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn cancel_during_the_check_keeps_what_was_there() {
+        let dir = tempfile::tempdir().unwrap();
+        let checking = Arc::new(AtomicBool::new(false));
+        let seen = checking.clone();
+        // A test that runs until the runner is cancelled, as a real program would.
+        let tester: Tester = Arc::new(move |runner: &Runner, p: &Program, _: &[u8], _: &[String]| {
+            // The program sleeps until killed (the SLOW marker next to it).
+            let _ = std::fs::write(p.exe.parent().unwrap().join("SLOW"), b"");
+            seen.store(true, Ordering::SeqCst);
+            runner.run(p, Kind::Image, b"x", &mut |_, _| {}).is_ok()
+        });
+        let (m, _) = setup(dir.path(), Some(tester));
+        m.install(ModelId::Fast).unwrap();
+        while !checking.load(Ordering::SeqCst) || !m.runner.busy() {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        m.cancel();
+        let s = wait_idle(&m);
+        assert_eq!(s["job"]["reason"], "cancelled");
+        assert_eq!(s["models"][0]["installed"], Value::Null);
+    }
+
+    #[test]
+    fn a_server_answer_is_not_offline() {
+        assert_eq!(download_failure("PREVIEW_UNAVAILABLE", "No preview from https://download.thothnotes.com: the server answered 404"), Failure::Failed);
+        assert_eq!(download_failure("PREVIEW_UNAVAILABLE", "No preview from https://download.thothnotes.com: it is too large"), Failure::Verify);
+        assert_eq!(download_failure("PREVIEW_UNAVAILABLE", "No preview from https://download.thothnotes.com: too many redirects"), Failure::Failed);
+        assert_eq!(download_failure("NOT_ALLOWED", "not https"), Failure::Verify);
+        for m in ["the connection failed", "it took too long", "the host name was not found", "the connection broke"] {
+            assert_eq!(download_failure("PREVIEW_UNAVAILABLE", m), Failure::Offline, "{m}");
+        }
     }
 
     #[test]

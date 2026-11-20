@@ -111,6 +111,17 @@ export function runtimeFor(root: string, version: string, onnxruntime: string, p
   return { version, protocol, onnxruntime, targets };
 }
 
+/**
+ * What to upload, given what is already published at each key (`null`: nothing there). A published version never
+ * changes: apps already shipped pin these files by SHA-256 (runtime.json, the signed list). The same bytes again are
+ * skipped; different bytes stop the publish before anything is uploaded. A new program or model is a new version folder.
+ */
+export function uploadsFor(local: Record<string, string>, published: Record<string, string | null>): string[] {
+  const changed = Object.keys(local).filter((k) => published[k] != null && published[k] !== local[k]);
+  if (changed.length > 0) throw new Error(`already published with other bytes (bump the version instead): ${changed.join(", ")}`);
+  return Object.keys(local).filter((k) => published[k] == null);
+}
+
 type Run = (args: string[], env: NodeJS.ProcessEnv) => void;
 const runTauri: Run = (args, env) => execFileSync("pnpm", ["--filter", "@thoth/desktop", "exec", "tauri", ...args], { env, stdio: ["ignore", "ignore", "inherit"] });
 
@@ -173,8 +184,16 @@ async function main(): Promise<void> {
     execFileSync("aws", ["s3api", "put-object", "--endpoint-url", endpoint, "--bucket", BUCKET, "--key", key, "--body", local, "--content-type", type, "--cache-control", cache], { stdio: ["ignore", "ignore", "inherit"] });
     console.log(`uploaded ${key}`);
   };
-  // A published version never changes: a new model or program is a new version folder.
-  for (const key of plain) put(join(dir, "modules", `${key}.gz`), `modules/${key}.gz`, "application/gzip", "public, max-age=31536000, immutable");
+  // A published version never changes: a new model or program is a new version folder (see uploadsFor).
+  const sha = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+  const local = Object.fromEntries(plain.map((key) => [`modules/${key}.gz`, sha(join(dir, "modules", `${key}.gz`))]));
+  const published: Record<string, string | null> = {};
+  for (const key of Object.keys(local)) {
+    const res = await fetch(`${HOST_ROOT}${key}`, { redirect: "error" });
+    if (res.status !== 404 && !res.ok) throw new Error(`reading the published ${key}: HTTP ${res.status}`);
+    published[key] = res.status === 404 ? null : createHash("sha256").update(new Uint8Array(await res.arrayBuffer())).digest("hex");
+  }
+  for (const key of uploadsFor(local, published)) put(join(dir, key), key, "application/gzip", "public, max-age=31536000, immutable");
   put(join(dir, "models.json.sig"), "modules/models.json.sig", "text/plain; charset=utf-8", "public, max-age=300");
   put(join(dir, "models.json"), "modules/models.json", "application/json", "public, max-age=300");
 }

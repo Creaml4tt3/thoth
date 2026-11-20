@@ -121,7 +121,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add modules/models.json scripts/ocr/stage-models.sh .github/workflows/release-ocr.yml tools/ocr-spike/models.lock
+          git add modules/models.json scripts/ocr/stage-models.sh scripts/model-watch.ts .github/workflows/release-ocr.yml tools/ocr-spike/models.lock
           git commit -m "feat(ocr): a newer OCR model, no worse on every image group"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
           { echo "The weekly model watch found a newer model and read the test corpus with it (ADR-0055)."; echo; cat table.md; echo; echo "Nothing is published until a person merges this and tags \`ocr-v*\` (release-ocr.yml signs the list and uploads)."; } > body.md

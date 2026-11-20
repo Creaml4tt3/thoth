@@ -47,12 +47,14 @@ pub struct Runner {
     idle: Duration,
     /// The running job's process group, `None` when idle.
     job: Mutex<Option<i32>>,
+    /// Who started the running job (a window), so a Cancel from another window leaves it alone.
+    owner: Mutex<Option<String>>,
     cancelled: AtomicBool,
 }
 
 impl Runner {
     pub fn new(idle: Duration) -> Runner {
-        Runner { idle, job: Mutex::new(None), cancelled: AtomicBool::new(false) }
+        Runner { idle, job: Mutex::new(None), owner: Mutex::new(None), cancelled: AtomicBool::new(false) }
     }
 
     pub fn busy(&self) -> bool {
@@ -62,6 +64,18 @@ impl Runner {
     /// Runs one job: its pages, and a PDF's page count (more than the pages read past `MAX_PDF_PAGES`).
     /// `progress(page, pages)` after each page. `OCR_BUSY` while another runs.
     pub fn run(&self, program: &Program, kind: Kind, bytes: &[u8], progress: &mut dyn FnMut(usize, usize)) -> HostResult<(Vec<Page>, Option<usize>)> {
+        self.run_as("", program, kind, bytes, progress)
+    }
+
+    /// `run`, started by `owner`: only `cancel_for(owner)` (or `cancel`) stops it.
+    pub fn run_as(
+        &self,
+        owner: &str,
+        program: &Program,
+        kind: Kind,
+        bytes: &[u8],
+        progress: &mut dyn FnMut(usize, usize),
+    ) -> HostResult<(Vec<Page>, Option<usize>)> {
         let limit = if kind == Kind::Image { MAX_IMAGE_BYTES } else { MAX_PDF_BYTES };
         if bytes.len() > limit {
             return Err(HostError::new("OCR_TOO_LARGE", "The file is too large to read"));
@@ -85,6 +99,7 @@ impl Runner {
         crate::agent::kill_windows::adopt(&mut child).map_err(failed)?;
         let group = i32::try_from(child.id()).ok();
         *job = group;
+        *locked(&self.owner) = Some(owner.to_owned());
         drop(job);
         let result = self.supervise(&mut child, group, kind, bytes, progress);
         // Whatever is left of the job goes now: nothing keeps running or holds the pipes.
@@ -94,6 +109,7 @@ impl Runner {
         let _ = child.kill();
         let _ = child.wait();
         *locked(&self.job) = None;
+        *locked(&self.owner) = None;
         if self.cancelled.load(Ordering::SeqCst) {
             return Err(HostError::new("OCR_CANCELLED", "Reading was cancelled"));
         }
@@ -160,6 +176,17 @@ impl Runner {
             pages.push(Page { text: text.to_owned(), source: source.to_owned() });
             progress(page as usize, total as usize);
         }
+    }
+
+    /// Kills the running job if `owner` started it (a window's Cancel). False: nothing of theirs was running.
+    pub fn cancel_for(&self, owner: &str) -> bool {
+        let job = locked(&self.job);
+        if job.is_some() && locked(&self.owner).as_deref() == Some(owner) {
+            drop(job);
+            self.cancel();
+            return true;
+        }
+        false
     }
 
     /// Kills the running job, if any (Cancel, Remove, quit). The job answers `OCR_CANCELLED`.
@@ -277,6 +304,22 @@ echo '{"done":true,"total":70}'"#;
         assert_eq!(runner.run(&slow, Kind::Image, b"x", &mut |_, _| {}).unwrap_err().code, "OCR_BUSY");
         runner.cancel();
         let _ = job.join();
+    }
+
+    #[test]
+    fn cancel_from_another_owner_leaves_the_job_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = fake(dir.path(), "sleep 30");
+        let runner = Arc::new(Runner::new(IDLE));
+        let r = runner.clone();
+        let job = std::thread::spawn(move || r.run_as("window-a", &p, Kind::Pdf, b"x", &mut |_, _| {}));
+        while !runner.busy() {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!runner.cancel_for("window-b"));
+        assert!(runner.busy());
+        assert!(runner.cancel_for("window-a"));
+        assert_eq!(job.join().unwrap().unwrap_err().code, "OCR_CANCELLED");
     }
 
     #[test]

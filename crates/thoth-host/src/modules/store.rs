@@ -19,7 +19,29 @@ use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, mpsc};
+use std::time::Duration;
+
+/// Reads `reader` to its end on a thread of its own: chunks, then an empty one at the end, or the error. When the
+/// receiver goes (Cancel), the thread ends at its next chunk, or when the download's own deadline closes the stream.
+fn read_on_a_thread(mut reader: Box<dyn Read + Send>) -> mpsc::Receiver<std::io::Result<Vec<u8>>> {
+    let (send, receive) = mpsc::sync_channel(4);
+    std::thread::spawn(move || {
+        let mut buf = vec![0u8; 64 * 1024];
+        loop {
+            let chunk = match reader.read(&mut buf) {
+                Ok(n) => Ok(buf[..n].to_vec()),
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => Err(e),
+            };
+            let last = !matches!(&chunk, Ok(c) if !c.is_empty());
+            if send.send(chunk).is_err() || last {
+                break;
+            }
+        }
+    });
+    receive
+}
 
 /// Where a set of files goes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -106,12 +128,19 @@ fn folder_size(dir: &Path) -> u64 {
 }
 
 impl Store {
-    /// The store at `root` (`<app-data>/modules/ocr`); removes stale `.part` folders.
+    /// The store at `root` (`<app-data>/modules/ocr`). Every folder that is not an active version goes: stale `.part`
+    /// downloads, a version that never passed its test (the app quit while checking), and an old version a running read
+    /// kept from being deleted (Windows).
     pub fn open(root: PathBuf) -> Store {
         let store = Store { root, lock: Mutex::new(()) };
-        for dir in [store.root.join("runtime"), store.root.join("models/fast"), store.root.join("models/second")] {
-            for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-                if e.path().extension().is_some_and(|x| x == "part") {
+        let state = store.state();
+        if !state.previous.is_empty() {
+            let _ = store.change(|s| s.previous.clear());
+        }
+        for dest in [Dest::Runtime, Dest::Model(ModelId::Fast), Dest::Model(ModelId::Second)] {
+            let active = state.active.get(dest.key());
+            for e in std::fs::read_dir(store.dir(dest)).into_iter().flatten().flatten() {
+                if active.is_none_or(|v| e.file_name().to_str() != Some(v.as_str())) {
                     let _ = std::fs::remove_dir_all(e.path());
                 }
             }
@@ -228,28 +257,29 @@ impl Store {
         progress(0, Some(total));
         for f in files {
             let gz_path = part.join(format!("{}.gz", f.name));
-            let mut reader = fetch.open(&f.url, f.size)?;
+            let reader = fetch.open(&f.url, f.size)?;
             let mut out = std::fs::File::create(&gz_path).map_err(|e| disk(&e))?;
             let mut hash = Sha256::new();
             let mut got = 0u64;
-            let mut buf = vec![0u8; 64 * 1024];
+            let chunks = read_on_a_thread(reader);
             loop {
                 if cancel.load(Ordering::SeqCst) {
                     return Err(Failure::Cancelled);
                 }
-                let n = match reader.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => n,
-                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                    Err(_) => return Err(Failure::Offline),
+                // A server that stops sending must not hold Cancel: wait in short steps.
+                let chunk = match chunks.recv_timeout(Duration::from_millis(200)) {
+                    Ok(Ok(chunk)) if chunk.is_empty() => break,
+                    Ok(Ok(chunk)) => chunk,
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    Ok(Err(_)) | Err(mpsc::RecvTimeoutError::Disconnected) => return Err(Failure::Offline),
                 };
-                got += n as u64;
+                got += chunk.len() as u64;
                 if got > f.size {
                     return Err(Failure::Verify);
                 }
-                hash.update(&buf[..n]);
-                out.write_all(&buf[..n]).map_err(|e| disk(&e))?;
-                received += n as u64;
+                hash.update(&chunk);
+                out.write_all(&chunk).map_err(|e| disk(&e))?;
+                received += chunk.len() as u64;
                 progress(received, Some(total));
             }
             if cancel.load(Ordering::SeqCst) {
@@ -262,6 +292,7 @@ impl Store {
             }
             // Only now, with the .gz checked, is it decompressed.
             let plain = part.join(&f.name);
+            let mut buf = vec![0u8; 64 * 1024];
             let mut decoder = flate2::read::GzDecoder::new(std::fs::File::open(&gz_path).map_err(|e| disk(&e))?);
             let mut file = std::fs::File::create(&plain).map_err(|e| disk(&e))?;
             let mut hash = Sha256::new();
@@ -551,6 +582,25 @@ mod tests {
         store.remove(ModelId::Second).unwrap();
         assert_eq!(store.installed(), Installed::default());
         assert!(!dir.path().join("runtime").exists());
+    }
+
+    #[test]
+    fn a_version_never_tested_goes_on_start_and_the_active_one_stays() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path().to_path_buf());
+        let mut fetch = FakeFetch::default();
+        let v1 = files(&mut fetch, "v1", &["det.onnx"]);
+        installed(&store, &fetch, "v1", &v1);
+        // v2 was activated and the app quit during its test: v1 is "previous" and v2 never passed.
+        let v2 = files(&mut fetch, "v2", &["det.onnx"]);
+        installed(&store, &fetch, "v2", &v2);
+        std::fs::create_dir_all(dir.path().join("models/fast/v0")).unwrap();
+        let store = Store::open(dir.path().to_path_buf());
+        assert_eq!(store.installed().fast.as_deref(), Some("v2"));
+        assert!(dir.path().join("models/fast/v2").is_dir());
+        assert!(!dir.path().join("models/fast/v1").exists());
+        assert!(!dir.path().join("models/fast/v0").exists());
+        store.verify(FAST).unwrap();
     }
 
     #[test]

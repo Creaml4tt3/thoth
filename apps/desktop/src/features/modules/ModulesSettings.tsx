@@ -91,7 +91,7 @@ function ModelRow({ model, status, service }: { model: ModuleModel; status: NonN
               </Button>
             )}
             {model.installed && (
-              <Button variant="ghost" small disabled={mine && busy} onClick={() => void service.remove(model.id)}>
+              <Button variant="ghost" small disabled={busy} onClick={() => void service.remove(model.id)}>
                 {t.remove}
               </Button>
             )}
