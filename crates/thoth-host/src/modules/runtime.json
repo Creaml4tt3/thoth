@@ -2,5 +2,84 @@
   "version": "0.1.0",
   "protocol": 1,
   "onnxruntime": "1.28.0",
-  "targets": {}
+  "targets": {
+    "aarch64-apple-darwin": [
+      {
+        "name": "NOTICE.txt",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/aarch64-apple-darwin/NOTICE.txt.gz",
+        "size": 98601,
+        "sha256": "5893dfcd2ee8f90283f4ece5090535fdac68542f70ac76c37dab1f9381110305"
+      },
+      {
+        "name": "libonnxruntime.dylib",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/aarch64-apple-darwin/libonnxruntime.dylib.gz",
+        "size": 11196540,
+        "sha256": "0c8518c7b3244fcbbd6a48ce4a2338d40e85e040165e69a2c116adeb7302f73e"
+      },
+      {
+        "name": "thoth-ocr",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/aarch64-apple-darwin/thoth-ocr.gz",
+        "size": 3252358,
+        "sha256": "427f352038d1d4041026533fa4dcaef2e690ca51fcc661b357e13a09f8f9dc2f",
+        "executable": true
+      }
+    ],
+    "x86_64-apple-darwin": [
+      {
+        "name": "NOTICE.txt",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-apple-darwin/NOTICE.txt.gz",
+        "size": 85052,
+        "sha256": "c640ac00852231f0c3a24d99d3a5eca743adb1bbc5cf3fe40c14796e3ff8be77"
+      },
+      {
+        "name": "thoth-ocr",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-apple-darwin/thoth-ocr.gz",
+        "size": 7410263,
+        "sha256": "062d759d19e71c7fbe1f0f548306a1a2e55bac0e9c3144367612202304b44ca6",
+        "executable": true
+      }
+    ],
+    "x86_64-pc-windows-msvc": [
+      {
+        "name": "NOTICE.txt",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-pc-windows-msvc/NOTICE.txt.gz",
+        "size": 100914,
+        "sha256": "3632dc1f6ceed391960601fff4f3a8f9b1722c5801722e3a2619f2c6d8e939f9"
+      },
+      {
+        "name": "onnxruntime.dll",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-pc-windows-msvc/onnxruntime.dll.gz",
+        "size": 5911642,
+        "sha256": "e62927a2d52e45345d1da4a3236608662193872d0fce1af81b0b5988efb10ec8"
+      },
+      {
+        "name": "thoth-ocr.exe",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-pc-windows-msvc/thoth-ocr.exe.gz",
+        "size": 3575827,
+        "sha256": "eb53eebcf07ec9812c103a72af8aab1acc08c50608abd13801cd5c671e28b9b4",
+        "executable": true
+      }
+    ],
+    "x86_64-unknown-linux-gnu": [
+      {
+        "name": "NOTICE.txt",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-unknown-linux-gnu/NOTICE.txt.gz",
+        "size": 100793,
+        "sha256": "22568bb980f43840e7489f007ae5460e4669b95b5c05ad5b1567d3639f316243"
+      },
+      {
+        "name": "libonnxruntime.so",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-unknown-linux-gnu/libonnxruntime.so.gz",
+        "size": 9052207,
+        "sha256": "d4c927d74d8aae91899f953d34440d754cf7a1f6ca508b3bfd7b7b7c0f102a6e"
+      },
+      {
+        "name": "thoth-ocr",
+        "url": "https://download.thothnotes.com/modules/ocr/0.1.0/x86_64-unknown-linux-gnu/thoth-ocr.gz",
+        "size": 3847227,
+        "sha256": "744ba4df0aa78a54eefd1a6f5140017db8c3285c0c9fa429c9a47f8975fff2ee",
+        "executable": true
+      }
+    ]
+  }
 }

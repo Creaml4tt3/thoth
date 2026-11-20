@@ -234,8 +234,16 @@ mod tests {
                 assert!(names.contains(&"det.onnx") && names.contains(&"rec.onnx"), "{id:?} on {t}");
             }
         }
-        // runtime.json stays empty until the first publish: OCR is "not available in this build".
-        assert!(c.runtime_files().is_none());
+        // runtime.json is the published ocr-v0.1.0: every target has its program, under BASE, with a hash.
+        for t in ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"] {
+            let files = &c.runtime.targets[t];
+            assert!(files.iter().any(|f| f.name.starts_with("thoth-ocr") && f.executable), "{t}");
+            for f in files {
+                check_file(f).unwrap();
+                assert!(f.size > 0 && f.sha256.len() == 64, "{t}: {}", f.name);
+            }
+        }
+        assert!(c.runtime_files().is_some());
     }
 
     #[test]
