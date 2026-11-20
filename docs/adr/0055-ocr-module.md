@@ -176,6 +176,22 @@ And on a page judged broken, OCR read the owner's brochure at 1.0–3.6 % oCER, 
   2.2 dewarping branch, later).
 - Peak memory of 0.5–0.9 GB per job is acceptable for one job at a time (plan §4 limits).
 
+### As built (0.12.0, 2026-11-20)
+
+- **One process per job.** The host starts `thoth-ocr serve` for each read (protocol 1 on stdin/stdout), in its own
+  process group (a Job Object on Windows), and kills it after 60 s without a finished page, on Cancel, on Remove and
+  when the app quits. A PDF's last line also gives the file's page count, so a page made from a longer PDF says that
+  only the first 50 pages were read.
+- **What comes from where.** The program and ONNX Runtime are code, listed per target in the app's compiled
+  `runtime.json`; the models are in a list signed with minisign (`modules/models.json` + `.sig`, key in
+  `crates/thoth-host/src/modules/modules.pub`), whose `serial` only goes up. Every file is checked against its SHA-256
+  while it downloads and again before each run; a new model must read the test image before it replaces the old one.
+- **ONNX Runtime 1.28.0** comes from Microsoft's NuGet package (the GitHub release was unreachable), pinned by
+  SHA-256. It has no Intel macOS library.
+- **The Intel Mac engine actually shipped is tract** (feature `tract`, `ort-tract` 0.4.1), with the patched
+  detectors (`det.tract1280.onnx`, `det.tract960.onnx`) given only to `x86_64-apple-darwin` in the model list. It was
+  smoke-tested under Rosetta 2 in CI, not on a real Intel Mac. It is 7–12× slower, as measured in Phase 0.
+
 ## What was not measured
 
 - **Windows and Linux:** not built or run. CI must build both before Phase 1.

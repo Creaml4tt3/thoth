@@ -13,6 +13,9 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 ### Added
 
 - Board: see your notes as sticky notes on a board, joined by their links. Build your own boards, and draw string between two notes to link them. Boards are .canvas files that Obsidian can open too.
+- Settings → Modules: download OCR, which reads Thai and English text in images and PDFs on your computer. Choose Fast or Second opinion; nothing is downloaded until you click.
+- Copy text and Insert text below on an image: get the text out of a screenshot or a photo of a page. If one model misses something, try the other.
+- Page from PDF…: make a page from a PDF of up to 50 pages, using its own text where it has good text and OCR for the rest.
 
 ### Changed
 

@@ -1,6 +1,7 @@
 # OCR in Thoth: review of the handoff, and a plan
 
-- **Status:** Proposal for the owner. Nothing is built yet.
+- **Status:** Accepted as ADR-0055; built for 0.12.0 on `feat/ocr-module` (2026-11-20): the module download, Copy
+  text / Insert text below, and Page from PDF.
 - **Date:** 2026-11-10, updated 2026-11-15 with iApp's OpenThai 2.0 OCR (§2a)
 - **Input:** "Thoth Modules: OCR Module Architecture — Engineering Handoff" (another agent's proposal).
 - **Next step:** the Phase 0 spike, then ADR-0055. The owner's decisions are in §7 (latest 2026-11-19: model choices

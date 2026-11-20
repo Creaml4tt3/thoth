@@ -45,8 +45,16 @@ download site. It does not cover:
     choose "Load preview". Settings → Editor → "Link previews" offers On, Only
     for links I paste, and Off.
 
+  <!-- REVIEW: owner -->
+  - **OCR models.** Only if you download OCR in Settings → Modules: when the
+    app checks for updates, it also reads the list of OCR models from the
+    download site, to offer a better model. With "Update OCR models
+    automatically" on, it downloads that model too. These requests reveal the
+    same as an update check: your IP address and the app's version. The images
+    and PDFs that OCR reads never leave your computer.
+
   Everything else happens only when you choose it, such as connecting to a
-  server or sending a problem report. The app also keeps a small log on your
+  server, downloading OCR or sending a problem report. The app also keeps a small log on your
   computer of errors and app events (about 3 MB at most). It is built to leave out page text and titles, and it
   masks file paths, links and email addresses. The log is sent only if you
   include it in a problem report, after you have seen every line. You can turn
@@ -62,7 +70,7 @@ download site. It does not cover:
 | Pages, page history, attachments and workspace membership | You | To provide the service | Performing our agreement with you |
 | Sign-in sessions (stored only as hashes) | Created when you sign in | To keep you signed in | Performing our agreement with you |
 | IP address and request counts | Each request to the demo server | Rate limiting and preventing abuse | Our legitimate interest in keeping the service secure |
-| IP address, country, user agent (for the app, its version number), time and path of each request to the download site: update checks and installer downloads | Your app or your browser | Delivering the files; counting, once a week, how many different addresses check for updates or download an installer, which tells us roughly how many people use Thoth | Our legitimate interest in running the download site and knowing whether Thoth is used |
+| IP address, country, user agent (for the app, its version number), time and path of each request to the download site: update checks, installer downloads, and OCR module downloads and model list checks <!-- REVIEW: owner --> | Your app or your browser | Delivering the files; counting, once a week, how many different addresses check for updates or download an installer, which tells us roughly how many people use Thoth | Our legitimate interest in running the download site and knowing whether Thoth is used |
 | Server logs: time, method, path without query, status code, request ID | Each request to the demo server | Running and fixing the service | Our legitimate interest in running the service |
 | Feedback you send from the website, the web version or the desktop app: your message, the kind, and, only if you give or include them, your email address, the app version, operating system, processor type and language, and the recent app log (from the desktop app, only if you tick "Include recent app log", after you have seen every line; built to leave out page text and titles; file paths, links and emails masked). If you are signed in when you send it, it is linked to your account | You, when you send it; the demo server only receives it if the app sends it there | To read and answer problems, ideas and questions, and to fix bugs | Our legitimate interest in answering you and fixing the app; for the app log, your consent, given by ticking the box |
 | Visit counts on the website: the page, the page that sent you, your approximate location, device type, operating system and browser (see below) | Your browser, on every visit to thothnotes.com | Counting visits and where they come from, including visitors who decline cookies | Our legitimate interest in knowing whether the website is used |
