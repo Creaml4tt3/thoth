@@ -210,7 +210,6 @@ function PageFrameReady(props: PageFrameProps) {
   media.current = props.media ?? null;
   const pickImage = pageHost.pickImage;
   const ocr = pageHost.ocr;
-  const info = useRef<string | null>(null);
   const ctx = useMemo(
     () =>
       createEditorContext({
@@ -224,7 +223,6 @@ function PageFrameReady(props: PageFrameProps) {
         ...(links ? { links, openExternal: (url: string) => links.open(url) } : {}),
         ...(pickImage ? { pickImage } : {}),
         ...ocr,
-        pageInfo: () => info.current,
       }),
     [t, client, links, pickImage, ocr],
   );
@@ -232,13 +230,9 @@ function PageFrameReady(props: PageFrameProps) {
   const { session, state, member, owner } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten }, pageKey(store, modeKey.space, modeKey.page));
   const paneActive = usePaneActive();
 
-  // "Created … · Edited … by …" under the title; redrawn when the dates or the names change.
+  // "Created … · Edited … by …" under the breadcrumbs, outside the page's text.
   const nameOf = props.nameOf;
   const infoText = useMemo(() => pageInfoText(state.dates, t.pageInfo, strings.lang, nameOf), [state.dates, t.pageInfo, strings.lang, nameOf]);
-  useEffect(() => {
-    info.current = infoText;
-    for (const view of ctx.views) view.refresh();
-  }, [infoText, ctx]);
 
   // Wikilink chips resolve through the index; refresh them when it changes.
   useEffect(() => {
@@ -355,6 +349,7 @@ function PageFrameReady(props: PageFrameProps) {
         {props.actions}
         <ModeSwitch mode={mode} disabled={!canSwitch} onChange={switchMode} />
       </Breadcrumbs>
+      {state.phase === "ready" && infoText && <p className="page-info">{infoText}</p>}
       <div className="page-scroll">
         <div className="page-col">
           {state.phase === "missing" && (
@@ -406,8 +401,6 @@ function PageFrameReady(props: PageFrameProps) {
               )}
             </>
           )}
-          {/* Plain mode shows the text as it is: the line goes above it instead of under the title. */}
-          {state.phase === "ready" && mode === "plain" && infoText && <p className="page-info">{infoText}</p>}
           <div hidden={state.phase !== "ready"} data-editor-mode={mode} onFocus={() => member?.focused()}>
             {mode === "plain" && Plain ? <Plain key="plain" {...editorProps} /> : <PageEditor key="blocks" {...editorProps} />}
           </div>

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** The line under a page's title: created and edited, "today"/"yesterday" with the time, a date otherwise, and who edited. */
+/** The line under a page's breadcrumbs: created and edited, "today"/"yesterday" with the time, a date otherwise, and who edited. */
 import { describe, expect, it } from "vitest";
 import { newStableId, stableIdTime } from "@thoth/domain";
 import { pageInfoText } from "../src/editor/PageFrame.tsx";

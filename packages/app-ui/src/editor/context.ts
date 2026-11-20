@@ -46,8 +46,6 @@ export interface EditorContext {
   ocrModels?(): readonly ("fast" | "second")[];
   /** Opens Settings → Modules (where OCR is downloaded). */
   openModules?(): void;
-  /** The line under the title (made, last edited, by whom); null: none. Redrawn through `views`. */
-  pageInfo?(): string | null;
 }
 
 export function createEditorContext(init: {
@@ -65,7 +63,6 @@ export function createEditorContext(init: {
   cancelOcr?(): void;
   ocrModels?(): readonly ("fast" | "second")[];
   openModules?(): void;
-  pageInfo?(): string | null;
 }): EditorContext {
   return { media: () => null, ...init, strings: init.strings ?? en.editor, client: init.client ?? "desktop", views: new Set() };
 }

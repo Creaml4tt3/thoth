@@ -11,7 +11,6 @@ import type { EditorContext } from "./context.ts";
 import { calloutView, embedView, inlineRawView, mentionView, preservedView, taskItemView, wikilinkView } from "./node-views.ts";
 import { imageView } from "./image-views.ts";
 import { imageInsertExtension } from "./image-insert.ts";
-import { pageInfoExtension } from "./page-info.ts";
 import { linkSuggestExtension } from "./link-suggest-blocks.ts";
 import { slashExtension } from "./slash-menu.ts";
 import { blockHandleExtension } from "./block-handle.ts";
@@ -99,7 +98,6 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     textStylesExtension(ctx.strings, ctx.client),
     linkSuggestExtension(ctx),
     imageInsertExtension(ctx),
-    pageInfoExtension(ctx),
     pasteLinksExtension(ctx),
     webLinksExtension(ctx),
     ...(links ? [linkCardsExtension({ ...ctx, links })] : []),

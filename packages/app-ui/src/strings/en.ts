@@ -24,7 +24,7 @@ export const en = {
     modeGroup: "Editor mode",
     /** The editor's accessible name. */
     content: "Page content",
-    /** The line under a page's title. */
+    /** The line under a page's breadcrumbs. */
     pageInfo: {
       created: (when: string) => `Created ${when}`,
       edited: (when: string) => `Edited ${when}`,

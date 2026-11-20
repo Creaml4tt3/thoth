@@ -350,7 +350,5 @@
 .presence-face + .presence-face { margin-left: -6px; }
 .presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
 
-/* The line under a page's title (page-info.ts): made, last edited, by whom. Not part of the text. */
-.page-info { margin: -0.35em 0 1.1em; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); user-select: none; }
-.prose > .page-info:first-child { margin-top: 0; }
-[data-editor-mode="plain"] ~ .page-info, .page-col > .page-info { margin: var(--thoth-space-2) 0 var(--thoth-space-2); }
+/* Under the breadcrumbs, outside the page's text: when the page was made and last edited, and by whom. */
+.page-info { margin: -6px 0 0; padding: 0 12px 4px var(--thoth-space-6); color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
