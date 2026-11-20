@@ -179,7 +179,7 @@ artifact holds what a publish would write.
 **Signing key, once** (the owner, not an agent): `pnpm --filter @thoth/desktop tauri signer generate -w
 ~/.thoth-modules-signing.key` with a password; `gh secret set THOTH_MODULES_SIGNING_KEY < ~/.thoth-modules-signing.key`
 and `gh secret set THOTH_MODULES_SIGNING_KEY_PASSWORD`; the public key goes into
-`crates/thoth-host/src/modules/modules.pub`. Back both up as for the updater key. A lost key is not fatal: the next app
+`crates/thoth-host/src/modules/modules.pub`. Back both up as for the updater key: the password is in the owner's password manager, the key file in the owner's backup (both made 2026-11-20). The secrets live in the `downloads` environment, next to the R2 ones (`gh secret set … --env downloads`). A lost key is not fatal: the next app
 update carries a new public key, and until then apps keep the models they have.
 
 **Publishing:** tag `ocr-v<version>` (the `thoth-ocr` crate version) and push it. Then commit the run's `runtime.json`
