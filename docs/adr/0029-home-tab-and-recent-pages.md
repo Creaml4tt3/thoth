@@ -114,3 +114,25 @@ now reads "Thoth · <this Private Space> ▾" and opens a short menu instead of 
 - **All Private Spaces**, which goes to the picker, as the logo did under 2026-10-28 rule 1.
 
 The house, Alt/Option+Shift+H and the palette still go straight to the picker.
+
+## Amendment (2026-11-20, 0.12.0): the desktop reopens the last Private Space at launch
+
+The owner wants the app to open where they left off: most people use one Private Space every day, so the picker at
+every launch was one more click. Decisions:
+
+1. **At launch, the main window opens the Private Space it had open when the app quit**, with its tabs (they are
+   saved per Private Space and window, 2026-10-28 rule 3). It is kept in `localStorage` under
+   `thoth.desktop.lastSpace`; the main window writes it each time it opens a Private Space. Windows the app opened
+   itself (ADR-0019) are reopened by the main window as before and never write it.
+2. **After an update** the Private Space "Restart now" named (ADR-0034) still wins; it is normally the same one.
+3. **Leaving on purpose forgets it:** Back to Private Spaces (the house, Alt/Option+Shift+H, the palette, All Private
+   Spaces) clears it, so the next launch shows the picker. Picking another Private Space in the switcher remembers
+   that one instead.
+4. **A Private Space that can't be opened** (the folder was deleted or renamed, or is on a drive that is not plugged
+   in) shows the picker with the reason, as any failed open does, and is forgotten, so the next launch does not try
+   it again. It stays in the picker's Recent list.
+5. The picker itself is unchanged and still one click away. No setting for now: rule 3 is the way to get the picker at
+   launch. A setting can follow if people ask.
+
+Consequences: the app opens straight into the notes; someone who wants the picker at every launch leaves through Back
+to Private Spaces before quitting. Tests that start at the picker pass `reopenLast: false` (the test default).

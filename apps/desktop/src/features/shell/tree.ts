@@ -15,6 +15,8 @@ export interface PageNode {
   title: string;
   /** A board (`.canvas`, ADR-0056), not a page: it opens as a Board tab and has no page actions. */
   board?: true;
+  /** The file's modified time (ms), for "Edited …" in the row's tooltip. */
+  mtimeMs?: number;
 }
 export type TreeNode = FolderNode | PageNode;
 
@@ -56,7 +58,7 @@ export function buildTree(pages: readonly PageSummary[], options: BuildOptions =
   for (const folder of options.folders ?? []) if (folder !== "") folderFor(folder);
   for (const page of pages) {
     const slash = page.path.lastIndexOf("/");
-    folderFor(slash === -1 ? "" : page.path.slice(0, slash)).children.push({ kind: "page", path: page.path, title: page.title });
+    folderFor(slash === -1 ? "" : page.path.slice(0, slash)).children.push({ kind: "page", path: page.path, title: page.title, mtimeMs: page.mtimeMs });
   }
   for (const path of options.boards ?? []) {
     const slash = path.lastIndexOf("/");

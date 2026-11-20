@@ -53,6 +53,14 @@ export type HostErrorCode =
   | "UNAVAILABLE"
   /** Another copy of Thoth answers connected apps already. */
   | "BUSY"
+  /** The OCR module (ADR-0055): not downloaded yet, already reading, a file over the limits or not readable, a read that stopped answering, a read the person cancelled, or anything else (a changed file, a crash). */
+  | "OCR_NOT_INSTALLED"
+  | "OCR_BUSY"
+  | "OCR_TOO_LARGE"
+  | "OCR_BAD_FILE"
+  | "OCR_TIMEOUT"
+  | "OCR_CANCELLED"
+  | "OCR_FAILED"
   | "INTERNAL";
 
 export interface HostError {
@@ -121,7 +129,7 @@ export interface Commands {
   "watch.start": { args: { vault: string }; result: null };
   "watch.stop": { args: { vault: string }; result: null };
 
-  "source.pick": { args: { kind: "file" | "directory" }; result: string | null };
+  "source.pick": { args: { kind: "file" | "directory" | "pdf" }; result: string | null };
   "source.open": { args: { location: string }; result: { source: string; rootKind: "file" | "directory"; label: string; location: string } };
   "source.list": { args: { source: string; dir: string }; result: SourceDirEntry[] };
   "source.file.open": { args: { source: string; path: string }; result: { file: string; size: number } };
@@ -242,6 +250,23 @@ export interface Commands {
    * with `update.status({ reopen: true })`, once.
    */
   "update.restart": { args: { evenIfRunning?: boolean; reopen?: string }; result: RestartAnswer };
+  // ---- The OCR module (ADR-0055). Desktop only: the host downloads, checks and runs it; nothing leaves the computer.
+  /** The module and its two models. `refresh`: read the signed model list now (Settings → Modules opened). */
+  "module.status": { args: { refresh?: boolean }; result: ModuleStatus };
+  /** Download was clicked: the model, and the program too if it is missing or older. Progress comes as `module.progress`. */
+  "module.install": { args: { model: OcrModel }; result: ModuleStatus };
+  "module.cancel": { args: Record<string, never>; result: ModuleStatus };
+  /** Removes a model (a read going is stopped first); the program goes with the last one. */
+  "module.remove": { args: { model: OcrModel }; result: ModuleStatus };
+  /** "Update OCR models automatically" (off by default). */
+  "module.settings": { args: { autoUpdate: boolean }; result: ModuleStatus };
+  /**
+   * Request bytes: the image (PNG or JPEG, up to 20 MB) or the PDF (up to 50 MB; the first 50 pages). `model` omitted:
+   * Fast if it is downloaded, else Second opinion. Pages read come as `ocr.progress`.
+   */
+  "ocr.read": { args: { kind: "image" | "pdf"; model?: OcrModel }; result: { model: OcrModel; pages: { text: string; source: "ocr" | "text" }[]; total?: number } };
+  /** Stops the read going (it answers `OCR_CANCELLED`). */
+  "ocr.cancel": { args: Record<string, never>; result: null };
   // ---- Connected apps (ADR-0021). Desktop only: other apps read shared Private Spaces through `thoth-mcp`.
   "mcp.settings": { args: Record<string, never>; result: ConnectedAppsSettings };
   /**
@@ -354,6 +379,38 @@ export type UpdateCheck =
   | { state: "unavailable" | "off" }
   | { state: "waiting" | "current" | "failed"; checkedAt: number }
   | { state: "available"; checkedAt: number; update: UpdateInfo };
+
+/** The OCR module's two choices (ADR-0055): Fast (OpenThai 2.1) and Second opinion (PaddleOCR Thai). */
+export type OcrModel = "fast" | "second";
+
+export interface ModuleModel {
+  id: OcrModel;
+  /** The version installed, null: not downloaded. */
+  installed: string | null;
+  /** A newer version this app can run, when one is installed. */
+  update: string | null;
+  /** Bytes a Download (or Update) costs now, the program included when it is needed. */
+  downloadSize: number;
+  /** Bytes on disk. */
+  size: number;
+  /** False when no version in the list runs on this app: Download is refused until Thoth is updated. */
+  offered: boolean;
+}
+
+export type ModuleJob =
+  | { state: "idle" }
+  | { state: "downloading"; model: OcrModel; received: number; total: number | null }
+  | { state: "checking"; model: OcrModel }
+  | { state: "failed"; model: OcrModel; reason: "offline" | "verify" | "disk" | "cancelled" | "failed" | "test" };
+
+export interface ModuleStatus {
+  /** False: OCR isn't available in this build (no program for this computer, or no data folder). */
+  available: boolean;
+  runtime: string | null;
+  models: ModuleModel[];
+  autoUpdate: boolean;
+  job: ModuleJob;
+}
 
 export interface UpdateSettings {
   /** False when this build has no update notice (nothing to set). */

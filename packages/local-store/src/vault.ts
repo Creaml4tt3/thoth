@@ -157,6 +157,8 @@ export interface ReadResult {
   document: PageDocument;
   /** False for non-UTF-8 files: `source` is display-only and writes are refused. */
   editable: boolean;
+  /** The file's modified time (ms), as `stat` gave it. */
+  mtimeMs: number;
 }
 
 export interface WriteOptions {
@@ -766,7 +768,7 @@ export class Vault {
     if (!stat || stat.kind !== "file") throw new NotFoundError(`Page ${normalized}`);
     const bytes = await this.fs.readFile(normalized);
     const { text: source, editable } = decodeText(bytes);
-    return { path: normalized, source, hash: sha256Hex(bytes), document: parsePage(normalized, source), editable };
+    return { path: normalized, source, hash: sha256Hex(bytes), document: parsePage(normalized, source), editable, mtimeMs: stat.mtimeMs };
   }
 
   async search(query: string, limit = 20): Promise<SearchHit[]> {

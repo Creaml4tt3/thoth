@@ -5,8 +5,8 @@
  * browser can drive the real UI against the real Rust host.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
+import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, ModuleStatus, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, decodeBase64, encodeBase64, isHostErrorShape, remoteConnectedApps, remoteModules, remoteUpdates } from "./remote.ts";
 
 export class HttpTransport implements Transport {
   private readonly base: string;
@@ -113,6 +113,11 @@ export function createHttpPlatform(base: string, token: string): Platform {
     ...createRemotePlatform(transport, "bridge"),
     // In-app updates (ADR-0034): the host's `update.progress`.
     updates: remoteUpdates(transport, { onProgress: (listener) => on<InstallState>("update.progress", listener) }),
+    // The OCR module (ADR-0055): the host's `module.progress` and `ocr.progress`.
+    modules: remoteModules(transport, {
+      onProgress: (listener) => on<ModuleStatus>("module.progress", listener),
+      onReadProgress: (listener) => on<{ page: number; pages: number }>("ocr.progress", listener),
+    }),
     windows: bridgeWindows(),
     connectedApps: bridgeConnectedApps(transport, on),
   };

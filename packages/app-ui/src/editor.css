@@ -51,7 +51,11 @@
 .page-image-remote:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
 .page-image-remote .page-image-url { color: var(--thoth-link); font: var(--thoth-text-small); text-decoration: underline; text-underline-offset: 3px; }
 .page-image.is-inline .page-image-remote { padding: 0 6px; }
-.page-image.ProseMirror-selectednode { outline-offset: 4px; }
+.page-image.image-ocr-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--thoth-space-2); margin-top: var(--thoth-space-2); padding: 6px 12px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-hover); color: var(--thoth-ink-secondary); font: var(--thoth-text-small); }
+.image-ocr-status[hidden] { display: none; }
+.image-ocr-button { padding: 2px 8px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: transparent; color: var(--thoth-ink-primary); font: inherit; cursor: pointer; }
+.image-ocr-button:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+.ProseMirror-selectednode { outline-offset: 4px; }
 .page-image-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; padding: 8px; max-width: 520px; border: 1px solid var(--thoth-border); border-radius: var(--thoth-radius-md); background: var(--thoth-bg); box-shadow: var(--thoth-shadow-pop); font: var(--thoth-text-small); }
 .page-image.is-inline .page-image-alt { position: absolute; z-index: 5; }
 .page-image-alt-input { flex: 1 1 220px; min-width: 0; min-height: 36px; padding: 4px 8px; border: 1px solid var(--thoth-border-strong); border-radius: var(--thoth-radius-sm); background: var(--thoth-bg); color: var(--thoth-ink-primary); font: inherit; }
@@ -115,6 +119,7 @@
 /* Page chrome */
 /* minmax(0, 1fr): the column may be narrower than its content, so a long breadcrumb is cut instead of widening the page. */
 .page-view { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 0; height: 100%; }
+.page-view:has(> .page-info) { grid-template-rows: auto auto 1fr; }
 .page-scroll { overflow: auto; padding: var(--thoth-space-6) var(--thoth-space-8) var(--thoth-space-12); }
 .page-col { max-width: var(--thoth-content-width); margin: 0 auto; }
 /* Settings (ui/SettingsLayout.tsx): a tab list of the sections beside the chosen section, sticky while it scrolls; above
@@ -224,9 +229,10 @@
 
 /* Block handle (gutter), drop indicator and block menu */
 .editor-surface { position: relative; }
-.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: grab; user-select: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .block-handle:hover, .block-handle:active { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
 .block-handle[hidden] { display: none; }
+.block-handle svg { fill: currentColor; pointer-events: none; }
 .block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-instant) var(--thoth-ease-out); }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
@@ -244,7 +250,9 @@
 .block-menu-item[aria-disabled="true"] { color: var(--thoth-ink-faint); cursor: default; }
 .block-menu-item[aria-disabled="true"]:hover { background: none; }
 .block-menu-item[aria-checked="true"] .block-menu-label::after { content: " ✓"; color: var(--thoth-ink-tertiary); }
-.block-menu-icon { width: 20px; text-align: center; color: var(--thoth-ink-secondary); font-size: 12px; }
+.block-menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--thoth-ink-secondary); font: 600 13px / 1 var(--thoth-font-sans); }
+.block-menu-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.block-menu-item[aria-disabled="true"] .block-menu-icon { color: var(--thoth-ink-faint); }
 .block-menu-label { flex: 1; }
 .block-menu-hint { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 
@@ -342,3 +350,6 @@
 .presence-face { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--thoth-workspace) 18%, var(--thoth-bg)); color: var(--thoth-workspace); font: 600 10px/1 var(--thoth-font-sans); box-shadow: 0 0 0 2px var(--thoth-bg); }
 .presence-face + .presence-face { margin-left: -6px; }
 .presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
+
+/* Under the breadcrumbs, outside the page's text: when the page was made and last edited, and by whom. */
+.page-info { margin: -6px 0 0; padding: 0 12px 6px var(--thoth-space-6); line-height: 16px; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

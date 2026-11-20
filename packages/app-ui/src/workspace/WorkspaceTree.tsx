@@ -35,6 +35,7 @@ import { TrashDialog } from "./TrashDialog.tsx";
 import { VisibilityDialog } from "./VisibilityDialog.tsx";
 import { clearMembers, usePendingMembers } from "./members-request.ts";
 import { ConfirmByNameDialog } from "./ConfirmByNameDialog.tsx";
+import { pageInfoText } from "../editor/PageFrame.tsx";
 import { announceWorkspaces, clearWorkspaceAdmin, usePendingWorkspaceAdmin } from "./workspace-admin-request.ts";
 
 /**
@@ -101,7 +102,8 @@ const anchorOf = (el: HTMLElement) => {
  * opens in the editor, and one with sub-pages also shows them (keyboard users need no separate caret).
  */
 function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
-  const t = useStrings().tree;
+  const strings = useStrings();
+  const t = strings.tree;
   const { server, workspace, current } = ctx;
   const selected = !item.folder && current?.server === server && current.workspace === workspace && current.page === item.id;
   const expanded = ctx.open.has(item.id);
@@ -154,7 +156,7 @@ function PageItem({ item, depth, index, size, ctx }: PageItemProps) {
         data-target={(item.folder && ctx.target === item.id) || undefined}
         data-dragging={ctx.dnd.dragging === item.id || undefined}
         style={indent}
-        title={item.folder ? `${t.folder} · ${t.itemCount(item.children.length)}` : undefined}
+        title={item.folder ? `${t.folder} · ${t.itemCount(item.children.length)}` : (pageInfoText({ updated: item.updatedAt ? Date.parse(item.updatedAt) : null }, strings.editor.pageInfo, strings.lang) ?? undefined)}
         {...tipIfClipped(item.title)}
         onKeyDown={(event) => {
           if (!item.folder && event.target === event.currentTarget && isOpenInNewTabKey(event)) {

@@ -10,6 +10,7 @@ import { NO_SYSTEM_NOTIFIER } from "@thoth/app-ui/notifications/core.ts";
 import { VaultHost } from "./VaultHost.tsx";
 import type { AppOptions } from "./context.ts";
 import { MAIN_WINDOW, type Launch } from "./windows.ts";
+import { loadLastSpace, saveLastSpace } from "./last-space.ts";
 import "./app.css";
 
 export const DEFAULT_OPTIONS: AppOptions = {
@@ -93,6 +94,7 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
         const next = { connection, vault, empty };
         hostRef.current = next;
         setHost(next);
+        if (launch.id === MAIN_WINDOW) saveLastSpace(root);
       } catch (e) {
         await connection?.close().catch(() => undefined);
         setError(e instanceof Error ? e.message : String(e));
@@ -100,7 +102,7 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
         setBusy(false);
       }
     },
-    [platform],
+    [platform, launch.id],
   );
 
   // A window the app opened on a Private Space shows it at once, with the tabs it was given (only the first time).
@@ -112,16 +114,27 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
     void openRoot(launch.root);
   }, [launch.root, openRoot]);
 
-  // After "Restart now" into an update (ADR-0034), the main window opens again the Private Space that was open.
+  // At launch the main window opens a Private Space by itself: the one "Restart now" into an update named (ADR-0034),
+  // else the one open when the app last quit.
   const reopened = useRef(false);
   useEffect(() => {
-    if (reopened.current || launch.id !== MAIN_WINDOW || launch.root !== null || !platform.updates) return;
+    if (reopened.current || launch.id !== MAIN_WINDOW || launch.root !== null || options?.reopenLast === false) return;
     reopened.current = true;
-    void platform.updates
-      .takeReopen()
-      .then((root) => (root ? openRoot(root) : undefined))
-      .catch(() => undefined);
-  }, [launch, platform, openRoot]);
+    void (platform.updates?.takeReopen() ?? Promise.resolve(null))
+      .catch(() => null)
+      .then((root) => {
+        // Otherwise the Private Space open when the app last quit (ADR-0029, 2026-11-20); a folder that is gone shows
+        // the picker with why (openRoot's error), and is forgotten so the next launch doesn't try it again.
+        const last = root ?? loadLastSpace();
+        if (!last) return;
+        return openRoot(last).then(() => {
+          if (!hostRef.current) {
+            saveLastSpace(null);
+            setLeft(last);
+          }
+        });
+      });
+  }, [launch, platform, openRoot, options?.reopenLast]);
 
   // The window's close button, or Quit (ADR-0019): write the open page's edits, then close, even the last window. The
   // shell closes a window that does not answer within a few seconds.
@@ -160,9 +173,10 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
         setLeft(current.connection.root);
         void closeHost(current);
       }
+      if (launch.id === MAIN_WINDOW && !next) saveLastSpace(null);
       if (next) void openRoot(next);
     },
-    [openRoot],
+    [openRoot, launch.id],
   );
 
   useEffect(

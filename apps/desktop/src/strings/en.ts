@@ -309,7 +309,64 @@ export const en = {
     announceFailed: (version: string) => `Thoth ${version} was not installed.`,
   },
 
-  /** Settings → Connected apps, and the question when an app connects (ADR-0021). */
+  /** Page from PDF… (ADR-0055): a page from a PDF's own text, or its OCR. */
+  pdfToPage: {
+    title: "Page from PDF",
+    command: "Page from PDF…",
+    reading: "Reading the PDF…",
+    progress: (page: number, pages: number) => `Page ${page} of ${pages}`,
+    limit: "Up to 50 pages and 50 MB. Pages with their own text are read as they are; the rest with OCR, on this computer.",
+    cancel: "Cancel",
+    close: "Close",
+    openSettings: "Open Settings",
+    notInstalled: "OCR isn't downloaded yet. Download it in Settings → Modules, then try again.",
+    tooLarge: "This PDF is larger than 50 MB.",
+    badFile: "This file can't be read as a PDF.",
+    timeout: "Reading took too long and was stopped. Nothing was created.",
+    failed: "The PDF could not be read. Nothing was created.",
+    untitled: "PDF",
+    importedFrom: "Imported from ",
+    firstPages: (read: number, total: number) => `Only the first ${read} of ${total} pages were read.`,
+    pageHeading: (n: number) => `Page ${n}`,
+  },
+
+  /** Settings → Modules: the OCR module (ADR-0055). */
+  modules: {
+    title: "Modules",
+    ocrTitle: "OCR (Thai and English)",
+    ocrNote: "Reads the text in images and PDFs on this computer: Copy text or Insert text below on an image, and Page from PDF. It is a separate download; your images and PDFs never leave this computer.",
+    unavailable: "OCR isn't available in this build.",
+    fast: "Fast (recommended)",
+    fastNote: "Quick and accurate on screenshots and printed pages.",
+    second: "Second opinion",
+    secondNote: "Another model to try when Fast misses something, a little better on English and numbers.",
+    mb: (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`,
+    download: (size: string) => `Download (${size})`,
+    remove: "Remove",
+    cancel: "Cancel",
+    needsUpdate: "This model needs a newer version of Thoth. Update Thoth, then download it.",
+    update: "Update",
+    uses: (size: string) => `Uses ${size}`,
+    updateReady: (size: string) => `A better model is ready (${size})`,
+    downloading: "Downloading…",
+    checking: "Checking that it reads text correctly…",
+    progressLabel: "Download progress",
+    progress: (received: number, total: number | null) => {
+      const mb = (n: number) => `${(n / 1_048_576).toFixed(1)} MB`;
+      return total ? `${Math.floor((received / total) * 100)}% (${mb(received)} of ${mb(total)})` : mb(received);
+    },
+    failed: {
+      offline: "Thoth could not download it. Check your connection and try again.",
+      verify: "The download did not match what Thoth expected, so nothing was installed. Try again later.",
+      disk: "There is not enough space on the disk. Free some space and try again.",
+      cancelled: "The download was cancelled. Nothing was installed.",
+      failed: "It could not be installed. Try again later.",
+      test: "The new model did not read its test image correctly, so Thoth kept what you had.",
+    } as Record<"offline" | "verify" | "disk" | "cancelled" | "failed" | "test", string>,
+    autoUpdate: "Update OCR models automatically",
+    autoUpdateHint: "When Thoth checks for updates, it also gets newer OCR models for the choices you downloaded. Off: you choose when to update.",
+  },
+
   connectedApps: {
     title: "Connected apps",
     intro: "Apps on this computer that speak MCP, such as Claude Desktop or Cursor, can search and read the Private Spaces you share here. If you let them, they can also propose changes, which you review before anything is written.",

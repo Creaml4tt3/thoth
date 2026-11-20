@@ -132,3 +132,22 @@ h1, h2, h3, p { margin: 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* Toasts (ui/toast.ts): pills floating over the bottom of the window, newest at the bottom, in the manner of Ding. */
+.toast-viewport { position: fixed; z-index: 80; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; min-height: 40px; max-width: min(560px, calc(100vw - 32px)); padding: 6px 6px 6px 12px; overflow: hidden; border-radius: 20px; background: rgb(var(--thoth-ink)); color: var(--thoth-bg); font: var(--thoth-text-ui); box-shadow: var(--thoth-shadow-modal); animation: thoth-toast-in var(--thoth-dur-base) var(--thoth-ease-spring); }
+.toast.is-leaving { animation: thoth-toast-out var(--thoth-dur-fast) var(--thoth-ease-in) forwards; }
+@keyframes thoth-toast-in { from { opacity: 0; transform: translateY(calc(var(--thoth-shift) * 2)) scale(var(--thoth-pop-scale)); } }
+@keyframes thoth-toast-out { to { opacity: 0; transform: translateY(var(--thoth-shift)) scale(var(--thoth-exit-scale)); } }
+.toast-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.toast-icon { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* The pill is the inverse of the theme (dark ink on paper, light on night), so its icons take the other scheme's colours. */
+.toast[data-kind="success"] .toast-icon { color: light-dark(#4ade80, #12a36b); }
+.toast[data-kind="error"] .toast-icon { color: light-dark(#f87171, #e5484d); }
+.toast[data-kind="info"] .toast-icon { color: light-dark(#60a5fa, #2f7de1); }
+.toast[data-kind="loading"] .toast-icon { opacity: 0.75; }
+.toast-action { flex: none; padding: 5px 12px; border: 0; border-radius: var(--thoth-radius-pill); background: color-mix(in srgb, var(--thoth-bg) 16%, transparent); color: inherit; font: 500 13px / 18px var(--thoth-font-sans); cursor: pointer; white-space: nowrap; }
+.toast-action:hover { background: color-mix(in srgb, var(--thoth-bg) 26%, transparent); }
+.toast-close { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; opacity: 0.7; font-size: 18px; line-height: 1; cursor: pointer; }
+.toast-close:hover { opacity: 1; background: color-mix(in srgb, var(--thoth-bg) 16%, transparent); }
+.toast :focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 1px; }

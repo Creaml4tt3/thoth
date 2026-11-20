@@ -1,0 +1,118 @@
+{
+  "serial": 1,
+  "models": [
+    {
+      "id": "fast",
+      "version": "openthai-2.1-20261118",
+      "preset": "openthai",
+      "minApp": "0.12.0",
+      "protocol": 1,
+      "files": [
+        {
+          "name": "det.onnx",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/det.onnx.gz",
+          "size": 1594389,
+          "sha256": "96c79474f8bdcca48fa23223a9203fcf529a61126f45b768ad644992d76e7812",
+          "targets": [
+            "aarch64-apple-darwin",
+            "x86_64-pc-windows-msvc",
+            "x86_64-unknown-linux-gnu"
+          ]
+        },
+        {
+          "name": "det.onnx",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/det.tract1280.onnx.gz",
+          "size": 1598507,
+          "sha256": "5211b28560037b0707ff109216c88a1a2c3849af10c4544c6540b4f13914b4c3",
+          "targets": [
+            "x86_64-apple-darwin"
+          ]
+        },
+        {
+          "name": "rec.onnx",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec.onnx.gz",
+          "size": 2187425,
+          "sha256": "1c1c4d61df7121c4463febb70b4ac2e77972a683a5722f714b0401422c4cecf7"
+        },
+        {
+          "name": "rec2.onnx",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec2.onnx.gz",
+          "size": 2187496,
+          "sha256": "0bc86bbba627b695f6da712494f7f20dd2cd69053c2b61e9b0d0596b25386b14"
+        },
+        {
+          "name": "rec_dict.txt",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec_dict.txt.gz",
+          "size": 1188,
+          "sha256": "e3d1547dbdffe9cb65c7221f331938168e29decd0ef283b263145a2c941d99a3"
+        },
+        {
+          "name": "config.json",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/config.json.gz",
+          "size": 192,
+          "sha256": "e23711066810bf334f73aed7b0d5dd5bca410f7039a94732718b3aa9df4d1738"
+        },
+        {
+          "name": "NOTICE",
+          "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/NOTICE.gz",
+          "size": 339,
+          "sha256": "38ce219faa038071ae0b7d607ab48c09292dae12bfe0dcdeb512e2de7559b9ce"
+        }
+      ]
+    },
+    {
+      "id": "second",
+      "version": "pp-ocrv5-th-20250821",
+      "preset": "pp5",
+      "minApp": "0.12.0",
+      "protocol": 1,
+      "files": [
+        {
+          "name": "det.onnx",
+          "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/det.onnx.gz",
+          "size": 4530401,
+          "sha256": "2cc09c7b7a4adbfed1416e3807d7380f85103a29d15748d145799a7503405af2",
+          "targets": [
+            "aarch64-apple-darwin",
+            "x86_64-pc-windows-msvc",
+            "x86_64-unknown-linux-gnu"
+          ]
+        },
+        {
+          "name": "det.onnx",
+          "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/det.tract960.onnx.gz",
+          "size": 4539698,
+          "sha256": "2fb47a5b09059b28bfbcc621a7fbfe86b6c2ceb68ea7b312f6c695cda494db4d",
+          "targets": [
+            "x86_64-apple-darwin"
+          ]
+        },
+        {
+          "name": "rec.onnx",
+          "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/rec.onnx.gz",
+          "size": 7270684,
+          "sha256": "6ff82cf481c32d5cb4fdbb3585bdfa34b59cca4ab7b2a355cb9493122aad7949"
+        },
+        {
+          "name": "dict.txt",
+          "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/dict.txt.gz",
+          "size": 1179,
+          "sha256": "48be19bffb94cdb680c5d98090c90d7981d871a2aa66253677e53c19eeaf3bbc"
+        }
+      ]
+    }
+  ],
+  "test": {
+    "file": {
+      "name": "ocr-test.png",
+      "url": "https://download.thothnotes.com/modules/test/1/ocr-test.png.gz",
+      "size": 57515,
+      "sha256": "91613e71912df8ab0b5d5fb7322862794ae123bf13d76ffbeb5723b77ffee14c"
+    },
+    "expect": [
+      "Getting Started",
+      "สมาชิกฟรี",
+      "Markdown"
+    ]
+  }
+}

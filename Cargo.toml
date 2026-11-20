@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/thoth-host", "crates/thoth-mcp", "apps/desktop/src-tauri"]
+# The OCR program has its own workspace: it ships in the module download, not with the app (ADR-0055).
+exclude = ["crates/thoth-ocr"]
 
 [workspace.package]
 edition = "2024"
@@ -40,6 +42,10 @@ unicode-normalization = "0.1"
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 url = "=2.5.8"
 sha2 = "=0.10.9"
+# The OCR module's downloads (ADR-0055): gzip, and the model list's minisign signature. The versions the Tauri updater
+# already locks.
+flate2 = "=1.1.10"
+minisign-verify = "=0.2.5"
 # The OS keychain, desktop shell only. Platform-native stores only: macOS Keychain, Windows Credential
 # Manager, Linux kernel keyutils. No Secret Service/D-Bus, no OpenSSL.
 keyring = { version = "=3.6.3", features = ["apple-native", "windows-native", "linux-native"] }

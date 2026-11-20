@@ -35,6 +35,11 @@ describe("third-party licences", () => {
     expect(text).toContain("(no licence file shipped; the package declares ISC)");
   });
 
+  it("names what the OCR module download contains (ADR-0055)", () => {
+    const text = licenseText([]);
+    for (const name of ["OpenThai OCR 2.1 by iApp Technology (Apache-2.0)", "PaddleOCR PP-OCRv5", "ONNX Runtime 1.28.0 by Microsoft (MIT)", "oar-ocr (Apache-2.0)", "hayro (Apache-2.0 OR MIT)", "NOTICE"]) expect(text).toContain(name);
+  });
+
   it("takes every licence text of a dual-licensed package, never the SPDX metadata", () => {
     expect(licenceFiles(["package.json", "LICENSE.spdx", "LICENSE-MIT", "LICENSE-APACHE-2.0", "README.md"])).toEqual(["LICENSE-APACHE-2.0", "LICENSE-MIT"]);
     expect(licenceFiles(["LICENSE.md", "licence", "COPYING", "LICENSE-MIT.txt", "LICENSES.json", "license.js", "LICENSE-MIT.spdx"])).toEqual(["COPYING", "LICENSE-MIT.txt", "LICENSE.md", "licence"]);

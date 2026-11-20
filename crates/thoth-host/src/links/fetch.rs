@@ -144,6 +144,14 @@ impl Fetcher {
     /// GETs `url`, following up to `MAX_REDIRECTS` redirects, each checked like the first. A 2xx answer's body is read
     /// as `want` says; any other status is `PREVIEW_UNAVAILABLE`.
     pub fn get(&self, url: &Url, deadline: Instant, want: &Want<'_>) -> HostResult<Fetched> {
+        let (current, content_type, reader) = self.open(url, deadline, want)?;
+        let body = read_body(&current, reader, want)?;
+        Ok(Fetched { url: current, content_type, body })
+    }
+
+    /// `get` up to the body: the final address, its content type and the body as a stream (the module downloads read it
+    /// themselves, with progress and Cancel). The deadline covers the whole read.
+    pub fn open(&self, url: &Url, deadline: Instant, want: &Want<'_>) -> HostResult<(Url, Option<String>, Box<dyn Read + Send>)> {
         let mut current = url.clone();
         for hop in 0..=MAX_REDIRECTS {
             check_link(&current)?;
@@ -165,7 +173,7 @@ impl Fetcher {
                 .header("accept", want.accept)
                 .body(())
                 .map_err(|_| unavailable(&current, "the link could not be requested"))?;
-            let mut response = agent.run(request).map_err(|e| network(&current, &e))?;
+            let response = agent.run(request).map_err(|e| network(&current, &e))?;
             let status = response.status().as_u16();
             if (300..400).contains(&status) && status != 304 {
                 let location =
@@ -192,8 +200,8 @@ impl Fetcher {
             {
                 return Err(unavailable(&current, "it is too large"));
             }
-            let body = read_body(&current, response.body_mut().with_config().limit(u64::MAX).reader(), want)?;
-            return Ok(Fetched { url: current, content_type, body });
+            let reader = response.into_body().into_with_config().limit(u64::MAX).reader();
+            return Ok((current, content_type, Box::new(reader)));
         }
         Err(unavailable(url, "too many redirects"))
     }

@@ -31,10 +31,23 @@ export function licenceFiles(names: readonly string[]): string[] {
   return names.filter((f) => /^(licen[sc]e|copying)([-_][\w.-]*)?(\.(txt|md|markdown|rst))?$/i.test(f) && !/\.spdx$/i.test(f)).sort();
 }
 
+/**
+ * The OCR module (ADR-0055) is not in the bundle: it is a separate download whose own NOTICE.txt (scripts/ocr/notice.py)
+ * and model NOTICE carry the full texts. The licences page names it, so a reader knows what the download contains.
+ */
+export const OCR_MODULE_NOTICE = `The OCR module (Settings → Modules) is a separate download, not part of this bundle. It contains:
+  - thoth-ocr, Thoth's OCR program (Apache-2.0), built with oar-ocr (Apache-2.0), ort (MIT OR Apache-2.0),
+    hayro (Apache-2.0 OR MIT) and other Rust crates; on Intel Macs, tract (MIT OR Apache-2.0) instead of ONNX Runtime
+  - ONNX Runtime 1.28.0 by Microsoft (MIT), with its ThirdPartyNotices
+  - OpenThai OCR 2.1 by iApp Technology (Apache-2.0), the "Fast" model, with its NOTICE
+  - PaddleOCR PP-OCRv5 Thai by PaddlePaddle (Apache-2.0), the "Second opinion" model
+Their full licence texts are in the NOTICE.txt and NOTICE files that come with the download.
+`;
+
 /** The file's text: a header, then each package's licence file (or what it declares when it ships none). */
 export function licenseText(packages: Iterable<BundledPackage>): string {
   const byKey = new Map([...packages].map((p) => [`${p.name}@${p.version}`, p]));
-  const parts = ["Thoth's own code in this bundle is Apache-2.0 (https://github.com/Creaml4tt3/thoth).\nThe third-party packages below are bundled with it, under their own licences.\n"];
+  const parts = ["Thoth's own code in this bundle is Apache-2.0 (https://github.com/Creaml4tt3/thoth).\nThe third-party packages below are bundled with it, under their own licences.\n", OCR_MODULE_NOTICE];
   for (const key of [...byKey.keys()].sort()) {
     const pkg = byKey.get(key)!;
     const files = licenceFiles(readdirSync(pkg.dir));

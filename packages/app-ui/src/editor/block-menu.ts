@@ -9,7 +9,7 @@
 import { localizedBlockKinds, type BlockKind } from "./block-kinds.ts";
 import type { EditorStrings } from "../strings/en.ts";
 
-export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" } | { type: "alt" };
+export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" } | { type: "alt" } | { type: "copyText" } | { type: "insertText" };
 
 export interface BlockMenuState {
   /** Block type of the target, shown as checked in "Turn into"; null when it has none in the list. */
@@ -19,6 +19,8 @@ export interface BlockMenuState {
   canMoveDown: boolean;
   /** The block is an image: offer "Edit alt text" (ADR-0028). */
   isImage?: boolean;
+  /** An image and the app has OCR (ADR-0055): offer Copy text / Insert text below; a string disables them with that reason. */
+  ocr?: true | string;
 }
 
 export interface BlockMenu {
@@ -34,6 +36,31 @@ interface Options {
   /** Called whenever the menu closes. `refocus` is false when the user clicked elsewhere (focus is already where they put it). */
   onClose(refocus: boolean): void;
   strings: EditorStrings;
+}
+
+/** The menu's own icons: drawn like the app's (ui/Icon.tsx: 24-unit grid, 1.8 stroke, round caps), shown at 16px. */
+const DRAWN: Record<string, string[]> = {
+  alt: ["M4 5.5h16v13H4z", "M7.5 15l3-3.5 2.5 2.5 1.5-1.5 2 2.5", "M15.5 8.6v.1"],
+  copyText: ["M9 9h11v11H9z", "M5 15V6a2 2 0 0 1 2-2h9", "M12 13h5M12 16.5h3"],
+  insertText: ["M4 5h16M4 9.5h10", "M12 12.5v7M8.8 16.5l3.2 3.2 3.2-3.2"],
+  turn: ["M19.5 12a7.5 7.5 0 1 1-2.2-5.3", "M19.5 4.5v4h-4"],
+  duplicate: ["M9 9h11v11H9z", "M5 15V6a2 2 0 0 1 2-2h9", "M14.5 12v5M12 14.5h5"],
+  delete: ["M5 7h14", "M10 4h4", "M7 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4L17 7", "M10.5 11v5.5M13.5 11v5.5"],
+  up: ["M12 19V5M6.5 10.5L12 5l5.5 5.5"],
+  down: ["M12 5v14M6.5 13.5L12 19l5.5-5.5"],
+};
+
+function drawn(name: string): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  for (const d of DRAWN[name] ?? []) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
 }
 
 export function createBlockMenu(opts: Options): BlockMenu {
@@ -73,7 +100,9 @@ export function createBlockMenu(opts: Options): BlockMenu {
       const icon = document.createElement("span");
       icon.className = "block-menu-icon";
       icon.setAttribute("aria-hidden", "true");
-      icon.textContent = o.icon;
+      // A drawn icon by its name, else the block kind's own glyph (H1, •, ☐…) as text.
+      if (o.icon in DRAWN) icon.append(drawn(o.icon));
+      else icon.textContent = o.icon;
       b.append(icon);
     }
     const text = document.createElement("span");
@@ -127,14 +156,21 @@ export function createBlockMenu(opts: Options): BlockMenu {
 
   function open(state: BlockMenuState, anchor: DOMRect): void {
     hideSub();
-    const turn = item(t.turnInto, { icon: "↻", popup: true, disabled: !state.canTurn, onRun: () => openSub(turn, state, true) });
+    const turn = item(t.turnInto, { icon: "turn", popup: true, disabled: !state.canTurn, onRun: () => openSub(turn, state, true) });
     root.replaceChildren(
-      ...(state.isImage ? [item(t.image.editAlt, { icon: "Aa", onRun: () => run({ type: "alt" }) })] : []),
+      ...(state.isImage ? [item(t.image.editAlt, { icon: "alt", onRun: () => run({ type: "alt" }) })] : []),
+      ...(state.ocr
+        ? (["copyText", "insertText"] as const).map((type) => {
+            const why = state.ocr === true ? undefined : state.ocr;
+            const label = why ? `${t.image[type]} (${why})` : t.image[type];
+            return item(label, { icon: type, disabled: !!why, onRun: () => run({ type }) });
+          })
+        : []),
       turn,
-      item(t.duplicate, { icon: "⧉", onRun: () => run({ type: "duplicate" }) }),
-      item(t.delete, { icon: "✕", onRun: () => run({ type: "delete" }) }),
-      item(t.moveUp, { icon: "↑", shortcut: "Alt+Shift+↑", disabled: !state.canMoveUp, onRun: () => run({ type: "up" }) }),
-      item(t.moveDown, { icon: "↓", shortcut: "Alt+Shift+↓", disabled: !state.canMoveDown, onRun: () => run({ type: "down" }) }),
+      item(t.duplicate, { icon: "duplicate", onRun: () => run({ type: "duplicate" }) }),
+      item(t.delete, { icon: "delete", onRun: () => run({ type: "delete" }) }),
+      item(t.moveUp, { icon: "up", shortcut: "Alt+Shift+↑", disabled: !state.canMoveUp, onRun: () => run({ type: "up" }) }),
+      item(t.moveDown, { icon: "down", shortcut: "Alt+Shift+↓", disabled: !state.canMoveDown, onRun: () => run({ type: "down" }) }),
     );
     root.hidden = false;
     const width = root.offsetWidth || 240;

@@ -1,0 +1,10 @@
+{
+  "serial": 5,
+  "models": [
+    { "id": "fast", "version": "f1", "preset": "openthai", "minApp": "0.12.0", "protocol": 1,
+      "files": [ { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/fast/f1/det.onnx.gz", "size": 30, "sha256": "00" } ] },
+    { "id": "fast", "version": "f2", "preset": "openthai", "minApp": "99.0.0", "protocol": 1,
+      "files": [ { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/fast/f2/det.onnx.gz", "size": 30, "sha256": "00" } ] }
+  ],
+  "test": { "file": { "name": "ocr-test.png", "url": "https://download.thothnotes.com/modules/test/1/ocr-test.png.gz", "size": 30, "sha256": "00" }, "expect": ["Q4"] }
+}

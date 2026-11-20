@@ -59,6 +59,8 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
   useEffect(() => directory.openPage({ server: target.server, workspace: target.workspace, page: target.page }), [directory, target.server, target.workspace, target.page]);
   const here = state.presence[presenceKey(target)] ?? [];
   const me = entry?.info.account?.id;
+  // "Edited … by …" (the line under the title): a member's name; the list is read again as members change.
+  const nameOf = useCallback((id: string) => directory.memberName(target.server, target.workspace, id), [directory, target.server, target.workspace, workspace?.members]);
   const changeNotice = useMemo(
     // A change by this account (another window, a rename from the sidebar) is not news: no notice.
     () => ({ text: (by: string | null) => (by !== null && by === me ? null : t.changedBy(by === null ? null : directory.memberName(target.server, target.workspace, by))), dismiss: t.dismissChange }),
@@ -174,6 +176,7 @@ export function WorkspacePage({ directory, target, modeSpace, openPage, signedOu
         </>
       }
       changeNotice={changeNotice}
+      nameOf={nameOf}
       {...(onConflict ? { onConflict } : {})}
       {...(onSaved ? { onSaved } : {})}
     />

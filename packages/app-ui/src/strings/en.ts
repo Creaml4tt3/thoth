@@ -24,6 +24,13 @@ export const en = {
     modeGroup: "Editor mode",
     /** The editor's accessible name. */
     content: "Page content",
+    /** The line under a page's breadcrumbs. */
+    pageInfo: {
+      created: (when: string) => `Created ${when}`,
+      edited: (when: string) => `Edited ${when}`,
+      by: (name: string) => `by ${name}`,
+      byYou: "by you",
+    },
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },
@@ -140,6 +147,27 @@ export const en = {
       addFailed: (detail: string) => `Could not add the image: ${detail}`,
       notAnImageFile: "This file is not an image a page can show.",
       fileTooLarge: "The image is larger than 20 MB.",
+      // Reading an image's text (ADR-0055).
+      copyText: "Copy text",
+      insertText: "Insert text below",
+      remoteNoOcr: "Web images are not read",
+      notLoadedNoOcr: "The image isn't loaded",
+      reading: "Reading text…",
+      copied: "Text copied",
+      copyFailed: "The text was read, but it could not be copied.",
+      inserted: "Text inserted below the image",
+      noText: "No text found in this image",
+      otherModel: "Try the other model",
+      notInstalled: "OCR isn't downloaded yet. Download it in Settings → Modules.",
+      openSettings: "Open Settings",
+      cancelled: "Cancelled. Nothing was changed.",
+      ocrFailed: {
+        "too-large": "This image is too large to read.",
+        "bad-file": "This image can't be read.",
+        timeout: "Reading took too long and was stopped.",
+        failed: "The text could not be read.",
+      } as Record<"too-large" | "bad-file" | "timeout" | "failed", string>,
+      dismiss: "Close",
     },
 
     blocks: {

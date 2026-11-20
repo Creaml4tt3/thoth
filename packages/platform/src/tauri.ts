@@ -11,8 +11,8 @@
  * call. The app may pass those functions instead via `createTauriPlatform(api)`.
  */
 import type { ConnectedApps, Platform, Windows } from "./index.ts";
-import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, Transport, VaultChangedEvent } from "./ipc.ts";
-import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps, remoteUpdates } from "./remote.ts";
+import type { CommandName, Commands, InstallState, McpRequest, MemoryWritten, ModuleStatus, Transport, VaultChangedEvent } from "./ipc.ts";
+import { HostCallError, createRemotePlatform, isHostErrorShape, remoteConnectedApps, remoteModules, remoteUpdates } from "./remote.ts";
 
 /** Header carrying the JSON arguments when the body is raw bytes. */
 export const ARGS_HEADER = "x-thoth-args";
@@ -28,6 +28,9 @@ export const MCP_PROPOSALS_EVENT = "thoth:mcp-proposals";
 export const MCP_MEMORIES_EVENT = "thoth:mcp-memories";
 /** In-app updates (ADR-0034): the host's `update.progress`. */
 export const UPDATE_PROGRESS_EVENT = "thoth:update-progress";
+/** The OCR module (ADR-0055): the host's `module.progress` and `ocr.progress`. */
+export const MODULE_PROGRESS_EVENT = "thoth:module-progress";
+export const OCR_PROGRESS_EVENT = "thoth:ocr-progress";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<unknown>;
 export type TauriListen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
@@ -171,5 +174,13 @@ export function createTauriPlatform(api?: TauriApi): Platform {
       return () => void unlisten();
     },
   });
-  return { ...createRemotePlatform(transport, "tauri"), updates, windows: tauriWindows(api), connectedApps: tauriConnectedApps(transport, api) };
+  const listen = <T>(event: string) => async (listener: (payload: T) => void) => {
+    const unlisten = await bound.listen<T>(event, (e) => listener(e.payload));
+    return () => void unlisten();
+  };
+  const modules = remoteModules(transport, {
+    onProgress: listen<ModuleStatus>(MODULE_PROGRESS_EVENT),
+    onReadProgress: listen<{ page: number; pages: number }>(OCR_PROGRESS_EVENT),
+  });
+  return { ...createRemotePlatform(transport, "tauri"), updates, modules, windows: tauriWindows(api), connectedApps: tauriConnectedApps(transport, api) };
 }

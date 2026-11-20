@@ -36,6 +36,8 @@ export interface AppOptions {
   notifier: SystemNotifier;
   /** How long the mascot's message after a run stays up. */
   messageMs: number;
+  /** Open the Private Space of the last session at launch (ADR-0029, 2026-11-20); tests of the picker turn it off. */
+  reopenLast?: boolean;
   /** The update notice (ADR-0022): time from the start to its first check, and between checks after that. */
   updateDelayMs: number;
   updateIntervalMs: number;
@@ -57,7 +59,7 @@ export interface Session {
   /** Opens a page in the current tab, or in a new one (`newTab`: Cmd/Ctrl+click, middle-click, Cmd/Ctrl+Enter). */
   openPage(path: string, options?: OpenOptions): void;
   /** Opens Settings as a tab (one only), optionally scrolled to a section. */
-  openSettings(section?: "servers" | "agents" | "import" | "today"): void;
+  openSettings(section?: "servers" | "agents" | "import" | "today" | "modules"): void;
   /** The window's tabs (ADR-0016 rule 5). */
   tabs: TabsController;
   /** Workspace servers: the host holds the credentials; this is the app's view of them. */

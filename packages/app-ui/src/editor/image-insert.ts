@@ -5,7 +5,7 @@
  * an empty paragraph there becomes the image, otherwise it goes after the block. Each image is one undo step; undo
  * takes it out of the page and leaves the kept file where it is.
  *
- * Also: Enter on a selected image opens its alt text field. Progress and errors are said in a live region.
+ * Also: Enter on a selected image opens its alt text field. Progress and errors are said in a toast.
  */
 import { Extension } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
@@ -14,6 +14,7 @@ import { NodeSelection, Plugin, PluginKey, type Transaction } from "@tiptap/pm/s
 import type { EditorView } from "@tiptap/pm/view";
 import type { EditorContext } from "./context.ts";
 import { editImageAlt } from "./image-views.ts";
+import { toast, type ToastHandle } from "../ui/toast.ts";
 import { ImageRejectedError, MAX_IMAGE_BYTES, imageMimeType, isImageMimeType, type ImageFile } from "./media.ts";
 
 interface Pending {
@@ -60,28 +61,16 @@ async function readFile(file: File): Promise<ImageFile> {
   return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), type: file.type };
 }
 
-/** A small live region next to the editor: successes for screen readers, errors for everyone. */
-function createStatus(view: EditorView): { say(text: string, error?: boolean): void; destroy(): void } {
-  const region = document.createElement("div");
-  region.className = "image-insert-status sr-only";
-  // A live region without the `status` role: the page's save status is the one status there.
-  region.setAttribute("aria-live", "polite");
-  region.setAttribute("aria-atomic", "true");
-  view.dom.parentElement?.append(region);
-  let timer: ReturnType<typeof setTimeout> | undefined;
+/** Progress and errors as a toast (ui/toast.ts): successes leave on their own, errors stay until closed. */
+function createStatus(view: EditorView, ctx: EditorContext): { say(text: string, error?: boolean): void; destroy(): void } {
+  const id = `image-insert-${++nextId}`;
+  let handle: ToastHandle | null = null;
   return {
     say(text, error = false) {
-      clearTimeout(timer);
-      region.textContent = text;
-      region.className = error ? "image-insert-status is-error" : "image-insert-status sr-only";
-      timer = setTimeout(() => {
-        region.textContent = "";
-        region.className = "image-insert-status sr-only";
-      }, error ? 10_000 : 4000);
+      if (!view.isDestroyed) handle = toast(text, { id, kind: error ? "error" : text === ctx.strings.image.adding ? "loading" : "success", closeLabel: ctx.strings.image.dismiss });
     },
     destroy() {
-      clearTimeout(timer);
-      region.remove();
+      handle?.dismiss();
     },
   };
 }
@@ -196,7 +185,7 @@ export function imageInsertExtension(ctx: EditorContext) {
             },
           },
           view(view) {
-            statuses.set(view, createStatus(view));
+            statuses.set(view, createStatus(view, ctx));
             return {
               destroy: () => {
                 statuses.get(view)?.destroy();

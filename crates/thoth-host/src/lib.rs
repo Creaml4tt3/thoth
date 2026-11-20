@@ -30,6 +30,7 @@ pub mod index_home;
 pub mod install;
 pub mod links;
 pub mod mcp;
+pub mod modules;
 pub mod network;
 pub mod paths;
 pub mod remote;
@@ -48,6 +49,7 @@ pub use remote::{Browser, KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_SERVICE, MemorySecre
 
 use agent::Agents;
 use links::{LinkOptions, LinkPreviews};
+use modules::{ModuleOptions, Modules};
 use paths::{canonical, canonicalize_path, check_root_policy};
 use remote::Remote;
 #[cfg(unix)]
@@ -81,6 +83,7 @@ pub const COMMANDS: &[&str] = &[
     "agent.history.write", "agent.history.read", "agent.history.list", "agent.history.delete",
     "link.preview", "link.preview.clear", "link.open",
     "update.check", "update.settings", "update.install", "update.cancel", "update.status", "update.restart",
+    "module.status", "module.install", "module.cancel", "module.remove", "module.settings", "ocr.read", "ocr.cancel",
     "mcp.settings", "mcp.configure", "mcp.decide", "mcp.forget", "mcp.answer", "mcp.log",
     "mcp.mayPropose", "mcp.proposals", "mcp.proposal", "mcp.settle",
     "mcp.mayRemember", "mcp.memoryFolder", "mcp.memoryHistory", "mcp.skillLinks", "mcp.install", "mcp.setupStatus",
@@ -110,6 +113,10 @@ pub trait Picker: Send + Sync {
     fn pick_source(&self, directory: bool) -> Option<PathBuf>;
     /// An image file to add to a page (ADR-0028). None: cancelled, or no picker (the default).
     fn pick_image(&self) -> Option<PathBuf> {
+        None
+    }
+    /// A PDF to make a page from (ADR-0055, `source.pick { kind: "pdf" }`). None: cancelled, or no picker (the default).
+    fn pick_pdf(&self) -> Option<PathBuf> {
         None
     }
     /// Where to save a downloaded page (`file.save`): a "Save as" dialog that starts with `name`. None: cancelled, or no
@@ -193,6 +200,8 @@ pub struct Host {
     agents: Agents,
     links: LinkPreviews,
     updates: Updates,
+    /// The OCR module (ADR-0055); unavailable until `with_updates` names the app version.
+    modules: Arc<Modules>,
     mcp: mcp::Relay,
     /// Where the app's log files are (`diag.collect`); `None`: no log.
     log_dir: Option<PathBuf>,
@@ -223,6 +232,7 @@ impl Host {
         };
         let mcp = mcp::Relay::new(config.data_dir.as_ref().map(|d| d.join(mcp::DIR)), config.events.clone(), open, mcp::McpOptions::default());
         let updates = Updates::new(config.data_dir.clone(), UpdateOptions::off());
+        let modules = Modules::new(ModuleOptions::new(None, ""));
         Self {
             config,
             home,
@@ -232,6 +242,7 @@ impl Host {
             agents,
             links,
             updates,
+            modules,
             mcp,
             log_dir: None,
             version: String::new(),
@@ -250,7 +261,18 @@ impl Host {
         options.allow_loopback |= self.config.link_preview_loopback;
         options.events = Some(self.config.events.clone());
         self.version = options.current.clone();
+        self.modules = Modules::new(ModuleOptions {
+            events: Some(self.config.events.clone()),
+            ..ModuleOptions::new(self.config.data_dir.as_ref().map(|d| d.join("modules").join("ocr")), &options.current)
+        });
         self.updates = Updates::new(self.config.data_dir.clone(), options);
+        self
+    }
+
+    /// Replaces the OCR module's options (tests and the stdio harness): its downloads, list and test.
+    #[must_use]
+    pub fn with_modules(mut self, options: ModuleOptions) -> Self {
+        self.modules = Modules::new(ModuleOptions { events: Some(self.config.events.clone()), ..options });
         self
     }
 
@@ -298,8 +320,10 @@ impl Host {
         if !args.is_object() {
             return Err(HostError::bad_argument("Arguments must be an object"));
         }
-        let wants_bytes =
-            matches!(command, "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save");
+        let wants_bytes = matches!(
+            command,
+            "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save" | "ocr.read"
+        );
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
         }
@@ -422,12 +446,13 @@ impl Host {
                 null()
             }
             "source.pick" => {
-                let directory = match str_arg(args, "kind")? {
-                    "file" => false,
-                    "directory" => true,
-                    _ => return Err(HostError::bad_argument("kind must be \"file\" or \"directory\"")),
+                let picked = match str_arg(args, "kind")? {
+                    "file" => self.config.picker.pick_source(false),
+                    "directory" => self.config.picker.pick_source(true),
+                    "pdf" => self.config.picker.pick_pdf(),
+                    _ => return Err(HostError::bad_argument("kind must be \"file\", \"directory\" or \"pdf\"")),
                 };
-                json(self.pick_source(directory))
+                json(self.allow_source(picked))
             }
             "source.open" => json(self.open_source(str_arg(args, "location")?)?),
             "source.list" => {
@@ -564,13 +589,41 @@ impl Host {
                 null()
             }
             // The update notice (ADR-0022): the host asks `latest.json`; the webview gets a verdict, never a page.
-            "update.check" => json(self.updates.check(bool_arg(args, "force")?)),
+            "update.check" => {
+                let answer = self.updates.check(bool_arg(args, "force")?);
+                // The signed model list goes with a real check (same schedule, same privacy), only when OCR is installed.
+                if matches!(answer["state"].as_str(), Some("current" | "available")) && self.modules.wants_list() {
+                    let modules = self.modules.clone();
+                    std::thread::spawn(move || modules.refresh());
+                }
+                json(answer)
+            }
             "update.settings" => json(self.updates.settings(args)?),
             // In-app updates (ADR-0034): only after the person clicked Update; progress comes as `update.progress`.
             "update.install" => json(self.updates.install()?),
             "update.cancel" => json(self.updates.cancel()),
             "update.status" => json(self.update_status(bool_arg(args, "reopen")?)),
             "update.restart" => json(self.update_restart(args)?),
+            // The OCR module (ADR-0055): downloads only after Download; progress comes as `module.progress`.
+            "module.status" => {
+                if bool_arg(args, "refresh")? {
+                    self.modules.refresh();
+                }
+                json(self.modules.status())
+            }
+            "module.install" => json(self.modules.install(modules_model(args)?)?),
+            "module.cancel" => json(self.modules.cancel()),
+            "module.remove" => json(self.modules.remove(modules_model(args)?)?),
+            "module.settings" => json(self.modules.settings(args)?),
+            // The bytes are the image or PDF; they go to the program on stdin and nowhere else. Pages: `ocr.progress`.
+            "ocr.read" => {
+                let data = bytes.ok_or_else(|| HostError::bad_argument("ocr.read needs request bytes"))?;
+                json(self.modules.read_as(owner, args, data)?)
+            }
+            "ocr.cancel" => {
+                self.modules.cancel_read(owner);
+                null()
+            }
             // Connected apps (ADR-0021): the switch, the shared Private Spaces and each app's Allow or Deny, set by the
             // user in a window; `mcp.answer` is a window's answer to an app's request (`mcp.request` event).
             "mcp.settings" => json(self.mcp.settings()),
@@ -889,8 +942,9 @@ impl Host {
 
     // ------------------------------------------------------------ sources
 
-    fn pick_source(&self, directory: bool) -> Value {
-        let Some(picked) = self.config.picker.pick_source(directory) else { return Value::Null };
+    /// A picked import source or PDF joins the allow-list for `source.open`; the page gets its path to open it with.
+    fn allow_source(&self, picked: Option<PathBuf>) -> Value {
+        let Some(picked) = picked else { return Value::Null };
         let Ok(location) = canonicalize_path(&picked) else { return Value::Null };
         let shown = location.to_string_lossy().into_owned();
         self.state().picked_sources.insert(location);
@@ -1054,6 +1108,7 @@ impl Host {
     /// settings are kept for the next start).
     /// The host stays usable.
     pub fn shutdown(&self) {
+        self.modules.shutdown();
         self.mcp.stop();
         self.remote.shutdown();
         self.agents.shutdown();
@@ -1196,6 +1251,13 @@ fn save_name(name: &str) -> String {
 
 fn str_arg<'a>(args: &'a Value, key: &str) -> HostResult<&'a str> {
     args.get(key).and_then(Value::as_str).ok_or_else(|| HostError::bad_argument(format!("{key} must be a string")))
+}
+
+fn modules_model(args: &Value) -> HostResult<modules::catalog::ModelId> {
+    args.get("model")
+        .and_then(Value::as_str)
+        .and_then(modules::catalog::ModelId::parse)
+        .ok_or_else(|| HostError::bad_argument("model must be \"fast\" or \"second\""))
 }
 
 fn bool_arg(args: &Value, key: &str) -> HostResult<bool> {

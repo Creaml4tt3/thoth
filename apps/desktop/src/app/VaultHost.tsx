@@ -14,6 +14,7 @@ import { ServerDirectory } from "@thoth/app-ui/workspace/directory.ts";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
 import { createLinkPreviewService } from "@thoth/app-ui/editor/link-previews.ts";
 import { useTabs } from "@thoth/app-ui/tabs/useTabs.ts";
+import { pageOcr } from "../features/modules/page-ocr.ts";
 import { serializeLayout } from "@thoth/app-ui/tabs/layout.ts";
 import { loadTabs, parseDesktopLayout, saveTabs } from "./tabs-store.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
@@ -213,6 +214,9 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   const servers = useMemo(() => new ServerDirectory(platform.servers, { pollMs: options.pollMs }), [platform, options.pollMs]);
   // Link previews (ADR-0020): the host fetches them; a platform without `links` shows plain links.
   const linkPreviews = useMemo(() => (platform.links ? createLinkPreviewService(platform.links) : undefined), [platform]);
+  // A ref: a new tabs controller must not rebuild every open editor's context.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
   const pageHost = useMemo<PageHost>(
     () => ({
       client: "desktop",
@@ -222,6 +226,8 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
       ...(linkPreviews ? { links: linkPreviews } : {}),
       // Images (ADR-0028): the host's picker; the page gets the name and the bytes, never the path.
       ...(platform.pickImage ? { pickImage: () => platform.pickImage!() } : {}),
+      // Reading an image's text (ADR-0055): the host's OCR module; "not installed" opens Settings → Modules.
+      ...(platform.modules ? { ocr: { ...pageOcr(platform.modules), openModules: () => tabsRef.current.open({ kind: "settings", section: "modules" }) } } : {}),
       // Download as Markdown: the host's "Save as"; the page never learns where it went.
       ...(platform.saveFile ? { saveFile: (name: string, text: string) => platform.saveFile!(name, new TextEncoder().encode(text)) } : {}),
       flushAll,

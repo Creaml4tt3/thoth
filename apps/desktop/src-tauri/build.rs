@@ -24,6 +24,9 @@ pub const TAURI_COMMANDS: &[&str] = &[
     // In-app updates (ADR-0034): the host downloads, checks and installs through the updater plugin's Rust API; the
     // webview gets these four commands and progress events, and no plugin permission.
     "update_install", "update_cancel", "update_status", "update_restart",
+    // The OCR module (ADR-0055): the host downloads, checks and runs it; the webview gets these commands and progress
+    // events. `ocr_read` carries the image or PDF bytes to the host, which gives them to the program on stdin only.
+    "module_status", "module_install", "module_cancel", "module_remove", "module_settings", "ocr_read", "ocr_cancel",
     // Connected apps (ADR-0021): the settings, the Allow or Deny, a window's answer and the log; thoth-mcp's socket is
     // the host's own.
     "mcp_settings", "mcp_configure", "mcp_decide", "mcp_forget", "mcp_answer", "mcp_log",

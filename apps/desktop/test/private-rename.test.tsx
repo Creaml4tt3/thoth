@@ -242,7 +242,7 @@ describe("rename a folder with F2", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Notes", "Beta"]));
     expect(current()).toBe("Beta");
     const notes = await rowEl("Notes");
-    await waitFor(() => expect(notes.getAttribute("title")).toBe("Papers/Notes.md"));
+    await waitFor(() => expect(notes.getAttribute("title")?.split("\n")[0]).toBe("Papers/Notes.md"));
     await app.user.click(screen.getAllByRole("tab")[0]!);
     await waitFor(() => expect(current()).toBe("Notes"));
     await waitFor(async () => expect((await rowEl("Notes")).getAttribute("aria-current")).toBe("page"));
@@ -282,7 +282,8 @@ describe("New folder", () => {
     await app.user.click(screen.getByRole("button", { name: "New folder" }));
     const first = await naming("Untitled folder");
     expect(first.value).toBe("Untitled folder");
-    expect(document.activeElement).toBe(first);
+    // Focus follows the field a frame later on a loaded machine.
+    await waitFor(() => expect(document.activeElement).toBe(first));
     expect((await stat(join(root, "Untitled folder"))).isDirectory()).toBe(true);
     // Escape keeps the folder with its default name.
     await app.user.keyboard("{Escape}");

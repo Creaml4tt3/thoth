@@ -8,16 +8,25 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
-## [Unreleased]
+## [0.12.0] - 2026-11-21
 
 ### Added
 
 - Board: see your notes as sticky notes on a board, joined by their links. Build your own boards, and draw string between two notes to link them. Boards are .canvas files that Obsidian can open too.
+- Settings → Modules: download OCR, which reads Thai and English text in images and PDFs on your computer. Choose Fast or Second opinion; nothing is downloaded until you click.
+- Copy text and Insert text below on an image: get the text out of a screenshot or a photo of a page. If one model misses something, try the other.
+- Page from PDF…: make a page from a PDF of up to 50 pages, using its own text where it has good text and OCR for the rest.
+- Under the page's path at the top: when it was created and last edited, and by whom in a workspace. The sidebar shows when a page was last edited when you point at it.
+- Right-click an image for its menu, with Copy text and Insert text below.
 
 ### Changed
 
+- Thoth opens the Private Space you had open when you quit. Back to Private Spaces before quitting shows the list of Private Spaces next time.
+- Blocks and Plain show their names next to their icons, and Timeline and Board in the sidebar have icons.
 - Settings shows one section at a time, with a wider list and an icon for each section.
 - Dropdowns look like the rest of Thoth instead of your system's.
+- Messages about images and their text float at the bottom of the window and leave on their own; errors stay until you close them.
+- The block menu and its handle have bigger, clearer icons.
 
 ## [0.11.0] - 2026-11-19
 
@@ -391,7 +400,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
-[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...HEAD
+[0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Creaml4tt3/thoth/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/Creaml4tt3/thoth/compare/v0.9.2...v0.10.0

@@ -1,0 +1,38 @@
+{
+  "serial": 1,
+  "models": [
+    {
+      "id": "fast",
+      "version": "openthai-2.1-20261118",
+      "preset": "openthai",
+      "minApp": "0.12.0",
+      "protocol": 1,
+      "files": [
+        { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/det.onnx.gz", "size": 0, "sha256": "", "targets": ["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"] },
+        { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/det.tract1280.onnx.gz", "size": 0, "sha256": "", "targets": ["x86_64-apple-darwin"] },
+        { "name": "rec.onnx", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec.onnx.gz", "size": 0, "sha256": "" },
+        { "name": "rec2.onnx", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec2.onnx.gz", "size": 0, "sha256": "" },
+        { "name": "rec_dict.txt", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/rec_dict.txt.gz", "size": 0, "sha256": "" },
+        { "name": "config.json", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/config.json.gz", "size": 0, "sha256": "" },
+        { "name": "NOTICE", "url": "https://download.thothnotes.com/modules/models/fast/openthai-2.1-20261118/NOTICE.gz", "size": 0, "sha256": "" }
+      ]
+    },
+    {
+      "id": "second",
+      "version": "pp-ocrv5-th-20250821",
+      "preset": "pp5",
+      "minApp": "0.12.0",
+      "protocol": 1,
+      "files": [
+        { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/det.onnx.gz", "size": 0, "sha256": "", "targets": ["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"] },
+        { "name": "det.onnx", "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/det.tract960.onnx.gz", "size": 0, "sha256": "", "targets": ["x86_64-apple-darwin"] },
+        { "name": "rec.onnx", "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/rec.onnx.gz", "size": 0, "sha256": "" },
+        { "name": "dict.txt", "url": "https://download.thothnotes.com/modules/models/second/pp-ocrv5-th-20250821/dict.txt.gz", "size": 0, "sha256": "" }
+      ]
+    }
+  ],
+  "test": {
+    "file": { "name": "ocr-test.png", "url": "https://download.thothnotes.com/modules/test/1/ocr-test.png.gz", "size": 0, "sha256": "" },
+    "expect": ["Getting Started", "สมาชิกฟรี", "Markdown"]
+  }
+}
