@@ -248,18 +248,32 @@ describe("BoardTab: saves and history across tabs and windows", () => {
     expect(await flushAll()).toBe(false);
   });
 
-  it("a failed save says so and reads the file again; the next good change clears the message", async () => {
-    const { user } = setup(BOARD);
+  it("a failed save says so and keeps the note where it was moved; the next good save clears the message", async () => {
+    const { flushAll, user } = setup(BOARD);
     await selectA(user);
     fake();
     vi.spyOn(vault, "writeFileAtomic").mockRejectedValueOnce(new Error("disk full"));
     await moveA();
     await advance(500);
     await until(() => screen.queryByText(/Couldn’t save the board/) !== null);
-    // Read again: the note is back where the file has it.
-    await until(() => note(/^A,/).style.left === "0px");
+    // Read again, with the change that failed still queued on top: the note stays where the person put it.
+    await until(() => note(/^A,/).style.left === "8px");
     await moveA();
-    expect(screen.queryByText(/Couldn’t save the board/)).toBeNull();
+    expect(await flushAll()).toBe(true);
+    expect((await nodes(BOARD))[0]).toMatchObject({ x: 16 });
+    await until(() => screen.queryByText(/Couldn’t save the board/) === null);
+  });
+
+  it("a failed save keeps the queued change, and the next flush writes it", async () => {
+    const { flushAll, user } = setup(BOARD);
+    await selectA(user);
+    fake();
+    vi.spyOn(vault, "writeFileAtomic").mockRejectedValueOnce(new Error("disk full"));
+    await moveA();
+    expect(await flushAll()).toBe(false);
+    // Not thrown away: the retry writes the move that failed.
+    expect(await flushAll()).toBe(true);
+    expect((await nodes(BOARD))[0]).toMatchObject({ x: 8 });
   });
 
   it("Cmd/Ctrl+Z after leaving the tab and coming back still undoes the move", async () => {

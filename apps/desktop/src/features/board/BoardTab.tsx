@@ -160,7 +160,9 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
         show(applyChanges(base.current.canvas, queue.current));
         if (live.current) setMessage("");
         return true;
-      } catch {
+      } catch (error) {
+        // Not lost: a board that is still a canvas keeps the changes queued, ahead of newer ones, for the next flush.
+        if (!(error instanceof CanvasError) && !(error instanceof NotFoundError)) queue.current.unshift(...changes);
         if (live.current) setMessage(t.saveFailed);
         return false;
       } finally {

@@ -97,6 +97,12 @@ describe("drawLink", () => {
     expect(await read("Atlas.md")).toBe("# Atlas\n\nEdited elsewhere.\n[[Roadmap]]\n");
   });
 
+  it("two draws of the same string at once add the line only once", async () => {
+    const [a, b] = await Promise.all([drawLink(vault, flushed, "Atlas.md", "Roadmap.md"), drawLink(vault, flushed, "Atlas.md", "Roadmap.md")]);
+    expect([a.outcome, b.outcome]).toEqual(["linked", "linked"]);
+    expect(added("# Atlas\n\nSome text.\n", await read("Atlas.md"))).toHaveLength(1);
+  });
+
   it("two conflicts write nothing of ours and say the page changed", async () => {
     const write = vault.writePage.bind(vault);
     let n = 0;

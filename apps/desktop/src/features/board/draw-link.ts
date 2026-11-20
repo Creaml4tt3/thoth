@@ -23,12 +23,16 @@ const readEditable = (vault: Vault, path: string) =>
   vault.readPage(path).then((r) => (r.editable ? r : null), (e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
 
 /** Writes `next(source)` with compare-and-swap; one conflict reads again and retries. null `next` writes nothing. */
-async function rewrite(vault: Vault, path: string, next: (source: string) => string | null): Promise<"written" | "changed" | "gone"> {
+/** What `next` returns when the page already has what it would add: nothing is written, and it is not a change. */
+const ALREADY = Symbol("already");
+
+async function rewrite(vault: Vault, path: string, next: (source: string) => string | null | typeof ALREADY): Promise<"written" | "changed" | "gone" | "already"> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const page = await readEditable(vault, path);
     if (!page) return "gone";
     const source = next(page.source);
     if (source === null) return "changed";
+    if (source === ALREADY) return "already";
     try {
       await vault.writePage(path, source, { expectedHash: page.hash });
       return "written";
@@ -66,11 +70,14 @@ export async function drawLink(vault: Vault, flushAll: () => Promise<boolean>, f
     const next = source + sep + line + eol;
     // Written only if, in the page as it would be, our line is one whole link that reaches `to`: not inside an open
     // code block, not a name that cannot be spelled as a link. Ranges are UTF-16 offsets into the whole source.
+    // Already linked by a write that raced this one (two quick draws): nothing more to add.
+    if (parsePage(from, source).references.some((r) => { const hit = resolver.resolve(from, r); return hit.state === "resolved" && hit.path === to; })) return ALREADY;
     const start = source.length + sep.length;
     const ref = parsePage(from, next).references.at(-1);
     const reached = ref && resolver.resolve(from, ref);
     return ref?.range.start === start && ref.range.end === start + line.length && reached?.state === "resolved" && reached.path === to ? next : null;
   });
+  if (written === "already") return { outcome: "linked" };
   if (written !== "written") return { outcome: written };
 
   // Undoable only while our line is still the page's last line, whole and unchanged; then only it (and the line break
