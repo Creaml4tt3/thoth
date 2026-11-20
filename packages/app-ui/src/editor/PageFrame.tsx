@@ -14,7 +14,8 @@ import { EMPTY_SUGGESTER, type LinkSuggester } from "./link-suggest.ts";
 import { registerEditorActions } from "../keyboard/editor-actions.ts";
 import { usePageSession } from "./usePageSession.ts";
 import { usePageHost } from "./host.ts";
-import type { PageStore, SaveStatus } from "./page-session.ts";
+import type { PageDates, PageStore, SaveStatus } from "./page-session.ts";
+import type { EditorStrings } from "../strings/en.ts";
 import { EDITOR_MODES, pageEditorMode, rememberPageEditorMode, type EditorMode } from "./mode.ts";
 import { loadPlainEditor, plainEditorNow } from "./plain/load.ts";
 import { pageKey } from "./session-pool.ts";
@@ -159,6 +160,8 @@ export interface PageFrameProps {
   onConflict?(event: { kind: "shown" } | { kind: "resolved"; choice: "mine" | "theirs" | "both" }): void;
   /** Told after each save that wrote the page (the web client's anonymous analytics). */
   onSaved?(): void;
+  /** A server page's editor by their account ID, for "Edited … by …"; absent: no name. */
+  nameOf?(id: string): string | null;
   /** A workspace page that reloaded because someone changed it says so (ADR-0041): the text for its author's ID. */
   changeNotice?: { text(by: string | null): string | null; dismiss: string };
 }
@@ -207,6 +210,7 @@ function PageFrameReady(props: PageFrameProps) {
   media.current = props.media ?? null;
   const pickImage = pageHost.pickImage;
   const ocr = pageHost.ocr;
+  const info = useRef<string | null>(null);
   const ctx = useMemo(
     () =>
       createEditorContext({
@@ -220,12 +224,21 @@ function PageFrameReady(props: PageFrameProps) {
         ...(links ? { links, openExternal: (url: string) => links.open(url) } : {}),
         ...(pickImage ? { pickImage } : {}),
         ...ocr,
+        pageInfo: () => info.current,
       }),
     [t, client, links, pickImage, ocr],
   );
   // One session per page per window (ADR-0030): an editor of the same page in the other pane shares it.
   const { session, state, member, owner } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten }, pageKey(store, modeKey.space, modeKey.page));
   const paneActive = usePaneActive();
+
+  // "Created … · Edited … by …" under the title; redrawn when the dates or the names change.
+  const nameOf = props.nameOf;
+  const infoText = useMemo(() => pageInfoText(state.dates, t.pageInfo, strings.lang, nameOf), [state.dates, t.pageInfo, strings.lang, nameOf]);
+  useEffect(() => {
+    info.current = infoText;
+    for (const view of ctx.views) view.refresh();
+  }, [infoText, ctx]);
 
   // Wikilink chips resolve through the index; refresh them when it changes.
   useEffect(() => {
@@ -393,6 +406,8 @@ function PageFrameReady(props: PageFrameProps) {
               )}
             </>
           )}
+          {/* Plain mode shows the text as it is: the line goes above it instead of under the title. */}
+          {state.phase === "ready" && mode === "plain" && infoText && <p className="page-info">{infoText}</p>}
           <div hidden={state.phase !== "ready"} data-editor-mode={mode} onFocus={() => member?.focused()}>
             {mode === "plain" && Plain ? <Plain key="plain" {...editorProps} /> : <PageEditor key="blocks" {...editorProps} />}
           </div>
@@ -414,4 +429,32 @@ function PageFrameReady(props: PageFrameProps) {
       )}
     </section>
   );
+}
+
+/** "Created 20 Nov 2026 · Edited today, 10:14 by Mali": the parts the store knew. */
+export function pageInfoText(
+  dates: PageDates,
+  t: EditorStrings["pageInfo"],
+  lang: string,
+  nameOf?: (id: string) => string | null,
+  now: Date = new Date(),
+): string | null {
+  const day = new Intl.DateTimeFormat(lang, { dateStyle: "medium" });
+  const time = new Intl.DateTimeFormat(lang, { timeStyle: "short" });
+  const valid = (ms: number | null | undefined): ms is number => typeof ms === "number" && Number.isFinite(ms) && ms > 0;
+  const when = (ms: number): string => {
+    const date = new Date(ms);
+    // Today and yesterday by their names; other days by their date. Only today's has the time.
+    const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86_400_000);
+    if (days === 0 || days === 1) return `${new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(-days, "day")}, ${time.format(date)}`;
+    return day.format(date);
+  };
+  const parts: string[] = [];
+  if (valid(dates.created)) parts.push(t.created(when(dates.created)));
+  if (valid(dates.updated) && (!valid(dates.created) || dates.updated - dates.created > 60_000)) {
+    const name = dates.updatedByMe ? null : dates.updatedBy ? (nameOf?.(dates.updatedBy) ?? null) : null;
+    const by = dates.updatedByMe && nameOf ? ` ${t.byYou}` : name ? ` ${t.by(name)}` : "";
+    parts.push(t.edited(when(dates.updated)) + by);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

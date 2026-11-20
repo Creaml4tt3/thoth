@@ -23,6 +23,11 @@ export function isStableId(id: string): boolean {
   return UUID_V7.test(id);
 }
 
+/** When a UUIDv7 was made (its first 48 bits, ms since 1970): for a page's `thoth_id`, when Thoth first kept it. Null for anything else. */
+export function stableIdTime(id: string | undefined): number | null {
+  return id && UUID_V7.test(id) ? parseInt(id.replace(/-/g, "").slice(0, 12), 16) : null;
+}
+
 export function isProvisionalId(id: string): boolean {
   return PROVISIONAL.test(id);
 }

@@ -11,6 +11,12 @@ export const th: Strings = {
     status: { idle: "", dirty: "ยังไม่ได้บันทึก", saving: "กำลังบันทึก…", saved: "บันทึกแล้ว", error: "บันทึกไม่สำเร็จ" },
     modeGroup: "โหมดแก้ไข",
     content: "เนื้อหาของหน้า", // REVIEW
+    pageInfo: {
+      created: (when: string) => `สร้างเมื่อ ${when}`, // REVIEW
+      edited: (when: string) => `แก้ไขล่าสุด ${when}`, // REVIEW
+      by: (name: string) => `โดย ${name}`, // REVIEW
+      byYou: "โดยคุณ", // REVIEW
+    },
     modeSwitchTitle: "สลับโหมดแก้ไข (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "บล็อก", hint: "จัดรูปแบบเป็นบล็อก แบบ Notion" },
@@ -119,6 +125,7 @@ export const th: Strings = {
       remoteNoOcr: "ไม่อ่านรูปภาพจากเว็บ", // REVIEW
       notLoadedNoOcr: "รูปภาพยังไม่ได้โหลด", // REVIEW
       reading: "กำลังอ่านข้อความ…", // REVIEW
+      copyFailed: "อ่านข้อความได้แล้ว แต่คัดลอกไม่ได้", // REVIEW
       copied: "คัดลอกข้อความแล้ว", // REVIEW
       inserted: "แทรกข้อความใต้รูปภาพแล้ว", // REVIEW
       noText: "ไม่พบข้อความในรูปภาพนี้", // REVIEW

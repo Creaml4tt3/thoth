@@ -79,7 +79,8 @@ export function workspacePageStore(deps: WorkspaceStoreDeps): PageStore {
       try {
         const resource = await client.getPage(workspace, page);
         remember(resource);
-        return { source: resource.markdown, hash: resource.revision.id, editable, author: resource.revision.authorId };
+        const { createdAt, updatedAt, updatedBy } = resource.metadata;
+        return { source: resource.markdown, hash: resource.revision.id, editable, author: resource.revision.authorId, dates: { created: Date.parse(createdAt), updated: Date.parse(updatedAt), updatedBy } };
       } catch (error) {
         if (error instanceof ProblemError && error.status === 404) return null;
         throw error;

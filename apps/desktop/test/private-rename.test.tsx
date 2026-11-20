@@ -242,7 +242,7 @@ describe("rename a folder with F2", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Notes", "Beta"]));
     expect(current()).toBe("Beta");
     const notes = await rowEl("Notes");
-    await waitFor(() => expect(notes.getAttribute("title")).toBe("Papers/Notes.md"));
+    await waitFor(() => expect(notes.getAttribute("title")?.split("\n")[0]).toBe("Papers/Notes.md"));
     await app.user.click(screen.getAllByRole("tab")[0]!);
     await waitFor(() => expect(current()).toBe("Notes"));
     await waitFor(async () => expect((await rowEl("Notes")).getAttribute("aria-current")).toBe("page"));

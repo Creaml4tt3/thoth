@@ -9,10 +9,12 @@
  * - Dragging uses ProseMirror's own mechanism: a NodeSelection plus
  *   `view.dragging`. The drop is handled here, as one transaction that moves
  *   the same node objects, so an untouched block keeps its original source.
+ * - A right click on an image opens its block menu where the pointer is (the OCR items, ADR-0055).
  * - A read-only editor (non-UTF-8 file, open conflict) shows no handle and no menu.
  */
 import { Extension } from "@tiptap/core";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
 import { createBlockMenu, type BlockAction, type BlockMenu } from "./block-menu.ts";
 import { editImageAlt } from "./image-views.ts";
@@ -218,7 +220,20 @@ export function blockHandleExtension(strings: EditorStrings, ctx?: EditorContext
             handle.tabIndex = -1; // mouse-only; keyboard users have Alt+Shift+Up/Down and the menu shortcut
             handle.setAttribute("aria-label", strings.handleLabel);
             handle.title = strings.handleTitle;
-            handle.textContent = "⋮⋮";
+            // Six dots, drawn (16px) rather than the "⋮⋮" text, which was too small to see.
+            const grip = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            grip.setAttribute("viewBox", "0 0 24 24");
+            grip.setAttribute("width", "16");
+            grip.setAttribute("height", "16");
+            grip.setAttribute("aria-hidden", "true");
+            for (const [cx, cy] of [[9, 6], [15, 6], [9, 12], [15, 12], [9, 18], [15, 18]]) {
+              const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+              dot.setAttribute("cx", String(cx));
+              dot.setAttribute("cy", String(cy));
+              dot.setAttribute("r", "1.6");
+              grip.append(dot);
+            }
+            handle.append(grip);
             handle.setAttribute("contenteditable", "false");
             indicator = document.createElement("div");
             indicator.className = "block-drop-indicator";
@@ -303,6 +318,26 @@ export function blockHandleExtension(strings: EditorStrings, ctx?: EditorContext
           },
           props: {
             handleDOMEvents: {
+              // A right click on an image opens its menu there (Edit alt text, Copy text, Insert text below, …).
+              contextmenu(view, event) {
+                if (!view.editable || !menu || !(event.target instanceof Element)) return false;
+                const figure = event.target.closest(".page-image:not(.is-inline)");
+                if (!figure || !view.dom.contains(figure)) return false;
+                // The image whose view is this element (found by its DOM: posAtDOM is unreliable on a leaf).
+                let target: { pos: number; node: PMNode } | null = null;
+                view.state.doc.descendants((node, at) => {
+                  if (target) return false;
+                  if (node.type.name === "image" && view.nodeDOM(at) === figure) target = { pos: at, node };
+                  return true;
+                });
+                const found = target as { pos: number; node: PMNode } | null;
+                if (!found) return false;
+                event.preventDefault();
+                view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, found.pos)));
+                hideHandle();
+                openMenu(view, found, new DOMRect(event.clientX, event.clientY, 0, 0));
+                return true;
+              },
               mousemove(view, event) {
                 if (!view.editable || dragged || menu?.isOpen()) return false;
                 const target = gutterTarget(view, event);

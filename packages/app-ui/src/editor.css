@@ -228,9 +228,10 @@
 
 /* Block handle (gutter), drop indicator and block menu */
 .editor-surface { position: relative; }
-.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-faint); font: 700 11px / 1 var(--thoth-font-sans); letter-spacing: -2px; cursor: grab; user-select: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
+.block-handle { box-sizing: border-box; position: absolute; z-index: 5; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--thoth-radius-sm); color: var(--thoth-ink-tertiary); cursor: grab; user-select: none; transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out); }
 .block-handle:hover, .block-handle:active { background: var(--thoth-bg-active); color: var(--thoth-ink-secondary); }
 .block-handle[hidden] { display: none; }
+.block-handle svg { fill: currentColor; pointer-events: none; }
 .block-drop-indicator { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--thoth-drop-indicator); pointer-events: none; animation: thoth-fade-in var(--thoth-dur-instant) var(--thoth-ease-out); }
 .block-drop-indicator[hidden] { display: none; }
 .is-block-dragging .ProseMirror-selectednode { outline: none; opacity: 0.45; }
@@ -248,7 +249,9 @@
 .block-menu-item[aria-disabled="true"] { color: var(--thoth-ink-faint); cursor: default; }
 .block-menu-item[aria-disabled="true"]:hover { background: none; }
 .block-menu-item[aria-checked="true"] .block-menu-label::after { content: " ✓"; color: var(--thoth-ink-tertiary); }
-.block-menu-icon { width: 20px; text-align: center; color: var(--thoth-ink-secondary); font-size: 12px; }
+.block-menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--thoth-ink-secondary); font: 600 13px / 1 var(--thoth-font-sans); }
+.block-menu-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.block-menu-item[aria-disabled="true"] .block-menu-icon { color: var(--thoth-ink-faint); }
 .block-menu-label { flex: 1; }
 .block-menu-hint { color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); }
 
@@ -346,3 +349,8 @@
 .presence-face { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--thoth-workspace) 18%, var(--thoth-bg)); color: var(--thoth-workspace); font: 600 10px/1 var(--thoth-font-sans); box-shadow: 0 0 0 2px var(--thoth-bg); }
 .presence-face + .presence-face { margin-left: -6px; }
 .presence-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
+
+/* The line under a page's title (page-info.ts): made, last edited, by whom. Not part of the text. */
+.page-info { margin: -0.35em 0 1.1em; color: var(--thoth-ink-tertiary); font: var(--thoth-text-small); user-select: none; }
+.prose > .page-info:first-child { margin-top: 0; }
+[data-editor-mode="plain"] ~ .page-info, .page-col > .page-info { margin: var(--thoth-space-2) 0 var(--thoth-space-2); }

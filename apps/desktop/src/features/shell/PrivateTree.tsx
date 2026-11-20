@@ -19,6 +19,7 @@ import { TreeList } from "@thoth/app-ui/order/TreeList.tsx";
 import { focusTreeItem, focusTreeItemSoon, treeKeyDown } from "@thoth/app-ui/order/tree-keys.ts";
 import { useStrings } from "@thoth/app-ui/strings/index.ts";
 import { tipIfClipped } from "@thoth/app-ui/ui/Tooltip.tsx";
+import { pageInfoText } from "@thoth/app-ui/editor/PageFrame.tsx";
 import { Button } from "@thoth/app-ui/ui/Button.tsx";
 import { DeleteDialog } from "@thoth/app-ui/order/DeleteDialog.tsx";
 import { DuplicateDialog } from "@thoth/app-ui/order/DuplicateDialog.tsx";
@@ -81,7 +82,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const directory = useSyncExternalStore(servers.subscribe, servers.getState);
   const canSend = directory.servers.some((s) => s.info.auth !== "signed-out" && (s.workspaces?.some((w) => roleCan(w.role, "write")) ?? false));
   const t = useDesktopStrings().shell;
-  const tt = useStrings().tree;
+  const strings = useStrings();
+  const tt = strings.tree;
   const ts = useDesktopStrings().transfer;
   const importFrom = useDesktopStrings().settings.importFrom;
   const revealName = useDesktopStrings().settings.reveal[currentOs()];
@@ -625,7 +627,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
               keys(event);
             }}
             onContextMenu={onContextMenu}
-            title={node.path}
+            // Where it is, and when it was last edited (a second line in the system tooltip).
+            title={[node.path, node.board ? null : pageInfoText({ updated: node.mtimeMs ?? null }, strings.editor.pageInfo, strings.lang)].filter(Boolean).join("\n")}
             {...tipIfClipped(node.title)}
             {...dnd.rowProps(node.path)}
           >

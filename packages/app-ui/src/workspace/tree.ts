@@ -8,6 +8,8 @@ export interface WorkspaceTreeItem {
   position: string | null;
   /** A folder page (`thoth_kind: folder`). */
   folder: boolean;
+  /** When the page last changed (ISO), as the tree gave it. */
+  updatedAt?: string;
   children: WorkspaceTreeItem[];
 }
 
@@ -53,7 +55,7 @@ export function childrenOf(nodes: readonly TreeNode[], parentId: string | null, 
 export function nestWorkspaceTree(nodes: readonly TreeNode[], options: NestOptions = {}): WorkspaceTreeItem[] {
   const ordered = options.ordered ?? true;
   const items = new Map<string, WorkspaceTreeItem>(
-    nodes.map((n) => [n.id, { id: n.id, title: n.title || "Untitled", position: isKey(n.position) ? n.position : null, folder: options.isFolder?.(n.id) ?? false, children: [] }]),
+    nodes.map((n) => [n.id, { id: n.id, title: n.title || "Untitled", position: isKey(n.position) ? n.position : null, folder: options.isFolder?.(n.id) ?? false, updatedAt: n.updatedAt, children: [] }]),
   );
   const roots: WorkspaceTreeItem[] = [];
   for (const node of nodes) {

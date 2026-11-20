@@ -33,6 +33,16 @@ export interface StoredPage {
   editable: boolean;
   /** Who wrote this version, when the store knows (a workspace revision's `authorId`). */
   author?: string | null;
+  /** When the page was made and last changed (ms), and by whom (an account ID), as far as the store knows. */
+  dates?: PageDates;
+}
+
+export interface PageDates {
+  created?: number | null;
+  updated?: number | null;
+  updatedBy?: string | null;
+  /** The last edit was this person's own save, in this window. */
+  updatedByMe?: boolean;
 }
 
 /** Where an open page is read from and written to. */
@@ -84,6 +94,8 @@ export interface PageState {
   conflictCopy: { ref: string; label: string } | null;
   /** A workspace page reloaded because someone changed it on the server (ADR-0041); `by` is the author's ID when known. */
   changed: { by: string | null } | null;
+  /** When the page was made and last changed, for the line under its title. */
+  dates: PageDates;
 }
 
 export interface PageSessionDeps {
@@ -138,7 +150,7 @@ const message = (error: unknown): string => (error instanceof Error ? error.mess
 export function createPageSession(deps: PageSessionDeps): PageSession {
   const { store, editor } = deps;
   const serverChecked = store.kind === "workspace";
-  let state: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null, changed: null };
+  let state: PageState = { phase: "loading", editable: true, save: "idle", conflict: null, error: null, conflictCopy: null, changed: null, dates: {} };
   const listeners = new Set<() => void>();
   /** The last content this page read from or wrote to disk. */
   let base: DiskVersion | null = null;
@@ -170,11 +182,11 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
 
   const readDisk = (): Promise<StoredPage | null> => store.read();
 
-  const adopt = (disk: DiskVersion & { editable: boolean }): void => {
+  const adopt = (disk: DiskVersion & { editable: boolean; dates?: PageDates }): void => {
     base = { source: disk.source, hash: disk.hash };
     editor.load(disk.source);
     editor.setEditable(disk.editable);
-    set({ editable: disk.editable, save: "idle", conflict: null, error: null });
+    set({ editable: disk.editable, save: "idle", conflict: null, error: null, ...(disk.dates ? { dates: disk.dates } : {}) });
   };
 
   const enterConflict = async (mine: string, disk: (DiskVersion & { editable: boolean }) | null): Promise<void> => {
@@ -205,7 +217,7 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         base = { source: read.source, hash: read.hash };
         editor.load(read.source);
         editor.setEditable(read.editable);
-        set({ phase: "ready", editable: read.editable, save: "idle", conflict: null, error: null });
+        set({ phase: "ready", editable: read.editable, save: "idle", conflict: null, error: null, dates: read.dates ?? {} });
       } catch (error) {
         set({ phase: "error", error: message(error) });
       }
@@ -236,6 +248,8 @@ export function createPageSession(deps: PageSessionDeps): PageSession {
         }
         const hash = await store.write(mine, base.hash);
         base = { source: mine, hash };
+        // Written just now, by this person: "Edited" follows without reading the page again.
+        set({ dates: { ...state.dates, updated: deps.now().getTime(), updatedBy: null, updatedByMe: true } });
         deps.onWritten();
         const after = editor.markdown();
         if (after !== null && after !== mine && snapshot === undefined) {

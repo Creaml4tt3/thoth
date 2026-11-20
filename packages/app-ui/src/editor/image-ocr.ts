@@ -1,7 +1,7 @@
 /**
  * Copy text / Insert text below on an image (ADR-0055). The bytes come from the page's media, the host reads them
- * (`ctx.ocr`); nothing is downloaded from here: "not installed" only offers Settings → Modules. A status line under the
- * editor (a polite live region) says what is happening, with Cancel while reading and "Try the other model" after.
+ * (`ctx.ocr`); nothing is downloaded from here: "not installed" only offers Settings → Modules. A toast (a polite
+ * live region) says what is happening, with Cancel while reading and "Try the other model" after.
  * Insert adds one paragraph per line after the image as one undo step; the other model replaces what Insert added.
  */
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -9,6 +9,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { applyAsOneStep } from "./block-ops.ts";
 import type { EditorContext, OcrResult } from "./context.ts";
 import { copyText } from "../ui/clipboard.ts";
+import { toast } from "../ui/toast.ts";
 
 type Model = "fast" | "second";
 type Mode = "copyText" | "insertText";
@@ -22,43 +23,49 @@ export function ocrState(ctx: EditorContext, view: EditorView, pos: number, node
   return state === undefined || state === "ready" || state === "loading" ? true : t.notLoadedNoOcr;
 }
 
+type Kind = "info" | "success" | "error" | "loading";
+
 interface Status {
-  el: HTMLElement;
-  say(text: string, buttons?: { label: string; onClick(): void }[]): void;
+  say(text: string, buttons?: { label: string; onClick(): void }[], kind?: Kind): void;
 }
 
-const statuses = new WeakMap<EditorView, Status>();
+let nextId = 0;
 
-function statusFor(view: EditorView, ctx: EditorContext): Status {
-  const known = statuses.get(view);
-  if (known?.el.isConnected) return known;
-  const el = document.createElement("div");
-  el.className = "image-ocr-status";
-  el.setAttribute("aria-live", "polite");
-  el.hidden = true;
-  view.dom.parentElement?.append(el);
-  const status: Status = {
-    el,
-    say(text, buttons = []) {
-      const line = document.createElement("span");
-      line.textContent = text;
-      const all = [...buttons, { label: ctx.strings.image.dismiss, onClick: () => (el.hidden = true) }];
-      el.replaceChildren(
-        line,
-        ...all.map((b) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "image-ocr-button";
-          button.textContent = b.label;
-          button.addEventListener("click", b.onClick);
-          return button;
-        }),
-      );
-      el.hidden = false;
+/** One toast per read: each step updates it in place (Reading… → Text copied), Ding's way. */
+function statusFor(ctx: EditorContext): Status {
+  const id = `image-ocr-${++nextId}`;
+  return {
+    say(text, buttons = [], kind = "info") {
+      toast(text, { id, kind, actions: buttons, closeLabel: ctx.strings.image.dismiss });
     },
   };
-  statuses.set(view, status);
-  return status;
+}
+
+/**
+ * A clipboard write begun now whose text comes later (WebKit's way to copy what an async task returns): `give(text)`
+ * finishes it and answers whether it worked; `give(null)` drops it. Null where the async clipboard has no ClipboardItem.
+ */
+function startCopy(): { give(text: string | null): Promise<boolean> } | null {
+  if (typeof ClipboardItem === "undefined" || typeof navigator.clipboard?.write !== "function") return null;
+  let settle: (text: string | null) => void = () => {};
+  const blob = new Promise<Blob>((resolve, reject) => {
+    settle = (text) => (text === null ? reject(new Error("nothing to copy")) : resolve(new Blob([text], { type: "text/plain" })));
+  });
+  let written: Promise<boolean>;
+  try {
+    written = navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]).then(
+      () => true,
+      () => false,
+    );
+  } catch {
+    written = Promise.resolve(false);
+  }
+  return {
+    give(text) {
+      settle(text);
+      return written;
+    },
+  };
 }
 
 /** Where the image now is: the same node object, found again if the document moved it. */
@@ -78,7 +85,7 @@ export function runImageOcr(ctx: EditorContext, view: EditorView, pos: number, m
   const image = view.state.doc.nodeAt(pos);
   if (!ocr || !image) return;
   const t = ctx.strings.image;
-  const status = statusFor(view, ctx);
+  const status = statusFor(ctx);
   /** The paragraphs the last Insert added, so the other model can replace them. */
   let added: PMNode[] = [];
 
@@ -113,6 +120,8 @@ export function runImageOcr(ctx: EditorContext, view: EditorView, pos: number, m
   };
 
   const read = async (model?: Model): Promise<void> => {
+    // Started here, inside the click: WebKit refuses a clipboard write begun after the read's seconds have passed.
+    const copy = mode === "copyText" ? startCopy() : null;
     // Cancel may come before the host has started the program: the answer is dropped whatever it is.
     let cancelled = false;
     const cancel = (): void => {
@@ -120,39 +129,41 @@ export function runImageOcr(ctx: EditorContext, view: EditorView, pos: number, m
       ctx.cancelOcr?.();
       status.say(t.cancelled);
     };
-    status.say(t.reading, [{ label: t.cancel, onClick: cancel }]);
+    status.say(t.reading, [{ label: t.cancel, onClick: cancel }], "loading");
     let result: OcrResult;
     try {
       const loaded = await ctx.media()?.load(image.attrs["src"] as string);
       if (cancelled) return;
-      if (!loaded || loaded.state !== "ready") return status.say(t.notLoadedNoOcr);
+      if (!loaded || loaded.state !== "ready") return status.say(t.notLoadedNoOcr, [], "error");
       result = await ocr({ bytes: loaded.bytes, mimeType: loaded.mimeType }, model);
     } catch {
       result = { state: "failed", reason: "failed" };
     }
+    if (cancelled || result.state !== "done" || result.text.trim() === "") copy?.give(null);
     if (cancelled) return;
     switch (result.state) {
       case "not-installed":
-        return status.say(t.notInstalled, ctx.openModules ? [{ label: t.openSettings, onClick: () => ctx.openModules?.() }] : []);
+        return status.say(t.notInstalled, ctx.openModules ? [{ label: t.openSettings, onClick: () => ctx.openModules?.() }] : [], "error");
       case "cancelled":
         return status.say(t.cancelled);
       case "failed":
-        return status.say(t.ocrFailed[result.reason]);
+        return status.say(t.ocrFailed[result.reason], [], "error");
     }
     const other: Model = result.model === "fast" ? "second" : "fast";
     const retry = ctx.ocrModels?.().includes(other) ? [{ label: t.otherModel, onClick: () => void read(other) }] : [];
-    if (result.text.trim() === "") return status.say(t.noText, retry);
+    if (result.text.trim() === "") return status.say(t.noText, retry, "info");
     if (mode === "copyText") {
       try {
-        await copyText(result.text);
+        if (!copy || !(await copy.give(result.text))) await copyText(result.text);
       } catch {
-        return status.say(t.ocrFailed.failed, retry);
+        // The text was read; only the clipboard refused it. Offer it under the image instead of losing it.
+        return status.say(t.copyFailed, view.editable ? [{ label: t.insertText, onClick: () => insert(result.text) }, ...retry] : retry, "error");
       }
-      return status.say(t.copied, retry);
+      return status.say(t.copied, retry, "success");
     }
-    if (!view.editable) return status.say(t.ocrFailed.failed);
+    if (!view.editable) return status.say(t.ocrFailed.failed, [], "error");
     insert(result.text);
-    status.say(t.inserted, retry);
+    status.say(t.inserted, retry, "success");
   };
 
   void read();

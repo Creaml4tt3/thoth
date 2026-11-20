@@ -24,6 +24,13 @@ export const en = {
     modeGroup: "Editor mode",
     /** The editor's accessible name. */
     content: "Page content",
+    /** The line under a page's title. */
+    pageInfo: {
+      created: (when: string) => `Created ${when}`,
+      edited: (when: string) => `Edited ${when}`,
+      by: (name: string) => `by ${name}`,
+      byYou: "by you",
+    },
     modeSwitchTitle: "Switch editor mode (Ctrl/Cmd+Shift+E)",
     modes: {
       blocks: { label: "Blocks", hint: "Formatted blocks, like Notion" },
@@ -147,6 +154,7 @@ export const en = {
       notLoadedNoOcr: "The image isn't loaded",
       reading: "Reading text…",
       copied: "Text copied",
+      copyFailed: "The text was read, but it could not be copied.",
       inserted: "Text inserted below the image",
       noText: "No text found in this image",
       otherModel: "Try the other model",

@@ -55,7 +55,7 @@ function openMenuOnImage(): HTMLElement {
 }
 
 const item = (menu: HTMLElement, name: string) => [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((i) => i.textContent?.includes(name));
-const status = () => document.querySelector<HTMLElement>(".image-ocr-status");
+const status = () => document.querySelector<HTMLElement>(".toast-viewport .toast:last-child");
 const md = () => docToMarkdown(editor.getJSON());
 const done = (text: string, model: "fast" | "second" = "fast"): OcrResult => ({ state: "done", model, text });
 
@@ -77,7 +77,7 @@ describe("Copy text and Insert text below", () => {
     await vi.waitFor(() => expect(copied).toEqual(["Total 1,290 บาท"]));
     expect(ocr).toHaveBeenCalledWith({ bytes: PNG, mimeType: "image/png" }, undefined);
     await vi.waitFor(() => expect(status()?.textContent).toContain("Text copied"));
-    expect(status()?.getAttribute("aria-live")).toBe("polite");
+    expect(status()?.closest(".toast-viewport")?.getAttribute("aria-live")).toBe("polite");
   });
 
   it("insert adds one paragraph per line after the image as one undo step", async () => {
@@ -143,6 +143,29 @@ describe("Copy text and Insert text below", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(md()).toBe("![Receipt](receipt.png)\n");
     expect(status()?.textContent).toContain("Nothing was changed");
+  });
+
+  it("a right click on an image opens its menu with Copy text", async () => {
+    const ocr = vi.fn(async () => done("Right click"));
+    setup("![Receipt](receipt.png)\n", ocr);
+    const figure = editor.view.dom.querySelector(".page-image")!;
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
+    figure.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    const menu = document.querySelector<HTMLElement>('.block-menu[aria-label="Block menu"]')!;
+    expect(menu.hidden).toBe(false);
+    item(menu, "Copy text")!.click();
+    await vi.waitFor(() => expect(copied).toEqual(["Right click"]));
+  });
+
+  it("text that cannot be copied is not lost: Insert text below is offered", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => Promise.reject(new Error("denied")) } });
+    document.execCommand = () => false;
+    setup("![Receipt](receipt.png)\n", async () => done("Kept"));
+    item(openMenuOnImage(), "Copy text")!.click();
+    await vi.waitFor(() => expect(status()?.textContent).toContain("could not be copied"));
+    [...status()!.querySelectorAll("button")].find((b) => b.textContent === "Insert text below")!.click();
+    await vi.waitFor(() => expect(md()).toBe("![Receipt](receipt.png)\n\nKept\n"));
   });
 
   it("a web image disables the items", async () => {

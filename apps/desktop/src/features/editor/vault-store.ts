@@ -1,4 +1,5 @@
 /** The Private Space side of the shared editor: a vault file as a `PageStore`, and wikilinks from the vault index. */
+import { stableIdTime } from "@thoth/domain";
 import { ConflictError, NotFoundError, type Vault } from "@thoth/local-store";
 import { conflictCopyPath, type PageStore } from "@thoth/app-ui/editor/page-session.ts";
 import { buildLinkLookup, type LinkLookup } from "@thoth/app-ui/editor/links.ts";
@@ -15,7 +16,8 @@ export function vaultPageStore(vault: Vault, path: string): PageStore {
     async read() {
       try {
         const read = await vault.readPage(path);
-        return { source: read.source, hash: read.hash, editable: read.editable };
+        // Made: when its thoth_id was given (a file's birth time is lost by many editors' saves); changed: the file's time.
+        return { source: read.source, hash: read.hash, editable: read.editable, dates: { created: stableIdTime(read.document.thothId), updated: read.mtimeMs } };
       } catch (error) {
         if (error instanceof NotFoundError) return null;
         throw error;

@@ -16,6 +16,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Settings → Modules: download OCR, which reads Thai and English text in images and PDFs on your computer. Choose Fast or Second opinion; nothing is downloaded until you click.
 - Copy text and Insert text below on an image: get the text out of a screenshot or a photo of a page. If one model misses something, try the other.
 - Page from PDF…: make a page from a PDF of up to 50 pages, using its own text where it has good text and OCR for the rest.
+- Under a page's title: when it was created and last edited, and by whom in a workspace. The sidebar shows when a page was last edited when you point at it.
+- Right-click an image for its menu, with Copy text and Insert text below.
 
 ### Changed
 
@@ -23,6 +25,8 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - Blocks and Plain show their names next to their icons, and Timeline and Board in the sidebar have icons.
 - Settings shows one section at a time, with a wider list and an icon for each section.
 - Dropdowns look like the rest of Thoth instead of your system's.
+- Messages about images and their text float at the bottom of the window and leave on their own; errors stay until you close them.
+- The block menu and its handle have bigger, clearer icons.
 
 ## [0.11.0] - 2026-11-19
 
