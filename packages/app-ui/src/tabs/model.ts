@@ -15,7 +15,7 @@
  *   leave it), and it keeps its page: opening a page "in the current tab" while a pinned tab is current opens a new
  *   tab after the pinned ones instead. An empty tab is never pinned (there is nothing to keep).
  */
-import { isStableId } from "@thoth/domain";
+import { extname, isStableId } from "@thoth/domain";
 
 export type TabTarget =
   /** A page of the Private Space (desktop). */
@@ -336,7 +336,7 @@ function targetFromStored(value: unknown): TabTarget | null {
       return TIMELINE;
     case "board":
       if (v["path"] === undefined) return { kind: "board" };
-      return text(v["path"], 4096) && v["path"].endsWith(".canvas") ? { kind: "board", path: v["path"] } : null;
+      return text(v["path"], 4096) && extname(v["path"]) === ".canvas" ? { kind: "board", path: v["path"] } : null;
     case "blank":
       return BLANK;
     default:

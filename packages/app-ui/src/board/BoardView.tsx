@@ -400,7 +400,13 @@ export function BoardView({ label, notes, strings, actions, extras = [] }: { lab
   // Reading order: top to bottom, then left to right, by the stored positions only. A live drag or arrow move must not
   // reorder the DOM: React would move the focused button, and Chromium blurs a moved element.
   const ordered = [...notes].sort((a, b) => a.y - b.y || a.x - b.x);
-  const linked = (path: string) => strings.flatMap((s) => (s.from === path ? [s.to] : s.to === path ? [s.from] : []));
+  const neighbours = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const add = (a: string, b: string) => (map.get(a) ?? map.set(a, []).get(a)!).push(b);
+    for (const s of strings) (add(s.from, s.to), add(s.to, s.from));
+    return map;
+  }, [strings]);
+  const linked = (path: string) => neighbours.get(path) ?? [];
   // One short line each: a text card's first line, a link's URL, a group's label, a file's name.
   const listedExtras = extras.flatMap((x) => {
     const text = Array.from(x.text.trim().split("\n")[0]!).slice(0, 140).join("");

@@ -13,7 +13,7 @@ let root: string;
 beforeEach(async () => {
   localStorage.clear();
   root = await dirs.dir();
-  await seed(root, { "Alpha.md": ALPHA, "Beta.md": BETA, "Plans/Research.canvas": JSON.stringify({ nodes: [], edges: [] }) });
+  await seed(root, { "Alpha.md": ALPHA, "Beta.md": BETA, "Plans/Research.canvas": JSON.stringify({ nodes: [], edges: [] }), "Plans/Upper.CANVAS": JSON.stringify({ nodes: [], edges: [] }) });
 });
 afterEach(async () => {
   cleanup();
@@ -48,6 +48,10 @@ describe("the Board in the app", () => {
     await waitFor(() => expect(tabNames()).toEqual(["Alpha", "Research"]));
     expect(await screen.findByRole("application", { name: "Research" })).toBeTruthy();
     await waitFor(() => expect(row.getAttribute("aria-current")).toBe("page"));
+    // Letter case of the extension does not matter (Upper.CANVAS).
+    await app.user.click(await within(await tree()).findByRole("treeitem", { name: "Upper" }));
+    expect(await screen.findByRole("application", { name: "Upper" })).toBeTruthy();
+    await app.user.click(row);
     fireEvent.contextMenu(row);
     const menu = await screen.findByRole("menu");
     const items = within(menu).getAllByRole("menuitem").map((m) => m.textContent ?? "");

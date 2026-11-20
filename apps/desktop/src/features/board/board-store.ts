@@ -6,7 +6,7 @@
 import { decodeText, encodeText } from "@thoth/content";
 import { collisionKey, extname, sha256Hex } from "@thoth/domain";
 import { ConflictError, entryNameProblem, NotFoundError, type Vault } from "@thoth/local-store";
-import { applyChanges, CanvasError, parseCanvas, serializeCanvas, type BoardChange, type CanvasFile } from "@thoth/app-ui/board/canvas.ts";
+import { applyChanges, CanvasError, parseCanvas, serializeCanvas, type BoardChange, type CanvasFile, type CanvasNode } from "@thoth/app-ui/board/canvas.ts";
 import { RenameError } from "../shell/rename.ts";
 
 export interface Board {
@@ -36,8 +36,8 @@ export function boardStore(vault: Vault) {
 
     read,
 
-    /** `${folder}/${name}.canvas` ("" is the Space root), empty. @throws RenameError a bad name, or one already taken in any letter case */
-    async create(within: string, name: string): Promise<string> {
+    /** `${folder}/${name}.canvas` ("" is the Space root), with `nodes` (none by default) in one write. @throws RenameError a bad name, or one already taken in any letter case */
+    async create(within: string, name: string, nodes: CanvasNode[] = []): Promise<string> {
       const folder = within.replace(/\/+$/, "");
       const stem = name.trim();
       const entry = `${stem}.canvas`;
@@ -48,7 +48,7 @@ export function boardStore(vault: Vault) {
       const siblings = (await vault.fs.stat(folder)) ? await vault.fs.list(folder) : [];
       if (siblings.some((e) => collisionKey(e.name) === key)) throw new RenameError("exists");
       try {
-        await write(path, { raw: { nodes: [], edges: [] }, nodes: [], edges: [] }, null);
+        await write(path, { raw: { nodes, edges: [] }, nodes, edges: [] }, null);
       } catch (error) {
         if (error instanceof ConflictError) throw new RenameError("exists");
         throw error;

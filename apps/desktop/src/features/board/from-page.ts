@@ -17,14 +17,6 @@ const SLOT = 190;
 export async function boardFromPage(vault: Vault, page: string): Promise<string> {
   const store = boardStore(vault);
   const name = stripExtension(basename(page));
-  let path: string | null = null;
-  for (let n = 1; path === null; n++) {
-    try {
-      path = await store.create(dirname(page), n === 1 ? name : `${name} ${n}`);
-    } catch (error) {
-      if (!(error instanceof RenameError) || error.problem !== "exists" || n >= 100) throw error;
-    }
-  }
   const { links } = await vault.graph();
   const around = [...new Set(links.flatMap((l) => (l.from === page ? [l.to] : l.to === page ? [l.from] : [])))].filter((p) => p !== page).sort();
   // Positions are note centres here; the file keeps top-left corners.
@@ -37,7 +29,15 @@ export async function boardFromPage(vault: Vault, page: string): Promise<string>
       return note(file, r * Math.cos(a), r * Math.sin(a));
     }),
   ];
-  await store.save(path, await store.read(path), nodes.map((node) => ({ kind: "pin" as const, node })));
+  // One write with every pin: a failed second write can't leave an empty board.
+  let path: string | null = null;
+  for (let n = 1; path === null; n++) {
+    try {
+      path = await store.create(dirname(page), n === 1 ? name : `${name} ${n}`, nodes);
+    } catch (error) {
+      if (!(error instanceof RenameError) || error.problem !== "exists" || n >= 100) throw error;
+    }
+  }
   return path;
 }
 

@@ -62,6 +62,9 @@ describe("boardStore", () => {
     await expect(store.create("", "a/b")).rejects.toThrow(RenameError);
     await expect(store.create("", " ")).rejects.toThrow(RenameError);
     expect(JSON.parse(await read("Ideas.canvas"))).toEqual({ nodes: [], edges: [] });
+    const pin = { id: "p", type: "file", file: "A.md", x: 0, y: 0, width: 160, height: 120 };
+    expect(await store.create("", "Pinned", [pin])).toBe("Pinned.canvas");
+    expect(JSON.parse(await read("Pinned.canvas"))).toEqual({ nodes: [pin], edges: [] });
   });
 
   it("saves the changes and keeps everything else", async () => {

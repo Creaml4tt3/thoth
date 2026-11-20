@@ -417,6 +417,8 @@ describe("the Board tab (ADR-0056)", () => {
     expect(shown(parseTabs(text)!)).toEqual(["A.md", "board:", "board:Research/OCR.canvas"]);
     const bad = JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }, { k: "board", path: "A.md" }, { k: "board", path: 3 }] });
     expect(shown(parseTabs(bad)!)).toEqual(["A.md"]);
+    const upper = JSON.stringify({ v: 1, active: 0, tabs: [{ k: "page", path: "A.md" }, { k: "board", path: "Plan.CANVAS" }] });
+    expect(shown(parseTabs(upper)!)).toEqual(["A.md", "board:Plan.CANVAS"]);
   });
 
   it("follows a renamed board file", () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
-import { basename, dirname, stripExtension } from "@thoth/domain";
+import { basename, dirname, extname, stripExtension } from "@thoth/domain";
 import { roleCan } from "@thoth/workspace-protocol";
 import { ConflictError, type OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
@@ -178,7 +178,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const isBoard = (node: TreeNode) => node.kind === "page" && node.board === true;
   /** A page opens in the editor; a board (`.canvas`) as a Board tab. */
   const openNode = (path: string, options?: { newTab?: boolean }) =>
-    path.endsWith(".canvas") && find(path)?.kind === "page" ? tabs.open({ kind: "board", path }, options) : openPage(path, options);
+    extname(path) === ".canvas" && find(path)?.kind === "page" ? tabs.open({ kind: "board", path }, options) : openPage(path, options);
   /** "Board from this page" (ADR-0056): the page and its neighbours on a new board next to it, opened. */
   const boardFromPage = (path: string) =>
     enqueue(async () => {
