@@ -190,8 +190,7 @@ test.describe("web client", () => {
     await expect(search).toBeHidden();
 
     // ---- Switch to Plain and keep writing.
-    await page.getByRole("button", { name: /^Editor mode:/ }).click();
-    await page.getByRole("menuitemradio", { name: "Plain" }).click();
+    await page.getByRole("button", { name: "Plain" }).click();
     box = await editor(page);
     await box.click();
     await page.keyboard.press("ControlOrMeta+End");

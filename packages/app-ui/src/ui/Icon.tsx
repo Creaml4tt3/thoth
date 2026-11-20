@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard" | "module" | "view";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard" | "module";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A house: Home (ADR-0029). */
@@ -161,13 +161,6 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     </>
   ),
   text: <path d="M4 6h16M4 12h16M4 18h10" />,
-  /** An eye: how the page is shown (the editor mode menu). */
-  view: (
-    <>
-      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
-      <circle cx="12" cy="12" r="2.8" />
-    </>
-  ),
   copy: (
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />

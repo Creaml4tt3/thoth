@@ -218,8 +218,7 @@ describe("workspaces", () => {
     await waitFor(() => expect([...ws.pages.values()][0]!.markdown.trim()).toBe("# Plan"));
     await waitFor(() => expect(document.querySelector(".save-status")!.textContent).toBe("Saved"));
 
-    await browser.user.click(screen.getByRole("button", { name: /^Editor mode:/ }));
-    await browser.user.click(await screen.findByRole("menuitemradio", { name: "Plain" }));
+    await browser.user.click(screen.getByRole("button", { name: "Plain" }));
     // The Plain editor loads the first time it is used, so the switch lands a moment later.
     await waitFor(async () => expect((await editorBox()).closest("[data-editor-mode]")!.getAttribute("data-editor-mode")).toBe("plain"));
     const plain = await editorBox();
@@ -336,10 +335,9 @@ describe("English and Thai", () => {
     const tree = await screen.findByRole("tree", { name: "เวิร์กสเปซ" });
     await browser.user.click(within(tree).getByRole("button", { name: "หน้าใหม่ใน งานของฉัน" }));
     const box = await editorBox("เนื้อหาของหน้า"); // the editor's own name is Thai too
-    await browser.user.click(screen.getByRole("button", { name: "โหมดแก้ไข: บล็อก" }));
-    const modes = await screen.findByRole("menu", { name: "โหมดแก้ไข" });
-    expect(within(modes).getByRole("menuitemradio", { name: "ข้อความล้วน" })).toBeTruthy();
-    await browser.user.keyboard("{Escape}");
+    expect(screen.getByRole("group", { name: "โหมดแก้ไข" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "บล็อก" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "ข้อความล้วน" })).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "ตำแหน่งของหน้า" }).textContent).toContain("เวิร์กสเปซ · งานของฉัน");
     expect(document.querySelector('[role="listbox"][aria-label="แทรกบล็อก"]')).not.toBeNull();
     // The `/` menu offers Thai block names, and English words still find them.

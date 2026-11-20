@@ -169,9 +169,8 @@ test("Plain mode: type real keystrokes, switch modes, save exact bytes", async (
   await writeFile(join(vault, "Plain.md"), source); // the Rust watcher picks it up
   await page.getByRole("treeitem", { name: "Plain" }).click({ timeout: 15_000 });
 
-  const modeButton = page.getByRole("button", { name: /^Editor mode:/ });
-  await modeButton.click();
-  await page.getByRole("menuitemradio", { name: "Plain" }).click();
+  const modes = page.getByRole("group", { name: "Editor mode" });
+  await modes.getByRole("button", { name: "Plain" }).click();
   const box = await editor(page);
   await expect(box).toHaveClass(/cm-content/);
   // The line with the cursor shows its exact source; other lines show the live preview.
@@ -187,10 +186,10 @@ test("Plain mode: type real keystrokes, switch modes, save exact bytes", async (
   await page.keyboard.type("new item");
   // Switch back to Blocks with the edit unsaved: nothing is written, the edit is kept.
   await page.keyboard.press("ControlOrMeta+Shift+E");
-  await expect(modeButton).toHaveAttribute("aria-label", "Editor mode: Blocks");
+  await expect(modes.getByRole("button", { name: "Blocks" })).toHaveAttribute("aria-pressed", "true");
   expect(await readFile(join(vault, "Plain.md"), "utf8")).toBe(source);
   await page.keyboard.press("ControlOrMeta+Shift+E");
-  await expect(modeButton).toHaveAttribute("aria-label", "Editor mode: Plain");
+  await expect(modes.getByRole("button", { name: "Plain" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("ControlOrMeta+s");
 
   // Enter continued the list with the file's own CRLF; nothing else changed.
@@ -217,8 +216,7 @@ test("[[ autocomplete in both modes, with real keystrokes", async ({ page }) => 
   await expect(box.locator('.wikilink[data-target="Projects/Roadmap.md"]')).toBeVisible();
 
   // Plain: same page, same menu, plain text result.
-  await page.getByRole("button", { name: /^Editor mode:/ }).click();
-  await page.getByRole("menuitemradio", { name: "Plain" }).click();
+  await page.getByRole("group", { name: "Editor mode" }).getByRole("button", { name: "Plain" }).click();
   await box.getByText("Plain:").click();
   await page.keyboard.press("End");
   await page.keyboard.type(" [[road");

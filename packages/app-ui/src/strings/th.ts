@@ -10,7 +10,6 @@ export const th: Strings = {
   editor: {
     status: { idle: "", dirty: "ยังไม่ได้บันทึก", saving: "กำลังบันทึก…", saved: "บันทึกแล้ว", error: "บันทึกไม่สำเร็จ" },
     modeGroup: "โหมดแก้ไข",
-    modeButton: (mode: string) => `โหมดแก้ไข: ${mode}`,
     content: "เนื้อหาของหน้า", // REVIEW
     modeSwitchTitle: "สลับโหมดแก้ไข (Ctrl/Cmd+Shift+E)",
     modes: {
