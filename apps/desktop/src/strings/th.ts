@@ -310,6 +310,7 @@ export const th: DesktopStrings = {
     download: (size) => `ดาวน์โหลด (${size})`, // REVIEW
     remove: "ลบ", // REVIEW
     cancel: "ยกเลิก", // REVIEW
+    needsUpdate: "โมเดลนี้ต้องใช้ Thoth เวอร์ชันใหม่กว่านี้ อัปเดต Thoth ก่อน แล้วจึงดาวน์โหลด",
     update: "อัปเดต", // REVIEW
     uses: (size) => `ใช้พื้นที่ ${size}`, // REVIEW
     updateReady: (size) => `มีโมเดลที่ดีกว่าแล้ว (${size})`, // REVIEW

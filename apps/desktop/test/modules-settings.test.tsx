@@ -21,8 +21,8 @@ class FakeModules implements Modules {
     available: true,
     runtime: null,
     models: [
-      { id: "fast", installed: null, update: null, downloadSize: 21 * MB, size: 0 },
-      { id: "second", installed: null, update: null, downloadSize: 27 * MB, size: 0 },
+      { id: "fast", installed: null, update: null, downloadSize: 21 * MB, size: 0, offered: true },
+      { id: "second", installed: null, update: null, downloadSize: 27 * MB, size: 0, offered: true },
     ],
     autoUpdate: false,
     job: { state: "idle" },
@@ -130,9 +130,17 @@ describe("Settings → Modules", () => {
     expect(seen.size).toBe(6);
   });
 
+  it("a model this version can't run says to update Thoth instead of a Download that does nothing", async () => {
+    modules.state.models[1] = { ...modules.state.models[1]!, offered: false };
+    await open();
+    expect(within(row("Second opinion")).queryByRole("button", { name: /Download/ })).toBeNull();
+    expect(within(row("Second opinion")).getByText(/needs a newer version of Thoth/)).toBeTruthy();
+    expect(within(row("Fast (recommended)")).getByRole("button", { name: /Download/ })).toBeTruthy();
+  });
+
   it("offers the update and installs it", async () => {
     modules.state.runtime = "0.1.0";
-    modules.state.models[0] = { id: "fast", installed: "openthai-2.1", update: "openthai-2.2", downloadSize: 6 * MB, size: 7 * MB };
+    modules.state.models[0] = { id: "fast", installed: "openthai-2.1", update: "openthai-2.2", downloadSize: 6 * MB, size: 7 * MB, offered: true };
     const app = await open();
     const fast = row("Fast (recommended)");
     expect(within(fast).getByText("A better model is ready (6.0 MB)")).toBeTruthy();

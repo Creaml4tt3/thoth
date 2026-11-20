@@ -7,7 +7,7 @@ const status = (ids: ("fast" | "second")[]): ModuleStatus => ({
   runtime: "1",
   autoUpdate: true,
   job: { state: "idle" },
-  models: (["fast", "second"] as const).map((id) => ({ id, installed: ids.includes(id) ? "1" : null, update: null, downloadSize: 0, size: 0 })),
+  models: (["fast", "second"] as const).map((id) => ({ id, installed: ids.includes(id) ? "1" : null, update: null, downloadSize: 0, size: 0, offered: true })),
 });
 const fail = (code: string) => Object.assign(new Error(code), { code });
 const host = (read: Modules["read"]): Modules => ({ read, status: async () => status(["fast", "second"]), cancelRead: vi.fn(async () => {}) }) as unknown as Modules;

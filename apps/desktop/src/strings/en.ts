@@ -344,6 +344,7 @@ export const en = {
     download: (size: string) => `Download (${size})`,
     remove: "Remove",
     cancel: "Cancel",
+    needsUpdate: "This model needs a newer version of Thoth. Update Thoth, then download it.",
     update: "Update",
     uses: (size: string) => `Uses ${size}`,
     updateReady: (size: string) => `A better model is ready (${size})`,

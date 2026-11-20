@@ -80,7 +80,8 @@ function ModelRow({ model, status, service }: { model: ModuleModel; status: NonN
           </Button>
         ) : (
           <>
-            {!model.installed && (
+            {!model.installed && !model.offered && <p className="muted">{t.needsUpdate}</p>}
+            {!model.installed && model.offered && (
               <Button variant="primary" small disabled={busy} onClick={() => void service.install(model.id)}>
                 {t.download(t.mb(model.downloadSize))}
               </Button>

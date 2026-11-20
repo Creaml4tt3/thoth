@@ -393,6 +393,8 @@ export interface ModuleModel {
   downloadSize: number;
   /** Bytes on disk. */
   size: number;
+  /** False when no version in the list runs on this app: Download is refused until Thoth is updated. */
+  offered: boolean;
 }
 
 export type ModuleJob =

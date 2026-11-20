@@ -223,7 +223,8 @@ impl Modules {
                 let size = have.as_ref().map_or(0, |_| store.model_bytes(id));
                 // The download a click costs now: the model (or its update), plus the program if it is missing or old.
                 let download = model_size + if runtime_missing { Self::sizes(&runtime_files) } else { 0 };
-                json!({ "id": id.as_str(), "installed": have, "update": update, "downloadSize": download, "size": size })
+                // `offered`: the list has a version this app can run; false, Download would be refused (a newer app is needed).
+                json!({ "id": id.as_str(), "installed": have, "update": update, "downloadSize": download, "size": size, "offered": entry.is_some() })
             })
             .collect();
         json!({ "available": true, "runtime": installed.runtime, "models": models, "autoUpdate": store.auto_update(), "job": job })
@@ -589,6 +590,7 @@ echo '{"done":true}'
         let before = m.status();
         assert_eq!(before["available"], true);
         assert!(before["models"][0]["downloadSize"].as_u64().unwrap() > 0);
+        assert_eq!(before["models"][0]["offered"], true);
         assert_eq!(m.read(&json!({ "kind": "image" }), b"x").unwrap_err().code, "OCR_NOT_INSTALLED");
         m.install(ModelId::Fast).unwrap();
         let after = wait_idle(&m);
