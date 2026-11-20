@@ -13,7 +13,7 @@
 > change both together, or the site build fails.
 <!-- repo-only:end -->
 
-ปรับปรุงล่าสุด: 16 พฤศจิกายน 2569
+ปรับปรุงล่าสุด: 21 พฤศจิกายน 2569
 
 ## เราคือใคร
 

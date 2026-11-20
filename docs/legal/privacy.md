@@ -13,7 +13,7 @@
 > change both together, or the site build fails.
 <!-- repo-only:end -->
 
-Last updated: 16 November 2026
+Last updated: 21 November 2026
 
 ## Who we are
 
