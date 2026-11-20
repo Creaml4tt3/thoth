@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { isMarkdownPath, stripExtension } from "@thoth/domain";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
+import { ContextMenu } from "../order/ContextMenu.tsx";
 import { tip } from "../ui/Tooltip.tsx";
 import { useShortcutHint } from "../keyboard/hints.ts";
 import { useStrings } from "../strings/index.ts";
@@ -21,27 +22,51 @@ import { pageKey } from "./session-pool.ts";
 import { usePaneActive } from "../tabs/pane.ts";
 import type { OpenOptions } from "../tabs/model.ts";
 
+/**
+ * The editor mode, as one control: a button showing the current mode under an eye icon (how this page is shown), and a
+ * menu of the modes with the current one checked. Ctrl/Cmd+Shift+E still flips between them without the menu.
+ */
 function ModeSwitch({ mode, disabled, onChange }: { mode: EditorMode; disabled: boolean; onChange(mode: EditorMode): void }) {
   const t = useStrings().editor;
   const hint = useShortcutHint("editor.mode");
+  const button = useRef<HTMLButtonElement>(null);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const current = t.modes[mode].label;
   return (
-    <div className="mode-switch" role="group" aria-label={t.modeGroup}>
-      {EDITOR_MODES.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          className="icon-btn mode-option"
-          aria-label={t.modes[m.id].label}
-          aria-pressed={mode === m.id}
-          {...(hint ? { "aria-keyshortcuts": hint.aria } : {})}
-          {...tip(t.modes[m.id].label, hint?.keys, t.modes[m.id].hint)}
-          disabled={disabled}
-          onClick={() => onChange(m.id)}
-        >
-          <Icon name={m.id === "blocks" ? "blocks" : "text"} />
-        </button>
-      ))}
-    </div>
+    <>
+      <button
+        ref={button}
+        type="button"
+        className="mode-menu-btn"
+        aria-label={t.modeButton(current)}
+        aria-haspopup="menu"
+        aria-expanded={at !== null}
+        {...(hint ? { "aria-keyshortcuts": hint.aria } : {})}
+        {...tip(t.modeGroup, hint?.keys, t.modes[mode].hint)}
+        disabled={disabled}
+        onClick={() => {
+          const r = button.current!.getBoundingClientRect();
+          setAt((was) => (was ? null : { x: r.left, y: r.bottom + 4 }));
+        }}
+      >
+        <Icon name="view" />
+        <span className="mode-menu-label">{current}</span>
+        <svg className="mode-menu-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+          <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {at && (
+        <ContextMenu
+          label={t.modeGroup}
+          at={at}
+          items={EDITOR_MODES.map((m) => ({ id: m.id, label: t.modes[m.id].label, checked: mode === m.id, onSelect: () => onChange(m.id) }))}
+          onClose={(restore) => {
+            setAt(null);
+            if (restore) button.current?.focus();
+          }}
+        />
+      )}
+    </>
   );
 }
 

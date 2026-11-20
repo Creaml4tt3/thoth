@@ -164,7 +164,8 @@ test("Page Down moves the caret a screen down and keeps it on screen", async ({ 
 
 test("Plain mode moves a line at a time too", async ({ page }) => {
   await openLong(page);
-  await page.getByRole("button", { name: "Plain", exact: true }).click();
+  await page.getByRole("button", { name: /^Editor mode:/ }).click();
+  await page.getByRole("menuitemradio", { name: "Plain" }).click();
   const plain = page.locator(".cm-content");
   await expect(plain).toBeFocused();
   await page.locator(".cm-line", { hasText: "Line 3 of a long page" }).click();

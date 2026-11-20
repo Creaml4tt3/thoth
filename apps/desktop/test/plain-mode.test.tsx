@@ -50,7 +50,14 @@ async function openPage(name: string) {
   return app;
 }
 
-const modeButton = (label: "Blocks" | "Plain") => within(screen.getByRole("group", { name: "Editor mode" })).getByRole("button", { name: label });
+/** The editor mode button: its name says the current mode. */
+const modeButton = () => screen.getByRole("button", { name: /^Editor mode:/ });
+const isMode = (label: "Blocks" | "Plain") => expect(modeButton().getAttribute("aria-label")).toBe(`Editor mode: ${label}`);
+/** Chooses a mode from the button's menu. */
+async function pickMode(user: { click(el: Element): Promise<void> }, label: "Blocks" | "Plain") {
+  await user.click(modeButton());
+  await user.click(await screen.findByRole("menuitemradio", { name: label }));
+}
 
 describe("Plain mode", () => {
   it("opens in Plain when that is the default, and saves only the typed characters", async () => {
@@ -59,7 +66,7 @@ describe("Plain mode", () => {
     const app = await openPage("Odd");
     const view = await plainView();
     await waitFor(() => expect(view.state.doc.toString()).toContain("star bullet"));
-    expect(modeButton("Plain").getAttribute("aria-pressed")).toBe("true");
+    isMode("Plain");
 
     typeAt(view, "star bullet", "!");
     await app.user.keyboard("{Meta>}s{/Meta}");
@@ -85,12 +92,12 @@ describe("Plain mode", () => {
   it("switching modes keeps an unsaved edit and does not write", async () => {
     const guard = guardWrites();
     const app = await openPage("Alpha");
-    await app.user.click(modeButton("Plain"));
+    await pickMode(app.user, "Plain");
     const view = await plainView();
     await waitFor(() => expect(view.state.doc.toString()).toContain("First paragraph stays exactly."));
     typeAt(view, "First paragraph stays exactly.", " Typed in Plain.");
 
-    await app.user.click(modeButton("Blocks"));
+    await pickMode(app.user, "Blocks");
     const box = await editorBox();
     await waitFor(() => expect(box.textContent).toContain("First paragraph stays exactly. Typed in Plain."));
     await waitFor(() => expect(box.classList.contains("ProseMirror-focused")).toBe(true)); // focus follows the switch (Tiptap focuses on the next frame)
@@ -108,13 +115,13 @@ describe("Plain mode", () => {
     const app = await openPage("Alpha");
     await editorBox();
     await app.user.keyboard("{Meta>}{Shift>}e{/Shift}{/Meta}");
-    await waitFor(() => expect(modeButton("Plain").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => isMode("Plain"));
     expect(document.querySelector(".cm-editor")).not.toBeNull();
 
     await app.user.click(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Beta" }));
-    await waitFor(() => expect(modeButton("Blocks").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => isMode("Blocks"));
     await app.user.click(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Alpha" }));
-    await waitFor(() => expect(modeButton("Plain").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => isMode("Plain"));
   });
 
   it("an external change with unsaved Plain edits opens the conflict dialog and nothing is overwritten", async () => {
@@ -130,7 +137,7 @@ describe("Plain mode", () => {
 
     const dialog = await screen.findByRole("dialog", { name: /changed on disk/i });
     expect(view.state.readOnly).toBe(true);
-    expect(modeButton("Blocks").hasAttribute("disabled")).toBe(true);
+    expect(modeButton().hasAttribute("disabled")).toBe(true);
     await app.user.click(within(dialog).getByRole("button", { name: /keep both/i }));
     await waitFor(() => expect(view.state.doc.toString()).toContain("Rewritten elsewhere."));
     expect(await app.read("Alpha.md")).toBe(external);
@@ -208,6 +215,6 @@ describe("Plain mode", () => {
     await app.user.click(await screen.findByRole("radio", { name: /plain/i }));
     await waitFor(() => expect(localStorage.getItem("thoth.editor.defaultMode")).toBe("plain"));
     await app.user.click(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Beta" }));
-    await waitFor(() => expect(modeButton("Plain").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => isMode("Plain"));
   });
 });

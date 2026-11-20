@@ -251,12 +251,12 @@ describe("commands", () => {
 
   it("Switch between Blocks and Plain mode flips the mode of the open page", async () => {
     const app = await start();
-    const mode = (name: string) => screen.getByRole("button", { name });
-    expect(mode("Blocks").getAttribute("aria-pressed")).toBe("true");
+    const mode = (name: string) => screen.getByRole("button", { name: `Editor mode: ${name}` });
+    expect(mode("Blocks")).toBeTruthy();
     await run(app, "plain");
-    await waitFor(() => expect(mode("Plain").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => expect(mode("Plain")).toBeTruthy());
     await run(app, "blocks");
-    await waitFor(() => expect(mode("Blocks").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => expect(mode("Blocks")).toBeTruthy());
   });
 
   it("offers no page commands, mode or formatting when no page is open", async () => {

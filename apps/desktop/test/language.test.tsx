@@ -143,7 +143,7 @@ describe("language in the app", () => {
     await screen.findByRole("tree", { name: th.shell.pagesInSpace });
     expect(screen.getByRole("button", { name: th.shell.newPage })).toBeTruthy();
     // A shared (app-ui) string: the editor mode switch.
-    expect(await screen.findByRole("group", { name: sharedTh.editor.modeGroup })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: sharedTh.editor.modeButton(sharedTh.editor.modes.blocks.label) })).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: th.shell.settings }));
     expect(await screen.findByRole("heading", { level: 1, name: th.settings.title })).toBeTruthy();
     await chooseSettingsSection(app, th.settings.editor);

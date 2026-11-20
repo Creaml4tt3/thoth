@@ -179,7 +179,8 @@ describe("images in a Private Space page", () => {
     const app = await openBirds();
     const box = await editorBox();
     await within(box).findByRole("img", { name: "Uric acid crystals" });
-    await app.user.click(within(screen.getByRole("group", { name: "Editor mode" })).getByRole("button", { name: "Plain" }));
+    await app.user.click(screen.getByRole("button", { name: /^Editor mode:/ }));
+    await app.user.click(await screen.findByRole("menuitemradio", { name: "Plain" }));
     // The Plain editor loads the first time it is used, so the switch lands a moment later.
     await waitFor(async () => expect((await editorBox()).closest(".cm-editor")).not.toBeNull());
     const cm = EditorView.findFromDOM((await editorBox()).closest(".cm-editor") as HTMLElement)!;

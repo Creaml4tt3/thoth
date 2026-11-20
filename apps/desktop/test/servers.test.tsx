@@ -322,7 +322,7 @@ describe("workspace pages", () => {
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByText("Workspace · Design")).toBeTruthy();
     expect(within(crumbs).getByText("Plan").closest("li")!.getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("group", { name: "Editor mode" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Editor mode: Blocks" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: /backlinks/i })).toBeNull();
 
     const before = servers.page(ws, "Plan").revisions.at(-1)!.id;
