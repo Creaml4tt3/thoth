@@ -311,3 +311,28 @@ describe("app CSS uses the tested accent", () => {
     }
   });
 });
+
+/** The Board's sticky notes (ADR-0056): title and excerpt ink, and a tag chip (accent-ink on the Moon wash), on cream and
+ * every folder colour's paper, light and dark. */
+describe.each(Object.entries(themes))("Board notes, %s theme", (_name, t) => {
+  const token = (name: string): Colour => parse(t[name] ?? (() => { throw new Error(`missing ${name}`); })());
+  const papers = ["cream", ...TEXT_COLOURS];
+
+  it.each(papers)("title, excerpt and tag chip on the %s note are at least 4.5:1", (paper) => {
+    const back = token(`--thoth-note-${paper}`).rgb;
+    const chip = over(token("--thoth-accent-soft"), back);
+    expect(ratio(over(token("--thoth-note-ink"), back), back)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(over(token("--thoth-note-ink-muted"), back), back)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(token("--thoth-accent-ink").rgb, chip)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // A suggestion fades its paper (55 % over the page, board.css), never its text.
+  it.each(papers)("title, excerpt and tag chip on the faded %s suggestion are at least 4.5:1", (paper) => {
+    const page = token("--thoth-bg").rgb;
+    const back = over({ ...token(`--thoth-note-${paper}`), alpha: 0.55 }, page);
+    const chip = over(token("--thoth-accent-soft"), back);
+    expect(ratio(over(token("--thoth-note-ink"), back), back)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(over(token("--thoth-note-ink-muted"), back), back)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(token("--thoth-accent-ink").rgb, chip)).toBeGreaterThanOrEqual(4.5);
+  });
+});

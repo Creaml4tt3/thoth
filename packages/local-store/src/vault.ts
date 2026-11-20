@@ -3,6 +3,7 @@ import {
   collisionKey,
   isMarkdownPath,
   isReservedPath,
+  isSafeVaultPath,
   isStableId,
   newStableId,
   normalizeVaultPath,
@@ -11,6 +12,7 @@ import {
   sha256Hex,
   basename,
   dirname,
+  extname,
   stripExtension,
   type PageSummary,
 } from "@thoth/domain";
@@ -61,6 +63,8 @@ const IGNORED_DIRS = new Set([".thoth", ".obsidian", ".git", ".trash", "node_mod
 
 /** A directory no walk of the vault enters: `IGNORED_DIRS`, and Thoth's own in any letter case or Unicode form. */
 const skippedDir = (name: string): boolean => IGNORED_DIRS.has(name) || isReservedPath(name);
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** True for a path a walk of the vault reaches and indexes as a file: not inside a skipped directory, not `.DS_Store`. */
 function walkedFile(path: string): boolean {
@@ -124,6 +128,20 @@ export interface SearchHit {
   snippet: string;
 }
 
+export interface GraphPage {
+  id: string;
+  path: string;
+  title: string;
+  tags: string[];
+  excerpt: string;
+}
+
+/** A resolved link between two pages, by vault path; no self links, each pair once. */
+export interface GraphLink {
+  from: string;
+  to: string;
+}
+
 export interface Backlink {
   sourceId: string;
   sourcePath: string;
@@ -153,9 +171,9 @@ export interface WriteOptions {
 export interface MoveReport {
   /** The page, attachment or folder that moved (one entry). */
   moved: { from: string; to: string }[];
-  /** Pages whose links were rewritten to follow the move. */
+  /** Pages whose links, and Boards (`.canvas`) whose pinned paths, were rewritten to follow the move. */
   rewritten: string[];
-  /** Pages whose links could not be updated, and why. They are left as they were. */
+  /** Pages and Boards that could not be updated, and why. They are left as they were. */
   skipped: { path: string; reason: string }[];
 }
 
@@ -631,6 +649,7 @@ export class Vault {
       "refs (source_page_id, ord, syntax, target, fragment, external, resolution, target_path, line)",
       doc.references.map((ref, ord) => [id, ord, ref.syntax, ref.target, ref.fragment ?? null, ref.external ? 1 : 0, ref.external ? "external" : "unresolved", null, ref.range.startLine]),
     );
+    // graph() relies on this layout: `title \n aliases \n plainText`. Change both together.
     const searchable = [doc.title, doc.aliases.join(" "), doc.plainText].join("\n");
     await this.sql.run("INSERT INTO search_content (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
     await this.sql.run("INSERT INTO search_trigram (page_id, title, body) VALUES (?, ?, ?)", [id, doc.title, searchable]);
@@ -823,13 +842,34 @@ export class Vault {
     ).map((r) => ({ sourcePath: r.path, target: r.target, resolution: r.resolution, line: r.line }));
   }
 
-  /** Nodes and resolved edges between pages for the basic graph view. */
-  async graph(): Promise<{ nodes: { id: string; path: string; title: string }[]; edges: { from: string; to: string }[] }> {
-    const nodes = await this.sql.all<{ id: string; path: string; title: string }>("SELECT id, path, title FROM pages ORDER BY path");
-    const edges = await this.sql.all<{ from: string; to: string }>(
-      'SELECT DISTINCT r.source_page_id AS "from", p.id AS "to" FROM refs r JOIN pages p ON p.path = r.target_path WHERE r.resolution = \'resolved\' AND r.source_page_id <> p.id',
+  /** Pages (with tags and a one-line excerpt) and the resolved page-to-page links between them, for the Board. */
+  async graph(): Promise<{ pages: GraphPage[]; links: GraphLink[] }> {
+    // Only a bounded head of the body is read: enough for title + aliases + the first line (a very long title/alias list gives an empty excerpt).
+    // One scan of the FTS table, joined in JS: its page_id is UNINDEXED, so a JOIN on it scans the whole table per page.
+    const bodies = new Map<string, string>();
+    for (const b of await this.sql.all<{ page_id: string; body: string | null }>("SELECT page_id, substr(body, 1, 2000) AS body FROM search_content"))
+      bodies.set(b.page_id, b.body ?? "");
+    const rows = (await this.sql.all<{ id: string; path: string; title: string }>("SELECT id, path, title FROM pages ORDER BY path")).map((r) => ({
+      ...r,
+      body: bodies.get(r.id) ?? null,
+    }));
+    const tags = new Map<string, string[]>();
+    for (const t of await this.sql.all<{ page_id: string; tag: string }>("SELECT page_id, tag FROM page_tags ORDER BY rowid"))
+      tags.set(t.page_id, [...(tags.get(t.page_id) ?? []), t.tag]);
+    const aliases = new Map<string, string[]>();
+    for (const a of await this.sql.all<{ page_id: string; alias: string }>("SELECT page_id, alias FROM page_aliases ORDER BY rowid"))
+      aliases.set(a.page_id, [...(aliases.get(a.page_id) ?? []), a.alias]);
+    const pages = rows.map((r): GraphPage => {
+      // The search body is `title \n aliases \n plainText` (upsertPage); drop that head, then take the first non-empty line.
+      const head = `${r.title}\n${(aliases.get(r.id) ?? []).join(" ")}\n`.length;
+      const excerpt = (r.body ?? "").slice(head).split("\n").map((l) => l.trim()).find((l) => l && l !== r.title) ?? "";
+      return { id: r.id, path: r.path, title: r.title, tags: tags.get(r.id) ?? [], excerpt: Array.from(excerpt).slice(0, 140).join("") };
+    });
+    // The JOIN on pages keeps attachments out; `external = 0` and `resolved` drop web links and unresolved ones.
+    const links = await this.sql.all<{ from: string; to: string }>(
+      'SELECT DISTINCT p.path AS "from", r.target_path AS "to" FROM refs r JOIN pages p ON p.id = r.source_page_id JOIN pages t ON t.path = r.target_path WHERE r.resolution = \'resolved\' AND r.external = 0 AND r.target_path <> p.path ORDER BY "from", "to"',
     );
-    return { nodes, edges };
+    return { pages, links };
   }
 
   async listAttachments(): Promise<{ path: string; hash: string; size: number; mimeType: string }[]> {
@@ -959,6 +999,8 @@ export class Vault {
    *   a wikilink or embed to the shortest form that resolves, a Markdown link to a relative path. That includes
    *   relative links inside moved pages. Each rewrite is its own compare-and-swap write on the bytes just read; a
    *   page that changed meanwhile, is not UTF-8 or cannot carry the new target is left alone and reported.
+   * - Boards: every `.canvas` node `file` that pointed at what moved is rewritten the same way (compare-and-swap); a
+   *   board that changed meanwhile, is not UTF-8 or not JSON is left alone and reported.
    *
    * Crash safety: the rename is one atomic filesystem operation, so a page is always at its old path or its new
    * one, never lost or doubled. A crash after the rename and before every link is rewritten leaves some links
@@ -1041,6 +1083,42 @@ export class Vault {
           if (unwritable) report.skipped.push({ path, reason: "link_not_rewritable" });
           if (edits.length === 0) continue;
           await this.writeFileAtomicNow(path, encodeText(rewriteTargets(text, edits)), { expectedHash: sha256Hex(bytes) }, false);
+          report.rewritten.push(path);
+        } catch (error) {
+          report.skipped.push({ path, reason: error instanceof ConflictError ? "changed" : error instanceof Error ? error.message : String(error) });
+        }
+      }
+      // Boards (JSON Canvas, also written by Obsidian) pin pages by path: follow the move in each `file`, keeping every
+      // other byte's meaning and the key order. Located after the move, since a folder move may carry the board.
+      for (const board of attachments) {
+        if (extname(board.path) !== ".canvas") continue;
+        const path = map(board.path);
+        try {
+          const bytes = await this.fs.readFile(path);
+          const { text, editable } = decodeText(bytes);
+          if (!editable) {
+            report.skipped.push({ path, reason: "not_utf8" });
+            continue;
+          }
+          let canvas: unknown;
+          try {
+            canvas = JSON.parse(text);
+          } catch {
+            report.skipped.push({ path, reason: "not_canvas" });
+            continue;
+          }
+          const nodes: unknown[] = isRecord(canvas) && Array.isArray(canvas.nodes) ? canvas.nodes : [];
+          let changed = false;
+          for (const node of nodes) {
+            if (!isRecord(node) || typeof node.file !== "string" || !isSafeVaultPath(node.file)) continue;
+            // `./A.md` or another Unicode form names the same page; a pin that did not move keeps its spelling.
+            const file = normalizeVaultPath(node.file);
+            if (map(file) === file) continue;
+            node.file = map(file);
+            changed = true;
+          }
+          if (!changed) continue;
+          await this.writeFileAtomicNow(path, encodeText(`${JSON.stringify(canvas, null, 2)}\n`), { expectedHash: sha256Hex(bytes) }, false);
           report.rewritten.push(path);
         } catch (error) {
           report.skipped.push({ path, reason: error instanceof ConflictError ? "changed" : error instanceof Error ? error.message : String(error) });

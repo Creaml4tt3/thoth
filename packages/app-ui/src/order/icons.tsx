@@ -57,6 +57,19 @@ export function PageIcon() {
   );
 }
 
+/** A board (`.canvas`, ADR-0056): two notes joined by a string. */
+export function BoardIcon() {
+  return (
+    <span className="tree-icon tree-icon-page" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <rect x="2" y="2.5" width="5" height="5" rx="0.5" {...STROKE} />
+        <rect x="9" y="8.5" width="5" height="5" rx="0.5" {...STROKE} />
+        <path d="M7 5.5c2 0 2.5 1 2.5 3" {...STROKE} />
+      </svg>
+    </span>
+  );
+}
+
 /** A folder's colour for screen readers, placed after the row's label so the name reads "Notes, Red". */
 export function FolderColorName({ color }: { color: string | null | undefined }) {
   const names = useStrings().editor.styles.colorNames;

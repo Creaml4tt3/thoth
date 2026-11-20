@@ -1058,4 +1058,58 @@ export const th: Strings = {
       feedbackNote: "เจอปัญหา มีไอเดีย หรือมีคำถาม ส่งถึงทีมของเซิร์ฟเวอร์นี้ได้ จะส่งเฉพาะสิ่งที่คุณพิมพ์ และรายละเอียดของเบราว์เซอร์หากคุณเปิดไว้", // REVIEW
     },
   },
+  board: {
+    title: "บอร์ด", // REVIEW
+    overview: "ภาพรวม", // REVIEW
+    newBoard: "บอร์ดใหม่", // REVIEW
+    newBoardName: "ชื่อบอร์ด", // REVIEW
+    newBoardPlaceholder: "งานวิจัย OCR", // REVIEW
+    addNote: "เพิ่มโน้ต", // REVIEW
+    linkTo: "ลิงก์ไปยัง…", // REVIEW
+    pin: "ปักลงบอร์ด", // REVIEW
+    unpin: "เอาออกจากบอร์ด", // REVIEW
+    open: "เปิด", // REVIEW
+    openNewTab: "เปิดในแท็บใหม่", // REVIEW
+    reveal: "แสดงในแถบด้านข้าง", // REVIEW
+    listView: "มุมมองรายการ", // REVIEW
+    zoom: "ซูม", // REVIEW
+    zoomIn: "ซูมเข้า", // REVIEW
+    zoomOut: "ซูมออก", // REVIEW
+    zoomFit: "ซูมให้พอดี", // REVIEW
+    zoomPercent: (percent) => `${percent}%`,
+    allTags: "ทุกแท็ก", // REVIEW
+    allFolders: "ทุกโฟลเดอร์", // REVIEW
+    missing: "ไม่พบโน้ตนี้", // REVIEW
+    suggested: "แนะนำ", // REVIEW
+    empty: "ยังไม่มีโน้ต เพิ่มโน้ตเพื่อเริ่มบอร์ดนี้", // REVIEW
+    emptyOverview: "ยังไม่มีหน้า", // REVIEW
+    instructions: "กด Tab เพื่อไปยังโน้ตถัดไป Space เพื่อเลือกโน้ต Escape เพื่อยกเลิกการเลือก Enter เพื่อเปิด ปุ่มลูกศรเลื่อนโน้ตที่เลือก กด Shift ค้างเพื่อเลื่อนทีละมาก เลือกโน้ตจาง ๆ ที่แนะนำเพื่อปักลงบอร์ด ปุ่มเมนูหรือ Shift+F10 แสดงคำสั่งเพิ่ม บวก ลบ และ 0 ใช้ซูม", // REVIEW
+    noteLabel: (title, excerpt, tags, links, state) =>
+      state === "missing" ? `${title}, ไม่พบโน้ตนี้` : [title, ...(excerpt ? [excerpt] : []), ...(tags.length ? [tags.map((t) => `#${t}`).join(" ")] : []), `ลิงก์ ${count(links)} รายการ`, ...(state === "suggested" ? ["แนะนำ"] : [])].join(", "), // REVIEW
+    menu: (title) => `โน้ต: ${title}`, // REVIEW
+    linksOf: (title) => `ลิงก์ของ ${title}`, // REVIEW
+    linked: "ลิงก์แล้ว", // REVIEW
+    linkChanged: "หน้านี้เปลี่ยนไปแล้ว จึงไม่ได้เขียนอะไรลงไป", // REVIEW
+    linkGone: "ไม่พบหน้านั้นแล้ว", // REVIEW
+    undoLinkEdited: "บรรทัดลิงก์ถูกแก้ไขแล้ว จึงไม่ได้เอาออก", // REVIEW
+    linkToTitle: (title) => `ลิงก์ ${title} ไปยัง…`, // REVIEW
+    linkFilter: "ค้นหาโน้ตบนบอร์ดนี้", // REVIEW
+    linkNone: "ไม่มีโน้ตอื่นที่ตรงกัน", // REVIEW
+    linkFailed: "เพิ่มลิงก์ไม่สำเร็จ", // REVIEW
+    switcher: "บอร์ด", // REVIEW
+    filterTag: "แท็ก", // REVIEW
+    filterFolder: "โฟลเดอร์", // REVIEW
+    create: "สร้าง", // REVIEW
+    cancel: "ยกเลิก", // REVIEW
+    addNoteFilter: "ค้นหาหน้า", // REVIEW
+    addNoteNone: "ไม่มีหน้าที่ตรงกัน", // REVIEW
+    gone: "ไม่พบบอร์ดนี้แล้ว อาจถูกย้ายหรือลบไป", // REVIEW
+    invalid: "อ่านบอร์ดนี้ไม่ได้ Thoth จึงไม่แตะต้องไฟล์นี้", // REVIEW
+    saveFailed: "บันทึกบอร์ดไม่สำเร็จ จึงอ่านบอร์ดใหม่อีกครั้ง", // REVIEW
+    fromPage: "สร้างบอร์ดจากหน้านี้", // REVIEW
+    openCommand: "เปิดบอร์ด", // REVIEW
+    addNoteList: "หน้าที่ยังไม่อยู่บนบอร์ดนี้", // REVIEW
+    deleteBoard: (trash) => `บอร์ดนี้จะย้ายไปที่${trash} หน้าบนบอร์ดยังอยู่ครบ คุณนำบอร์ดกลับมาจากที่นั่นได้`, // REVIEW
+    alsoOnBoard: "สิ่งอื่นบนบอร์ดนี้", // REVIEW
+  },
 };

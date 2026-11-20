@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sha256Hex } from "@thoth/domain";
 import { colorInOrder, ConflictError, emptyOrder, OrderRecordSchema, entryNameProblem, ORDER_PATH, orderChildren, readOrder, renameInOrder, writeOrder, type Vault } from "../src/index.ts";
 import { openNodeVault } from "../src/node/index.ts";
@@ -109,6 +109,89 @@ describe("Vault.move", () => {
     const report = await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
     expect(report.skipped).toEqual([{ path: "Latin.md", reason: "not_utf8" }]);
     expect(await readFile(join(root, "Latin.md"))).toEqual(before);
+  });
+});
+
+describe("Vault.move keeps Board pins (.canvas)", () => {
+  const board = (nodes: unknown[]) => ({
+    nodes,
+    edges: [{ id: "e1", fromNode: "t1", fromSide: "right", toNode: "f1", toSide: "left", label: "see" }],
+    metadata: { version: "1.0" },
+  });
+  const pin = (id: string, file: string) => ({ id, type: "file", file, subpath: "#Goals", x: 10, y: 20, width: 160, height: 120, color: "4" });
+  const TEXT = { id: "t1", type: "text", text: "Overview.md", x: 0, y: 0, width: 250, height: 60 };
+  const json = async (path: string) => JSON.parse(await read(path));
+
+  it("a page rename rewrites `file` in every board and leaves every other field and edge as it was", async () => {
+    const a = board([TEXT, pin("f1", "Projects/Thoth/Overview.md"), pin("f2", "Inbox/Welcome.md")]);
+    await put("Boards/A.canvas", JSON.stringify(a, null, "\t"));
+    await put("B.canvas", JSON.stringify(board([pin("f1", "Projects/Thoth/Overview.md")])));
+    const report = await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
+    expect(report.rewritten).toEqual(expect.arrayContaining(["Boards/A.canvas", "B.canvas"]));
+    expect(report.skipped).toEqual([]);
+    const after = await json("Boards/A.canvas");
+    expect(after).toEqual({ ...a, nodes: [TEXT, pin("f1", "Projects/Thoth/Summary.md"), pin("f2", "Inbox/Welcome.md")] });
+    expect(Object.keys(after.nodes[1])).toEqual(Object.keys(pin("f1", "x")));
+    expect((await json("B.canvas")).nodes[0].file).toBe("Projects/Thoth/Summary.md");
+    // The index sees the new bytes.
+    const indexed = (await vault.listAttachments()).find((x) => x.path === "B.canvas");
+    expect(indexed?.hash).toBe(sha256Hex(await readFile(join(root, "B.canvas"))));
+  });
+
+  it("a folder move rewrites every pin under it, also in a board that moved with the folder", async () => {
+    await put("Boards/A.canvas", JSON.stringify(board([pin("f1", "Projects/Thoth/Overview.md"), pin("f2", "Projects/Thoth/Architecture.md"), pin("f3", "Inbox/Welcome.md")])));
+    await put("Projects/Thoth/Map.canvas", JSON.stringify(board([pin("f1", "Projects/Thoth/Overview.md")])));
+    const report = await vault.move("Projects/Thoth", "Archive/Thoth");
+    expect(report.rewritten).toEqual(expect.arrayContaining(["Boards/A.canvas", "Archive/Thoth/Map.canvas"]));
+    expect((await json("Boards/A.canvas")).nodes.map((n: { file: string }) => n.file)).toEqual(["Archive/Thoth/Overview.md", "Archive/Thoth/Architecture.md", "Inbox/Welcome.md"]);
+    expect((await json("Archive/Thoth/Map.canvas")).nodes[0].file).toBe("Archive/Thoth/Overview.md");
+  });
+
+  it("a pin spelled `./` or in another Unicode form follows a rename; other spellings are left as written", async () => {
+    await put("Café.md", "# Café\n");
+    await vault.reconcile();
+    const nodes = [pin("f1", "./Projects/Thoth/Overview.md"), pin("f2", "Cafe\u0301.md"), pin("f3", "./Inbox/Welcome.md"), pin("f4", "../Outside.md")];
+    await put("A.canvas", JSON.stringify(board(nodes)));
+    await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
+    expect((await json("A.canvas")).nodes.map((n: { file: string }) => n.file)).toEqual(["Projects/Thoth/Summary.md", "Cafe\u0301.md", "./Inbox/Welcome.md", "../Outside.md"]);
+    await vault.move("Café.md", "Tea.md");
+    expect((await json("A.canvas")).nodes.map((n: { file: string }) => n.file)).toEqual(["Projects/Thoth/Summary.md", "Tea.md", "./Inbox/Welcome.md", "../Outside.md"]);
+  });
+
+  it("a board another app changes while the move rewrites it is reported as changed and kept", async () => {
+    await put("B.canvas", JSON.stringify(board([pin("f1", "Projects/Thoth/Overview.md")])));
+    const theirs = JSON.stringify(board([pin("f1", "Projects/Thoth/Overview.md"), pin("f2", "Inbox/Welcome.md")]));
+    const readFileOrig = vault.fs.readFile.bind(vault.fs);
+    vi.spyOn(vault.fs, "readFile").mockImplementation(async (path) => {
+      const bytes = await readFileOrig(path);
+      // Right after the move reads the board, another app saves it.
+      if (path === "B.canvas" && (await exists("Projects/Thoth/Summary.md"))) await put("B.canvas", theirs);
+      return bytes;
+    });
+    const report = await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
+    expect(report.skipped).toContainEqual({ path: "B.canvas", reason: "changed" });
+    expect(report.rewritten).not.toContain("B.canvas");
+    expect(await read("B.canvas")).toBe(theirs);
+    expect(await exists("Projects/Thoth/Summary.md")).toBe(true);
+  });
+
+  it("moving a board whose pins do not change leaves its bytes alone", async () => {
+    const text = JSON.stringify(board([pin("f1", "Inbox/Welcome.md")]), null, "\t");
+    await put("Boards/A.canvas", text);
+    const report = await vault.move("Boards/A.canvas", "Archive/A.canvas");
+    expect(report.rewritten).not.toContain("Archive/A.canvas");
+    expect(await read("Archive/A.canvas")).toBe(text);
+  });
+
+  it("a board that is not a canvas is reported and the move still succeeds", async () => {
+    await put("Broken.canvas", "{ not json");
+    await put("Latin1.canvas", new Uint8Array([0x7b, 0xe9, 0x7d]));
+    await put("Array.canvas", "[]");
+    const report = await vault.move("Projects/Thoth/Overview.md", "Projects/Thoth/Summary.md");
+    expect(report.skipped).toEqual(expect.arrayContaining([{ path: "Broken.canvas", reason: "not_canvas" }, { path: "Latin1.canvas", reason: "not_utf8" }]));
+    expect(await read("Broken.canvas")).toBe("{ not json");
+    expect(await read("Array.canvas")).toBe("[]");
+    expect(await exists("Projects/Thoth/Summary.md")).toBe(true);
   });
 });
 

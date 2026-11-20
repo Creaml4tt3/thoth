@@ -63,7 +63,7 @@ describe("Vault indexing", () => {
       { sourcePath: "Projects/Thoth/Architecture.md", target: "Nowhere", resolution: "unresolved", line: 3 },
     ]);
     const graph = await vault.graph();
-    expect(graph.edges.length).toBe(4);
+    expect(graph.links.length).toBe(4);
   });
 
   it("searches with FTS5 including diacritics and Thai substrings", async () => {

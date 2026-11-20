@@ -70,6 +70,9 @@ export interface CommandActions {
   openToday?(): void;
   /** Timeline (ADR-0051): pages by date. */
   openTimeline?(): void;
+  /** The Board (ADR-0056, the desktop only): its Overview, and a new board around the open page. */
+  openBoard?(): void;
+  boardFromPage?(): void;
   /** Back to the Private Space picker, on the same shortcut as Home (the desktop, ADR-0029 amendment of 2026-10-28). */
   leaveSpace?(): void;
   /** The first-run tour of the basic tools (the desktop only, ADR-0032), shown again. */
@@ -149,6 +152,8 @@ export function buildCommands(a: CommandActions, strings: Strings, client: Clien
   if (a.goHome) add("home.open", t.goHome, a.goHome, { ...key("home.open"), keywords: "home start recent favorites dashboard" });
   if (a.openToday) add("today.open", t.openToday, a.openToday, { ...key("today.open"), keywords: "today daily journal note date diary" });
   if (a.openTimeline) add("timeline.open", t.openTimeline, a.openTimeline, { keywords: "timeline date dates day days journal history recent edited tags calendar" });
+  if (a.openBoard) add("board.open", strings.board.openCommand, a.openBoard, { keywords: "board overview graph map canvas notes links sticky" });
+  if (a.boardFromPage) add("board.fromPage", strings.board.fromPage, a.boardFromPage, { keywords: "board canvas new graph map neighbours links" });
   if (a.leaveSpace) add("space.leave", t.leaveSpace, a.leaveSpace, { ...key("home.open"), keywords: "home close switch change open other private space folder vault picker" });
   if (a.showTour) add("tour.show", t.showTour, a.showTour, { keywords: "tour help guide welcome getting started onboarding tips" });
   if (a.sidebar) add("sidebar.toggle", a.sidebar.hidden ? t.showSidebar : t.hideSidebar, a.sidebar.toggle, { ...key("sidebar.toggle"), keywords: "sidebar collapse expand hide show panel focus full width" });

@@ -1,5 +1,5 @@
 import type { PageSummary } from "@thoth/domain";
-import { basename } from "@thoth/domain";
+import { basename, stripExtension } from "@thoth/domain";
 import { emptyOrder, orderChildren, type OrderRecord } from "@thoth/local-store";
 
 export interface FolderNode {
@@ -13,6 +13,8 @@ export interface PageNode {
   kind: "page";
   path: string;
   title: string;
+  /** A board (`.canvas`, ADR-0056), not a page: it opens as a Board tab and has no page actions. */
+  board?: true;
 }
 export type TreeNode = FolderNode | PageNode;
 
@@ -30,6 +32,8 @@ export interface BuildOptions {
   folders?: readonly string[];
   /** The order people gave (ADR-0016 rule 4). Missing or empty: A–Z. */
   order?: OrderRecord;
+  /** Board files (`.canvas`), shown as leaves named by their file name. */
+  boards?: readonly string[];
 }
 
 /**
@@ -53,6 +57,10 @@ export function buildTree(pages: readonly PageSummary[], options: BuildOptions =
   for (const page of pages) {
     const slash = page.path.lastIndexOf("/");
     folderFor(slash === -1 ? "" : page.path.slice(0, slash)).children.push({ kind: "page", path: page.path, title: page.title });
+  }
+  for (const path of options.boards ?? []) {
+    const slash = path.lastIndexOf("/");
+    folderFor(slash === -1 ? "" : path.slice(0, slash)).children.push({ kind: "page", path, title: stripExtension(basename(path)), board: true });
   }
   const sort = (node: FolderNode): void => {
     node.children = orderChildren(node.path, node.children, nodeName, alphabetical, order);

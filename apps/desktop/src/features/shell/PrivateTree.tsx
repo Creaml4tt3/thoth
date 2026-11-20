@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
-import { basename, dirname, stripExtension } from "@thoth/domain";
+import { basename, dirname, extname, stripExtension } from "@thoth/domain";
 import { roleCan } from "@thoth/workspace-protocol";
 import { ConflictError, type OrderRecord } from "@thoth/local-store";
 import { ContextMenu, type MenuItem } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { useTreeDnd, type DropZone } from "@thoth/app-ui/order/dnd.ts";
 import type { SpaceDrag } from "@thoth/app-ui/order/space-drag.ts";
-import { Disclosure, FolderColorName, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
+import { BoardIcon, Disclosure, FolderColorName, FolderIcon, PageIcon } from "@thoth/app-ui/order/icons.tsx";
 import { MoveToDialog, type Destination } from "@thoth/app-ui/order/MoveToDialog.tsx";
 import { clearMoveTo, usePendingMoveTo, type MoveToRequest } from "@thoth/app-ui/order/move-to.ts";
 import { clearNewFolder, usePendingNewFolder } from "@thoth/app-ui/order/new-folder-request.ts";
@@ -36,9 +36,10 @@ import { childrenAt, listFolders, nodeName, type TreeNode } from "./tree.ts";
 import { PRIVATE_SPACE, privateAcross } from "./space-drop.ts";
 import type { TransferTarget } from "../transfer/TransferDialog.tsx";
 import { currentOs } from "../settings/path.ts";
+import { openBoardFromPage } from "../board/from-page.ts";
 
-/** Every page below a folder, at any depth. */
-const pagesIn = (node: TreeNode): string[] => (node.kind === "page" ? [node.path] : node.children.flatMap(pagesIn));
+/** Every page below a folder, at any depth (boards are not pages: they never go to a workspace). */
+const pagesIn = (node: TreeNode): string[] => (node.kind === "page" ? (node.board ? [] : [node.path]) : node.children.flatMap(pagesIn));
 
 export interface Selection {
   active: boolean;
@@ -87,6 +88,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
   const trashName = t.trashName[currentOs()];
   const favorites = useFavorites();
   const tf = useStrings().favorites;
+  const tb = useStrings().board;
+  const shownBoard = tabs.active.target.kind === "board" ? tabs.active.target.path : undefined;
   /** `path` is null for the menu of the empty area (the top level). */
   const [menu, setMenu] = useState<{ path: string | null; at: { x: number; y: number } } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -171,6 +174,21 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     }
   };
   const arrange = (from: string, folder: string, index: number) => enqueue(() => arrangeNow(from, folder, index));
+
+  const isBoard = (node: TreeNode) => node.kind === "page" && node.board === true;
+  /** A page opens in the editor; a board (`.canvas`) as a Board tab. */
+  const openNode = (path: string, options?: { newTab?: boolean }) =>
+    extname(path) === ".canvas" && find(path)?.kind === "page" ? tabs.open({ kind: "board", path }, options) : openPage(path, options);
+  /** "Board from this page" (ADR-0056): the page and its neighbours on a new board next to it, opened. */
+  const boardFromPage = (path: string) =>
+    enqueue(async () => {
+      setError(null);
+      try {
+        await openBoardFromPage({ vault, refresh, tabs }, path);
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }
+    });
 
   const stemOf = (node: TreeNode) => (node.kind === "folder" ? node.name : stripExtension(basename(node.path)));
 
@@ -337,7 +355,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     // to a workspace; a workspace page lands in the folder under the pointer, or the folder of the page under it.
     carry: (path): SpaceDrag | null => {
       const node = find(path);
-      if (!node) return null;
+      if (!node || (node.kind === "page" && node.board)) return null;
       if (node.kind === "page") {
         const ids = selection.active && selection.paths.has(path) ? [...selection.paths].sort() : [path];
         return { from: PRIVATE_SPACE, row: path, ids, title: node.title };
@@ -375,9 +393,12 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
     const list = childrenAt(tree, dirname(node.path));
     const i = list.findIndex((n) => n.path === node.path);
     const ref = { kind: "private" as const, path: node.path };
+    // A board (ADR-0056) opens, is renamed, moved, shown or deleted like any file; nothing that reads a page.
+    const page = node.kind === "page" && !node.board;
     return [
-      ...(node.kind === "page" ? [{ id: "open-tab", label: tt.openNewTab, hint: newTabKeys, onSelect: () => openPage(node.path, { newTab: true }) }] : []),
-      ...(node.kind === "page" && favorites ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }] : []),
+      ...(node.kind === "page" ? [{ id: "open-tab", label: tt.openNewTab, hint: newTabKeys, onSelect: () => openNode(node.path, { newTab: true }) }] : []),
+      ...(page && favorites ? [{ id: "favorite", label: favorites.has(ref) ? tf.remove : tf.add, onSelect: () => favorites.toggle(ref) }] : []),
+      ...(page ? [{ id: "board-from-page", label: tb.fromPage, onSelect: () => void boardFromPage(node.path) }] : []),
       { id: "rename", label: tt.rename, hint: "F2", onSelect: () => setRenaming(node.path) },
       ...(node.kind === "folder"
         ? [
@@ -389,13 +410,17 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       { id: "up", label: tt.moveUp, hint: "⌥⇧↑", disabled: i <= 0, onSelect: () => reorder(node, -1) },
       { id: "down", label: tt.moveDown, hint: "⌥⇧↓", disabled: i < 0 || i >= list.length - 1, onSelect: () => reorder(node, 1) },
       { id: "move", label: tt.moveTo, onSelect: () => setMoving(node.path) },
-      { id: "duplicate", label: tt.duplicate, hint: duplicateKeys, onSelect: () => startDuplicate(node, false) },
-      { id: "duplicate-structure", label: tt.duplicateStructure, onSelect: () => startDuplicate(node, true) },
-      { id: "duplicate-to", label: tt.duplicateTo, onSelect: () => setDuplicating({ path: node.path, structure: false, to: true }) },
+      ...(isBoard(node)
+        ? []
+        : [
+            { id: "duplicate", label: tt.duplicate, hint: duplicateKeys, onSelect: () => startDuplicate(node, false) },
+            { id: "duplicate-structure", label: tt.duplicateStructure, onSelect: () => startDuplicate(node, true) },
+            { id: "duplicate-to", label: tt.duplicateTo, onSelect: () => setDuplicating({ path: node.path, structure: false, to: true }) },
+          ]),
       ...(onTransfer && canSend ? sendItems(node, onTransfer) : []),
       // The host checks the path itself (inside the folder, no symlink, not .thoth/) and shows it selected.
       ...(connection.reveal ? [{ id: "reveal", label: revealName, onSelect: () => void revealEntry(node.path) }] : []),
-      ...(download && node.kind === "page" ? [{ id: "download", label: td.menu, onSelect: () => void download(stripExtension(basename(node.path)), async () => (await vault.readPage(node.path)).source) }] : []),
+      ...(download && page ? [{ id: "download", label: td.menu, onSelect: () => void download(stripExtension(basename(node.path)), async () => (await vault.readPage(node.path)).source) }] : []),
       ...(connection.trash ? [{ id: "delete", label: tt.delete, danger: true, onSelect: () => setDeleting(node.path) }] : []),
     ];
   };
@@ -414,7 +439,10 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       } catch (failure) {
         return tt.deleteFailed(failure instanceof Error ? failure.message : String(failure));
       }
-      for (const tab of allTabs(tabs.layout)) if (tab.target.kind === "page" && (tab.target.path === path || tab.target.path.startsWith(`${path}/`))) tabs.close(tab.id);
+      for (const tab of allTabs(tabs.layout)) {
+        const on = tab.target.kind === "page" || tab.target.kind === "board" ? tab.target.path : undefined;
+        if (on !== undefined && (on === path || on.startsWith(`${path}/`))) tabs.close(tab.id);
+      }
       // A folder in the Trash takes its colors with it; the next folder of that name starts plain.
       if (Object.keys(colors).some((k) => k === path || k.startsWith(`${path}/`))) await colorFolder(vault, path, null).then(onOrder, () => undefined);
       if (targetFolder === path || targetFolder.startsWith(`${path}/`)) setTarget?.(dirname(path));
@@ -453,6 +481,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
 
   /** Duplicate or Duplicate structure only, in place: a folder with pages in it asks first. */
   const startDuplicate = (node: TreeNode, structure: boolean) => {
+    if (isBoard(node)) return;
     if (node.kind === "folder" && pagesIn(node).length > 0) return setDuplicating({ path: node.path, structure, to: false });
     void duplicateEntry(node.path, dirname(node.path), structure).then((failure) => {
       if (failure) setError(failure);
@@ -525,9 +554,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       if (node.kind === "page") {
         return (
           <li role="none" key={`page:${node.path}`}>
-            <div role="treeitem" aria-selected={node.path === current} className="tree-item tree-renaming" data-kind="page" style={indent} {...common}>
+            <div role="treeitem" aria-selected={node.path === (node.board ? shownBoard : current)} className="tree-item tree-renaming" data-kind="page" style={indent} {...common}>
               <Disclosure open={false} hidden />
-              <PageIcon />
+              {node.board ? <BoardIcon /> : <PageIcon />}
               {field}
             </div>
           </li>
@@ -552,6 +581,9 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
 
     if (node.kind === "page") {
       const checked = selection.paths.has(node.path);
+      // A board row is current while its board is the current tab.
+      const isCurrent = node.path === (node.board ? shownBoard : current);
+      if (selection.active && node.board) return null; // only pages go to a workspace
       if (selection.active) {
         // While selecting, the row is a checkbox: Space toggles it, the tree keeps its keyboard order.
         return (
@@ -568,8 +600,8 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
           <button
             type="button"
             role="treeitem"
-            aria-selected={node.path === current}
-            aria-current={node.path === current ? "page" : undefined}
+            aria-selected={isCurrent}
+            aria-current={isCurrent ? "page" : undefined}
             {...common}
             className="tree-item"
             data-kind="page"
@@ -577,17 +609,17 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             style={indent}
             onClick={(event) => {
               setTarget?.(dirname(node.path));
-              openPage(node.path, clickOpens(event));
+              openNode(node.path, clickOpens(event));
             }}
             onAuxClick={(event) => {
               if (!isMiddleClick(event)) return;
               event.preventDefault();
-              openPage(node.path, { newTab: true });
+              openNode(node.path, { newTab: true });
             }}
             onKeyDown={(event) => {
               if (event.target === event.currentTarget && isOpenInNewTabKey(event)) {
                 event.preventDefault();
-                openPage(node.path, { newTab: true });
+                openNode(node.path, { newTab: true });
                 return;
               }
               keys(event);
@@ -598,7 +630,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
             {...dnd.rowProps(node.path)}
           >
             <Disclosure open={false} hidden />
-            <PageIcon />
+            {node.board ? <BoardIcon /> : <PageIcon />}
             <span className="tree-label">{node.title}</span>
           </button>
         </li>
@@ -710,7 +742,7 @@ export function PrivateTree({ tree, current, open, setFolder, remapFolders, sele
       {deletingNode && (
         <DeleteDialog
           name={label(deletingNode.path)}
-          body={deletingNode.kind === "folder" ? tt.deleteDialog.privateFolder(pagesIn(deletingNode).length, trashName) : tt.deleteDialog.privatePage(trashName)}
+          body={deletingNode.kind === "folder" ? tt.deleteDialog.privateFolder(pagesIn(deletingNode).length, trashName) : deletingNode.board ? tb.deleteBoard(trashName) : tt.deleteDialog.privatePage(trashName)}
           onDelete={() => deleteEntry(deletingNode.path)}
           onClose={() => {
             setDeleting(null);

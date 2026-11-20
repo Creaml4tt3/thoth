@@ -54,7 +54,7 @@ trade-off.
 | [0042](0042-teams-manager-role-and-folder-visibility.md) | Teams in workspaces, a Manager role, and folder visibility | Proposed 2026-11-01 |
 | [0043](0043-manager-rights-and-page-trash.md) | What managers may do, and a Trash for pages | Proposed 2026-11-01 |
 | [0044](0044-shrinking-images-before-upload.md) | Shrinking images before they are uploaded to a workspace | Proposed 2026-11-02, not scheduled |
-| [0045](0045-switching-from-obsidian-on-thoths-terms.md) | Switching from Obsidian, on Thoth's own terms | Accepted 2026-11-02 |
+| [0045](0045-switching-from-obsidian-on-thoths-terms.md) | Switching from Obsidian, on Thoth's own terms | Accepted 2026-11-02; "no graph view" amended by 0056 |
 | [0046](0046-index-outside-the-notes-folder.md) | The search index lives outside the notes folder | Accepted 2026-11-02 |
 | [0047](0047-duplicate-pages-and-folders.md) | Duplicating pages and folders | Proposed 2026-11-02 |
 | [0048](0048-connected-apps-propose-changes.md) | Connected apps propose changes, reviewed in Thoth | Accepted 2026-11-02 |
@@ -64,6 +64,7 @@ trade-off.
 | [0052](0052-agent-memory-and-skills.md) | Agent memory and skills in Thoth | Accepted 2026-11-07 |
 | [0053](0053-papyrus-black.md) | Papyrus Black, the colour system for the app and the site | Accepted 2026-11-15 |
 | [0054](0054-hooded-ibis-mascot.md) | The hooded ibis replaces Moon Crown as the mascot | Accepted 2026-11-18 |
+| [0056](0056-board.md) | Board, sticky notes for pages and string for their links (amends 0045's "no graph view") | Proposed 2026-11-20 |
 
 Template: [0000-template.md](0000-template.md).
 

@@ -78,7 +78,7 @@ function findOnePerWindow(layout: Layout, target: TabTarget): { pane: number; ta
 }
 
 export function open(layout: Layout, target: TabTarget, options: OpenOptions = {}): Layout {
-  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home" || target.kind === "timeline") {
+  if (target.kind === "settings" || target.kind === "agent-run" || target.kind === "home" || target.kind === "timeline" || target.kind === "board") {
     const found = findOnePerWindow(layout, target);
     if (found) return withPane({ ...layout, active: found.pane }, found.pane, (s) => model.open(s, target, options));
   }
@@ -244,11 +244,12 @@ export function parseLayout(raw: string | null | undefined, keep: (target: TabTa
   const stored = data as Partial<StoredLayout>;
   if (stored.v !== 2 || !Array.isArray(stored.panes)) return null;
   const seen = new Set<string>();
-  /** Home, Timeline and Settings once per window: the first pane that has it keeps it. */
+  /** Home, Timeline, Settings and each board once per window: the first pane that has it keeps it. */
   const once = (target: TabTarget): boolean => {
-    if (target.kind !== "home" && target.kind !== "settings" && target.kind !== "timeline") return true;
-    if (seen.has(target.kind)) return false;
-    seen.add(target.kind);
+    if (target.kind !== "home" && target.kind !== "settings" && target.kind !== "timeline" && target.kind !== "board") return true;
+    const key = target.kind === "board" ? `board\n${target.path ?? ""}` : target.kind;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   };
   const panes: TabsState[] = [];
