@@ -282,7 +282,8 @@ describe("New folder", () => {
     await app.user.click(screen.getByRole("button", { name: "New folder" }));
     const first = await naming("Untitled folder");
     expect(first.value).toBe("Untitled folder");
-    expect(document.activeElement).toBe(first);
+    // Focus follows the field a frame later on a loaded machine.
+    await waitFor(() => expect(document.activeElement).toBe(first));
     expect((await stat(join(root, "Untitled folder"))).isDirectory()).toBe(true);
     // Escape keeps the folder with its default name.
     await app.user.keyboard("{Escape}");
