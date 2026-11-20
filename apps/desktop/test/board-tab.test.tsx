@@ -3,7 +3,7 @@
 // pinning a suggestion and moving notes saved once after 500 ms of quiet, undo of a move, a drawn link that refreshes
 // the session (and its undo too), "Board from this page", and the graph read again when the index changes.
 import "../../../tests/helpers/jsdom-shims.ts";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openNodeVault } from "@thoth/local-store/node";
 import type { Vault } from "@thoth/local-store";
 import { SessionContext, type Session } from "../src/app/context.ts";
-import { chooseOption, selectLabels } from "../../../packages/app-ui/test/support/select.ts";
+import { chooseOption } from "../../../packages/app-ui/test/support/select.ts";
 import { BoardTab } from "../src/features/board/BoardTab.tsx";
 import { boardFromPage } from "../src/features/board/from-page.ts";
 import { setTargetFolder } from "../src/features/shell/target-folder.ts";
@@ -92,7 +92,10 @@ describe("BoardTab", () => {
   it("the switcher lists the Overview, then the boards by name; choosing one opens it", async () => {
     const { tabs } = setup();
     const switcher = await screen.findByRole("combobox", { name: "Board" });
-    await waitFor(() => expect(selectLabels(switcher)).toEqual(["Overview", "Alpha board", "Zeta"]));
+    // Open once and wait on the list: opening inside waitFor changes the DOM, which re-runs waitFor without end.
+    fireEvent.click(switcher);
+    const list = document.getElementById(switcher.getAttribute("aria-controls")!)!;
+    await waitFor(() => expect(within(list).getAllByRole("option").map((o) => o.textContent)).toEqual(["Overview", "Alpha board", "Zeta"]));
     chooseOption(switcher, "Zeta");
     expect(tabs.open).toHaveBeenCalledWith({ kind: "board", path: "Zeta.canvas" }, { replace: true });
   });
