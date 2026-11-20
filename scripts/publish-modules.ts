@@ -162,7 +162,8 @@ async function main(): Promise<void> {
   for (const key of plain) gzipTo(join(dir, "modules", key), join(dir, "modules", `${key}.gz`));
 
   const source = JSON.parse(readFileSync(join(repo, "modules", "models.json"), "utf8")) as ModelList;
-  const list = fillList(source, dir, await publishedSerial());
+  // A build-only run (pull requests) checks the files, not the serial: the published list may be this very one.
+  const list = fillList(source, dir, publish ? await publishedSerial() : 0);
   const crate = readFileSync(join(repo, "crates", "thoth-ocr", "Cargo.toml"), "utf8");
   const version = /^version = "([^"]+)"/m.exec(crate)?.[1];
   if (!version) throw new Error("no version in crates/thoth-ocr/Cargo.toml");
