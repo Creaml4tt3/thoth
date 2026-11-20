@@ -88,6 +88,13 @@ impl Runner {
         let mut command = Command::new(&program.exe);
         command.args([OsStr::new("serve"), OsStr::new("--models"), program.models.as_os_str(), OsStr::new("--preset"), OsStr::new(&program.preset)]);
         command.env_clear();
+        // Windows programs need these even with nothing else: without SystemRoot, system DLLs and the RNG fail to load.
+        #[cfg(windows)]
+        for key in ["SystemRoot", "windir", "TEMP", "TMP"] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
         if let Some(ort) = &program.ort {
             command.env("ORT_DYLIB_PATH", ort);
         }
