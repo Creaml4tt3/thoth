@@ -79,6 +79,10 @@ describe("publish-modules", () => {
       signList("/out/models.json", { THOTH_MODULES_SIGNING_KEY: KEY, THOTH_MODULES_SIGNING_KEY_PASSWORD: "pw", PATH: "/bin" }, run);
       expect(calls).toHaveLength(1);
       expect(calls[0]!.args).toContain("/out/models.json");
+      // A relative path is made absolute: the signer runs in another folder.
+      signList("dist-ocr/models.json", { THOTH_MODULES_SIGNING_KEY: KEY, PATH: "/bin" }, run);
+      expect(calls[1]!.args).toContain(join(process.cwd(), "dist-ocr/models.json"));
+      calls.pop();
       expect(calls[0]!.args.join(" ")).not.toContain(KEY);
       expect(calls[0]!.env).toMatchObject({ TAURI_SIGNING_PRIVATE_KEY: KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "pw", PATH: "/bin" });
       // A missing key stops before anything runs.

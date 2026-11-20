@@ -20,7 +20,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 import { BUCKET } from "./publish-downloads.ts";
 
@@ -130,7 +130,8 @@ export function signList(file: string, env: NodeJS.ProcessEnv, run: Run = runTau
   const key = env.THOTH_MODULES_SIGNING_KEY;
   if (!key) throw new Error("THOTH_MODULES_SIGNING_KEY is missing: the model list would be unsigned");
   const { THOTH_MODULES_SIGNING_KEY: _, THOTH_MODULES_SIGNING_KEY_PASSWORD: password, ...rest } = env;
-  run(["signer", "sign", file], { ...rest, TAURI_SIGNING_PRIVATE_KEY: key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password ?? "" });
+  // Absolute: `pnpm --filter … exec` runs in apps/desktop, where a relative path names nothing.
+  run(["signer", "sign", resolve(file)], { ...rest, TAURI_SIGNING_PRIVATE_KEY: key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password ?? "" });
 }
 
 /** Every plain file under <dir>, as paths relative to it with `/`. */
