@@ -253,6 +253,25 @@ describe("limits", () => {
   });
 });
 
+describe("OCR module (ADR-0055)", () => {
+  it("is not available in a build without the program, and checks every argument", async () => {
+    const t = await transport({ dataDir: join(base, "data"), updateUrl: "https://download.invalid/latest.json", updateCurrent: "0.12.0" });
+    const status = await t.call("module.status", {});
+    expect(status).toEqual({ available: false, runtime: null, models: [], autoUpdate: false, job: { state: "idle" } });
+    await expect(t.call("module.install", { model: "fast" })).rejects.toMatchObject({ code: "NOT_ALLOWED" });
+    await expect(t.call("module.install", { model: "big" } as never)).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    await expect(t.call("module.remove", {} as never)).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    await expect(t.call("module.settings", { autoUpdate: "yes" } as never)).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    await expect(t.call("module.status", { refresh: 1 } as never)).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    expect(await t.call("module.cancel", {})).toEqual(status);
+    // The image goes as request bytes, and only to ocr.read.
+    await expect(t.call("ocr.read", { kind: "image" })).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    await expect(t.call("ocr.read", { kind: "image" }, text("png"))).rejects.toMatchObject({ code: "NOT_ALLOWED" });
+    await expect(t.call("module.status", {}, text("x"))).rejects.toMatchObject({ code: "BAD_ARGUMENT" });
+    expect(await t.call("ocr.cancel", {})).toBeNull();
+  });
+});
+
 describe("watcher", () => {
   it("emits vault-relative paths after an external write and excludes .thoth/", async () => {
     const root = join(base, "v");

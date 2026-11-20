@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, ModuleStatus, OcrModel, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -74,6 +74,8 @@ export interface Platform {
   readonly updates?: Updates;
   /** Other apps reading shared Private Spaces over MCP (ADR-0021). Only the desktop host has it; absent: no such setting. */
   readonly connectedApps?: ConnectedApps;
+  /** Downloadable modules: OCR (ADR-0055). Only the desktop host has them; absent: no Modules section, no image text. */
+  readonly modules?: Modules;
   /** The app's local log for problem reports (ADR-0040). Only the desktop host has it; absent: no log, nothing reported. */
   readonly diagnostics?: Diagnostics;
 }
@@ -110,6 +112,23 @@ export interface Updates {
   restart(options?: { evenIfRunning?: boolean; reopen?: string }): Promise<RestartAnswer>;
   /** The host's `update.progress` events. */
   onProgress(listener: (state: InstallState) => void): Promise<() => void>;
+}
+
+/** The OCR module (ADR-0055): its download, and reading the text of an image or a PDF on this computer. */
+export interface Modules {
+  /** `refresh`: read the signed model list now. */
+  status(options?: { refresh?: boolean }): Promise<ModuleStatus>;
+  install(model: OcrModel): Promise<ModuleStatus>;
+  cancel(): Promise<ModuleStatus>;
+  remove(model: OcrModel): Promise<ModuleStatus>;
+  setAutoUpdate(on: boolean): Promise<ModuleStatus>;
+  /** The text of an image or a PDF, page by page. Rejects with `OCR_*` codes. */
+  read(kind: "image" | "pdf", bytes: Uint8Array, model?: OcrModel): Promise<{ model: OcrModel; pages: { text: string; source: "ocr" | "text" }[] }>;
+  cancelRead(): Promise<void>;
+  /** The host's `module.progress` events (the whole status). */
+  onProgress(listener: (status: ModuleStatus) => void): Promise<() => void>;
+  /** The host's `ocr.progress` events: pages read so far. */
+  onReadProgress(listener: (progress: { page: number; pages: number }) => void): Promise<() => void>;
 }
 
 /** Connected apps (ADR-0021): the user's settings, and the requests the host sends a window to answer. */

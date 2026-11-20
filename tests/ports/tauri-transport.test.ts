@@ -112,6 +112,40 @@ describe("TauriTransport", () => {
     expect(shell).toContain(`UPDATE_PROGRESS_EVENT: &str = "thoth:update-progress"`);
   });
 
+  it("sends the OCR module's commands to the host, the image as raw bytes, and hears both progress events (ADR-0055)", async () => {
+    const status = { available: false, runtime: null, models: [], autoUpdate: false, job: { state: "idle" } };
+    const { api, calls } = fakeApi((command) => (command === "ocr_read" ? { model: "fast", pages: [] } : command === "ocr_cancel" ? null : status));
+    const modules = createTauriPlatform(api).modules!;
+    expect(await modules.status()).toEqual(status);
+    await modules.status({ refresh: true });
+    await modules.install("fast");
+    await modules.cancel();
+    await modules.remove("second");
+    await modules.setAutoUpdate(true);
+    expect(await modules.read("image", new Uint8Array([1, 2]), "second")).toEqual({ model: "fast", pages: [] });
+    await modules.cancelRead();
+    await modules.onProgress(() => undefined);
+    await modules.onReadProgress(() => undefined);
+    expect(calls.map((c) => [c[0], c[0] === "ocr_read" ? JSON.parse(decodeURIComponent((c[2] as { headers: Record<string, string> }).headers[ARGS_HEADER]!)) : c[1]])).toEqual([
+      ["module_status", { args: {} }],
+      ["module_status", { args: { refresh: true } }],
+      ["module_install", { args: { model: "fast" } }],
+      ["module_cancel", { args: {} }],
+      ["module_remove", { args: { model: "second" } }],
+      ["module_settings", { args: { autoUpdate: true } }],
+      ["ocr_read", { kind: "image", model: "second" }],
+      ["ocr_cancel", { args: {} }],
+      ["listen", "thoth:module-progress"],
+      ["listen", "thoth:ocr-progress"],
+    ]);
+    expect(calls[6]![1]).toEqual(new Uint8Array([1, 2]));
+    const shell = readFileSync(join(import.meta.dirname, "../../apps/desktop/src-tauri/src/lib.rs"), "utf8");
+    expect(shell).toContain(`MODULE_PROGRESS_EVENT: &str = "thoth:module-progress"`);
+    expect(shell).toContain(`OCR_PROGRESS_EVENT: &str = "thoth:ocr-progress"`);
+    const host = readFileSync(join(import.meta.dirname, "../../crates/thoth-host/src/lib.rs"), "utf8");
+    expect(host).toContain(`"module.status", "module.install", "module.cancel", "module.remove", "module.settings", "ocr.read", "ocr.cancel",`);
+  });
+
   it("binds to window.__TAURI_INTERNALS__ like @tauri-apps/api", async () => {
     const invoked: unknown[][] = [];
     const api = internalsApi({

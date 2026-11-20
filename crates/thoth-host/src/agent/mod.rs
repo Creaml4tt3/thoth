@@ -534,27 +534,27 @@ impl DetachedRuns {
 // --------------------------------------------------------------------------- process
 
 #[derive(Clone, Copy)]
-enum Signal {
+pub(crate) enum Signal {
     Term,
     Kill,
 }
 
 #[cfg(unix)]
-fn own_group(command: &mut Command) {
+pub(crate) fn own_group(command: &mut Command) {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
 }
 
 #[cfg(windows)]
-fn own_group(command: &mut Command) {
+pub(crate) fn own_group(command: &mut Command) {
     kill_windows::prepare(command);
 }
 
 #[cfg(not(any(unix, windows)))]
-fn own_group(_command: &mut Command) {}
+pub(crate) fn own_group(_command: &mut Command) {}
 
 #[cfg(unix)]
-fn signal_group(pgid: i32, signal: Signal) {
+pub(crate) fn signal_group(pgid: i32, signal: Signal) {
     let Some(pid) = rustix::process::Pid::from_raw(pgid) else { return };
     let signal = match signal {
         Signal::Term => rustix::process::Signal::TERM,
@@ -565,12 +565,12 @@ fn signal_group(pgid: i32, signal: Signal) {
 
 /// Windows: the run's Job Object, by the CLI's process id (`kill_windows`).
 #[cfg(windows)]
-fn signal_group(pgid: i32, signal: Signal) {
+pub(crate) fn signal_group(pgid: i32, signal: Signal) {
     kill_windows::signal(pgid, matches!(signal, Signal::Kill));
 }
 
 #[cfg(not(any(unix, windows)))]
-fn signal_group(_pgid: i32, _signal: Signal) {}
+pub(crate) fn signal_group(_pgid: i32, _signal: Signal) {}
 
 fn kill_group(state: &RunState, signal: Signal) {
     if let Some(pgid) = state.pgid {

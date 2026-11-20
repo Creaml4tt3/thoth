@@ -152,6 +152,11 @@ impl Store {
         }
     }
 
+    /// Bytes on disk of one model's folder (every version kept).
+    pub fn model_bytes(&self, id: ModelId) -> u64 {
+        folder_size(&self.dir(Dest::Model(id)))
+    }
+
     pub fn auto_update(&self) -> bool {
         self.state().auto_update
     }

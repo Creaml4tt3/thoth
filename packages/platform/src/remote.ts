@@ -6,7 +6,7 @@
 import type { AgentFiles, AgentHost } from "@thoth/agent-core";
 import type { RandomAccessFile, SourceDirEntry, SourceHost, TempFile } from "@thoth/importer-core";
 import type { DirEntry, FileStat, ScanEntry, SqlDriver, SqlRow, SqlValue, VaultFs } from "@thoth/local-store";
-import type { ConnectedApps, Diagnostics, Links, Platform, Servers, Updates, VaultConnection } from "./index.ts";
+import type { ConnectedApps, Diagnostics, Links, Modules, Platform, Servers, Updates, VaultConnection } from "./index.ts";
 import type { HostErrorCode, MemoryHistoryChange, MemoryHistoryText, Transport, WireRow, WireValue } from "./ipc.ts";
 
 /** An error returned by the host, re-thrown with its `code` (e.g. "EEXIST") like a Node errno error. */
@@ -345,6 +345,21 @@ export function remoteUpdates(transport: Transport, events: Pick<Updates, "onPro
     takeReopen: async () => (await transport.call("update.status", { reopen: true })).reopen ?? null,
     restart: (options) => transport.call("update.restart", { ...(options?.evenIfRunning ? { evenIfRunning: true } : {}), ...(options?.reopen ? { reopen: options.reopen } : {}) }),
     onProgress: (listener) => events.onProgress(listener),
+  };
+}
+
+/** The OCR module (ADR-0055) over `module.*` and `ocr.*`; the events come from the platform's own event channel. */
+export function remoteModules(transport: Transport, events: Pick<Modules, "onProgress" | "onReadProgress">): Modules {
+  return {
+    status: (options) => transport.call("module.status", options?.refresh ? { refresh: true } : {}),
+    install: (model) => transport.call("module.install", { model }),
+    cancel: () => transport.call("module.cancel", {}),
+    remove: (model) => transport.call("module.remove", { model }),
+    setAutoUpdate: (on) => transport.call("module.settings", { autoUpdate: on }),
+    read: (kind, bytes, model) => transport.call("ocr.read", model ? { kind, model } : { kind }, bytes),
+    cancelRead: async () => void (await transport.call("ocr.cancel", {})),
+    onProgress: (listener) => events.onProgress(listener),
+    onReadProgress: (listener) => events.onReadProgress(listener),
   };
 }
 

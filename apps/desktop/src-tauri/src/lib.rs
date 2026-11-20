@@ -229,6 +229,9 @@ pub const MCP_PROPOSALS_EVENT: &str = "thoth:mcp-proposals";
 pub const MCP_MEMORIES_EVENT: &str = "thoth:mcp-memories";
 /// In-app updates (ADR-0034): the host's `update.progress`, to every window.
 pub const UPDATE_PROGRESS_EVENT: &str = "thoth:update-progress";
+/// The OCR module (ADR-0055): the host's `module.progress` (downloads) and `ocr.progress` (pages read), to every window.
+pub const MODULE_PROGRESS_EVENT: &str = "thoth:module-progress";
+pub const OCR_PROGRESS_EVENT: &str = "thoth:ocr-progress";
 
 /// Native dialogs, shown by the host so that only paths the user chose enter the allow-list.
 struct DialogPicker {
@@ -859,6 +862,8 @@ pub fn run() {
                         thoth_host::mcp::PROPOSALS_EVENT => emitter.emit(MCP_PROPOSALS_EVENT, payload),
                         thoth_host::mcp::MEMORIES_EVENT => emitter.emit(MCP_MEMORIES_EVENT, payload),
                         thoth_host::install::PROGRESS_EVENT => emitter.emit(UPDATE_PROGRESS_EVENT, payload),
+                        thoth_host::modules::PROGRESS_EVENT => emitter.emit(MODULE_PROGRESS_EVENT, payload),
+                        thoth_host::modules::OCR_PROGRESS_EVENT => emitter.emit(OCR_PROGRESS_EVENT, payload),
                         _ => emitter.emit(VAULT_CHANGED_EVENT, payload),
                     };
                 }),
