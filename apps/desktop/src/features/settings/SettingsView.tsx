@@ -12,6 +12,7 @@ import { ConnectedAppsSettings } from "../connected-apps/ConnectedAppsSettings.t
 import { LinkPreviewSettings } from "./LinkPreviewSettings.tsx";
 import { DailySettingsSection } from "./DailySettings.tsx";
 import { UpdateSettings } from "../updates/UpdateSettings.tsx";
+import { ModulesSettings } from "../modules/ModulesSettings.tsx";
 import { usePageHost } from "@thoth/app-ui/editor/host.ts";
 import { SettingsLayout, type SettingsSectionLink } from "@thoth/app-ui/ui/SettingsLayout.tsx";
 import { EDITOR_MODES, defaultEditorMode, setDefaultEditorMode, type EditorMode } from "@thoth/app-ui/editor/mode.ts";
@@ -25,9 +26,9 @@ type Rebuild = { state: "idle" } | { state: "running" } | { state: "done"; pages
 
 /**
  * Settings, most used first: Appearance (theme, language), Editor, the Private Space (its folder and search index),
- * Today (the daily notes setting), Import, Servers, the assistant, Connected apps, Notifications, Updates, and Help and feedback (with the tour).
+ * Today (the daily notes setting), Import, Servers, the assistant, Modules (OCR, desktop only), Connected apps, Notifications, Updates, and Help and feedback (with the tour).
  */
-export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import" | "today"; request?: object }) {
+export function SettingsView({ section = "top", request }: { section?: "top" | "servers" | "agents" | "import" | "today" | "modules"; request?: object }) {
   const { connection, vault, refresh, switchVault, openPage, openFolder, platform } = useSession();
   const previews = usePageHost().links;
   const t = useDesktopStrings().settings;
@@ -77,6 +78,7 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
     { id: "set-import", label: t.importExport, icon: "import" },
     { id: "set-servers", label: d.servers.title, icon: "server" },
     { id: "set-agents", label: d.agents.title, icon: "sparkle" },
+    ...(platform.modules ? [{ id: "set-modules", label: d.modules.title, icon: "module" } as const] : []),
     { id: "set-connected-apps", label: d.connectedApps.title, icon: "plug" },
     { id: "set-notifications", label: d.notifications.title, icon: "bell" },
     { id: "set-general", label: d.updates.general, icon: "gear" },
@@ -204,6 +206,8 @@ export function SettingsView({ section = "top", request }: { section?: "top" | "
       <ServersSettings />
 
       <AgentSettings />
+
+      {platform.modules && <ModulesSettings host={platform.modules} />}
 
       {platform.connectedApps && <ConnectedAppsSettings connectedApps={platform.connectedApps} />}
 

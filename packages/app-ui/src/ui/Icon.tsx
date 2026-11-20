@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The icons of toolbars and icon buttons: hand-drawn on a 24-unit grid, shown at 16px, 1.8 stroke, round caps, `currentColor`
  * (the same style as the gear and the folder icons in the sidebar). Decorative: the button around one carries the name.
  */
-export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard";
+export type IconName = "page-plus" | "folder-plus" | "plus" | "close" | "gear" | "sparkle" | "select" | "done" | "blocks" | "text" | "copy" | "move-in" | "to-workspace" | "sign-out" | "shrink" | "expand" | "bell" | "grip" | "people" | "open-tab" | "star" | "pin" | "share" | "import" | "home" | "sidebar" | "search" | "page" | "moon" | "pen" | "folder" | "sun" | "server" | "plug" | "speech" | "keyboard" | "module";
 
 const DRAWINGS: Record<IconName, ReactNode> = {
   /** A house: Home (ADR-0029). */
@@ -95,6 +95,13 @@ const DRAWINGS: Record<IconName, ReactNode> = {
     </>
   ),
   /** A plug: Connected apps. */
+  // A box: a module, downloaded on its own (ADR-0055).
+  module: (
+    <>
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+      <path d="M4 7.5l8 4.5 8-4.5M12 12v9" />
+    </>
+  ),
   plug: (
     <>
       <path d="M9 3v4M15 3v4" />

@@ -277,6 +277,41 @@ export const th: DesktopStrings = {
   },
 
   // Settings → Connected apps and the question when an app connects (ADR-0021). "Private Space" and "MCP" stay in English, as elsewhere.
+  modules: {
+    title: "โมดูล", // REVIEW
+    ocrTitle: "OCR (ภาษาไทยและอังกฤษ)", // REVIEW
+    ocrNote: "อ่านข้อความในรูปภาพและ PDF บนคอมพิวเตอร์เครื่องนี้ ใช้ได้กับคำสั่ง คัดลอกข้อความ และ แทรกข้อความด้านล่าง บนรูปภาพ และ หน้าจาก PDF ดาวน์โหลดแยกต่างหาก รูปภาพและ PDF ของคุณไม่ออกจากคอมพิวเตอร์เครื่องนี้", // REVIEW
+    unavailable: "Thoth รุ่นนี้ยังไม่มี OCR", // REVIEW
+    fast: "เร็ว (แนะนำ)", // REVIEW
+    fastNote: "เร็วและแม่นกับภาพหน้าจอและเอกสารพิมพ์", // REVIEW
+    second: "ความเห็นที่สอง", // REVIEW
+    secondNote: "อีกโมเดลหนึ่งไว้ลองเมื่อแบบเร็วอ่านพลาด อ่านภาษาอังกฤษและตัวเลขได้ดีกว่าเล็กน้อย", // REVIEW
+    mb: (bytes) => `${(bytes / 1_048_576).toFixed(1)} MB`,
+    download: (size) => `ดาวน์โหลด (${size})`, // REVIEW
+    remove: "ลบ", // REVIEW
+    cancel: "ยกเลิก", // REVIEW
+    update: "อัปเดต", // REVIEW
+    uses: (size) => `ใช้พื้นที่ ${size}`, // REVIEW
+    updateReady: (size) => `มีโมเดลที่ดีกว่าแล้ว (${size})`, // REVIEW
+    downloading: "กำลังดาวน์โหลด…", // REVIEW
+    checking: "กำลังตรวจว่าอ่านข้อความได้ถูกต้อง…", // REVIEW
+    progressLabel: "ความคืบหน้าการดาวน์โหลด", // REVIEW
+    progress: (received, total) => {
+      const mb = (n: number) => `${(n / 1_048_576).toFixed(1)} MB`;
+      return total ? `${Math.floor((received / total) * 100)}% (${mb(received)} จาก ${mb(total)})` : mb(received); // REVIEW
+    },
+    failed: {
+      offline: "Thoth ดาวน์โหลดไม่ได้ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง", // REVIEW
+      verify: "ไฟล์ที่ดาวน์โหลดไม่ตรงกับที่ Thoth คาดไว้ จึงไม่ได้ติดตั้งอะไร ลองใหม่ภายหลัง", // REVIEW
+      disk: "พื้นที่ดิสก์ไม่พอ ลบไฟล์บางส่วนแล้วลองอีกครั้ง", // REVIEW
+      cancelled: "ยกเลิกการดาวน์โหลดแล้ว ไม่ได้ติดตั้งอะไร", // REVIEW
+      failed: "ติดตั้งไม่ได้ ลองใหม่ภายหลัง", // REVIEW
+      test: "โมเดลใหม่อ่านภาพทดสอบไม่ถูกต้อง Thoth จึงเก็บของเดิมไว้", // REVIEW
+    },
+    autoUpdate: "อัปเดตโมเดล OCR อัตโนมัติ", // REVIEW
+    autoUpdateHint: "เมื่อ Thoth ตรวจหาอัปเดต จะดาวน์โหลดโมเดล OCR รุ่นใหม่ของตัวเลือกที่คุณดาวน์โหลดไว้ด้วย ถ้าปิด คุณเลือกเองว่าจะอัปเดตเมื่อไร", // REVIEW
+  },
+
   connectedApps: {
     title: "แอปที่เชื่อมต่อ",
     // REVIEW
