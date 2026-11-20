@@ -15,7 +15,16 @@ mkdir -p "$fast" "$second" "$out/modules/test/1"
 
 # The SHA-256 models.lock gives for a path (relative to the spike's cache), or a stop.
 want() { awk -v p="$2" '$2 == p { print $1 }' "$lock" | grep . || { echo "::error::$2 is not in $lock"; exit 1; }; }
-check() { echo "$(want "$lock" "$2")  $1" | shasum -a 256 -c -; }
+# RELOCK=1 (the model watch, scripts/model-watch.ts, after it moved a pinned revision): record each file's new
+# SHA-256 in models.lock instead of checking it; the watch's pull request shows that change to a person.
+check() {
+  if [ "${RELOCK:-}" = 1 ]; then
+    sum=$(shasum -a 256 "$1" | cut -d' ' -f1)
+    awk -v p="$2" -v s="$sum" '$2 == p { $1 = s } { print }' "$lock" > "$lock.new" && mv "$lock.new" "$lock"
+  else
+    echo "$(want "$lock" "$2")  $1" | shasum -a 256 -c -
+  fi
+}
 get() { curl -fsSL --retry 3 -o "$1" "$hf/$2"; check "$1" "$3"; }
 
 ot=iapp/OpenThai2.1-OCR-Text-20261118/resolve/c765cb8017c406ddc2a518de51db22bb2e2bbd07

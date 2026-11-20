@@ -1,0 +1,128 @@
+# The weekly OCR model watch (ADR-0055, scripts/model-watch.ts). Asks Hugging Face whether a listed model's repo has a
+# newer commit that changes a model file. When one has, it builds thoth-ocr, reads tools/ocr-spike/corpus with the listed
+# models and with the new revision, and opens a pull request that switches to the new model only if its oCER is no worse
+# on every image group (the table goes in the pull request). It never signs or uploads anything: after a person merges,
+# an `ocr-v*` tag runs release-ocr.yml, which does.
+#
+# A pull request that touches the watch runs the check only (workflow_dispatch reaches only a workflow already on main).
+# Actions are pinned to the same commit SHAs as release-ocr.yml.
+name: OCR model watch
+
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays, 03:17 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/model-watch.yml"
+      - "scripts/model-watch.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-watch
+  cancel-in-progress: false
+
+env:
+  ORT_NUPKG_URL: https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.28.0/microsoft.ml.onnxruntime.1.28.0.nupkg
+  ORT_NUPKG_SHA256: 769d1d3ea8ab6cd69f737c9dd4d4462aa4ad0ccfa106eaf506efc40d7bead5db
+
+jobs:
+  check:
+    name: Is there a newer model?
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - id: check
+        run: |
+          node scripts/model-watch.ts check | tee check.json
+          n=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("check.json","utf8")).changed.length)')
+          echo "changed=$n" >> "$GITHUB_OUTPUT"
+          if [ "$n" = 0 ]; then echo "No newer model." >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-watch-check
+          path: check.json
+          retention-days: 7
+
+  # Only on the schedule or by hand, and only when something changed: build, score both, propose.
+  try:
+    name: Score the new model and propose it
+    needs: [check]
+    if: needs.check.outputs.changed != '0' && github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: model-watch-check
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # stable, 2026-10-01
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: python3 -m pip install --user uv==0.13.2
+      - name: Build thoth-ocr and get ONNX Runtime (checked)
+        run: |
+          cargo build --manifest-path crates/thoth-ocr/Cargo.toml --release --locked
+          mkdir -p ort
+          curl -fsSL --retry 3 -o ort/ort.nupkg "$ORT_NUPKG_URL"
+          echo "$ORT_NUPKG_SHA256  ort/ort.nupkg" | sha256sum -c -
+          unzip -q ort/ort.nupkg runtimes/linux-x64/native/libonnxruntime.so -d ort
+          echo "ORT_DYLIB_PATH=$PWD/ort/runtimes/linux-x64/native/libonnxruntime.so" >> "$GITHUB_ENV"
+      - name: Score the listed models
+        run: |
+          bash scripts/ocr/stage-models.sh base
+          for m in fast:openthai second:pp5; do
+            IFS=: read -r id preset <<<"$m"
+            dir=$(ls -d base/modules/models/$id/*)
+            node scripts/model-watch.ts read crates/thoth-ocr/target/release/thoth-ocr "$dir" "$preset" "base-$id.jsonl"
+            uv run --no-project --with numpy==2.3.4 python -I tools/ocr-spike/scripts/score.py tools/ocr-spike/corpus/manifest.json "base-$id.jsonl" > "base-$id.txt"
+          done
+      - name: Switch to the new revisions and score them
+        run: |
+          node scripts/model-watch.ts apply check.json | tee versions.json
+          RELOCK=1 bash scripts/ocr/stage-models.sh cand
+          : > table.md
+          propose=1
+          for id in $(node -e 'console.log(Object.keys(JSON.parse(require("fs").readFileSync("versions.json","utf8"))).join(" "))'); do
+            preset=openthai; [ "$id" = second ] && preset=pp5
+            dir=$(ls -d cand/modules/models/$id/*)
+            node scripts/model-watch.ts read crates/thoth-ocr/target/release/thoth-ocr "$dir" "$preset" "cand-$id.jsonl"
+            uv run --no-project --with numpy==2.3.4 python -I tools/ocr-spike/scripts/score.py tools/ocr-spike/corpus/manifest.json "cand-$id.jsonl" > "cand-$id.txt"
+            echo "### $id" >> table.md
+            if ! node scripts/model-watch.ts decide "base-$id.txt" "cand-$id.txt" >> table.md; then propose=0; fi
+            echo >> table.md
+          done
+          cat table.md >> "$GITHUB_STEP_SUMMARY"
+          echo "PROPOSE=$propose" >> "$GITHUB_ENV"
+      - name: Open the pull request (only when no group is worse)
+        if: env.PROPOSE == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="model-watch/$(date -u +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add modules/models.json scripts/ocr/stage-models.sh .github/workflows/release-ocr.yml tools/ocr-spike/models.lock
+          git commit -m "feat(ocr): a newer OCR model, no worse on every image group"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+          { echo "The weekly model watch found a newer model and read the test corpus with it (ADR-0055)."; echo; cat table.md; echo; echo "Nothing is published until a person merges this and tags \`ocr-v*\` (release-ocr.yml signs the list and uploads)."; } > body.md
+          gh pr create --draft --base main --head "$branch" --title "OCR: a newer model from the weekly watch" --body-file body.md
