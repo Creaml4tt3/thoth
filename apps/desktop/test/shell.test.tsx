@@ -123,7 +123,8 @@ describe("shell", () => {
     await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Untitled" })).toBeTruthy());
     await app.user.keyboard("Plan{Enter}");
     await waitFor(async () => expect(await app.read("Projects/Plan.md")).toMatch(/# Plan\n$/));
-    expect(within(screen.getByRole("tree")).getByRole("treeitem", { name: "Plan" })).toBeTruthy();
+    // The tree refreshes after the file is renamed: under load, a moment later.
+    expect(await within(screen.getByRole("tree")).findByRole("treeitem", { name: "Plan" })).toBeTruthy();
   });
 
   it("New page never overwrites a page: a taken name gets a number; a click beside the rows goes back to the top level", async () => {
