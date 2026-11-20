@@ -1222,6 +1222,7 @@ export const en = {
     openCommand: "Open Board",
     addNoteList: "Pages not on this board",
     deleteBoard: (trash: string) => `This board moves to the ${trash}. The pages on it stay. You can put it back from there.`,
+    alsoOnBoard: "Also on this board",
   },
 };
 

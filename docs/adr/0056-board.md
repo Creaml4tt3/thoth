@@ -25,8 +25,11 @@ Canvas 1.0 files, an open format that Thoth can read and write without locking p
    Filters by tag and by folder. Below 40 % zoom notes draw as coloured squares in one SVG; above it only notes in view
    are in the DOM.
 3. **Boards are `.canvas` files** (JSON Canvas 1.0) in the Space, next to the notes; Obsidian can open them. Each pinned
-   page is a `file` node (top-left `x`, `y`, `width`, `height`). Unknown nodes (`text`, `link`, `group`), edges and
-   fields are kept as they were, so a round trip loses nothing. A save is debounced 500 ms and compare-and-swap; on a
+   page is a `file` node (top-left `x`, `y`, `width`, `height`). Other nodes (`text`, `link`, `group`, files that
+   are not pages), edges and fields are kept as they were, so a round trip loses nothing. Those nodes are drawn plainly
+   and read-only under the notes: a text card as a plain card with its text (no Markdown), a link card with its URL as
+   inert text, a group as a labelled frame, another file as a card with its name. They are out of the Tab order, and the
+   List view names them under "Also on this board". A save is debounced 500 ms and compare-and-swap; on a
    conflict Thoth reads the file again, re-applies only its own changes by node id, and writes once more. Moving or
    renaming a pinned page rewrites its `file` path in every board, as links are rewritten.
 4. **Strings are links, never edges.** Strings are drawn from the pages' real links in the index, so they are always

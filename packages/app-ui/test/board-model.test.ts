@@ -1,6 +1,6 @@
 // What the Board draws: notes and strings from the index graph and a board file.
 import { describe, expect, it } from "vitest";
-import { boardNotes, folderColor, overviewNotes, suggestions } from "../src/board/model.ts";
+import { boardExtras, boardNotes, folderColor, overviewNotes, suggestions } from "../src/board/model.ts";
 import { parseCanvas } from "../src/board/canvas.ts";
 
 const page = (path: string, tags: string[] = []) => ({ id: path, path, title: path.replace(/^.*\//, "").replace(/\.md$/, ""), tags, excerpt: `about ${path}` });
@@ -116,5 +116,31 @@ describe("overviewNotes", () => {
     const { notes, strings } = overviewNotes(g, {}, new Map([["A.md", { x: 5, y: 6 }]]));
     expect(notes.map((n) => [n.path, n.state, n.x, n.y, n.links])).toEqual([["A.md", "free", 5, 6, 1], ["B.md", "free", 0, 0, 1]]);
     expect(strings).toEqual([{ from: "A.md", to: "B.md" }]);
+  });
+});
+
+describe("boardExtras", () => {
+  it("returns Obsidian's text, link and group nodes and non-page files, groups first; never pages or unknown types", () => {
+    const at = { x: 1, y: 2, width: 300, height: 200 };
+    const c = parseCanvas(
+      JSON.stringify({
+        nodes: [
+          { id: "t", type: "text", text: "Hello\nworld", ...at },
+          { id: "l", type: "link", url: "https://example.com", ...at },
+          { id: "g", type: "group", label: "Ideas", ...at },
+          { id: "g2", type: "group", ...at },
+          { id: "f", type: "file", file: "Media/pic.PNG", ...at },
+          { id: "p", type: "file", file: "Plan.md", ...at },
+          { id: "u", type: "sticker", ...at },
+        ],
+      }),
+    );
+    expect(boardExtras(c)).toEqual([
+      { id: "g", kind: "group", text: "Ideas", ...at },
+      { id: "g2", kind: "group", text: "", ...at },
+      { id: "t", kind: "text", text: "Hello\nworld", ...at },
+      { id: "l", kind: "link", text: "https://example.com", ...at },
+      { id: "f", kind: "file", text: "pic.PNG", ...at },
+    ]);
   });
 });

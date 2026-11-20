@@ -1110,5 +1110,6 @@ export const th: Strings = {
     openCommand: "เปิดบอร์ด", // REVIEW
     addNoteList: "หน้าที่ยังไม่อยู่บนบอร์ดนี้", // REVIEW
     deleteBoard: (trash) => `บอร์ดนี้จะย้ายไปที่${trash} หน้าบนบอร์ดยังอยู่ครบ คุณนำบอร์ดกลับมาจากที่นั่นได้`, // REVIEW
+    alsoOnBoard: "สิ่งอื่นบนบอร์ดนี้", // REVIEW
   },
 };

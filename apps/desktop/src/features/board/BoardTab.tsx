@@ -20,7 +20,7 @@ import { BoardView, NOTE_H, NOTE_W, type BoardActions } from "@thoth/app-ui/boar
 import { applyChanges, CanvasError, newNodeId, pinnedPaths, type BoardChange, type CanvasFile, type CanvasNode } from "@thoth/app-ui/board/canvas.ts";
 import { createHistory } from "@thoth/app-ui/board/history.ts";
 import { layoutOverviewAsync } from "@thoth/app-ui/board/layout.ts";
-import { boardNotes, overviewNotes, type Graph } from "@thoth/app-ui/board/model.ts";
+import { boardExtras, boardNotes, overviewNotes, type Graph } from "@thoth/app-ui/board/model.ts";
 import { shellRoot } from "@thoth/app-ui/order/ContextMenu.tsx";
 import { focusTreeItem } from "@thoth/app-ui/order/tree-keys.ts";
 import { allTabs } from "@thoth/app-ui/tabs/layout.ts";
@@ -242,6 +242,7 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
     }
     return loaded.kind === "ready" ? boardNotes(graph, loaded.canvas, colors) : null;
   }, [graph, path, positions, tag, folder, colors, loaded]);
+  const extras = useMemo(() => (path !== undefined && loaded.kind === "ready" ? boardExtras(loaded.canvas) : []), [path, loaded]);
 
   // ---------------------------------------------------------------- actions
   const actions: BoardActions = {
@@ -354,7 +355,7 @@ export function BoardTab({ tabId, path }: { tabId: string; path?: string | undef
       ) : (
         <>
           {shown && shown.notes.length === 0 && <p className="board-empty">{path === undefined ? t.emptyOverview : t.empty}</p>}
-          <BoardView label={label} notes={shown?.notes ?? []} strings={shown?.strings ?? []} actions={actions} />
+          <BoardView label={label} notes={shown?.notes ?? []} strings={shown?.strings ?? []} extras={extras} actions={actions} />
         </>
       )}
       {dialog === "new" && <NewBoardDialog onCreate={createBoard} onClose={() => setDialog(null)} />}

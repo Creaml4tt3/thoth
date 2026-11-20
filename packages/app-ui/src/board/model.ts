@@ -2,7 +2,7 @@
  * What the Board draws, as plain data: notes and strings from the index graph (Vault.graph()) and a board file.
  * The graph shapes are re-declared here so app-ui does not depend on local-store.
  */
-import { basename, dirname, stripExtension } from "@thoth/domain";
+import { basename, dirname, isMarkdownPath, stripExtension } from "@thoth/domain";
 import { pinnedPaths, type CanvasFile } from "./canvas.ts";
 
 export interface GraphPage { id: string; path: string; title: string; tags: string[]; excerpt: string }
@@ -124,4 +124,32 @@ export function overviewNotes(graph: Graph, colors: Readonly<Record<string, stri
   const adj = neighbours(graph.links);
   const notes = graph.pages.map((p) => noteOf(p, "free", positions.get(p.path)?.x ?? 0, positions.get(p.path)?.y ?? 0, colors, adj.get(p.path)?.size ?? 0));
   return { notes, strings: strings(graph.links, new Set(notes.map((n) => n.path))) };
+}
+
+/** A node Thoth does not own (Obsidian's text card, link card, group, or a file that is not a page), drawn plainly and read-only. */
+export interface BoardExtra {
+  id: string;
+  kind: "text" | "link" | "group" | "file";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** The card's text, the link's URL, the group's label (may be empty) or the file's name. */
+  text: string;
+}
+
+const EXTRA_FIELD = { text: "text", link: "url", group: "label", file: "file" } as const;
+
+/** The canvas's other nodes, groups first so they draw under the cards. Unknown node types are not drawn. */
+export function boardExtras(canvas: CanvasFile): BoardExtra[] {
+  const out: BoardExtra[] = [];
+  for (const n of canvas.nodes) {
+    if (!Object.hasOwn(EXTRA_FIELD, n.type)) continue;
+    const kind = n.type as BoardExtra["kind"];
+    if (kind === "file" && typeof n.file === "string" && isMarkdownPath(n.file)) continue; // a page: a note
+    const raw = n[EXTRA_FIELD[kind]];
+    const text = typeof raw === "string" ? raw : "";
+    out.push({ id: n.id, kind, x: n.x, y: n.y, width: n.width, height: n.height, text: kind === "file" ? basename(text) : text });
+  }
+  return out.sort((a, b) => Number(b.kind === "group") - Number(a.kind === "group"));
 }

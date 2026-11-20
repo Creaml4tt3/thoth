@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardView, type BoardActions } from "../src/board/BoardView.tsx";
-import type { BoardNote, BoardString } from "../src/board/model.ts";
+import type { BoardExtra, BoardNote, BoardString } from "../src/board/model.ts";
 
 const note = (path: string, x: number, y: number, extra: Partial<BoardNote> = {}): BoardNote => ({
   path, title: path.replace(/\.md$/, ""), excerpt: `About ${path}`, tags: [], color: null, x, y, state: "pinned", links: 0, ...extra,
@@ -31,9 +31,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup(props: { notes?: BoardNote[]; strings?: BoardString[]; actions?: Partial<BoardActions>; noMove?: boolean } = {}) {
+function setup(props: { notes?: BoardNote[]; strings?: BoardString[]; actions?: Partial<BoardActions>; noMove?: boolean; extras?: BoardExtra[] } = {}) {
   const actions: BoardActions = { open: vi.fn(), ...(props.noMove ? {} : { move: vi.fn() }), ...props.actions };
-  const view = render(<BoardView label="OCR research" notes={props.notes ?? notes} strings={props.strings ?? strings} actions={actions} />);
+  const view = render(<BoardView label="OCR research" notes={props.notes ?? notes} strings={props.strings ?? strings} extras={props.extras ?? []} actions={actions} />);
   const region = screen.getByRole("application", { name: "OCR research" });
   const plane = () => region.querySelector<HTMLElement>(".board-plane")!;
   return { actions, region, plane, container: view.container, user: userEvent.setup() };
@@ -208,6 +208,32 @@ describe("BoardView", () => {
     setup({ notes: [...notes, note("Far.md", 100_000, 100_000)] });
     expect(screen.queryByRole("button", { name: /^Far,/ })).toBeNull();
     expect(noteButton(/^A,/)).toBeTruthy();
+  });
+
+  it("draws Obsidian's text cards and groups plainly: readable, not buttons, not in the Tab order; listed in the List view", async () => {
+    const box = { y: 0, width: 300, height: 200 };
+    const extras: BoardExtra[] = [
+      { id: "g", kind: "group", text: "Ideas", x: -20, ...box },
+      { id: "t", kind: "text", text: "Remember the milk\nand bread", x: 400, ...box },
+      { id: "l", kind: "link", text: "https://example.com", x: 800, ...box },
+      { id: "far", kind: "text", text: "Far away", x: 100_000, ...box },
+    ];
+    const { region, user } = setup({ extras });
+    const card = screen.getByText(/Remember the milk/);
+    const group = screen.getByText("Ideas");
+    for (const el of [card, group, screen.getByText("https://example.com")]) {
+      expect(el.closest("button, a, [tabindex], [aria-hidden]")).toBe(region); // only the region itself is focusable
+    }
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByText("Far away")).toBeNull(); // culled like notes
+    expect(screen.getAllByRole("button").some((b) => b.textContent?.includes("Remember"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "List view" }));
+    expect(within(screen.getByRole("list", { name: "Also on this board" })).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "Ideas",
+      "Remember the milk",
+      "https://example.com",
+      "Far away",
+    ]);
   });
 
   it("List view shows the same notes and their links as a plain list", async () => {

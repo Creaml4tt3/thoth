@@ -13,6 +13,8 @@
  *   does the same from the keyboard, choosing among the other notes on the board. The outcome is announced.
  * - Below 40 % the notes are coloured squares in one SVG and no note is a button; above it only notes in view are.
  *   The List view shows every note and its links as a plain list, so keyboard and screen-reader users always reach them.
+ * - `extras` (Obsidian's text and link cards, groups, other files) are drawn plainly under the notes, read-only and out of
+ *   the Tab order; the List view names them under "Also on this board".
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -24,7 +26,7 @@ import { clickOpens } from "../tabs/open-keys.ts";
 import { motionOff } from "../ui/presence.ts";
 import { Modal } from "../ui/Modal.tsx";
 import { tip } from "../ui/Tooltip.tsx";
-import type { BoardNote, BoardString } from "./model.ts";
+import type { BoardExtra, BoardNote, BoardString } from "./model.ts";
 
 export interface BoardActions {
   open(path: string, options?: OpenOptions): void;
@@ -117,7 +119,7 @@ function track(start: ReactPointerEvent, onMove: (dx: number, dy: number) => voi
   el.addEventListener("lostpointercapture", up);
 }
 
-export function BoardView({ label, notes, strings, actions }: { label: string; notes: BoardNote[]; strings: BoardString[]; actions: BoardActions }) {
+export function BoardView({ label, notes, strings, actions, extras = [] }: { label: string; notes: BoardNote[]; strings: BoardString[]; actions: BoardActions; extras?: BoardExtra[] }) {
   const t = useStrings().board;
   const help = useId();
   const region = useRef<HTMLDivElement>(null);
@@ -399,6 +401,11 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   // reorder the DOM: React would move the focused button, and Chromium blurs a moved element.
   const ordered = [...notes].sort((a, b) => a.y - b.y || a.x - b.x);
   const linked = (path: string) => strings.flatMap((s) => (s.from === path ? [s.to] : s.to === path ? [s.from] : []));
+  // One short line each: a text card's first line, a link's URL, a group's label, a file's name.
+  const listedExtras = extras.flatMap((x) => {
+    const text = Array.from(x.text.trim().split("\n")[0]!).slice(0, 140).join("");
+    return text ? [{ id: x.id, text }] : [];
+  });
 
   const toolbar = (
     <div className="board-toolbar">
@@ -449,6 +456,14 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
             );
           })}
         </ul>
+        {listedExtras.length > 0 && (
+          <div className="board-list-extras">
+            <p id={`${help}-extras`} className="board-list-heading">{t.alsoOnBoard}</p>
+            <ul aria-labelledby={`${help}-extras`}>
+              {listedExtras.map((x) => <li key={x.id}>{x.text}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
@@ -456,7 +471,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
   // Notes in view, with a margin of one note so a pan does not show them popping in.
   const [vx0, vy0] = [-view.x / view.z - NOTE_W, -view.y / view.z - NOTE_H];
   const [vx1, vy1] = [(size.w - view.x) / view.z + NOTE_W, (size.h - view.y) / view.z + NOTE_H];
-  const inView = (p: Point) => p.x + NOTE_W >= vx0 && p.x <= vx1 && p.y + NOTE_H >= vy0 && p.y <= vy1;
+  const inView = (p: Point, w = NOTE_W, h = NOTE_H) => p.x + w >= vx0 && p.x <= vx1 && p.y + h >= vy0 && p.y <= vy1;
   const paper = (n: BoardNote) => `var(--thoth-note-${n.color ?? "cream"}, var(--thoth-note-cream))`;
   const menuNote = menu && byPath.get(menu.path);
   const snapA = snap && byPath.get(snap.from);
@@ -479,6 +494,14 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
       >
         <p id={help} className="sr-only">{t.instructions}</p>
         <div className="board-plane" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+          {!squares &&
+            extras.map((x) =>
+              inView(x, x.width, x.height) ? (
+                <div key={x.id} className="board-extra" data-kind={x.kind} style={{ left: x.x, top: x.y, width: x.width, height: x.height }}>
+                  {x.text && <span className="board-extra-text">{x.text}</span>}
+                </div>
+              ) : null,
+            )}
           <svg className="board-strings" aria-hidden="true" width="1" height="1">
             {strings.map((s) => {
               const a = byPath.get(s.from);
@@ -492,6 +515,7 @@ export function BoardView({ label, notes, strings, actions }: { label: string; n
           </svg>
           {squares ? (
             <svg className="board-squares" aria-hidden="true" width="1" height="1">
+              {extras.map((x) => x.kind === "group" && <rect key={x.id} className="board-square-group" x={x.x} y={x.y} width={x.width} height={x.height} rx={8} />)}
               {notes.map((n) => {
                 const p = at(n);
                 return <rect key={n.path} x={p.x} y={p.y} width={NOTE_W} height={NOTE_H} rx={4} style={{ fill: paper(n) }} data-state={n.state} />;

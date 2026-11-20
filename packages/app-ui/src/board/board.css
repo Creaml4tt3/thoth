@@ -104,3 +104,14 @@
 .board-empty { margin: var(--thoth-space-3); color: var(--thoth-ink-secondary); }
 .board-add-option { all: unset; box-sizing: border-box; display: flex; gap: var(--thoth-space-2); width: 100%; cursor: pointer; }
 .board-add-option:focus-visible { outline: 2px solid var(--thoth-accent); outline-offset: 2px; }
+
+/* Obsidian's own nodes: drawn plainly, read-only, under the notes; a pointer goes through them to the paper. */
+.board-extra { position: absolute; box-sizing: border-box; pointer-events: none; overflow: hidden; padding: 8px 10px; border-radius: var(--thoth-radius-md); background: var(--thoth-bg-container); border: 1px solid var(--thoth-outline); color: var(--thoth-ink-primary); font: 400 12px / 1.4 var(--thoth-font-sans); }
+.board-extra-text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.board-extra[data-kind="link"], .board-extra[data-kind="file"] { color: var(--thoth-ink-secondary); }
+.board-extra[data-kind="group"] { background: transparent; border-width: 1.5px; overflow: visible; padding: 0; }
+.board-extra[data-kind="group"] .board-extra-text { position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; font: 600 13px / 1.3 var(--thoth-font-sans); color: var(--thoth-ink-secondary); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.board-squares rect.board-square-group { fill: none; stroke: var(--thoth-outline); stroke-width: 6; }
+.board-list-extras { flex: 0 1 auto; max-height: 40%; overflow: auto; padding: 0 var(--thoth-space-6) var(--thoth-space-4); border-top: 1px solid var(--thoth-border); font: var(--thoth-text-ui); color: var(--thoth-ink-secondary); }
+.board-list-extras ul { margin: 0; padding-inline-start: var(--thoth-space-6); overflow-wrap: anywhere; }
+.board-list-heading { margin: var(--thoth-space-3) 0 var(--thoth-space-1); font-weight: 600; color: var(--thoth-ink-primary); }
