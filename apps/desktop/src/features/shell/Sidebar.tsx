@@ -45,6 +45,8 @@ interface Props {
   onNewPage(): void;
   /** Creates a folder the same way. */
   onNewFolder(): void;
+  /** Page from PDF… (ADR-0055); absent without the OCR module. */
+  onPageFromPdf?: (() => void) | undefined;
   /** Opens the copy/move dialog for the selected pages. */
   onTransfer(target: TransferTarget): void;
   /** Whether the notification list under the bell is open (the palette opens it too). */
@@ -101,13 +103,14 @@ function PendingTransfers() {
  * sections in the order the person chose (SidebarSections.tsx): the Private Space's page tree with its Local badge, and
  * one section per workspace server.
  */
-export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch, onTimeline, timelineOpen, onBoard, boardOpen }: Props) {
+export function Sidebar({ hidden, favorites, pages, current, currentRemote = null, currentRun = null, onSearch, onNewPage, onNewFolder, onPageFromPdf, onTransfer, notificationsOpen, onNotificationsOpen, onHome, onSwitch, onTimeline, timelineOpen, onBoard, boardOpen }: Props) {
   const { connection, reveal, openSettings, vault, agents, askAssistant, notifications, openNotification, servers } = useSession();
   const t = useDesktopStrings().shell;
   const ttree = useStrings().tree;
   const tt = useDesktopStrings().transfer;
   const ta = useDesktopStrings().agents;
   const importFrom = useDesktopStrings().settings.importFrom;
+  const pdfLabel = useDesktopStrings().pdfToPage.command;
   const proposals = useProposalsEntry();
   const teamMemories = useTeamMemoryEntry();
   const hideLabel = useStrings().sidebar.hide;
@@ -227,6 +230,7 @@ export function Sidebar({ hidden, favorites, pages, current, currentRemote = nul
     items: [
       { id: "new-page", label: ttree.newPage, onSelect: () => requestNewPage({ parent: "" }) },
       { id: "new-folder", label: ttree.newFolder, onSelect: () => requestNewFolder({ parent: "" }) },
+      ...(onPageFromPdf ? [{ id: "page-from-pdf", label: pdfLabel, onSelect: onPageFromPdf }] : []),
     ],
     drop: rootDrop,
     dropLit: rootLit,

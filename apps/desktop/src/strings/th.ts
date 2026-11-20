@@ -276,7 +276,27 @@ export const th: DesktopStrings = {
     announceFailed: (version) => `ไม่ได้ติดตั้ง Thoth ${version}`, // REVIEW
   },
 
-  // Settings → Connected apps and the question when an app connects (ADR-0021). "Private Space" and "MCP" stay in English, as elsewhere.
+  pdfToPage: {
+    title: "หน้าจาก PDF", // REVIEW
+    command: "หน้าจาก PDF…", // REVIEW
+    reading: "กำลังอ่าน PDF…", // REVIEW
+    progress: (page, pages) => `หน้า ${count(page)} จาก ${count(pages)}`, // REVIEW
+    limit: "ได้สูงสุด 50 หน้าและ 50 MB หน้าที่มีข้อความอยู่แล้วจะอ่านตามนั้น หน้าอื่นอ่านด้วย OCR บนคอมพิวเตอร์เครื่องนี้", // REVIEW
+    cancel: "ยกเลิก", // REVIEW
+    close: "ปิด", // REVIEW
+    openSettings: "เปิดการตั้งค่า", // REVIEW
+    notInstalled: "ยังไม่ได้ดาวน์โหลด OCR ดาวน์โหลดได้ที่ การตั้งค่า → โมดูล แล้วลองอีกครั้ง", // REVIEW
+    tooLarge: "PDF นี้ใหญ่เกิน 50 MB", // REVIEW
+    badFile: "อ่านไฟล์นี้เป็น PDF ไม่ได้", // REVIEW
+    timeout: "อ่านนานเกินไปจึงหยุดแล้ว ไม่ได้สร้างหน้าใด", // REVIEW
+    failed: "อ่าน PDF ไม่ได้ ไม่ได้สร้างหน้าใด", // REVIEW
+    untitled: "ไฟล์ PDF", // REVIEW
+    importedFrom: "นำเข้าจาก ", // REVIEW
+    firstPages: (read, total) => `อ่านเฉพาะ ${count(read)} หน้าแรกจากทั้งหมด ${count(total)} หน้า`, // REVIEW
+    pageHeading: (n) => `หน้า ${count(n)}`, // REVIEW
+  },
+
+  // Settings → Modules: the OCR module (ADR-0055).
   modules: {
     title: "โมดูล", // REVIEW
     ocrTitle: "OCR (ภาษาไทยและอังกฤษ)", // REVIEW

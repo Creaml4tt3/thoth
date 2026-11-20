@@ -129,7 +129,7 @@ export interface Commands {
   "watch.start": { args: { vault: string }; result: null };
   "watch.stop": { args: { vault: string }; result: null };
 
-  "source.pick": { args: { kind: "file" | "directory" }; result: string | null };
+  "source.pick": { args: { kind: "file" | "directory" | "pdf" }; result: string | null };
   "source.open": { args: { location: string }; result: { source: string; rootKind: "file" | "directory"; label: string; location: string } };
   "source.list": { args: { source: string; dir: string }; result: SourceDirEntry[] };
   "source.file.open": { args: { source: string; path: string }; result: { file: string; size: number } };
@@ -264,7 +264,7 @@ export interface Commands {
    * Request bytes: the image (PNG or JPEG, up to 20 MB) or the PDF (up to 50 MB; the first 50 pages). `model` omitted:
    * Fast if it is downloaded, else Second opinion. Pages read come as `ocr.progress`.
    */
-  "ocr.read": { args: { kind: "image" | "pdf"; model?: OcrModel }; result: { model: OcrModel; pages: { text: string; source: "ocr" | "text" }[] } };
+  "ocr.read": { args: { kind: "image" | "pdf"; model?: OcrModel }; result: { model: OcrModel; pages: { text: string; source: "ocr" | "text" }[]; total?: number } };
   /** Stops the read going (it answers `OCR_CANCELLED`). */
   "ocr.cancel": { args: Record<string, never>; result: null };
   // ---- Connected apps (ADR-0021). Desktop only: other apps read shared Private Spaces through `thoth-mcp`.

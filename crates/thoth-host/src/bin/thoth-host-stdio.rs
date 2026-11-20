@@ -59,6 +59,10 @@ impl Picker for FixedPicker {
     fn pick_image(&self) -> Option<PathBuf> {
         self.image.clone()
     }
+    /// `--pick-source` answers the PDF picker too.
+    fn pick_pdf(&self) -> Option<PathBuf> {
+        self.source.clone()
+    }
     /// `--pick-save <dir>`: saves into that folder under the suggested name.
     fn pick_save(&self, name: &str) -> Option<PathBuf> {
         self.save.as_ref().map(|dir| dir.join(name))

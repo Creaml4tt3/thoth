@@ -37,6 +37,7 @@ import { hasOtherWritableWorkspace } from "@thoth/app-ui/transfer/targets.ts";
 import { useEditorActions } from "@thoth/app-ui/keyboard/editor-actions.ts";
 import { ShortcutsDialog } from "@thoth/app-ui/keyboard/ShortcutsDialog.tsx";
 import { DesktopFeedbackDialog } from "../feedback/Feedback.tsx";
+import { PdfToPage } from "../modules/PdfToPage.tsx";
 import { requestMoveTo } from "@thoth/app-ui/order/move-to.ts";
 import { requestDuplicate } from "@thoth/app-ui/order/duplicate.ts";
 import { requestShare } from "@thoth/app-ui/workspace/share-request.ts";
@@ -73,7 +74,7 @@ import { openBoardFromPage } from "../board/from-page.ts";
 
 const noSubscribe = () => () => undefined;
 
-type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
+type Dialog = { kind: "search" } | { kind: "shortcuts" } | { kind: "feedback" } | { kind: "pdf" } | { kind: "rename"; target: RenameTarget } | { kind: "transfer"; target: TransferTarget } | null;
 
 /** What startup recovery did, said once (ADR-0006 §7: an interrupted transfer is never silent). */
 function RecoveryNotice() {
@@ -110,6 +111,7 @@ export function Shell() {
   const { platform: host, vault, connection, revision, refresh, watchError, openPage, openSettings, openWorkspacePage, flushAll, tabs, servers, assistant, agents, windowId, switchVault, recent: recentStore } = useSession();
   const t = useDesktopStrings().shell;
   const sessionTitle = useDesktopStrings().agents.session.tab;
+  const pdfStrings = useDesktopStrings().pdfToPage;
   // Session tabs are named by their run's task.
   const runs = useSyncExternalStore(agents?.subscribe ?? noSubscribe, () => agents?.getState() ?? null);
   const strings = useStrings();
@@ -342,6 +344,7 @@ export function Shell() {
     theme: { current: themeNow, set: setTheme },
     openSettings: () => openSettings(),
     importPages: () => openSettings("import"),
+    ...(host.modules ? { pageFromPdf: { label: pdfStrings.command, run: () => setDialog({ kind: "pdf" }) } } : {}),
     ...(assistant
       ? { askAssistant: () => assistant.ask(), toggleAssistantSize: () => assistant.toggleSize(), openAssistantSettings: () => openSettings("agents") }
       : {}),
@@ -576,7 +579,7 @@ export function Shell() {
     <HintContext value={hints}>
     <FavoritesContext value={favorites.api}>
     <div className="shell" ref={shell} style={sidebar.style} data-sidebar-hidden={side.hidden ? "" : undefined} data-sidebar-moving={side.moving ? "" : undefined}>
-      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} onTimeline={openTimeline} timelineOpen={target.kind === "timeline"} onBoard={openBoard} boardOpen={target.kind === "board"} />
+      <Sidebar hidden={side} favorites={favorites} pages={pages ?? []} current={path} currentRemote={remote} currentRun={target.kind === "agent-run" ? target.run : null} onSearch={() => setDialog({ kind: "search" })} onNewPage={() => requestNewPage()} onNewFolder={() => requestNewFolder()} onPageFromPdf={host.modules ? () => setDialog({ kind: "pdf" }) : undefined} onTransfer={transfer} notificationsOpen={notificationsOpen} onNotificationsOpen={setNotificationsOpen} onHome={leave} onSwitch={switchTo} onTimeline={openTimeline} timelineOpen={target.kind === "timeline"} onBoard={openBoard} boardOpen={target.kind === "board"} />
       <main className="main">
         <Panes
           tabs={tabs}
@@ -652,6 +655,7 @@ export function Shell() {
       {dialog?.kind === "search" && <SearchPalette commands={buildCommands(makeActions(), strings, "desktop", platform)} onRun={runCommand} onClose={() => setDialog(null)} />}
       {dialog?.kind === "shortcuts" && <ShortcutsDialog client="desktop" platform={platform} onClose={() => setDialog(null)} />}
       {dialog?.kind === "feedback" && <DesktopFeedbackDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === "pdf" && host.modules && <PdfToPage modules={host.modules} onClose={() => setDialog(null)} />}
       {dialog?.kind === "rename" && <RenamePage target={dialog.target} onClose={() => setDialog(null)} />}
       {dialog?.kind === "transfer" && (
         <Suspense fallback={null}>

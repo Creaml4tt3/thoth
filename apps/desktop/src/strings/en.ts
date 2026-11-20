@@ -309,7 +309,28 @@ export const en = {
     announceFailed: (version: string) => `Thoth ${version} was not installed.`,
   },
 
-  /** Settings → Connected apps, and the question when an app connects (ADR-0021). */
+  /** Page from PDF… (ADR-0055): a page from a PDF's own text, or its OCR. */
+  pdfToPage: {
+    title: "Page from PDF",
+    command: "Page from PDF…",
+    reading: "Reading the PDF…",
+    progress: (page: number, pages: number) => `Page ${page} of ${pages}`,
+    limit: "Up to 50 pages and 50 MB. Pages with their own text are read as they are; the rest with OCR, on this computer.",
+    cancel: "Cancel",
+    close: "Close",
+    openSettings: "Open Settings",
+    notInstalled: "OCR isn't downloaded yet. Download it in Settings → Modules, then try again.",
+    tooLarge: "This PDF is larger than 50 MB.",
+    badFile: "This file can't be read as a PDF.",
+    timeout: "Reading took too long and was stopped. Nothing was created.",
+    failed: "The PDF could not be read. Nothing was created.",
+    untitled: "PDF",
+    importedFrom: "Imported from ",
+    firstPages: (read: number, total: number) => `Only the first ${read} of ${total} pages were read.`,
+    pageHeading: (n: number) => `Page ${n}`,
+  },
+
+  /** Settings → Modules: the OCR module (ADR-0055). */
   modules: {
     title: "Modules",
     ocrTitle: "OCR (Thai and English)",

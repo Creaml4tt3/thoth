@@ -153,7 +153,7 @@ fn model_arg(args: &Value) -> HostResult<ModelId> {
 /// The real test: the program reads the image, and every phrase must be in its text.
 fn run_test(program: &Program, image: &[u8], expect: &[String]) -> bool {
     let runner = Runner::new(runner::IDLE);
-    let Ok(pages) = runner.run(program, Kind::Image, image, &mut |_, _| {}) else { return false };
+    let Ok((pages, _)) = runner.run(program, Kind::Image, image, &mut |_, _| {}) else { return false };
     let text: String = pages.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join("\n");
     expect.iter().all(|e| text.contains(e.as_str()))
 }
@@ -423,8 +423,12 @@ impl Modules {
         store.verify(Dest::Model(id))?;
         let program = self.program(id, &preset)?;
         let events = self.events.clone();
-        let pages = self.runner.run(&program, kind, bytes, &mut |page, pages| events(OCR_PROGRESS_EVENT, json!({ "page": page, "pages": pages })))?;
-        Ok(json!({ "model": id.as_str(), "pages": pages.iter().map(|p| json!({ "text": p.text, "source": p.source })).collect::<Vec<_>>() }))
+        let (pages, total) = self.runner.run(&program, kind, bytes, &mut |page, pages| events(OCR_PROGRESS_EVENT, json!({ "page": page, "pages": pages })))?;
+        let pages: Vec<Value> = pages.iter().map(|p| json!({ "text": p.text, "source": p.source })).collect();
+        Ok(match total {
+            Some(total) => json!({ "model": id.as_str(), "pages": pages, "total": total }),
+            None => json!({ "model": id.as_str(), "pages": pages }),
+        })
     }
 
     /// `ocr.cancel`.

@@ -86,6 +86,8 @@ fn a_pdf_uses_its_good_text_and_ocrs_the_rest() {
         let (lines, code) = run(&models, "openthai", &format!(r#"{{"op":"pdf","len":{},"maxPages":1}}"#, pdf.len()), &pdf);
         assert_eq!(code, 0, "{file}: {lines:?}");
         assert_eq!((lines[0]["page"].as_u64(), lines[0]["pages"].as_u64()), (Some(1), Some(1)), "{file}");
+        // The done line says how many pages the file has, read or not.
+        assert!(lines.last().unwrap()["total"].as_u64().is_some_and(|t| t >= 1), "{file}");
         assert_eq!(lines[0]["source"], source, "{file}");
         assert!(!lines[0]["text"].as_str().unwrap().is_empty(), "{file}");
         assert_eq!(lines.len(), 2, "{file}: maxPages 1 gives one page and done");

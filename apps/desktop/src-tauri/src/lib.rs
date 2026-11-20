@@ -249,6 +249,10 @@ impl Picker for DialogPicker {
         picked?.into_path().ok()
     }
 
+    fn pick_pdf(&self) -> Option<PathBuf> {
+        self.app.dialog().file().set_title("Make a page from a PDF").add_filter("PDF", &["pdf"]).blocking_pick_file()?.into_path().ok()
+    }
+
     fn pick_image(&self) -> Option<PathBuf> {
         self.app.dialog().file().set_title("Add an image").add_filter("Images", thoth_host::IMAGE_EXTENSIONS).blocking_pick_file()?.into_path().ok()
     }

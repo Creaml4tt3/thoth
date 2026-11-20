@@ -115,6 +115,10 @@ pub trait Picker: Send + Sync {
     fn pick_image(&self) -> Option<PathBuf> {
         None
     }
+    /// A PDF to make a page from (ADR-0055, `source.pick { kind: "pdf" }`). None: cancelled, or no picker (the default).
+    fn pick_pdf(&self) -> Option<PathBuf> {
+        None
+    }
     /// Where to save a downloaded page (`file.save`): a "Save as" dialog that starts with `name`. None: cancelled, or no
     /// dialog (the default).
     fn pick_save(&self, _name: &str) -> Option<PathBuf> {
@@ -442,12 +446,13 @@ impl Host {
                 null()
             }
             "source.pick" => {
-                let directory = match str_arg(args, "kind")? {
-                    "file" => false,
-                    "directory" => true,
-                    _ => return Err(HostError::bad_argument("kind must be \"file\" or \"directory\"")),
+                let picked = match str_arg(args, "kind")? {
+                    "file" => self.config.picker.pick_source(false),
+                    "directory" => self.config.picker.pick_source(true),
+                    "pdf" => self.config.picker.pick_pdf(),
+                    _ => return Err(HostError::bad_argument("kind must be \"file\", \"directory\" or \"pdf\"")),
                 };
-                json(self.pick_source(directory))
+                json(self.allow_source(picked))
             }
             "source.open" => json(self.open_source(str_arg(args, "location")?)?),
             "source.list" => {
@@ -937,8 +942,9 @@ impl Host {
 
     // ------------------------------------------------------------ sources
 
-    fn pick_source(&self, directory: bool) -> Value {
-        let Some(picked) = self.config.picker.pick_source(directory) else { return Value::Null };
+    /// A picked import source or PDF joins the allow-list for `source.open`; the page gets its path to open it with.
+    fn allow_source(&self, picked: Option<PathBuf>) -> Value {
+        let Some(picked) = picked else { return Value::Null };
         let Ok(location) = canonicalize_path(&picked) else { return Value::Null };
         let shown = location.to_string_lossy().into_owned();
         self.state().picked_sources.insert(location);

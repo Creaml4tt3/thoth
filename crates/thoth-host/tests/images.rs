@@ -124,3 +124,46 @@ fn a_picked_image_that_grew_past_the_cap_is_not_read() {
     std::fs::OpenOptions::new().write(true).open(&file).unwrap().set_len(MAX_IMAGE_BYTES + 1).unwrap();
     assert_eq!(host.call("image.read", &json!({ "image": handle }), None).unwrap_err().code, "TOO_LARGE");
 }
+
+/// Answers only the PDF picker (Page from PDF…, ADR-0055).
+struct PdfPicker(PathBuf);
+impl Picker for PdfPicker {
+    fn pick_vault(&self) -> Option<PathBuf> {
+        None
+    }
+    fn pick_source(&self, _: bool) -> Option<PathBuf> {
+        None
+    }
+    fn pick_pdf(&self) -> Option<PathBuf> {
+        Some(self.0.clone())
+    }
+}
+
+#[test]
+fn a_picked_pdf_can_be_opened_and_nothing_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = dir.path().join("Statement.pdf");
+    let other = dir.path().join("Other.pdf");
+    std::fs::write(&pdf, b"%PDF-1.7").unwrap();
+    std::fs::write(&other, b"%PDF-1.7").unwrap();
+    let host = Host::new(HostConfig {
+        data_dir: None,
+        allow_roots: vec![],
+        picker: Arc::new(PdfPicker(pdf.clone())),
+        events: Arc::new(|_, _| {}),
+        disable_hardlink: false,
+        secrets: Arc::new(MemorySecretStore::default()),
+        browser: Arc::new(Nothing),
+        file_manager: Arc::new(Nothing),
+        agent_search_dirs: None,
+        link_preview_loopback: false,
+    });
+    // The archive picker is not the PDF picker.
+    assert_eq!(host.call("source.pick", &json!({ "kind": "file" }), None).unwrap().0, Value::Null);
+    let picked = host.call("source.pick", &json!({ "kind": "pdf" }), None).unwrap().0;
+    let location = picked.as_str().unwrap();
+    let opened = host.call("source.open", &json!({ "location": location }), None).unwrap().0;
+    assert_eq!(opened["rootKind"], "file");
+    assert_eq!(host.call("source.open", &json!({ "location": other.to_string_lossy() }), None).unwrap_err().code, "NOT_ALLOWED");
+    assert_eq!(host.call("source.pick", &json!({ "kind": "zip" }), None).unwrap_err().code, "BAD_ARGUMENT");
+}

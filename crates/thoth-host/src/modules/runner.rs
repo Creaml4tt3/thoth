@@ -59,8 +59,9 @@ impl Runner {
         locked(&self.job).is_some()
     }
 
-    /// Runs one job. `progress(page, pages)` after each page. `OCR_BUSY` while another runs.
-    pub fn run(&self, program: &Program, kind: Kind, bytes: &[u8], progress: &mut dyn FnMut(usize, usize)) -> HostResult<Vec<Page>> {
+    /// Runs one job: its pages, and a PDF's page count (more than the pages read past `MAX_PDF_PAGES`).
+    /// `progress(page, pages)` after each page. `OCR_BUSY` while another runs.
+    pub fn run(&self, program: &Program, kind: Kind, bytes: &[u8], progress: &mut dyn FnMut(usize, usize)) -> HostResult<(Vec<Page>, Option<usize>)> {
         let limit = if kind == Kind::Image { MAX_IMAGE_BYTES } else { MAX_PDF_BYTES };
         if bytes.len() > limit {
             return Err(HostError::new("OCR_TOO_LARGE", "The file is too large to read"));
@@ -99,7 +100,14 @@ impl Runner {
         result
     }
 
-    fn supervise(&self, child: &mut Child, group: Option<i32>, kind: Kind, bytes: &[u8], progress: &mut dyn FnMut(usize, usize)) -> HostResult<Vec<Page>> {
+    fn supervise(
+        &self,
+        child: &mut Child,
+        group: Option<i32>,
+        kind: Kind,
+        bytes: &[u8],
+        progress: &mut dyn FnMut(usize, usize),
+    ) -> HostResult<(Vec<Page>, Option<usize>)> {
         let failed = |m: &str| HostError::new("OCR_FAILED", m.to_owned());
         let header = match kind {
             Kind::Image => json!({ "op": "image", "len": bytes.len() }),
@@ -135,7 +143,7 @@ impl Runner {
             };
             let value: Value = serde_json::from_str(&line).map_err(|_| failed("OCR answered something it should not"))?;
             if value.get("done") == Some(&Value::Bool(true)) {
-                return Ok(pages);
+                return Ok((pages, value.get("total").and_then(Value::as_u64).map(|t| t as usize)));
             }
             if let Some(error) = value.get("error").and_then(Value::as_str) {
                 return Err(match error {
@@ -185,14 +193,15 @@ mod tests {
 
     const TWO_PAGES: &str = r#"echo '{"page":1,"pages":2,"source":"text","text":"one"}'
 echo '{"page":2,"pages":2,"source":"ocr","text":"two"}'
-echo '{"done":true}'"#;
+echo '{"done":true,"total":70}'"#;
 
     #[test]
     fn reads_every_page_and_reports_progress() {
         let dir = tempfile::tempdir().unwrap();
         let p = fake(dir.path(), TWO_PAGES);
         let mut seen = Vec::new();
-        let pages = Runner::new(IDLE).run(&p, Kind::Pdf, b"%PDF", &mut |i, n| seen.push((i, n))).unwrap();
+        let (pages, total) = Runner::new(IDLE).run(&p, Kind::Pdf, b"%PDF", &mut |i, n| seen.push((i, n))).unwrap();
+        assert_eq!(total, Some(70));
         assert_eq!(pages, vec![Page { text: "one".into(), source: "text".into() }, Page { text: "two".into(), source: "ocr".into() }]);
         assert_eq!(seen, vec![(1, 2), (2, 2)]);
     }
@@ -275,7 +284,8 @@ echo '{"done":true}'"#;
         let dir = tempfile::tempdir().unwrap();
         let mut p = fake(dir.path(), r#"printf '{"page":1,"pages":1,"source":"ocr","text":"%s|%s"}\n' "$*" "$ORT_DYLIB_PATH"; echo '{"done":true}'"#);
         p.ort = Some(dir.path().join("libonnxruntime.dylib"));
-        let pages = Runner::new(IDLE).run(&p, Kind::Image, b"x", &mut |_, _| {}).unwrap();
+        let (pages, total) = Runner::new(IDLE).run(&p, Kind::Image, b"x", &mut |_, _| {}).unwrap();
+        assert_eq!(total, None);
         assert_eq!(pages[0].text, format!("serve --models {} --preset openthai|{}", dir.path().display(), dir.path().join("libonnxruntime.dylib").display()));
     }
 }

@@ -46,8 +46,8 @@ export interface Platform {
   inspectFolder?(root: string): Promise<FolderContents>;
   /** Opens a vault root the user picked (or one from `recentVaults`); the host refuses any other path. */
   openVault(root: string): Promise<VaultConnection>;
-  /** Native picker for an import source: an archive file or a folder. */
-  pickImportSource(kind: "file" | "directory"): Promise<string | null>;
+  /** Native picker for an import source: an archive file, a folder, or a PDF to make a page from (ADR-0055). */
+  pickImportSource(kind: "file" | "directory" | "pdf"): Promise<string | null>;
   openImportSource(location: string): Promise<SourceHost>;
   /**
    * Native picker for an image to add to a page (ADR-0028): its file name and bytes, or null when cancelled. Absent
@@ -123,7 +123,8 @@ export interface Modules {
   remove(model: OcrModel): Promise<ModuleStatus>;
   setAutoUpdate(on: boolean): Promise<ModuleStatus>;
   /** The text of an image or a PDF, page by page. Rejects with `OCR_*` codes. */
-  read(kind: "image" | "pdf", bytes: Uint8Array, model?: OcrModel): Promise<{ model: OcrModel; pages: { text: string; source: "ocr" | "text" }[] }>;
+  /** `total`: a PDF's page count (more than the pages read past 50). */
+  read(kind: "image" | "pdf", bytes: Uint8Array, model?: OcrModel): Promise<{ model: OcrModel; pages: { text: string; source: "ocr" | "text" }[]; total?: number }>;
   cancelRead(): Promise<void>;
   /** The host's `module.progress` events (the whole status). */
   onProgress(listener: (status: ModuleStatus) => void): Promise<() => void>;

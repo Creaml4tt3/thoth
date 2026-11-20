@@ -41,8 +41,9 @@ fn main() {
             let mut out = BufWriter::new(std::io::stdout().lock());
             let res = serve(Path::new(dir), preset, &mut std::io::stdin().lock(), &mut out);
             let code = match res {
-                Ok(()) => {
-                    let _ = writeln!(out, "{}", json!({"done": true}));
+                // A PDF's done line also gives its page count, so the app can say when only the first pages were read.
+                Ok(total) => {
+                    let _ = writeln!(out, "{}", total.map_or_else(|| json!({"done": true}), |t| json!({"done": true, "total": t})));
                     0
                 }
                 Err(Fail(kind, message)) => {
@@ -61,7 +62,8 @@ fn main() {
     std::process::exit(code);
 }
 
-fn serve(models: &Path, preset: &str, input: &mut impl std::io::Read, out: &mut impl Write) -> Result<(), Fail> {
+/// Ok: the PDF's page count (None for an image).
+fn serve(models: &Path, preset: &str, input: &mut impl std::io::Read, out: &mut impl Write) -> Result<Option<usize>, Fail> {
     let request = protocol::read_request(input).map_err(|e| match e {
         ProtoError::TooLarge => Fail("too-large", "the file is over the size limit".into()),
         ProtoError::BadRequest(m) => Fail("bad-request", m),
@@ -73,11 +75,13 @@ fn serve(models: &Path, preset: &str, input: &mut impl std::io::Read, out: &mut 
             let img = image::load_from_memory(&bytes).map_err(|e| Fail("bad-image", e.to_string()))?.to_rgb8();
             let ocr = build(models, preset)?;
             page_line(out, 1, 1, "ocr", &read(&ocr, img)?)?;
+            Ok(None)
         }
         Request::Pdf { bytes, max_pages } => {
             let doc = pdf::open(bytes).map_err(|m| Fail("bad-pdf", m))?;
             let ocr = build(models, preset)?;
-            let pages = doc.pages().len().min(max_pages);
+            let total = doc.pages().len();
+            let pages = total.min(max_pages);
             for i in 0..pages {
                 let text = pdf::text_layer(&doc, i);
                 if textcheck::check(&text).verdict() != "broken" && !text.trim().is_empty() {
@@ -87,9 +91,9 @@ fn serve(models: &Path, preset: &str, input: &mut impl std::io::Read, out: &mut 
                     page_line(out, i + 1, pages, "ocr", &read(&ocr, img)?)?;
                 }
             }
+            Ok(Some(total))
         }
     }
-    Ok(())
 }
 
 fn build(dir: &Path, preset: &str) -> Result<OAROCR, Fail> {
