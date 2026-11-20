@@ -22,7 +22,8 @@ export interface Harness {
 configure({ asyncUtilTimeout: 5000 });
 
 // No starter server: tests that want one pass it, so no test depends on the real demo address.
-export const TEST_OPTIONS: Partial<AppOptions> = { autosaveMs: 0, reconcileDebounceMs: 15, starterServer: null };
+// The picker at launch: a test that wants the last Private Space reopened says so (reopenLast: true).
+export const TEST_OPTIONS: Partial<AppOptions> = { autosaveMs: 0, reconcileDebounceMs: 15, starterServer: null, reopenLast: false };
 
 export async function openApp(root: string, options: Partial<AppOptions> = {}, platform = createNodePlatform({ vault: root })): Promise<Harness> {
   const user = userEvent.setup();

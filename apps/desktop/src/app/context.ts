@@ -36,6 +36,8 @@ export interface AppOptions {
   notifier: SystemNotifier;
   /** How long the mascot's message after a run stays up. */
   messageMs: number;
+  /** Open the Private Space of the last session at launch (ADR-0029, 2026-11-20); tests of the picker turn it off. */
+  reopenLast?: boolean;
   /** The update notice (ADR-0022): time from the start to its first check, and between checks after that. */
   updateDelayMs: number;
   updateIntervalMs: number;

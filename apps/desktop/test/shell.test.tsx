@@ -7,6 +7,7 @@ import { cleanup, editorBox, openApp, screen, waitFor, within, openSettingsAt } 
 import { createNodePlatform, tempDirs } from "./support/node-platform.ts";
 import { ALPHA, BETA, seed } from "./support/fixtures.ts";
 import { WELCOME_RECORD } from "../src/features/onboarding/welcome.ts";
+import { loadLastSpace, saveLastSpace } from "../src/app/last-space.ts";
 import { axeViolations } from "../../../tests/helpers/axe.ts";
 
 const tauriPlatform = createNodePlatform();
@@ -21,10 +22,49 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   cleanup();
+  saveLastSpace(null);
   await dirs.cleanup();
 });
 
 describe("onboarding", () => {
+  it("reopens the Private Space open when the app quit; Back to Private Spaces makes the next launch show the picker", async () => {
+    const { App } = await import("../src/app/App.tsx");
+    const { render } = await import("@testing-library/react");
+    const { userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    const first = render(<App platform={createNodePlatform({ vault: root })} />);
+    await user.click(await screen.findByRole("button", { name: /open a folder you already use/i }));
+    await screen.findByRole("tree");
+    first.unmount();
+
+    // Launch again: straight into it, no picker.
+    const second = render(<App platform={createNodePlatform({ vault: root })} />);
+    expect(await screen.findByRole("tree")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /open a folder you already use/i })).toBeNull();
+    await user.click(screen.getAllByRole("button", { name: /back to private spaces/i })[0]!);
+    await screen.findByRole("button", { name: /open a folder you already use/i });
+    second.unmount();
+
+    // Left on purpose: the next launch shows the picker.
+    render(<App platform={createNodePlatform({ vault: root })} />);
+    expect(await screen.findByRole("button", { name: /open a folder you already use/i })).toBeTruthy();
+  });
+
+  it("a last Private Space that can't be opened shows the picker with why, and is forgotten", async () => {
+    saveLastSpace(`${root}/gone`);
+    const platform = createNodePlatform({ vault: root });
+    // As the host answers for a folder that was deleted or is on a drive that is not plugged in.
+    platform.openVault = async () => {
+      throw new Error("The folder could not be found");
+    };
+    const { App } = await import("../src/app/App.tsx");
+    const { render } = await import("@testing-library/react");
+    render(<App platform={platform} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("could not be found");
+    expect(screen.getByRole("button", { name: /open a folder you already use/i })).toBeTruthy();
+    expect(loadLastSpace()).toBeNull();
+  });
+
   it("explains the local-first promise and lists recent Private Spaces", async () => {
     const platform = createNodePlatform({ vault: null });
     platform.recent = [root];
