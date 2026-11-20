@@ -13,7 +13,7 @@
 # tract engine instead (ADR-0055 Decision 2 fallback, feature `tract`) with the patched detectors in the model list.
 #
 # runtime.json is a workflow artifact (job "prepare"): after a real publish a person commits it as
-# crates/thoth-host/src/modules/runtime.json. Nothing is uploaded unless the run is a tag or publish is on.
+# crates/thoth-host/src/modules/runtime.json. Nothing is uploaded unless the run is an `ocr-v*` tag or a run by hand with publish on.
 #
 # Actions are pinned to the same commit SHAs as release-desktop.yml.
 name: Release OCR module
@@ -21,6 +21,15 @@ name: Release OCR module
 on:
   push:
     tags: ["ocr-v*"]
+  # A pull request that touches the module builds and checks it (never publishes): workflow_dispatch only reaches a
+  # workflow that is already on main.
+  pull_request:
+    paths:
+      - ".github/workflows/release-ocr.yml"
+      - "crates/thoth-ocr/**"
+      - "modules/**"
+      - "scripts/ocr/**"
+      - "scripts/publish-modules.ts"
   workflow_dispatch:
     inputs:
       publish:
@@ -203,7 +212,7 @@ jobs:
   publish:
     name: Sign and publish to R2
     needs: [prepare]
-    if: github.event_name == 'push' || inputs.publish
+    if: startsWith(github.ref, 'refs/tags/ocr-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: downloads
