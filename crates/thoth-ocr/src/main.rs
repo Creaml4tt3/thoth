@@ -93,18 +93,38 @@ fn serve(models: &Path, preset: &str, input: &mut impl std::io::Read, out: &mut 
 }
 
 fn build(dir: &Path, preset: &str) -> Result<OAROCR, Fail> {
-    // Loaded explicitly so a missing or wrong library is a plain error, not a panic inside ort.
-    let lib = std::env::var_os("ORT_DYLIB_PATH").ok_or_else(|| Fail("failed", "ORT_DYLIB_PATH is not set".into()))?;
-    ort::init_from(lib)?.commit();
+    #[cfg(feature = "tract")]
+    ort::set_api(ort_tract::api());
+    #[cfg(not(feature = "tract"))]
+    {
+        // Loaded explicitly so a missing or wrong library is a plain error, not a panic inside ort.
+        let lib = std::env::var_os("ORT_DYLIB_PATH").ok_or_else(|| Fail("failed", "ORT_DYLIB_PATH is not set".into()))?;
+        ort::init_from(lib)?.commit();
+    }
     let builder = match preset {
         "openthai" => OAROCRBuilder::openthai_from_dir(dir),
         "pp5" => OAROCRBuilder::new(dir.join("det.onnx"), dir.join("rec.onnx"), dir.join("dict.txt")),
         _ => return Err(Fail("bad-request", format!("unknown preset {preset}"))),
     };
+    // tract's detectors take a fixed square: pad the long side, as Phase 0 measured.
+    #[cfg(feature = "tract")]
+    let builder = builder.detection_preprocessing(oar_ocr::oarocr::DetectionPreprocessing::PaddedLongSide);
     Ok(builder.build()?)
 }
 
+/// Pad to a white square at the top left, so the padded-long-side detector input is the square tract's detector expects.
+/// shortcut: pages under ~290 px get a smaller detector input and fail on tract; upscale them first if that matters.
+#[cfg(feature = "tract")]
+fn pad_square(img: image::RgbImage) -> image::RgbImage {
+    let side = img.width().max(img.height());
+    let mut out = image::RgbImage::from_pixel(side, side, image::Rgb([255; 3]));
+    image::imageops::replace(&mut out, &img, 0, 0);
+    out
+}
+
 fn read(ocr: &OAROCR, img: image::RgbImage) -> Result<String, Fail> {
+    #[cfg(feature = "tract")]
+    let img = pad_square(img);
     let (page, rows) = ocr.predict_with_rows(vec![img])?.pop().ok_or_else(|| Fail("failed", "no result".into()))?;
     Ok(page.text_by_rows(&rows)?)
 }

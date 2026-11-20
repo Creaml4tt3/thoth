@@ -155,6 +155,37 @@ To try an update locally: build two debug versions with `THOTH_UPDATE_URL=http:/
 with a throwaway key (never committed), and serve the newer one's files and `latest.json` from that port. A release
 build refuses an `http` address.
 
+## OCR module
+
+OCR (ADR-0055) is a separate download, not part of the installers. `.github/workflows/release-ocr.yml` builds it on an
+`ocr-v*` tag (or by hand) and puts it under `https://download.thothnotes.com/modules/`:
+
+- `modules/ocr/<version>/<target>/`: `thoth-ocr` (crates/thoth-ocr, its own Cargo workspace), the ONNX Runtime 1.28.0
+  library and `NOTICE.txt`. This is code, so it changes only with an app update: the app has the files' URLs and
+  SHA-256 compiled in (`crates/thoth-host/src/modules/runtime.json`). ONNX Runtime comes from Microsoft's NuGet package
+  (pinned by SHA-256 in the workflow). Intel Macs get no ONNX Runtime: 1.28.0 has no x86_64 macOS build, so their
+  `thoth-ocr` is built with the pure-Rust tract engine (`--features tract`), which needs the patched detectors.
+- `modules/models/<id>/<version>/`: the model files, downloaded from Hugging Face at the revisions in
+  `tools/ocr-spike/models.lock` and checked against it (`scripts/ocr/stage-models.sh`).
+- `modules/models.json` + `models.json.sig`: the model list, from `modules/models.json` (the unsigned source; raise its
+  `serial` for every publish), signed with its own key. The app reads it to offer newer models without an app update.
+
+Every file is gzip; the list and `runtime.json` give the size and SHA-256 of the `.gz`. Before anything is published,
+each built program reads `modules/ocr-test.png` with both models on its own platform (Intel under Rosetta 2).
+
+**Try it without publishing:** `gh workflow run release-ocr.yml --ref <branch> -f publish=false`. The `runtime-json`
+artifact holds what a publish would write.
+
+**Signing key, once** (the owner, not an agent): `pnpm --filter @thoth/desktop tauri signer generate -w
+~/.thoth-modules-signing.key` with a password; `gh secret set THOTH_MODULES_SIGNING_KEY < ~/.thoth-modules-signing.key`
+and `gh secret set THOTH_MODULES_SIGNING_KEY_PASSWORD`; the public key goes into
+`crates/thoth-host/src/modules/modules.pub`. Back both up as for the updater key. A lost key is not fatal: the next app
+update carries a new public key, and until then apps keep the models they have.
+
+**Publishing:** tag `ocr-v<version>` (the `thoth-ocr` crate version) and push it. Then commit the run's `runtime.json`
+as `crates/thoth-host/src/modules/runtime.json` in a pull request: until then the app says "OCR isn't available in this
+build". A published file never changes; a new model is a new version folder and a higher `serial`.
+
 ## Package managers
 
 Both take the installers straight from `download.thothnotes.com` over HTTPS, at the versioned path, with no redirect.

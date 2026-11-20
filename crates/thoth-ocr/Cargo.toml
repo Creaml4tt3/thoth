@@ -9,11 +9,18 @@ publish = false
 
 [workspace]
 
+[features]
+# Intel Macs only (ADR-0055 Decision 2 fallback): ONNX Runtime 1.28.0 has no x86_64 macOS build, so the pure-Rust
+# tract engine runs the models there. Its detectors must be the patched, square-input files the model list names.
+tract = ["dep:ort-tract", "ort/alternative-backend"]
+
 [dependencies]
 # Pinned together (ADR-0055 Decision 7): 0.10.3 is the last oar-ocr on ort rc.13.
 oar-ocr = { version = "=0.10.3", default-features = false, features = ["simd"] }
 # ONNX Runtime 1.28.0 is loaded at run time from ORT_DYLIB_PATH (the library comes in the module download).
 ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "load-dynamic"] }
+# The ort that ort-tract 0.4.1 implements (ADR-0055 Decision 7).
+ort-tract = { version = "=0.4.1", optional = true }
 hayro = { version = "=0.9.0" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }
