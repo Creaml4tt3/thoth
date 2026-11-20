@@ -140,6 +140,26 @@ export const en = {
       addFailed: (detail: string) => `Could not add the image: ${detail}`,
       notAnImageFile: "This file is not an image a page can show.",
       fileTooLarge: "The image is larger than 20 MB.",
+      // Reading an image's text (ADR-0055).
+      copyText: "Copy text",
+      insertText: "Insert text below",
+      remoteNoOcr: "Web images are not read",
+      notLoadedNoOcr: "The image isn't loaded",
+      reading: "Reading text…",
+      copied: "Text copied",
+      inserted: "Text inserted below the image",
+      noText: "No text found in this image",
+      otherModel: "Try the other model",
+      notInstalled: "OCR isn't downloaded yet. Download it in Settings → Modules.",
+      openSettings: "Open Settings",
+      cancelled: "Cancelled. Nothing was changed.",
+      ocrFailed: {
+        "too-large": "This image is too large to read.",
+        "bad-file": "This image can't be read.",
+        timeout: "Reading took too long and was stopped.",
+        failed: "The text could not be read.",
+      } as Record<"too-large" | "bad-file" | "timeout" | "failed", string>,
+      dismiss: "Close",
     },
 
     blocks: {

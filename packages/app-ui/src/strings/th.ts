@@ -114,6 +114,25 @@ export const th: Strings = {
       addFailed: (detail) => `เพิ่มรูปไม่สำเร็จ: ${detail}`,
       notAnImageFile: "ไฟล์นี้ไม่ใช่รูปที่หน้าแสดงได้",
       fileTooLarge: "รูปใหญ่เกิน 20 MB",
+      copyText: "คัดลอกข้อความ", // REVIEW
+      insertText: "แทรกข้อความด้านล่าง", // REVIEW
+      remoteNoOcr: "ไม่อ่านรูปภาพจากเว็บ", // REVIEW
+      notLoadedNoOcr: "รูปภาพยังไม่ได้โหลด", // REVIEW
+      reading: "กำลังอ่านข้อความ…", // REVIEW
+      copied: "คัดลอกข้อความแล้ว", // REVIEW
+      inserted: "แทรกข้อความใต้รูปภาพแล้ว", // REVIEW
+      noText: "ไม่พบข้อความในรูปภาพนี้", // REVIEW
+      otherModel: "ลองอีกโมเดลหนึ่ง", // REVIEW
+      notInstalled: "ยังไม่ได้ดาวน์โหลด OCR ดาวน์โหลดได้ที่ การตั้งค่า → โมดูล", // REVIEW
+      openSettings: "เปิดการตั้งค่า", // REVIEW
+      cancelled: "ยกเลิกแล้ว ไม่มีอะไรเปลี่ยน", // REVIEW
+      ocrFailed: {
+        "too-large": "รูปภาพนี้ใหญ่เกินกว่าจะอ่านได้", // REVIEW
+        "bad-file": "อ่านรูปภาพนี้ไม่ได้", // REVIEW
+        timeout: "อ่านนานเกินไปจึงหยุดแล้ว", // REVIEW
+        failed: "อ่านข้อความไม่ได้", // REVIEW
+      },
+      dismiss: "ปิด", // REVIEW
     },
 
     blocks: {

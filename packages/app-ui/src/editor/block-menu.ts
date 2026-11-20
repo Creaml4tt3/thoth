@@ -9,7 +9,7 @@
 import { localizedBlockKinds, type BlockKind } from "./block-kinds.ts";
 import type { EditorStrings } from "../strings/en.ts";
 
-export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" } | { type: "alt" };
+export type BlockAction = { type: "turn"; kind: BlockKind } | { type: "duplicate" } | { type: "delete" } | { type: "up" } | { type: "down" } | { type: "alt" } | { type: "copyText" } | { type: "insertText" };
 
 export interface BlockMenuState {
   /** Block type of the target, shown as checked in "Turn into"; null when it has none in the list. */
@@ -19,6 +19,8 @@ export interface BlockMenuState {
   canMoveDown: boolean;
   /** The block is an image: offer "Edit alt text" (ADR-0028). */
   isImage?: boolean;
+  /** An image and the app has OCR (ADR-0055): offer Copy text / Insert text below; a string disables them with that reason. */
+  ocr?: true | string;
 }
 
 export interface BlockMenu {
@@ -130,6 +132,13 @@ export function createBlockMenu(opts: Options): BlockMenu {
     const turn = item(t.turnInto, { icon: "↻", popup: true, disabled: !state.canTurn, onRun: () => openSub(turn, state, true) });
     root.replaceChildren(
       ...(state.isImage ? [item(t.image.editAlt, { icon: "Aa", onRun: () => run({ type: "alt" }) })] : []),
+      ...(state.ocr
+        ? (["copyText", "insertText"] as const).map((type) => {
+            const why = state.ocr === true ? undefined : state.ocr;
+            const label = why ? `${t.image[type]} (${why})` : t.image[type];
+            return item(label, { icon: type === "copyText" ? "⧉" : "↧", disabled: !!why, onRun: () => run({ type }) });
+          })
+        : []),
       turn,
       item(t.duplicate, { icon: "⧉", onRun: () => run({ type: "duplicate" }) }),
       item(t.delete, { icon: "✕", onRun: () => run({ type: "delete" }) }),

@@ -93,7 +93,7 @@ export function createEditorExtensions(ctx: EditorContext): AnyExtension[] {
     listKeysExtension(),
     blockJoinKeysExtension(),
     slashExtension(ctx),
-    blockHandleExtension(ctx.strings),
+    blockHandleExtension(ctx.strings, ctx),
     caretScrollExtension(),
     textStylesExtension(ctx.strings, ctx.client),
     linkSuggestExtension(ctx),

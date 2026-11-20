@@ -203,6 +203,7 @@ function PageFrameReady(props: PageFrameProps) {
   const media = useRef(props.media ?? null);
   media.current = props.media ?? null;
   const pickImage = pageHost.pickImage;
+  const ocr = pageHost.ocr;
   const ctx = useMemo(
     () =>
       createEditorContext({
@@ -215,8 +216,9 @@ function PageFrameReady(props: PageFrameProps) {
         media: () => media.current,
         ...(links ? { links, openExternal: (url: string) => links.open(url) } : {}),
         ...(pickImage ? { pickImage } : {}),
+        ...ocr,
       }),
-    [t, client, links, pickImage],
+    [t, client, links, pickImage, ocr],
   );
   // One session per page per window (ADR-0030): an editor of the same page in the other pane shares it.
   const { session, state, member, owner } = usePageSession(store, handle, { checkTick: props.checkTick, onWritten: props.onWritten }, pageKey(store, modeKey.space, modeKey.page));

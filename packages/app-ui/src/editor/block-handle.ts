@@ -16,6 +16,8 @@ import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/stat
 import type { EditorView } from "@tiptap/pm/view";
 import { createBlockMenu, type BlockAction, type BlockMenu } from "./block-menu.ts";
 import { editImageAlt } from "./image-views.ts";
+import { ocrState, runImageOcr } from "./image-ocr.ts";
+import type { EditorContext } from "./context.ts";
 import { POINTER, createDragPreview, dragPreviewContent } from "./drag-preview.ts";
 import type { EditorStrings } from "../strings/en.ts";
 import {
@@ -58,7 +60,8 @@ function targetAtPos(view: EditorView, pos: number): BlockTarget | null {
   }
 }
 
-export function blockHandleExtension(strings: EditorStrings) {
+/** `ctx` with `ocr`: an image's menu also has Copy text / Insert text below (ADR-0055). */
+export function blockHandleExtension(strings: EditorStrings, ctx?: EditorContext) {
   return Extension.create({
     name: "thothBlockHandle",
     addProseMirrorPlugins() {
@@ -107,6 +110,8 @@ export function blockHandleExtension(strings: EditorStrings) {
             case "down":
               return moveBlock(tr, target, "down");
             case "alt":
+            case "copyText":
+            case "insertText":
               return false;
           }
         });
@@ -117,7 +122,8 @@ export function blockHandleExtension(strings: EditorStrings) {
         menuTarget = target;
         const parent = view.state.doc.resolve(target.pos).parent;
         const moves = canMove(view.state.doc, target);
-        menu.open({ current: kindOfBlock(target.node, parent), canTurn: canTurnInto(target), canMoveUp: moves.up, canMoveDown: moves.down, isImage: target.node.type.name === "image" }, anchor);
+        const isImage = target.node.type.name === "image";
+        menu.open({ current: kindOfBlock(target.node, parent), canTurn: canTurnInto(target), canMoveUp: moves.up, canMoveDown: moves.down, isImage, ...(isImage && ctx?.ocr ? { ocr: ocrState(ctx, view, target.pos, target.node) } : {}) }, anchor);
       };
 
       const place = (view: EditorView, target: BlockTarget): void => {
@@ -224,6 +230,7 @@ export function blockHandleExtension(strings: EditorStrings) {
               onAction: (action) => {
                 const target = menuTarget ? refreshTarget(view, menuTarget) : null;
                 if (target && action.type === "alt") editImageAlt(view, target.pos);
+                else if (target && ctx && (action.type === "copyText" || action.type === "insertText")) runImageOcr(ctx, view, target.pos, action.type);
                 else if (target) run(view, target, action);
               },
               onClose: (refocus) => {

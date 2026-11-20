@@ -5,6 +5,13 @@ import type { ImageFile, PageMedia } from "./media.ts";
 import { en, type EditorStrings } from "../strings/en.ts";
 import type { OpenOptions } from "../tabs/model.ts";
 
+/** What reading an image's text gave (ADR-0055). */
+export type OcrResult =
+  | { state: "done"; model: "fast" | "second"; text: string }
+  | { state: "not-installed" }
+  | { state: "cancelled" }
+  | { state: "failed"; reason: "too-large" | "bad-file" | "timeout" | "failed" };
+
 /** Something a node view can ask to re-render when the link index changes. */
 export interface Refreshable {
   refresh(): void;
@@ -31,6 +38,14 @@ export interface EditorContext {
   pickImage?(): Promise<ImageFile | null>;
   /** Opens a web address in the browser. Absent: a link opens the browser's own way (the web client). */
   openExternal?(url: string): void;
+  /** Reads an image's text on this computer (ADR-0055). Absent: no Copy text / Insert text below (the web client). */
+  ocr?(image: { bytes: Uint8Array; mimeType: string }, model?: "fast" | "second"): Promise<OcrResult>;
+  /** Stops the read going. */
+  cancelOcr?(): void;
+  /** The OCR models downloaded now; two offer "Try the other model". */
+  ocrModels?(): readonly ("fast" | "second")[];
+  /** Opens Settings → Modules (where OCR is downloaded). */
+  openModules?(): void;
 }
 
 export function createEditorContext(init: {
@@ -44,6 +59,10 @@ export function createEditorContext(init: {
   media?(): PageMedia | null;
   pickImage?(): Promise<ImageFile | null>;
   openExternal?(url: string): void;
+  ocr?(image: { bytes: Uint8Array; mimeType: string }, model?: "fast" | "second"): Promise<OcrResult>;
+  cancelOcr?(): void;
+  ocrModels?(): readonly ("fast" | "second")[];
+  openModules?(): void;
 }): EditorContext {
   return { media: () => null, ...init, strings: init.strings ?? en.editor, client: init.client ?? "desktop", views: new Set() };
 }
