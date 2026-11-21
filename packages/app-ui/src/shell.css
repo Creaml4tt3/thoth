@@ -259,7 +259,7 @@ div.tree-empty > p { margin: 0 0 6px; }
    --thoth-tab-min-width as more are open; then the strip scrolls. The enter and leave animations use the same tokens.
    The top padding is on the list, not the strip, so a lifted tab's shadow (while dragged) is not clipped by it. */
 .tabstrip { position: relative; --thoth-tab-width: 202px; --thoth-tab-min-width: 96px; --thoth-tab-max-width: 248px; flex: none; display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 0 8px; background: var(--thoth-bg-sidebar); border-bottom: 1px solid var(--thoth-border); }
-.tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding-top: 6px; overflow-x: auto; scrollbar-width: thin; }
+.tablist { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding-top: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .tab { position: relative; display: flex; align-items: center; flex: 0 1 var(--thoth-tab-width); width: var(--thoth-tab-width); min-width: var(--thoth-tab-min-width); max-width: var(--thoth-tab-max-width); margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-top: 2px solid transparent; border-radius: var(--thoth-radius-md) var(--thoth-radius-md) 0 0; color: var(--thoth-ink-secondary); transition: background-color var(--thoth-dur-fast) var(--thoth-ease-out), color var(--thoth-dur-fast) var(--thoth-ease-out), border-color var(--thoth-dur-fast) var(--thoth-ease-out); }
 /* A tab the user opened enters by widening and fading in; one that closes narrows and fades out (TabBar.tsx keeps it for
    that long, inert). The strip is a few elements wide, so width is the one layout property animated here. Tabs that
