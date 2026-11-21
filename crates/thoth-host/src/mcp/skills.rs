@@ -61,13 +61,15 @@ fn ours(link: &Path, root: &Path) -> Option<PathBuf> {
         return None;
     }
     let target = std::fs::read_link(link).ok()?;
+    // Windows may give the target back as `\\?\C:\…`; the roots Thoth keeps have no such prefix.
+    #[cfg(windows)]
+    let target = crate::win::paths::simplify(&target);
     let parent = target.parent()?;
     (parent.parent() == Some(root) && parent.file_name().is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(SKILLS))).then_some(target)
 }
 
 /// Links `root`'s skills (`on`), or removes Thoth's links to them (off). Links to skills that are gone are removed
 /// either way. Returns `{ linked: [name], skipped: [name], folders: [path] }`.
-#[cfg(unix)]
 pub fn sync(home: &Path, root: &Path, on: bool) -> HostResult<Value> {
     let skills = if on { skills_of(root) } else { Vec::new() };
     let mut linked = Vec::new();
@@ -80,7 +82,7 @@ pub fn sync(home: &Path, root: &Path, on: bool) -> HostResult<Value> {
             if let Some(target) = ours(&link, root)
                 && !skills.iter().any(|(_, path)| *path == target)
             {
-                let _ = std::fs::remove_file(&link);
+                remove_link(&link);
             }
         }
         if skills.is_empty() {
@@ -98,8 +100,14 @@ pub fn sync(home: &Path, root: &Path, on: bool) -> HostResult<Value> {
                 push_once(&mut skipped, name);
                 continue;
             }
-            match std::os::unix::fs::symlink(path, &link) {
+            match symlink_dir(path, &link) {
                 Ok(()) => push_once(&mut linked, name),
+                Err(e) if no_link_rights(&e) => {
+                    return Err(HostError::new(
+                        "UNAVAILABLE",
+                        "Windows lets apps make links only with Developer Mode on: turn it on (Settings → System → For developers), then try again",
+                    ));
+                }
                 Err(_) => push_once(&mut skipped, name),
             }
         }
@@ -110,9 +118,26 @@ pub fn sync(home: &Path, root: &Path, on: bool) -> HostResult<Value> {
     Ok(json!({ "linked": linked, "skipped": skipped, "folders": folders }))
 }
 
-#[cfg(not(unix))]
-pub fn sync(_home: &Path, _root: &Path, _on: bool) -> HostResult<Value> {
-    Err(HostError::new("UNAVAILABLE", "Linking skills is not available on this computer yet"))
+#[cfg(unix)]
+fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(target, link)
+}
+
+#[cfg(windows)]
+fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::windows::fs::symlink_dir(target, link)
+}
+
+/// Removes one of Thoth's links. A link to a folder is a directory entry on Windows, removed as one.
+fn remove_link(link: &Path) {
+    if std::fs::remove_file(link).is_err() && cfg!(windows) {
+        let _ = std::fs::remove_dir(link);
+    }
+}
+
+/// Windows refuses symbolic links to a user without Developer Mode (`ERROR_PRIVILEGE_NOT_HELD`).
+fn no_link_rights(error: &std::io::Error) -> bool {
+    cfg!(windows) && error.raw_os_error() == Some(1314)
 }
 
 fn push_once(list: &mut Vec<String>, name: &str) {

@@ -1,7 +1,7 @@
 //! The local socket `thoth-mcp` connects to (ADR-0021 rule 1): a Unix socket, `0600` in a `0700` folder of the app
 //! data folder that the host checks is the user's own. One request per connection, one JSON line each way.
 //!
-//! Windows (a named pipe with an owner-only ACL) is not built yet: starting fails with `UNAVAILABLE`.
+//! On Windows it is a named pipe only this user may open (`pipe.rs`), named after the same path; no file is made.
 use super::Inner;
 use crate::error::{HostError, HostResult};
 use std::path::{Path, PathBuf};
@@ -15,7 +15,8 @@ pub struct Listener {
     path: PathBuf,
     #[cfg(unix)]
     stop: Arc<std::sync::atomic::AtomicBool>,
-    #[cfg(unix)]
+    #[cfg(windows)]
+    stop: super::pipe::Stopper,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -142,10 +143,85 @@ mod unix {
     }
 }
 
-#[cfg(not(unix))]
-impl Listener {
-    pub fn start(_dir: &Path, _inner: Arc<Inner>) -> HostResult<Self> {
-        Err(HostError::new("UNAVAILABLE", "Connected apps are not available on Windows yet"))
+#[cfg(windows)]
+mod windows {
+    use super::*;
+    use crate::mcp::pipe::{self, PipeListener, PipeStream};
+    use crate::mcp::{MAX_CONNECTIONS, MAX_REQUEST, private_dir};
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    impl Listener {
+        pub fn start(dir: &Path, inner: Arc<Inner>) -> HostResult<Self> {
+            private_dir(dir)?;
+            let mut listener = PipeListener::bind(&socket_path(dir))?;
+            let stop = listener.stopper();
+            let active = Arc::new(AtomicUsize::new(0));
+            let thread = std::thread::Builder::new()
+                .name("thoth-mcp-accept".into())
+                .spawn(move || {
+                    loop {
+                        let stream = match listener.accept() {
+                            Ok(Some(stream)) => stream,
+                            Ok(None) => break,
+                            // A client that left before it was served; a pause so a lasting failure does not spin.
+                            Err(_) => {
+                                std::thread::sleep(std::time::Duration::from_millis(50));
+                                continue;
+                            }
+                        };
+                        if active.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                            active.fetch_sub(1, Ordering::SeqCst);
+                            stream.set_deadline(Some(std::time::Instant::now() + inner.options.read_timeout));
+                            let _ = reply(&stream, &super::super::error_line(&HostError::new("BUSY", "Thoth is answering too many requests: try again")));
+                            continue;
+                        }
+                        let (inner, done) = (inner.clone(), active.clone());
+                        let spawned = std::thread::Builder::new().name("thoth-mcp-request".into()).spawn(move || {
+                            serve(&inner, stream);
+                            done.fetch_sub(1, Ordering::SeqCst);
+                        });
+                        if spawned.is_err() {
+                            active.fetch_sub(1, Ordering::SeqCst);
+                        }
+                    }
+                })
+                .map_err(|e| HostError::internal(format!("Could not start listening: {e}")))?;
+            Ok(Self { stop, thread: Some(thread) })
+        }
+    }
+
+    impl Drop for Listener {
+        fn drop(&mut self) {
+            self.stop.stop();
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    fn serve(inner: &Inner, stream: PipeStream) {
+        // The whole line must come within `read_timeout`, as on Unix.
+        stream.set_deadline(Some(std::time::Instant::now() + inner.options.read_timeout));
+        let mut line = Vec::new();
+        let read = BufReader::new(&stream).take(MAX_REQUEST as u64 + 1).read_until(b'\n', &mut line);
+        let response = match read {
+            Ok(_) if line.len() > MAX_REQUEST => super::super::error_line(&HostError::bad_argument("The request is too long")),
+            Ok(0) => return,
+            Ok(_) => inner.serve(&line),
+            Err(_) => return,
+        };
+        stream.set_deadline(Some(std::time::Instant::now() + inner.options.read_timeout));
+        let _ = reply(&stream, &response);
+    }
+
+    fn reply(stream: &PipeStream, line: &str) -> std::io::Result<()> {
+        let mut out = stream;
+        out.write_all(line.as_bytes())?;
+        out.write_all(b"\n")?;
+        // Closing a pipe end throws away what the other end has not read yet: wait for the client to close first.
+        pipe::linger(stream, std::time::Instant::now() + pipe::LINGER);
+        Ok(())
     }
 }
 

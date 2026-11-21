@@ -60,7 +60,6 @@ something ("later", "no", "yes, next"), write it on the line. New ideas go in th
 - A table view of a folder's frontmatter, like Notion databases (L). Not asked for; "no databases" is the current position.
 
 **Connected apps (MCP)**
-- Connected apps on Windows: a named-pipe transport (M), `crates/thoth-host/src/mcp/socket.rs`.
 - The Linux AppImage path: the setup points at a path that changes each run (S), ADR-0021.
 - Proposals for workspace pages, re-run after a conflict, `list_changed`, peer credentials (M), ADR-0048 and ADR-0021.
 

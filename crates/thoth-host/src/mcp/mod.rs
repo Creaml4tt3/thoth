@@ -11,12 +11,14 @@
 //!
 //! An app is known by the name it gives (MCP `clientInfo.name`). That name is self-reported: any program of this
 //! user can give any name. Allow and Deny are the user's consent for a name, not proof of who connects; the socket
-//! being the user's own (`0600` in a `0700` folder) is what keeps other users out.
-#[cfg(unix)]
+//! being the user's own (`0600` in a `0700` folder; on Windows a pipe whose DACL names only this user) is what keeps
+//! other users out.
 pub mod closed;
 pub mod install;
 pub mod log;
 pub mod memory;
+#[cfg(windows)]
+pub mod pipe;
 pub mod proposals;
 pub mod skills;
 mod socket;
@@ -263,7 +265,7 @@ impl Relay {
             .map(|a| json!({ "name": a.name, "allowed": a.allowed, "decidedAt": a.decided_at, "propose": a.propose, "remember": a.remember.unwrap_or(true) }))
             .collect();
         json!({
-            "available": cfg!(unix) && self.inner.dir.is_some(),
+            "available": self.inner.dir.is_some(),
             "enabled": state.settings.enabled,
             "listening": listening,
             "error": state.error,
@@ -1271,6 +1273,11 @@ pub(crate) fn private_dir(dir: &Path) -> HostResult<()> {
         if meta.mode() & 0o777 != 0o700 {
             std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map_err(|e| HostError::io(&e, "chmod", &dir.to_string_lossy()))?;
         }
+    }
+    // The app data folder's inherited ACL keeps others out; refused when it is a link or not this user's.
+    #[cfg(windows)]
+    if !pipe::owned_by_me(dir, true) {
+        return Err(HostError::new("UNAVAILABLE", format!("{} is not a folder of this user", dir.display())));
     }
     Ok(())
 }

@@ -312,11 +312,11 @@ mod tests {
         let proposals = store(data.path(), now.clone());
         let made = proposals.add(new("Plan.md")).unwrap();
         assert!(super::super::tools::is_proposal_id(&made.id));
-        let file = data.path().join(DIR).join(format!("{}.json", made.id));
+        let _file = data.path().join(DIR).join(format!("{}.json", made.id));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            assert_eq!(std::fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+            assert_eq!(std::fs::metadata(&_file).unwrap().permissions().mode() & 0o777, 0o600);
             assert_eq!(std::fs::metadata(data.path().join(DIR)).unwrap().permissions().mode() & 0o777, 0o700);
         }
         let (record, before, after) = proposals.get(&made.id).unwrap();

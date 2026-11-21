@@ -4,6 +4,16 @@
 และจำนวนรายการต้องตรงกับ CHANGELOG.md เสมอ (มีเทสต์ตรวจ) หัวข้อที่เป็นโครงสร้าง เช่น `[Unreleased]`, `Added`,
 `Changed` และ `Fixed` คงเป็นภาษาอังกฤษไว้ตามรูปแบบ Keep a Changelog ส่วนหน้าเว็บจะแสดงเป็นภาษาไทยให้เอง
 
+## [Unreleased]
+
+### Added
+
+- แอปที่เชื่อมต่อใช้ได้บน Windows แล้ว: Claude Desktop, Cursor, Claude Code และ Codex ใช้โน้ตและความจำของคุณบน Windows ได้เหมือนบน Mac <!-- REVIEW -->
+
+### Fixed
+
+- Windows: แถบแท็บไม่มีแถบเลื่อนข้างแท็บอีกแล้ว <!-- REVIEW -->
+
 ## [0.12.0] - 2026-11-21
 
 ### Added
@@ -396,6 +406,7 @@
 - เว็บแอปที่ thothnotes.com/app/ เปิดเวิร์กสเปซบนเซิร์ฟเวอร์ทดลองที่ใช้ฟรี
 - แอปมีทั้งภาษาอังกฤษและภาษาไทย ตามภาษาของระบบ และเลือกได้ใน การตั้งค่า → ภาษา
 
+[Unreleased]: https://github.com/Creaml4tt3/thoth/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Creaml4tt3/thoth/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...v0.10.1

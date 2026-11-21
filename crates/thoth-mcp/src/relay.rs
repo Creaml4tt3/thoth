@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 pub const NOT_RUNNING: &str =
     "Thoth is not running, or Connected apps is off. Open Thoth and switch on Connected apps (Settings → Connected apps), then try again.";
 /// Longest answer read (the app sends at most 1 MB, plus the JSON around it).
-#[cfg(unix)]
 const MAX_ANSWER: u64 = 2 * 1024 * 1024;
 
 /// A call that did not give an answer, in words for the user (and the model).
@@ -37,15 +36,9 @@ impl Failure {
 
 /// With Thoth closed, the few tools the user let agents use then (ADR-0052 rule 9), answered from the app data folder
 /// that holds `socket`. `None` when the user has not switched that on.
-#[cfg(unix)]
 pub fn closed(socket: Option<&Path>, app: Option<&str>, tool: &str, arguments: &Value) -> Option<Result<Value, Failure>> {
     let dir = socket?.parent()?;
     thoth_host::mcp::closed::serve(dir, app, tool, arguments).map(|answer| answer.map_err(|e| Failure::new(e.message)))
-}
-
-#[cfg(not(unix))]
-pub fn closed(_socket: Option<&Path>, _app: Option<&str>, _tool: &str, _arguments: &Value) -> Option<Result<Value, Failure>> {
-    None
 }
 
 /// The app's usual socket, in its app data folder (the same folder Tauri's `app_data_dir` gives the app).
@@ -54,10 +47,11 @@ pub fn default_socket() -> Option<PathBuf> {
     let home = std::env::var_os("HOME").map(PathBuf::from).filter(|h| h.is_absolute());
     let data = if cfg!(target_os = "macos") {
         home.map(|h| h.join("Library").join("Application Support"))
-    } else if cfg!(unix) {
-        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|d| d.is_absolute()).or_else(|| home.map(|h| h.join(".local").join("share")))
+    } else if cfg!(windows) {
+        // Roaming AppData, what Tauri's `app_data_dir` gives on Windows.
+        std::env::var_os("APPDATA").map(PathBuf::from).filter(|d| d.is_absolute())
     } else {
-        None
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|d| d.is_absolute()).or_else(|| home.map(|h| h.join(".local").join("share")))
     };
     data.map(|d| d.join(APP).join("mcp").join("thoth.sock"))
 }
@@ -103,7 +97,27 @@ fn exchange(socket: &Path, line: &str) -> Result<String, Failure> {
     }
 }
 
-#[cfg(not(unix))]
-fn exchange(_socket: &Path, _line: &str) -> Result<String, Failure> {
-    Err(Failure::new("Connected apps are not available on Windows yet"))
+#[cfg(windows)]
+fn exchange(socket: &Path, line: &str) -> Result<String, Failure> {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::time::{Duration, Instant};
+    use thoth_host::mcp::pipe::{self, ConnectError};
+
+    // Only this user's pipe (pipe.rs): another user's is refused, as a socket of another user is on Unix.
+    let stream = pipe::connect(socket).map_err(|e| match e {
+        ConnectError::NotRunning => Failure::not_running(),
+        ConnectError::NotOurs => Failure::new(format!("The pipe for {} is not Thoth's for this user", socket.display())),
+    })?;
+    stream.set_deadline(Some(Instant::now() + Duration::from_secs(10)));
+    let mut out = &stream;
+    out.write_all(line.as_bytes()).and_then(|()| out.write_all(b"\n")).map_err(|_| Failure::new(NOT_RUNNING))?;
+    // The app may wait up to a minute for the user's Allow, then up to 15 s for its windows.
+    stream.set_deadline(Some(Instant::now() + Duration::from_secs(90)));
+    let mut answer = String::new();
+    match BufReader::new(&stream).take(MAX_ANSWER).read_line(&mut answer) {
+        Ok(0) => Err(Failure::new("Thoth closed the connection without answering")),
+        Ok(_) => Ok(answer),
+        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Err(Failure::new("Thoth did not answer in time: try again")),
+        Err(_) => Err(Failure::new("Thoth's answer could not be read")),
+    }
 }
