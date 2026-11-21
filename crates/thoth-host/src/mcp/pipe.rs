@@ -126,9 +126,9 @@ pub fn owned_by_me(path: &Path, dir: bool) -> bool {
     if meta.file_type().is_symlink() || (if dir { !meta.is_dir() } else { !meta.is_file() }) {
         return false;
     }
-    let name = wide(&path.to_string_lossy());
+    let name = crate::win::nt::wide_path(path);
     let (mut owner, mut descriptor): (sec::PSID, sec::PSECURITY_DESCRIPTOR) = (std::ptr::null_mut(), std::ptr::null_mut());
-    // SAFETY: `name` is NUL-terminated; `owner` points into `descriptor`, freed below after its last use.
+    // SAFETY: `name` is NUL-terminated; `owner` points into `descriptor`, freed in `owner_is_mine`.
     let status = unsafe {
         auth::GetNamedSecurityInfoW(
             name.as_ptr(),
@@ -141,10 +141,32 @@ pub fn owned_by_me(path: &Path, dir: bool) -> bool {
             &mut descriptor,
         )
     };
-    if status != f::ERROR_SUCCESS {
-        return false;
-    }
+    status == f::ERROR_SUCCESS && owner_is_mine(owner, descriptor)
+}
+
+/// Whether the pipe `instance` belongs to was made by this user: its owner is set by whoever made the first instance.
+fn pipe_is_mine(instance: &OwnedHandle) -> bool {
+    let (mut owner, mut descriptor): (sec::PSID, sec::PSECURITY_DESCRIPTOR) = (std::ptr::null_mut(), std::ptr::null_mut());
+    // SAFETY: `instance` is an open pipe handle; `owner` points into `descriptor`, freed in `owner_is_mine`.
+    let status = unsafe {
+        auth::GetSecurityInfo(
+            raw(instance),
+            auth::SE_KERNEL_OBJECT,
+            sec::OWNER_SECURITY_INFORMATION,
+            &mut owner,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut descriptor,
+        )
+    };
+    status == f::ERROR_SUCCESS && owner_is_mine(owner, descriptor)
+}
+
+/// Compares an owner from a `Get*SecurityInfo` call with this process's owners, and frees that call's descriptor.
+fn owner_is_mine(owner: sec::PSID, descriptor: sec::PSECURITY_DESCRIPTOR) -> bool {
     let same = sid_text(owner).is_ok_and(|sid| my_owners().contains(&sid));
+    // SAFETY: allocated by the call that gave `owner`; `owner` is not used after this.
     unsafe { f::LocalFree(descriptor.cast()) };
     same
 }
@@ -351,17 +373,23 @@ impl PipeListener {
             return Err(HostError::io(&last_error(), "security", &shown));
         }
         let name = wide(&shown);
-        let first = match instance(&name, descriptor, true) {
+        let not_ours = || HostError::new("UNAVAILABLE", format!("Something that is not Thoth has the pipe {shown}"));
+        let first = instance(&name, descriptor, true).or_else(|error| match connect(socket) {
+            Ok(_) => Err(HostError::new("BUSY", "Another copy of Thoth answers connected apps already")),
+            Err(ConnectError::NotOurs) => Err(not_ours()),
+            // Nobody answers, yet the pipe is there: this Thoth's own, still finishing answers from before it was
+            // switched off. Join it only if this user made it.
+            Err(ConnectError::NotRunning) if error.raw_os_error() == Some(f::ERROR_ACCESS_DENIED as i32) => {
+                instance(&name, descriptor, false).ok().filter(pipe_is_mine).ok_or_else(not_ours)
+            }
+            Err(ConnectError::NotRunning) => Err(HostError::io(&error, "pipe", &shown)),
+        });
+        let first = match first {
             Ok(first) => first,
             Err(error) => {
+                // SAFETY: allocated above and not used again.
                 unsafe { f::LocalFree(descriptor.cast()) };
-                return Err(match connect(socket) {
-                    Ok(_) => HostError::new("BUSY", "Another copy of Thoth answers connected apps already"),
-                    Err(_) if error.raw_os_error() == Some(f::ERROR_ACCESS_DENIED as i32) => {
-                        HostError::new("UNAVAILABLE", format!("Something that is not Thoth has the pipe {shown}"))
-                    }
-                    Err(_) => HostError::io(&error, "pipe", &shown),
-                });
+                return Err(error);
             }
         };
         let stop = match event() {
@@ -458,3 +486,23 @@ pub fn linger(stream: &PipeStream, until: Instant) {
 
 /// How long `linger` waits at most.
 pub const LINGER: Duration = Duration::from_secs(2);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn switching_back_on_while_an_answer_lingers_joins_the_pipe() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("thoth.sock");
+        let mut first = PipeListener::bind(&socket).unwrap();
+        let client = connect(&socket).unwrap();
+        let lingering = first.accept().unwrap().unwrap();
+        // Switched off: only the connection still lingering keeps the pipe.
+        drop(first);
+        let mut again = PipeListener::bind(&socket).expect("the pipe is this Thoth's own");
+        drop((client, lingering));
+        let _client = connect(&socket).unwrap();
+        assert!(again.accept().unwrap().is_some());
+    }
+}

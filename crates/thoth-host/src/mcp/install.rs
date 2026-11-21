@@ -150,7 +150,8 @@ fn app_dir(home: &Path, dir: &str, name: &str) -> HostResult<PathBuf> {
 }
 
 /// Where Claude Desktop keeps its settings: Application Support on macOS, roaming AppData on Windows.
-// shortcut: the installer's folder; the Microsoft Store copy keeps its own under Packages\, which the user pastes into.
+// shortcut: the installer's folder under the home folder; the Microsoft Store copy (under Packages\) and a redirected
+// AppData are not found, so the user pastes the setup there. Read %APPDATA% and the Store folder if people ask.
 fn claude_desktop_path(home: &Path) -> PathBuf {
     if cfg!(target_os = "macos") {
         home.join("Library/Application Support/Claude")
