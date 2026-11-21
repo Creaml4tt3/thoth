@@ -149,8 +149,20 @@ fn app_dir(home: &Path, dir: &str, name: &str) -> HostResult<PathBuf> {
     Ok(path)
 }
 
+/// Where Claude Desktop keeps its settings: Application Support on macOS, roaming AppData on Windows.
+// shortcut: the installer's folder; the Microsoft Store copy keeps its own under Packages\, which the user pastes into.
+fn claude_desktop_path(home: &Path) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        home.join("Library/Application Support/Claude")
+    } else if cfg!(windows) {
+        home.join("AppData").join("Roaming").join("Claude")
+    } else {
+        home.join(".config/Claude")
+    }
+}
+
 fn claude_desktop_dir(home: &Path) -> HostResult<PathBuf> {
-    let path = if cfg!(target_os = "macos") { home.join("Library/Application Support/Claude") } else { home.join(".config/Claude") };
+    let path = claude_desktop_path(home);
     if !path.is_dir() {
         return Err(HostError::new("UNAVAILABLE", "Claude Desktop is not set up on this computer: open it once, then try again"));
     }
@@ -527,7 +539,7 @@ mod tests {
         assert_eq!(status("cursor").get("instructions"), None);
 
         // Each app opened once: there, with nothing of Thoth's.
-        for dir in [".claude", ".codex", ".cursor", if cfg!(target_os = "macos") { "Library/Application Support/Claude" } else { ".config/Claude" }] {
+        for dir in [".claude", ".codex", ".cursor", claude_desktop_path(Path::new("")).to_str().unwrap()] {
             std::fs::create_dir_all(h.join(dir)).unwrap();
         }
         assert_eq!(all(), [json!("none"), json!("none"), json!("none"), json!("none")]);
@@ -553,8 +565,7 @@ mod tests {
             [status("claude-code")["server"].clone(), status("codex")["server"].clone(), status("cursor")["server"].clone()],
             [json!("other"), json!("other"), json!("other")]
         );
-        let desktop =
-            h.join(if cfg!(target_os = "macos") { "Library/Application Support/Claude" } else { ".config/Claude" }).join("claude_desktop_config.json");
+        let desktop = h.join(claude_desktop_path(Path::new("")).to_str().unwrap()).join("claude_desktop_config.json");
         std::fs::write(&desktop, &old).unwrap();
         assert_eq!(status("claude-desktop")["server"], "other");
         // Written as a dotted key or an inline table: edited by hand, which Thoth never replaces.

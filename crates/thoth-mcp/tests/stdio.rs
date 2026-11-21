@@ -2,10 +2,9 @@
 //! 2026-07-28 per-request metadata (`server/discover`, `_meta`), the tools, and every way a call can fail. The
 //! running app is played by a socket that records what it is sent. `tests/mcp/schema.test.ts` checks the same answers
 //! against the official MCP JSON schemas.
-#![cfg(unix)]
+//! On Windows the app's socket is a named pipe (`thoth_host::mcp::pipe`).
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -83,25 +82,52 @@ struct App {
     seen: Arc<Mutex<Vec<Value>>>,
 }
 
+/// A temporary folder: under `/tmp` on Unix, where a socket path stays short enough.
+fn temp() -> tempfile::TempDir {
+    let base = if cfg!(unix) { PathBuf::from("/tmp") } else { std::env::temp_dir() };
+    tempfile::Builder::new().prefix("mcp").tempdir_in(base).unwrap()
+}
+
 fn app(reply: impl Fn(&Value) -> Value + Send + 'static) -> App {
-    let dir = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
+    let dir = temp();
     let socket = dir.path().join("thoth.sock");
-    let listener = UnixListener::bind(&socket).unwrap();
     let seen = Arc::new(Mutex::new(Vec::new()));
     let recorded = seen.clone();
-    std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(stream) = stream else { return };
-            let mut line = String::new();
-            BufReader::new(&stream).read_line(&mut line).unwrap();
-            let request: Value = serde_json::from_str(&line).unwrap();
-            recorded.lock().unwrap().push(request.clone());
-            let answer = reply(&request);
-            if !answer.is_null() {
-                let _ = (&stream).write_all(format!("{answer}\n").as_bytes());
+    let answer = move |request: &str| -> Option<String> {
+        let request: Value = serde_json::from_str(request).unwrap();
+        recorded.lock().unwrap().push(request.clone());
+        let answer = reply(&request);
+        (!answer.is_null()).then(|| format!("{answer}\n"))
+    };
+    #[cfg(unix)]
+    {
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                if let Some(out) = answer(&line) {
+                    let _ = (&stream).write_all(out.as_bytes());
+                }
             }
-        }
-    });
+        });
+    }
+    #[cfg(windows)]
+    {
+        use thoth_host::mcp::pipe;
+        let mut listener = pipe::PipeListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            while let Ok(Some(stream)) = listener.accept() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                if let Some(out) = answer(&line) {
+                    let _ = (&stream).write_all(out.as_bytes());
+                    pipe::linger(&stream, Instant::now() + pipe::LINGER);
+                }
+            }
+        });
+    }
     App { socket, _dir: dir, seen }
 }
 
@@ -229,32 +255,35 @@ fn a_call_that_fails_is_a_tool_error_the_model_can_read() {
 
 #[test]
 fn thoth_not_running_or_switched_off_says_what_to_do() {
-    let dir = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
+    let dir = temp();
     let mut server = Server::start(&dir.path().join("thoth.sock"));
     server.initialize("claude-ai");
     let answer = server.call(1, "tools/call", json!({ "name": "search", "arguments": { "query": "x" } }));
     assert_eq!(answer["result"]["isError"], true);
     assert!(answer["result"]["content"][0]["text"].as_str().unwrap().contains("Open Thoth and switch on Connected apps"), "{answer}");
 
-    // A socket that is a link to somewhere else is not used.
-    let real = app(page_answer);
-    let link = dir.path().join("link.sock");
-    std::os::unix::fs::symlink(&real.socket, &link).unwrap();
-    let mut server = Server::start(&link);
-    server.initialize("claude-ai");
-    let answer = server.call(1, "tools/call", json!({ "name": "search", "arguments": { "query": "x" } }));
-    assert_eq!(answer["result"]["isError"], true);
-    assert!(real.seen.lock().unwrap().is_empty());
+    // A socket that is a link to somewhere else is not used (Windows has no socket file to link to).
+    #[cfg(unix)]
+    {
+        let real = app(page_answer);
+        let link = dir.path().join("link.sock");
+        std::os::unix::fs::symlink(&real.socket, &link).unwrap();
+        let mut server = Server::start(&link);
+        server.initialize("claude-ai");
+        let answer = server.call(1, "tools/call", json!({ "name": "search", "arguments": { "query": "x" } }));
+        assert_eq!(answer["result"]["isError"], true);
+        assert!(real.seen.lock().unwrap().is_empty());
+    }
 }
 
 /// ADR-0052 rule 9: with Thoth closed and the user's "while Thoth is closed" switch on, the memory tools are answered
 /// from the memory folder; the others still say to open Thoth. A running app is always asked instead.
 #[test]
 fn with_thoth_closed_the_memory_tools_answer_when_the_user_lets_them() {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
-    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
-    let root = std::fs::canonicalize(dir.path()).unwrap().join("Notes");
+    let dir = temp();
+    #[cfg(unix)]
+    std::fs::set_permissions(dir.path(), <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700)).unwrap();
+    let root = thoth_host::paths::canonicalize_path(dir.path()).unwrap().join("Notes");
     std::fs::create_dir_all(root.join("Memory")).unwrap();
     std::fs::write(root.join("Memory/tea.md"), "---\nkind: preference\n---\nLikes tea.\n").unwrap();
     let settings = json!({
@@ -263,7 +292,8 @@ fn with_thoth_closed_the_memory_tools_answer_when_the_user_lets_them() {
     });
     let file = dir.path().join("settings.json");
     std::fs::write(&file, settings.to_string()).unwrap();
-    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&file, <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600)).unwrap();
 
     let mut server = Server::start(&dir.path().join("thoth.sock"));
     server.initialize("claude-ai");

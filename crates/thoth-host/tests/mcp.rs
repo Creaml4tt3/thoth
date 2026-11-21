@@ -1,10 +1,10 @@
 //! Connected apps (ADR-0021): the relay between `thoth-mcp` (played here by a socket client) and the app's windows
 //! (played by a thread that answers `mcp.request` events as a window's open Vault would).
-#![cfg(unix)]
+//! On Windows the socket is a named pipe (`thoth_host::mcp::pipe`); the same tests run there, less the Unix modes.
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
@@ -105,8 +105,25 @@ struct Fixture {
     memories: Arc<Mutex<Vec<Value>>>,
 }
 
+/// A temporary folder: under `/tmp` on Unix, where a socket path stays short enough.
+fn temp(prefix: &str) -> tempfile::TempDir {
+    let base = if cfg!(unix) { PathBuf::from("/tmp") } else { std::env::temp_dir() };
+    tempfile::Builder::new().prefix(prefix).tempdir_in(base).unwrap()
+}
+
+/// One connection to the host, as `thoth-mcp` makes it.
+#[cfg(unix)]
+fn connect(socket: &Path) -> std::os::unix::net::UnixStream {
+    std::os::unix::net::UnixStream::connect(socket).unwrap()
+}
+
+#[cfg(windows)]
+fn connect(socket: &Path) -> thoth_host::mcp::pipe::PipeStream {
+    thoth_host::mcp::pipe::connect(socket).unwrap()
+}
+
 fn fixture(options: McpOptions) -> Fixture {
-    let data = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
+    let data = temp("mcp");
     let dir = data.path().join("mcp");
     let open = Arc::new(Mutex::new(vec![OpenSpace { root: NOTES.into(), owner: "main".into() }]));
     let (events_tx, events_rx) = channel::<(String, Value)>();
@@ -194,7 +211,7 @@ fn ask(socket: &Path, app: &str, tool: &str, arguments: Value) -> Value {
 }
 
 fn send(socket: &Path, line: &str) -> Value {
-    let mut stream = UnixStream::connect(socket).unwrap();
+    let mut stream = connect(socket);
     stream.write_all(line.as_bytes()).unwrap();
     stream.write_all(b"\n").unwrap();
     let mut answer = String::new();
@@ -218,27 +235,40 @@ fn it_is_off_until_switched_on_and_then_listens_on_an_owner_only_socket() {
 
     let settings = f.relay.configure(&json!({ "enabled": true }), &[]).unwrap();
     assert_eq!((settings["enabled"].clone(), settings["listening"].clone()), (json!(true), json!(true)));
-    let dir = std::fs::symlink_metadata(&f.dir).unwrap();
-    let sock = std::fs::symlink_metadata(socket(&f)).unwrap();
-    assert_eq!(dir.permissions().mode() & 0o777, 0o700);
-    assert_eq!(sock.permissions().mode() & 0o777, 0o600);
-    assert_eq!(sock.uid(), dir.uid());
-    assert_eq!(sock.uid(), euid());
+    #[cfg(unix)]
+    {
+        let dir = std::fs::symlink_metadata(&f.dir).unwrap();
+        let sock = std::fs::symlink_metadata(socket(&f)).unwrap();
+        assert_eq!(dir.permissions().mode() & 0o777, 0o700);
+        assert_eq!(sock.permissions().mode() & 0o777, 0o600);
+        assert_eq!(sock.uid(), dir.uid());
+        assert_eq!(sock.uid(), euid());
+    }
+    // On Windows a pipe this user can open; no file at the socket path.
+    #[cfg(windows)]
+    {
+        assert!(!socket(&f).exists());
+        assert!(thoth_host::mcp::pipe::connect(&socket(&f)).is_ok());
+    }
     // The setup to paste into an app names the sidecar next to this program and this socket.
     assert_eq!(settings["setup"]["args"], json!(["--socket", socket(&f)]));
-    assert!(settings["setup"]["command"].as_str().unwrap().ends_with("/thoth-mcp"));
+    assert!(settings["setup"]["command"].as_str().unwrap().ends_with(if cfg!(windows) { "\\thoth-mcp.exe" } else { "/thoth-mcp" }));
 
     // Switched off: the socket goes, and the setting is remembered by the next start.
     f.relay.configure(&json!({ "enabled": false }), &[]).unwrap();
     assert!(!socket(&f).exists());
+    #[cfg(windows)]
+    assert!(thoth_host::mcp::pipe::connect(&socket(&f)).is_err(), "the pipe goes too");
     let again = Relay::new(Some(f.dir.clone()), Arc::new(|_: &str, _: Value| {}), Arc::new(Vec::new), fast());
     assert_eq!(again.settings()["enabled"], false);
     let settings: Value = serde_json::from_slice(&std::fs::read(f.dir.join("settings.json")).unwrap()).unwrap();
     assert_eq!(settings["enabled"], false);
+    #[cfg(unix)]
     assert_eq!(std::fs::metadata(f.dir.join("settings.json")).unwrap().permissions().mode() & 0o777, 0o600);
 }
 
 /// The effective user id: the owner of a file this test makes.
+#[cfg(unix)]
 fn euid() -> u32 {
     let probe = tempfile::NamedTempFile::new().unwrap();
     std::fs::metadata(probe.path()).unwrap().uid()
@@ -247,9 +277,15 @@ fn euid() -> u32 {
 #[test]
 fn a_folder_that_is_not_the_users_own_is_refused() {
     let f = fixture(fast());
-    let elsewhere = tempfile::tempdir_in("/tmp").unwrap();
+    let elsewhere = temp("elsewhere");
     std::fs::create_dir_all(f.dir.parent().unwrap()).unwrap();
+    #[cfg(unix)]
     std::os::unix::fs::symlink(elsewhere.path(), &f.dir).unwrap();
+    // Windows makes links only for an administrator or with Developer Mode (both on CI).
+    #[cfg(windows)]
+    if std::os::windows::fs::symlink_dir(elsewhere.path(), &f.dir).is_err() {
+        return;
+    }
     let error = f.relay.configure(&json!({ "enabled": true }), &[]).unwrap_err();
     assert_eq!(error.code, "UNAVAILABLE");
     assert_eq!(f.relay.settings()["enabled"], false);
@@ -420,7 +456,7 @@ fn a_request_line_must_come_whole_in_time_and_within_its_limit() {
     let socket = socket(&f);
 
     // A byte every 100 ms never waits 300 ms for one, but the whole line must come within 300 ms.
-    let mut slow = UnixStream::connect(&socket).unwrap();
+    let mut slow = connect(&socket);
     let start = std::time::Instant::now();
     let mut cut = false;
     for _ in 0..30 {
@@ -435,7 +471,7 @@ fn a_request_line_must_come_whole_in_time_and_within_its_limit() {
 
     // Over the limit (2 MiB + 64 KiB): refused without being read to its end.
     let long = format!("{{\"v\":1,\"app\":\"Claude\",\"tool\":\"search\",\"arguments\":{{\"query\":\"{}\"}}}}", "x".repeat(thoth_host::mcp::MAX_REQUEST));
-    let mut stream = UnixStream::connect(&socket).unwrap();
+    let mut stream = connect(&socket);
     let _ = stream.write_all(long.as_bytes());
     let mut answer = String::new();
     BufReader::new(&stream).read_line(&mut answer).unwrap();
@@ -493,6 +529,7 @@ fn every_request_is_logged_without_page_text_and_old_days_go() {
     assert_eq!(files.len(), 1, "the day from 2000 is gone: {files:?}");
     let text = std::fs::read_to_string(f.dir.join("log").join(&files[0])).unwrap();
     assert!(!text.contains("Secret"), "no page text and no search words in the log");
+    #[cfg(unix)]
     assert_eq!(std::fs::metadata(f.dir.join("log").join(&files[0])).unwrap().permissions().mode() & 0o777, 0o600);
 }
 
@@ -706,9 +743,9 @@ mod through_the_host {
     #[test]
     fn the_host_shares_only_folders_opened_in_it_and_only_their_window_answers() {
         let allow = tempfile::tempdir().unwrap();
-        let root = std::fs::canonicalize(allow.path()).unwrap().join("Notes");
+        let root = thoth_host::paths::canonicalize_path(allow.path()).unwrap().join("Notes");
         std::fs::create_dir(&root).unwrap();
-        let data = tempfile::Builder::new().prefix("mcp").tempdir_in("/tmp").unwrap();
+        let data = temp("mcp");
         let (tx, events) = channel::<(String, Value)>();
         let tx = Mutex::new(tx);
         let host = Host::new(HostConfig {
@@ -823,6 +860,8 @@ fn an_allowed_app_saves_a_memory_without_review_and_the_host_keeps_its_history()
     assert!(f.relay.memory_history("space-other", None).unwrap()["changes"].as_array().unwrap().is_empty());
     assert_eq!(f.relay.memory_history("space-other", change["id"].as_str()).unwrap_err().code, "NOT_ALLOWED");
     let file = f.dir.join("memory").join(format!("{}.json", change["id"].as_str().unwrap()));
+    assert!(file.is_file());
+    #[cfg(unix)]
     assert_eq!(std::fs::metadata(file).unwrap().permissions().mode() & 0o777, 0o600);
     assert_eq!(
         memories_heard(&f, 1)[0],
@@ -1103,8 +1142,8 @@ fn an_addition_to_todays_note_is_a_proposal_and_starts_the_note_when_there_is_no
 #[test]
 fn skills_are_linked_into_the_home_folder_and_nothing_there_is_ever_replaced() {
     let f = fixture(fast());
-    let made = tempfile::Builder::new().prefix("skills").tempdir_in("/tmp").unwrap();
-    let base = std::fs::canonicalize(made.path()).unwrap();
+    let made = temp("skills");
+    let base = thoth_host::paths::canonicalize_path(made.path()).unwrap();
     let (root, home) = (base.join("Notes"), base.join("home"));
     let skill = |name: &str| {
         std::fs::create_dir_all(root.join("Skills").join(name)).unwrap();
