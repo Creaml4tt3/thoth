@@ -8,6 +8,16 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.12.1] - 2026-11-22
+
+### Added
+
+- Connected apps on Windows: Claude Desktop, Cursor, Claude Code and Codex can now use your notes and memory there too.
+
+### Fixed
+
+- Windows: the tab bar no longer shows a scrollbar beside the tabs.
+
 ## [0.12.0] - 2026-11-21
 
 ### Added
@@ -400,6 +410,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.12.1]: https://github.com/Creaml4tt3/thoth/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Creaml4tt3/thoth/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/Creaml4tt3/thoth/compare/v0.10.0...v0.10.1

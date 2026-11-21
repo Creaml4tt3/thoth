@@ -22,17 +22,20 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tempfile = "3"
 thiserror = "2"
-# Windows host file layer and Agent Hub process control (crates/thoth-host/src/win, agent/kill_windows.rs).
+# Windows host file layer, Agent Hub process control and the Connected apps pipe (crates/thoth-host/src/win,
+# agent/kill_windows.rs, mcp/pipe.rs).
 # Exact pin; the same version the Tauri stack already locks.
 windows-sys = { version = "=0.61.2", features = [
   "Wdk_Foundation",
   "Wdk_Storage_FileSystem",
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_Security_Authorization",
   "Win32_Storage_FileSystem",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_IO",
   "Win32_System_JobObjects",
+  "Win32_System_Pipes",
   "Win32_System_Threading",
   "Win32_System_WindowsProgramming",
 ] }

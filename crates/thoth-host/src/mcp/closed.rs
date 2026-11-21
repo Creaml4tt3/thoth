@@ -71,6 +71,13 @@ pub fn serve(dir: &Path, app: Option<&str>, tool: &str, arguments: &Value) -> Op
 }
 
 /// A folder or file of this user that nobody else may change: what the app wrote, not something put in its place.
+#[cfg(windows)]
+fn mine(path: &Path, dir: bool) -> bool {
+    super::pipe::owned_by_me(path, dir)
+}
+
+/// A folder or file of this user that nobody else may change: what the app wrote, not something put in its place.
+#[cfg(unix)]
 fn mine(path: &Path, dir: bool) -> bool {
     use std::os::unix::fs::MetadataExt;
     let me = rustix::process::geteuid().as_raw();
@@ -876,12 +883,12 @@ mod tests {
 
     /// A data folder as the app leaves it, and a shared Private Space with `files`.
     fn setup(settings: Value, files: &[(&str, &str)]) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
-        use std::os::unix::fs::PermissionsExt;
         let tmp = tempfile::tempdir().unwrap();
         let data = tmp.path().join("mcp");
         let root = crate::paths::canonicalize_path(tmp.path()).unwrap().join("Notes");
         std::fs::create_dir_all(&data).unwrap();
-        std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o700)).unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&data, <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700)).unwrap();
         for (path, text) in files {
             let file = root.join(path);
             std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -893,7 +900,8 @@ mod tests {
         settings["memoryFolders"] = json!({ root.to_string_lossy(): "Memory" });
         let file = data.join(SETTINGS_FILE);
         std::fs::write(&file, settings.to_string()).unwrap();
-        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&file, <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600)).unwrap();
         (tmp, data, root)
     }
 
@@ -912,9 +920,24 @@ mod tests {
         let (_tmp, data, _) = setup(json!({ "enabled": false, "closed": true }), &[]);
         assert!(serve(&data, Some("Claude Code"), "recall", &json!({})).is_none());
         // Settings anyone else could have written are not read.
-        let (_tmp, data, _) = setup(on(), &[]);
-        std::fs::set_permissions(&data, <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o777)).unwrap();
-        assert!(serve(&data, Some("Claude Code"), "recall", &json!({})).is_none());
+        #[cfg(unix)]
+        {
+            let (_tmp, data, _) = setup(on(), &[]);
+            std::fs::set_permissions(&data, <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o777)).unwrap();
+            assert!(serve(&data, Some("Claude Code"), "recall", &json!({})).is_none());
+        }
+        // A data folder that is a link to somewhere else is not read either.
+        let (tmp, data, _) = setup(on(), &[]);
+        let link = tmp.path().join("linked");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&data, &link).unwrap();
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_dir(&data, &link).is_ok();
+        #[cfg(unix)]
+        let linked = true;
+        if linked {
+            assert!(serve(&link, Some("Claude Code"), "recall", &json!({})).is_none());
+        }
     }
 
     #[test]

@@ -73,6 +73,16 @@ Constraints from Thoth:
        is refused.
      - A stale socket is replaced, but a live one (another copy of Thoth) is left alone.
      - The socket only exists while Connected apps is on.
+   - **Windows: a named pipe (amended 2026-11-21).** `crates/thoth-host/src/mcp/pipe.rs`.
+     - The pipe is named after the same socket path (`\\.\pipe\thoth-mcp-<hash of the path>`), so the setup an app
+       pastes is the same on every system; no file is made at that path.
+     - Its DACL grants only the user's SID, remote clients are refused, and the app makes the first instance with
+       `FILE_FLAG_FIRST_PIPE_INSTANCE`, so a pipe another user made first is never shared.
+     - `thoth-mcp` connects only when the pipe's server process runs as the same user, and with
+       `SECURITY_IDENTIFICATION`, so a server that is not Thoth cannot act as the user.
+     - The `<app data>/mcp` folder must be the user's own and not a link; its inherited ACL keeps others out.
+     - Skill links (ADR-0052 rule 7) are symbolic links, which Windows allows only with Developer Mode on; without
+       it the switch says so.
    - **Not running or switched off.** When Thoth is not running or Connected apps is off, every tool answers with a
      tool error: "Thoth is not running, or Connected apps is off. Open Thoth and switch on Connected apps (Settings →
      Connected apps), then try again."
@@ -209,8 +219,8 @@ The host's events are `mcp.request` and `mcp.pending`; the shell sends them as `
 - Negative: Thoth must be running, with the Private Space open in a window.
 - Negative: the app name is not verified. A Linux AppImage's sidecar path changes on every launch, because the image
   is mounted somewhere new; use the `.deb` there (Open questions).
-- Negative: Windows is not built yet. The host reports `UNAVAILABLE`, and Settings says "not available on this
-  computer yet".
+- Negative: on Windows, linking skills needs Developer Mode, and Claude Desktop from the Microsoft Store keeps its
+  settings elsewhere (paste the setup there by hand).
 - Follow-up:
   - The release workflow builds the sidecar (`scripts/build-mcp-sidecar.ts`; macOS universal via `lipo`) and merges
     `src-tauri/tauri.sidecar.conf.json` into `tauri build`. `cargo test` and `tauri dev` need no built sidecar.
