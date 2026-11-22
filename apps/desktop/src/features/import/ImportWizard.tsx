@@ -66,7 +66,7 @@ export function ImportWizard({ onClose, onOpenFolder }: Props) {
     setScanning(true);
     await drop();
     try {
-      const result = await service.scan(sourceKindFor(system, format), location);
+      const result = await service.scan(sourceKindFor(system, format), location, undefined, w.folders);
       setScan(result);
       setDestination(result.manifest.options.destinationRoot);
       setStep("preview");

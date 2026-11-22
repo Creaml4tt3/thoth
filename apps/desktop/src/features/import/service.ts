@@ -9,6 +9,7 @@ import {
   planImport,
   resumeImport,
   runImport,
+  type ImportFolderNames,
   type ImportManifest,
   type ImportOptions,
   type ImportPhase,
@@ -39,7 +40,7 @@ export interface RunHandlers {
 
 export interface ImportService {
   /** Opens and validates a source and plans the import. Writes nothing to the vault. */
-  scan(kind: ImportSourceKind, location: string, options?: Partial<ImportOptions>): Promise<ScanResult>;
+  scan(kind: ImportSourceKind, location: string, options?: Partial<ImportOptions>, names?: ImportFolderNames): Promise<ScanResult>;
   /** Plans again over the same open source with new destination or options. Writes nothing. */
   replan(scan: ScanResult, options: Partial<ImportOptions>): Promise<ScanResult>;
   /** Releases a scan that will not be run. */
@@ -67,8 +68,8 @@ export function createImportService(vault: Vault, openSource: OpenSource, option
   const { onFinished } = options;
   const running = new Map<string, AbortController>();
 
-  const plan = async (source: ImportSource, provider: ImportProvider, options: Partial<ImportOptions> | undefined): Promise<ScanResult> => {
-    const { manifest, preview } = await planImport({ vault, source, provider, ...(options ? { options } : {}) });
+  const plan = async (source: ImportSource, provider: ImportProvider, options: Partial<ImportOptions> | undefined, names?: ImportFolderNames): Promise<ScanResult> => {
+    const { manifest, preview } = await planImport({ vault, source, provider, ...(options ? { options } : {}), ...(names ? { names } : {}) });
     return { preview, manifest, source, provider };
   };
 
@@ -89,10 +90,10 @@ export function createImportService(vault: Vault, openSource: OpenSource, option
   };
 
   return {
-    async scan(kind, location, options) {
+    async scan(kind, location, options, names) {
       const { source, provider } = await openSource(kind, location);
       try {
-        return await plan(source, provider, options);
+        return await plan(source, provider, options, names);
       } catch (error) {
         await source.close().catch(() => undefined);
         throw error;

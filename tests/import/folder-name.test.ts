@@ -40,4 +40,10 @@ describe("defaultImportRoot", () => {
     expect(await defaultImportRoot(async (p) => taken.has(p), "Notion import 2026-10-22")).toBe("Imports/Notion import 2026-10-22 3");
     expect(await defaultImportRoot(async () => false, "MyVault")).toBe("Imports/MyVault");
   });
+
+  it("speaks the user's language", async () => {
+    const th = { parent: "นำเข้า", untitled: (system: string, date: string) => `นำเข้าจาก ${system} ${date}` };
+    expect(importFolderName("...", "notion", DAY, th)).toBe("นำเข้าจาก Notion 2026-10-22");
+    expect(await defaultImportRoot(async () => false, "งานวิจัย", th.parent)).toBe("นำเข้า/งานวิจัย");
+  });
 });
