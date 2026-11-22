@@ -936,8 +936,7 @@ impl Inner {
             "Proposed {what} {path} in {}. It waits for the user's review in Thoth and nothing is written until they apply it. Proposal {} (pending); check it later with get_proposal.",
             target.label, record.id
         );
-        let structured =
-            json!({ "id": record.id, "status": "pending", "space": target.label, "path": path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS) });
+        let structured = json!({ "id": record.id, "status": "pending", "space": target.label, "path": path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS), "message": text });
         Ok(tools::Answer { text, structured, paths: vec![path] })
     }
 
@@ -1109,8 +1108,9 @@ impl Inner {
         let change = tools::memory_change(&self.request(target, "memory_change", args)?, folder)?;
         let paths = vec![change.path.clone()];
         if change.before == change.after {
-            let structured = json!({ "status": "unchanged", "space": target.label, "path": change.path, "id": change.id });
-            return Ok(tools::Answer { text: format!("{} already says this; nothing changed.", change.path), structured, paths });
+            let text = format!("{} already says this; nothing changed.", change.path);
+            let structured = json!({ "status": "unchanged", "space": target.label, "path": change.path, "id": change.id, "message": text });
+            return Ok(tools::Answer { text, structured, paths });
         }
         let without_review = {
             let state = self.state();
@@ -1140,7 +1140,7 @@ impl Inner {
                 "The user reviews memories from {app} before they are saved: this one waits in Thoth as proposal {} (pending). Nothing is saved until they apply it.",
                 record.id
             );
-            let structured = json!({ "status": "pending", "proposal": record.id, "space": target.label, "path": change.path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS) });
+            let structured = json!({ "status": "pending", "proposal": record.id, "space": target.label, "path": change.path, "expiresAt": log::iso(record.created + proposals::KEEP_SECS), "message": text });
             return Ok(tools::Answer { text, structured, paths });
         }
         if self.history.today(app) >= memory::DAILY_LIMIT {
@@ -1192,14 +1192,14 @@ impl Inner {
             memory::Action::Updated => ("saved", "Updated"),
             memory::Action::Forgot => ("forgotten", "Forgot"),
         };
-        let mut structured = json!({ "status": status, "space": target.label, "path": change.path, "id": change.id });
-        if let Some(hash) = after_hash {
-            structured["version"] = json!(hash);
-        }
         let text = match action {
             memory::Action::Forgot => format!("Forgot {}: it is in the system Trash, and will not be saved again.", change.path),
             _ => format!("{said} {} in {}.", change.path, target.label),
         };
+        let mut structured = json!({ "status": status, "space": target.label, "path": change.path, "id": change.id, "message": text });
+        if let Some(hash) = after_hash {
+            structured["version"] = json!(hash);
+        }
         Ok(tools::Answer { text, structured, paths })
     }
 

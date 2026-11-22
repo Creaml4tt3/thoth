@@ -411,7 +411,7 @@ fn tool_answers_and_their_errors() {
     assert_eq!(read["result"]["text"], PLAN);
     assert_eq!(
         read["result"]["structured"],
-        json!({ "space": "Notes", "path": "Plan.md", "id": "p1", "title": "Plan", "attachments": ["chart.png"], "version": PLAN_HASH })
+        json!({ "space": "Notes", "path": "Plan.md", "id": "p1", "title": "Plan", "markdown": PLAN, "attachments": ["chart.png"], "version": PLAN_HASH })
     );
     let back = ask(&socket, "Claude", "backlinks", json!({ "path": "Plan.md" }));
     assert_eq!(back["result"]["structured"]["backlinks"], json!([{ "path": "Log.md", "title": "Log", "id": "p2", "line": 3 }]));
@@ -557,6 +557,7 @@ fn an_app_proposes_only_once_the_user_lets_it_and_the_call_writes_nothing() {
     assert_eq!((made["status"].clone(), made["space"].clone(), made["path"].clone()), (json!("pending"), json!("Notes"), json!("Plan.md")));
     let id = made["id"].as_str().unwrap();
     assert!(answer["result"]["text"].as_str().unwrap().contains("nothing is written"));
+    assert_eq!(made["message"], answer["result"]["text"], "apps that read only structuredContent see the review hint too");
     assert_eq!(f.relay.settings()["apps"][0]["propose"], true);
 
     // The window was only asked to read the page, never sent the proposed text.
@@ -1206,8 +1207,13 @@ fn a_shared_workspaces_team_memory_is_reached_through_a_window_and_never_forgott
     );
 
     let saved = ask(&socket(&f), "Claude", "remember", json!({ "space": "Studio", "text": "Put blockers first.", "kind": "preference" }));
-    assert_eq!(saved["result"]["structured"], json!({ "status": "pending", "proposal": "mem_abc", "space": "Studio", "title": "Blockers first" }), "{saved}");
-    assert!(saved["result"]["text"].as_str().unwrap().contains("waits for review"));
+    let text = saved["result"]["text"].as_str().unwrap();
+    assert!(text.contains("waits for review"));
+    assert_eq!(
+        saved["result"]["structured"],
+        json!({ "status": "pending", "proposal": "mem_abc", "space": "Studio", "title": "Blockers first", "message": text }),
+        "{saved}"
+    );
     let asked = f.requests.lock().unwrap().last().cloned().unwrap();
     assert_eq!(
         (asked["tool"].clone(), asked["args"]["app"].clone(), asked["args"]["op"].clone()),

@@ -760,8 +760,9 @@ fn remember(dir: &Path, settings: &Settings, app: &str, call: &Call, space: &Spa
         before: None,
         after: Some(file),
     });
-    let structured = json!({ "status": "saved", "space": space.label, "path": path, "id": id, "version": hash });
-    Ok(Answer { text: format!("Saved {path} in {}.", space.label), structured, paths: vec![path] })
+    let text = format!("Saved {path} in {}.", space.label);
+    let structured = json!({ "status": "saved", "space": space.label, "path": path, "id": id, "version": hash, "message": text });
+    Ok(Answer { text, structured, paths: vec![path] })
 }
 
 /// `cleanMemoryText` (memory.ts).
