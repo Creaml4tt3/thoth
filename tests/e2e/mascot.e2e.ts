@@ -109,6 +109,14 @@ test("drag the mascot, move it with keys, shrink and expand it, change its setti
   await section.getByRole("button", { name: "Reset position" }).click();
   await expect.poll(async () => Math.round((await box(page)).x)).toBe(1200 - 24 - Math.round(88 * 1.2));
 
+  // The import wizard's lower buttons stay clickable: the mascot steps aside while it is open.
+  await page.getByRole("tablist", { name: "Settings sections" }).getByRole("tab", { name: "Import notes" }).click();
+  await page.getByRole("tabpanel", { name: "Import notes" }).getByRole("button", { name: "Import from Notion or Obsidian" }).click();
+  await expect(page.getByRole("region", { name: "Import" })).toBeVisible();
+  await expect(layer(page)).toBeHidden();
+  await page.getByRole("region", { name: "Import" }).getByRole("button", { name: "Close" }).click();
+  await expect(layer(page)).toBeVisible();
+
   // Run a task from the bubble, review it, apply it.
   const tree = page.getByRole("tree", { name: "Pages in this Private Space" });
   await tree.getByText("Notes", { exact: true }).click();

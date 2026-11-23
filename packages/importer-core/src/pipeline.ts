@@ -16,7 +16,7 @@ import {
   type ImportWarning,
 } from "@thoth/domain";
 import type { Vault } from "@thoth/local-store";
-import { defaultImportRoot, folderExists, importFolderName } from "./folder-name.ts";
+import { defaultImportRoot, folderExists, importFolderName, type ImportFolderNames } from "./folder-name.ts";
 import { hashStream } from "./hash.ts";
 import {
   IMPORT_STAGING_DIR,
@@ -172,6 +172,8 @@ export interface PlanInput {
   options?: Partial<ImportOptions>;
   jobId?: string;
   now?: () => number;
+  /** The default folder's words in the user's language (English when not given). */
+  names?: ImportFolderNames;
 }
 
 /**
@@ -183,7 +185,9 @@ export async function planImport(input: PlanInput): Promise<{ manifest: ImportMa
   const now = input.now ?? Date.now;
   const jobId = input.jobId ?? newStableId(now());
   const options: ImportOptions = {
-    destinationRoot: input.options?.destinationRoot ?? (await defaultImportRoot(folderExists((dir) => vault.fs.list(dir)), importFolderName(source.label, provider.system, now()))),
+    destinationRoot:
+      input.options?.destinationRoot ??
+      (await defaultImportRoot(folderExists((dir) => vault.fs.list(dir)), importFolderName(source.label, provider.system, now(), input.names), input.names?.parent)),
     conflictPolicy: input.options?.conflictPolicy ?? "rename",
     addIdentityFrontmatter: input.options?.addIdentityFrontmatter ?? true,
   };

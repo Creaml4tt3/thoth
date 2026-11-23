@@ -1120,6 +1120,7 @@ export const th: DesktopStrings = {
       report: "รายงาน",
     },
     stepOf: (step, total) => `นำเข้าโน้ต · ขั้นที่ ${step} จาก ${total}`,
+    folders: { parent: "นำเข้า", untitled: (system, date) => `นำเข้าจาก ${system} ${date}` }, // REVIEW
     close: "ปิด",
     back: "ย้อนกลับ",
     continue: "ต่อไป",

@@ -1174,6 +1174,8 @@ export const en = {
       report: "Report",
     } satisfies Record<Step, string>,
     stepOf: (step: number, total: number) => `Import notes · Step ${step} of ${total}`,
+    /** The default destination: `<parent>/<the source's name>`, or `untitled` when its name is all generated IDs. */
+    folders: { parent: "Imports", untitled: (system: string, date: string) => `${system} import ${date}` },
     close: "Close",
     back: "Back",
     continue: "Continue",

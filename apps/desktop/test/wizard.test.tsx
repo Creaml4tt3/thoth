@@ -169,6 +169,8 @@ describe("import wizard", () => {
       expect(screen.getByText(w.warnings.malformed_frontmatter!.title)).toBeTruthy();
       await app.user.click(screen.getByRole("button", { name: w.continue }));
       expect(screen.getByText(w.destination.later)).toBeTruthy();
+      // The default folder is named in Thai too.
+      expect((within(screen.getByRole("region", { name: w.region })).getByRole("textbox") as HTMLInputElement).value).toBe("นำเข้า/obsidian-vault");
       await app.user.click(screen.getByRole("button", { name: w.continue }));
       await app.user.click(screen.getByRole("button", { name: w.options.start }));
       const report = await screen.findByTestId("import-report", {}, { timeout: 15000 });

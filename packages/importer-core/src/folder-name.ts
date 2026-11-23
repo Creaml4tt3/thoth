@@ -10,6 +10,16 @@ const HEX_ID = /\b[0-9a-f]{32}\b/gi;
 const UNSAFE = /[\\/:*?"<>|\u0000-\u001f\u007f]+/g;
 const SYSTEM_NAME: Record<ImportProvider["system"], string> = { notion: "Notion", obsidian: "Obsidian" };
 
+/** The words in a default import folder, in the user's language. */
+export interface ImportFolderNames {
+  /** The folder every import goes under. */
+  parent: string;
+  /** The name when the source's own has nothing readable: "<System> import <date>". */
+  untitled: (system: string, date: string) => string;
+}
+
+export const ENGLISH_FOLDER_NAMES: ImportFolderNames = { parent: "Imports", untitled: (system, date) => `${system} import ${date}` };
+
 function truncate(text: string, max: number): string {
   const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)].map((s) => s.segment);
   if (graphemes.length <= max) return text;
@@ -31,7 +41,7 @@ function localDate(ms: number): string {
  * `<uuid>_Export-<uuid>.zip`, which would otherwise become a 90-character folder.
  * When nothing readable is left, the name is "<System> import <date>".
  */
-export function importFolderName(sourceLabel: string, system: ImportProvider["system"], now: number = Date.now()): string {
+export function importFolderName(sourceLabel: string, system: ImportProvider["system"], now: number = Date.now(), names: ImportFolderNames = ENGLISH_FOLDER_NAMES): string {
   const stem = stripExtension(sourceLabel).normalize("NFC");
   const generated = UUID.test(stem);
   UUID.lastIndex = 0;
@@ -44,13 +54,13 @@ export function importFolderName(sourceLabel: string, system: ImportProvider["sy
     .replace(/(\s*-\s*){2,}/g, " - ")
     .replace(/^[\s.\-]+|[\s.\-]+$/g, "");
   const name = truncate(readable, MAX_IMPORT_FOLDER_CHARS).replace(/[\s.\-]+$/, "");
-  return name !== "" ? name : `${SYSTEM_NAME[system]} import ${localDate(now)}`;
+  return name !== "" ? name : names.untitled(SYSTEM_NAME[system], localDate(now));
 }
 
-/** `Imports/<name>`, with " 2", " 3"… appended when that folder already exists in the vault. */
-export async function defaultImportRoot(existing: (path: string) => Promise<boolean>, name: string): Promise<string> {
+/** `Imports/<name>` (`parent`), with " 2", " 3"… appended when that folder already exists in the vault. */
+export async function defaultImportRoot(existing: (path: string) => Promise<boolean>, name: string, parent: string = ENGLISH_FOLDER_NAMES.parent): Promise<string> {
   for (let n = 1; ; n++) {
-    const candidate = `Imports/${n === 1 ? name : `${name} ${n}`}`;
+    const candidate = `${parent}/${n === 1 ? name : `${name} ${n}`}`;
     if (!(await existing(candidate))) return candidate;
   }
 }

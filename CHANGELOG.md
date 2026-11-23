@@ -8,6 +8,14 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.12.2] - 2026-11-23
+
+### Fixed
+
+- Claude Code now reads the text of pages and skills from Thoth. Before, it saw only their titles and answered from those.
+- Importing in Thai puts your notes in a Thai-named folder instead of "Imports".
+- The Thoth assistant steps aside while you import notes, so it no longer covers the import's buttons.
+
 ## [0.12.1] - 2026-11-22
 
 ### Added
@@ -410,6 +418,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.12.2]: https://github.com/Creaml4tt3/thoth/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Creaml4tt3/thoth/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Creaml4tt3/thoth/compare/v0.10.1...v0.11.0

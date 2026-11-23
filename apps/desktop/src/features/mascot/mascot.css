@@ -191,3 +191,5 @@
 /* Settings ends with room for the mascot's largest box (140% of 88 px) and its gap, so the last lines can scroll clear of
    the corner it sits in. */
 body:has(.mascot-layer) .settings { padding-bottom: 160px; }
+/* The import wizard's buttons end low in the window, where the mascot sits: it steps aside until the wizard closes. */
+body:has(.wizard) .mascot-layer { display: none; }
