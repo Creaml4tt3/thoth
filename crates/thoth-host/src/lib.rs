@@ -326,7 +326,16 @@ impl Host {
         }
         let wants_bytes = matches!(
             command,
-            "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save" | "ocr.read" | "opened.write" | "opened.copy"
+            "fs.write"
+                | "source.temp.write"
+                | "api.call"
+                | "agent.fs.write"
+                | "agent.start"
+                | "agent.history.write"
+                | "file.save"
+                | "ocr.read"
+                | "opened.write"
+                | "opened.copy"
         );
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));

@@ -694,9 +694,7 @@ fn open_paths<R: tauri::Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
                 focus(&window);
                 Ok(())
             }
-            Open::NewSpace { root, page } => {
-                space_window(app, &root, &page)
-            }
+            Open::NewSpace { root, page } => space_window(app, &root, &page),
             Open::NewFile(path) => {
                 let label = new_label("file-");
                 let token = host.grant_file(&label, path);
@@ -726,7 +724,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 if app.get_webview_window(&window.label).is_some() {
                     return Err(InvokeError::from(HostError::bad_argument("That window is open already")));
                 }
-                build_window(&app, &window.label, window.page, window.at).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                build_window(&app, &window.label, window.page, window.at)
+                    .map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
                 Ok(InvokeResponseBody::Json("null".to_owned()))
             }
             "window_close" => {
@@ -755,7 +754,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 let token = args.get("token").and_then(Value::as_str).ok_or_else(|| InvokeError::from(HostError::bad_argument("token must be a string")))?;
                 let (folder, name) = host.promote_file(&caller, token).map_err(InvokeError::from)?;
                 // The file window closes only once the Space window is there; it gives its file back as it goes.
-                space_window(&app, &folder.to_string_lossy(), &name).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                space_window(&app, &folder.to_string_lossy(), &name)
+                    .map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
                 if let Some(window) = app.get_webview_window(&caller) {
                     let _ = window.destroy();
                 }
