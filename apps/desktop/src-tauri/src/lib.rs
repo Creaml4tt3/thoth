@@ -24,7 +24,7 @@
 //! webview gets no http, opener or shell permission.
 use serde_json::Value;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -454,7 +454,7 @@ fn contract_name(tauri_command: &str) -> Option<&'static str> {
 }
 
 /// The shell's own commands (not the host's): Thoth's windows on a Private Space (ADR-0019).
-pub const SHELL_COMMANDS: &[&str] = &["window_open", "window_close"];
+pub const SHELL_COMMANDS: &[&str] = &["window_open", "window_close", "file_promote"];
 /// Sent to the other windows when the user closes one (never while the app quits): they forget it, so it does not come back.
 pub const WINDOW_CLOSED_EVENT: &str = "thoth:window-closed";
 /// The longest tab list a new window starts with (30 tabs of long paths fit many times over).
@@ -471,6 +471,95 @@ const CLOSE_ANSWER_TIMEOUT: Duration = Duration::from_secs(4);
 /// grants Thoth's commands to `main` and `space-*`; nothing else can be made through `window_open`.
 fn is_window_label(label: &str) -> bool {
     label.strip_prefix("space-").is_some_and(|id| (1..=32).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+}
+
+/// Is `label` a window on one Markdown file the system handed over (`file-` and 1 to 32 lowercase letters or digits,
+/// ADR-0057)? Only the shell makes these (`open_paths`); `capabilities/file.json` grants them the `opened.*` commands only.
+fn is_file_window_label(label: &str) -> bool {
+    label.strip_prefix("file-").is_some_and(|id| (1..=32).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+}
+
+/// Sent to the window that has a Private Space open, to open one of its pages as a tab (ADR-0057): `{ root, page }`.
+pub const OPEN_PAGE_EVENT: &str = "thoth:open-page";
+
+/// What to do with one Markdown file the system handed over (ADR-0057).
+#[derive(Debug, PartialEq)]
+enum Open {
+    /// Its Private Space is open in `window`: a tab there.
+    Tab { window: String, root: String, page: String },
+    /// Its Private Space is known but no window has it: a new window on it, with this page.
+    NewSpace { root: String, page: String },
+    /// Already open on its own in this window.
+    Focus(String),
+    /// Anywhere else: a new file window.
+    NewFile(PathBuf),
+}
+
+/// Decides, for files already checked (`opened::check_opened`), where each opens. `recent` are the Private Spaces Thoth
+/// opened before; `space_window` and `file_window` say which window has a Space or a file open now. Files that would need
+/// a window past `MAX_WINDOWS` (with `windows` open now) are left out; the same file twice opens once.
+fn plan_opens(
+    paths: &[PathBuf],
+    recent: &[String],
+    space_window: impl Fn(&str) -> Option<String>,
+    file_window: impl Fn(&Path) -> Option<String>,
+    windows: usize,
+) -> Vec<Open> {
+    let mut plan: Vec<Open> = Vec::new();
+    let mut windows = windows;
+    let mut seen: BTreeSet<&Path> = BTreeSet::new();
+    for path in paths {
+        if !seen.insert(path) {
+            continue;
+        }
+        let open = match thoth_host::opened::route(path, recent) {
+            thoth_host::opened::Route::Space { root, page } => match space_window(&root) {
+                Some(window) => Open::Tab { window, root, page },
+                None => Open::NewSpace { root, page },
+            },
+            thoth_host::opened::Route::Loose(file) => match file_window(&file) {
+                Some(window) => Open::Focus(window),
+                None => Open::NewFile(file),
+            },
+        };
+        if matches!(open, Open::NewSpace { .. } | Open::NewFile(_)) {
+            if windows >= MAX_WINDOWS {
+                continue;
+            }
+            windows += 1;
+        }
+        plan.push(open);
+    }
+    plan
+}
+
+/// Files the system handed over before the app could open them (macOS sends them before the first window exists).
+/// Holds them until `ready`; after that nothing waits.
+struct OpenQueue(Mutex<(bool, Vec<PathBuf>)>);
+
+impl Default for OpenQueue {
+    fn default() -> Self {
+        Self(Mutex::new((false, Vec::new())))
+    }
+}
+
+impl OpenQueue {
+    /// Keeps `paths` while the app is not ready and says so (true); once ready, false: the caller opens them now.
+    fn push(&self, paths: Vec<PathBuf>) -> bool {
+        let mut state = locked(&self.0);
+        if state.0 {
+            return false;
+        }
+        state.1.extend(paths);
+        true
+    }
+
+    /// The app is ready: what waited, once.
+    fn ready(&self) -> Vec<PathBuf> {
+        let mut state = locked(&self.0);
+        state.0 = true;
+        std::mem::take(&mut state.1)
+    }
 }
 
 /// Percent-encodes everything but the unreserved characters, for a query value.
@@ -528,6 +617,99 @@ fn new_window(args: &Value, recent: &[String], open: usize) -> HostResult<NewWin
     Ok(NewWindow { label: label.to_owned(), page, at })
 }
 
+/// Makes one of Thoth's windows on the app's own page `page`, focused, near `at` when given: the Space windows of
+/// `window_open` and the windows `open_paths` makes for files the system handed over.
+fn build_window<R: tauri::Runtime>(app: &AppHandle<R>, label: &str, page: String, at: Option<(f64, f64)>) -> tauri::Result<tauri::WebviewWindow<R>> {
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
+        .title("Thoth")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(720.0, 480.0)
+        // Files dropped from the system arrive as the page's own drop events (images, ADR-0028), not as paths.
+        .disable_drag_drop_handler()
+        // Cmd/Ctrl + - = 0 zoom the page (WCAG 1.4.4), as in the main window (tauri.conf.json).
+        .zoom_hotkeys_enabled(true)
+        .focused(true);
+    // The same translucent sidebar as the main window (tauri.macos.conf.json; ADR-0053 amendment).
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::utils::config::WindowEffectsConfig;
+        use tauri::window::{Effect, EffectState};
+        builder = builder.transparent(true).effects(WindowEffectsConfig {
+            effects: vec![Effect::Sidebar],
+            state: Some(EffectState::FollowsWindowActiveState),
+            ..Default::default()
+        });
+    }
+    // The tab was let go here: the new window's tab bar starts under the pointer.
+    if let Some((x, y)) = at {
+        builder = builder.position((x - 140.0).max(0.0), (y - 20.0).max(0.0));
+    }
+    builder.build()
+}
+
+/// A new window id after `prefix`: 16 random lowercase hex digits.
+fn new_label(prefix: &str) -> String {
+    let mut bytes = [0u8; 8];
+    let _ = getrandom::fill(&mut bytes);
+    format!("{prefix}{}", bytes.iter().map(|b| format!("{b:02x}")).collect::<String>())
+}
+
+/// Files the system handed over before the app could open them (`OPENED.ready()` in `setup`).
+static OPENED: OnceLock<OpenQueue> = OnceLock::new();
+
+/// Opens Markdown files the system handed over (Open With, a Dock drop, a second launch; ADR-0057): each one is
+/// checked, then opens as a tab of its Private Space or in a window of its own. Never logs a path, only counts.
+fn open_paths<R: tauri::Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
+    let queue = OPENED.get_or_init(OpenQueue::default);
+    if paths.is_empty() || queue.push(paths.clone()) {
+        return;
+    }
+    let Some(host) = HOST.get().cloned() else { return };
+    let checked: Vec<PathBuf> = paths.iter().filter_map(|p| thoth_host::opened::check_opened(p)).collect();
+    let refused = paths.len() - checked.len();
+    if refused > 0 {
+        log::info!(target: "shell", "{refused} opened file(s) refused (not a Markdown file Thoth opens)");
+    }
+    let plan = plan_opens(&checked, &host.recent(), |root| host.owner_of_root(root), |file| host.file_owner(file), app.webview_windows().len());
+    let skipped = checked.len() - plan.len();
+    if skipped > 0 {
+        log::info!(target: "shell", "{skipped} opened file(s) skipped: too many windows");
+    }
+    for open in plan {
+        let focus = |label: &str| {
+            if let Some(w) = app.get_webview_window(label) {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        };
+        let made = match open {
+            Open::Tab { window, root, page } => {
+                let _ = app.emit_to(window.as_str(), OPEN_PAGE_EVENT, serde_json::json!({ "root": root, "page": page }));
+                focus(&window);
+                Ok(())
+            }
+            Open::Focus(window) => {
+                focus(&window);
+                Ok(())
+            }
+            Open::NewSpace { root, page } => {
+                let label = new_label("space-");
+                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&root), query_escape(&page));
+                build_window(app, &label, page, None).map(|_| ())
+            }
+            Open::NewFile(path) => {
+                let label = new_label("file-");
+                let token = host.grant_file(&label, path);
+                let page = format!("index.html?window={label}&file={}", query_escape(&token));
+                build_window(app, &label, page, None).map(|_| ())
+            }
+        };
+        if let Err(e) = made {
+            log::warn!(target: "shell", "an opened file's window could not be made: {e}");
+        }
+    }
+}
+
 /// `window_open` and `window_close`, for the window that asked.
 fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
     let webview = invoke.message.webview();
@@ -544,31 +726,7 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 if app.get_webview_window(&window.label).is_some() {
                     return Err(InvokeError::from(HostError::bad_argument("That window is open already")));
                 }
-                let mut builder = WebviewWindowBuilder::new(&app, &window.label, WebviewUrl::App(window.page.into()))
-                    .title("Thoth")
-                    .inner_size(1200.0, 800.0)
-                    .min_inner_size(720.0, 480.0)
-                    // Files dropped from the system arrive as the page's own drop events (images, ADR-0028), not as paths.
-                    .disable_drag_drop_handler()
-                    // Cmd/Ctrl + - = 0 zoom the page (WCAG 1.4.4), as in the main window (tauri.conf.json).
-                    .zoom_hotkeys_enabled(true)
-                    .focused(true);
-                // The same translucent sidebar as the main window (tauri.macos.conf.json; ADR-0053 amendment).
-                #[cfg(target_os = "macos")]
-                {
-                    use tauri::utils::config::WindowEffectsConfig;
-                    use tauri::window::{Effect, EffectState};
-                    builder = builder.transparent(true).effects(WindowEffectsConfig {
-                        effects: vec![Effect::Sidebar],
-                        state: Some(EffectState::FollowsWindowActiveState),
-                        ..Default::default()
-                    });
-                }
-                // The tab was let go here: the new window's tab bar starts under the pointer.
-                if let Some((x, y)) = window.at {
-                    builder = builder.position((x - 140.0).max(0.0), (y - 20.0).max(0.0));
-                }
-                builder.build().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                build_window(&app, &window.label, window.page, window.at).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
                 Ok(InvokeResponseBody::Json("null".to_owned()))
             }
             "window_close" => {
@@ -586,6 +744,28 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                     window.destroy().map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be closed: {e}"))))?;
                 }
                 Ok(InvokeResponseBody::Json(closes.to_string()))
+            }
+            // A file window's "Open its folder as a Private Space" (ADR-0057): its token is taken back, the folder is
+            // allowed as if picked, a Space window opens on it with this file's tab, and the file window closes.
+            "file_promote" => {
+                let host = host.get().cloned().ok_or_else(|| InvokeError::from(HostError::internal("Host is not ready")))?;
+                if !is_file_window_label(&caller) {
+                    return Err(InvokeError::from(HostError::not_allowed("Only a file window opens its folder")));
+                }
+                let token = args.get("token").and_then(Value::as_str).ok_or_else(|| InvokeError::from(HostError::bad_argument("token must be a string")))?;
+                let path = host.take_file(&caller, token).ok_or_else(|| InvokeError::from(HostError::not_allowed("This window was not given that file")))?;
+                let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
+                    return Err(InvokeError::from(HostError::internal("An opened file has no folder")));
+                };
+                host.allow_root(folder.to_path_buf());
+                let root = folder.to_string_lossy().into_owned();
+                let label = new_label("space-");
+                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&root), query_escape(&name.to_string_lossy()));
+                build_window(&app, &label, page, None).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                if let Some(window) = app.get_webview_window(&caller) {
+                    let _ = window.destroy();
+                }
+                Ok(InvokeResponseBody::Json("null".to_owned()))
             }
             _ => Err(InvokeError::from(HostError::bad_argument("Unknown shell command"))),
         }
@@ -816,7 +996,10 @@ fn attach_log(app: &AppHandle) -> bool {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+/// Starts the app. `files`: the Markdown files this launch was asked to open (Windows and Linux pass them as arguments,
+/// read by `main.rs`; macOS sends `RunEvent::Opened`). They are only ever opened as files (ADR-0057), never read as settings.
+pub fn run(files: Vec<PathBuf>) {
+    OPENED.get_or_init(OpenQueue::default).push(files);
     let context = tauri::generate_context!();
     // Before the builder: the config's window (and on Linux its webview folder, the data folder) is made before `setup`.
     move_legacy_data_dir(&context.config().identifier);
@@ -827,6 +1010,12 @@ pub fn run() {
             quit(app);
         }
     });
+    // Windows and Linux: Open With on a Markdown file while Thoth runs starts a second copy, which hands its arguments
+    // here and exits (ADR-0057). Registered first, as the plugin asks. macOS sends `RunEvent::Opened` instead.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        open_paths(app, argv.iter().skip(1).map(PathBuf::from).collect());
+    }));
     builder
         .plugin(tauri_plugin_dialog::init())
         // System notifications (ADR-0018): the webview may only check and ask for the permission and show one.
@@ -924,6 +1113,16 @@ pub fn run() {
         .build(context)
         .expect("failed to build the Thoth app")
         .run(|app, event| {
+            // The main window exists from here on: files handed over before it open now (ADR-0057).
+            if let tauri::RunEvent::Ready = event {
+                let waiting = OPENED.get_or_init(OpenQueue::default).ready();
+                open_paths(app, waiting);
+            }
+            // macOS: Open With, a Dock drop or a double-click on a Markdown file, at start or while running.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                open_paths(app, urls.iter().filter(|u| u.scheme() == "file").filter_map(|u| u.to_file_path().ok()).collect());
+            }
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 EXITING.store(true, Ordering::SeqCst);
             }
@@ -952,6 +1151,95 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn file_window_label_rules() {
+        assert!(is_file_window_label("file-abc123"));
+        for bad in ["file-", "file-ABC", "files-a", "space-a", &format!("file-{}", "a".repeat(33))] {
+            assert!(!is_file_window_label(bad), "{bad}");
+        }
+        assert!(!is_window_label("file-abc"), "window_open never makes a file window");
+    }
+
+    #[test]
+    fn file_capability_is_least_privilege() {
+        let file: Value = serde_json::from_str(include_str!("../capabilities/file.json")).unwrap();
+        assert_eq!(file["windows"], json!(["file-*"]));
+        let allowed = [
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            "core:webview:allow-set-webview-zoom",
+            "core:window:allow-set-theme",
+            "allow-opened-stat",
+            "allow-opened-read",
+            "allow-opened-write",
+            "allow-opened-copy",
+            "allow-window-close",
+            "allow-file-promote",
+        ];
+        let granted: BTreeSet<&str> = file["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+        assert_eq!(granted, BTreeSet::from(allowed));
+        assert!(!include_str!("../capabilities/main.json").contains("allow-opened-"));
+        assert!(!include_str!("../capabilities/main.json").contains("allow-file-promote"));
+    }
+
+    #[test]
+    fn file_associations_offer_md_without_owning_it() {
+        let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let assoc = &conf["bundle"]["fileAssociations"][0];
+        assert_eq!(assoc["ext"], json!(["md", "markdown"]));
+        assert_eq!(assoc["role"], "Editor");
+        assert_eq!(assoc["rank"], "Alternate");
+    }
+
+    fn opens(paths: &[&str], recent: &[&str], open_roots: &[(&str, &str)], open_files: &[(&str, &str)], windows: usize) -> Vec<Open> {
+        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        let recent: Vec<String> = recent.iter().map(|r| (*r).to_owned()).collect();
+        plan_opens(
+            &paths,
+            &recent,
+            |root| open_roots.iter().find(|(r, _)| *r == root).map(|(_, w)| (*w).to_owned()),
+            |file| open_files.iter().find(|(f, _)| Path::new(f) == file).map(|(_, w)| (*w).to_owned()),
+            windows,
+        )
+    }
+
+    #[test]
+    fn opened_files_route_to_their_space_or_their_own_window() {
+        assert_eq!(
+            opens(&["/n/a.md", "/n/sub/b.md", "/d/c.md"], &["/n"], &[("/n", "space-x")], &[], 1),
+            vec![
+                Open::Tab { window: "space-x".into(), root: "/n".into(), page: "a.md".into() },
+                Open::Tab { window: "space-x".into(), root: "/n".into(), page: "sub/b.md".into() },
+                Open::NewFile(PathBuf::from("/d/c.md")),
+            ]
+        );
+        // A known Space no window has open gets a new window on it.
+        assert_eq!(opens(&["/n/a.md"], &["/n"], &[], &[], 1), vec![Open::NewSpace { root: "/n".into(), page: "a.md".into() }]);
+    }
+
+    #[test]
+    fn same_loose_file_focuses_its_window() {
+        assert_eq!(opens(&["/d/c.md"], &[], &[], &[("/d/c.md", "file-q")], 2), vec![Open::Focus("file-q".into())]);
+        // Twice in one batch: one window.
+        assert_eq!(opens(&["/d/c.md", "/d/c.md"], &[], &[], &[], 1), vec![Open::NewFile(PathBuf::from("/d/c.md"))]);
+    }
+
+    #[test]
+    fn opened_files_never_go_past_the_window_limit() {
+        assert_eq!(opens(&["/d/a.md", "/d/b.md"], &[], &[], &[], MAX_WINDOWS - 1), vec![Open::NewFile(PathBuf::from("/d/a.md"))]);
+        // A tab in an open window needs no new window.
+        assert_eq!(opens(&["/n/a.md"], &["/n"], &[("/n", "main")], &[], MAX_WINDOWS).len(), 1);
+    }
+
+    #[test]
+    fn opened_before_ready_is_queued_then_opened() {
+        let queue = OpenQueue::default();
+        assert!(queue.push(vec![PathBuf::from("/d/a.md")]), "not ready: kept");
+        assert_eq!(queue.ready(), vec![PathBuf::from("/d/a.md")]);
+        assert_eq!(queue.ready(), Vec::<PathBuf>::new(), "taken once");
+        assert!(!queue.push(vec![PathBuf::from("/d/b.md")]), "ready: opened at once, not kept");
+    }
+
+    #[test]
     fn every_contract_command_has_a_tauri_command_and_permission() {
         let build = include_str!("../build.rs");
         let capability = include_str!("../capabilities/main.json");
@@ -975,9 +1263,13 @@ mod tests {
     fn the_shell_commands_have_a_permission_and_are_not_host_commands() {
         let build = include_str!("../build.rs");
         let capability = include_str!("../capabilities/main.json");
+        let file_window = include_str!("../capabilities/file.json");
         for command in SHELL_COMMANDS {
             assert!(build.contains(&format!("\"{command}\"")), "{command} missing from build.rs");
-            assert!(capability.contains(&format!("\"allow-{}\"", command.replace('_', "-"))), "{command} missing from capability");
+            let permission = format!("\"allow-{}\"", command.replace('_', "-"));
+            // `file_promote` is a file window's (ADR-0057); the others are Space windows'.
+            let (mine, other) = if *command == "file_promote" { (file_window, capability) } else { (capability, file_window) };
+            assert!(mine.contains(&permission) && (!other.contains(&permission) || *command == "window_close"), "{command} granted to the wrong windows");
             assert_eq!(contract_name(command), None, "{command} must not reach the host");
         }
     }
@@ -1093,7 +1385,7 @@ mod tests {
             .iter()
             .filter(|c| !c.starts_with("opened."))
             .map(|c| c.replace('.', "_"))
-            .chain(SHELL_COMMANDS.iter().map(|c| (*c).to_owned()))
+            .chain(SHELL_COMMANDS.iter().filter(|c| **c != "file_promote").map(|c| (*c).to_owned()))
             .map(|c| format!("allow-{}", c.replace('_', "-")))
             .collect();
         assert_eq!(granted, expected);
@@ -1323,7 +1615,7 @@ mod tests {
         // folder, which is the data folder) before `setup`, and the host opens the folder in `setup`.
         let source = include_str!("lib.rs");
         let code = source.split("#[cfg(test)]").next().unwrap();
-        let run = &code[code.find("pub fn run()").unwrap()..];
+        let run = &code[code.find("pub fn run(").unwrap()..];
         let moved = run.find("move_legacy_data_dir(").unwrap();
         assert!(moved < run.find("tauri::Builder::default()").unwrap());
         assert!(run.contains(".build(context)"));

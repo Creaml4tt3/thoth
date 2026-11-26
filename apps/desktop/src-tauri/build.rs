@@ -46,6 +46,8 @@ pub const TAURI_COMMANDS: &[&str] = &[
     "diag_report", "diag_collect", "diag_settings",
     // The shell's own commands (src/lib.rs `SHELL_COMMANDS`): Thoth's windows on a Private Space (ADR-0019).
     "window_open", "window_close",
+    // A file window opens its file's folder as a Private Space (ADR-0057); granted to file-* windows only.
+    "file_promote",
 ];
 
 /// An address from the environment, for the app's build (ADR-0022): `https`, or empty (no update notice); never a

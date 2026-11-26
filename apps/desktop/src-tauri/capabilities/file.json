@@ -14,6 +14,7 @@
     "allow-opened-read",
     "allow-opened-write",
     "allow-opened-copy",
-    "allow-window-close"
+    "allow-window-close",
+    "allow-file-promote"
   ]
 }

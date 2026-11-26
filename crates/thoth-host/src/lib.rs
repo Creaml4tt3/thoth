@@ -1126,6 +1126,20 @@ impl Host {
         if state.opened.get(token).is_some_and(|o| o.owner == owner) { state.opened.remove(token).map(|o| o.path) } else { None }
     }
 
+    /// A folder the user chose to open as a Private Space from a file window ("Open its folder", ADR-0057): allowed
+    /// as if picked.
+    pub fn allow_root(&self, root: PathBuf) {
+        self.state().picked_vaults.insert(root);
+    }
+
+    /// The window that has the Private Space at `root` (canonical) open, `main` first.
+    pub fn owner_of_root(&self, root: &str) -> Option<String> {
+        let state = self.state();
+        let mut owners: Vec<&str> = state.vaults.values().filter(|v| v.root.to_string_lossy() == root).map(|v| v.owner.as_str()).collect();
+        owners.sort_unstable();
+        owners.iter().find(|o| **o == "main").or(owners.first()).map(|o| (*o).to_owned())
+    }
+
     /// The path behind `args.token`, for the window it was given to only.
     fn opened_path(&self, owner: &str, args: &Value) -> HostResult<PathBuf> {
         let token = str_arg(args, "token")?;

@@ -55,7 +55,7 @@ fn setup() -> (tempfile::TempDir, PathBuf, Host, String) {
 }
 
 fn code(result: HostResult<(Value, Option<Vec<u8>>)>) -> &'static str {
-    result.err().expect("expected an error").code
+    result.expect_err("expected an error").code
 }
 
 fn leftovers(dir: &Path) -> Vec<String> {
@@ -119,4 +119,15 @@ fn take_file_hands_over_once() {
     assert_eq!(host.take_file("file-b", &token), None);
     assert_eq!(host.take_file("file-a", &token), Some(path));
     assert_eq!(host.take_file("file-a", &token), None);
+}
+
+#[test]
+fn allow_root_lets_that_folder_open_and_owner_of_root_finds_its_window() {
+    let (dir, _path, host, _token) = setup();
+    let root = std::fs::canonicalize(dir.path()).unwrap().to_string_lossy().into_owned();
+    assert_eq!(code(host.call_as("space-a", "vault.open", &json!({ "root": root }), None)), "NOT_ALLOWED");
+    assert_eq!(host.owner_of_root(&root), None);
+    host.allow_root(std::path::PathBuf::from(&root));
+    host.call_as("space-a", "vault.open", &json!({ "root": root }), None).unwrap();
+    assert_eq!(host.owner_of_root(&root).as_deref(), Some("space-a"));
 }
