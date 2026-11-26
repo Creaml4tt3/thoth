@@ -411,5 +411,11 @@ export function createRemotePlatform(transport: Transport, kind: Platform["kind"
       return { name: picked.name, bytes: await transport.call("image.read", { image: picked.image }) };
     },
     saveFile: (name, bytes) => transport.call("file.save", { name }, bytes),
+    openedFile: {
+      stat: (token) => transport.call("opened.stat", { token }),
+      read: (token) => transport.call("opened.read", { token }),
+      write: (token, bytes, expectedHash) => transport.call("opened.write", { token, expectedHash }, bytes),
+      copy: (token, name, bytes) => transport.call("opened.copy", { token, name }, bytes),
+    },
   };
 }

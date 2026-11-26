@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, ModuleStatus, OcrModel, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, OpenedFileInfo, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, ModuleStatus, OcrModel, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -59,6 +59,8 @@ export interface Platform {
    * saved, false when cancelled. Absent where the host has none (the browser downloads instead).
    */
   saveFile?(name: string, bytes: Uint8Array): Promise<boolean>;
+  /** One Markdown file the system handed to this window (ADR-0057), by its token. Absent where the host has none. */
+  openedFile?: OpenedFiles;
   /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
   readonly servers: Servers;
   /**
@@ -177,6 +179,14 @@ export interface Links {
   /** Forgets every cached preview. */
   clearPreviews(): Promise<void>;
   open(url: string): Promise<void>;
+}
+
+/** The `opened.*` commands of a file window (ADR-0057). */
+export interface OpenedFiles {
+  stat(token: string): Promise<OpenedFileInfo>;
+  read(token: string): Promise<Uint8Array>;
+  write(token: string, bytes: Uint8Array, expectedHash: string): Promise<{ hash: string }>;
+  copy(token: string, name: string, bytes: Uint8Array): Promise<{ name: string }>;
 }
 
 /** What a window asks of the app shell about windows (ADR-0019). Window ids are `space-` and lowercase letters or digits. */

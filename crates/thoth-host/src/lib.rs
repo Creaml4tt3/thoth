@@ -77,6 +77,7 @@ pub const COMMANDS: &[&str] = &[
     "source.temp.create", "source.temp.write", "source.close",
     "image.pick", "image.read",
     "file.save",
+    "opened.stat", "opened.read", "opened.write", "opened.copy",
     "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
     "api.call",
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
@@ -189,6 +190,8 @@ struct State {
     vaults: HashMap<String, Arc<VaultEntry>>,
     sources: HashMap<String, Arc<Mutex<Source>>>,
     files: HashMap<String, Arc<FileEntry>>,
+    /// Markdown files the system handed to a window (ADR-0057), by token.
+    opened: HashMap<String, opened::Opened>,
 }
 
 pub struct Host {
@@ -323,7 +326,7 @@ impl Host {
         }
         let wants_bytes = matches!(
             command,
-            "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save" | "ocr.read"
+            "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save" | "ocr.read" | "opened.write" | "opened.copy"
         );
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
@@ -501,6 +504,19 @@ impl Host {
             }
             "image.pick" => json(self.pick_image()?),
             "image.read" => Ok((Value::Null, Some(self.read_picked_image(str_arg(args, "image")?)?))),
+            "opened.stat" => json(opened::stat(&self.opened_path(owner, args)?)?),
+            "opened.read" => Ok((Value::Null, Some(opened::read(&self.opened_path(owner, args)?)?))),
+            "opened.write" => {
+                let path = self.opened_path(owner, args)?;
+                let data = bytes.ok_or_else(|| HostError::bad_argument("opened.write needs request bytes"))?;
+                let _one_at_a_time = lock(&self.replace);
+                json(json!({ "hash": opened::write(&path, str_arg(args, "expectedHash")?, data, hex_digest)? }))
+            }
+            "opened.copy" => {
+                let path = self.opened_path(owner, args)?;
+                let data = bytes.ok_or_else(|| HostError::bad_argument("opened.copy needs request bytes"))?;
+                json(opened::copy(&path, str_arg(args, "name")?, data)?)
+            }
             "file.save" => {
                 let data = bytes.ok_or_else(|| HostError::bad_argument("file.save needs request bytes"))?;
                 json(json!(self.save_file(str_arg(args, "name")?, data)?))
@@ -1092,12 +1108,40 @@ impl Host {
         self.detach(owner).end();
     }
 
+    /// Gives window `owner` a token for one file the system handed over (ADR-0057); only that window can use it.
+    pub fn grant_file(&self, owner: &str, path: PathBuf) -> String {
+        let token = handles::new_handle("file").unwrap_or_else(|_| format!("file_{}", self.state().opened.len()));
+        self.state().opened.insert(token.clone(), opened::Opened { owner: owner.to_owned(), path });
+        token
+    }
+
+    /// The window that has `path` open on its own, if one does.
+    pub fn file_owner(&self, path: &Path) -> Option<String> {
+        self.state().opened.values().find(|o| o.path == path).map(|o| o.owner.clone())
+    }
+
+    /// Takes back `owner`'s token for good (the file's folder is about to open as a Private Space): its path, once.
+    pub fn take_file(&self, owner: &str, token: &str) -> Option<PathBuf> {
+        let mut state = self.state();
+        if state.opened.get(token).is_some_and(|o| o.owner == owner) { state.opened.remove(token).map(|o| o.path) } else { None }
+    }
+
+    /// The path behind `args.token`, for the window it was given to only.
+    fn opened_path(&self, owner: &str, args: &Value) -> HostResult<PathBuf> {
+        let token = str_arg(args, "token")?;
+        match self.state().opened.get(token) {
+            Some(o) if o.owner == owner => Ok(o.path.clone()),
+            _ => Err(HostError::not_allowed("This window was not given that file")),
+        }
+    }
+
     /// The quick half of `release`, safe to call on the shell's event loop: `owner`'s vault and run handles stop
     /// working at once (and no longer count for `shared`), so a page that loads next in the same window never loses a
     /// handle it opens after this. `Detached::end` does the slow part (watchers, index connections, processes, folders).
     pub fn detach(&self, owner: &str) -> Detached {
         let vaults = {
             let mut state = self.state();
+            state.opened.retain(|_, o| o.owner != owner);
             let mine: Vec<String> = state.vaults.iter().filter(|(_, v)| v.owner == owner).map(|(h, _)| h.clone()).collect();
             mine.iter().filter_map(|h| state.vaults.remove(h)).collect()
         };

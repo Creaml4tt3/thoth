@@ -955,11 +955,18 @@ mod tests {
     fn every_contract_command_has_a_tauri_command_and_permission() {
         let build = include_str!("../build.rs");
         let capability = include_str!("../capabilities/main.json");
+        let file_window = include_str!("../capabilities/file.json");
         for command in thoth_host::COMMANDS {
             let tauri = command.replace('.', "_");
             assert_eq!(contract_name(&tauri), Some(*command));
             assert!(build.contains(&format!("\"{tauri}\"")), "{tauri} missing from build.rs");
-            assert!(capability.contains(&format!("\"allow-{}\"", tauri.replace('_', "-"))), "{tauri} missing from capability");
+            let permission = format!("\"allow-{}\"", tauri.replace('_', "-"));
+            // An opened file's commands belong to file windows only (ADR-0057); every other command to Space windows only.
+            if command.starts_with("opened.") {
+                assert!(file_window.contains(&permission) && !capability.contains(&permission), "{tauri} must be granted to file windows only");
+            } else {
+                assert!(capability.contains(&permission) && !file_window.contains(&permission), "{tauri} must be granted to Space windows only");
+            }
         }
         assert_eq!(contract_name("plugin:fs|read"), None);
     }
@@ -1084,6 +1091,7 @@ mod tests {
             capability["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).filter(|p| p.starts_with("allow-")).map(str::to_owned).collect();
         let expected: BTreeSet<String> = thoth_host::COMMANDS
             .iter()
+            .filter(|c| !c.starts_with("opened."))
             .map(|c| c.replace('.', "_"))
             .chain(SHELL_COMMANDS.iter().map(|c| (*c).to_owned()))
             .map(|c| format!("allow-{}", c.replace('_', "-")))

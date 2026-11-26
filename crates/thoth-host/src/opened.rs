@@ -1,6 +1,9 @@
 //! A Markdown file the system handed to Thoth (Open With, a Dock drop; ADR-0057): which files are accepted, and
 //! whether one belongs to a Private Space Thoth knows or opens on its own.
 
+use crate::error::{HostError, HostResult};
+use serde_json::{Value, json};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// The largest file accepted: far below the vault's write limit, at what the editor still handles.
@@ -41,6 +44,93 @@ pub fn route(file: &Path, roots: &[String]) -> Route {
         }
         None => Route::Loose(file.to_path_buf()),
     }
+}
+
+/// A file the system handed to one window (`owner`): it reaches the file only through the token it was given.
+pub struct Opened {
+    pub owner: String,
+    pub path: PathBuf,
+}
+
+/// The file's name, for messages: never its folder (the page does not learn where the file is).
+fn name_of(path: &Path) -> String {
+    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// The file itself, never a link or folder put in its place since it was opened.
+fn regular(path: &Path) -> HostResult<std::fs::Metadata> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| HostError::io(&e, "stat", &name_of(path)))?;
+    if !meta.is_file() {
+        return Err(HostError::new("NOT_A_REGULAR_FILE", format!("Not a regular file: {}", name_of(path))));
+    }
+    Ok(meta)
+}
+
+/// `opened.stat`: the file's name, its folder's name (not the path), when it changed and its size.
+pub fn stat(path: &Path) -> HostResult<Value> {
+    let meta = regular(path)?;
+    let folder = path.parent().and_then(Path::file_name).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let mtime = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    Ok(json!({ "name": name_of(path), "folder": folder, "mtimeMs": mtime, "size": meta.len() }))
+}
+
+/// `opened.read`: the file's bytes.
+pub fn read(path: &Path) -> HostResult<Vec<u8>> {
+    let meta = regular(path)?;
+    if meta.len() > MAX_OPENED_BYTES {
+        return Err(HostError::bad_argument(format!("{} is larger than Thoth opens", name_of(path))));
+    }
+    std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))
+}
+
+/// `opened.write`: replaces the file with `data` when it is still the version `expected` (its sha256), through a
+/// temporary file in the same folder and a rename, so a crash never leaves half a file. Returns the new hash.
+/// The caller holds the host's replace lock, so two windows cannot both pass the check.
+pub fn write(path: &Path, expected: &str, data: &[u8], digest: impl Fn(&[u8]) -> String) -> HostResult<String> {
+    if data.len() as u64 > MAX_OPENED_BYTES {
+        return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
+    }
+    let current = match regular(path) {
+        Ok(_) => Some(digest(&std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))?)),
+        Err(e) if e.code == "ENOENT" => None,
+        Err(e) => return Err(e),
+    };
+    if current.as_deref() != Some(expected) {
+        return Err(HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path))));
+    }
+    let dir = path.parent().ok_or_else(|| HostError::internal("An opened file has no folder"))?;
+    let temp = dir.join(format!(".{}.thoth-tmp-{}", name_of(path), crate::handles::new_handle("w")?));
+    let written = (|| -> std::io::Result<()> {
+        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        f.write_all(data)?;
+        f.sync_all()?;
+        std::fs::rename(&temp, path)
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&temp);
+        return Err(HostError::io(&e, "write", &name_of(path)));
+    }
+    Ok(digest(data))
+}
+
+/// A conflict copy's name: one plain file name ending `.md`, nothing that reaches another folder.
+fn copy_name_ok(name: &str) -> bool {
+    name.len() > 3 && name.len() <= 255 && name.ends_with(".md") && !name.starts_with('.') && !name.contains(['/', '\\', '\0'])
+}
+
+/// `opened.copy`: writes `data` as a new file `name` next to the opened file (Keep both), never over another.
+pub fn copy(path: &Path, name: &str, data: &[u8]) -> HostResult<Value> {
+    if !copy_name_ok(name) {
+        return Err(HostError::bad_argument("A copy's name is one file name ending .md"));
+    }
+    if data.len() as u64 > MAX_OPENED_BYTES {
+        return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
+    }
+    let dir = path.parent().ok_or_else(|| HostError::internal("An opened file has no folder"))?;
+    let target = dir.join(name);
+    let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&target).map_err(|e| HostError::io(&e, "open", name))?;
+    f.write_all(data).and_then(|()| f.sync_all()).map_err(|e| HostError::io(&e, "write", name))?;
+    Ok(json!({ "name": name }))
 }
 
 #[cfg(test)]

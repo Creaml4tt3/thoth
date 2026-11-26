@@ -151,6 +151,16 @@ export interface Commands {
    * bytes are written there. True when saved, false when cancelled. The webview never names or learns the path.
    */
   "file.save": { args: { name: string }; result: boolean };
+  /**
+   * A Markdown file the system handed to a file window (ADR-0057), named by the token in the window's address; only
+   * that window may use it, and the page never learns the path. `folder` is the folder's name only.
+   */
+  "opened.stat": { args: { token: string }; result: OpenedFileInfo };
+  "opened.read": { args: { token: string }; result: Bytes };
+  /** Compare-and-swap on the file's sha256 (`CONFLICT` when it changed or is gone); the new hash. */
+  "opened.write": { args: { token: string; expectedHash: string }; result: { hash: string } };
+  /** Keep both: a new file `name` (one `.md` file name) next to it; `EEXIST` when taken. */
+  "opened.copy": { args: { token: string; name: string }; result: { name: string } };
 
   // ---- Workspace servers (Phase 2b part 3). The host is the HTTP client: tokens never enter the webview.
   "server.list": { args: Record<string, never>; result: ServerInfo[] };
@@ -521,6 +531,14 @@ export type SetupApp = "claude-code" | "codex" | "claude-desktop" | "cursor";
 export interface SetupState {
   server: "unavailable" | "none" | "this" | "other" | "edited" | "unknown";
   instructions?: "unavailable" | "none" | "this" | "outdated" | "edited" | "unknown";
+}
+
+/** What `opened.stat` says about an opened file: its name, its folder's name (not the path), when it changed and its size. */
+export interface OpenedFileInfo {
+  name: string;
+  folder: string;
+  mtimeMs: number;
+  size: number;
 }
 
 /** What `mcp.skillLinks` did: the skills linked, those not linked (a file or folder of that name was there), and where. */
