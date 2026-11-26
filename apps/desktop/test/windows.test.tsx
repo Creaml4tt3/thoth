@@ -166,8 +166,7 @@ describe("a window opened on a Private Space", () => {
   });
 
   it("opens a page the system sends to this window's Private Space as a tab, and ignores another Space's", async () => {
-    const { platform, user } = await launched("space-0000000000000004", [page("Alpha.md")]);
-    const app0 = { user };
+    const { user } = await launched("space-0000000000000004", [page("Alpha.md")]);
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
     windows.emitOpenPage({ window: "space-0000000000000004", root: "/elsewhere", page: "Beta.md" });
     // Sent to another window of the same Private Space: not this one's.
@@ -176,11 +175,10 @@ describe("a window opened on a Private Space", () => {
     await waitFor(() => expect(current()).toBe("Beta"));
     expect(tabNames()).toEqual(["Alpha", "Beta"]);
     // The same page again: its tab comes to the front, no second tab.
-    await app0.user.click(screen.getByRole("tab", { name: /Alpha/ }));
+    await user.click(screen.getByRole("tab", { name: /Alpha/ }));
     windows.emitOpenPage({ window: "space-0000000000000004", root, page: "Beta.md" });
     await waitFor(() => expect(current()).toBe("Beta"));
     expect(tabNames()).toEqual(["Alpha", "Beta"]);
-    void platform;
   });
 
   it("does not run start-up recovery while another window has the folder open: what it would sweep is in flight", async () => {

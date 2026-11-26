@@ -84,21 +84,32 @@ pub fn read(path: &Path) -> HostResult<Vec<u8>> {
     std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))
 }
 
+/// Refuses a page larger than Thoth writes to an opened file.
+fn fits(data: &[u8]) -> HostResult<()> {
+    if data.len() as u64 > MAX_OPENED_BYTES {
+        return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
+    }
+    Ok(())
+}
+
+/// The file is no longer the version the window has.
+fn changed(path: &Path) -> HostError {
+    HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path)))
+}
+
 /// `opened.write`: replaces the file with `data` when it is still the version `expected` (its sha256), through a
 /// temporary file in the same folder and a rename, so a crash never leaves half a file. Returns the new hash.
 /// The caller holds the host's replace lock, so two windows cannot both pass the check.
 pub fn write(path: &Path, expected: &str, data: &[u8], digest: impl Fn(&[u8]) -> String) -> HostResult<String> {
-    if data.len() as u64 > MAX_OPENED_BYTES {
-        return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
-    }
+    fits(data)?;
     let meta = match regular(path) {
         Ok(meta) => meta,
-        Err(e) if e.code == "ENOENT" => return Err(HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path)))),
+        Err(e) if e.code == "ENOENT" => return Err(changed(path)),
         Err(e) => return Err(e),
     };
     let current = digest(&std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))?);
     if current != expected {
-        return Err(HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path))));
+        return Err(changed(path));
     }
     // A file the person made read-only stays as it is, though replacing it would only need the folder's permission.
     if meta.permissions().readonly() {
@@ -132,9 +143,7 @@ pub fn copy(path: &Path, name: &str, data: &[u8]) -> HostResult<Value> {
     if !copy_name_ok(name) {
         return Err(HostError::bad_argument("A copy's name is one file name ending .md"));
     }
-    if data.len() as u64 > MAX_OPENED_BYTES {
-        return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
-    }
+    fits(data)?;
     let dir = path.parent().ok_or_else(|| HostError::internal("An opened file has no folder"))?;
     let target = dir.join(name);
     let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&target).map_err(|e| HostError::io(&e, "open", name))?;

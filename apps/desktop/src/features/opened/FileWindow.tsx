@@ -1,7 +1,6 @@
 /** A window on one Markdown file the system handed over (Open With, a Dock drop; ADR-0057): the shared page editor over
  * the file's token. No Private Space is open here: links stay unresolved and the file's images show placeholders. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { basename } from "@thoth/domain";
 import type { OpenedFileInfo, Platform } from "@thoth/platform";
 import { PageFrame } from "@thoth/app-ui/editor/PageFrame.tsx";
 import { PageHostContext, type PageHost } from "@thoth/app-ui/editor/host.ts";
@@ -18,8 +17,7 @@ export function FileWindow({ platform, token }: { platform: Platform; token: str
 }
 
 function FileWindowBody({ platform, token }: { platform: Platform; token: string }) {
-  const t = useDesktopStrings().opened;
-  const page = useDesktopStrings().page;
+  const { opened: t, page } = useDesktopStrings();
   const files = platform.openedFile;
   const [info, setInfo] = useState<OpenedFileInfo | null>(null);
   const [failed, setFailed] = useState(false);
@@ -90,28 +88,28 @@ function FileWindowBody({ platform, token }: { platform: Platform; token: string
   return (
     <main className="file-window">
       <PageHostContext.Provider value={pageHost}>
-      <PageFrame
-        label={info.name}
-        store={store}
-        modeKey={{ space: `file:${info.folder}`, page: info.name }}
-        crumbs={{ badge: <span className="badge">{info.folder}</span>, parts: [info.name] }}
-        checkTick={tick}
-        onWritten={nowhere}
-        loadLinks={null}
-        linkTick={0}
-        openLink={nowhere}
-        openCopy={nowhere}
-        readOnlyNote={page.readOnly}
-        missing={{ title: t.goneTitle, detail: t.goneDetail(basename(info.name)) }}
-        actions={
-          <span className="page-actions">
-            <button type="button" className="btn" onClick={promote}>
-              {t.openFolder}
-            </button>
-          </span>
-        }
-        footer={problem ? <p role="alert">{problem}</p> : undefined}
-      />
+        <PageFrame
+          label={info.name}
+          store={store}
+          modeKey={{ space: `file:${info.folder}`, page: info.name }}
+          crumbs={{ badge: <span className="badge">{info.folder}</span>, parts: [info.name] }}
+          checkTick={tick}
+          onWritten={nowhere}
+          loadLinks={null}
+          linkTick={0}
+          openLink={nowhere}
+          openCopy={nowhere}
+          readOnlyNote={page.readOnly}
+          missing={{ title: t.goneTitle, detail: t.goneDetail(info.name) }}
+          actions={
+            <span className="page-actions">
+              <button type="button" className="btn" onClick={promote}>
+                {t.openFolder}
+              </button>
+            </span>
+          }
+          footer={problem ? <p role="alert">{problem}</p> : undefined}
+        />
       </PageHostContext.Provider>
     </main>
   );

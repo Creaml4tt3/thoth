@@ -535,13 +535,8 @@ fn plan_opens(
 
 /// Files the system handed over before the app could open them (macOS sends them before the first window exists).
 /// Holds them until `ready`; after that nothing waits.
+#[derive(Default)]
 struct OpenQueue(Mutex<(bool, Vec<PathBuf>)>);
-
-impl Default for OpenQueue {
-    fn default() -> Self {
-        Self(Mutex::new((false, Vec::new())))
-    }
-}
 
 impl OpenQueue {
     /// Keeps `paths` while the app is not ready and says so (true); once ready, false: the caller opens them now.
@@ -647,6 +642,12 @@ fn build_window<R: tauri::Runtime>(app: &AppHandle<R>, label: &str, page: String
     builder.build()
 }
 
+/// A new window on the Private Space at `root`, opening its page `page` as a tab.
+fn space_window<R: tauri::Runtime>(app: &AppHandle<R>, root: &str, page: &str) -> tauri::Result<()> {
+    let label = new_label("space-");
+    build_window(app, &label, format!("index.html?window={label}&root={}&page={}", query_escape(root), query_escape(page)), None).map(|_| ())
+}
+
 /// A new window id after `prefix`: 16 random lowercase hex digits.
 fn new_label(prefix: &str) -> String {
     let mut bytes = [0u8; 8];
@@ -694,9 +695,7 @@ fn open_paths<R: tauri::Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
                 Ok(())
             }
             Open::NewSpace { root, page } => {
-                let label = new_label("space-");
-                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&root), query_escape(&page));
-                build_window(app, &label, page, None).map(|_| ())
+                space_window(app, &root, &page)
             }
             Open::NewFile(path) => {
                 let label = new_label("file-");
@@ -755,10 +754,8 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 }
                 let token = args.get("token").and_then(Value::as_str).ok_or_else(|| InvokeError::from(HostError::bad_argument("token must be a string")))?;
                 let (folder, name) = host.promote_file(&caller, token).map_err(InvokeError::from)?;
-                let label = new_label("space-");
-                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&folder.to_string_lossy()), query_escape(&name));
                 // The file window closes only once the Space window is there; it gives its file back as it goes.
-                build_window(&app, &label, page, None).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
+                space_window(&app, &folder.to_string_lossy(), &name).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
                 if let Some(window) = app.get_webview_window(&caller) {
                     let _ = window.destroy();
                 }
