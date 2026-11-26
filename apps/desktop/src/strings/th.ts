@@ -87,6 +87,14 @@ export const th: DesktopStrings = {
     goneDetail: (path) => `ไม่มี ${path} บนดิสก์แล้ว`,
   },
 
+  opened: {
+    openFolder: "เปิดโฟลเดอร์ของไฟล์นี้เป็น Private Space", // REVIEW
+    openFolderFailed: "เปิดโฟลเดอร์ของไฟล์นี้เป็น Private Space ไม่ได้", // REVIEW
+    goneTitle: "ไฟล์นี้ไม่มีแล้ว", // REVIEW
+    goneDetail: (name) => `${name} ถูกย้ายหรือลบนอก Thoth`, // REVIEW
+    loadFailed: "Thoth เปิดไฟล์นี้ไม่ได้", // REVIEW
+  },
+
   settings: {
     title: "การตั้งค่า",
     privateSpace: "Private Space",

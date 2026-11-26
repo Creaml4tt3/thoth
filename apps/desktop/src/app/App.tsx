@@ -41,7 +41,7 @@ async function closeHost(host: Host): Promise<void> {
 }
 
 /** The UI language: the system's unless one was chosen in Settings, for both the shared and the desktop text. */
-function LanguageRoot({ children }: { children: ReactNode }) {
+export function LanguageRoot({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<LangPreference>(langPreference);
   const lang = resolveLang(preference, systemLanguages());
   const setPreference = useCallback((next: LangPreference) => {
@@ -200,6 +200,7 @@ function AppBody({ platform, options, launch }: { platform: Platform; options?: 
       switchVault={switchVault}
       windowId={launch.id}
       startTabs={host.connection.root === launch.root ? launchTabs : null}
+      startPage={host.connection.root === launch.root ? (launch.page ?? null) : null}
       onStarted={() => setLaunchTabs(null)}
       flushOnClose={flushOnClose}
     />

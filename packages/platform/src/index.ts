@@ -208,6 +208,13 @@ export interface Windows {
    * a page that does not answer within a few seconds is closed anyway. Returns the remover.
    */
   onCloseRequested(listener: () => void): Promise<() => void>;
+  /**
+   * The system asked to open a Markdown file of a Private Space this window has open (Open With, ADR-0057): its root and
+   * page path. Optional: a shell without file opening never sends it. Returns the remover.
+   */
+  onOpenPage?(listener: (request: { root: string; page: string }) => void): Promise<() => void>;
+  /** A file window (ADR-0057) asks the shell to open its file's folder as a Private Space; the window then closes. */
+  promoteFile?(token: string): Promise<void>;
 }
 
 export interface Servers {

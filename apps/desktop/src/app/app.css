@@ -8,3 +8,6 @@
 @import "@thoth/app-ui/transfer/transfer.css";
 @import "@thoth/app-ui/board/board.css";
 @import "../features/tour/tour.css";
+
+/* A window on one Markdown file the system handed over (ADR-0057): the page fills the window, no sidebar. */
+.file-window { height: 100vh; display: grid; grid-template-rows: minmax(0, 1fr); background: var(--thoth-bg); }

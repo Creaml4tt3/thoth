@@ -1151,6 +1151,11 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn the_page_and_the_shell_name_the_open_page_event_alike() {
+        assert!(include_str!("../../../../packages/platform/src/tauri.ts").contains(&format!("OPEN_PAGE_EVENT = \"{OPEN_PAGE_EVENT}\"")));
+    }
+
+    #[test]
     fn file_window_label_rules() {
         assert!(is_file_window_label("file-abc123"));
         for bad in ["file-", "file-ABC", "files-a", "space-a", &format!("file-{}", "a".repeat(33))] {

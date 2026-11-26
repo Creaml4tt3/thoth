@@ -14,6 +14,24 @@ export interface Launch {
   root: string | null;
   /** The tabs to start with (stored form, `serializeTabs`); null: this window's saved tabs. */
   tabs: string | null;
+  /** A page of that Private Space the system asked to open (Open With, ADR-0057): opened as a tab once it is open. */
+  page?: string;
+}
+
+/** A window on one Markdown file the system handed over (ADR-0057): its id and the token the host gave it. */
+export interface FileLaunch {
+  id: string;
+  token: string;
+}
+
+const FILE_WINDOW_ID = /^file-[a-z0-9]{1,32}$/;
+
+/** A file window's launch from its address (`?window=file-…&file=<token>`), or null when this is not one. */
+export function readFileLaunch(search: string): FileLaunch | null {
+  const params = new URLSearchParams(search);
+  const id = params.get("window");
+  const token = params.get("file");
+  return id !== null && FILE_WINDOW_ID.test(id) && token ? { id, token } : null;
 }
 
 export const isWindowId = (id: string): boolean => WINDOW_ID.test(id);
@@ -25,7 +43,8 @@ export function readLaunch(search: string): Launch {
   if (id === null || !isWindowId(id)) return { id: MAIN_WINDOW, root: null, tabs: null };
   const root = params.get("root");
   const tabs = params.get("tabs");
-  return { id, root: root && root.length > 0 ? root : null, tabs: tabs && tabs.length > 0 ? tabs : null };
+  const page = params.get("page");
+  return { id, root: root && root.length > 0 ? root : null, tabs: tabs && tabs.length > 0 ? tabs : null, ...(page ? { page } : {}) };
 }
 
 /** A new window id: `space-` and 16 random lowercase letters and digits. */
