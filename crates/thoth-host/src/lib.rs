@@ -32,6 +32,7 @@ pub mod links;
 pub mod mcp;
 pub mod modules;
 pub mod network;
+pub mod opened;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
