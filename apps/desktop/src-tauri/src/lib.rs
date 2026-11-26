@@ -1185,6 +1185,18 @@ mod tests {
     }
 
     #[test]
+    fn the_app_turns_on_every_capability_file() {
+        // A capability file the config does not list grants nothing: a file window then cannot read its file (ADR-0057).
+        let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let listed: BTreeSet<&str> = conf["app"]["security"]["capabilities"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+        let files: BTreeSet<String> = std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/capabilities"))
+            .unwrap()
+            .filter_map(|e| e.unwrap().path().file_stem().map(|s| s.to_string_lossy().into_owned()))
+            .collect();
+        assert_eq!(listed, files.iter().map(String::as_str).collect());
+    }
+
+    #[test]
     fn file_associations_offer_md_without_owning_it() {
         let conf: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         let assoc = &conf["bundle"]["fileAssociations"][0];
