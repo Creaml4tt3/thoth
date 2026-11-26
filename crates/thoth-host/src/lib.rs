@@ -1115,21 +1115,27 @@ impl Host {
         token
     }
 
+    /// Window `owner` is gone (closed, never on a page reload): the files it was given are given back. Not part of
+    /// `release`, which the shell also runs when a page starts loading, the first load included.
+    pub fn forget_files(&self, owner: &str) {
+        self.state().opened.retain(|_, o| o.owner != owner);
+    }
+
     /// The window that has `path` open on its own, if one does.
     pub fn file_owner(&self, path: &Path) -> Option<String> {
         self.state().opened.values().find(|o| o.path == path).map(|o| o.owner.clone())
     }
 
-    /// Takes back `owner`'s token for good (the file's folder is about to open as a Private Space): its path, once.
-    pub fn take_file(&self, owner: &str, token: &str) -> Option<PathBuf> {
-        let mut state = self.state();
-        if state.opened.get(token).is_some_and(|o| o.owner == owner) { state.opened.remove(token).map(|o| o.path) } else { None }
-    }
-
-    /// A folder the user chose to open as a Private Space from a file window ("Open its folder", ADR-0057): allowed
-    /// as if picked.
-    pub fn allow_root(&self, root: PathBuf) {
-        self.state().picked_vaults.insert(root);
+    /// "Open its folder as a Private Space" from file window `owner` (ADR-0057): when the folder of the file behind
+    /// `token` may be a Private Space (the same rule as a picked folder), it is allowed as if picked; the folder and the
+    /// file's name are returned. The window keeps its file until it closes (`forget_files`), so a Space window that
+    /// cannot open leaves it working.
+    pub fn promote_file(&self, owner: &str, token: &str) -> HostResult<(PathBuf, String)> {
+        let path = self.opened_path(owner, &json!({ "token": token }))?;
+        let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else { return Err(HostError::internal("An opened file has no folder")) };
+        check_root_policy(folder, self.home.as_deref(), self.config.data_dir.as_deref())?;
+        self.state().picked_vaults.insert(folder.to_path_buf());
+        Ok((folder.to_path_buf(), name.to_string_lossy().into_owned()))
     }
 
     /// The window that has the Private Space at `root` (canonical) open, `main` first.
@@ -1155,7 +1161,6 @@ impl Host {
     pub fn detach(&self, owner: &str) -> Detached {
         let vaults = {
             let mut state = self.state();
-            state.opened.retain(|_, o| o.owner != owner);
             let mine: Vec<String> = state.vaults.iter().filter(|(_, v)| v.owner == owner).map(|(h, _)| h.clone()).collect();
             mine.iter().filter_map(|h| state.vaults.remove(h)).collect()
         };

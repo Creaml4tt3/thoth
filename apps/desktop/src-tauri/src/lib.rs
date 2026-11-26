@@ -684,7 +684,8 @@ fn open_paths<R: tauri::Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
         };
         let made = match open {
             Open::Tab { window, root, page } => {
-                let _ = app.emit_to(window.as_str(), OPEN_PAGE_EVENT, serde_json::json!({ "root": root, "page": page }));
+                // Pages listen for any target, so every window hears it: the payload names the one that acts.
+                let _ = app.emit_to(window.as_str(), OPEN_PAGE_EVENT, serde_json::json!({ "window": window, "root": root, "page": page }));
                 focus(&window);
                 Ok(())
             }
@@ -701,7 +702,7 @@ fn open_paths<R: tauri::Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
                 let label = new_label("file-");
                 let token = host.grant_file(&label, path);
                 let page = format!("index.html?window={label}&file={}", query_escape(&token));
-                build_window(app, &label, page, None).map(|_| ())
+                build_window(app, &label, page, None).map(|_| ()).inspect_err(|_| host.forget_files(&label))
             }
         };
         if let Err(e) = made {
@@ -745,22 +746,18 @@ fn handle_shell(host: &'static OnceLock<Arc<Host>>, invoke: Invoke) -> bool {
                 }
                 Ok(InvokeResponseBody::Json(closes.to_string()))
             }
-            // A file window's "Open its folder as a Private Space" (ADR-0057): its token is taken back, the folder is
-            // allowed as if picked, a Space window opens on it with this file's tab, and the file window closes.
+            // A file window's "Open its folder as a Private Space" (ADR-0057): the folder is allowed as if picked (when it
+            // may be a Private Space), a Space window opens on it with this file's tab, and the file window closes.
             "file_promote" => {
                 let host = host.get().cloned().ok_or_else(|| InvokeError::from(HostError::internal("Host is not ready")))?;
                 if !is_file_window_label(&caller) {
                     return Err(InvokeError::from(HostError::not_allowed("Only a file window opens its folder")));
                 }
                 let token = args.get("token").and_then(Value::as_str).ok_or_else(|| InvokeError::from(HostError::bad_argument("token must be a string")))?;
-                let path = host.take_file(&caller, token).ok_or_else(|| InvokeError::from(HostError::not_allowed("This window was not given that file")))?;
-                let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
-                    return Err(InvokeError::from(HostError::internal("An opened file has no folder")));
-                };
-                host.allow_root(folder.to_path_buf());
-                let root = folder.to_string_lossy().into_owned();
+                let (folder, name) = host.promote_file(&caller, token).map_err(InvokeError::from)?;
                 let label = new_label("space-");
-                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&root), query_escape(&name.to_string_lossy()));
+                let page = format!("index.html?window={label}&root={}&page={}", query_escape(&folder.to_string_lossy()), query_escape(&name));
+                // The file window closes only once the Space window is there; it gives its file back as it goes.
                 build_window(&app, &label, page, None).map_err(|e| InvokeError::from(HostError::internal(format!("The window could not be opened: {e}"))))?;
                 if let Some(window) = app.get_webview_window(&caller) {
                     let _ = window.destroy();
@@ -1097,6 +1094,10 @@ pub fn run(files: Vec<PathBuf>) {
             tauri::WindowEvent::Destroyed => {
                 let label = window.label().to_owned();
                 locked(&CLOSING).remove(&label);
+                // A file window's file is given back only now: a page load keeps it (ADR-0057).
+                if let Some(host) = HOST.get() {
+                    host.forget_files(&label);
+                }
                 // Its vaults (watchers, index connections) close and its agent runs end, as all of them do at quit; then
                 // the other windows hear of it (and may now be alone on their Private Space).
                 let app = window.app_handle().clone();

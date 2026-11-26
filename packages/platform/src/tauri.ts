@@ -134,8 +134,8 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
       return () => void unlisten();
     },
     async onOpenPage(listener) {
-      // The shell sends it to the one window that has that Private Space open (ADR-0057); the page checks the root too.
-      const unlisten = await api.listen<{ root: string; page: string }>(OPEN_PAGE_EVENT, (e) => listener(e.payload));
+      // Every window hears it (a page listens for any target); the payload names the one the shell chose (ADR-0057).
+      const unlisten = await api.listen<{ window: string; root: string; page: string }>(OPEN_PAGE_EVENT, (e) => listener(e.payload));
       return () => void unlisten();
     },
     async promoteFile(token) {

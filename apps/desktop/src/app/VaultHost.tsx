@@ -114,13 +114,14 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
     let stop: (() => void) | undefined;
     let live = true;
     void listen((request) => {
-      if (request.root === connection.root) tabs.open({ kind: "page", path: request.page }, { newTab: true });
+      // Only the window the shell chose, and only for its own Private Space; a page already open comes to the front.
+      if (request.window === windowId && request.root === connection.root) tabs.openOrFocus({ kind: "page", path: request.page });
     }).then((remove) => (live ? (stop = remove) : remove()));
     return () => {
       live = false;
       stop?.();
     };
-  }, [platform.windows, connection.root, tabs]);
+  }, [platform.windows, connection.root, tabs, windowId]);
 
   // Windows (ADR-0019). A window the app opened is remembered on this Private Space until it is closed; one closed
   // elsewhere is forgotten here. The main window, alone on the Private Space, brings back the windows that were open.

@@ -59,7 +59,7 @@ fn code(result: HostResult<(Value, Option<Vec<u8>>)>) -> &'static str {
 }
 
 fn leftovers(dir: &Path) -> Vec<String> {
-    std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).filter(|n| n.contains("thoth-tmp")).collect()
+    std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with(".thoth-")).collect()
 }
 
 #[test]
@@ -105,29 +105,57 @@ fn copy_is_exclusive_and_one_segment() {
 }
 
 #[test]
-fn release_drops_tokens() {
+fn a_page_load_keeps_the_token_and_a_closed_window_drops_it() {
     let (_dir, path, host, token) = setup();
     assert_eq!(host.file_owner(&path).as_deref(), Some("file-a"));
+    // The shell releases a window's handles when its page starts loading, the first load included: the file stays.
     host.release("file-a");
+    host.call_as("file-a", "opened.read", &json!({ "token": token }), None).unwrap();
+    // The window is gone: so is its file.
+    host.forget_files("file-a");
     assert_eq!(code(host.call_as("file-a", "opened.read", &json!({ "token": token }), None)), "NOT_ALLOWED");
     assert_eq!(host.file_owner(&path), None);
 }
 
 #[test]
-fn take_file_hands_over_once() {
-    let (_dir, path, host, token) = setup();
-    assert_eq!(host.take_file("file-b", &token), None);
-    assert_eq!(host.take_file("file-a", &token), Some(path));
-    assert_eq!(host.take_file("file-a", &token), None);
-}
-
-#[test]
-fn allow_root_lets_that_folder_open_and_owner_of_root_finds_its_window() {
+fn a_promoted_folder_opens_and_owner_of_root_finds_its_window() {
     let (dir, _path, host, _token) = setup();
     let root = std::fs::canonicalize(dir.path()).unwrap().to_string_lossy().into_owned();
     assert_eq!(code(host.call_as("space-a", "vault.open", &json!({ "root": root }), None)), "NOT_ALLOWED");
     assert_eq!(host.owner_of_root(&root), None);
-    host.allow_root(std::path::PathBuf::from(&root));
+    let token = host.grant_file("file-a", std::path::PathBuf::from(&root).join("Note.md"));
+    host.promote_file("file-a", &token).unwrap();
     host.call_as("space-a", "vault.open", &json!({ "root": root }), None).unwrap();
     assert_eq!(host.owner_of_root(&root).as_deref(), Some("space-a"));
+}
+
+#[test]
+fn promote_refuses_a_folder_that_cannot_be_a_private_space_and_keeps_the_token() {
+    let host = host();
+    let home = std::fs::canonicalize(dirs_home()).unwrap();
+    let token = host.grant_file("file-a", home.join("notes.md"));
+    assert_eq!(host.promote_file("file-a", &token).unwrap_err().code, "NOT_ALLOWED");
+    assert!(host.file_owner(&home.join("notes.md")).is_some(), "the file window keeps its file");
+    let (dir, path, host, token) = setup();
+    let (root, name) = host.promote_file("file-a", &token).unwrap();
+    assert_eq!((root.clone(), name.as_str()), (std::fs::canonicalize(dir.path()).unwrap(), "Note.md"));
+    assert_eq!(host.file_owner(&path).as_deref(), Some("file-a"), "kept until the file window closes");
+    host.call_as("space-b", "vault.open", &json!({ "root": root.to_string_lossy() }), None).unwrap();
+}
+
+fn dirs_home() -> PathBuf {
+    PathBuf::from(std::env::var_os("HOME").expect("a home folder"))
+}
+
+#[cfg(unix)]
+#[test]
+fn a_save_keeps_the_file_private_and_never_writes_a_read_only_file() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_dir, path, host, token) = setup();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    host.call_as("file-a", "opened.write", &json!({ "token": token, "expectedHash": sha(b"# Hello\n") }), Some(b"# Mine\n")).unwrap();
+    assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o444)).unwrap();
+    assert_eq!(code(host.call_as("file-a", "opened.write", &json!({ "token": token, "expectedHash": sha(b"# Mine\n") }), Some(b"x"))), "EACCES");
+    assert_eq!(std::fs::read(&path).unwrap(), b"# Mine\n");
 }

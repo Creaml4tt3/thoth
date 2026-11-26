@@ -54,13 +54,13 @@ export interface FakeWindows extends Windows {
   /** The window's close button (or Quit) was used: the shell asks the page to write its edits and close. */
   emitCloseRequested(): void;
   /** The system asked to open `page` of the Private Space at `root` (ADR-0057). */
-  emitOpenPage(request: { root: string; page: string }): void;
+  emitOpenPage(request: { window: string; root: string; page: string }): void;
 }
 
 export function createFakeWindows(): FakeWindows {
   const listeners = new Set<(id: string) => void>();
   const closeListeners = new Set<() => void>();
-  const openPageListeners = new Set<(request: { root: string; page: string }) => void>();
+  const openPageListeners = new Set<(request: { window: string; root: string; page: string }) => void>();
   const windows: FakeWindows = {
     opened: [],
     others: 0,

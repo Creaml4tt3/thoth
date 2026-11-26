@@ -209,10 +209,10 @@ export interface Windows {
    */
   onCloseRequested(listener: () => void): Promise<() => void>;
   /**
-   * The system asked to open a Markdown file of a Private Space this window has open (Open With, ADR-0057): its root and
-   * page path. Optional: a shell without file opening never sends it. Returns the remover.
+   * The system asked to open a Markdown file of a Private Space (Open With, ADR-0057): the window the shell chose, the
+   * Space's root and the page path. Every window hears it; only the one named acts. Optional: a shell without file opening never sends it. Returns the remover.
    */
-  onOpenPage?(listener: (request: { root: string; page: string }) => void): Promise<() => void>;
+  onOpenPage?(listener: (request: { window: string; root: string; page: string }) => void): Promise<() => void>;
   /** A file window (ADR-0057) asks the shell to open its file's folder as a Private Space; the window then closes. */
   promoteFile?(token: string): Promise<void>;
 }

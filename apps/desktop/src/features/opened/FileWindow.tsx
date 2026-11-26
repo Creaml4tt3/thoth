@@ -45,10 +45,6 @@ function FileWindowBody({ platform, token }: { platform: Platform; token: string
     return () => void (live = false);
   }, [files, token]);
   const store = useMemo(() => (files && info ? openedFileStore(files, token, info.name) : null), [files, info, token]);
-  const promote = useCallback(() => {
-    setProblem(null);
-    void (platform.windows?.promoteFile?.(token) ?? Promise.reject(new Error("no shell"))).catch(() => setProblem(t.openFolderFailed));
-  }, [platform.windows, token, t.openFolderFailed]);
   // Links lead nowhere without a Private Space; a conflict copy is next to the file, where the person can open it.
   const nowhere = useCallback(() => undefined, []);
   // The editor's host: autosave as in a Private Space, and the window's close button writes pending edits first.
@@ -65,6 +61,16 @@ function FileWindowBody({ platform, token }: { platform: Platform; token: string
       flushAll,
     };
   }, []);
+  // "Open its folder as a Private Space": pending edits are written first; one that cannot be keeps the file open here.
+  const promote = useCallback(() => {
+    setProblem(null);
+    void pageHost.flushAll!()
+      .then((saved) => {
+        if (!saved) throw new Error("not saved");
+        return platform.windows?.promoteFile?.(token) ?? Promise.reject(new Error("no shell"));
+      })
+      .catch(() => setProblem(t.openFolderFailed));
+  }, [pageHost, platform.windows, token, t.openFolderFailed]);
   useEffect(() => {
     const windows = platform.windows;
     if (!windows?.onCloseRequested) return;

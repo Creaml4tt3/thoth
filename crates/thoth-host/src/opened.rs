@@ -21,7 +21,8 @@ pub enum Route {
 /// The file's real path when it is an existing regular file named `.md` or `.markdown` (any case, after links are
 /// followed) of at most `MAX_OPENED_BYTES`; else nothing.
 pub fn check_opened(path: &Path) -> Option<PathBuf> {
-    let real = std::fs::canonicalize(path).ok()?;
+    // The host's form of a path (on Windows without `\\?\`), so it compares with the recent Private Spaces.
+    let real = crate::paths::canonicalize_path(path).ok()?;
     let ext = real.extension()?.to_str()?.to_ascii_lowercase();
     if ext != "md" && ext != "markdown" {
         return None;
@@ -90,19 +91,27 @@ pub fn write(path: &Path, expected: &str, data: &[u8], digest: impl Fn(&[u8]) ->
     if data.len() as u64 > MAX_OPENED_BYTES {
         return Err(HostError::bad_argument("The page is larger than Thoth writes to an opened file"));
     }
-    let current = match regular(path) {
-        Ok(_) => Some(digest(&std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))?)),
-        Err(e) if e.code == "ENOENT" => None,
+    let meta = match regular(path) {
+        Ok(meta) => meta,
+        Err(e) if e.code == "ENOENT" => return Err(HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path)))),
         Err(e) => return Err(e),
     };
-    if current.as_deref() != Some(expected) {
+    let current = digest(&std::fs::read(path).map_err(|e| HostError::io(&e, "read", &name_of(path)))?);
+    if current != expected {
         return Err(HostError::new("CONFLICT", format!("{} changed or was removed outside Thoth", name_of(path))));
     }
+    // A file the person made read-only stays as it is, though replacing it would only need the folder's permission.
+    if meta.permissions().readonly() {
+        return Err(HostError::new("EACCES", format!("{} is read-only", name_of(path))));
+    }
     let dir = path.parent().ok_or_else(|| HostError::internal("An opened file has no folder"))?;
-    let temp = dir.join(format!(".{}.thoth-tmp-{}", name_of(path), crate::handles::new_handle("w")?));
+    // A short name of fixed length, so a file with a long name can still be saved.
+    let temp = dir.join(format!(".thoth-{}.tmp", &crate::handles::new_handle("w")?[2..14]));
     let written = (|| -> std::io::Result<()> {
         let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
         f.write_all(data)?;
+        // The replaced file keeps who may read it (a private note stays private).
+        f.set_permissions(meta.permissions())?;
         f.sync_all()?;
         std::fs::rename(&temp, path)
     })();

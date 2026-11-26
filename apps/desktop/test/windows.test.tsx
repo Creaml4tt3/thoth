@@ -166,10 +166,18 @@ describe("a window opened on a Private Space", () => {
   });
 
   it("opens a page the system sends to this window's Private Space as a tab, and ignores another Space's", async () => {
-    const { platform } = await launched("space-0000000000000004", [page("Alpha.md")]);
+    const { platform, user } = await launched("space-0000000000000004", [page("Alpha.md")]);
+    const app0 = { user };
     await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
-    windows.emitOpenPage({ root: "/elsewhere", page: "Beta.md" });
-    windows.emitOpenPage({ root, page: "Beta.md" });
+    windows.emitOpenPage({ window: "space-0000000000000004", root: "/elsewhere", page: "Beta.md" });
+    // Sent to another window of the same Private Space: not this one's.
+    windows.emitOpenPage({ window: "space-other", root, page: "Beta.md" });
+    windows.emitOpenPage({ window: "space-0000000000000004", root, page: "Beta.md" });
+    await waitFor(() => expect(current()).toBe("Beta"));
+    expect(tabNames()).toEqual(["Alpha", "Beta"]);
+    // The same page again: its tab comes to the front, no second tab.
+    await app0.user.click(screen.getByRole("tab", { name: /Alpha/ }));
+    windows.emitOpenPage({ window: "space-0000000000000004", root, page: "Beta.md" });
     await waitFor(() => expect(current()).toBe("Beta"));
     expect(tabNames()).toEqual(["Alpha", "Beta"]);
     void platform;

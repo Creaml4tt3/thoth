@@ -77,9 +77,16 @@ describe("a file window", () => {
     expect(await screen.findByText("This file is gone")).toBeTruthy();
   });
 
-  it("opens its folder as a Private Space through the shell, by token", async () => {
+  it("opens its folder as a Private Space through the shell, by token, after writing pending edits", async () => {
     const { state, user } = setup();
-    await user.click(await screen.findByRole("button", { name: "Open its folder as a Private Space" }));
-    expect(state.promoted).toEqual(["file_tok"]);
+    const box = await screen.findByRole("textbox", { name: /page content/i });
+    await waitFor(() => expect(box.textContent).toContain("Ship it."));
+    box.focus();
+    caretAtEnd(paragraph(box, "Ship it."));
+    await user.keyboard("?");
+    // Before autosave would run: the click writes the edit, then asks the shell.
+    await user.click(screen.getByRole("button", { name: "Open its folder as a Private Space" }));
+    await waitFor(() => expect(state.promoted).toEqual(["file_tok"]));
+    expect(state.writes.at(-1)).toBe("# Plan\n\nShip it.?\n");
   });
 });
