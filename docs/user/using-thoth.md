@@ -52,6 +52,21 @@ whether Today should use the same folder, file name and template.
 Pages open in tabs. Right-click a tab to pin it, or to split it to the right.
 Star a page with **Favorite** to keep it in the sidebar's Favorites.
 
+## Open a Markdown file from anywhere
+
+Right-click any `.md` file in Finder or File Explorer and choose **Open With → Thoth**, or drop it on Thoth's icon.
+
+- If the file is in a Private Space you have opened in Thoth before, it opens there as a tab.
+- Otherwise it opens in a window of its own. You can read and edit it, and edits are saved to the same file. Thoth adds
+  nothing next to it: no index and no `.thoth` folder. If another app changes the file while it is open, Thoth asks
+  which version to keep before saving.
+- **Open its folder as a Private Space** turns that folder into a Private Space, with this file open.
+- In a file of its own, `[[links]]` and pictures stored next to the file don't show until you open its folder as a
+  Private Space.
+
+Thoth doesn't make itself the default app for Markdown files. To make it the default, use Get Info → Open with →
+Change All… on a Mac, or Open with → Choose another app → Always on Windows.
+
 ## Links and Connections
 
 Type `[[` or `@` and pick a page to link to it. This works in both modes. `@` also links a folder: the link shows that

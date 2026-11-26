@@ -66,6 +66,7 @@ trade-off.
 | [0054](0054-hooded-ibis-mascot.md) | The hooded ibis replaces Moon Crown as the mascot | Accepted 2026-11-18 |
 | [0055](0055-ocr-module.md) | The OCR module: engine, models, PDF renderer and the broken-text check | Accepted 2026-11-19 |
 | [0056](0056-board.md) | Board, sticky notes for pages and string for their links (amends 0045's "no graph view") | Proposed 2026-11-20 |
+| [0057](0057-opening-markdown-files-from-the-system.md) | Opening Markdown files from the system (Open With) | Accepted 2026-11-26 |
 
 Template: [0000-template.md](0000-template.md).
 
