@@ -8,6 +8,12 @@ The website’s changelog page (https://thothnotes.com/changelog/) and each GitH
 this file (`scripts/release-notes.ts`). The Thai page reads `CHANGELOG.th.md`, which lists the same versions, dates
 and number of entries. How to update both at a release: `docs/deploy/release.md`.
 
+## [0.12.3] - 2026-11-28
+
+### Added
+
+- Open Markdown files with Thoth: choose Thoth under Open With in Finder or File Explorer, or drop a `.md` file on Thoth's Dock icon. A file inside one of your Private Spaces opens as a tab there; any other file opens in its own window, where you can edit it and open its folder as a Private Space.
+
 ## [0.12.2] - 2026-11-23
 
 ### Fixed
@@ -418,6 +424,7 @@ and number of entries. How to update both at a release: `docs/deploy/release.md`
 - The web app at thothnotes.com/app/, which opens workspaces on the free demo server.
 - The app in English and Thai, following your system, with a choice in Settings → Language.
 
+[0.12.3]: https://github.com/Creaml4tt3/thoth/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/Creaml4tt3/thoth/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Creaml4tt3/thoth/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0

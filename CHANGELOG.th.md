@@ -4,6 +4,12 @@
 และจำนวนรายการต้องตรงกับ CHANGELOG.md เสมอ (มีเทสต์ตรวจ) หัวข้อที่เป็นโครงสร้าง เช่น `[Unreleased]`, `Added`,
 `Changed` และ `Fixed` คงเป็นภาษาอังกฤษไว้ตามรูปแบบ Keep a Changelog ส่วนหน้าเว็บจะแสดงเป็นภาษาไทยให้เอง
 
+## [0.12.3] - 2026-11-28
+
+### Added
+
+- เปิดไฟล์ Markdown ด้วย Thoth ได้แล้ว: เลือก Thoth จาก "เปิดด้วย" ใน Finder หรือ File Explorer หรือลากไฟล์ `.md` มาวางบนไอคอน Thoth ใน Dock ไฟล์ที่อยู่ใน Private Space ของคุณจะเปิดเป็นแท็บในนั้น ส่วนไฟล์อื่นจะเปิดในหน้าต่างของมันเอง แก้ไขได้ และเปิดโฟลเดอร์ของไฟล์เป็น Private Space ได้ <!-- REVIEW -->
+
 ## [0.12.2] - 2026-11-23
 
 ### Fixed
@@ -414,6 +420,7 @@
 - เว็บแอปที่ thothnotes.com/app/ เปิดเวิร์กสเปซบนเซิร์ฟเวอร์ทดลองที่ใช้ฟรี
 - แอปมีทั้งภาษาอังกฤษและภาษาไทย ตามภาษาของระบบ และเลือกได้ใน การตั้งค่า → ภาษา
 
+[0.12.3]: https://github.com/Creaml4tt3/thoth/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/Creaml4tt3/thoth/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Creaml4tt3/thoth/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Creaml4tt3/thoth/compare/v0.11.0...v0.12.0
