@@ -47,7 +47,7 @@ fn sha(bytes: &[u8]) -> String {
 
 fn setup() -> (tempfile::TempDir, PathBuf, Host, String) {
     let dir = tempfile::tempdir().unwrap();
-    let path = std::fs::canonicalize(dir.path()).unwrap().join("Note.md");
+    let path = thoth_host::paths::canonicalize_path(dir.path()).unwrap().join("Note.md");
     std::fs::write(&path, b"# Hello\n").unwrap();
     let host = host();
     let token = host.grant_file("file-a", path.clone());
@@ -70,7 +70,7 @@ fn opened_read_and_stat_for_owner_only() {
     assert_eq!(code(host.call_as("file-b", "opened.read", &json!({ "token": token }), None)), "NOT_ALLOWED");
     let (stat, _) = host.call_as("file-a", "opened.stat", &json!({ "token": token }), None).unwrap();
     assert_eq!(stat["name"], "Note.md");
-    let folder = std::fs::canonicalize(dir.path()).unwrap();
+    let folder = thoth_host::paths::canonicalize_path(dir.path()).unwrap();
     assert_eq!(stat["folder"], folder.file_name().unwrap().to_string_lossy().as_ref());
     assert!(!stat.to_string().contains(&*folder.to_string_lossy()), "stat must not carry the path");
     assert_eq!(stat["size"], 8);
@@ -120,7 +120,7 @@ fn a_page_load_keeps_the_token_and_a_closed_window_drops_it() {
 #[test]
 fn a_promoted_folder_opens_and_owner_of_root_finds_its_window() {
     let (dir, _path, host, _token) = setup();
-    let root = std::fs::canonicalize(dir.path()).unwrap().to_string_lossy().into_owned();
+    let root = thoth_host::paths::canonicalize_path(dir.path()).unwrap().to_string_lossy().into_owned();
     assert_eq!(code(host.call_as("space-a", "vault.open", &json!({ "root": root }), None)), "NOT_ALLOWED");
     assert_eq!(host.owner_of_root(&root), None);
     let token = host.grant_file("file-a", std::path::PathBuf::from(&root).join("Note.md"));
@@ -132,13 +132,13 @@ fn a_promoted_folder_opens_and_owner_of_root_finds_its_window() {
 #[test]
 fn promote_refuses_a_folder_that_cannot_be_a_private_space_and_keeps_the_token() {
     let host = host();
-    let home = std::fs::canonicalize(dirs_home()).unwrap();
+    let home = thoth_host::paths::canonicalize_path(&dirs_home()).unwrap();
     let token = host.grant_file("file-a", home.join("notes.md"));
     assert_eq!(host.promote_file("file-a", &token).unwrap_err().code, "NOT_ALLOWED");
     assert!(host.file_owner(&home.join("notes.md")).is_some(), "the file window keeps its file");
     let (dir, path, host, token) = setup();
     let (root, name) = host.promote_file("file-a", &token).unwrap();
-    assert_eq!((root.clone(), name.as_str()), (std::fs::canonicalize(dir.path()).unwrap(), "Note.md"));
+    assert_eq!((root.clone(), name.as_str()), (thoth_host::paths::canonicalize_path(dir.path()).unwrap(), "Note.md"));
     assert_eq!(host.file_owner(&path).as_deref(), Some("file-a"), "kept until the file window closes");
     host.call_as("space-b", "vault.open", &json!({ "root": root.to_string_lossy() }), None).unwrap();
 }
