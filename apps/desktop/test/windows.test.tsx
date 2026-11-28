@@ -13,7 +13,7 @@ import { userEvent } from "@testing-library/user-event";
 import { initialTabs, serializeTabs, type TabTarget } from "@thoth/app-ui/tabs/model.ts";
 import { parseLayout } from "@thoth/app-ui/tabs/layout.ts";
 import { App, DEFAULT_OPTIONS } from "../src/app/App.tsx";
-import { readLaunch } from "../src/app/windows.ts";
+import { readFileLaunch, readLaunch } from "../src/app/windows.ts";
 import { tabsKey } from "../src/app/tabs-store.ts";
 import { WINDOWS_KEY, rememberWindow, windowsOn } from "../src/app/windows-store.ts";
 import { caretAtEnd, cleanup, editorBox, openApp, paragraph, screen, TEST_OPTIONS, waitFor, within } from "./support/render.tsx";
@@ -67,6 +67,15 @@ describe("the window a window was opened as", () => {
     expect(readLaunch(query)).toEqual({ id: "space-ab12cd34", root: "/Users/a/Notes & more", tabs: tabsText });
     for (const bad of ["", "?window=main", "?window=space-", "?window=Space-AB", "?window=space-../x", `?window=space-${"a".repeat(40)}`, "?root=/x"]) expect(readLaunch(bad), bad).toEqual({ id: "main", root: null, tabs: null });
     expect(readLaunch("?window=space-ab12cd34")).toEqual({ id: "space-ab12cd34", root: null, tabs: null });
+     // A page the system asked to open in it (ADR-0057).
+    expect(readLaunch(`?window=space-ab12cd34&root=%2Fr&page=${encodeURIComponent("a/b c.md")}`)).toEqual({ id: "space-ab12cd34", root: "/r", tabs: null, page: "a/b c.md" });
+  });
+
+  it("a file window is told by its address which file token it has (ADR-0057); nothing else is one", () => {
+    expect(readFileLaunch("?window=file-ab12&file=file_0123")).toEqual({ id: "file-ab12", token: "file_0123" });
+    for (const bad of ["?window=file-ab12", "?window=file-&file=t", "?window=space-ab&file=t", "?window=file-AB&file=t", "?file=t", ""]) expect(readFileLaunch(bad), bad).toBeNull();
+    // A file window is never read as a Space window.
+    expect(readLaunch("?window=file-ab12&file=t").id).toBe("main");
   });
 });
 
@@ -147,6 +156,29 @@ describe("a window opened on a Private Space", () => {
     expect(windowsOn(root)).toEqual(["space-0000000000000001"]);
     // The whole shell: the page tree and the tab bar.
     expect(await row("Gamma")).toBeTruthy();
+  });
+
+  it("opens the page the system asked for as a tab once the folder is open (Open With, ADR-0057)", async () => {
+    const platform = createNodePlatform({ vault: root, windows, recent: [root] });
+    render(<App platform={platform} launch={{ id: "space-0000000000000003", root, tabs: null, page: "Gamma.md" }} options={{ ...DEFAULT_OPTIONS, ...TEST_OPTIONS }} />);
+    await waitFor(() => expect(tabNames()).toEqual(["Gamma"]));
+    await waitFor(() => expect(document.querySelector(".page-view")?.getAttribute("aria-label")).toBe("Gamma.md"));
+  });
+
+  it("opens a page the system sends to this window's Private Space as a tab, and ignores another Space's", async () => {
+    const { user } = await launched("space-0000000000000004", [page("Alpha.md")]);
+    await waitFor(() => expect(tabNames()).toEqual(["Alpha"]));
+    windows.emitOpenPage({ window: "space-0000000000000004", root: "/elsewhere", page: "Beta.md" });
+    // Sent to another window of the same Private Space: not this one's.
+    windows.emitOpenPage({ window: "space-other", root, page: "Beta.md" });
+    windows.emitOpenPage({ window: "space-0000000000000004", root, page: "Beta.md" });
+    await waitFor(() => expect(current()).toBe("Beta"));
+    expect(tabNames()).toEqual(["Alpha", "Beta"]);
+    // The same page again: its tab comes to the front, no second tab.
+    await user.click(screen.getByRole("tab", { name: /Alpha/ }));
+    windows.emitOpenPage({ window: "space-0000000000000004", root, page: "Beta.md" });
+    await waitFor(() => expect(current()).toBe("Beta"));
+    expect(tabNames()).toEqual(["Alpha", "Beta"]);
   });
 
   it("does not run start-up recovery while another window has the folder open: what it would sweep is in flight", async () => {

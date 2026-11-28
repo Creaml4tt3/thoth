@@ -15,6 +15,7 @@ tauri-build.workspace = true
 
 [dependencies]
 thoth-host.workspace = true
+getrandom.workspace = true
 dirs.workspace = true
 keyring.workspace = true
 log.workspace = true
@@ -27,3 +28,6 @@ tauri-plugin-log.workspace = true
 tauri-plugin-notification.workspace = true
 tauri-plugin-updater.workspace = true
 trash.workspace = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance.workspace = true

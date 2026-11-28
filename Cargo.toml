@@ -67,6 +67,9 @@ tauri-plugin-updater = { version = "=2.13.2", default-features = false, features
 # permission is granted). Exact pin, released 2026-09-26 (at least three weeks old). Brings fern, and num_threads (the
 # plugin's required time/local-offset); its Android-only crates aren't built on desktop.
 tauri-plugin-log = "=2.10.0"
+# Windows and Linux: a second launch (Open With on a Markdown file while Thoth runs) hands its arguments to the running
+# app instead of starting another (ADR-0057). Exact pin, released 2026-10-28 (four weeks old), for tauri ^2.12.
+tauri-plugin-single-instance = "=2.5.5"
 # Deleting a page or folder of the Private Space moves it to the system Trash (Finder, Recycle Bin, freedesktop), desktop
 # shell only. Exact pin, released 2026-09-13 (at least three weeks old).
 trash = "=5.2.9"

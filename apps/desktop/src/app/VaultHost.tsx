@@ -47,13 +47,15 @@ interface Props {
   windowId?: string;
   /** The tabs this window was opened with (stored form), instead of its saved ones; once. */
   startTabs?: string | null;
+  /** A page the system asked this window to open (Open With, ADR-0057): opened as a tab once; null for none. */
+  startPage?: string | null;
   onStarted?(): void;
   /** Set to this window's `flushAll` while it is shown: the app calls it before the window closes (its close button). */
   flushOnClose?: { current: () => Promise<boolean> };
 }
 
 /** Owns the live Session of one open Private Space: revision counter, watcher, import service. */
-export function VaultHost({ platform, connection, vault, options, intro, switchVault, windowId = MAIN_WINDOW, startTabs = null, onStarted, flushOnClose }: Props) {
+export function VaultHost({ platform, connection, vault, options, intro, switchVault, windowId = MAIN_WINDOW, startTabs = null, startPage = null, onStarted, flushOnClose }: Props) {
   const [revision, setRevision] = useState(0);
   const [reveal, setReveal] = useState<Session["reveal"]>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
@@ -80,7 +82,11 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
 
   // Tabs: restored per Private Space and window, saved on every change. Leaving the page on screen writes its edits first.
   const pageTabs = useTabs({
-    initial: () => (startTabs !== null ? parseDesktopLayout(startTabs) : null) ?? loadTabs(connection.root, windowId),
+    // A window opened for a file the system handed over (ADR-0057) starts on that page alone.
+    initial: () =>
+      (startPage ? parseDesktopLayout(serializeTabs(initialTabs([{ kind: "page", path: startPage }]))) : null) ??
+      (startTabs !== null ? parseDesktopLayout(startTabs) : null) ??
+      loadTabs(connection.root, windowId),
     flush: flushAll,
     save: (layout) => saveTabs(connection.root, layout, windowId),
   });
@@ -99,6 +105,23 @@ export function VaultHost({ platform, connection, vault, options, intro, switchV
   );
   const started = useRef(onStarted);
   useEffect(() => started.current?.(), []);
+
+  // Markdown files the system asked to open (Open With, ADR-0057) that the shell sends to the window that has this
+  // Private Space open.
+  useEffect(() => {
+    const listen = platform.windows?.onOpenPage;
+    if (!listen) return;
+    let stop: (() => void) | undefined;
+    let live = true;
+    void listen((request) => {
+      // Only the window the shell chose, and only for its own Private Space; a page already open comes to the front.
+      if (request.window === windowId && request.root === connection.root) tabs.openOrFocus({ kind: "page", path: request.page });
+    }).then((remove) => (live ? (stop = remove) : remove()));
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, [platform.windows, connection.root, tabs, windowId]);
 
   // Windows (ADR-0019). A window the app opened is remembered on this Private Space until it is closed; one closed
   // elsewhere is forgotten here. The main window, alone on the Private Space, brings back the windows that were open.

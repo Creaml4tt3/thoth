@@ -115,6 +115,15 @@ export const en = {
     goneDetail: (path: string) => `${path} no longer exists on disk.`,
   },
 
+  /** A window on one Markdown file the system handed over (Open With, ADR-0057). */
+  opened: {
+    openFolder: "Open its folder as a Private Space",
+    openFolderFailed: "Its folder could not be opened as a Private Space.",
+    goneTitle: "This file is gone",
+    goneDetail: (name: string) => `${name} was moved or deleted outside Thoth.`,
+    loadFailed: "Thoth could not open this file.",
+  },
+
   settings: {
     title: "Settings",
     privateSpace: "Private Space",

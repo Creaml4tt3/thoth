@@ -7,7 +7,7 @@
 import type { AgentHost } from "@thoth/agent-core";
 import type { SourceHost } from "@thoth/importer-core";
 import type { SqlDriver, VaultFs } from "@thoth/local-store";
-import type { FolderContents, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, ModuleStatus, OcrModel, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
+import type { FolderContents, OpenedFileInfo, ApiCallArgs, ApiCallResult, ConnectedAppProposal, ConnectedAppProposalText, ConnectedAppsLogEntry, ConnectedAppsSettings, DiagnosticsBundle, MemoryHistoryChange, MemoryHistoryText, MemoryWritten, SetupApp, SetupState, SkillLinksReport, InstallState, LinkPreview, ModuleStatus, OcrModel, McpAnswer, McpRequest, RestartAnswer, ServerInfo, UpdateCheck, UpdateSettings, VaultChangedEvent } from "./ipc.ts";
 
 export type * from "./ipc.ts";
 
@@ -59,6 +59,8 @@ export interface Platform {
    * saved, false when cancelled. Absent where the host has none (the browser downloads instead).
    */
   saveFile?(name: string, bytes: Uint8Array): Promise<boolean>;
+  /** One Markdown file the system handed to this window (ADR-0057), by its token. Absent where the host has none. */
+  openedFile?: OpenedFiles;
   /** Workspace servers. The host holds every credential; the webview only names a server by its handle. */
   readonly servers: Servers;
   /**
@@ -179,6 +181,14 @@ export interface Links {
   open(url: string): Promise<void>;
 }
 
+/** The `opened.*` commands of a file window (ADR-0057). */
+export interface OpenedFiles {
+  stat(token: string): Promise<OpenedFileInfo>;
+  read(token: string): Promise<Uint8Array>;
+  write(token: string, bytes: Uint8Array, expectedHash: string): Promise<{ hash: string }>;
+  copy(token: string, name: string, bytes: Uint8Array): Promise<{ name: string }>;
+}
+
 /** What a window asks of the app shell about windows (ADR-0019). Window ids are `space-` and lowercase letters or digits. */
 export interface Windows {
   /**
@@ -198,6 +208,13 @@ export interface Windows {
    * a page that does not answer within a few seconds is closed anyway. Returns the remover.
    */
   onCloseRequested(listener: () => void): Promise<() => void>;
+  /**
+   * The system asked to open a Markdown file of a Private Space (Open With, ADR-0057): the window the shell chose, the
+   * Space's root and the page path. Every window hears it; only the one named acts. Optional: a shell without file opening never sends it. Returns the remover.
+   */
+  onOpenPage?(listener: (request: { window: string; root: string; page: string }) => void): Promise<() => void>;
+  /** A file window (ADR-0057) asks the shell to open its file's folder as a Private Space; the window then closes. */
+  promoteFile?(token: string): Promise<void>;
 }
 
 export interface Servers {

@@ -21,6 +21,8 @@ export const VAULT_CHANGED_EVENT = "vault:changed";
 export const WINDOW_CLOSED_EVENT = "thoth:window-closed";
 /** Sent by the shell to a window whose close button (or Quit) was used: write the edits, then `window_close` (ADR-0019). */
 export const CLOSE_REQUESTED_EVENT = "thoth:close-requested";
+/** Sent by the shell to the window that has a Private Space open, to open one of its pages (Open With, ADR-0057). */
+export const OPEN_PAGE_EVENT = "thoth:open-page";
 /** Connected apps (ADR-0021): a request for one window to answer, and the apps waiting for Allow or Deny. */
 export const MCP_REQUEST_EVENT = "thoth:mcp-request";
 export const MCP_PENDING_EVENT = "thoth:mcp-pending";
@@ -130,6 +132,18 @@ export function tauriWindows(api: TauriApi = internalsApi()): Windows {
     async onClosed(listener) {
       const unlisten = await api.listen<string>(WINDOW_CLOSED_EVENT, (e) => listener(e.payload));
       return () => void unlisten();
+    },
+    async onOpenPage(listener) {
+      // Every window hears it (a page listens for any target); the payload names the one the shell chose (ADR-0057).
+      const unlisten = await api.listen<{ window: string; root: string; page: string }>(OPEN_PAGE_EVENT, (e) => listener(e.payload));
+      return () => void unlisten();
+    },
+    async promoteFile(token) {
+      try {
+        await api.invoke("file_promote", { args: { token } });
+      } catch (error) {
+        throw toError(error);
+      }
     },
     async onCloseRequested(listener) {
       // Every window hears the request; only the one it names answers (the shell also refuses any other answer).

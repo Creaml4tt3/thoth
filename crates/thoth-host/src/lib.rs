@@ -32,6 +32,7 @@ pub mod links;
 pub mod mcp;
 pub mod modules;
 pub mod network;
+pub mod opened;
 pub mod paths;
 pub mod remote;
 #[cfg_attr(windows, path = "source_windows.rs")]
@@ -76,6 +77,7 @@ pub const COMMANDS: &[&str] = &[
     "source.temp.create", "source.temp.write", "source.close",
     "image.pick", "image.read",
     "file.save",
+    "opened.stat", "opened.read", "opened.write", "opened.copy",
     "server.list", "server.add", "server.remove", "server.signIn", "server.signInCancel", "server.useToken", "server.signOut",
     "api.call",
     "agent.detect", "agent.run.create", "agent.fs.stat", "agent.fs.read", "agent.fs.list", "agent.fs.mkdirp", "agent.fs.write",
@@ -188,6 +190,8 @@ struct State {
     vaults: HashMap<String, Arc<VaultEntry>>,
     sources: HashMap<String, Arc<Mutex<Source>>>,
     files: HashMap<String, Arc<FileEntry>>,
+    /// Markdown files the system handed to a window (ADR-0057), by token.
+    opened: HashMap<String, opened::Opened>,
 }
 
 pub struct Host {
@@ -322,7 +326,16 @@ impl Host {
         }
         let wants_bytes = matches!(
             command,
-            "fs.write" | "source.temp.write" | "api.call" | "agent.fs.write" | "agent.start" | "agent.history.write" | "file.save" | "ocr.read"
+            "fs.write"
+                | "source.temp.write"
+                | "api.call"
+                | "agent.fs.write"
+                | "agent.start"
+                | "agent.history.write"
+                | "file.save"
+                | "ocr.read"
+                | "opened.write"
+                | "opened.copy"
         );
         if bytes.is_some() && !wants_bytes {
             return Err(HostError::bad_argument(format!("{command} takes no request bytes")));
@@ -500,6 +513,19 @@ impl Host {
             }
             "image.pick" => json(self.pick_image()?),
             "image.read" => Ok((Value::Null, Some(self.read_picked_image(str_arg(args, "image")?)?))),
+            "opened.stat" => json(opened::stat(&self.opened_path(owner, args)?)?),
+            "opened.read" => Ok((Value::Null, Some(opened::read(&self.opened_path(owner, args)?)?))),
+            "opened.write" => {
+                let path = self.opened_path(owner, args)?;
+                let data = bytes.ok_or_else(|| HostError::bad_argument("opened.write needs request bytes"))?;
+                let _one_at_a_time = lock(&self.replace);
+                json(json!({ "hash": opened::write(&path, str_arg(args, "expectedHash")?, data, hex_digest)? }))
+            }
+            "opened.copy" => {
+                let path = self.opened_path(owner, args)?;
+                let data = bytes.ok_or_else(|| HostError::bad_argument("opened.copy needs request bytes"))?;
+                json(opened::copy(&path, str_arg(args, "name")?, data)?)
+            }
             "file.save" => {
                 let data = bytes.ok_or_else(|| HostError::bad_argument("file.save needs request bytes"))?;
                 json(json!(self.save_file(str_arg(args, "name")?, data)?))
@@ -1089,6 +1115,53 @@ impl Host {
     /// deleting their working directories, as quitting does for all of them. Other windows' handles are untouched.
     pub fn release(&self, owner: &str) {
         self.detach(owner).end();
+    }
+
+    /// Gives window `owner` a token for one file the system handed over (ADR-0057); only that window can use it.
+    pub fn grant_file(&self, owner: &str, path: PathBuf) -> String {
+        let token = handles::new_handle("file").unwrap_or_else(|_| format!("file_{}", self.state().opened.len()));
+        self.state().opened.insert(token.clone(), opened::Opened { owner: owner.to_owned(), path });
+        token
+    }
+
+    /// Window `owner` is gone (closed, never on a page reload): the files it was given are given back. Not part of
+    /// `release`, which the shell also runs when a page starts loading, the first load included.
+    pub fn forget_files(&self, owner: &str) {
+        self.state().opened.retain(|_, o| o.owner != owner);
+    }
+
+    /// The window that has `path` open on its own, if one does.
+    pub fn file_owner(&self, path: &Path) -> Option<String> {
+        self.state().opened.values().find(|o| o.path == path).map(|o| o.owner.clone())
+    }
+
+    /// "Open its folder as a Private Space" from file window `owner` (ADR-0057): when the folder of the file behind
+    /// `token` may be a Private Space (the same rule as a picked folder), it is allowed as if picked; the folder and the
+    /// file's name are returned. The window keeps its file until it closes (`forget_files`), so a Space window that
+    /// cannot open leaves it working.
+    pub fn promote_file(&self, owner: &str, token: &str) -> HostResult<(PathBuf, String)> {
+        let path = self.opened_path(owner, &json!({ "token": token }))?;
+        let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else { return Err(HostError::internal("An opened file has no folder")) };
+        check_root_policy(folder, self.home.as_deref(), self.config.data_dir.as_deref())?;
+        self.state().picked_vaults.insert(folder.to_path_buf());
+        Ok((folder.to_path_buf(), name.to_string_lossy().into_owned()))
+    }
+
+    /// The window that has the Private Space at `root` (canonical) open, `main` first.
+    pub fn owner_of_root(&self, root: &str) -> Option<String> {
+        let state = self.state();
+        let mut owners: Vec<&str> = state.vaults.values().filter(|v| v.root.to_string_lossy() == root).map(|v| v.owner.as_str()).collect();
+        owners.sort_unstable();
+        owners.iter().find(|o| **o == "main").or(owners.first()).map(|o| (*o).to_owned())
+    }
+
+    /// The path behind `args.token`, for the window it was given to only.
+    fn opened_path(&self, owner: &str, args: &Value) -> HostResult<PathBuf> {
+        let token = str_arg(args, "token")?;
+        match self.state().opened.get(token) {
+            Some(o) if o.owner == owner => Ok(o.path.clone()),
+            _ => Err(HostError::not_allowed("This window was not given that file")),
+        }
     }
 
     /// The quick half of `release`, safe to call on the shell's event loop: `owner`'s vault and run handles stop

@@ -4,7 +4,8 @@ import "./fonts/fonts.css";
 import { desktopTheme } from "./features/settings/theme.ts"; // applies the saved theme before the first render
 import { isMacTauri, startWindowGlass } from "./platform/window-glass.ts";
 import { App } from "./app/App.tsx";
-import { readLaunch } from "./app/windows.ts";
+import { readFileLaunch, readLaunch } from "./app/windows.ts";
+import { FileWindow } from "./features/opened/FileWindow.tsx";
 import { selectPlatform } from "./platform/select.ts";
 import { selectNotifier } from "./platform/notifier.ts";
 import { createErrorReporter } from "./platform/errors.ts";
@@ -38,7 +39,11 @@ selectPlatform()
     }
     return platform;
   })
-  .then((platform) => createRoot(container).render(<App platform={platform} launch={readLaunch(window.location.search)} options={{ notifier: selectNotifier() }} />))
+  .then((platform) => {
+    // A window on one Markdown file the system handed over (ADR-0057) shows only that file.
+    const file = readFileLaunch(window.location.search);
+    createRoot(container).render(file ? <FileWindow platform={platform} token={file.token} /> : <App platform={platform} launch={readLaunch(window.location.search)} options={{ notifier: selectNotifier() }} />);
+  })
   .catch((error: unknown) => {
     container.textContent = `Thoth could not start: ${error instanceof Error ? error.message : String(error)}`;
   });
