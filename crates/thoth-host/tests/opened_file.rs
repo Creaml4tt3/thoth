@@ -143,8 +143,10 @@ fn promote_refuses_a_folder_that_cannot_be_a_private_space_and_keeps_the_token()
     host.call_as("space-b", "vault.open", &json!({ "root": root.to_string_lossy() }), None).unwrap();
 }
 
+/// The home folder the way the host finds it (`HOME`, or `USERPROFILE` on Windows).
 fn dirs_home() -> PathBuf {
-    PathBuf::from(std::env::var_os("HOME").expect("a home folder"))
+    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    PathBuf::from(std::env::var_os(var).expect("a home folder"))
 }
 
 #[cfg(unix)]
