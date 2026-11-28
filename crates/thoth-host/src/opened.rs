@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn check_accepts_md_and_markdown_any_case() {
         let d = tempfile::tempdir().unwrap();
-        assert_eq!(check_opened(&file(d.path(), "a.md")), Some(fs::canonicalize(d.path().join("a.md")).unwrap()));
+        assert_eq!(check_opened(&file(d.path(), "a.md")), Some(crate::paths::canonicalize_path(&d.path().join("a.md")).unwrap()));
         assert!(check_opened(&file(d.path(), "b.MARKDOWN")).is_some());
     }
 
