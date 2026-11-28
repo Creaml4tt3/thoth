@@ -195,3 +195,6 @@ To report a security problem, please do not open an issue: email **security@thot
 
 [Apache-2.0](LICENSE). See [ADR-0011](docs/adr/0011-license-and-contribution-policy.md) for the license and
 contribution policy.
+
+Thoth is built by Teekayu Poongkawabutr (Creaml4tt3). How and why it was made:
+[creaml4tt3.me/projects/personal-thoth](https://creaml4tt3.me/projects/personal-thoth).
